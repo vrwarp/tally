@@ -10,6 +10,36 @@ import { reloadReady } from './support/auth';
 import { expect, test } from './support/fixtures';
 
 
+/** The screen-reader line in the event header: "7 of 43 students checked in". */
+const countsLine = (page: Page) => page.getByText(/^\d+ of \d+ students checked in$/);
+
+/**
+ * Waits for the live attendance stream to catch up with the roster.
+ *
+ * The check-in screen paints names the moment it has them — that is the whole
+ * point of it — and fills in who is *already* present a beat later, when the
+ * `onSnapshot` stream delivers. A test that reads a row during that beat can
+ * pick a student who is about to move to the checked-in list, and then spend
+ * fifteen seconds waiting for a button that will never come back.
+ */
+async function rosterSettled(page: Page): Promise<void> {
+  const counts = countsLine(page);
+  await expect(counts).toBeVisible();
+
+  let last: string | null = null;
+  await expect
+    .poll(
+      async () => {
+        const now = await counts.innerText();
+        const unchanged = now === last;
+        last = now;
+        return unchanged;
+      },
+      { intervals: [250, 250, 250, 250], message: 'the check-in counts never settled' },
+    )
+    .toBe(true);
+}
+
 /**
  * Picks a student off the roster and returns their name.
  *
@@ -19,6 +49,7 @@ import { expect, test } from './support/fixtures';
  * the same student. Acting on the name closes that race.
  */
 async function tapFirstRoster(page: Page): Promise<string> {
+  await rosterSettled(page);
   const row = page.getByRole('button', { name: /^Check in / }).first();
   const label = (await row.getAttribute('aria-label')) ?? '';
   const name = /^Check in ([^,]+),/.exec(label)?.[1] ?? '';
@@ -86,8 +117,16 @@ test.describe('check-in', () => {
   });
 
   test('search filters instantly without appearing to lose students', async ({ page }) => {
-    const header = page.getByRole('banner').or(page.locator('header')).first();
-    const before = await header.innerText();
+    /*
+     * The counts themselves, not the bar they sit in.
+     *
+     * This used to read the app banner — which holds a name and a logo and no
+     * counts at all, so it could only ever fail for reasons unrelated to
+     * search.
+     */
+    await rosterSettled(page);
+    const counts = countsLine(page);
+    const before = await counts.innerText();
 
     const search = page.getByLabel(/search students by name/i);
     await search.fill('ma');
@@ -98,7 +137,7 @@ test.describe('check-in', () => {
     // a counselor watching the number drop as they type would reasonably think
     // they had broken something.
     await expect
-      .poll(async () => (await header.innerText()) === before, {
+      .poll(async () => (await counts.innerText()) === before, {
         message: 'the header counts changed while typing a search',
       })
       .toBe(true);
@@ -108,6 +147,7 @@ test.describe('check-in', () => {
   });
 
   test('finds a student by surname alone', async ({ page }) => {
+    await rosterSettled(page);
     const row = page.getByRole('button', { name: /^Check in / }).first();
     const label = (await row.getAttribute('aria-label')) ?? '';
     const surname = /^Check in \S+ (\S+),/.exec(label)?.[1];

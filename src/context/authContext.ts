@@ -12,8 +12,20 @@ import type { Role, UserProfile } from '@/types';
  */
 export type AuthStatus = 'loading' | 'signedOut' | 'pending' | 'ready';
 
+/**
+ * Which half of a `loading` status is outstanding.
+ *
+ * "Signing you in" is two waits wearing one spinner: Firebase resolving whether
+ * there is a session at all, and then Firestore delivering the `users/{uid}`
+ * document that says what this person may do. They fail for completely
+ * different reasons and want completely different advice, and until now a stuck
+ * app could not tell you which one it was — including in a test report.
+ */
+export type AuthStage = 'session' | 'profile' | null;
+
 export interface AuthContextValue {
   status: AuthStatus;
+  stage: AuthStage;
   user: User | null;
   profile: UserProfile | null;
   /** Set when a sign-in attempt failed; cleared on the next attempt. */
@@ -24,6 +36,13 @@ export interface AuthContextValue {
   sendMagicLink: (email: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
+  /**
+   * Re-read `users/{uid}` from the server and restart the live listener.
+   *
+   * For the one case the listener cannot cover: something else has just written
+   * the document it is waiting for, and waiting is no longer the right answer.
+   */
+  refreshProfile: () => Promise<void>;
   clearError: () => void;
   /** True when the signed-in user's role meets `required`. */
   can: (required: Role) => boolean;

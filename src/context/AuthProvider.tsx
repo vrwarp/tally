@@ -20,11 +20,21 @@ import {
   signOut as firebaseSignOut,
   type User,
 } from 'firebase/auth';
-import { auth, firebaseApp, popupRedirectResolver } from '@/lib/firebase';
+import {
+  auth,
+  firebaseApp,
+  popupRedirectResolver,
+  recoverFromWedgedPersistence,
+} from '@/lib/firebase';
 import { googleSignInStrategy, isEmbeddedBrowser } from '@/lib/embeddedBrowser';
-import { subscribeUserProfile, touchLastSeen } from '@/services/users';
+import { getUserProfileFromServer, subscribeUserProfile, touchLastSeen } from '@/services/users';
 import { roleAtLeast, type Role, type UserProfile } from '@/types';
-import { AuthContext, type AuthContextValue, type AuthStatus } from '@/context/authContext';
+import {
+  AuthContext,
+  type AuthContextValue,
+  type AuthStage,
+  type AuthStatus,
+} from '@/context/authContext';
 
 /** Where the magic link lands. Kept in one place so it matches the auth domain allowlist. */
 const EMAIL_STORAGE_KEY = 'tally:magic-link-email';
@@ -38,6 +48,13 @@ const EMAIL_STORAGE_KEY = 'tally:magic-link-email';
  * every *other* tab pay for a handshake it never began.
  */
 const REDIRECT_PENDING_KEY = 'tally:google-redirect-pending';
+
+/**
+ * How long Firestore may say nothing at all before the app assumes its local
+ * cache has seized. Deliberately under the eight seconds after which the
+ * restoring screen offers a manual reload: heal first, explain second.
+ */
+const SILENT_CLIENT_MS = 7000;
 
 function redirectPending(): boolean {
   try {
@@ -99,18 +116,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [magicLinkSentTo, setMagicLinkSentTo] = useState<string | null>(null);
   const completingLink = useRef(false);
+  /** Bumped to re-establish the profile listener. See `refreshProfile`. */
+  const [profileEpoch, setProfileEpoch] = useState(0);
+  const uid = useRef<string | null>(null);
+  /** Whose "last seen" has already been stamped in this tab. */
+  const heartbeat = useRef<string | null>(null);
 
   /* Track the Firebase session. */
   useEffect(() => {
     return onAuthStateChanged(auth, (nextUser) => {
-      setUser(nextUser);
       setAuthResolved(true);
-      if (!nextUser) {
-        setProfile(null);
-        setProfileResolved(true);
-      } else {
-        setProfileResolved(false);
-      }
+
+      // Firebase re-announces the same person whenever it refreshes their ID
+      // token — roughly hourly, which for Tally lands in the middle of an
+      // event. Treating that as a fresh sign-in would tear down the profile
+      // listener and drop a counselor back to a spinner mid-check-in.
+      if ((nextUser?.uid ?? null) === uid.current) return;
+
+      uid.current = nextUser?.uid ?? null;
+      setUser(nextUser);
+      setProfile(null);
+      setProfileResolved(nextUser === null);
     });
   }, []);
 
@@ -118,29 +144,99 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
+    let heard = false;
 
     const unsubscribe = subscribeUserProfile(
       user.uid,
-      (next) => {
+      (next, source) => {
         if (cancelled) return;
+        /*
+         * A cache miss is not an answer.
+         *
+         * Firestore reports "no such document" for a document it has simply
+         * never fetched, and that is indistinguishable from the real thing.
+         * Believing it sends a counselor who is very much on the team to the
+         * "we couldn't find you" screen, on the strength of a read that had
+         * not happened yet.
+         */
+        if (!next && source.fromCache) return;
+        heard = true;
         setProfile(next);
         setProfileResolved(true);
-        if (next?.active) void touchLastSeen(user.uid);
       },
       () => {
         // A rules denial here means "not a member" — surface it as pending
         // rather than as a crash.
         if (cancelled) return;
+        heard = true;
         setProfile(null);
         setProfileResolved(true);
       },
     );
 
+    /*
+     * Firestore is allowed to be slow. It is not allowed to be silent.
+     *
+     * Every ordinary failure — offline, denied, deleted — arrives as a snapshot
+     * or an error. Saying nothing the server has stood behind is the signature
+     * of the client itself having seized: a Web Locks lease that is never
+     * granted, an IndexedDB that never opens. Nothing inside the page can
+     * recover from that, because the cache is chosen once at startup — so the
+     * app reloads itself without it.
+     */
+    const watchdog = setTimeout(() => {
+      if (cancelled || heard) return;
+      recoverFromWedgedPersistence();
+    }, SILENT_CLIENT_MS);
+
     return () => {
       cancelled = true;
+      clearTimeout(watchdog);
       unsubscribe();
     };
-  }, [user]);
+  }, [user, profileEpoch]);
+
+  /*
+   * The sign-in heartbeat — once per session, and deliberately not in the
+   * snapshot callback above.
+   *
+   * That is where it started, and it looked harmless: mark them seen whenever
+   * their profile arrives. But `lastSeenAt` lives *in* the document this
+   * listener watches, so the write came straight back as a change, which wrote
+   * it again. Every signed-in tab sat in a write loop for as long as it was
+   * open — a bill and a battery, and on a phone at the back of a church hall
+   * enough chatter to starve the listener the check-in screen is waiting on.
+   */
+  const authorised = profile?.active ?? false;
+  useEffect(() => {
+    if (!user || !authorised) return;
+    if (heartbeat.current === user.uid) return;
+    heartbeat.current = user.uid;
+    void touchLastSeen(user.uid);
+  }, [user, authorised]);
+
+  /**
+   * Ask for the authorisation document now, rather than waiting to be told.
+   *
+   * The live listener is the normal path and it is nearly always enough. This
+   * is for the moment something else knows better — `provisionAccess` has just
+   * written the document the listener is waiting for — and re-subscribing gives
+   * a stalled stream a reason to start over.
+   */
+  const refreshProfile = useCallback(async () => {
+    const current = auth.currentUser;
+    if (!current) return;
+
+    try {
+      const next = await getUserProfileFromServer(current.uid);
+      setProfile(next);
+      setProfileResolved(true);
+    } catch {
+      /* Offline, or denied. The listener remains the source of truth. */
+    } finally {
+      setProfileEpoch((epoch) => epoch + 1);
+    }
+  }, []);
 
   /*
    * Finish a `signInWithRedirect` round-trip — but only when this tab actually
@@ -303,6 +399,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           ? 'ready'
           : 'pending';
 
+  const stage: AuthStage = !authResolved ? 'session' : user && !profileResolved ? 'profile' : null;
+
   const can = useCallback(
     (required: Role) => (profile?.active ? roleAtLeast(profile.role, required) : false),
     [profile],
@@ -311,6 +409,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AuthContextValue>(
     () => ({
       status,
+      stage,
       user,
       profile,
       error,
@@ -318,10 +417,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sendMagicLink,
       signInWithGoogle,
       signOut,
+      refreshProfile,
       clearError: () => setError(null),
       can,
     }),
-    [status, user, profile, error, magicLinkSentTo, sendMagicLink, signInWithGoogle, signOut, can],
+    [
+      status,
+      stage,
+      user,
+      profile,
+      error,
+      magicLinkSentTo,
+      sendMagicLink,
+      signInWithGoogle,
+      signOut,
+      refreshProfile,
+      can,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

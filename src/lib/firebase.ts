@@ -61,6 +61,50 @@ function readConfig(): FirebaseOptions {
 export const firebaseApp: FirebaseApp = initializeApp(readConfig());
 
 /**
+ * Set when offline persistence has been caught wedging this tab (see
+ * `recoverFromWedgedPersistence`). Session-scoped on purpose: the next time the
+ * counselor opens Tally it gets another chance at the good path.
+ */
+const NO_PERSISTENCE_KEY = 'tally:no-persistence';
+
+function persistenceDisabled(): boolean {
+  try {
+    return window.sessionStorage.getItem(NO_PERSISTENCE_KEY) === '1';
+  } catch {
+    // Private mode. Nothing was ever stored, so nothing is disabled.
+    return false;
+  }
+}
+
+/**
+ * Last resort for a Firestore client that has gone silent.
+ *
+ * The persistent cache coordinates tabs through the Web Locks API, and a lock
+ * that is never granted takes the whole client with it: no listener fires, no
+ * error is raised, nothing rejects. There is no way back from inside the page —
+ * the cache is chosen at `initializeFirestore` and cannot be swapped — so the
+ * only real recovery is to reload having decided not to use it.
+ *
+ * Returns false when persistence is already off, which means the silence has a
+ * different cause and reloading would only cost the user their place.
+ */
+export function recoverFromWedgedPersistence(): boolean {
+  if (persistenceDisabled()) return false;
+
+  try {
+    window.sessionStorage.setItem(NO_PERSISTENCE_KEY, '1');
+  } catch {
+    // Without somewhere to record the decision the reload would come straight
+    // back to the same wedge, and then reload again. Better to stay put.
+    return false;
+  }
+
+  console.warn('[tally] Firestore never responded; reloading without offline persistence.');
+  window.location.reload();
+  return true;
+}
+
+/**
  * The best cache this browser can actually run.
  *
  * A persistent multi-tab cache is what Tally wants: the roster stays readable
@@ -77,14 +121,15 @@ export const firebaseApp: FirebaseApp = initializeApp(readConfig());
  * volunteer is most likely to be holding, which makes this the worst possible
  * place to assume a modern API.
  *
- * So: multi-tab where it works, single-tab where it does not, memory as the
- * floor. Losing multi-tab coordination costs a little cross-tab freshness.
- * Losing the whole app costs the check-in.
+ * So: the persistent cache where the browser can be trusted to run it, memory
+ * everywhere else — including on a browser that looked capable and then proved
+ * otherwise. Losing offline support costs a little. Losing the whole app costs
+ * the check-in.
  */
 function bestLocalCache(): FirestoreLocalCache {
   const hasWebLocks = typeof navigator !== 'undefined' && 'locks' in navigator;
 
-  if (hasWebLocks) {
+  if (hasWebLocks && !persistenceDisabled()) {
     return persistentLocalCache({ tabManager: persistentMultipleTabManager() });
   }
 
@@ -100,19 +145,50 @@ function bestLocalCache(): FirestoreLocalCache {
    * beats an app that does not start, and the roster has its own copy in
    * localStorage (see services/roster.ts) so the door still has names.
    */
-  console.info('[tally] No Web Locks API — offline persistence is off on this browser.');
+  console.info(
+    hasWebLocks
+      ? '[tally] Offline persistence is off for this session after it stopped responding.'
+      : '[tally] No Web Locks API — offline persistence is off on this browser.',
+  );
   return memoryLocalCache();
 }
 
+/**
+ * Safari, and every browser on an iPhone — all WebKit underneath.
+ *
+ * Chrome and Edge on macOS both carry "Safari" in their user agent, so the
+ * signal is WebKit *without* the Chromium markers.
+ */
+function isWebKit(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent;
+  return /AppleWebKit/.test(ua) && !/Chrome|Chromium|Edg\//.test(ua);
+}
+
 function createDb(): Firestore {
+  /*
+   * Force long-polling on WebKit.
+   *
+   * Firestore streams over WebChannel and picks its transport by probing the
+   * connection once at startup. On WebKit that probe is not reliable, and when
+   * it guesses wrong the failure is silent and total: listeners are accepted,
+   * never deliver, and never error. Tally's symptom was a counselor signed in
+   * and looking at a screen of skeleton rows that would never fill, with no
+   * error anywhere to explain it.
+   *
+   * Long-polling is what the detector settles on for Safari anyway. Naming it
+   * up front costs one round trip of latency and removes the guess.
+   */
+  const transport = isWebKit() ? { experimentalForceLongPolling: true } : {};
+
   try {
-    return initializeFirestore(firebaseApp, { localCache: bestLocalCache() });
+    return initializeFirestore(firebaseApp, { localCache: bestLocalCache(), ...transport });
   } catch (cause) {
     // Private browsing, a blocked IndexedDB, a quota refusal. An in-memory
     // cache means no offline support, which is a real loss — and still
     // enormously better than an app that does not start.
     console.warn('[tally] Offline persistence unavailable; falling back to memory.', cause);
-    return initializeFirestore(firebaseApp, { localCache: memoryLocalCache() });
+    return initializeFirestore(firebaseApp, { localCache: memoryLocalCache(), ...transport });
   }
 }
 

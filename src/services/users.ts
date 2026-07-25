@@ -10,6 +10,7 @@ import {
   collection,
   doc,
   getDoc,
+  getDocFromServer,
   onSnapshot,
   orderBy,
   query,
@@ -23,20 +24,46 @@ import { paths } from '@/lib/paths';
 import { toUserProfile } from '@/services/converters';
 import type { Role, UserProfile } from '@/types';
 
+/** Where a profile snapshot came from. `fromCache` means "nobody has asked the server yet". */
+export interface ProfileSource {
+  fromCache: boolean;
+}
+
 export function subscribeUserProfile(
   uid: string,
-  onChange: (profile: UserProfile | null) => void,
+  onChange: (profile: UserProfile | null, source: ProfileSource) => void,
   onError?: (error: Error) => void,
 ): Unsubscribe {
   return onSnapshot(
     doc(db, paths.user(uid)),
-    (snapshot) => onChange(snapshot.exists() ? toUserProfile(snapshot) : null),
+    /*
+     * Metadata changes matter on this one document.
+     *
+     * "No document, from the local cache" and "no document, confirmed by the
+     * server" carry identical data and opposite meanings: the first is *not
+     * yet*, the second is *not authorised*. Without this flag the SDK treats
+     * the move between them as a metadata-only change and never delivers it,
+     * so a counselor whose first read missed would stay unauthorised until
+     * they thought to reload.
+     */
+    { includeMetadataChanges: true },
+    (snapshot) =>
+      onChange(snapshot.exists() ? toUserProfile(snapshot) : null, {
+        fromCache: snapshot.metadata.fromCache,
+      }),
     (error) => onError?.(error),
   );
 }
 
-export async function getUserProfile(uid: string): Promise<UserProfile | null> {
-  const snapshot = await getDoc(doc(db, paths.user(uid)));
+/**
+ * A one-shot, server-authoritative read of one profile.
+ *
+ * `getDocFromServer`, not `getDoc`: this is what the app calls when the live
+ * listener has not produced something there is good reason to believe exists,
+ * and a cached "no such document" is the exact answer that got it here.
+ */
+export async function getUserProfileFromServer(uid: string): Promise<UserProfile | null> {
+  const snapshot = await getDocFromServer(doc(db, paths.user(uid)));
   return snapshot.exists() ? toUserProfile(snapshot) : null;
 }
 

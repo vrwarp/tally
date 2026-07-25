@@ -48,13 +48,22 @@ test.describe('quick-add visitor', () => {
 
     expect(created.data.lastName).toBe(VISITOR.last);
     expect(created.data.grade).toBe(Number(VISITOR.grade));
-    // The two flags the handoff depends on. `profileComplete` is deliberately
-    // *not* among them any more: whether a parent can be reached is something
-    // only Planning Center knows, and Tally no longer keeps a copy to go stale.
-    // What it stores instead is "this one is mine and has not been pushed yet".
+    // The handoff, which is what this record is for. `profileComplete` is
+    // deliberately not asserted any more: whether a parent can be reached is
+    // something only Planning Center knows, and Tally no longer keeps a copy to
+    // go stale.
     expect(created.data.isVisitor).toBe(true);
-    expect(created.data.pcoPushPending).toBe(true);
-    expect(created.data.pcoPersonId ?? null).toBeNull();
+
+    /*
+     * Either still queued, or already pushed — never both, never neither.
+     *
+     * The push runs on an `onStudentCreated` trigger, so it races this read and
+     * on a warm emulator it wins. Insisting on catching the row mid-flight
+     * tested how slow the trigger was, which is not a promise Tally makes; that
+     * the two fields agree with each other is.
+     */
+    const pushed = (created.data.pcoPersonId ?? null) !== null;
+    expect(created.data.pcoPushPending).toBe(!pushed);
   });
 
   test('refuses to save a half-typed name', async ({ page, signedInAs }) => {

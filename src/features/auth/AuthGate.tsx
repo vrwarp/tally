@@ -13,17 +13,17 @@
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { useAuth } from '@/context/authContext';
+import { useAuth, type AuthStage } from '@/context/authContext';
 import { provisionAccess, type ProvisionAccessResult } from '@/services/functions';
 import { Button, ErrorBanner, LoadingScreen, Spinner } from '@/components/ui';
 import type { Role } from '@/types';
 
 export function AuthGate({ children }: { children: ReactNode }): ReactNode {
-  const { status } = useAuth();
+  const { status, stage } = useAuth();
 
   switch (status) {
     case 'loading':
-      return <RestoringSession />;
+      return <RestoringSession stage={stage} />;
     case 'signedOut':
       return <Navigate to="/login" replace />;
     case 'pending':
@@ -46,7 +46,7 @@ const SLOW_RESTORE_MS = 8000;
  * forever, which is the single worst thing to hand a volunteer with a queue at
  * the door: nothing to read, nothing to press, no way to tell broken from slow.
  */
-function RestoringSession() {
+function RestoringSession({ stage }: { stage: AuthStage }) {
   const [slow, setSlow] = useState(false);
 
   useEffect(() => {
@@ -56,8 +56,24 @@ function RestoringSession() {
 
   if (!slow) return <LoadingScreen message="Signing you in…" />;
 
+  /*
+   * Two different waits, two different pieces of advice.
+   *
+   * `session` is Firebase deciding whether there is a sign-in at all — a
+   * network problem, and "check the wifi" is the right thing to say. `profile`
+   * means the session is fine and Firestore has not delivered the document that
+   * says what this person may do, which reloading rarely fixes.
+   *
+   * The `data-stage` attribute is not decoration: a stuck app is the hardest
+   * thing to diagnose from a volunteer's description, and it is what a failing
+   * test report shows too.
+   */
+
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center gap-4 px-6 text-center">
+    <div
+      data-stage={stage ?? 'unknown'}
+      className="flex min-h-dvh flex-col items-center justify-center gap-4 px-6 text-center"
+    >
       <Spinner className="size-8" />
       <div>
         <p className="font-medium text-ink-200">This is taking longer than usual.</p>
@@ -130,9 +146,17 @@ function describeProvisionError(error: unknown): string {
   }
 }
 
+/**
+ * When to look again for the document `provisionAccess` has just written, in ms
+ * after the grant. Four tries over six seconds, then the screen stops pretending
+ * and hands over a button.
+ */
+const OPENING_RETRIES = [300, 1200, 3000, 6000];
+
 function PendingScreen() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, refreshProfile } = useAuth();
   const [phase, setPhase] = useState<ProvisionPhase>({ kind: 'checking' });
+  const [stuck, setStuck] = useState(false);
   // Provisioning is a server-side write, so it must not fire twice on the
   // double mount React StrictMode performs in development.
   const requested = useRef(false);
@@ -152,6 +176,37 @@ function PendingScreen() {
     requested.current = true;
     void check();
   }, [check]);
+
+  const granted = phase.kind === 'result' && phase.result.status === 'granted';
+
+  /*
+   * A grant is not the same as being let in.
+   *
+   * `provisionAccess` writes `users/{uid}` with the Admin SDK, and the live
+   * listener in AuthProvider is what notices. It usually does — but it is one
+   * Firestore stream, and if that stream is the thing having a bad night
+   * (a phone that changed networks between the sign-in and the write, a
+   * half-open connection Safari has not yet given up on) then nothing will ever
+   * wake this screen, and a counselor stands under "Opening Tally…" with a
+   * queue at the door.
+   *
+   * So the screen asks instead of waiting. Each attempt re-reads the document
+   * from the server and restarts the listener; if the app is let in, this whole
+   * component unmounts and the timers go with it.
+   */
+  useEffect(() => {
+    if (!granted) return;
+
+    const timers = OPENING_RETRIES.map((delay) =>
+      setTimeout(() => void refreshProfile(), delay),
+    );
+    const giveUp = setTimeout(() => setStuck(true), OPENING_RETRIES.at(-1)! + 3000);
+
+    return () => {
+      for (const timer of timers) clearTimeout(timer);
+      clearTimeout(giveUp);
+    };
+  }, [granted, refreshProfile]);
 
   const email = user?.email ?? null;
   const signOutButton = (
@@ -190,12 +245,26 @@ function PendingScreen() {
             Planning Center has you on the Footprints team
             {role ? <> as {role}</> : null}. Your access is set up.
           </p>
-          {/* No reload: the live `users/{uid}` listener in AuthProvider flips
-              status to `ready` as soon as the document lands. */}
-          <div className="flex items-center gap-3 text-sm text-ink-400">
-            <Spinner label="Opening Tally" />
-            <span>Opening Tally…</span>
-          </div>
+          {stuck ? (
+            <>
+              {/* Access exists; only this tab has failed to see it. Reloading
+                  rebuilds the Firestore client from nothing, which is the one
+                  thing a stuck stream reliably survives. */}
+              <p className="text-sm text-ink-500">
+                Tally is having trouble opening on this device. Your access is fine — reloading
+                normally sorts it out.
+              </p>
+              <Button fullWidth onClick={() => window.location.reload()}>
+                Reload Tally
+              </Button>
+              {signOutButton}
+            </>
+          ) : (
+            <div className="flex items-center gap-3 text-sm text-ink-400">
+              <Spinner label="Opening Tally" />
+              <span>Opening Tally…</span>
+            </div>
+          )}
         </>
       );
     } else if (status === 'not-on-roster') {
