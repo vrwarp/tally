@@ -23,7 +23,7 @@
     "emulators": "firebase emulators:start --project demo-tally --import=./.emulator-data --export-on-exit=./.emulator-data",
     "emulators:clean": "firebase emulators:start --project demo-tally",
     "seed": "tsx scripts/seed.ts",
-    "dev:emulated": "concurrently -k -n emulators,vite -c magenta,cyan \"npm:emulators:clean\" \"npm:dev -- --mode emulated\""
+    "dev:emulated": "npm run functions:build && concurrently -k -n emulators,vite -c magenta,cyan \"firebase emulators:start --project demo-tally\" \"vite --mode emulated\""
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -35,6 +35,7 @@
     "tailwind-merge": "^3.3.1"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@firebase/rules-unit-testing": "^4.0.1",
     "@tailwindcss/vite": "^4.1.10",
     "@testing-library/dom": "^10.4.0",
