@@ -246,8 +246,12 @@ enabled":
 gcloud services enable \
   cloudbuild.googleapis.com cloudfunctions.googleapis.com artifactregistry.googleapis.com \
   run.googleapis.com eventarc.googleapis.com pubsub.googleapis.com \
-  secretmanager.googleapis.com --project tally-76406
+  secretmanager.googleapis.com firebaseextensions.googleapis.com --project tally-76406
 ```
+
+`run`, `eventarc` and `pubsub` are there because the functions are 2nd gen: `onCall` runs on Cloud
+Run, and `onDocumentCreated` is delivered through Eventarc. `firebaseextensions` is needed even
+though Tally uses no extensions — the CLI checks for them on every deploy.
 
 Or click through the console, starting with
 [Cloud Build](https://console.cloud.google.com/apis/library/cloudbuild.googleapis.com?project=tally-76406).
