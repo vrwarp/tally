@@ -162,7 +162,9 @@ export function computeWarnings(
   if (event.requiresWaiver && !rsvp?.waiverSigned) warnings.push('missing-waiver');
   if (event.requiresPayment && !rsvp?.paymentReceived) warnings.push('missing-payment');
   if (student.hasAllergies) warnings.push('allergy');
-  if (!student.profileComplete) warnings.push('incomplete-profile');
+  // `=== false` deliberately, not falsy: `null` means nobody has checked, and a
+  // badge on every row is a badge nobody reads.
+  if (student.profileComplete === false) warnings.push('incomplete-profile');
   return warnings;
 }
 
@@ -224,7 +226,7 @@ export function buildRoster(input: BuildRosterInput): RosterView {
     if (group && !studentMatchesGroup(student, group)) continue;
     if (filters.smallGroupId && student.smallGroupId !== filters.smallGroupId) continue;
     if (filters.grade != null && student.grade !== filters.grade) continue;
-    if (filters.incompleteOnly && student.profileComplete) continue;
+    if (filters.incompleteOnly && student.profileComplete !== false) continue;
 
     eligible += 1;
     if (record) presentTotal += 1;

@@ -141,7 +141,7 @@ export function computeNewVisitors(
  */
 export function computeIncompleteProfiles(students: readonly Student[]): Student[] {
   return students
-    .filter((student) => student.status === 'active' && !student.profileComplete)
+    .filter((student) => student.status === 'active' && student.profileComplete === false)
     .sort(
       (a, b) =>
         Number(b.isVisitor) - Number(a.isVisitor) ||

@@ -163,11 +163,14 @@ export interface Student
    */
   fromPlanningCenter: boolean;
   /**
-   * Whether Planning Center holds a way to reach a parent. Derived server-side
-   * so the "Incomplete profiles" list works without shipping the contact
-   * details themselves.
+   * Whether a parent can be reached — or `null` for "nobody has looked".
+   *
+   * Three states, not two, because the honest answer for most students is the
+   * third. A roster read from Planning Center does not fetch households, so it
+   * cannot tell an unreachable family from one it simply did not ask about.
+   * Only `false` is a problem worth a badge.
    */
-  profileComplete: boolean;
+  profileComplete: boolean | null;
   /** *That* there is an allergy, never what it is. See `PcoRosterPerson`. */
   hasAllergies: boolean;
 }
@@ -415,7 +418,8 @@ export interface PcoRosterPerson {
   gender: Gender;
   status: StudentStatus;
   searchName: string;
-  profileComplete: boolean;
+  /** `null` when the roster read did not look. See the server-side note. */
+  profileComplete: boolean | null;
   /**
    * *That* there is an allergy, never what it is.
    *

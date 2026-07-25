@@ -107,7 +107,13 @@ describe('dashboard insight properties', () => {
     }
   });
 
-  forAll('incomplete profiles are exactly the active, unreachable ones', arbitraryDashboard, (input) => {
+  /*
+   * `profileComplete` has three states, and only one of them is a problem.
+   * `null` means a roster read did not hydrate households and so nobody has
+   * checked — listing those as "no way to reach a parent" would hand the core
+   * team a follow-up list containing the entire ministry.
+   */
+  forAll('incomplete profiles are exactly the active, known-unreachable ones', arbitraryDashboard, (input) => {
     const incomplete = computeIncompleteProfiles(input.students);
 
     for (const student of incomplete) {
@@ -116,7 +122,7 @@ describe('dashboard insight properties', () => {
     }
 
     const expected = input.students.filter(
-      (student) => student.status === 'active' && !student.profileComplete,
+      (student) => student.status === 'active' && student.profileComplete === false,
     ).length;
     expect(incomplete).toHaveLength(expected);
   });

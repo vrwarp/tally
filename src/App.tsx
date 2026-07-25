@@ -2,6 +2,7 @@ import { Suspense, lazy } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from '@/context/AuthProvider';
 import { DataProvider } from '@/context/DataProvider';
+import { ThemeProvider } from '@/context/ThemeProvider';
 import { ToastProvider } from '@/context/ToastProvider';
 import { AuthGate, RequireRole } from '@/features/auth/AuthGate';
 import { LoginPage } from '@/features/auth/LoginPage';
@@ -53,83 +54,86 @@ const SettingsPage = lazy(() =>
 export default function App() {
   return (
     <ErrorBoundary>
-      <AuthProvider>
-        <ToastProvider>
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route
-              path="/*"
-              element={
-                <AuthGate>
-                  <DataProvider>
-                    <AppShell>
-                      {/* Scoped per route: a lazy chunk that fails to load must
-                        not take the app shell down with it. */}
-                      <ErrorBoundary what="this screen">
-                        <Suspense fallback={<LoadingScreen />}>
-                          <Routes>
-                            {/* Check-in is the home screen: a counselor at the door
-                          should never have to navigate to start working. */}
-                            <Route index element={<CheckInPage />} />
-                            <Route
-                              path="event/:eventId"
-                              element={<CheckInPage />}
-                            />
+      {/* Outermost of the providers: the login screen and every error state
+          need a theme too, and neither has an auth session yet. */}
+      <ThemeProvider>
+        <AuthProvider>
+          <ToastProvider>
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              <Route
+                path="/*"
+                element={
+                  <AuthGate>
+                    <DataProvider>
+                      <AppShell>
+                        {/* Scoped per route: a lazy chunk that fails to load must
+                          not take the app shell down with it. */}
+                        <ErrorBoundary what="this screen">
+                          <Suspense fallback={<LoadingScreen />}>
+                            <Routes>
+                              {/* Check-in is the home screen: a counselor at the door
+                            should never have to navigate to start working. */}
+                              <Route index element={<CheckInPage />} />
+                              <Route
+                                path="event/:eventId"
+                                element={<CheckInPage />}
+                              />
 
-                            <Route
-                              path="dashboard"
-                              element={
-                                <RequireRole role="core">
-                                  <DashboardPage />
-                                </RequireRole>
-                              }
-                            />
-                            <Route
-                              path="events"
-                              element={
-                                <RequireRole role="core">
-                                  <EventsPage />
-                                </RequireRole>
-                              }
-                            />
-                            <Route
-                              path="events/:eventId"
-                              element={
-                                <RequireRole role="core">
-                                  <EventDetailPage />
-                                </RequireRole>
-                              }
-                            />
-                            <Route
-                              path="students"
-                              element={
-                                <RequireRole role="core">
-                                  <StudentsPage />
-                                </RequireRole>
-                              }
-                            />
-                            <Route
-                              path="students/:studentId"
-                              element={
-                                <RequireRole role="core">
-                                  <StudentDetailPage />
-                                </RequireRole>
-                              }
-                            />
-                            <Route
-                              path="settings"
-                              element={
-                                <RequireRole role="core">
-                                  <SettingsPage />
-                                </RequireRole>
-                              }
-                            />
+                              <Route
+                                path="dashboard"
+                                element={
+                                  <RequireRole role="core">
+                                    <DashboardPage />
+                                  </RequireRole>
+                                }
+                              />
+                              <Route
+                                path="events"
+                                element={
+                                  <RequireRole role="core">
+                                    <EventsPage />
+                                  </RequireRole>
+                                }
+                              />
+                              <Route
+                                path="events/:eventId"
+                                element={
+                                  <RequireRole role="core">
+                                    <EventDetailPage />
+                                  </RequireRole>
+                                }
+                              />
+                              <Route
+                                path="students"
+                                element={
+                                  <RequireRole role="core">
+                                    <StudentsPage />
+                                  </RequireRole>
+                                }
+                              />
+                              <Route
+                                path="students/:studentId"
+                                element={
+                                  <RequireRole role="core">
+                                    <StudentDetailPage />
+                                  </RequireRole>
+                                }
+                              />
+                              <Route
+                                path="settings"
+                                element={
+                                  <RequireRole role="core">
+                                    <SettingsPage />
+                                  </RequireRole>
+                                }
+                              />
 
-                            <Route
-                              path="*"
-                              element={<Navigate to="/" replace />}
-                            />
-                          </Routes>
+                              <Route
+                                path="*"
+                                element={<Navigate to="/" replace />}
+                              />
+                            </Routes>
                         </Suspense>
                       </ErrorBoundary>
                     </AppShell>
@@ -138,8 +142,9 @@ export default function App() {
               }
             />
           </Routes>
-        </ToastProvider>
-      </AuthProvider>
+          </ToastProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </ErrorBoundary>
   );
 }

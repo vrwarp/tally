@@ -22,7 +22,6 @@ import { cacheKey, type TtlCache } from './cache.js';
 import {
   addToIncludedIndex,
   buildIncludedIndex,
-  computeProfileComplete,
   extractParentContact,
   isYouth,
   mapPersonToAccessEntry,
@@ -72,8 +71,20 @@ export interface RosterPerson {
   gender: 'male' | 'female' | 'unspecified';
   status: 'active' | 'inactive';
   searchName: string;
-  /** True when Planning Center has a way to reach a parent. */
-  profileComplete: boolean;
+  /**
+   * Whether Planning Center holds a way to reach a parent — or `null` for "we
+   * did not look".
+   *
+   * A roster read does not hydrate households, and a parent's phone number
+   * lives on the *parent*, not the student. Reporting that absence as `false`
+   * made every student on the check-in screen wear an "incomplete profile"
+   * badge, which is worse than useless: a warning that fires on everyone is one
+   * nobody reads, and it buried the handful of quick-added visitors the badge
+   * exists for.
+   *
+   * `getPersonDetails` knows the real answer for one student at a time.
+   */
+  profileComplete: boolean | null;
   /**
    * *That* there is an allergy, never what it is. Enough to render the badge
    * that makes a counselor look; the note itself stays behind a detail read.
@@ -168,8 +179,6 @@ export async function fetchYouthRoster(options: RosterOptions): Promise<RosterRe
       const seen = new Set<string>();
 
       for await (const page of client.paginate<PcoPerson>(rosterPath(config), rosterQuery(config))) {
-        const index = buildIncludedIndex(page.included);
-
         for (const person of page.data) {
           // In list mode the youth pastor's list *is* the roster; second-guessing
           // it on grade would drop the 5th grader who comes with an older sibling.
@@ -189,11 +198,6 @@ export async function fetchYouthRoster(options: RosterOptions): Promise<RosterRe
             now,
           });
 
-          // Cheap when the email came down with the page; this never triggers a
-          // household fetch, so "can we reach a parent" is best-effort on a
-          // roster row and authoritative on a detail read.
-          const contact = extractParentContact(person, index);
-
           collected.push({
             id: pcoStudentId(person.id),
             pcoPersonId: person.id,
@@ -203,7 +207,10 @@ export async function fetchYouthRoster(options: RosterOptions): Promise<RosterRe
             gender: mapped.gender,
             status: mapped.status,
             searchName: mapped.searchName,
-            profileComplete: computeProfileComplete(contact),
+            // Not looked up — see the note on the field. Hydrating households
+          // here would be one request per family on the path a counselor waits
+          // for at a door.
+          profileComplete: null,
             hasAllergies: mapped.allergies !== null && mapped.allergies.length > 0,
           });
         }

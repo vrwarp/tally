@@ -145,6 +145,10 @@ describe('fetchYouthRoster', () => {
     // The whole point of splitting the roster from the details: a door volunteer
     // never receives a minor's medical notes or a parent's phone number, because
     // the screen they are on never asks for them.
+    //
+    // `profileComplete` is null here for the same reason — a roster read does
+    // not hydrate households, so it cannot know, and saying `false` would put an
+    // "incomplete profile" badge on every student in the ministry.
     const { people } = await fetchYouthRoster({ ...world, config: baseConfig() });
     const sofia = people.find((person) => person.pcoPersonId === FIXTURE_IDS.sofiaWithAllergy);
 
@@ -164,6 +168,7 @@ describe('fetchYouthRoster', () => {
     // The *fact* of an allergy travels, so the badge can be drawn. The note
     // does not.
     expect(sofia?.hasAllergies).toBe(true);
+    expect(sofia?.profileComplete).toBeNull();
   });
 
   it('prefers the nickname a counselor would actually say', async () => {

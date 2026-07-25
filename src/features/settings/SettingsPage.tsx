@@ -22,6 +22,7 @@ import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { PlanningCenterCard } from '@/features/settings/PlanningCenterCard';
 import { TeamList } from '@/features/settings/TeamList';
+import { ThemeCard } from '@/features/settings/ThemeCard';
 import { ThresholdPreview } from '@/features/settings/ThresholdPreview';
 import { formatRelative } from '@/lib/time';
 import { saveSettings } from '@/services/events';
@@ -132,7 +133,8 @@ export function SettingsPage() {
       <header>
         <h1 className="text-xl font-bold text-ink-50">Settings &amp; team</h1>
         <p className="mt-0.5 text-sm text-ink-500">
-          Changes here apply to every counselor's phone immediately.
+          Thresholds and team changes apply to every counselor's phone immediately. Appearance is
+          yours alone.
         </p>
       </header>
 
@@ -230,6 +232,8 @@ export function SettingsPage() {
           </div>
         </div>
       </Card>
+
+      <ThemeCard />
 
       <PlanningCenterCard />
 

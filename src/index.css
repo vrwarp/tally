@@ -5,8 +5,28 @@
  *
  * The app is used one-handed, in dim rooms, by volunteers who are looking at a
  * queue of students rather than at the screen. Everything below optimises for
- * that: large tap targets, high contrast, and a dark surface that does not
- * blind anyone at a Friday night fellowship.
+ * that: large tap targets and high contrast.
+ *
+ * ## How the two themes work
+ *
+ * `ink` is not a set of greys, it is a *distance from the reader*. Low numbers
+ * are what you are meant to look at — headings, names — and high numbers are
+ * what holds them: chips, cards, the page itself. The whole app is written that
+ * way, consistently, in 379 places.
+ *
+ * That consistency is what makes a light theme cost one block of CSS instead of
+ * a rewrite. Flipping the ramp keeps every `text-ink-100` a heading and every
+ * `bg-ink-950` a page, and Tailwind resolves each utility through the custom
+ * property at paint time. Nothing in `src/features` or `src/components` knows
+ * there is more than one theme.
+ *
+ * The accents are not flipped, they are *re-picked*. `text-brand-300` is a pale
+ * blue chosen to sit on near-black; on white it is barely there. Each accent
+ * gets a light-mode value at the same slot, dark enough to read on paper.
+ *
+ * The resolved theme is stamped on `<html data-theme>` by ThemeProvider — and
+ * before that by an inline script in index.html, so a light-theme user does not
+ * get a black flash on every cold start.
  */
 @theme {
   --color-ink-50: #f8fafc;
@@ -21,6 +41,11 @@
   --color-ink-900: #0f172a;
   --color-ink-950: #020617;
 
+  /* `brand-200` is used for tinted body copy on a brand-washed panel. It was
+     referenced in five places before it existed, which Tailwind resolves by
+     simply not emitting the class — so that text quietly inherited and nobody
+     noticed. Defined now. */
+  --color-brand-200: #bae6fd;
   --color-brand-300: #7dd3fc;
   --color-brand-400: #38bdf8;
   --color-brand-500: #0ea5e9;
@@ -44,6 +69,58 @@
   --spacing-safe-top: env(safe-area-inset-top, 0px);
 }
 
+/*
+ * Light.
+ *
+ * Read the ink ramp bottom-up against the block above: 50 is still the most
+ * prominent thing on screen and 950 is still the page, they have just swapped
+ * ends of the lightness axis.
+ *
+ * Two places deliberately break a strict inversion, because a straight flip
+ * would be wrong rather than merely different:
+ *
+ *  - `ink-900` (cards) is *lighter* than `ink-950` (page). On a dark screen a
+ *    raised surface catches more light; on paper it is the page that is grey
+ *    and the card that is white. Inverting the numbers without inverting that
+ *    relationship would leave every card looking like a hole.
+ *  - `ink-500` is the app's most-used muted text — 74 occurrences — so it holds
+ *    at #64748b, which clears 4.5:1 on white. A mechanical flip would have put
+ *    a pale grey there and quietly failed contrast across half the app.
+ */
+:root[data-theme='light'] {
+  --color-ink-50: #0f172a;
+  --color-ink-100: #1e293b;
+  --color-ink-200: #334155;
+  --color-ink-300: #475569;
+  --color-ink-400: #576375;
+  --color-ink-500: #64748b;
+  --color-ink-600: #8b97a8;
+  --color-ink-700: #cbd5e1;
+  --color-ink-800: #e2e8f0;
+  --color-ink-900: #ffffff;
+  --color-ink-950: #f1f5f9;
+
+  /* Accents re-picked for a white ground, not lightened versions of the dark ones. */
+  --color-brand-200: #075985;
+  --color-brand-300: #0369a1;
+  --color-brand-400: #0284c7;
+  --color-brand-500: #0284c7;
+  --color-brand-600: #0369a1;
+  --color-brand-700: #075985;
+
+  --color-present-400: #15803d;
+  --color-present-500: #16a34a;
+  --color-present-600: #15803d;
+
+  --color-warn-400: #a16207;
+  --color-warn-500: #ca8a04;
+  --color-warn-600: #854d0e;
+
+  --color-danger-400: #b91c1c;
+  --color-danger-500: #dc2626;
+  --color-danger-600: #991b1b;
+}
+
 @layer base {
   html {
     -webkit-tap-highlight-color: transparent;
@@ -53,6 +130,8 @@
 
   body {
     @apply bg-ink-950 text-ink-100 antialiased;
+    /* Native form controls, scrollbars and autofill follow the theme too. */
+    color-scheme: dark;
     font-family:
       ui-sans-serif,
       system-ui,
@@ -64,6 +143,10 @@
       sans-serif;
     /* Stop iOS rubber-banding from detaching the sticky search bar. */
     overscroll-behavior-y: none;
+  }
+
+  :root[data-theme='light'] body {
+    color-scheme: light;
   }
 
   /* Inputs below 16px make iOS Safari zoom on focus, which wrecks the roster. */
