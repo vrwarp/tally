@@ -11,7 +11,13 @@ dist-ssr/
 
 # Planning Center credentials for the local functions emulator.
 # `.env.demo-tally` is deliberately NOT ignored: it holds only simulator
-# settings for the emulator-only `demo-` project namespace.
+# settings for the emulator-only `demo-` project namespace. The negation has to
+# be spelled out — `.env.*` above matches at every level, so without this line
+# the file was ignored despite this comment, and no clone or CI checkout has ever
+# had it. The Functions emulator then stops to prompt for the params it declares,
+# loads nothing, and every end-to-end sign-in fails on a 404 from
+# `provisionAccess`.
+!functions/.env.demo-tally
 functions/.secret.local
 functions/.env
 functions/.env.local
