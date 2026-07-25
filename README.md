@@ -325,7 +325,7 @@ rules it deploys on merge with no prompt.
   | `roles/firebaserules.admin` | Deploys `firestore.rules` and the indexes. |
   | `roles/iam.serviceAccountUser` | Lets the deploy act as the functions' own runtime service account. |
   | `roles/artifactregistry.writer` | Holds the container image each function is built into. |
-  | `roles/secretmanager.secretAccessor` | Binds `PCO_APP_ID` and `PCO_SECRET` to the deployed functions. |
+  | `roles/secretmanager.admin`, on the two secrets rather than the project | Binds `PCO_APP_ID` and `PCO_SECRET` to the deployed functions. `secretAccessor` is *not* enough and is the obvious wrong guess: it grants `versions.access` but not `secrets.get`, so a deploy fails reading the secret it is about to bind. Granting on each secret keeps it off everything else: `gcloud secrets add-iam-policy-binding PCO_APP_ID --member=... --role=roles/secretmanager.admin`. |
 
   `roles/firebase.admin` covers all of these in one, but it also carries Hosting, which would
   undo the point of keeping two keys. The list above is the narrower equivalent.
