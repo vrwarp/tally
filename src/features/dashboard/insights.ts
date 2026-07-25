@@ -113,7 +113,11 @@ export function computeNewVisitors(
 
   for (const student of students) {
     const firstAttendedAt = student.firstAttendedAt;
-    if (!firstAttendedAt || firstAttendedAt < windowStart) continue;
+    // An unusable date fails *every* comparison, including `< windowStart`, so
+    // without this check a student with a corrupt timestamp would sit on the
+    // new-visitor list permanently — and nobody would think to question it.
+    if (!firstAttendedAt || !Number.isFinite(firstAttendedAt.getTime())) continue;
+    if (firstAttendedAt < windowStart) continue;
 
     const firstEvent = oldestFirst.find((snapshot) => snapshot.presentStudentIds.has(student.id));
 

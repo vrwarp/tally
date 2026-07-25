@@ -32,17 +32,28 @@ import {
 /* Primitive coercion                                                          */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Every date this module returns is renderable.
+ *
+ * An `Invalid Date` is not a cosmetic problem: `date-fns` throws a `RangeError`
+ * when it formats one, so a single malformed field turns into a crash on the
+ * check-in screen rather than a blank cell. Firestore itself cannot store one,
+ * but the locally-cached echo of a write can carry a JS `Date` straight through,
+ * and a numeric field of `NaN` produces one too — so the guard lives here,
+ * where every path already passes.
+ */
+function usable(date: Date): Date | null {
+  return Number.isFinite(date.getTime()) ? date : null;
+}
+
 export function toDate(value: unknown, fallback: Date): Date {
-  if (value instanceof Timestamp) return value.toDate();
-  if (value instanceof Date) return value;
-  if (typeof value === 'number') return new Date(value);
-  return fallback;
+  return toDateOrNull(value) ?? fallback;
 }
 
 export function toDateOrNull(value: unknown): Date | null {
-  if (value instanceof Timestamp) return value.toDate();
-  if (value instanceof Date) return value;
-  if (typeof value === 'number') return new Date(value);
+  if (value instanceof Timestamp) return usable(value.toDate());
+  if (value instanceof Date) return usable(value);
+  if (typeof value === 'number') return usable(new Date(value));
   return null;
 }
 

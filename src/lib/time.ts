@@ -174,6 +174,26 @@ export function fromDateTimeLocalValue(value: string): Date {
   // input means. Constructing explicitly avoids UTC drift on older engines.
   const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
   if (!match) throw new Error(`Invalid datetime-local value "${value}".`);
+
   const [, y, mo, d, h, mi] = match;
-  return new Date(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), 0, 0);
+  const year = Number(y);
+  const month = Number(mo);
+  const day = Number(d);
+  const hours = Number(h);
+  const minutes = Number(mi);
+
+  if (month < 1 || month > 12 || day < 1 || day > 31 || hours > 23 || minutes > 59) {
+    throw new Error(`Datetime-local value out of range: "${value}".`);
+  }
+
+  const date = new Date(year, month - 1, day, hours, minutes, 0, 0);
+
+  // The constructor rolls overflow forward rather than complaining, so
+  // "2026-02-31" would quietly become 3 March and put an event on the wrong
+  // evening. Reading the fields back is the only way to catch it.
+  if (date.getMonth() !== month - 1 || date.getDate() !== day) {
+    throw new Error(`No such date: "${value}".`);
+  }
+
+  return date;
 }
