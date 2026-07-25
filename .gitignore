@@ -1,0 +1,28 @@
+node_modules/
+dist/
+dist-ssr/
+
+# Local env files
+.env
+.env.local
+.env.*.local
+
+# Firebase emulator artifacts
+*-debug.log
+.firebase/
+firebase-export-*/
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Build / tool caches
+*.tsbuildinfo
+coverage/
