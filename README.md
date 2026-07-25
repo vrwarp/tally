@@ -223,10 +223,11 @@ which is still the way to deploy from a branch or when CI is unavailable.
 2. **Get access to the Firebase project.** Your Google account needs at least Editor on
    `tally` in the [Firebase console](https://console.firebase.google.com/) — ask whoever
    administers it to add you. `npx firebase projects:list` should show `tally` once you do.
-3. **Fill in `.env.local`.** Copy `.env.example` to `.env.local` and fill it from the console
-   (Project settings → General → Your apps → Web app config) if you haven't already for local dev.
-   This is what the production build embeds, so it has to exist even though these values are not
-   secret — see below.
+3. **Fill in `.env.local`.** Copy `.env.example` to `.env.local` and paste the config object from
+   the console (Project settings → General → Your apps → Web app config) into
+   `VITE_FIREBASE_CONFIG`, as one line of JSON. The console prints it as JavaScript, so the keys
+   need double quotes. This is what the production build embeds, so it has to exist even though
+   these values are not secret — see below.
 4. **Set the Planning Center secrets**, once, in Secret Manager:
    ```bash
    npx firebase functions:secrets:set PCO_APP_ID
@@ -295,10 +296,9 @@ rules it deploys on merge with no prompt.
   gated merge job, never to the preview deploy that runs on every pull request. Prefer
   [Workload Identity Federation](https://github.com/google-github-actions/auth#workload-identity-federation)
   over a long-lived JSON key if you are willing to do the extra GCP setup.
-- `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`,
-  `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID` and
-  `VITE_FIREBASE_APP_ID` — the same values `.env.local` holds. Vite embeds them at build
-  time, so the Hosting workflows need them even though they are not secrets.
+- `VITE_FIREBASE_CONFIG` — the web config object as one line of JSON, the same value
+  `.env.local` holds. Vite embeds it at build time, so the Hosting workflows need it even
+  though it is not a secret.
 
 ---
 
