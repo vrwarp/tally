@@ -19,7 +19,7 @@ env:
   NODE_VERSION: '22'
   # Every firebase invocation is pinned to the project explicitly rather than
   # relying on .firebaserc, so a change there cannot silently retarget a deploy.
-  FIREBASE_PROJECT: tally
+  FIREBASE_PROJECT: tally-76406
 
 jobs:
   # On a pull request, prove the deploy *would* work without changing anything:

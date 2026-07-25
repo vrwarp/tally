@@ -209,7 +209,7 @@ Setup, configuration parameters, role mapping and troubleshooting live in
 ## Deployment
 
 Merging to `main` deploys everything — Hosting, Cloud Functions, Firestore rules and Firestore
-indexes — to the `tally` Firebase project configured in `.firebaserc`. See
+indexes — to the `tally-76406` Firebase project configured in `.firebaserc`. See
 [Deploying from CI](#deploying-from-ci) below and [docs/ci.md](docs/ci.md#what-ci-deploys) for why
 the backend half is gated more tightly than Hosting. `npm run deploy` does the same thing by hand,
 which is still the way to deploy from a branch or when CI is unavailable.
@@ -221,8 +221,8 @@ which is still the way to deploy from a branch or when CI is unavailable.
    dependency of this repo, not something you install globally — always run it through `npx` or an
    npm script so the pinned version is used.)
 2. **Get access to the Firebase project.** Your Google account needs at least Editor on
-   `tally` in the [Firebase console](https://console.firebase.google.com/) — ask whoever
-   administers it to add you. `npx firebase projects:list` should show `tally` once you do.
+   `tally-76406` in the [Firebase console](https://console.firebase.google.com/) — ask whoever
+   administers it to add you. `npx firebase projects:list` should show `tally-76406` once you do.
 3. **Fill in `.env.local`.** Copy `.env.example` to `.env.local` and paste the config object from
    the console (Project settings → General → Your apps → Web app config) into
    `VITE_FIREBASE_CONFIG`, as one line of JSON. The console prints it as JavaScript, so the keys
