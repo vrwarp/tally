@@ -12,7 +12,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'icons/icon-192.png'],
       manifest: {
-        name: 'Tally — Footprints Attendance',
+        name: 'Tally',
         short_name: 'Tally',
         description: 'Fast attendance check-in for the Footprints youth ministry.',
         theme_color: '#0f172a',
