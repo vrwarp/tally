@@ -112,7 +112,7 @@ export default defineConfig({
     actionTimeout: 15_000,
   },
 
-  projects: BROWSERS.map(({ name, use }) => ({ name, use })),
+  projects: BROWSERS.map((browser) => ({ ...browser })),
 
   webServer: [
     {

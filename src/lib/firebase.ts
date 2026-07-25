@@ -22,9 +22,11 @@ import {
 import {
   connectFirestoreEmulator,
   initializeFirestore,
+  memoryLocalCache,
   persistentLocalCache,
   persistentMultipleTabManager,
   type Firestore,
+  type FirestoreLocalCache,
 } from 'firebase/firestore';
 
 const env = import.meta.env;
@@ -59,13 +61,62 @@ function readConfig(): FirebaseOptions {
 export const firebaseApp: FirebaseApp = initializeApp(readConfig());
 
 /**
- * Persistent multi-tab cache keeps the roster readable when the church wifi
- * drops mid-check-in, and lets `onSnapshot` resolve from cache instantly on
- * reopen. Writes queue locally and flush when the connection returns.
+ * The best cache this browser can actually run.
+ *
+ * A persistent multi-tab cache is what Tally wants: the roster stays readable
+ * when the church wifi drops mid-check-in, `onSnapshot` resolves from cache
+ * instantly on reopen, and writes queue locally and flush when the connection
+ * returns.
+ *
+ * But `persistentMultipleTabManager` needs the Web Locks API to coordinate
+ * between tabs, and Safari did not ship `navigator.locks` until version 16. On
+ * anything older the tab manager never acquires its lock, so *no listener ever
+ * fires* — no error, no rejection, just silence. Tally's own symptom was a
+ * counselor sitting on a spinner forever, because the screen waits for the
+ * `users/{uid}` snapshot that was never coming. Safari is the browser a youth
+ * volunteer is most likely to be holding, which makes this the worst possible
+ * place to assume a modern API.
+ *
+ * So: multi-tab where it works, single-tab where it does not, memory as the
+ * floor. Losing multi-tab coordination costs a little cross-tab freshness.
+ * Losing the whole app costs the check-in.
  */
-export const db: Firestore = initializeFirestore(firebaseApp, {
-  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
-});
+function bestLocalCache(): FirestoreLocalCache {
+  const hasWebLocks = typeof navigator !== 'undefined' && 'locks' in navigator;
+
+  if (hasWebLocks) {
+    return persistentLocalCache({ tabManager: persistentMultipleTabManager() });
+  }
+
+  /*
+   * Measured, not assumed: single-tab persistence was tried here first, on the
+   * reasoning that a counselor has one tab open so the lease is uncontended.
+   * It wedges the same way — the listener never fires and never errors, and the
+   * app sits on "restoring your session" forever.
+   *
+   * So on these browsers Tally gives up offline persistence entirely. That is a
+   * genuine loss: no cached roster when the church wifi drops, no writes queued
+   * across a reload. It is the smaller loss. An app that works while online
+   * beats an app that does not start, and the roster has its own copy in
+   * localStorage (see services/roster.ts) so the door still has names.
+   */
+  console.info('[tally] No Web Locks API — offline persistence is off on this browser.');
+  return memoryLocalCache();
+}
+
+function createDb(): Firestore {
+  try {
+    return initializeFirestore(firebaseApp, { localCache: bestLocalCache() });
+  } catch (cause) {
+    // Private browsing, a blocked IndexedDB, a quota refusal. An in-memory
+    // cache means no offline support, which is a real loss — and still
+    // enormously better than an app that does not start.
+    console.warn('[tally] Offline persistence unavailable; falling back to memory.', cause);
+    return initializeFirestore(firebaseApp, { localCache: memoryLocalCache() });
+  }
+}
+
+export const db: Firestore = createDb();
 
 /**
  * Auth, built *without* a popup/redirect resolver.

@@ -98,18 +98,28 @@
  * the instant a counselor taps it — this runs off the optimistic local state
  * so it fires before the Firestore round-trip completes.
  */
+/*
+ * Colour only — deliberately no `transform`.
+ *
+ * This used to dip to `scale(0.99)`, which looked good in isolation and was
+ * wrong for the screen it lives on. Journey 1 is a counselor tapping down a
+ * queue of teenagers as fast as they can read names, and the row that just
+ * flashed is also the Undo button for the tap they may have got wrong. Moving
+ * it for 600ms means a thumb already travelling toward it lands somewhere else.
+ *
+ * Colour carries the confirmation on its own; the haptic pulse carries the
+ * rest. Nothing about the row's box changes, so it is safe to hit again the
+ * instant it is drawn.
+ */
 @keyframes tally-flash {
   0% {
     background-color: color-mix(in oklab, var(--color-present-500) 55%, transparent);
-    transform: scale(1);
   }
   35% {
     background-color: color-mix(in oklab, var(--color-present-500) 40%, transparent);
-    transform: scale(0.99);
   }
   100% {
     background-color: transparent;
-    transform: scale(1);
   }
 }
 

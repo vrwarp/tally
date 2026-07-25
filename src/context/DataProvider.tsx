@@ -29,6 +29,24 @@ const EVENT_WINDOW_DAYS = 120;
  */
 const ROSTER_REFRESH_MS = 10 * 60 * 1000;
 
+/**
+ * A cheap identity for a roster, so an unchanged one can be dropped.
+ *
+ * The provider paints from this device's saved copy immediately and then reads
+ * Planning Center, which almost always returns exactly the same people. Setting
+ * state anyway re-renders every screen and re-sorts the list a second or two
+ * after it appeared — visible as a flicker, and worse than that on a slow
+ * device: a counselor's thumb is already moving toward a row when it is
+ * replaced, and Playwright sees the same thing as "element was detached from
+ * the DOM". Only the fields the roster renders are compared; anything else
+ * changing would not be visible anyway.
+ */
+function rosterSignature(students: readonly Student[]): string {
+  return students
+    .map((s) => `${s.id}|${s.firstName}|${s.lastName}|${s.grade}|${s.status}|${s.profileComplete}|${s.hasAllergies}`)
+    .join('\n');
+}
+
 function describeRosterError(cause: unknown): string {
   const code = (cause as { code?: string })?.code ?? '';
   if (code.includes('unauthenticated')) return 'Your session expired. Sign in again.';
@@ -123,7 +141,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     try {
       const snapshot = await fetchRoster(new Date(), force);
-      setRoster(snapshot.students);
+      setRoster((current) =>
+        rosterSignature(current) === rosterSignature(snapshot.students) ? current : snapshot.students,
+      );
       setRosterFetchedAt(snapshot.fetchedAt);
       setRosterOffline(false);
       setRosterError(null);
