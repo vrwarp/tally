@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "firebase-admin": "^13.0.2",
-    "firebase-functions": "^6.3.2"
+    "firebase-functions": "^7.3.0"
   },
   "devDependencies": {
     "@types/node": "^22.15.3",
