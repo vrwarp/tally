@@ -264,10 +264,13 @@ Three workflows, split by what they can reach:
 | --- | --- | --- |
 | `firebase-hosting-pull-request.yml` | Deploys a preview channel, posts the link on the PR | — |
 | `firebase-hosting-merge.yml` | — | Publishes the Hosting live channel |
-| `firebase-backend.yml` | `firebase deploy --dry-run`: builds the functions, validates rules and indexes, deploys nothing | Deploys Cloud Functions, Firestore rules and Firestore indexes |
+| `firebase-backend.yml` | Builds the functions, then `firebase deploy --dry-run` validates rules and indexes without deploying | Deploys Cloud Functions, Firestore rules and Firestore indexes |
 
 Both pull-request jobs are skipped for forked PRs (`head.repo.full_name == github.repository`),
-because a fork cannot read repository secrets.
+because a fork cannot read repository secrets. Until the secrets below exist the backend dry run
+skips itself with a notice rather than failing the PR — the functions build and the emulator-based
+rules suite in `ci.yml` need no credentials, so they still gate every pull request. The merge-time
+deploy has no such escape hatch: without its key it fails loudly rather than silently doing nothing.
 
 The backend deploy is deliberately the strict one. It re-runs `npm run test:rules` and
 `npm run test:functions` *inside the deploy job* before it deploys anything — CI is a separate

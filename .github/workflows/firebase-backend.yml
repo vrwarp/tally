@@ -42,7 +42,34 @@ jobs:
       - run: npm ci
       - run: npm --prefix functions ci
 
+      # Credential-free, so it runs on every pull request regardless of secrets.
+      - name: The functions must compile
+        run: npm run functions:build
+
+      # A pull request should not go red merely because the deploy key has not
+      # been set up yet — that says nothing about the change being reviewed. The
+      # dry run is skipped with a notice instead, and starts running by itself
+      # once the secret exists. Skipping it loses less than it appears to: the
+      # functions build above and the emulator-based rules suite in ci.yml gate
+      # every pull request without needing any credential at all.
+      #
+      # The deploy job deliberately does *not* do this. A deploy that quietly
+      # skipped itself because a key was missing would be a silent no-op, so it
+      # is left to fail loudly.
+      - name: Is the backend key configured?
+        id: creds
+        env:
+          KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TALLY_BACKEND }}
+        run: |
+          if [ -n "$KEY" ]; then
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+            echo '::notice::FIREBASE_SERVICE_ACCOUNT_TALLY_BACKEND is not set, so the deploy dry run was skipped. See README.md#repository-secrets.'
+          fi
+
       - uses: google-github-actions/auth@v2
+        if: steps.creds.outputs.present == 'true'
         with:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TALLY_BACKEND }}
 
@@ -50,6 +77,7 @@ jobs:
       # enable required APIs on the target project. It never deploys code or
       # rules, which is the property being relied on here.
       - name: Validate functions, rules and indexes without deploying
+        if: steps.creds.outputs.present == 'true'
         run: >-
           npx firebase deploy
           --only functions,firestore:rules,firestore:indexes
