@@ -35,10 +35,21 @@ test.describe('dashboard', () => {
     await signedInAs('core');
     await gotoReady(page, '/dashboard');
 
-    // The PRD asks for actionable insights rather than a data table: a row that
-    // cannot be acted on is a row somebody has to copy into their phone by hand.
+    /*
+     * The PRD asks for actionable insights rather than a data table: a row that
+     * cannot be acted on is a row somebody has to copy into their phone by hand.
+     *
+     * It now takes one tap to get there. Parent contact lives in Planning
+     * Center and is read one person at a time, so a list of twenty students no
+     * longer puts twenty parents' phone numbers on a leader's screen at once.
+     * "Actionable" therefore means the row offers to fetch it, and then does.
+     */
+    const reveal = page.getByRole('button', { name: /show contact/i }).first();
+    await expect(reveal).toBeVisible();
+    await reveal.click();
+
     const contactable = page.locator('a[href^="tel:"], a[href^="sms:"], a[href^="mailto:"]');
-    await expect(contactable.first()).toBeVisible();
+    await expect(contactable.first()).toBeVisible({ timeout: 20_000 });
   });
 
   test('a counselor cannot reach it', async ({ page, signedInAs }) => {

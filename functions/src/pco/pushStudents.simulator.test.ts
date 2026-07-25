@@ -36,7 +36,7 @@ function config(writeBack: PcoWriteBackMode): PcoConfig {
     minGrade: 6,
     maxGrade: 12,
     writeBack,
-    syncSchedule: 'every 6 hours',
+    cacheTtlSeconds: 30,
     smallGroupField: null,
     configError: null,
   };
