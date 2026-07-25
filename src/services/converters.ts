@@ -120,6 +120,7 @@ export function toStudent(snapshot: DocumentSnapshot<DocumentData>): Student {
     createdAt: toDate(data.createdAt, fallback),
     updatedAt: toDate(data.updatedAt, fallback),
     createdBy: str(data.createdBy),
+    updatedBy: strOrNull(data.updatedBy),
   };
 }
 
@@ -250,7 +251,8 @@ export function toPcoSyncState(snapshot: DocumentSnapshot<DocumentData>): PcoSyn
       errors: num(counts.errors, 0),
     },
     lastError: strOrNull(data.lastError),
-    rosterSource: data.rosterSource === 'grade' ? 'grade' : 'list',
+    // Mirrors PCO_ROSTER_SOURCE's default in functions/src/config.ts.
+    rosterSource: data.rosterSource === 'list' ? 'list' : 'grade',
     writeBack:
       data.writeBack === 'off' || data.writeBack === 'full' ? data.writeBack : 'create',
     triggeredBy: strOrNull(data.triggeredBy),

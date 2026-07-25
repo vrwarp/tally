@@ -7,6 +7,7 @@
  * mid-event takes effect without a reload.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   GoogleAuthProvider,
   isSignInWithEmailLink,
@@ -53,6 +54,7 @@ function describeAuthError(error: unknown): string {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [authResolved, setAuthResolved] = useState(false);
@@ -125,11 +127,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         window.localStorage.removeItem(EMAIL_STORAGE_KEY);
         setMagicLinkSentTo(null);
         setError(null);
-        // Strip the one-time credential out of the address bar.
-        window.history.replaceState({}, '', '/');
+        // Strip the one-time credential out of the address bar. This must go
+        // through the router rather than history.replaceState: React Router
+        // does not observe direct history mutations, so the app would stay
+        // mounted on /login and the user would sit staring at the sign-in form
+        // they had just completed.
+        navigate('/', { replace: true });
       })
       .catch((cause) => setError(describeAuthError(cause)));
-  }, []);
+  }, [navigate]);
 
   const sendMagicLink = useCallback(async (email: string) => {
     const address = email.trim().toLowerCase();

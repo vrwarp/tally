@@ -10,7 +10,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
+      includeAssets: ['favicon.svg', 'icons/icon-192.png'],
       manifest: {
         name: 'Tally — Footprints Attendance',
         short_name: 'Tally',
@@ -47,6 +47,26 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+    },
+  },
+  build: {
+    // The Firebase SDK is a single ~585 kB vendor chunk and cannot be usefully
+    // split further; warning about it on every build would only train people to
+    // ignore the warning that matters.
+    chunkSizeWarningLimit: 700,
+    rollupOptions: {
+      output: {
+        /*
+         * Pin the two heavy, slow-moving dependencies into their own chunks.
+         * Tally ships as a PWA that counselors keep installed for months, so an
+         * app-code deploy should not invalidate the ~450 kB of Firebase SDK
+         * sitting in their cache.
+         */
+        manualChunks: {
+          firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/functions'],
+          react: ['react', 'react-dom', 'react-router-dom'],
+        },
+      },
     },
   },
   server: {

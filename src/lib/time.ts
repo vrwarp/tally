@@ -120,7 +120,11 @@ export function nextSeriesOccurrence(
     startAt = atTimeOfDay(day, series.startTime);
   }
 
-  const endAt = atTimeOfDay(startAt, series.endTime);
+  let endAt = atTimeOfDay(startAt, series.endTime);
+  // A lock-in that runs 22:00-01:00 ends on the following day. Without this the
+  // check-in window would close before it opened.
+  if (endAt <= startAt) endAt = new Date(endAt.getTime() + 86_400_000);
+
   return {
     startAt,
     endAt,

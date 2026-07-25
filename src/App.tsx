@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from '@/context/AuthProvider';
 import { DataProvider } from '@/context/DataProvider';
@@ -6,12 +7,35 @@ import { AuthGate, RequireRole } from '@/features/auth/AuthGate';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { AppShell } from '@/components/AppShell';
 import { CheckInPage } from '@/features/checkin/CheckInPage';
-import { DashboardPage } from '@/features/dashboard/DashboardPage';
-import { EventsPage } from '@/features/events/EventsPage';
-import { EventDetailPage } from '@/features/events/EventDetailPage';
-import { StudentsPage } from '@/features/students/StudentsPage';
-import { StudentDetailPage } from '@/features/students/StudentDetailPage';
-import { SettingsPage } from '@/features/settings/SettingsPage';
+import { LoadingScreen } from '@/components/ui';
+
+/*
+ * Check-in and sign-in ship in the entry chunk; the core-team screens are
+ * fetched on demand.
+ *
+ * Most people who install Tally are counselors who will only ever open the
+ * roster, often on church wifi from a phone that has been in a pocket all week.
+ * Making them download the dashboard, the event editor and the RSVP manager
+ * before they can tap a single name is the wrong trade.
+ */
+const DashboardPage = lazy(() =>
+  import('@/features/dashboard/DashboardPage').then((m) => ({ default: m.DashboardPage })),
+);
+const EventsPage = lazy(() =>
+  import('@/features/events/EventsPage').then((m) => ({ default: m.EventsPage })),
+);
+const EventDetailPage = lazy(() =>
+  import('@/features/events/EventDetailPage').then((m) => ({ default: m.EventDetailPage })),
+);
+const StudentsPage = lazy(() =>
+  import('@/features/students/StudentsPage').then((m) => ({ default: m.StudentsPage })),
+);
+const StudentDetailPage = lazy(() =>
+  import('@/features/students/StudentDetailPage').then((m) => ({ default: m.StudentDetailPage })),
+);
+const SettingsPage = lazy(() =>
+  import('@/features/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })),
+);
 
 export default function App() {
   return (
@@ -25,6 +49,7 @@ export default function App() {
               <AuthGate>
                 <DataProvider>
                   <AppShell>
+                    <Suspense fallback={<LoadingScreen />}>
                     <Routes>
                       {/* Check-in is the home screen: a counselor at the door
                           should never have to navigate to start working. */}
@@ -82,6 +107,7 @@ export default function App() {
 
                       <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
+                    </Suspense>
                   </AppShell>
                 </DataProvider>
               </AuthGate>

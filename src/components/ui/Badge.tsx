@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
+import { WARNING_META } from '@/components/ui/warnings';
 import type { RosterWarning } from '@/types';
 
 type Tone = 'neutral' | 'brand' | 'success' | 'warn' | 'danger';
@@ -34,13 +35,6 @@ export function Badge({ tone = 'neutral', children, className, title }: BadgePro
   );
 }
 
-const WARNING_META: Record<RosterWarning, { label: string; short: string; tone: Tone }> = {
-  'missing-waiver': { label: 'Missing waiver', short: 'Waiver', tone: 'danger' },
-  'missing-payment': { label: 'Payment due', short: 'Payment', tone: 'danger' },
-  'incomplete-profile': { label: 'Missing parent contact', short: 'Info', tone: 'warn' },
-  allergy: { label: 'Has allergies on file', short: 'Allergy', tone: 'warn' },
-};
-
 /** Renders a roster warning as its badge. Blocking issues read red, not yellow. */
 export function WarningBadge({ warning }: { warning: RosterWarning }) {
   const meta = WARNING_META[warning];
@@ -51,8 +45,4 @@ export function WarningBadge({ warning }: { warning: RosterWarning }) {
       <span aria-hidden="true">{meta.short}</span>
     </Badge>
   );
-}
-
-export function warningLabel(warning: RosterWarning): string {
-  return WARNING_META[warning].label;
 }

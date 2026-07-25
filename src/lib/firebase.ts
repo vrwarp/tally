@@ -70,7 +70,6 @@ if (USE_EMULATORS) {
   connectAuthEmulator(auth, `http://${host}:${authPort}`, { disableWarnings: true });
   connectFirestoreEmulator(db, host, firestorePort);
 
-  // eslint-disable-next-line no-console
   console.info(
     `[tally] Using Firebase emulators — auth :${authPort}, firestore :${firestorePort}`,
   );

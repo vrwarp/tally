@@ -94,6 +94,7 @@ export function buildStudentPayload(draft: StudentDraft, uid: string) {
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     createdBy: uid,
+    updatedBy: uid,
   };
 }
 

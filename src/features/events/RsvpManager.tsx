@@ -1,0 +1,557 @@
+/**
+ * Who is coming on the retreat, and who is still blocking the bus (Journey 4).
+ *
+ * The week before a trip, a leader is not browsing an RSVP list — they are
+ * chasing two numbers: outstanding waivers and outstanding payments. So those
+ * lead the summary, and the names behind them are spelled out rather than left
+ * for someone to find by scrolling. Declined students are excluded from both
+ * counts; nobody chases a waiver from a student who is not going.
+ *
+ * Every toggle writes straight through `upsertRsvp`, which merges: a counselor
+ * ticking a waiver at the church door cannot clobber the payment a core team
+ * member recorded from home a second earlier. Success is visible in the live
+ * data, so only failures raise a toast.
+ */
+import { useMemo, useRef, useState } from 'react';
+import {
+  Badge,
+  Button,
+  Card,
+  CardHeader,
+  EmptyState,
+  ErrorBanner,
+  Modal,
+  SkeletonRows,
+  StatTile,
+} from '@/components/ui';
+import { useAuth } from '@/context/authContext';
+import { useData } from '@/context/dataContext';
+import { useToast } from '@/context/toastContext';
+import { useRsvps } from '@/hooks/useAttendance';
+import { cn, matchesQuery, ordinalGrade, sortByName } from '@/lib/utils';
+import {
+  addRsvps,
+  removeRsvp,
+  setRsvpStatus,
+  upsertRsvp,
+  type RsvpDraft,
+} from '@/services/rsvps';
+import { studentFullName, type Rsvp, type RsvpStatus, type Student, type TallyEvent } from '@/types';
+
+const STATUS_OPTIONS: { value: RsvpStatus; label: string; active: string }[] = [
+  { value: 'yes', label: 'Going', active: 'bg-present-500/20 text-present-400' },
+  { value: 'maybe', label: 'Maybe', active: 'bg-warn-500/20 text-warn-400' },
+  { value: 'no', label: 'No', active: 'bg-ink-700 text-ink-200' },
+];
+
+/** `2500` -> `$25.00`. */
+function formatFee(cents: number): string {
+  return `$${(cents / 100).toFixed(2)}`;
+}
+
+interface RsvpRow {
+  rsvp: Rsvp;
+  /** Null when the student record is gone but the RSVP document survived. */
+  student: Student | null;
+  name: string;
+}
+
+function ToggleChip({
+  label,
+  pressed,
+  busy,
+  onPress,
+  ariaLabel,
+}: {
+  label: string;
+  pressed: boolean;
+  busy: boolean;
+  onPress: () => void;
+  ariaLabel: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={pressed}
+      aria-label={ariaLabel}
+      aria-busy={busy || undefined}
+      disabled={busy}
+      onClick={onPress}
+      className={cn(
+        'inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-xs font-semibold ring-1 transition-colors disabled:opacity-50',
+        pressed
+          ? 'bg-present-500/15 text-present-400 ring-present-500/30'
+          : 'bg-ink-800 text-ink-300 ring-ink-700 active:bg-ink-700',
+      )}
+    >
+      <span aria-hidden="true">{pressed ? '✓' : '○'}</span>
+      {label}
+    </button>
+  );
+}
+
+function AddStudentsModal({
+  open,
+  onClose,
+  candidates,
+  onAdd,
+}: {
+  open: boolean;
+  onClose: () => void;
+  candidates: readonly Student[];
+  onAdd: (studentIds: string[]) => Promise<void>;
+}) {
+  const [query, setQuery] = useState('');
+  const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
+  const [saving, setSaving] = useState(false);
+
+  const visible = candidates.filter((student) => matchesQuery(student.searchName, query));
+
+  const toggle = (studentId: string) => {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(studentId)) next.delete(studentId);
+      else next.add(studentId);
+      return next;
+    });
+  };
+
+  const close = () => {
+    setQuery('');
+    setSelected(new Set());
+    onClose();
+  };
+
+  const submit = async () => {
+    setSaving(true);
+    try {
+      await onAdd([...selected]);
+      close();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={close}
+      title="Add students"
+      description="Tick everyone going, then add them in one go."
+      footer={
+        <div className="flex gap-2">
+          <Button variant="secondary" size="lg" className="flex-1" onClick={close}>
+            Cancel
+          </Button>
+          <Button
+            size="lg"
+            className="flex-[2]"
+            loading={saving}
+            disabled={selected.size === 0}
+            onClick={() => void submit()}
+          >
+            Add {selected.size > 0 ? selected.size : ''}{' '}
+            {selected.size === 1 ? 'student' : 'students'}
+          </Button>
+        </div>
+      }
+    >
+      <div className="flex flex-col gap-3">
+        <input
+          type="search"
+          inputMode="search"
+          autoCapitalize="off"
+          autoCorrect="off"
+          autoComplete="off"
+          spellCheck={false}
+          aria-label="Search students by name"
+          placeholder="Search students…"
+          value={query}
+          onChange={(changed) => setQuery(changed.target.value)}
+          className="min-h-12 w-full rounded-xl bg-ink-950 px-3 text-ink-100 ring-1 ring-ink-700 placeholder:text-ink-500 focus:outline-none focus:ring-2 focus:ring-brand-400"
+        />
+
+        {visible.length === 0 ? (
+          <EmptyState
+            title={candidates.length === 0 ? 'Everyone is already on the list' : 'No match'}
+            description={
+              candidates.length === 0
+                ? undefined
+                : 'Students already on the RSVP list are not shown here.'
+            }
+          />
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {visible.map((student) => {
+              const checked = selected.has(student.id);
+              return (
+                <li key={student.id}>
+                  <button
+                    type="button"
+                    role="checkbox"
+                    aria-checked={checked}
+                    onClick={() => toggle(student.id)}
+                    className={cn(
+                      'flex min-h-14 w-full items-center gap-3 rounded-xl px-3 py-2 text-left ring-1 transition-colors',
+                      checked
+                        ? 'bg-brand-500/15 ring-brand-500/40'
+                        : 'bg-ink-950 ring-ink-800 active:bg-ink-800',
+                    )}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        'flex size-6 shrink-0 items-center justify-center rounded-md text-xs font-bold ring-1',
+                        checked
+                          ? 'bg-brand-500 text-white ring-brand-400'
+                          : 'bg-ink-900 text-transparent ring-ink-700',
+                      )}
+                    >
+                      ✓
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink-100">
+                      {studentFullName(student)}
+                    </span>
+                    <span className="shrink-0 text-xs text-ink-500">
+                      {ordinalGrade(student.grade)}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+export interface RsvpManagerProps {
+  event: TallyEvent;
+}
+
+export function RsvpManager({ event }: RsvpManagerProps) {
+  const { students } = useData();
+  const { user } = useAuth();
+  const { show } = useToast();
+  const { rsvps, loading, error } = useRsvps(event.id);
+
+  const [addOpen, setAddOpen] = useState(false);
+  const [pending, setPending] = useState<ReadonlySet<string>>(() => new Set());
+  const [announcement, setAnnouncement] = useState('');
+  // Guarding on a ref rejects a double-tap before React has re-rendered.
+  const inFlight = useRef(new Set<string>());
+
+  const studentsById = useMemo(
+    () => new Map(students.map((student) => [student.id, student])),
+    [students],
+  );
+
+  const rows = useMemo<RsvpRow[]>(() => {
+    return rsvps
+      .map((rsvp) => {
+        const student = studentsById.get(rsvp.studentId) ?? null;
+        return {
+          rsvp,
+          student,
+          name: student ? studentFullName(student) : 'Former student',
+        };
+      })
+      .sort((a, b) =>
+        a.student && b.student ? sortByName(a.student, b.student) : a.name.localeCompare(b.name),
+      );
+  }, [rsvps, studentsById]);
+
+  const summary = useMemo(() => {
+    const going = rows.filter((row) => row.rsvp.status === 'yes');
+    const maybe = rows.filter((row) => row.rsvp.status === 'maybe');
+    const declined = rows.filter((row) => row.rsvp.status === 'no');
+    // Only people who might actually get on the bus are chased.
+    const expected = [...going, ...maybe];
+    return {
+      going,
+      maybe,
+      declined,
+      expected,
+      waiverMissing: event.requiresWaiver
+        ? expected.filter((row) => !row.rsvp.waiverSigned)
+        : [],
+      paymentMissing: event.requiresPayment
+        ? expected.filter((row) => !row.rsvp.paymentReceived)
+        : [],
+    };
+  }, [rows, event.requiresWaiver, event.requiresPayment]);
+
+  const candidates = useMemo(() => {
+    const onList = new Set(rsvps.map((rsvp) => rsvp.studentId));
+    return students
+      .filter((student) => student.status === 'active' && !onList.has(student.id))
+      .sort(sortByName);
+  }, [students, rsvps]);
+
+  const run = async (key: string, action: () => Promise<void>, failure: string) => {
+    if (!user || inFlight.current.has(key)) return;
+    inFlight.current.add(key);
+    setPending((current) => new Set(current).add(key));
+    try {
+      await action();
+    } catch {
+      show(failure, { tone: 'error' });
+    } finally {
+      inFlight.current.delete(key);
+      setPending((current) => {
+        const next = new Set(current);
+        next.delete(key);
+        return next;
+      });
+    }
+  };
+
+  const handleStatus = (row: RsvpRow, status: RsvpStatus) => {
+    if (!user || row.rsvp.status === status) return;
+    void run(
+      `${row.rsvp.studentId}:status`,
+      () => setRsvpStatus(event.id, row.rsvp.studentId, status, user.uid),
+      `Could not update ${row.name}'s RSVP.`,
+    );
+  };
+
+  const handleFlag = (row: RsvpRow, field: 'waiverSigned' | 'paymentReceived') => {
+    if (!user) return;
+    const next = !row.rsvp[field];
+    // One field per write, so the merge only touches what was actually toggled.
+    const draft: RsvpDraft =
+      field === 'waiverSigned' ? { waiverSigned: next } : { paymentReceived: next };
+    void run(
+      `${row.rsvp.studentId}:${field}`,
+      () => upsertRsvp(event.id, row.rsvp.studentId, draft, user.uid),
+      `Could not update ${row.name}'s ${field === 'waiverSigned' ? 'waiver' : 'payment'}.`,
+    );
+  };
+
+  const handleRemove = (row: RsvpRow) => {
+    void run(
+      `${row.rsvp.studentId}:remove`,
+      async () => {
+        await removeRsvp(event.id, row.rsvp.studentId);
+        setAnnouncement(`${row.name} removed from the RSVP list`);
+      },
+      `Could not remove ${row.name}.`,
+    );
+  };
+
+  const handleAdd = async (studentIds: string[]) => {
+    if (!user || studentIds.length === 0) return;
+    try {
+      await addRsvps(event.id, studentIds, user.uid);
+      setAnnouncement(
+        `${studentIds.length} ${studentIds.length === 1 ? 'student' : 'students'} added to the RSVP list`,
+      );
+    } catch {
+      show('Could not add those students. Try again.', { tone: 'error' });
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader
+        title="RSVPs"
+        count={rows.length}
+        description={
+          event.requiresRsvp
+            ? 'Only these students appear at check-in.'
+            : 'This event is open to everyone — RSVPs are for planning.'
+        }
+        action={<Button onClick={() => setAddOpen(true)}>Add students</Button>}
+      />
+
+      <div className="flex flex-col gap-3 p-3">
+        {error ? <ErrorBanner message={error} /> : null}
+
+        <div className="grid grid-cols-3 gap-2">
+          <StatTile label="Going" value={summary.going.length} tone="success" />
+          <StatTile label="Maybe" value={summary.maybe.length} />
+          <StatTile label="Declined" value={summary.declined.length} />
+        </div>
+
+        {event.requiresWaiver || event.requiresPayment ? (
+          <div
+            className={cn(
+              'grid gap-2',
+              event.requiresWaiver && event.requiresPayment ? 'grid-cols-2' : 'grid-cols-1',
+            )}
+          >
+            {event.requiresWaiver ? (
+              <StatTile
+                label="Waivers outstanding"
+                value={summary.waiverMissing.length}
+                tone={summary.waiverMissing.length > 0 ? 'danger' : 'success'}
+                hint={
+                  summary.waiverMissing.length > 0
+                    ? `of ${summary.expected.length} going or maybe`
+                    : 'All in.'
+                }
+              />
+            ) : null}
+            {event.requiresPayment ? (
+              <StatTile
+                label="Payments outstanding"
+                value={summary.paymentMissing.length}
+                tone={summary.paymentMissing.length > 0 ? 'danger' : 'success'}
+                hint={
+                  summary.paymentMissing.length > 0 && event.feeCents
+                    ? `${formatFee(summary.paymentMissing.length * event.feeCents)} to collect`
+                    : summary.paymentMissing.length > 0
+                      ? `of ${summary.expected.length} going or maybe`
+                      : 'All in.'
+                }
+              />
+            ) : null}
+          </div>
+        ) : null}
+
+        {summary.waiverMissing.length > 0 ? (
+          <p className="text-xs leading-relaxed text-danger-400">
+            <span className="font-bold">Waiver needed:</span>{' '}
+            {summary.waiverMissing.map((row) => row.name).join(', ')}
+          </p>
+        ) : null}
+        {summary.paymentMissing.length > 0 ? (
+          <p className="text-xs leading-relaxed text-danger-400">
+            <span className="font-bold">Payment due:</span>{' '}
+            {summary.paymentMissing.map((row) => row.name).join(', ')}
+          </p>
+        ) : null}
+
+        {loading && rows.length === 0 ? (
+          <SkeletonRows count={3} />
+        ) : rows.length === 0 ? (
+          <EmptyState
+            icon="🚌"
+            title="Nobody has RSVP’d yet"
+            description={
+              event.requiresRsvp
+                ? 'The check-in roster for this event stays empty until students are added here.'
+                : 'Add the students you expect so waivers and payments can be tracked.'
+            }
+            action={<Button onClick={() => setAddOpen(true)}>Add students</Button>}
+          />
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {rows.map((row) => {
+              const { rsvp } = row;
+              const expected = rsvp.status !== 'no';
+              const blocked =
+                expected &&
+                ((event.requiresWaiver && !rsvp.waiverSigned) ||
+                  (event.requiresPayment && !rsvp.paymentReceived));
+
+              return (
+                <li
+                  key={rsvp.id}
+                  className={cn(
+                    'rounded-xl p-3 ring-1',
+                    blocked ? 'bg-danger-500/10 ring-danger-500/40' : 'bg-ink-950 ring-ink-800',
+                  )}
+                >
+                  <div className="flex items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="flex items-baseline gap-2">
+                        <span className="truncate font-semibold text-ink-50">{row.name}</span>
+                        {row.student ? (
+                          <span className="shrink-0 text-xs text-ink-500">
+                            {ordinalGrade(row.student.grade)}
+                          </span>
+                        ) : null}
+                      </p>
+                      {blocked ? (
+                        <span className="mt-1 flex flex-wrap gap-1">
+                          {event.requiresWaiver && !rsvp.waiverSigned ? (
+                            <Badge tone="danger">No waiver</Badge>
+                          ) : null}
+                          {event.requiresPayment && !rsvp.paymentReceived ? (
+                            <Badge tone="danger">Unpaid</Badge>
+                          ) : null}
+                        </span>
+                      ) : null}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleRemove(row)}
+                      disabled={pending.has(`${rsvp.studentId}:remove`)}
+                      aria-label={`Remove ${row.name} from the RSVP list`}
+                      className="-mr-1 -mt-1 flex size-11 shrink-0 items-center justify-center rounded-xl text-xl leading-none text-ink-500 active:bg-ink-800 disabled:opacity-50"
+                    >
+                      <span aria-hidden="true">×</span>
+                    </button>
+                  </div>
+
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <div
+                      role="group"
+                      aria-label={`RSVP for ${row.name}`}
+                      className="inline-flex rounded-xl bg-ink-900 p-0.5 ring-1 ring-ink-800"
+                    >
+                      {STATUS_OPTIONS.map((option) => {
+                        const active = rsvp.status === option.value;
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            aria-pressed={active}
+                            aria-label={`${option.label} — ${row.name}`}
+                            disabled={pending.has(`${rsvp.studentId}:status`)}
+                            onClick={() => handleStatus(row, option.value)}
+                            className={cn(
+                              'min-h-11 rounded-lg px-3 text-xs font-semibold transition-colors disabled:opacity-50',
+                              active ? option.active : 'text-ink-400 active:bg-ink-800',
+                            )}
+                          >
+                            {option.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {event.requiresWaiver ? (
+                      <ToggleChip
+                        label="Waiver"
+                        pressed={rsvp.waiverSigned}
+                        busy={pending.has(`${rsvp.studentId}:waiverSigned`)}
+                        onPress={() => handleFlag(row, 'waiverSigned')}
+                        ariaLabel={`Waiver signed for ${row.name}`}
+                      />
+                    ) : null}
+
+                    {event.requiresPayment ? (
+                      <ToggleChip
+                        label={event.feeCents ? `Paid ${formatFee(event.feeCents)}` : 'Paid'}
+                        pressed={rsvp.paymentReceived}
+                        busy={pending.has(`${rsvp.studentId}:paymentReceived`)}
+                        onPress={() => handleFlag(row, 'paymentReceived')}
+                        ariaLabel={`Payment received from ${row.name}`}
+                      />
+                    ) : null}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+
+      <AddStudentsModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        candidates={candidates}
+        onAdd={handleAdd}
+      />
+
+      <span aria-live="polite" role="status" className="sr-only">
+        {announcement}
+      </span>
+    </Card>
+  );
+}

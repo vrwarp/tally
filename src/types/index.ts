@@ -141,6 +141,12 @@ export interface StudentDoc {
   createdAt: Timestamp;
   updatedAt: Timestamp;
   createdBy: string;
+  /**
+   * Who last edited the record. Null for a student the sync has only ever
+   * written, so "a person changed this" stays distinguishable from "Planning
+   * Center changed this" when someone asks why a minor's data moved.
+   */
+  updatedBy: string | null;
 }
 
 export interface Student

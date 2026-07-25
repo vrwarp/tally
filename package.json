@@ -20,9 +20,10 @@
     "test:all": "npm run test && npm run test:functions && npm run test:rules",
     "functions:build": "npm --prefix functions run build",
     "functions:install": "npm --prefix functions install",
-    "emulators": "firebase emulators:start --project demo-tally --import=./.emulator-data --export-on-exit=./.emulator-data",
-    "emulators:clean": "firebase emulators:start --project demo-tally",
+    "emulators": "firebase emulators:start --project demo-tally --export-on-exit=./.emulator-data",
+    "emulators:resume": "firebase emulators:start --project demo-tally --import=./.emulator-data --export-on-exit=./.emulator-data",
     "seed": "tsx scripts/seed.ts",
+    "verify:seed": "tsx scripts/verify-seed.ts",
     "dev:emulated": "npm run functions:build && concurrently -k -n emulators,vite -c magenta,cyan \"firebase emulators:start --project demo-tally\" \"vite --mode emulated\""
   },
   "dependencies": {

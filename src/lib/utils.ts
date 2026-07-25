@@ -22,16 +22,16 @@ export function haptic(pattern: number | number[] = 12): void {
 
 /**
  * Case- and diacritic-insensitive substring match used by the roster search
- * fallback. Matches on the full name and on either name part, so "ma" finds
- * both "Marcus Lee" and "Ana Martinez".
+ * fallback.
+ *
+ * Substring rather than prefix matching, because a counselor at the door types
+ * whatever they heard: "ma" has to find both "Marcus Lee" and "Ana Martinez",
+ * and "lee" has to find "Marcus Lee" without them typing the first name.
  */
 export function matchesQuery(searchName: string, query: string): boolean {
   const needle = normalizeForSearch(query);
   if (!needle) return true;
-  const haystack = normalizeForSearch(searchName);
-  if (haystack.includes(needle)) return true;
-  // Also try matching the needle against each word start, so "le" hits "Lee".
-  return haystack.split(' ').some((part) => part.startsWith(needle));
+  return normalizeForSearch(searchName).includes(needle);
 }
 
 export function normalizeForSearch(value: string): string {

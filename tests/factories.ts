@@ -20,6 +20,19 @@ import { DEFAULT_SETTINGS, buildSearchName } from '@/types';
 let counter = 0;
 const nextId = (prefix: string) => `${prefix}-${(counter += 1)}`;
 
+/**
+ * Applies an override, falling back only when the caller omitted the field.
+ *
+ * `??` cannot be used here: a one-off event is *defined* by `seriesId: null`,
+ * and `overrides.seriesId ?? 'friday-fellowship'` would silently hand the test
+ * a recurring event instead — which is precisely the series-isolation bug the
+ * predictive-roster suite exists to catch.
+ */
+function pick<T, K extends keyof T>(overrides: Partial<T>, key: K, fallback: T[K]): T[K] {
+  const value = overrides[key];
+  return value === undefined ? fallback : (value as T[K]);
+}
+
 /** A fixed clock so date-sensitive assertions never depend on the wall clock. */
 export const NOW = new Date('2026-02-13T19:30:00');
 
@@ -28,30 +41,31 @@ export function makeStudent(overrides: Partial<Student> = {}): Student {
   const lastName = overrides.lastName ?? 'Rivera';
 
   return {
-    id: overrides.id ?? nextId('student'),
+    id: pick(overrides, 'id', nextId('student')),
     firstName,
     lastName,
-    grade: (overrides.grade ?? 8) as Grade,
-    gender: overrides.gender ?? 'unspecified',
-    smallGroupId: overrides.smallGroupId ?? null,
-    parentName: overrides.parentName ?? 'Alex Rivera',
-    parentPhone: overrides.parentPhone ?? '555-0100',
-    parentEmail: overrides.parentEmail ?? null,
-    allergies: overrides.allergies ?? null,
-    notes: overrides.notes ?? null,
-    status: overrides.status ?? 'active',
-    isVisitor: overrides.isVisitor ?? false,
-    profileComplete: overrides.profileComplete ?? true,
-    searchName: overrides.searchName ?? buildSearchName(firstName, lastName),
-    firstAttendedAt: overrides.firstAttendedAt ?? null,
-    lastAttendedAt: overrides.lastAttendedAt ?? null,
-    pcoPersonId: overrides.pcoPersonId ?? null,
-    pcoUpdatedAt: overrides.pcoUpdatedAt ?? null,
-    pcoSyncedAt: overrides.pcoSyncedAt ?? null,
-    pcoPushPending: overrides.pcoPushPending ?? false,
-    createdAt: overrides.createdAt ?? new Date('2025-09-01T12:00:00'),
-    updatedAt: overrides.updatedAt ?? new Date('2025-09-01T12:00:00'),
-    createdBy: overrides.createdBy ?? 'seed',
+    grade: (pick(overrides, 'grade', 8) as Grade),
+    gender: pick(overrides, 'gender', 'unspecified'),
+    smallGroupId: pick(overrides, 'smallGroupId', null),
+    parentName: pick(overrides, 'parentName', 'Alex Rivera'),
+    parentPhone: pick(overrides, 'parentPhone', '555-0100'),
+    parentEmail: pick(overrides, 'parentEmail', null),
+    allergies: pick(overrides, 'allergies', null),
+    notes: pick(overrides, 'notes', null),
+    status: pick(overrides, 'status', 'active'),
+    isVisitor: pick(overrides, 'isVisitor', false),
+    profileComplete: pick(overrides, 'profileComplete', true),
+    searchName: pick(overrides, 'searchName', buildSearchName(firstName, lastName)),
+    firstAttendedAt: pick(overrides, 'firstAttendedAt', null),
+    lastAttendedAt: pick(overrides, 'lastAttendedAt', null),
+    pcoPersonId: pick(overrides, 'pcoPersonId', null),
+    pcoUpdatedAt: pick(overrides, 'pcoUpdatedAt', null),
+    pcoSyncedAt: pick(overrides, 'pcoSyncedAt', null),
+    pcoPushPending: pick(overrides, 'pcoPushPending', false),
+    createdAt: pick(overrides, 'createdAt', new Date('2025-09-01T12:00:00')),
+    updatedAt: pick(overrides, 'updatedAt', new Date('2025-09-01T12:00:00')),
+    createdBy: pick(overrides, 'createdBy', 'seed'),
+    updatedBy: pick(overrides, 'updatedBy', null),
   };
 }
 
@@ -60,79 +74,79 @@ export function makeEvent(overrides: Partial<TallyEvent> = {}): TallyEvent {
   const endAt = overrides.endAt ?? new Date('2026-02-13T21:00:00');
 
   return {
-    id: overrides.id ?? nextId('event'),
-    title: overrides.title ?? 'Friday Fellowship',
-    mode: overrides.mode ?? 'recurring',
-    seriesId: overrides.seriesId ?? 'friday-fellowship',
+    id: pick(overrides, 'id', nextId('event')),
+    title: pick(overrides, 'title', 'Friday Fellowship'),
+    mode: pick(overrides, 'mode', 'recurring'),
+    seriesId: pick(overrides, 'seriesId', 'friday-fellowship'),
     startAt,
     endAt,
-    checkInOpensAt: overrides.checkInOpensAt ?? new Date(startAt.getTime() - 60 * 60_000),
-    checkInClosesAt: overrides.checkInClosesAt ?? new Date(endAt.getTime() + 60 * 60_000),
-    location: overrides.location ?? null,
-    notes: overrides.notes ?? null,
-    requiresRsvp: overrides.requiresRsvp ?? false,
-    requiresWaiver: overrides.requiresWaiver ?? false,
-    requiresPayment: overrides.requiresPayment ?? false,
-    feeCents: overrides.feeCents ?? null,
-    defaultGroupingMode: overrides.defaultGroupingMode ?? 'all',
-    status: overrides.status ?? 'scheduled',
-    createdAt: overrides.createdAt ?? new Date('2026-01-01T12:00:00'),
-    updatedAt: overrides.updatedAt ?? new Date('2026-01-01T12:00:00'),
-    createdBy: overrides.createdBy ?? 'seed',
+    checkInOpensAt: pick(overrides, 'checkInOpensAt', new Date(startAt.getTime() - 60 * 60_000)),
+    checkInClosesAt: pick(overrides, 'checkInClosesAt', new Date(endAt.getTime() + 60 * 60_000)),
+    location: pick(overrides, 'location', null),
+    notes: pick(overrides, 'notes', null),
+    requiresRsvp: pick(overrides, 'requiresRsvp', false),
+    requiresWaiver: pick(overrides, 'requiresWaiver', false),
+    requiresPayment: pick(overrides, 'requiresPayment', false),
+    feeCents: pick(overrides, 'feeCents', null),
+    defaultGroupingMode: pick(overrides, 'defaultGroupingMode', 'all'),
+    status: pick(overrides, 'status', 'scheduled'),
+    createdAt: pick(overrides, 'createdAt', new Date('2026-01-01T12:00:00')),
+    updatedAt: pick(overrides, 'updatedAt', new Date('2026-01-01T12:00:00')),
+    createdBy: pick(overrides, 'createdBy', 'seed'),
   };
 }
 
 export function makeAttendance(overrides: Partial<AttendanceRecord> = {}): AttendanceRecord {
   const studentId = overrides.studentId ?? nextId('student');
   return {
-    id: overrides.id ?? studentId,
+    id: pick(overrides, 'id', studentId),
     studentId,
-    eventId: overrides.eventId ?? 'event-1',
-    seriesId: overrides.seriesId ?? 'friday-fellowship',
-    checkedInAt: overrides.checkedInAt ?? NOW,
-    checkedInBy: overrides.checkedInBy ?? 'counselor-1',
-    method: overrides.method ?? 'tap',
-    isFirstEver: overrides.isFirstEver ?? false,
+    eventId: pick(overrides, 'eventId', 'event-1'),
+    seriesId: pick(overrides, 'seriesId', 'friday-fellowship'),
+    checkedInAt: pick(overrides, 'checkedInAt', NOW),
+    checkedInBy: pick(overrides, 'checkedInBy', 'counselor-1'),
+    method: pick(overrides, 'method', 'tap'),
+    isFirstEver: pick(overrides, 'isFirstEver', false),
   };
 }
 
 export function makeRsvp(overrides: Partial<Rsvp> = {}): Rsvp {
   const studentId = overrides.studentId ?? nextId('student');
   return {
-    id: overrides.id ?? studentId,
+    id: pick(overrides, 'id', studentId),
     studentId,
-    eventId: overrides.eventId ?? 'event-1',
-    status: overrides.status ?? 'yes',
-    waiverSigned: overrides.waiverSigned ?? false,
-    paymentReceived: overrides.paymentReceived ?? false,
-    amountPaidCents: overrides.amountPaidCents ?? null,
-    notes: overrides.notes ?? null,
-    updatedAt: overrides.updatedAt ?? NOW,
-    updatedBy: overrides.updatedBy ?? 'core-1',
+    eventId: pick(overrides, 'eventId', 'event-1'),
+    status: pick(overrides, 'status', 'yes'),
+    waiverSigned: pick(overrides, 'waiverSigned', false),
+    paymentReceived: pick(overrides, 'paymentReceived', false),
+    amountPaidCents: pick(overrides, 'amountPaidCents', null),
+    notes: pick(overrides, 'notes', null),
+    updatedAt: pick(overrides, 'updatedAt', NOW),
+    updatedBy: pick(overrides, 'updatedBy', 'core-1'),
   };
 }
 
 export function makeSmallGroup(overrides: Partial<SmallGroup> = {}): SmallGroup {
   return {
-    id: overrides.id ?? nextId('group'),
-    name: overrides.name ?? '8th Grade Boys',
-    grades: overrides.grades ?? [8],
-    gender: overrides.gender ?? 'male',
-    order: overrides.order ?? 0,
+    id: pick(overrides, 'id', nextId('group')),
+    name: pick(overrides, 'name', '8th Grade Boys'),
+    grades: pick(overrides, 'grades', [8]),
+    gender: pick(overrides, 'gender', 'male'),
+    order: pick(overrides, 'order', 0),
   };
 }
 
 export function makeUser(overrides: Partial<UserProfile> = {}): UserProfile {
   return {
-    id: overrides.id ?? nextId('user'),
-    email: overrides.email ?? 'counselor@example.org',
-    displayName: overrides.displayName ?? 'Sam Counselor',
-    role: overrides.role ?? 'counselor',
-    assignedGroupId: overrides.assignedGroupId ?? null,
-    active: overrides.active ?? true,
-    createdAt: overrides.createdAt ?? new Date('2025-08-01T12:00:00'),
-    lastSeenAt: overrides.lastSeenAt ?? null,
-    pcoPersonId: overrides.pcoPersonId ?? null,
+    id: pick(overrides, 'id', nextId('user')),
+    email: pick(overrides, 'email', 'counselor@example.org'),
+    displayName: pick(overrides, 'displayName', 'Sam Counselor'),
+    role: pick(overrides, 'role', 'counselor'),
+    assignedGroupId: pick(overrides, 'assignedGroupId', null),
+    active: pick(overrides, 'active', true),
+    createdAt: pick(overrides, 'createdAt', new Date('2025-08-01T12:00:00')),
+    lastSeenAt: pick(overrides, 'lastSeenAt', null),
+    pcoPersonId: pick(overrides, 'pcoPersonId', null),
   };
 }
 
