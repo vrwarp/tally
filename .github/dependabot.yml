@@ -1,0 +1,46 @@
+version: 2
+
+updates:
+  # Grouped so the repository gets a handful of pull requests a week rather than
+  # thirty. Majors stay separate — those are the ones worth reading.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: ['minor', 'patch']
+
+  - package-ecosystem: npm
+    directory: /functions
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      minor-and-patch:
+        update-types: ['minor', 'patch']
+
+  - package-ecosystem: npm
+    directory: /tools/pco-simulator
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      minor-and-patch:
+        update-types: ['minor', 'patch']
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        update-types: ['minor', 'patch']
+
+  # The Playwright base image and the @playwright/test package have to move
+  # together, so this one is worth seeing on its own.
+  - package-ecosystem: docker
+    directory: /docker/e2e
+    schedule:
+      interval: weekly

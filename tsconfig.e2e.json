@@ -1,0 +1,24 @@
+{
+  // The app's tsconfig deliberately keeps `types` browser-only. The end-to-end
+  // suite is Node code that drives a browser, so it gets its own config rather
+  // than widening the app's type environment.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "isolatedModules": true,
+    "noEmit": true,
+    "resolveJsonModule": true,
+
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "skipLibCheck": true,
+    "exactOptionalPropertyTypes": false,
+    "types": ["node"]
+  },
+  "include": ["e2e", "playwright.config.ts"]
+}

@@ -1,0 +1,33 @@
+# Keep the build context small and reproducible. Anything generated on a
+# developer's machine is rebuilt inside the image.
+node_modules
+functions/node_modules
+tools/*/node_modules
+dist
+functions/lib
+
+.git
+.github
+
+# Emulator state and test output are per-run, never inputs.
+.emulator-data
+playwright-report
+test-results
+coverage
+*-debug.log
+.firebase
+
+# Local secrets and machine-specific env. `.env.emulated` is deliberately kept:
+# the e2e build needs it to point the app at the emulators.
+.env
+.env.local
+.env.*.local
+functions/.secret.local
+functions/.env
+functions/.env.local
+*.local
+
+.DS_Store
+.idea
+.vscode
+*.swp

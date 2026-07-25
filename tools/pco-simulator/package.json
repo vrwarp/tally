@@ -1,0 +1,24 @@
+{
+  "name": "@tally/pco-simulator",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "An in-memory Planning Center People API simulator, used by the Cloud Functions unit tests and by the end-to-end suite.",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./server": "./src/server.ts"
+  },
+  "bin": {
+    "pco-simulator": "./bin/pco-simulator.js"
+  },
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  }
+}

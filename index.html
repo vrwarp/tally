@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no"
+    />
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Tally" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <title>Tally — Footprints Attendance</title>
+    <!--
+      Theme before first paint.
+
+      React cannot do this: by the time the bundle has parsed the browser has
+      already painted the default theme, and a light-theme user gets a black
+      flash on every cold start. So the smallest possible copy of the resolver
+      runs here, synchronously, ahead of everything.
+
+      Deliberately dumb and dependency-free — it must never be the reason a page
+      fails to load, hence the try/catch around storage, which Safari throws on
+      in private mode. src/lib/theme.ts is the real implementation and reaches
+      the same answer a moment later.
+    -->
+    <script>
+      (function () {
+        try {
+          var stored = null;
+          try {
+            stored = localStorage.getItem('tally:theme');
+          } catch (e) {
+            /* Private mode. Fall through to the device preference. */
+          }
+          var theme =
+            stored === 'light' || stored === 'dark'
+              ? stored
+              : window.matchMedia('(prefers-color-scheme: light)').matches
+                ? 'light'
+                : 'dark';
+          document.documentElement.dataset.theme = theme;
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', theme === 'light' ? '#f1f5f9' : '#0f172a');
+        } catch (e) {
+          document.documentElement.dataset.theme = 'dark';
+        }
+      })();
+    </script>
+  </head>
+  <body class="h-full">
+    <div id="root" class="h-full"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

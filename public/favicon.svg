@@ -1,0 +1,36 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 64 64"
+  width="64"
+  height="64"
+  role="img"
+  aria-labelledby="tally-favicon-title"
+>
+  <title id="tally-favicon-title">Tally</title>
+
+  <!-- Dark rounded square, matching the app's ink-950/ink-900 surface. -->
+  <defs>
+    <linearGradient id="tally-favicon-surface" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0f172a" />
+      <stop offset="1" stop-color="#020617" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#tally-favicon-surface)" />
+  <!-- Keeps the mark from dissolving into a light browser chrome. -->
+  <rect x="0.75" y="0.75" width="62.5" height="62.5" rx="13.25" fill="none" stroke="#0ea5e9" stroke-opacity="0.22" stroke-width="1.5" />
+
+  <!--
+    Four strokes and the diagonal that closes the group of five. Deliberately
+    heavy and widely spaced: at 16px each stroke is barely 1.5 device pixels, so
+    anything finer reads as a smudge.
+  -->
+  <g stroke-linecap="round" stroke-width="6" fill="none">
+    <g stroke="#0ea5e9">
+      <path d="M16.5 18v28" />
+      <path d="M27 18v28" />
+      <path d="M37.5 18v28" />
+      <path d="M48 18v28" />
+    </g>
+    <path stroke="#38bdf8" d="M11.5 48.5 53 15.5" />
+  </g>
+</svg>

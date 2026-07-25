@@ -1,0 +1,121 @@
+[
+  {
+    "journey": "Getting in",
+    "title": "Sign in",
+    "caption": "The only screen a signed-out volunteer sees. An email link is the primary path — counselors are handed a phone at the door and never set a password. Google is secondary, and hides itself in browsers that cannot do OAuth.",
+    "file": "desktop-01-sign-in.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "Journey 1 — high-volume check-in",
+    "title": "The predictive roster",
+    "caption": "Tally picked tonight’s event from the clock; nobody chose it. The “Recent” block is the predictive roster: students who came to at least 2 of the last 3 Fridays, most consistent first. Friday history predicts Friday — Sunday’s regulars are not in this list.",
+    "file": "desktop-02-the-predictive-roster.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "Journey 1 — high-volume check-in",
+    "title": "One tap checks a student in",
+    "caption": "Maya Adebayo moved to “Checked in” at the bottom, and the header count went up. The row flashed green and buzzed before the write left the device — the authoritative state then arrives back through Firestore, so a second counselor at the same door sees it too.",
+    "file": "desktop-03-one-tap-checks-a-student-in.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "Journey 1 — high-volume check-in",
+    "title": "Search for anyone not in the Recent block",
+    "caption": "Two letters, filtered instantly against the in-memory roster. The header counts deliberately do not move: they describe the event, not the query, so nobody watches the number drop as they type and thinks they broke something.",
+    "file": "desktop-04-search-for-anyone-not-in-the-recent-block.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "Journey 3 — bring a friend",
+    "title": "Quick-add a visitor",
+    "caption": "A first name, a last name, a grade. Nothing else, because anything more forms a queue at the door. “Save & check in” is one atomic write: the student is created and marked present together, then the modal closes.",
+    "file": "desktop-05-quick-add-a-visitor.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "Journey 3 — bring a friend",
+    "title": "The visitor is already checked in",
+    "caption": "Back on the roster with no interruption. The record is Tally’s own and is queued for Planning Center — a Cloud Function pushes it upstream, and until it lands the student carries a “not pushed yet” flag rather than a half-filled profile.",
+    "file": "desktop-06-the-visitor-is-already-checked-in.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "Journey 5 — pastoral follow-up",
+    "title": "Insights, not a data table",
+    "caption": "Monday evening. The PRD asks for actionable insight rather than raw numbers, so every row leads somewhere: tap-to-call, tap-to-text, or through to the student. “Missing in action” is students who missed three or more gatherings in a row.",
+    "file": "desktop-07-insights-not-a-data-table.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "Journey 5 — pastoral follow-up",
+    "title": "New faces and incomplete profiles",
+    "caption": "First-timers from the past week, and the profiles with no way to reach a parent — the visitors quick-added at the door, before anyone in the church office has met them. “Copy list” puts names and numbers on the clipboard for a group chat, which is what actually happens.",
+    "file": "desktop-08-new-faces-and-incomplete-profiles.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "Journey 5 — pastoral follow-up",
+    "title": "Attendance trend",
+    "caption": "Head count per gathering, per series. Eight bars, no gridlines, no chart library — enough to see a slide starting, which is all this needs to do.",
+    "file": "desktop-09-attendance-trend.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "Journey 4 — the field trip",
+    "title": "The event calendar",
+    "caption": "Recurring gatherings and one-offs together. “Schedule next Friday Fellowship” is two taps, because somebody has to do it every single week.",
+    "file": "desktop-10-the-event-calendar.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "Journey 4 — the field trip",
+    "title": "RSVPs, waivers and payments",
+    "caption": "A one-off event is about accountability rather than speed. The numbers a leader is actually chasing the week before a retreat — waivers outstanding, payments outstanding — are the prominent ones.",
+    "file": "desktop-11-rsvps-waivers-and-payments.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "The roster",
+    "title": "Students",
+    "caption": "The whole ministry, filterable by grade, small group and status. Each row says whether the record came from Planning Center or was created in Tally, so it is obvious which fields are safe to edit here.",
+    "file": "desktop-12-students.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "Settings",
+    "title": "Thresholds, in plain language",
+    "caption": "The prediction window is the one genuinely dangerous control here — it silently reshapes what every counselor sees at the door — so each number is restated as the behaviour it causes, and the panel beside it counts the students the change would actually move. Nobody should have to reason about “2 of 3” at 6:55pm.",
+    "file": "desktop-13-thresholds-in-plain-language.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "Planning Center",
+    "title": "Connected, and holding nothing",
+    "caption": "Tally reads its people from Planning Center and keeps no copy of them. “Refresh” is a live read: browser → callable → Cloud Function → the Planning Center API → back. Between reads a short cache (30 seconds by default, 0 to turn it off) keeps a busy door from becoming a rate limit.",
+    "file": "desktop-14-connected-and-holding-nothing.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "Settings",
+    "title": "The same screen, in daylight",
+    "caption": "Dark is the default because Tally’s home is a dim room on a Friday night, but a Sunday morning classroom is not that room. Light, dark, or follow the device — the choice is per-person and local, unlike the thresholds above it, which are ministry-wide the instant they save.",
+    "file": "desktop-15-the-same-screen-in-daylight.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "The roster",
+    "title": "A roster nobody stores",
+    "caption": "These names are not in Tally’s database. They arrived from Planning Center on this page load, merged with the handful of things Planning Center has no opinion about — a small group, a note, when somebody first turned up.",
+    "file": "desktop-16-a-roster-nobody-stores.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "The roster",
+    "title": "Who do I call, and only when asked",
+    "caption": "A parent’s number, fetched for one student at the moment somebody needs it — resolved through her household, since Planning Center keeps contact on the parent’s record rather than the child’s. Firestore holds none of it: no parent name, no phone, no email, no allergies. For a database full of minors, the safest copy is the one that was never made.",
+    "file": "desktop-17-who-do-i-call-and-only-when-asked.png",
+    "viewport": "desktop"
+  }
+]

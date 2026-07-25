@@ -1,0 +1,24 @@
+# Runs the end-to-end suite in a container and leaves the report behind.
+#
+#   docker compose -f docker-compose.e2e.yml run --rm e2e
+#   docker compose -f docker-compose.e2e.yml run --rm e2e --project=webkit-mobile
+#
+# One service on purpose: the simulator, the emulators and the app preview all
+# run inside the container on localhost, so there is no cross-container
+# networking to get wrong.
+services:
+  e2e:
+    build:
+      context: .
+      dockerfile: docker/e2e/Dockerfile
+    image: tally-e2e:local
+    # Chromium maps large shared-memory segments for page rendering. The Docker
+    # default of 64 MB makes it crash on real pages, and the resulting flake
+    # looks exactly like an application bug.
+    shm_size: 1gb
+    init: true
+    volumes:
+      # Mounted back out so a failed run can be opened with
+      # `npx playwright show-report`.
+      - ./playwright-report:/app/playwright-report
+      - ./test-results:/app/test-results

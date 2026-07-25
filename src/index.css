@@ -1,0 +1,225 @@
+@import 'tailwindcss';
+
+/*
+ * Tally design tokens.
+ *
+ * The app is used one-handed, in dim rooms, by volunteers who are looking at a
+ * queue of students rather than at the screen. Everything below optimises for
+ * that: large tap targets and high contrast.
+ *
+ * ## How the two themes work
+ *
+ * `ink` is not a set of greys, it is a *distance from the reader*. Low numbers
+ * are what you are meant to look at — headings, names — and high numbers are
+ * what holds them: chips, cards, the page itself. The whole app is written that
+ * way, consistently, in 379 places.
+ *
+ * That consistency is what makes a light theme cost one block of CSS instead of
+ * a rewrite. Flipping the ramp keeps every `text-ink-100` a heading and every
+ * `bg-ink-950` a page, and Tailwind resolves each utility through the custom
+ * property at paint time. Nothing in `src/features` or `src/components` knows
+ * there is more than one theme.
+ *
+ * The accents are not flipped, they are *re-picked*. `text-brand-300` is a pale
+ * blue chosen to sit on near-black; on white it is barely there. Each accent
+ * gets a light-mode value at the same slot, dark enough to read on paper.
+ *
+ * The resolved theme is stamped on `<html data-theme>` by ThemeProvider — and
+ * before that by an inline script in index.html, so a light-theme user does not
+ * get a black flash on every cold start.
+ */
+@theme {
+  --color-ink-50: #f8fafc;
+  --color-ink-100: #f1f5f9;
+  --color-ink-200: #e2e8f0;
+  --color-ink-300: #cbd5e1;
+  --color-ink-400: #94a3b8;
+  --color-ink-500: #64748b;
+  --color-ink-600: #475569;
+  --color-ink-700: #334155;
+  --color-ink-800: #1e293b;
+  --color-ink-900: #0f172a;
+  --color-ink-950: #020617;
+
+  /* `brand-200` is used for tinted body copy on a brand-washed panel. It was
+     referenced in five places before it existed, which Tailwind resolves by
+     simply not emitting the class — so that text quietly inherited and nobody
+     noticed. Defined now. */
+  --color-brand-200: #bae6fd;
+  --color-brand-300: #7dd3fc;
+  --color-brand-400: #38bdf8;
+  --color-brand-500: #0ea5e9;
+  --color-brand-600: #0284c7;
+  --color-brand-700: #0369a1;
+
+  --color-present-400: #4ade80;
+  --color-present-500: #22c55e;
+  --color-present-600: #16a34a;
+
+  --color-warn-400: #facc15;
+  --color-warn-500: #eab308;
+  --color-warn-600: #ca8a04;
+
+  --color-danger-400: #f87171;
+  --color-danger-500: #ef4444;
+  --color-danger-600: #dc2626;
+
+  /* Safe-area aware sizing for the persistent check-in chrome. */
+  --spacing-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --spacing-safe-top: env(safe-area-inset-top, 0px);
+}
+
+/*
+ * Light.
+ *
+ * Read the ink ramp bottom-up against the block above: 50 is still the most
+ * prominent thing on screen and 950 is still the page, they have just swapped
+ * ends of the lightness axis.
+ *
+ * Two places deliberately break a strict inversion, because a straight flip
+ * would be wrong rather than merely different:
+ *
+ *  - `ink-900` (cards) is *lighter* than `ink-950` (page). On a dark screen a
+ *    raised surface catches more light; on paper it is the page that is grey
+ *    and the card that is white. Inverting the numbers without inverting that
+ *    relationship would leave every card looking like a hole.
+ *  - `ink-500` is the app's most-used muted text — 74 occurrences — so it holds
+ *    at #64748b, which clears 4.5:1 on white. A mechanical flip would have put
+ *    a pale grey there and quietly failed contrast across half the app.
+ */
+:root[data-theme='light'] {
+  --color-ink-50: #0f172a;
+  --color-ink-100: #1e293b;
+  --color-ink-200: #334155;
+  --color-ink-300: #475569;
+  --color-ink-400: #576375;
+  --color-ink-500: #64748b;
+  --color-ink-600: #8b97a8;
+  --color-ink-700: #cbd5e1;
+  --color-ink-800: #e2e8f0;
+  --color-ink-900: #ffffff;
+  --color-ink-950: #f1f5f9;
+
+  /* Accents re-picked for a white ground, not lightened versions of the dark ones. */
+  --color-brand-200: #075985;
+  --color-brand-300: #0369a1;
+  --color-brand-400: #0284c7;
+  --color-brand-500: #0284c7;
+  --color-brand-600: #0369a1;
+  --color-brand-700: #075985;
+
+  --color-present-400: #15803d;
+  --color-present-500: #16a34a;
+  --color-present-600: #15803d;
+
+  --color-warn-400: #a16207;
+  --color-warn-500: #ca8a04;
+  --color-warn-600: #854d0e;
+
+  --color-danger-400: #b91c1c;
+  --color-danger-500: #dc2626;
+  --color-danger-600: #991b1b;
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-ink-950 text-ink-100 antialiased;
+    /* Native form controls, scrollbars and autofill follow the theme too. */
+    color-scheme: dark;
+    font-family:
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      'Segoe UI',
+      Roboto,
+      'Helvetica Neue',
+      Arial,
+      sans-serif;
+    /* Stop iOS rubber-banding from detaching the sticky search bar. */
+    overscroll-behavior-y: none;
+  }
+
+  :root[data-theme='light'] body {
+    color-scheme: light;
+  }
+
+  /* Inputs below 16px make iOS Safari zoom on focus, which wrecks the roster. */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-brand-400;
+  }
+}
+
+@layer utilities {
+  .pb-safe {
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .pt-safe {
+    padding-top: calc(0.5rem + env(safe-area-inset-top, 0px));
+  }
+
+  /* Momentum scrolling for the roster list on iOS. */
+  .scroll-touch {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/*
+ * Check-in confirmation flash. Journey 1 calls for the row to "flash green"
+ * the instant a counselor taps it — this runs off the optimistic local state
+ * so it fires before the Firestore round-trip completes.
+ */
+/*
+ * Colour only — deliberately no `transform`.
+ *
+ * This used to dip to `scale(0.99)`, which looked good in isolation and was
+ * wrong for the screen it lives on. Journey 1 is a counselor tapping down a
+ * queue of teenagers as fast as they can read names, and the row that just
+ * flashed is also the Undo button for the tap they may have got wrong. Moving
+ * it for 600ms means a thumb already travelling toward it lands somewhere else.
+ *
+ * Colour carries the confirmation on its own; the haptic pulse carries the
+ * rest. Nothing about the row's box changes, so it is safe to hit again the
+ * instant it is drawn.
+ */
+@keyframes tally-flash {
+  0% {
+    background-color: color-mix(in oklab, var(--color-present-500) 55%, transparent);
+  }
+  35% {
+    background-color: color-mix(in oklab, var(--color-present-500) 40%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.animate-flash {
+  animation: tally-flash 600ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-flash {
+    animation-duration: 1ms;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
