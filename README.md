@@ -211,7 +211,7 @@ Setup, configuration parameters, role mapping and troubleshooting live in
 Everything except Hosting deploys by a deliberate, manual, human action (see
 [docs/ci.md](docs/ci.md#what-ci-does-not-do)); Hosting itself is published by CI, covered in
 [Hosting via GitHub Actions](#hosting-via-github-actions) below. Both ship to the
-`tally-footprints` Firebase project configured in `.firebaserc`.
+`tally` Firebase project configured in `.firebaserc`.
 
 ### One-time setup, per machine
 
@@ -220,8 +220,8 @@ Everything except Hosting deploys by a deliberate, manual, human action (see
    dependency of this repo, not something you install globally — always run it through `npx` or an
    npm script so the pinned version is used.)
 2. **Get access to the Firebase project.** Your Google account needs at least Editor on
-   `tally-footprints` in the [Firebase console](https://console.firebase.google.com/) — ask whoever
-   administers it to add you. `npx firebase projects:list` should show `tally-footprints` once you do.
+   `tally` in the [Firebase console](https://console.firebase.google.com/) — ask whoever
+   administers it to add you. `npx firebase projects:list` should show `tally` once you do.
 3. **Fill in `.env.local`.** Copy `.env.example` to `.env.local` and fill it from the console
    (Project settings → General → Your apps → Web app config) if you haven't already for local dev.
    This is what the production build embeds, so it has to exist even though these values are not
@@ -266,8 +266,8 @@ rules change is not live until a human runs it.
 
 Two sets of repository secrets make that work:
 
-- `FIREBASE_SERVICE_ACCOUNT_TALLY_FOOTPRINTS` — a service account JSON key for
-  `tally-footprints` holding the Firebase Hosting Admin role.
+- `FIREBASE_SERVICE_ACCOUNT_TALLY` — a service account JSON key for
+  `tally` holding the Firebase Hosting Admin role.
   `npx firebase init hosting:github` creates one and stores it for you; otherwise generate
   it in the [Google Cloud console](https://console.cloud.google.com/iam-admin/serviceaccounts).
 - `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`,
