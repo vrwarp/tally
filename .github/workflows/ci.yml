@@ -1,11 +1,24 @@
 name: CI
 
 on:
+  # `main` only. A branch push used to trigger this as well, which meant every
+  # push to a branch with an open pull request ran the whole suite twice — two
+  # sets of four E2E jobs, each of which can take half an hour. The two runs
+  # could not even cancel each other: `github.ref` is `refs/heads/<branch>` for
+  # the push and `refs/pull/<n>/merge` for the pull request, so they landed in
+  # different concurrency groups and both ran to the end, queueing each other's
+  # jobs for an hour on the way.
+  #
+  # The pull request run is the one worth having, because it tests `main` merged
+  # into the branch rather than the branch alone. The cost is that a branch with
+  # no pull request open gets no CI; open the pull request and it does.
   push:
-    branches: ['**']
+    branches: [main]
   pull_request:
 
-# A second push to the same branch makes the first one's result irrelevant.
+# A second push to the same pull request makes the first one's result
+# irrelevant. `refs/pull/<n>/merge` is stable across pushes to one pull request,
+# so this still collapses a burst of them into a single run.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
