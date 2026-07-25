@@ -1,0 +1,132 @@
+@import 'tailwindcss';
+
+/*
+ * Tally design tokens.
+ *
+ * The app is used one-handed, in dim rooms, by volunteers who are looking at a
+ * queue of students rather than at the screen. Everything below optimises for
+ * that: large tap targets, high contrast, and a dark surface that does not
+ * blind anyone at a Friday night fellowship.
+ */
+@theme {
+  --color-ink-50: #f8fafc;
+  --color-ink-100: #f1f5f9;
+  --color-ink-200: #e2e8f0;
+  --color-ink-300: #cbd5e1;
+  --color-ink-400: #94a3b8;
+  --color-ink-500: #64748b;
+  --color-ink-600: #475569;
+  --color-ink-700: #334155;
+  --color-ink-800: #1e293b;
+  --color-ink-900: #0f172a;
+  --color-ink-950: #020617;
+
+  --color-brand-300: #7dd3fc;
+  --color-brand-400: #38bdf8;
+  --color-brand-500: #0ea5e9;
+  --color-brand-600: #0284c7;
+  --color-brand-700: #0369a1;
+
+  --color-present-400: #4ade80;
+  --color-present-500: #22c55e;
+  --color-present-600: #16a34a;
+
+  --color-warn-400: #facc15;
+  --color-warn-500: #eab308;
+  --color-warn-600: #ca8a04;
+
+  --color-danger-400: #f87171;
+  --color-danger-500: #ef4444;
+  --color-danger-600: #dc2626;
+
+  /* Safe-area aware sizing for the persistent check-in chrome. */
+  --spacing-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --spacing-safe-top: env(safe-area-inset-top, 0px);
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-ink-950 text-ink-100 antialiased;
+    font-family:
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      'Segoe UI',
+      Roboto,
+      'Helvetica Neue',
+      Arial,
+      sans-serif;
+    /* Stop iOS rubber-banding from detaching the sticky search bar. */
+    overscroll-behavior-y: none;
+  }
+
+  /* Inputs below 16px make iOS Safari zoom on focus, which wrecks the roster. */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-brand-400;
+  }
+}
+
+@layer utilities {
+  .pb-safe {
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .pt-safe {
+    padding-top: calc(0.5rem + env(safe-area-inset-top, 0px));
+  }
+
+  /* Momentum scrolling for the roster list on iOS. */
+  .scroll-touch {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/*
+ * Check-in confirmation flash. Journey 1 calls for the row to "flash green"
+ * the instant a counselor taps it — this runs off the optimistic local state
+ * so it fires before the Firestore round-trip completes.
+ */
+@keyframes tally-flash {
+  0% {
+    background-color: color-mix(in oklab, var(--color-present-500) 55%, transparent);
+    transform: scale(1);
+  }
+  35% {
+    background-color: color-mix(in oklab, var(--color-present-500) 40%, transparent);
+    transform: scale(0.99);
+  }
+  100% {
+    background-color: transparent;
+    transform: scale(1);
+  }
+}
+
+.animate-flash {
+  animation: tally-flash 600ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-flash {
+    animation-duration: 1ms;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

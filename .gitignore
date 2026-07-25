@@ -1,0 +1,35 @@
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Local env — never commit real Firebase config or API keys.
+.env
+.env.*
+!.env.example
+!.env.emulated
+
+# Planning Center credentials for the local functions emulator.
+functions/.secret.local
+functions/.env
+functions/lib/
+
+# Firebase
+.firebase/
+.emulator-data/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+database-debug.log
+pubsub-debug.log
+*-debug.log
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+
+# Test output
+coverage/
