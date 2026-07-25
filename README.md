@@ -235,6 +235,25 @@ which is still the way to deploy from a branch or when CI is unavailable.
    ```
 5. **Generate the PWA icons** — see [public/icons/README.md](public/icons/README.md).
 
+### One-time setup, per project
+
+Deploying Cloud Functions needs a handful of Google Cloud APIs turned on. A project **owner** has
+to do this once — a deploy service account deliberately cannot enable APIs itself, and a first
+deploy otherwise fails with "Cloud Functions deployment requires the Cloud Build API to be
+enabled":
+
+```bash
+gcloud services enable \
+  cloudbuild.googleapis.com cloudfunctions.googleapis.com artifactregistry.googleapis.com \
+  run.googleapis.com eventarc.googleapis.com pubsub.googleapis.com \
+  secretmanager.googleapis.com --project tally-76406
+```
+
+Or click through the console, starting with
+[Cloud Build](https://console.cloud.google.com/apis/library/cloudbuild.googleapis.com?project=tally-76406).
+Deploying by hand from an owner account enables them along the way, which is why this only bites
+the first time CI deploys.
+
 ### Deploying
 
 ```bash
