@@ -208,10 +208,11 @@ Setup, configuration parameters, role mapping and troubleshooting live in
 
 ## Deployment
 
-Everything except Hosting deploys by a deliberate, manual, human action (see
-[docs/ci.md](docs/ci.md#what-ci-does-not-do)); Hosting itself is published by CI, covered in
-[Hosting via GitHub Actions](#hosting-via-github-actions) below. Both ship to the
-`tally` Firebase project configured in `.firebaserc`.
+Merging to `main` deploys everything — Hosting, Cloud Functions, Firestore rules and Firestore
+indexes — to the `tally` Firebase project configured in `.firebaserc`. See
+[Deploying from CI](#deploying-from-ci) below and [docs/ci.md](docs/ci.md#what-ci-deploys) for why
+the backend half is gated more tightly than Hosting. `npm run deploy` does the same thing by hand,
+which is still the way to deploy from a branch or when CI is unavailable.
 
 ### One-time setup, per machine
 
@@ -255,25 +256,46 @@ The Planning Center Personal Access Token **is** a secret. It lives in Secret Ma
 and in `functions/.secret.local` (gitignored) for the emulator. It never reaches the browser, which
 is why every call into Planning Center goes through a Cloud Function.
 
-### Hosting via GitHub Actions
+### Deploying from CI
 
-Hosting — and only Hosting — also ships automatically. A push to `main` publishes the live
-channel (`.github/workflows/firebase-hosting-merge.yml`), and a pull request from a branch
-in this repo gets its own preview channel with the link posted on the PR
-(`.github/workflows/firebase-hosting-pull-request.yml`). Neither touches Firestore rules,
-indexes or Cloud Functions: those still ship only through `npm run deploy` above, so a
-rules change is not live until a human runs it.
+Three workflows, split by what they can reach:
 
-Two sets of repository secrets make that work:
+| Workflow | On a pull request | On merge to `main` |
+| --- | --- | --- |
+| `firebase-hosting-pull-request.yml` | Deploys a preview channel, posts the link on the PR | — |
+| `firebase-hosting-merge.yml` | — | Publishes the Hosting live channel |
+| `firebase-backend.yml` | `firebase deploy --dry-run`: builds the functions, validates rules and indexes, deploys nothing | Deploys Cloud Functions, Firestore rules and Firestore indexes |
 
-- `FIREBASE_SERVICE_ACCOUNT_TALLY` — a service account JSON key for
-  `tally` holding the Firebase Hosting Admin role.
-  `npx firebase init hosting:github` creates one and stores it for you; otherwise generate
+Both pull-request jobs are skipped for forked PRs (`head.repo.full_name == github.repository`),
+because a fork cannot read repository secrets.
+
+The backend deploy is deliberately the strict one. It re-runs `npm run test:rules` and
+`npm run test:functions` *inside the deploy job* before it deploys anything — CI is a separate
+workflow it cannot depend on, so this is what guarantees a failing ruleset never reaches
+production. It also runs without `--force`, so a Cloud Function deleted from the source is left
+running rather than torn down by a robot; remove one with `npx firebase functions:delete`.
+
+**Require an approval for backend deploys** (recommended): the `deploy` job declares
+`environment: production`, so adding required reviewers to that environment under
+Settings → Environments turns every backend deploy into an approval prompt. Without protection
+rules it deploys on merge with no prompt.
+
+#### Repository secrets
+
+- `FIREBASE_SERVICE_ACCOUNT_TALLY` — service account JSON key holding **only** Firebase Hosting
+  Admin. `npx firebase init hosting:github` creates one and stores it for you; otherwise generate
   it in the [Google Cloud console](https://console.cloud.google.com/iam-admin/serviceaccounts).
+- `FIREBASE_SERVICE_ACCOUNT_TALLY_BACKEND` — a **second, separate** key for the backend workflow,
+  needing Cloud Functions Admin, Firebase Rules Admin, Service Account User, and Secret Manager
+  Secret Accessor (so the deployed functions can bind `PCO_APP_ID` and `PCO_SECRET`). Keeping it
+  apart from the Hosting key is the point: the privileged credential is only ever exposed to the
+  gated merge job, never to the preview deploy that runs on every pull request. Prefer
+  [Workload Identity Federation](https://github.com/google-github-actions/auth#workload-identity-federation)
+  over a long-lived JSON key if you are willing to do the extra GCP setup.
 - `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`,
   `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID` and
   `VITE_FIREBASE_APP_ID` — the same values `.env.local` holds. Vite embeds them at build
-  time, so the workflow needs them even though they are not secrets.
+  time, so the Hosting workflows need them even though they are not secrets.
 
 ---
 

@@ -1,0 +1,109 @@
+# Cloud Functions, Firestore security rules and Firestore indexes.
+#
+# Hosting lives in the two firebase-hosting-* workflows. It is separate on
+# purpose: Hosting is a static bundle that can be rolled back by redeploying,
+# whereas these three change what the backend *does* and who can read a roster
+# of minors' data. They therefore run behind a stricter gate — see
+# docs/ci.md#what-ci-does-not-do — and use their own, more privileged key.
+name: Firebase backend
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '22'
+  # Every firebase invocation is pinned to the project explicitly rather than
+  # relying on .firebaserc, so a change there cannot silently retarget a deploy.
+  FIREBASE_PROJECT: tally
+
+jobs:
+  # On a pull request, prove the deploy *would* work without changing anything:
+  # `--dry-run` builds the functions and validates the rules and indexes against
+  # the real project, which catches a malformed ruleset or a functions build
+  # break before it is merged rather than after.
+  validate:
+    name: Validate (dry run)
+    if: >-
+      github.event_name == 'pull_request'
+      && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm --prefix functions ci
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TALLY_BACKEND }}
+
+      # Note that a dry run is not entirely free of side effects: the CLI may
+      # enable required APIs on the target project. It never deploys code or
+      # rules, which is the property being relied on here.
+      - name: Validate functions, rules and indexes without deploying
+        run: >-
+          npx firebase deploy
+          --only functions,firestore:rules,firestore:indexes
+          --dry-run --non-interactive
+          --project "$FIREBASE_PROJECT"
+
+  # On merge, deploy for real — but only after the suites that describe the
+  # things being deployed have passed *in this job*. CI runs in a separate
+  # workflow that this one cannot depend on, so re-running them here is what
+  # makes "rules are never deployed while their tests are failing" true rather
+  # than merely likely.
+  deploy:
+    name: Deploy functions, rules and indexes
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Add required reviewers to this environment to make a backend deploy need a
+    # human approval; without protection rules it simply deploys on merge.
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      # The Firestore emulator the rules suite runs against is a Java program.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Cache the emulator jars
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}
+
+      - run: npm ci
+      - run: npm --prefix functions ci
+
+      - name: Security rules must pass before they ship
+        run: npm run test:rules
+      - name: Cloud Functions tests must pass before they ship
+        run: npm run test:functions
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TALLY_BACKEND }}
+
+      # No --force: a function that has disappeared from the source is left
+      # running rather than deleted by a robot. Removing one is a deliberate
+      # `npx firebase functions:delete` by a human.
+      - name: Deploy
+        run: >-
+          npx firebase deploy
+          --only functions,firestore:rules,firestore:indexes
+          --non-interactive
+          --project "$FIREBASE_PROJECT"
