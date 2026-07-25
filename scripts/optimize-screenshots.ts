@@ -5,7 +5,7 @@
  * much to embed in a single shareable page. These are the copies the HTML
  * inlines as data URIs; the PNGs stay as the archival originals.
  */
-import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const SHOTS = 'docs/walkthrough/shots';

@@ -47,10 +47,13 @@ function EventRow({
   const cancelled = event.status === 'cancelled';
 
   return (
-    <li className="flex items-stretch gap-2">
+    // `min-w-0` at every level of the flex chain: a flex item defaults to
+    // `min-width: auto`, which refuses to shrink below its content and pushes
+    // the whole page sideways when an event has a long location.
+    <li className="flex min-w-0 items-stretch gap-2">
       <Link
         to={`/events/${event.id}`}
-        className="flex min-h-16 flex-1 items-center gap-3 rounded-xl bg-ink-900 px-4 py-3 ring-1 ring-ink-800 active:bg-ink-800"
+        className="flex min-h-16 min-w-0 flex-1 items-center gap-3 rounded-xl bg-ink-900 px-4 py-3 ring-1 ring-ink-800 active:bg-ink-800"
       >
         <span className="min-w-0 flex-1">
           <span
