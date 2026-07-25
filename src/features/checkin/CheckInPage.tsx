@@ -37,23 +37,28 @@ const FLASH_MS = 700;
 
 export function CheckInPage() {
   const { eventId } = useParams();
-  const { event, autoEvent, isOverridden, now, selectableEvents } = useActiveEvent(eventId ?? null);
+  const { event, autoEvent, isOverridden, now, selectableEvents } =
+    useActiveEvent(eventId ?? null);
 
   const { students, groups, settings, loading: dataLoading } = useData();
   const { profile, user } = useAuth();
   const { show } = useToast();
 
-  const { attendance, error: attendanceError } = useAttendance(event?.id ?? null);
+  const { attendance, error: attendanceError } = useAttendance(
+    event?.id ?? null,
+  );
   const { rsvps } = useRsvps(event?.id ?? null, event?.requiresRsvp ?? false);
   const historyEvents = useSeriesHistoryEvents(event);
   const { snapshots } = useEventSnapshots(historyEvents);
 
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const [grade, setGrade] = useState<Grade | null>(null);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
-  const [announcement, setAnnouncement] = useState('');
+  const [announcement, setAnnouncement] = useState("");
 
-  const [flashing, setFlashing] = useState<ReadonlySet<string>>(() => new Set());
+  const [flashing, setFlashing] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
   const [pending, setPending] = useState<ReadonlySet<string>>(() => new Set());
   const flashTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   // Guarding on a ref rather than on `pending` keeps the tap handler out of the
@@ -74,7 +79,7 @@ export function CheckInPage() {
   // everyone. Derived from the event id rather than stored in an effect so that
   // switching events cannot leave a previous event's scope behind.
   const defaultScopeGroupId =
-    event?.mode === 'recurring' && event.defaultGroupingMode === 'smallGroup'
+    event?.mode === "recurring" && event.defaultGroupingMode === "smallGroup"
       ? (profile?.assignedGroupId ?? null)
       : null;
   const [scopeOverride, setScopeOverride] = useState<{
@@ -85,7 +90,8 @@ export function CheckInPage() {
     scopeOverride && scopeOverride.eventId === event?.id
       ? scopeOverride.groupId
       : defaultScopeGroupId;
-  const group = groups.find((candidate) => candidate.id === scopeGroupId) ?? null;
+  const group =
+    groups.find((candidate) => candidate.id === scopeGroupId) ?? null;
 
   const handleScopeChange = useCallback(
     (groupId: string | null) => {
@@ -109,7 +115,17 @@ export function CheckInPage() {
       filters: { query, grade },
       group,
     });
-  }, [event, students, attendance, rsvps, snapshots, settings, query, grade, group]);
+  }, [
+    event,
+    students,
+    attendance,
+    rsvps,
+    snapshots,
+    settings,
+    query,
+    grade,
+    group,
+  ]);
 
   /* ---- The tap ----------------------------------------------------------- */
 
@@ -155,7 +171,7 @@ export function CheckInPage() {
           // modal costs every counselor a beat on every correction.
           await undoCheckIn(event.id, studentId);
           setAnnouncement(`${name} removed`);
-          show(`Undid ${name}`, { tone: 'info' });
+          show(`Undid ${name}`, { tone: "info" });
         } else {
           // Paint and buzz first — the confirmation must land on the tap, not on
           // the round trip.
@@ -166,7 +182,7 @@ export function CheckInPage() {
             event,
             student: entry.student,
             uid: user.uid,
-            method: query.trim() ? 'search' : 'tap',
+            method: query.trim() ? "search" : "tap",
           });
         }
       } catch {
@@ -174,7 +190,7 @@ export function CheckInPage() {
           ? `Could not undo ${name}. Try again.`
           : `Could not check in ${name}. Try again.`;
         setAnnouncement(failure);
-        show(failure, { tone: 'error' });
+        show(failure, { tone: "error" });
       } finally {
         inFlight.current.delete(studentId);
         setBusy(studentId, false);
@@ -210,34 +226,39 @@ export function CheckInPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="shrink-0 border-b border-ink-800 bg-ink-950">
-        <EventHeader
-          event={event}
-          autoEvent={autoEvent}
-          isOverridden={isOverridden}
-          selectableEvents={selectableEvents}
-          now={now}
-          present={counts.present}
-          eligible={counts.eligible}
-        />
-        <div className="pt-2">
-          <SearchBar value={query} onChange={setQuery} />
-          <ScopeBar
-            groups={groups}
-            scopeGroupId={scopeGroupId}
-            onScopeChange={handleScopeChange}
-            grade={grade}
-            onGradeChange={setGrade}
-            assignedGroupId={profile?.assignedGroupId ?? null}
+        <div className="mx-auto w-full max-w-3xl">
+          <EventHeader
+            event={event}
+            autoEvent={autoEvent}
+            isOverridden={isOverridden}
+            selectableEvents={selectableEvents}
+            now={now}
             present={counts.present}
             eligible={counts.eligible}
-            absent={counts.absent}
           />
+          <div className="pt-2">
+            <SearchBar value={query} onChange={setQuery} />
+            <ScopeBar
+              groups={groups}
+              scopeGroupId={scopeGroupId}
+              onScopeChange={handleScopeChange}
+              grade={grade}
+              onGradeChange={setGrade}
+              assignedGroupId={profile?.assignedGroupId ?? null}
+              present={counts.present}
+              eligible={counts.eligible}
+              absent={counts.absent}
+            />
+          </div>
         </div>
       </div>
 
-      {/* Bottom padding clears the floating quick-add button, which would
-          otherwise sit on top of the last student's tap target. */}
-      <div className="scroll-touch min-h-0 flex-1 overflow-y-auto pb-36">
+      {/* Capped width on desktop: stretched to a 27-inch monitor a roster row puts
+          the student's name and the control that checks them in a foot apart, so
+          the eye and the mouse both have to travel the whole way. The bottom
+          padding clears the floating add button, which otherwise sits on top of
+          the last student in the list. */}
+      <div className="scroll-touch mx-auto min-h-0 w-full max-w-3xl flex-1 overflow-y-auto pb-36 lg:pb-8">
         {attendanceError ? (
           <div className="px-3 pt-3">
             <ErrorBanner message={attendanceError} />
@@ -248,11 +269,15 @@ export function CheckInPage() {
           <EmptyState
             className="pt-10"
             icon="👋"
-            title={event.requiresRsvp ? 'Nobody has RSVP’d yet' : 'Nobody on this roster yet'}
+            title={
+              event.requiresRsvp
+                ? "Nobody has RSVP’d yet"
+                : "Nobody on this roster yet"
+            }
             description={
               event.requiresRsvp
-                ? 'This trip is limited to students who RSVP’d. Add them from the event page, or quick-add someone who turned up anyway.'
-                : 'Students appear here as soon as the roster syncs. You can still quick-add anyone who walks in.'
+                ? "This trip is limited to students who RSVP’d. Add them from the event page, or quick-add someone who turned up anyway."
+                : "Students appear here as soon as the roster syncs. You can still quick-add anyone who walks in."
             }
           />
         ) : roster.isFiltered && visible === 0 ? (
@@ -297,18 +322,20 @@ export function CheckInPage() {
               entries={roster.recent}
               description={
                 counts.historyWindow > 0
-                  ? `from the last ${counts.historyWindow} ${counts.historyWindow === 1 ? 'gathering' : 'gatherings'}`
+                  ? `from the last ${counts.historyWindow} ${counts.historyWindow === 1 ? "gathering" : "gatherings"}`
                   : undefined
               }
-              showRecentHint={event.mode === 'recurring'}
+              showRecentHint={event.mode === "recurring"}
               onPress={onPress}
               flashing={flashing}
               busy={pending}
             />
             <RosterSection
-              title={roster.recent.length > 0 ? 'Everyone else' : 'Roster'}
+              title={roster.recent.length > 0 ? "Everyone else" : "Roster"}
               entries={roster.roster}
-              emptyLabel={roster.recent.length > 0 ? undefined : 'Everyone is checked in.'}
+              emptyLabel={
+                roster.recent.length > 0 ? undefined : "Everyone is checked in."
+              }
               onPress={onPress}
               flashing={flashing}
               busy={pending}
@@ -331,7 +358,7 @@ export function CheckInPage() {
         type="button"
         onClick={() => setQuickAddOpen(true)}
         aria-label="Quick add a visitor"
-        className="fixed bottom-safe-bottom right-4 z-30 mb-20 flex size-14 items-center justify-center rounded-full bg-brand-500 text-3xl leading-none text-white shadow-lg shadow-black/40 active:bg-brand-600"
+        className="fixed bottom-safe-bottom right-4 z-30 mb-20 flex size-14 items-center justify-center rounded-full bg-brand-500 text-3xl leading-none text-white shadow-lg shadow-black/40 active:bg-brand-600 lg:mb-6"
       >
         <span aria-hidden="true">+</span>
       </button>
@@ -346,7 +373,7 @@ export function CheckInPage() {
           onAdded={(name) => {
             // Clearing the search guarantees the new visitor is visible in the
             // "Checked in" block instead of hiding behind a stale query.
-            setQuery('');
+            setQuery("");
             setAnnouncement(`${name} added and checked in`);
           }}
         />

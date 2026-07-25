@@ -7,21 +7,22 @@
  * plain-language sentence that restates the setting as the behaviour it causes.
  * Nobody should have to reason about "minAttended of ofLastN" at 6:55pm.
  */
-import { useEffect, useState, type ChangeEvent } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Button,
   Card,
   CardHeader,
   ErrorBanner,
   LoadingScreen,
+  NumberStepperField,
   SelectField,
-  TextField,
 } from '@/components/ui';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { PlanningCenterCard } from '@/features/settings/PlanningCenterCard';
 import { TeamList } from '@/features/settings/TeamList';
+import { ThresholdPreview } from '@/features/settings/ThresholdPreview';
 import { formatRelative } from '@/lib/time';
 import { saveSettings } from '@/services/events';
 import { setAssignedGroup } from '@/services/users';
@@ -87,8 +88,7 @@ export function SettingsPage() {
     (key) => form[key] !== settings[key],
   );
 
-  const setNumber = (field: keyof ThresholdForm) => (changed: ChangeEvent<HTMLInputElement>) => {
-    const value = Number(changed.target.value);
+  const setNumber = (field: keyof ThresholdForm) => (value: number) => {
     setForm((current) => ({ ...current, [field]: Number.isFinite(value) ? value : 0 }));
   };
 
@@ -145,69 +145,75 @@ export function SettingsPage() {
         <div className="flex flex-col gap-4 px-4 py-3">
           {saveError ? <ErrorBanner message={saveError} /> : null}
 
-          <div className="grid grid-cols-2 gap-3">
-            <TextField
-              label="Attended at least"
-              type="number"
-              inputMode="numeric"
-              min={1}
-              max={MAX_WINDOW}
-              value={form.predictiveMinAttended}
-              onChange={setNumber('predictiveMinAttended')}
-              error={errors.predictiveMinAttended}
-            />
-            <TextField
-              label="Of the last"
-              type="number"
-              inputMode="numeric"
-              min={1}
-              max={MAX_WINDOW}
-              value={form.predictiveOfLastN}
-              onChange={setNumber('predictiveOfLastN')}
-              error={errors.predictiveOfLastN}
-            />
-          </div>
+          {/* Wide screens get the controls and their consequences side by side,
+              so the count moves in the same glance as the number that changed.
+              Stacked below `lg`, where a second column would squeeze both. */}
+          <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start lg:gap-6">
+            <div className="flex flex-col gap-4">
+              <div className="grid grid-cols-2 gap-3">
+                <NumberStepperField
+                  label="Attended at least"
+                  min={1}
+                  max={MAX_WINDOW}
+                  value={form.predictiveMinAttended}
+                  onValueChange={setNumber('predictiveMinAttended')}
+                  error={errors.predictiveMinAttended}
+                />
+                <NumberStepperField
+                  label="Of the last"
+                  min={1}
+                  max={MAX_WINDOW}
+                  value={form.predictiveOfLastN}
+                  onValueChange={setNumber('predictiveOfLastN')}
+                  error={errors.predictiveOfLastN}
+                />
+              </div>
 
-          <p
-            aria-live="polite"
-            className="rounded-xl bg-brand-500/10 px-3 py-2 text-sm text-brand-200 ring-1 ring-brand-500/25"
-          >
-            Show students who came to at least{' '}
-            <span className="font-bold tabular-nums">{form.predictiveMinAttended}</span> of the last{' '}
-            <span className="font-bold tabular-nums">{form.predictiveOfLastN}</span> {cadence}.
-            <span className="mt-1 block text-xs text-brand-200/70">
-              Each series counts only its own history — Friday never predicts Sunday. A brand-new
-              series relaxes the threshold to whatever history exists, so the block is never empty
-              for the wrong reason.
-            </span>
-          </p>
+              <p
+                aria-live="polite"
+                className="rounded-xl bg-brand-500/10 px-3 py-2 text-sm text-brand-200 ring-1 ring-brand-500/25"
+              >
+                Show students who came to at least{' '}
+                <span className="font-bold tabular-nums">{form.predictiveMinAttended}</span> of the
+                last <span className="font-bold tabular-nums">{form.predictiveOfLastN}</span>{' '}
+                {cadence}.
+                <span className="mt-1 block text-xs text-brand-200/70">
+                  Each series counts only its own history — Friday never predicts Sunday. A
+                  brand-new series relaxes the threshold to whatever history exists, so the block is
+                  never empty for the wrong reason.
+                </span>
+              </p>
 
-          <div className="grid grid-cols-2 gap-3">
-            <TextField
-              label="MIA after misses"
-              type="number"
-              inputMode="numeric"
-              min={1}
-              value={form.miaConsecutiveMisses}
-              onChange={setNumber('miaConsecutiveMisses')}
-              error={errors.miaConsecutiveMisses}
-              hint={`Flag a student after ${Math.max(1, form.miaConsecutiveMisses)} missed ${
-                form.miaConsecutiveMisses === 1 ? 'gathering' : 'gatherings'
-              } in a row.`}
-            />
-            <TextField
-              label="New visitor window (days)"
-              type="number"
-              inputMode="numeric"
-              min={1}
-              value={form.newVisitorWindowDays}
-              onChange={setNumber('newVisitorWindowDays')}
-              error={errors.newVisitorWindowDays}
-              hint={`A first-timer stays on the “New faces” list for ${Math.max(
-                1,
-                form.newVisitorWindowDays,
-              )} days.`}
-            />
+              <div className="grid grid-cols-2 gap-3">
+                <NumberStepperField
+                  label="MIA after misses"
+                  min={1}
+                  max={99}
+                  value={form.miaConsecutiveMisses}
+                  onValueChange={setNumber('miaConsecutiveMisses')}
+                  error={errors.miaConsecutiveMisses}
+                  hint={`Flag a student after ${Math.max(1, form.miaConsecutiveMisses)} missed ${
+                    form.miaConsecutiveMisses === 1 ? 'gathering' : 'gatherings'
+                  } in a row.`}
+                />
+                <NumberStepperField
+                  label="New visitor window (days)"
+                  min={1}
+                  max={365}
+                  value={form.newVisitorWindowDays}
+                  onValueChange={setNumber('newVisitorWindowDays')}
+                  error={errors.newVisitorWindowDays}
+                  hint={`A first-timer stays on the “New faces” list for ${Math.max(
+                    1,
+                    form.newVisitorWindowDays,
+                  )} days.`}
+                />
+              </div>
+            </div>
+
+            <div className="lg:sticky lg:top-4">
+              <ThresholdPreview draft={form} saved={settings} valid={valid} />
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">

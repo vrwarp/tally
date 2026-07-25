@@ -60,6 +60,7 @@ export function EventDetailPage() {
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
   const [busy, setBusy] = useState(false);
 
   if (!event) {
@@ -206,15 +207,51 @@ export function EventDetailPage() {
               <Button variant="secondary" className="flex-1" onClick={() => setEditorOpen(true)}>
                 Edit
               </Button>
-              <Button
-                variant={cancelled ? 'secondary' : 'danger'}
-                className="flex-1"
-                loading={busy && !confirmingDelete}
-                onClick={() => void toggleStatus()}
-              >
-                {cancelled ? 'Un-cancel' : 'Cancel event'}
-              </Button>
+
+              {/*
+                * Cancelling used to be one tap, sitting right beside Edit with
+                * only colour between them — a stray thumb calls off a gathering
+                * forty families are expecting. Un-cancelling stays one tap,
+                * because putting friction on the recovery is backwards.
+                */}
+              {cancelled ? (
+                <Button
+                  variant="secondary"
+                  className="flex-1"
+                  loading={busy && !confirmingDelete}
+                  onClick={() => void toggleStatus()}
+                >
+                  Un-cancel
+                </Button>
+              ) : confirmingCancel ? (
+                <div className="flex flex-1 gap-2">
+                  <Button variant="ghost" className="flex-1" onClick={() => setConfirmingCancel(false)}>
+                    Keep it
+                  </Button>
+                  <Button
+                    variant="danger"
+                    className="flex-1"
+                    loading={busy && !confirmingDelete}
+                    onClick={() => {
+                      setConfirmingCancel(false);
+                      void toggleStatus();
+                    }}
+                  >
+                    Yes, cancel
+                  </Button>
+                </div>
+              ) : (
+                <Button variant="secondary" className="flex-1" onClick={() => setConfirmingCancel(true)}>
+                  Cancel event
+                </Button>
+              )}
             </div>
+
+            {confirmingCancel ? (
+              <p role="alert" className="text-center text-xs text-ink-400">
+                Cancelling hides {event.title} from check-in. Attendance already recorded is kept.
+              </p>
+            ) : null}
           </div>
         </div>
       </Card>
