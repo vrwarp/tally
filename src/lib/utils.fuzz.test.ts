@@ -51,6 +51,47 @@ describe('utility properties', () => {
     expect(matchesQuery(name, normalized.toUpperCase())).toBe(true);
   });
 
+  const SEPARATORS = ["'", '’', '-', '.', ' ', ',', '_'];
+
+  forAll('punctuation typed into the query never hides the name', (rng) => {
+    const name = arbitraryString(rng);
+    const normalized = normalizeForSearch(name);
+    return { name, normalized, separator: rng.pick(SEPARATORS), at: rng.int(0, 40) };
+  }, ({ name, normalized, separator, at }) => {
+    if (normalized.length === 0) return;
+    // Nobody agrees where the hyphen goes in a name, so a query must survive
+    // one appearing anywhere in it.
+    const index = at % (normalized.length + 1);
+    const punctuated = normalized.slice(0, index) + separator + normalized.slice(index);
+    expect(matchesQuery(name, punctuated)).toBe(true);
+  });
+
+  forAll('one typo still finds a name, once the query is long enough', (rng) => {
+    const name = arbitraryString(rng);
+    const compact = normalizeForSearch(name).replace(/ /g, '');
+    return { name, compact, at: rng.int(0, 200) };
+  }, ({ name, compact, at }) => {
+    // Astral characters are two code units, so swapping one costs two edits
+    // rather than one; the guarantee below is about a single mistyped letter.
+    if (compact.length !== Array.from(compact).length) return;
+    // Absurdly long strings skip the typo pass entirely — see FUZZY_MAX_LENGTH.
+    if (compact.length < 4 || compact.length > 64) return;
+
+    const index = at % compact.length;
+    const replacement = compact[index] === 'q' ? 'x' : 'q';
+    const typo = compact.slice(0, index) + replacement + compact.slice(index + 1);
+    expect(matchesQuery(name, typo)).toBe(true);
+  });
+
+  forAll('a one-character query is never fuzzy', (rng) => ({
+    name: arbitraryString(rng),
+    letter: rng.pick(['q', 'x', 'z', 'j']),
+  }), ({ name, letter }) => {
+    // Typo tolerance must not leak down to the first keystroke, or the list
+    // stops narrowing at all.
+    expect(matchesQuery(name, letter)).toBe(normalizeForSearch(name).includes(letter));
+  });
+
   forAll('ordinalGrade always produces a label', (rng) => rng.int(-5, 30), (grade) => {
     const label = ordinalGrade(grade);
     expect(typeof label).toBe('string');

@@ -10,7 +10,7 @@
  * *this specific series*. Friday history predicts Friday; Sunday history
  * predicts Sunday. They never cross.
  */
-import { matchesQuery, sortByName } from '@/lib/utils';
+import { createSearchMatcher, sortByName } from '@/lib/utils';
 import type {
   AppSettings,
   AttendanceRecord,
@@ -203,8 +203,11 @@ export function buildRoster(input: BuildRosterInput): RosterView {
   const historyWindow = history.length;
   const threshold = effectiveThreshold(settings, historyWindow);
 
-  const query = filters.query?.trim() ?? '';
-  const isFiltered = query.length > 0;
+  // Built once for the whole pass: the matcher does the query-side work up
+  // front, and knows better than a `trim()` whether anything searchable was
+  // actually typed (a query of pure punctuation narrows nothing).
+  const matcher = createSearchMatcher(filters.query ?? '');
+  const isFiltered = !matcher.isEmpty;
 
   const checkedIn: RosterEntry[] = [];
   const recent: RosterEntry[] = [];
@@ -231,7 +234,7 @@ export function buildRoster(input: BuildRosterInput): RosterView {
     eligible += 1;
     if (record) presentTotal += 1;
 
-    if (isFiltered && !matchesQuery(student.searchName, query)) continue;
+    if (!matcher.matches(student.searchName)) continue;
 
     const recentHits = countRecentHits(student.id, history);
     const entry: RosterEntry = {

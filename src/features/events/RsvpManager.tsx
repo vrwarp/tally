@@ -28,7 +28,7 @@ import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { useRsvps } from '@/hooks/useAttendance';
-import { cn, matchesQuery, ordinalGrade, sortByName } from '@/lib/utils';
+import { cn, createSearchMatcher, ordinalGrade, sortByName } from '@/lib/utils';
 import {
   addRsvps,
   removeRsvp,
@@ -106,7 +106,8 @@ function AddStudentsModal({
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
   const [saving, setSaving] = useState(false);
 
-  const visible = candidates.filter((student) => matchesQuery(student.searchName, query));
+  const matcher = createSearchMatcher(query);
+  const visible = candidates.filter((student) => matcher.matches(student.searchName));
 
   const toggle = (studentId: string) => {
     setSelected((current) => {
