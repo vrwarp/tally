@@ -52,6 +52,19 @@ const pastSundays = (count: number) =>
 const ids = (entries: readonly RosterEntry[]) => entries.map((entry) => entry.student.id);
 
 /**
+ * A student who comes to everything, and who no test ever asks about.
+ *
+ * A past instance with an empty attendance list reads as a cancelled session, so
+ * a Friday that none of a test's *own* students attended still needs somebody
+ * through the door to count as a Friday that happened.
+ */
+const REGULAR = 'regular-who-never-misses';
+
+/** A past instance that definitely happened, plus whoever the test cares about. */
+const held = (event: TallyEvent, present: readonly string[] = []) =>
+  makeSnapshot(event, [REGULAR, ...present]);
+
+/**
  * `makeEvent` coalesces overrides with `??`, so it cannot express a null
  * `seriesId` — which is exactly what makes an event a one-off. Patch it after.
  */
@@ -132,7 +145,7 @@ describe('buildSeriesHistory', () => {
 
   it('returns the most recent instances of the same series, newest first', () => {
     const fridays = pastFridays(5);
-    const snapshots = fridays.map((event) => makeSnapshot(event, []));
+    const snapshots = fridays.map((event) => held(event));
 
     const history = buildSeriesHistory(tonight, snapshots, settings);
 
@@ -146,7 +159,7 @@ describe('buildSeriesHistory', () => {
   it('excludes the event being checked into — an event never predicts itself', () => {
     const snapshots = [
       makeSnapshot(tonight, ['someone']),
-      ...pastFridays(2).map((event) => makeSnapshot(event, [])),
+      ...pastFridays(2).map((event) => held(event)),
     ];
 
     const history = buildSeriesHistory(tonight, snapshots, settings);
@@ -157,8 +170,8 @@ describe('buildSeriesHistory', () => {
 
   it('excludes instances of other series', () => {
     const snapshots = [
-      ...pastFridays(2).map((event) => makeSnapshot(event, [])),
-      ...pastSundays(2).map((event) => makeSnapshot(event, [])),
+      ...pastFridays(2).map((event) => held(event)),
+      ...pastSundays(2).map((event) => held(event)),
     ];
 
     const history = buildSeriesHistory(tonight, snapshots, settings);
@@ -170,8 +183,10 @@ describe('buildSeriesHistory', () => {
   it('excludes cancelled instances', () => {
     const [older, newest] = pastFridays(2);
     const snapshots = [
-      makeSnapshot(makeEvent({ ...newest!, status: 'cancelled' }), []),
-      makeSnapshot(older!, []),
+      // With attendance on it — somebody turned up before the call was made — so
+      // the exclusion is the status and nothing else.
+      makeSnapshot(makeEvent({ ...newest!, status: 'cancelled' }), [REGULAR]),
+      held(older!),
     ];
 
     const history = buildSeriesHistory(tonight, snapshots, settings);
@@ -179,9 +194,41 @@ describe('buildSeriesHistory', () => {
     expect(history.map((snapshot) => snapshot.event.id)).toEqual([older!.id]);
   });
 
+  /*
+   * The cancelled-session rule. A Friday nobody was checked into did not happen,
+   * whether or not anybody remembered to mark it, so it cannot be evidence about
+   * who is a regular.
+   */
+  it('excludes an instance nobody was ever checked into', () => {
+    const [older, newest] = pastFridays(2);
+    const snapshots = [makeSnapshot(newest!, []), held(older!)];
+
+    const history = buildSeriesHistory(tonight, snapshots, settings);
+
+    expect(history.map((snapshot) => snapshot.event.id)).toEqual([older!.id]);
+  });
+
+  it('reaches further back rather than letting a cancelled week shrink the window', () => {
+    const fridays = pastFridays(5); // oldest first: -5 … -1
+    const snapshots = [
+      ...fridays.slice(0, 4).map((event) => held(event)),
+      makeSnapshot(fridays[4]!, []), // last week, called off
+    ];
+
+    const history = buildSeriesHistory(tonight, snapshots, settings);
+
+    // Three instances, not two: the filter runs before the slice, so the storm
+    // night costs the window nothing instead of eating one of its slots.
+    expect(history.map((snapshot) => snapshot.event.id)).toEqual([
+      `${FRIDAY}-2`,
+      `${FRIDAY}-3`,
+      `${FRIDAY}-4`,
+    ]);
+  });
+
   it('returns nothing for an event with no series (a one-off)', () => {
     const retreat = makeOneOff({ id: 'retreat' });
-    const snapshots = pastFridays(3).map((event) => makeSnapshot(event, []));
+    const snapshots = pastFridays(3).map((event) => held(event));
 
     expect(buildSeriesHistory(retreat, snapshots, settings)).toEqual([]);
   });
@@ -326,9 +373,9 @@ describe('buildRoster: the 2-of-3 rule', () => {
   const occasional = makeStudent({ id: 'occasional', firstName: 'Ben', lastName: 'Baker' });
 
   const history = [
-    makeSnapshot(weekA!, [regular.id]),
-    makeSnapshot(weekB!, [regular.id, occasional.id]),
-    makeSnapshot(weekC!, []),
+    held(weekA!, [regular.id]),
+    held(weekB!, [regular.id, occasional.id]),
+    held(weekC!),
   ];
 
   it('surfaces a student who attended 2 of the last 3, and not one who attended 1', () => {
@@ -423,6 +470,29 @@ describe('buildRoster: the history window', () => {
     expect(ids(view.roster)).toEqual([onlyCameToTheCancelledOne.id]);
   });
 
+  it('does not let a week nobody attended demote a regular out of Recent', () => {
+    const fridays = pastFridays(4); // oldest first: -4 … -1
+    const regular = makeStudent({ id: 'every-week' });
+
+    const view = roster({
+      students: [regular],
+      history: [
+        held(fridays[0]!, [regular.id]),
+        held(fridays[1]!, [regular.id]),
+        held(fridays[2]!, [regular.id]),
+        // Last week was called off, and nobody marked it.
+        makeSnapshot(fridays[3]!, []),
+      ],
+      settings: makeSettings({ predictiveMinAttended: 3, predictiveOfLastN: 3 }),
+    });
+
+    // Perfect attendance at the three Fridays that happened. Counting the storm
+    // night as an instance would make this "3 of 3" unreachable for everybody in
+    // the ministry at once — the Recent block would simply empty out.
+    expect(view.counts.historyWindow).toBe(3);
+    expect(view.recent[0]).toMatchObject({ student: regular, recentHits: 3 });
+  });
+
   it('looks only at the most recent predictiveOfLastN instances', () => {
     const fridays = pastFridays(5); // oldest first: -5, -4, -3, -2, -1
     const lapsed = makeStudent({ id: 'lapsed', lastName: 'Lapsed' });
@@ -461,7 +531,7 @@ describe('buildRoster: threshold clamping on a young series', () => {
     const [onlyFriday] = pastFridays(1);
     const student = makeStudent({ id: 'absent' });
 
-    const view = roster({ students: [student], history: [makeSnapshot(onlyFriday!, [])] });
+    const view = roster({ students: [student], history: [held(onlyFriday!)] });
 
     expect(view.recent).toEqual([]);
     expect(ids(view.roster)).toEqual([student.id]);
@@ -486,7 +556,7 @@ describe('buildRoster: custom thresholds', () => {
     const view = roster({
       students: [three, two],
       history: fridays.map((event, index) => {
-        const present = [];
+        const present = [REGULAR];
         if (index >= 2) present.push(three.id); // the 3 newest
         if (index >= 3) present.push(two.id); //   the 2 newest
         return makeSnapshot(event, present);
@@ -507,9 +577,9 @@ describe('buildRoster: custom thresholds', () => {
     const view = roster({
       students: [showedUpLastWeek, showedUpLongAgo],
       history: [
-        makeSnapshot(fridays[0]!, [showedUpLongAgo.id]), // outside the 2-week window
-        makeSnapshot(fridays[1]!, []),
-        makeSnapshot(fridays[2]!, [showedUpLastWeek.id]),
+        held(fridays[0]!, [showedUpLongAgo.id]), // outside the 2-week window
+        held(fridays[1]!),
+        held(fridays[2]!, [showedUpLastWeek.id]),
       ],
       settings: makeSettings({ predictiveMinAttended: 1, predictiveOfLastN: 2 }),
     });
@@ -634,9 +704,9 @@ describe('buildRoster: search', () => {
   // Marcus is a regular; without a query he sits in the Recent block.
   const [weekC, weekB, weekA] = pastFridays(3);
   const history = [
-    makeSnapshot(weekA!, [marcus.id]),
-    makeSnapshot(weekB!, [marcus.id]),
-    makeSnapshot(weekC!, []),
+    held(weekA!, [marcus.id]),
+    held(weekB!, [marcus.id]),
+    held(weekC!),
   ];
 
   it('is not "filtered" for an empty or whitespace query', () => {

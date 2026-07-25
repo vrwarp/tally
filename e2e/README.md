@@ -78,6 +78,48 @@ npx playwright test --project=chromium-mobile
 
 over a bare `npm run e2e`.
 
+## Two things the suite cannot run without
+
+Both of these looked like application bugs for a while, so they are written down
+rather than left to be rediscovered.
+
+**`functions/.env.demo-tally` is committed, and has to be.** The Firebase CLI
+resolves the `defineString`/`defineSecret` params in `functions/src/config.ts`
+when it *starts* the Functions emulator, before any function runs, and it reads
+them from `.env.<project>` — not from the environment. With the file missing it
+stops and asks at the terminal; an emulator sitting on a prompt loads no
+functions at all, so `provisionAccess` answers 404 and every `signIn()` dies on
+"Could not reach the access service" after 30 seconds. It holds simulator
+settings only. Add a param to `config.ts` and you must add it here too, or the
+CLI will ask about it.
+
+**WebKit needs long-polling *and* auto-detection off.** Firestore auto-detects
+its transport by default, and on WebKit against the emulator that probe breaks
+the stream it is measuring: every read and every write waits ~30s for an ack.
+The suite still passes tests, one at a time, until the job's timeout kills it —
+webkit-mobile was 26 minutes and mostly red. `src/lib/firebase.ts` therefore sets
+`experimentalAutoDetectLongPolling: false` alongside the forced long-polling, and
+a 5-second poll cycle under the emulator. Diagnosed next door in
+[LetUsMeet](https://github.com/vrwarp/LetUsMeet/commit/b6b9bb0c853801318e2dd759495c13a6febb4ef3),
+whose `docs/webkit-investigation.md` has the full trail.
+
+For reference, a healthy local run of each project:
+
+| Project | Tests | Wall time |
+| --- | --- | --- |
+| chromium-desktop | 34 | ~2.2 min |
+| chromium-mobile | 36 | ~2.1 min |
+| webkit-desktop | 34 | ~3.1 min |
+| webkit-mobile | 36 | ~3.0 min |
+
+If a project is taking ten times that, something above is wrong — look at the
+transport before you look at the tests.
+
+One local wrinkle: Playwright's `webServer` teardown does not always take the
+Firestore emulator's Java child with it, and the next run then dies on `Could not
+start Firestore Emulator, port taken`. `ps -eo pid,comm | awk '$2=="java"{print
+$1}' | xargs -r kill` clears it.
+
 ## In Docker
 
 ```bash

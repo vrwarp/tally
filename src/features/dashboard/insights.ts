@@ -5,6 +5,7 @@
  * is to hand the core team a call list, not a table — so every function here
  * answers a pastoral question rather than reporting a number.
  */
+import { wasHeld } from '@/lib/sessionHistory';
 import { sortByName } from '@/lib/utils';
 import type {
   AppSettings,
@@ -21,14 +22,20 @@ export function orderSnapshotsNewestFirst(
   return [...snapshots].sort((a, b) => b.event.startAt.getTime() - a.event.startAt.getTime());
 }
 
-/** Only recurring, non-cancelled instances count toward attendance patterns. */
+/**
+ * The gatherings attendance patterns are allowed to be read from: recurring
+ * instances that actually happened, newest first.
+ *
+ * "Actually happened" means somebody was checked in — a night with an empty
+ * attendance list was cancelled, whether or not anyone marked it (see
+ * `wasHeld`). Counting one as a gathering everybody missed would put the entire
+ * ministry on the MIA list the week after a snowstorm.
+ */
 export function recurringSnapshots(
   snapshots: readonly EventAttendanceSnapshot[],
 ): EventAttendanceSnapshot[] {
   return orderSnapshotsNewestFirst(
-    snapshots.filter(
-      (snapshot) => snapshot.event.mode === 'recurring' && snapshot.event.status !== 'cancelled',
-    ),
+    snapshots.filter((snapshot) => snapshot.event.mode === 'recurring' && wasHeld(snapshot)),
   );
 }
 
@@ -36,12 +43,15 @@ export function recurringSnapshots(
  * Students who have missed `miaConsecutiveMisses` or more recurring gatherings
  * in a row.
  *
- * Two deliberate exclusions:
+ * Three deliberate exclusions:
  *  - Events that happened before a student was added are not counted as misses.
  *    A visitor entered last Friday is not "missing" from the three Fridays
  *    before they existed.
  *  - Inactive students are skipped; they have already been followed up on and
  *    marked as moved away or graduated.
+ *  - Gatherings that never happened are not misses either. A cancelled night is
+ *    nobody's absence, so it neither counts toward a streak nor breaks one —
+ *    `recurringSnapshots` has already dropped it.
  *
  * A student with no attendance at all still qualifies, provided enough
  * gatherings have happened since they joined the roster — that is exactly the

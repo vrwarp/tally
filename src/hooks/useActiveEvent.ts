@@ -53,6 +53,18 @@ export function useActiveEvent(eventIdOverride?: string | null): ActiveEventResu
 }
 
 /**
+ * How many extra instances to load beyond the prediction window.
+ *
+ * `buildSeriesHistory` drops gatherings that never happened — cancelled, or with
+ * nobody ever checked in — and only then takes the most recent `ofLastN`. Loading
+ * exactly `ofLastN` events would mean a snowed-out Friday shrank the window to
+ * two instead of reaching one week further back for a third real one. Two spare
+ * reads, from a cache the dashboard shares, buys a full window through a bad
+ * fortnight.
+ */
+const CANCELLED_ALLOWANCE = 2;
+
+/**
  * The past instances of an event's series that feed its predictive roster.
  * Returns event records only — attendance for them is loaded by
  * `useEventSnapshots`.
@@ -63,8 +75,11 @@ export function useSeriesHistoryEvents(event: TallyEvent | null): TallyEvent[] {
 
   return useMemo(() => {
     if (!event?.seriesId) return [];
-    return recentSeriesInstances(events, event.seriesId, now, settings.predictiveOfLastN).filter(
-      (instance) => instance.id !== event.id,
-    );
+    return recentSeriesInstances(
+      events,
+      event.seriesId,
+      now,
+      settings.predictiveOfLastN + CANCELLED_ALLOWANCE,
+    ).filter((instance) => instance.id !== event.id);
   }, [event, events, now, settings.predictiveOfLastN]);
 }

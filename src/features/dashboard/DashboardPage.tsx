@@ -24,7 +24,9 @@ import {
   computeMia,
   computeNewVisitors,
   computeSummary,
+  recurringSnapshots,
 } from '@/features/dashboard/insights';
+import { presumedCancelled } from '@/lib/sessionHistory';
 import { formatShortDate } from '@/lib/time';
 
 /**
@@ -57,6 +59,14 @@ export function DashboardPage() {
 
   const { snapshots, loading: snapshotsLoading, error } = useEventSnapshots(recentGatherings);
 
+  /*
+   * The gatherings that actually happened, which is what every list below is
+   * really about. A scheduled night with nobody checked in was cancelled, and
+   * counting it would flag every student in the ministry as having missed it.
+   */
+  const held = useMemo(() => recurringSnapshots(snapshots), [snapshots]);
+  const skipped = useMemo(() => presumedCancelled(snapshots).length, [snapshots]);
+
   const mia = useMemo(
     () => computeMia(students, snapshots, settings),
     [students, snapshots, settings],
@@ -73,8 +83,11 @@ export function DashboardPage() {
 
   if (loading) return <LoadingScreen message="Loading insights…" />;
 
-  const lastGathering = recentGatherings[0] ?? null;
   const awaitingHistory = snapshotsLoading && snapshots.length === 0;
+  // The most recent night there is evidence for, not merely the most recent one
+  // on the calendar — "Through Friday Fellowship" must not name a night nobody
+  // came to.
+  const lastGathering = held[0]?.event ?? null;
 
   const previous = summary.previousEventCount;
   const delta = summary.lastEventCount - previous;
@@ -90,10 +103,24 @@ export function DashboardPage() {
       <header>
         <h1 className="text-xl font-bold text-ink-50">Insights</h1>
         <p className="mt-0.5 text-sm text-ink-500">
-          {lastGathering
-            ? `Through ${lastGathering.title}, ${formatShortDate(lastGathering.startAt)} · last ${recentGatherings.length} gatherings`
-            : 'No gatherings on record yet.'}
+          {awaitingHistory
+            ? 'Reading the recent attendance…'
+            : lastGathering
+              ? `Through ${lastGathering.title}, ${formatShortDate(lastGathering.startAt)} · last ${held.length} ${held.length === 1 ? 'gathering' : 'gatherings'}`
+              : recentGatherings.length > 0
+                ? 'Nobody has been checked into any of the recent gatherings.'
+                : 'No gatherings on record yet.'}
         </p>
+        {/* Said out loud rather than left implicit: "last 8 gatherings" when the
+            calendar shows ten scheduled reads as a bug in the numbers, and a
+            leader who knows two nights were called off can confirm it. */}
+        {skipped > 0 ? (
+          <p className="mt-1 text-xs text-ink-600">
+            {skipped === 1
+              ? 'One scheduled gathering had nobody checked in, so it counts as cancelled here.'
+              : `${skipped} scheduled gatherings had nobody checked in, so they count as cancelled here.`}
+          </p>
+        ) : null}
       </header>
 
       {error ? <ErrorBanner message={`Could not load attendance history. ${error}`} /> : null}

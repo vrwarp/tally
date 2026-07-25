@@ -27,7 +27,7 @@ import { SearchBar } from '@/features/checkin/SearchBar';
 import { buildRoster } from '@/features/roster/predictiveRoster';
 import { useActiveEvent, useSeriesHistoryEvents } from '@/hooks/useActiveEvent';
 import { useAttendance, useRsvps } from '@/hooks/useAttendance';
-import { useEventSnapshots } from '@/hooks/useEventSnapshots';
+import { invalidateSnapshotCache, useEventSnapshots } from '@/hooks/useEventSnapshots';
 import { haptic } from '@/lib/utils';
 import { checkIn, undoCheckIn } from '@/services/attendance';
 import { studentFullName, type Grade, type RosterEntry } from '@/types';
@@ -155,6 +155,19 @@ export function CheckInPage() {
     });
   }, []);
 
+  /**
+   * Attendance history is read once and memoised for the session, so back-filling
+   * a gathering that already finished has to drop the cached answer for it.
+   *
+   * That matters most for the night this is usually used on: a gathering with no
+   * attendance is read everywhere as cancelled, and somebody taking the register
+   * for last Friday after the fact should see the dashboard agree without a
+   * reload. Live events are untouched — their attendance comes from a listener.
+   */
+  const forgetCachedHistory = useCallback(() => {
+    if (event && event.checkInClosesAt < new Date()) invalidateSnapshotCache(event.id);
+  }, [event]);
+
   const handlePress = useCallback(
     async (entry: RosterEntry) => {
       if (!event || !user) return;
@@ -192,11 +205,12 @@ export function CheckInPage() {
         setAnnouncement(failure);
         show(failure, { tone: "error" });
       } finally {
+        forgetCachedHistory();
         inFlight.current.delete(studentId);
         setBusy(studentId, false);
       }
     },
-    [event, user, query, flash, setBusy, show],
+    [event, user, query, flash, setBusy, show, forgetCachedHistory],
   );
 
   const onPress = useCallback(
@@ -375,6 +389,7 @@ export function CheckInPage() {
             // "Checked in" block instead of hiding behind a stale query.
             setQuery("");
             setAnnouncement(`${name} added and checked in`);
+            forgetCachedHistory();
           }}
         />
       ) : null}

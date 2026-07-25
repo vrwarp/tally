@@ -178,8 +178,27 @@ function createDb(): Firestore {
    *
    * Long-polling is what the detector settles on for Safari anyway. Naming it
    * up front costs one round trip of latency and removes the guess.
+   *
+   * Turning the detector *off* is the other half, and it is not optional. Since
+   * v10 the SDK auto-detects by default, so forcing long-polling merely added a
+   * second mechanism alongside the probe rather than replacing it — and on WebKit
+   * the probe then breaks the very stream it is measuring. Every read and every
+   * write waits about thirty seconds for an ack that the cycling connection
+   * eventually delivers. It looks exactly like a slow server and it is neither:
+   * against the emulator the end-to-end suite went from minutes to an hour and
+   * timed out browser-wide.
+   *
+   * The short poll cycle is emulator-only. It makes those acks arrive promptly
+   * where a test is waiting on them, and a real counselor's phone keeps the
+   * default cycle rather than waking up every five seconds.
    */
-  const transport = isWebKit() ? { experimentalForceLongPolling: true } : {};
+  const transport = isWebKit()
+    ? {
+        experimentalForceLongPolling: true,
+        experimentalAutoDetectLongPolling: false,
+        ...(USE_EMULATORS ? { experimentalLongPollingOptions: { timeoutSeconds: 5 } } : {}),
+      }
+    : {};
 
   try {
     return initializeFirestore(firebaseApp, { localCache: bestLocalCache(), ...transport });

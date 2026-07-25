@@ -93,6 +93,15 @@ export function EventDetailPage() {
   const cancelled = event.status === 'cancelled';
   const seriesTitle = series.find((candidate) => candidate.id === event.seriesId)?.title ?? null;
 
+  /*
+   * A finished gathering with nobody checked in.
+   *
+   * Every derivation over history already treats this as a cancelled session —
+   * see `src/lib/sessionHistory.ts` — so this page says so rather than leaving a
+   * leader to wonder why the night is missing from the trend strip.
+   */
+  const readsAsCancelled = !cancelled && event.checkInClosesAt < now && attendance.length === 0;
+
   const studentsById = new Map(students.map((student) => [student.id, student]));
   const present = attendance
     .map((record) => ({ record, student: studentsById.get(record.studentId) ?? null }))
@@ -265,11 +274,31 @@ export function EventDetailPage() {
             label="Checked in"
             value={attendance.length}
             tone={attendance.length > 0 ? 'success' : 'neutral'}
-            hint={event.startAt > now ? 'Nothing recorded yet — this event is still ahead.' : undefined}
+            hint={
+              event.startAt > now
+                ? 'Nothing recorded yet — this event is still ahead.'
+                : readsAsCancelled
+                  ? 'Counted as a cancelled gathering.'
+                  : undefined
+            }
           />
 
           {present.length === 0 ? (
-            <p className="px-1 text-sm text-ink-500">Nobody has been checked in.</p>
+            readsAsCancelled ? (
+              <div className="rounded-xl bg-ink-950 px-3 py-2 ring-1 ring-ink-800">
+                <p className="text-sm text-ink-300">
+                  Nobody was checked in, so Tally reads this as a cancelled gathering: it is not
+                  counted as a miss for anybody, and it does not inform the predictive roster or the
+                  trend strip.
+                </p>
+                <p className="mt-1 text-xs text-ink-500">
+                  If it did go ahead and nobody took attendance, you can still take it now. If it
+                  was called off, cancelling the event says so on purpose.
+                </p>
+              </div>
+            ) : (
+              <p className="px-1 text-sm text-ink-500">Nobody has been checked in.</p>
+            )
           ) : (
             <ul className="flex flex-col gap-2">
               {present.map(({ record, student }) => (

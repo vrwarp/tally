@@ -58,7 +58,7 @@ All paths are built from `src/lib/paths.ts`. Nothing constructs a path by string
 
 ---
 
-## The two decisions worth explaining
+## The decisions worth explaining
 
 ### 1. Attendance and RSVP documents are keyed by student id
 
@@ -97,6 +97,36 @@ checking a student into a historical event does not rewrite their "last seen" in
 a check-in deliberately leaves both dates alone — recomputing them would need a scan of every past
 event, and the dashboard derives its real numbers from attendance documents anyway. These fields are
 conveniences, not the ledger.
+
+### 3. A gathering with no attendance is a cancelled one
+
+`status: 'cancelled'` is the honest answer to "did this happen?" only when somebody remembered to open
+Tally and say so. Gatherings are called off for weather, for a funeral, for a burst pipe in the hall —
+and on that evening nobody is thinking about the attendance app. The field is therefore reliable when
+it is `'cancelled'` and unreliable when it is `'scheduled'`.
+
+What is always reliable is the attendance subcollection. A gathering that ran has somebody in it; a
+gathering that never ran is empty. So every derivation over history treats a finished gathering with
+no attendance as cancelled, whether or not it is marked. The rule is one predicate,
+`src/lib/sessionHistory.ts`, applied everywhere history is read:
+
+| Where | Without the rule | With it |
+| --- | --- | --- |
+| MIA list | Every student in the ministry gains a miss for a night that did not happen, and three snow weeks flag all of them. | The night is neither a miss nor a reprieve; streaks close over it. |
+| Recent block | The cancelled Friday consumes one of the last three slots, and "2 of 3" becomes unreachable for regulars. | The window filters *before* it slices, so it reaches a week further back for a third real Friday. |
+| Trend strip | A zero bar mid-strip, which reads as attendance collapsing, and an average dragged down with it. | The gathering is simply not plotted. |
+| Student page | A row labelled "Missed", accusing a student of an absence at an event nobody attended. | A row labelled "No attendance", and the streak above it skips the night. |
+
+The cost is that a gathering somebody genuinely forgot to take attendance at also stops counting. That
+is unavoidable — the two cases are identical in the data — and it is the forgiving direction: nobody
+receives a "we've missed you" phone call over a night with no record of anyone at all. The screens say
+what they inferred rather than hiding it: the dashboard header notes how many scheduled gatherings had
+nobody checked in, and the event page says the night is being counted as cancelled and offers both
+repairs (take the attendance now, or cancel the event on purpose).
+
+An explicit `'cancelled'` still wins over the inference, even when a few students were checked in
+before the call was made. A leader saying "this did not happen" outranks a guess, and the alternative
+would make un-cancelling the only way to stop a cancelled night counting as everyone else's absence.
 
 ---
 
@@ -176,7 +206,7 @@ One dated gathering.
 | `requiresRsvp`, `requiresWaiver`, `requiresPayment` | boolean | One-off accountability switches. A one-off with no explicit flag still defaults to an RSVP roster. |
 | `feeCents` | number \| null | Integer cents. Never a float, never a card number. |
 | `defaultGroupingMode` | `'all' \| 'smallGroup'` | How the roster opens. |
-| `status` | `'scheduled' \| 'cancelled'` | Cancelled events are never auto-selected and never inform prediction. |
+| `status` | `'scheduled' \| 'cancelled'` | Cancelled events are never auto-selected and never inform prediction. A *finished* event with no attendance is treated as cancelled too — see [decision 3](#3-a-gathering-with-no-attendance-is-a-cancelled-one). |
 | `createdAt`, `updatedAt`, `createdBy` | — | |
 
 **Who writes:** core and up. A counselor cannot create or move an event — changing a date mid-check-in

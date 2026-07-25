@@ -138,6 +138,29 @@ describe('dashboard insight properties', () => {
     for (const point of trend) expect(point.count).toBeGreaterThanOrEqual(0);
   });
 
+  /*
+   * The cancelled-session rule, as a property. Zero attendance at a gathering
+   * means it did not happen, so a window in which nobody was ever checked into
+   * anything supports no conclusion at all: no phone calls, no bars, no numbers.
+   */
+  forAll('a history nobody attended yields no MIA list and no trend', arbitraryDashboard, (input) => {
+    const nobodyCame = input.snapshots.map((snapshot) => ({
+      ...snapshot,
+      presentStudentIds: new Set<string>(),
+    }));
+
+    expect(computeMia(input.students, nobodyCame, input.settings)).toEqual([]);
+    expect(computeAttendanceTrend(nobodyCame)).toEqual([]);
+  });
+
+  forAll('the trend never plots a gathering with nobody at it', arbitraryDashboard, (input, rng) => {
+    const trend = computeAttendanceTrend(input.snapshots, { limit: rng.int(1, 10) });
+
+    // A zero bar is indistinguishable from a collapse in attendance, and the
+    // average printed under the strip would be dragged down by a night off.
+    for (const point of trend) expect(point.count).toBeGreaterThan(0);
+  });
+
   forAll('the summary never counts more people than exist', arbitraryDashboard, (input) => {
     const mia = computeMia(input.students, input.snapshots, input.settings);
     const newVisitors = computeNewVisitors(input.students, input.snapshots, input.settings, NOW);
