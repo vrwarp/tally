@@ -198,9 +198,10 @@ Setup, configuration parameters, role mapping and troubleshooting live in
 
 ## Deployment
 
-Deploying is a deliberate, manual, human action (see [docs/ci.md](docs/ci.md#what-ci-does-not-do)) —
-there is no CI job for it. It ships to the `tally-footprints` Firebase project configured in
-`.firebaserc`.
+Everything except Hosting deploys by a deliberate, manual, human action (see
+[docs/ci.md](docs/ci.md#what-ci-does-not-do)); Hosting itself is published by CI, covered in
+[Hosting via GitHub Actions](#hosting-via-github-actions) below. Both ship to the
+`tally-footprints` Firebase project configured in `.firebaserc`.
 
 ### One-time setup, per machine
 
@@ -243,6 +244,26 @@ to every browser by design, and access control lives in `firestore.rules`, not i
 The Planning Center Personal Access Token **is** a secret. It lives in Secret Manager in production
 and in `functions/.secret.local` (gitignored) for the emulator. It never reaches the browser, which
 is why every call into Planning Center goes through a Cloud Function.
+
+### Hosting via GitHub Actions
+
+Hosting — and only Hosting — also ships automatically. A push to `main` publishes the live
+channel (`.github/workflows/firebase-hosting-merge.yml`), and a pull request from a branch
+in this repo gets its own preview channel with the link posted on the PR
+(`.github/workflows/firebase-hosting-pull-request.yml`). Neither touches Firestore rules,
+indexes or Cloud Functions: those still ship only through `npm run deploy` above, so a
+rules change is not live until a human runs it.
+
+Two sets of repository secrets make that work:
+
+- `FIREBASE_SERVICE_ACCOUNT_TALLY_FOOTPRINTS` — a service account JSON key for
+  `tally-footprints` holding the Firebase Hosting Admin role.
+  `npx firebase init hosting:github` creates one and stores it for you; otherwise generate
+  it in the [Google Cloud console](https://console.cloud.google.com/iam-admin/serviceaccounts).
+- `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`,
+  `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID` and
+  `VITE_FIREBASE_APP_ID` — the same values `.env.local` holds. Vite embeds them at build
+  time, so the workflow needs them even though they are not secrets.
 
 ---
 

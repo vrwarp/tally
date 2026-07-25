@@ -64,12 +64,19 @@ reproduces there but not on your machine is the container being right.
 
 ## What CI does not do
 
-**It does not deploy.** Tally ships to Firebase Hosting with
-`npm run build && firebase deploy`, and that stays a deliberate human action —
-this is a roster of minors' data for one ministry, not a service that benefits
-from continuous deployment. Adding a deploy job would mean putting a Firebase
-service-account key in repository secrets, which is a real risk to accept only
-in exchange for a real need.
+**It does not deploy anything but Hosting.** Merging to `main` publishes the
+Hosting build, and a pull request gets a preview channel; see
+[Hosting via GitHub Actions](../README.md#hosting-via-github-actions). Firestore
+rules, indexes and Cloud Functions are deliberately excluded and still ship by
+`npm run deploy` — this is a roster of minors' data for one ministry, so the
+changes that govern who can read it stay a human action, reviewed and run
+on purpose.
+
+That split is the whole point. Automating Hosting buys a preview URL per pull
+request and removes the "forgot to deploy" gap, and the service-account key it
+needs is scoped to Firebase Hosting Admin — it cannot touch Firestore or its
+rules. A key broad enough to deploy rules would be a much worse trade, and is
+the one this repository still refuses to make.
 
 **It does not publish an image.** The e2e image is built to prove it still
 builds. There is no application image, because a Firebase Hosting app does not
