@@ -7,7 +7,7 @@
  */
 import type { Page } from '@playwright/test';
 import { reloadReady } from './support/auth';
-import { expect, resetWorld, test } from './support/fixtures';
+import { expect, test } from './support/fixtures';
 
 
 /**
@@ -27,15 +27,6 @@ async function tapFirstRoster(page: Page): Promise<string> {
   await page.getByRole('button', { name: new RegExp(`^Check in ${name},`) }).first().click();
   return name;
 }
-
-/*
- * A known world, whatever ran before this file.
- *
- * Specs mutate shared state on purpose, so running them in any order other than
- * the one they were written in would otherwise produce failures describing bugs
- * that are not there.
- */
-test.beforeAll(resetWorld);
 
 test.describe('check-in', () => {
   test.beforeEach(async ({ signedInAs }) => {

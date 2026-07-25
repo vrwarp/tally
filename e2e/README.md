@@ -64,6 +64,20 @@ PLAYWRIGHT_WEBKIT_EXECUTABLE=/path/to/webkit npm run e2e
 Without that override the browser must match the installed `@playwright/test`
 exactly; `npm run e2e:install` fetches the right ones.
 
+**Run one project at a time.** The suite is seeded once, in `globalSetup`, and
+the specs mutate that data on purpose — a check-in is a write, and
+`planning-center.spec.ts` imports people who were not on the roster before. Two
+projects in a single invocation means the second one asserts against the world
+the first left behind, and the failures describe bugs that are not there. CI
+gives every browser its own job for exactly this reason; locally, prefer
+
+```bash
+npx playwright test --project=chromium-desktop
+npx playwright test --project=chromium-mobile
+```
+
+over a bare `npm run e2e`.
+
 ## In Docker
 
 ```bash

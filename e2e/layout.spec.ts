@@ -10,7 +10,7 @@
  * to shrink below its content — so the failure message names the offending
  * elements rather than just the number of pixels.
  */
-import { expect, resetWorld, test } from './support/fixtures';
+import { expect, test } from './support/fixtures';
 import { gotoReady } from './support/auth';
 
 const ROUTES = ['/', '/dashboard', '/events', '/students', '/settings'] as const;
@@ -20,15 +20,6 @@ interface Overflow {
   viewport: number;
   offenders: string[];
 }
-
-/*
- * A known world, whatever ran before this file.
- *
- * Specs mutate shared state on purpose, so running them in any order other than
- * the one they were written in would otherwise produce failures describing bugs
- * that are not there.
- */
-test.beforeAll(resetWorld);
 
 test.describe('layout', () => {
   test.beforeEach(async ({ signedInAs }) => {
