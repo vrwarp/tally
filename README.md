@@ -98,6 +98,7 @@ that follows the same `accessRoster` path.
 | `npm run dev:emulated` | Builds the functions, starts the whole Emulator Suite and Vite together. The normal way to work. |
 | `npm run build` | `tsc -b` then a production Vite build into `dist/`. |
 | `npm run preview` | Serves the built `dist/` locally. |
+| `npm run deploy` | Checks Firebase CLI login and `.env.local`, then builds and runs `firebase deploy`. See [Deployment](#deployment). |
 | `npm run typecheck` | Types only, no bundle. |
 | `npm run lint` | ESLint over the app, scripts and functions. |
 | `npm test` | Unit tests (Vitest, jsdom) — the pure logic and the components. |
@@ -197,27 +198,51 @@ Setup, configuration parameters, role mapping and troubleshooting live in
 
 ## Deployment
 
+Deploying is a deliberate, manual, human action (see [docs/ci.md](docs/ci.md#what-ci-does-not-do)) —
+there is no CI job for it. It ships to the `tally-footprints` Firebase project configured in
+`.firebaserc`.
+
+### One-time setup, per machine
+
+1. **Log in to the Firebase CLI:** `npx firebase login`. This opens a browser and stores a token
+   under your OS user account; you only need to do it once per machine. (`firebase-tools` is a dev
+   dependency of this repo, not something you install globally — always run it through `npx` or an
+   npm script so the pinned version is used.)
+2. **Get access to the Firebase project.** Your Google account needs at least Editor on
+   `tally-footprints` in the [Firebase console](https://console.firebase.google.com/) — ask whoever
+   administers it to add you. `npx firebase projects:list` should show `tally-footprints` once you do.
+3. **Fill in `.env.local`.** Copy `.env.example` to `.env.local` and fill it from the console
+   (Project settings → General → Your apps → Web app config) if you haven't already for local dev.
+   This is what the production build embeds, so it has to exist even though these values are not
+   secret — see below.
+4. **Set the Planning Center secrets**, once, in Secret Manager:
+   ```bash
+   npx firebase functions:secrets:set PCO_APP_ID
+   npx firebase functions:secrets:set PCO_SECRET
+   ```
+5. **Generate the PWA icons** — see [public/icons/README.md](public/icons/README.md).
+
+### Deploying
+
 ```bash
-npm run build
-firebase deploy          # hosting, rules, indexes and functions
+npm run deploy
 ```
 
-Before the first deploy, set the Planning Center credentials and pick a roster source:
+This checks that you're logged in to the Firebase CLI and that `.env.local` exists, then runs
+`npm run build` and `firebase deploy` (hosting, rules, indexes and functions — the functions build
+runs automatically as `firebase.json`'s `predeploy` hook). If either check fails it tells you which
+one-time setup step above you skipped, rather than failing deep inside `firebase deploy`. The same
+thing, without the checks: `npm run build && firebase deploy`.
 
-```bash
-firebase functions:secrets:set PCO_APP_ID
-firebase functions:secrets:set PCO_SECRET
-```
+To deploy only one piece — e.g. after a rules-only change — use the Firebase CLI's `--only` flag
+directly: `npx firebase deploy --only firestore:rules`.
 
 The Firebase **web config in `.env` is not a secret** — `apiKey`, `projectId` and friends are shipped
-to every browser by design, and access control lives in `firestore.rules`, not in those values. Copy
-`.env.example` to `.env.local` and fill it from the Firebase console.
+to every browser by design, and access control lives in `firestore.rules`, not in those values.
 
 The Planning Center Personal Access Token **is** a secret. It lives in Secret Manager in production
 and in `functions/.secret.local` (gitignored) for the emulator. It never reaches the browser, which
 is why every call into Planning Center goes through a Cloud Function.
-
-Generate the PWA icons before deploying — see [public/icons/README.md](public/icons/README.md).
 
 ---
 
