@@ -5,8 +5,28 @@
  * through `onSnapshot`. Where a test could pass on rendering alone, it also
  * reads the document back.
  */
+import type { Page } from '@playwright/test';
 import { reloadReady } from './support/auth';
 import { expect, test } from './support/fixtures';
+
+
+/**
+ * Picks a student off the roster and returns their name.
+ *
+ * Reading the label and clicking are two steps, and the roster is live: another
+ * counselor's check-in (or the previous test's) can re-sort the list in
+ * between, so "click the first row" and "the row I just read" are not reliably
+ * the same student. Acting on the name closes that race.
+ */
+async function tapFirstRoster(page: Page): Promise<string> {
+  const row = page.getByRole('button', { name: /^Check in / }).first();
+  const label = (await row.getAttribute('aria-label')) ?? '';
+  const name = /^Check in ([^,]+),/.exec(label)?.[1] ?? '';
+  expect(name, `could not read a student name from "${label}"`).toBeTruthy();
+
+  await page.getByRole('button', { name: new RegExp(`^Check in ${name},`) }).first().click();
+  return name;
+}
 
 test.describe('check-in', () => {
   test.beforeEach(async ({ signedInAs }) => {
@@ -34,12 +54,7 @@ test.describe('check-in', () => {
   });
 
   test('a tap checks a student in, and it survives a reload', async ({ page, firestore }) => {
-    const row = page.getByRole('button', { name: /^Check in / }).first();
-    const label = (await row.getAttribute('aria-label')) ?? '';
-    const name = /^Check in ([^,]+),/.exec(label)?.[1];
-    expect(name).toBeTruthy();
-
-    await row.click();
+    const name = await tapFirstRoster(page);
 
     // It moved to the checked-in section...
     await expect(
@@ -60,11 +75,7 @@ test.describe('check-in', () => {
   });
 
   test('undo returns a student to the roster', async ({ page }) => {
-    const row = page.getByRole('button', { name: /^Check in / }).first();
-    const label = (await row.getAttribute('aria-label')) ?? '';
-    const name = /^Check in ([^,]+),/.exec(label)?.[1];
-
-    await row.click();
+    const name = await tapFirstRoster(page);
     const checkedIn = page.getByRole('button', { name: new RegExp(`^Undo check-in for ${name}`) });
     await expect(checkedIn).toBeVisible();
 
