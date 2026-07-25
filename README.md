@@ -173,6 +173,12 @@ Three fields break that rule on purpose, and each carries an invariant: `profile
 "first last" for search), and `firstAttendedAt` (written exactly once, so "New Visitors" is stable
 even when someone back-fills an older event). See [docs/data-model.md](docs/data-model.md).
 
+Search itself (`createSearchMatcher` in `src/lib/utils.ts`) runs client-side over the roster already
+in memory, and forgives the four things a counselor at a door gets wrong: case, accents, punctuation
+("obrien" finds "O'Brien", "maryjane" finds "Mary-Jane"), and typos ("Marcs" and "Mracus" both find
+"Marcus"). Typo tolerance scales with query length and stays off below four characters, so the list
+still narrows on the first keystroke.
+
 ---
 
 ## Planning Center
