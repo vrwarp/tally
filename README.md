@@ -109,6 +109,10 @@ that follows the same `accessRoster` path.
 | `npm run emulators:resume` | The same, but importing `./.emulator-data` first so seeded data survives a restart. |
 | `npm run seed` | Fills the emulators with the demo ministry. |
 | `npm run verify:seed` | Re-derives the roster and dashboard from the seeded data, as an end-to-end check. |
+| `npm run e2e` | Playwright end-to-end suite: chromium and webkit, desktop and phone. |
+| `npm run e2e:install` | Downloads the browsers matching the pinned Playwright version. |
+| `npm run e2e:report` | Opens the last HTML report. |
+| `npm run walkthrough` | Captures the screenshot walkthrough from the running app and builds the page. |
 | `npm run functions:install` / `functions:build` | Dependency install / TypeScript build for `functions/`. |
 
 ---
@@ -226,3 +230,19 @@ Access is not a matter of knowing the URL: signing in grants nothing on its own.
 an active `users/{uid}` document whose role Planning Center governs, and the security rules in
 `firestore.rules` are the fence — the UI's role checks are only there so counselors are not shown
 buttons that would fail.
+
+---
+
+## Documentation
+
+| Document | What it covers |
+| --- | --- |
+| [docs/walkthrough](docs/walkthrough/README.md) | A guided tour of every feature, screenshotted from the running app |
+| [docs/planning-center.md](docs/planning-center.md) | Tokens, configuration, roster modes, write-back, troubleshooting |
+| [docs/data-model.md](docs/data-model.md) | Every collection, who may write it, and why it is shaped that way |
+| [docs/error-handling.md](docs/error-handling.md) | What happens when things fail, what was fixed, and what is still open |
+| [docs/fuzzing.md](docs/fuzzing.md) | The property suite, its invariants, and how to replay a failure |
+| [docs/ci.md](docs/ci.md) | What runs on a pull request and how to reproduce it |
+| [e2e/README.md](e2e/README.md) | Running and writing end-to-end tests |
+| [docker/README.md](docker/README.md) | The containerised end-to-end runner |
+| [tools/pco-simulator/README.md](tools/pco-simulator/README.md) | The Planning Center API simulator |

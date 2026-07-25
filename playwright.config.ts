@@ -53,6 +53,13 @@ const planningCenterEnv = {
 
 export default defineConfig({
   testDir: './e2e',
+  /*
+   * The walkthrough is a documentation build, not a test: it photographs the app
+   * rather than asserting on it, and it mutates the seeded data as it goes. It
+   * is opted in with `WALKTHROUGH=1` rather than ignored outright, so it can
+   * still be run by path.
+   */
+  testIgnore: process.env.WALKTHROUGH ? [] : ['**/walkthrough.spec.ts'],
   globalSetup: './e2e/support/globalSetup.ts',
 
   /*

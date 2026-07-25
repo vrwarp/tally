@@ -36,3 +36,12 @@ pubsub-debug.log
 
 # Test output
 coverage/
+
+# Walkthrough build products.
+#
+# `docs/walkthrough/web/*.jpg` IS committed — it is what the Markdown shows and
+# it is only ~700 kB. These two are not: the PNGs are 4 MB of archival
+# originals, and the HTML page is another megabyte of the same images inlined as
+# base64. Both regenerate with `npm run walkthrough`.
+docs/walkthrough/shots/
+docs/walkthrough/walkthrough.html

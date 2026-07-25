@@ -1,0 +1,107 @@
+[
+  {
+    "journey": "Getting in",
+    "title": "Sign in",
+    "caption": "The only screen a signed-out volunteer sees. An email link is the primary path — counselors are handed a phone at the door and never set a password. Google is secondary, and hides itself in browsers that cannot do OAuth.",
+    "file": "desktop-01-sign-in.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "Journey 1 — high-volume check-in",
+    "title": "The predictive roster",
+    "caption": "Tally picked tonight’s event from the clock; nobody chose it. The “Recent” block is the predictive roster: students who came to at least 2 of the last 3 Fridays, most consistent first. Friday history predicts Friday — Sunday’s regulars are not in this list.",
+    "file": "desktop-02-the-predictive-roster.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "Journey 1 — high-volume check-in",
+    "title": "One tap checks a student in",
+    "caption": "Maya Adebayo moved to “Checked in” at the bottom, and the header count went up. The row flashed green and buzzed before the write left the device — the authoritative state then arrives back through Firestore, so a second counselor at the same door sees it too.",
+    "file": "desktop-03-one-tap-checks-a-student-in.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "Journey 1 — high-volume check-in",
+    "title": "Search for anyone not in the Recent block",
+    "caption": "Two letters, filtered instantly against the in-memory roster. The header counts deliberately do not move: they describe the event, not the query, so nobody watches the number drop as they type and thinks they broke something.",
+    "file": "desktop-04-search-for-anyone-not-in-the-recent-block.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "Journey 3 — bring a friend",
+    "title": "Quick-add a visitor",
+    "caption": "A first name, a last name, a grade. Nothing else, because anything more forms a queue at the door. “Save & check in” is one atomic write: the student is created and marked present together, then the modal closes.",
+    "file": "desktop-05-quick-add-a-visitor.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "Journey 3 — bring a friend",
+    "title": "The visitor is already checked in",
+    "caption": "Back on the roster with no interruption. Behind the scenes the profile carries a “missing info” flag, which is what puts them on the core team’s follow-up list later that evening.",
+    "file": "desktop-06-the-visitor-is-already-checked-in.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "Journey 5 — pastoral follow-up",
+    "title": "Insights, not a data table",
+    "caption": "Monday evening. The PRD asks for actionable insight rather than raw numbers, so every row leads somewhere: tap-to-call, tap-to-text, or through to the student. “Missing in action” is students who missed three or more gatherings in a row.",
+    "file": "desktop-07-insights-not-a-data-table.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "Journey 5 — pastoral follow-up",
+    "title": "New faces and incomplete profiles",
+    "caption": "First-timers from the past week, and the profiles still missing a way to reach a parent — the visitors quick-added at the door. “Copy list” puts names and numbers on the clipboard for a group chat, which is what actually happens.",
+    "file": "desktop-08-new-faces-and-incomplete-profiles.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "Journey 5 — pastoral follow-up",
+    "title": "Attendance trend",
+    "caption": "Head count per gathering, per series. Eight bars, no gridlines, no chart library — enough to see a slide starting, which is all this needs to do.",
+    "file": "desktop-09-attendance-trend.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "Journey 4 — the field trip",
+    "title": "The event calendar",
+    "caption": "Recurring gatherings and one-offs together. “Schedule next Friday Fellowship” is two taps, because somebody has to do it every single week.",
+    "file": "desktop-10-the-event-calendar.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "Journey 4 — the field trip",
+    "title": "RSVPs, waivers and payments",
+    "caption": "A one-off event is about accountability rather than speed. The numbers a leader is actually chasing the week before a retreat — waivers outstanding, payments outstanding — are the prominent ones.",
+    "file": "desktop-11-rsvps-waivers-and-payments.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "The roster",
+    "title": "Students",
+    "caption": "The whole ministry, filterable by grade, small group and status. Each row says whether the record came from Planning Center or was created in Tally, so it is obvious which fields are safe to edit here.",
+    "file": "desktop-12-students.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "Planning Center",
+    "title": "Settings and the sync",
+    "caption": "The predictive thresholds are configurable with a plain-language preview. Below them, the Planning Center card: what the last sync did, and a button to run one now.",
+    "file": "desktop-13-settings-and-the-sync.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "Planning Center",
+    "title": "A sync, end to end",
+    "caption": "Browser → callable → Cloud Function → the Planning Center API → Firestore → back through onSnapshot. Students and counselors both come from Planning Center; access is derived from it rather than from a list somebody maintains by hand.",
+    "file": "desktop-14-a-sync-end-to-end.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "Planning Center",
+    "title": "People pulled from Planning Center",
+    "caption": "Amara Okonkwo existed only in Planning Center a moment ago. Her grade, allergies and parent contact all came across — the contact resolved through her household, since Planning Center keeps it on the parent’s record, not the child’s.",
+    "file": "desktop-15-people-pulled-from-planning-center.png",
+    "viewport": "desktop"
+  }
+]

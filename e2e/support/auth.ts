@@ -117,6 +117,41 @@ export async function reloadReady(page: Page): Promise<void> {
   await waitUntilReady(page);
 }
 
+/**
+ * Signs out through the app's own menu, then clears the Firebase session from
+ * the browser.
+ *
+ * Both halves are needed: the menu is the real user-facing path, but Firebase
+ * keeps its session in IndexedDB, and a stale one makes the next sign-in skip
+ * the login form entirely.
+ */
+export async function signOut(page: Page): Promise<void> {
+  const menu = page.getByRole('button', { name: /signed in|@/i }).first();
+  if (await menu.count()) {
+    await menu.click().catch(() => {});
+    await page.getByRole('menuitem', { name: /sign out/i }).click().catch(() => {});
+    await page.waitForTimeout(500);
+  }
+
+  await page.context().clearCookies();
+  await page.evaluate(async () => {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+    const databases = (await indexedDB.databases?.()) ?? [];
+    await Promise.all(
+      databases.map(
+        (db) =>
+          new Promise<void>((resolve) => {
+            if (!db.name) return resolve();
+            const request = indexedDB.deleteDatabase(db.name);
+            request.onsuccess = request.onerror = request.onblocked = () => resolve();
+          }),
+      ),
+    );
+  });
+  await page.goto('/login');
+}
+
 async function waitUntilReady(page: Page): Promise<void> {
   await page
     .getByRole('status', { name: /loading/i })
