@@ -30,6 +30,7 @@ import { StudentEditorModal } from '@/features/students/StudentEditorModal';
 import { useEventSnapshots } from '@/hooks/useEventSnapshots';
 import { useNow } from '@/hooks/useNow';
 import { usePersonDetails } from '@/hooks/usePersonDetails';
+import { sessionOutcome } from '@/lib/sessionHistory';
 import { formatRelative, formatShortDate } from '@/lib/time';
 import { formatPhone, initials, ordinalGrade } from '@/lib/utils';
 import { pushStudentToPlanningCenter } from '@/services/functions';
@@ -86,6 +87,10 @@ export function StudentDetailPage() {
         ? orderSnapshotsNewestFirst(snapshots).map((snapshot) => ({
             event: snapshot.event,
             present: snapshot.presentStudentIds.has(student.id),
+            // A night nobody was checked into is not an absence: it is a night
+            // that did not happen. Labelling it here is what makes the streak
+            // above legible — otherwise it looks like the count skipped a row.
+            outcome: sessionOutcome(snapshot),
           }))
         : [],
     [snapshots, student],
@@ -93,8 +98,9 @@ export function StudentDetailPage() {
 
   /**
    * Consecutive missed recurring gatherings, newest first — the same rule the
-   * MIA list uses, including the "events before they joined are not misses"
-   * exclusion, so this page and the dashboard never disagree.
+   * MIA list uses, including the "events before they joined are not misses" and
+   * "a night nobody attended did not happen" exclusions, so this page and the
+   * dashboard never disagree.
    */
   const streak = useMemo(() => {
     if (!student) return 0;
@@ -425,6 +431,19 @@ export function StudentDetailPage() {
                 </span>
                 {entry.present ? (
                   <Badge tone="success">Present</Badge>
+                ) : entry.outcome !== 'held' ? (
+                  /* Nobody at all was checked in, so this is not their absence.
+                     The streak above skips it for the same reason. */
+                  <Badge
+                    tone="neutral"
+                    title={
+                      entry.outcome === 'cancelled'
+                        ? 'Cancelled — not counted as a miss'
+                        : 'Nobody was checked in, so this counts as cancelled rather than as a miss'
+                    }
+                  >
+                    {entry.outcome === 'cancelled' ? 'Cancelled' : 'No attendance'}
+                  </Badge>
                 ) : entry.event.mode === 'oneoff' ? (
                   /* A retreat they never signed up for is not an absence. */
                   <Badge tone="neutral" title="One-off event — they were not on this trip">

@@ -198,6 +198,32 @@ describe('buildRoster properties', () => {
     },
   );
 
+  /*
+   * The cancelled-session rule, as a property. A run of past instances nobody was
+   * checked into is a run of gatherings that did not happen, and prediction from
+   * gatherings that did not happen is prediction from nothing.
+   */
+  forAll(
+    'predicts nothing from past instances nobody attended',
+    (rng) => {
+      const input = arbitraryRosterInput(rng);
+      return {
+        ...input,
+        history: input.history.map((snapshot) => ({
+          ...snapshot,
+          presentStudentIds: new Set<string>(),
+        })),
+        filters: { ...input.filters, query: '' },
+      };
+    },
+    (input) => {
+      const view = buildRoster(input);
+
+      expect(view.counts.historyWindow).toBe(0);
+      expect(view.recent).toEqual([]);
+    },
+  );
+
   forAll(
     'reports blocking warnings only for waivers and payments',
     arbitraryRosterInput,

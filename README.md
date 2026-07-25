@@ -159,6 +159,15 @@ profiles, roster warnings and the attendance trend are all computed in the brows
 already loaded. That keeps the interesting logic unit-testable without Firebase and means changing a
 threshold in Settings re-renders every screen immediately, with no backfill.
 
+**A gathering nobody attended did not happen.** Events carry `status: 'cancelled'`, but that field is
+only set when somebody remembers to open Tally on the night a gathering is called off, which is not
+when anybody is thinking about the app. So every derivation over history reads a finished gathering
+with no attendance as a cancelled one: it is not a miss for anybody, it does not consume a slot in the
+"last three Fridays" window, and it is not a zero on the trend strip. Without that, one snowed-out
+Friday puts the entire ministry on the MIA list. The rule lives in
+[`src/lib/sessionHistory.ts`](src/lib/sessionHistory.ts), so the check-in screen, the dashboard and a
+student's page all reach the same verdict about the same night.
+
 Three fields break that rule on purpose, and each carries an invariant: `profileComplete` (so
 "Incomplete Profiles" is an indexed query rather than a collection scan), `searchName` (a lowercased
 "first last" for search), and `firstAttendedAt` (written exactly once, so "New Visitors" is stable

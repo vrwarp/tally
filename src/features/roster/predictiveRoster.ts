@@ -10,6 +10,7 @@
  * *this specific series*. Friday history predicts Friday; Sunday history
  * predicts Sunday. They never cross.
  */
+import { wasHeld } from '@/lib/sessionHistory';
 import { matchesQuery, sortByName } from '@/lib/utils';
 import type {
   AppSettings,
@@ -94,6 +95,12 @@ export function effectiveThreshold(settings: AppSettings, historyWindow: number)
  * Only instances of the same series count, only instances that have already
  * finished, and only the most recent `ofLastN` of them. The event being checked
  * into is excluded — an event never predicts itself.
+ *
+ * A gathering that never happened is excluded too, whether it was marked
+ * cancelled or merely has nobody checked in (see `wasHeld`). That filter runs
+ * *before* the slice on purpose: a snowed-out Friday must cost the window
+ * nothing rather than consume one of its three slots and quietly demote every
+ * regular in the ministry to "not recent".
  */
 export function buildSeriesHistory(
   event: Pick<TallyEvent, 'id' | 'seriesId'>,
@@ -106,7 +113,7 @@ export function buildSeriesHistory(
       (snapshot) =>
         snapshot.event.id !== event.id &&
         snapshot.event.seriesId === event.seriesId &&
-        snapshot.event.status !== 'cancelled',
+        wasHeld(snapshot),
     )
     .sort((a, b) => b.event.startAt.getTime() - a.event.startAt.getTime())
     .slice(0, settings.predictiveOfLastN);

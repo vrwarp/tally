@@ -40,6 +40,20 @@ const makeOneOff = (overrides: Partial<TallyEvent>): TallyEvent => ({
 /** Long before any fixture event, so nothing is excluded by the join date. */
 const LONG_AGO = new Date(2025, 8, 1, 12, 0);
 
+/**
+ * A student who never misses anything, and who no test ever asks about.
+ *
+ * A gathering with an empty attendance list is read as a cancelled session, so a
+ * night that none of a test's *own* students attended still needs somebody
+ * through the door to count as a night that happened. This id is deliberately
+ * never passed to a derivation: it exists to make the gathering real.
+ */
+const REGULAR = 'regular-who-never-misses';
+
+/** A gathering that definitely happened, plus whoever the test cares about. */
+const held = (event: TallyEvent, present: readonly string[] = []) =>
+  makeSnapshot(event, [REGULAR, ...present]);
+
 const studentIds = (rows: readonly { student: { id: string } }[]) =>
   rows.map((row) => row.student.id);
 
@@ -67,15 +81,31 @@ describe('recurringSnapshots', () => {
   it('keeps only scheduled recurring instances, newest first', () => {
     const events = fridays(2);
     const input = [
-      makeSnapshot(events[0]!, []),
-      makeSnapshot(events[1]!, []),
-      makeSnapshot(makeOneOff({ id: 'retreat', startAt: new Date(2026, 1, 12, 9, 0) }), []),
-      makeSnapshot(makeEvent({ ...events[1]!, id: 'cancelled', status: 'cancelled' }), []),
+      held(events[0]!),
+      held(events[1]!),
+      makeSnapshot(makeOneOff({ id: 'retreat', startAt: new Date(2026, 1, 12, 9, 0) }), ['a']),
+      makeSnapshot(makeEvent({ ...events[1]!, id: 'cancelled', status: 'cancelled' }), ['a']),
     ];
 
     expect(recurringSnapshots(input).map((snapshot) => snapshot.event.id)).toEqual([
       `${FRIDAY}-1`,
       `${FRIDAY}-2`,
+    ]);
+  });
+
+  /*
+   * The cancelled-session rule. Nobody marks a snowed-out Friday as cancelled at
+   * 6pm on a Friday, so the attendance is the only evidence left: an empty one
+   * means the gathering did not happen, and a gathering that did not happen is
+   * not something anybody can be absent from.
+   */
+  it('drops a gathering nobody was ever checked into', () => {
+    const events = fridays(3);
+    const input = [held(events[0]!), makeSnapshot(events[1]!, []), held(events[2]!)];
+
+    expect(recurringSnapshots(input).map((snapshot) => snapshot.event.id)).toEqual([
+      `${FRIDAY}-1`,
+      `${FRIDAY}-3`,
     ]);
   });
 });
@@ -92,10 +122,10 @@ describe('computeMia', () => {
     const student = makeStudent({ id: 'missing', createdAt: LONG_AGO });
     // Present four weeks ago, absent for the three since.
     const snapshots = [
-      makeSnapshot(events[0]!, [student.id]),
-      makeSnapshot(events[1]!, []),
-      makeSnapshot(events[2]!, []),
-      makeSnapshot(events[3]!, []),
+      held(events[0]!, [student.id]),
+      held(events[1]!),
+      held(events[2]!),
+      held(events[3]!),
     ];
 
     const mia = computeMia([student], snapshots, settings);
@@ -107,10 +137,10 @@ describe('computeMia', () => {
   it('leaves out a student one miss below the threshold', () => {
     const student = makeStudent({ id: 'nearly', createdAt: LONG_AGO });
     const snapshots = [
-      makeSnapshot(events[0]!, []),
-      makeSnapshot(events[1]!, [student.id]),
-      makeSnapshot(events[2]!, []),
-      makeSnapshot(events[3]!, []),
+      held(events[0]!),
+      held(events[1]!, [student.id]),
+      held(events[2]!),
+      held(events[3]!),
     ];
 
     expect(computeMia([student], snapshots, settings)).toEqual([]);
@@ -118,7 +148,7 @@ describe('computeMia', () => {
 
   it('includes a student who has never attended, once enough gatherings have passed', () => {
     const student = makeStudent({ id: 'never-came', createdAt: LONG_AGO });
-    const snapshots = events.map((event) => makeSnapshot(event, []));
+    const snapshots = events.map((event) => held(event));
 
     const mia = computeMia([student], snapshots, settings);
 
@@ -134,14 +164,14 @@ describe('computeMia', () => {
       id: 'brand-new',
       createdAt: new Date(events[2]!.startAt.getTime() + 86_400_000),
     });
-    const snapshots = events.map((event) => makeSnapshot(event, []));
+    const snapshots = events.map((event) => held(event));
 
     expect(computeMia([student], snapshots, settings)).toEqual([]);
   });
 
   it('excludes inactive students, who have already been followed up on', () => {
     const gone = makeStudent({ id: 'graduated', status: 'inactive', createdAt: LONG_AGO });
-    const snapshots = events.map((event) => makeSnapshot(event, []));
+    const snapshots = events.map((event) => held(event));
 
     expect(computeMia([gone], snapshots, settings)).toEqual([]);
   });
@@ -150,11 +180,11 @@ describe('computeMia', () => {
     const student = makeStudent({ id: 'retreat-skipper', createdAt: LONG_AGO });
     const recent = fridays(2);
     const snapshots = [
-      makeSnapshot(recent[0]!, []),
-      makeSnapshot(recent[1]!, []),
+      held(recent[0]!),
+      held(recent[1]!),
       // Two retreats they also missed. Counting these would push them to four.
-      makeSnapshot(makeOneOff({ id: 'retreat-a', startAt: new Date(2026, 1, 7, 9, 0) }), []),
-      makeSnapshot(makeOneOff({ id: 'retreat-b', startAt: new Date(2026, 1, 11, 9, 0) }), []),
+      makeSnapshot(makeOneOff({ id: 'retreat-a', startAt: new Date(2026, 1, 7, 9, 0) }), [REGULAR]),
+      makeSnapshot(makeOneOff({ id: 'retreat-b', startAt: new Date(2026, 1, 11, 9, 0) }), [REGULAR]),
     ];
 
     expect(computeMia([student], snapshots, settings)).toEqual([]);
@@ -163,14 +193,52 @@ describe('computeMia', () => {
   it('ignores cancelled instances', () => {
     const student = makeStudent({ id: 'unlucky', createdAt: LONG_AGO });
     const snapshots = [
-      makeSnapshot(events[0]!, []),
-      makeSnapshot(events[1]!, []),
-      makeSnapshot(makeEvent({ ...events[2]!, status: 'cancelled' }), []),
-      makeSnapshot(makeEvent({ ...events[3]!, status: 'cancelled' }), []),
+      held(events[0]!),
+      held(events[1]!),
+      // Attendance on a cancelled night — somebody turned up before the call was
+      // made — so these are excluded on their status alone.
+      makeSnapshot(makeEvent({ ...events[2]!, status: 'cancelled' }), [REGULAR]),
+      makeSnapshot(makeEvent({ ...events[3]!, status: 'cancelled' }), [REGULAR]),
     ];
 
     // Only two real gatherings remain, which is under the threshold.
     expect(computeMia([student], snapshots, settings)).toEqual([]);
+  });
+
+  /*
+   * The two halves of the cancelled-session rule, which have to hold together:
+   * a night nobody attended is not a miss, and it is not a reprieve either.
+   */
+  it('does not count a gathering nobody attended as a miss', () => {
+    const student = makeStudent({ id: 'snowed-out', createdAt: LONG_AGO });
+    const snapshots = [
+      held(events[0]!, [student.id]),
+      held(events[1]!),
+      // The storm night. Nobody was checked in, so nobody was absent.
+      makeSnapshot(events[2]!, []),
+      held(events[3]!),
+    ];
+
+    // Two misses rather than three. Counting the storm night would put every
+    // student in the ministry on the call list the following week.
+    expect(computeMia([student], snapshots, settings)).toEqual([]);
+  });
+
+  it('does not let a gathering nobody attended break a streak', () => {
+    const student = makeStudent({ id: 'drifting', createdAt: LONG_AGO });
+    const snapshots = [
+      held(events[0]!),
+      held(events[1]!),
+      makeSnapshot(events[2]!, []),
+      held(events[3]!),
+    ];
+
+    const mia = computeMia([student], snapshots, settings);
+
+    // Three real gatherings missed in a row, with the empty night sitting in the
+    // middle of them counting as neither.
+    expect(mia).toHaveLength(1);
+    expect(mia[0]!.consecutiveMisses).toBe(3);
   });
 
   it('orders longest-absent first, breaking ties by name', () => {
@@ -179,10 +247,10 @@ describe('computeMia', () => {
     const tiedB = makeStudent({ id: 'tied-b', lastName: 'Brook', createdAt: LONG_AGO });
 
     const snapshots = [
-      makeSnapshot(events[0]!, [tiedA.id, tiedB.id]),
-      makeSnapshot(events[1]!, []),
-      makeSnapshot(events[2]!, []),
-      makeSnapshot(events[3]!, []),
+      held(events[0]!, [tiedA.id, tiedB.id]),
+      held(events[1]!),
+      held(events[2]!),
+      held(events[3]!),
     ];
 
     const mia = computeMia([tiedB, worst, tiedA], snapshots, settings);
@@ -195,10 +263,10 @@ describe('computeMia', () => {
     const student = makeStudent({ id: 'lapsed', createdAt: LONG_AGO });
     const lastSeen = makeEvent({ ...events[0]!, title: 'Friday Fellowship: Game Night' });
     const snapshots = [
-      makeSnapshot(lastSeen, [student.id]),
-      makeSnapshot(events[1]!, []),
-      makeSnapshot(events[2]!, []),
-      makeSnapshot(events[3]!, []),
+      held(lastSeen, [student.id]),
+      held(events[1]!),
+      held(events[2]!),
+      held(events[3]!),
     ];
 
     const mia = computeMia([student], snapshots, settings);
@@ -210,7 +278,7 @@ describe('computeMia', () => {
   it('falls back to the student record when the loaded window predates their last visit', () => {
     const lastAttendedAt = new Date(2025, 11, 5, 19, 0);
     const student = makeStudent({ id: 'long-gone', createdAt: LONG_AGO, lastAttendedAt });
-    const snapshots = events.map((event) => makeSnapshot(event, []));
+    const snapshots = events.map((event) => held(event));
 
     expect(computeMia([student], snapshots, settings)[0]!.lastAttendedAt).toEqual(lastAttendedAt);
   });
@@ -219,7 +287,7 @@ describe('computeMia', () => {
     const student = makeStudent({ createdAt: LONG_AGO });
     expect(computeMia([student], [], settings)).toEqual([]);
     expect(
-      computeMia([student], [makeSnapshot(makeOneOff({ id: 'retreat' }), [])], settings),
+      computeMia([student], [makeSnapshot(makeOneOff({ id: 'retreat' }), [REGULAR])], settings),
     ).toEqual([]);
   });
 });
@@ -414,12 +482,26 @@ describe('computeAttendanceTrend', () => {
     const snapshots = [
       makeSnapshot(events[0]!, ['a']),
       makeSnapshot(makeOneOff({ id: 'retreat', startAt: new Date(2026, 1, 7, 9, 0) }), ['a', 'b']),
-      makeSnapshot(makeEvent({ ...events[1]!, status: 'cancelled' }), []),
+      // With attendance on it, so the exclusion is the status and nothing else.
+      makeSnapshot(makeEvent({ ...events[1]!, status: 'cancelled' }), ['a']),
     ];
 
     expect(computeAttendanceTrend(snapshots).map((point) => point.eventId)).toEqual([
       `${FRIDAY}-3`,
     ]);
+  });
+
+  it('leaves out a gathering with no attendance rather than plotting a zero', () => {
+    const trend = computeAttendanceTrend([
+      makeSnapshot(events[0]!, ['a', 'b']),
+      makeSnapshot(events[1]!, []),
+      makeSnapshot(events[2]!, ['a', 'b', 'c']),
+    ]);
+
+    // A zero bar mid-strip reads as attendance collapsing, not as a night that
+    // never happened — and the average underneath it would be wrong too.
+    expect(trend.map((point) => point.eventId)).toEqual([`${FRIDAY}-3`, `${FRIDAY}-1`]);
+    expect(trend.every((point) => point.count > 0)).toBe(true);
   });
 
   it('keeps the most recent `limit` points and still returns them oldest first', () => {
@@ -502,6 +584,24 @@ describe('computeSummary', () => {
     expect(summary.lastEventCount).toBe(2);
     expect(summary.previousEventCount).toBe(0);
     expect(summary.uniqueStudents).toBe(2);
+  });
+
+  it('reads both head counts from the gatherings that happened', () => {
+    const summary = computeSummary({
+      snapshots: [
+        makeSnapshot(events[0]!, ['a', 'b']),
+        makeSnapshot(events[1]!, ['a', 'b', 'c']),
+        // The most recent gathering on the calendar, which nobody came to.
+        makeSnapshot(events[2]!, []),
+      ],
+      mia: [],
+      newVisitors: [],
+      incomplete: [],
+    });
+
+    // "Last gathering 0, down 3" reports a cancelled night as a catastrophe.
+    expect(summary.lastEventCount).toBe(3);
+    expect(summary.previousEventCount).toBe(2);
   });
 
   it('passes the list lengths straight through', () => {

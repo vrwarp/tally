@@ -11,7 +11,7 @@
  */
 import { useMemo, useState } from 'react';
 import { Card, CardHeader, EmptyState } from '@/components/ui';
-import { computeAttendanceTrend } from '@/features/dashboard/insights';
+import { computeAttendanceTrend, recurringSnapshots } from '@/features/dashboard/insights';
 import { formatShortDate } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import type { EventAttendanceSnapshot, EventSeries } from '@/types';
@@ -32,14 +32,17 @@ export interface AttendanceTrendProps {
 export function AttendanceTrend({ snapshots, series, limit = 8 }: AttendanceTrendProps) {
   const [selected, setSelected] = useState<string>(ALL_SERIES);
 
+  // Only the gatherings that produced a bar: a series whose recent instances were
+  // all cancelled has nothing to chart, and offering its tab leads to an empty
+  // strip that reads as a broken filter.
+  const charted = useMemo(() => recurringSnapshots(snapshots), [snapshots]);
+
   const tabs = useMemo(() => {
     const withHistory = new Set(
-      snapshots
-        .map((snapshot) => snapshot.event.seriesId)
-        .filter((id): id is string => id !== null),
+      charted.map((snapshot) => snapshot.event.seriesId).filter((id): id is string => id !== null),
     );
     return series.filter((entry) => withHistory.has(entry.id));
-  }, [series, snapshots]);
+  }, [series, charted]);
 
   // A tab can vanish when the window scrolls past a dormant series; fall back
   // rather than render an empty chart for a series that is no longer offered.
@@ -47,11 +50,11 @@ export function AttendanceTrend({ snapshots, series, limit = 8 }: AttendanceTren
 
   const points = useMemo(
     () =>
-      computeAttendanceTrend(snapshots, {
+      computeAttendanceTrend(charted, {
         seriesId: active === ALL_SERIES ? null : active,
         limit,
       }),
-    [snapshots, active, limit],
+    [charted, active, limit],
   );
 
   const peak = points.reduce((max, point) => Math.max(max, point.count), 0);
