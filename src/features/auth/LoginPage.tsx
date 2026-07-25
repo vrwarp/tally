@@ -13,9 +13,22 @@ import { useState, type FormEvent } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/context/authContext';
 import { Button, ErrorBanner, LoadingScreen, TextField } from '@/components/ui';
+import { googleSignInStrategy, isEmbeddedBrowser } from '@/lib/embeddedBrowser';
+import { firebaseApp } from '@/lib/firebase';
 
 export function LoginPage() {
   const { status, error, magicLinkSentTo, sendMagicLink, signInWithGoogle, clearError } = useAuth();
+
+  /*
+   * Decided once on mount, not on click: telling someone up front that a button
+   * will not work beats letting them press it and watch nothing happen. Both
+   * checks read the user agent and display mode, which do not change while the
+   * page is open.
+   */
+  const [inAppBrowser] = useState(() => isEmbeddedBrowser());
+  const [googleUnavailable] = useState(
+    () => googleSignInStrategy(firebaseApp.options.authDomain) === 'unavailable',
+  );
   const [email, setEmail] = useState('');
   const [sending, setSending] = useState(false);
   const [googlePending, setGooglePending] = useState(false);
@@ -147,12 +160,21 @@ export function LoginPage() {
             variant="secondary"
             size="lg"
             fullWidth
+            disabled={googleUnavailable}
             loading={googlePending}
             leading={<GoogleMark />}
             onClick={() => void handleGoogle()}
           >
             Continue with Google
           </Button>
+
+          {googleUnavailable ? (
+            <p className="text-center text-xs leading-relaxed text-warn-400">
+              {inAppBrowser
+                ? 'Google sign-in does not work inside an app’s built-in browser. The email link above does — or open Tally in Safari or Chrome.'
+                : 'Google sign-in is not available in the installed app. Use the email link above.'}
+            </p>
+          ) : null}
         </div>
 
         <p className="text-center text-xs leading-relaxed text-ink-500">

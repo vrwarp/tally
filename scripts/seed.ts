@@ -491,6 +491,39 @@ function buildEvents(now: Date): BuiltEvent[] {
     isPast: false,
   });
 
+  /*
+   * Make sure something is actually open for check-in right now.
+   *
+   * The weekly series are anchored to the next real Friday and Sunday, so on a
+   * Tuesday afternoon nothing is live and the app correctly shows "nothing to
+   * check into". That is right behaviour and a poor demo: the first screen
+   * anyone opens is the one that does not work. It also makes the end-to-end
+   * suite depend on the day it happens to run.
+   *
+   * So when no generated event covers `now`, add one Friday Fellowship instance
+   * that does. It carries no attendance (it has not happened yet), and
+   * `recentSeriesInstances` excludes events whose window is still open, so it
+   * never pollutes the history that predicts its own roster.
+   */
+  const somethingIsLive = events.some(
+    (event) => event.checkInOpensAt <= now && event.checkInClosesAt >= now,
+  );
+
+  if (!somethingIsLive) {
+    const startAt = addMinutes(now, -30);
+    const endAt = addMinutes(now, 90);
+    events.push({
+      id: `${SERIES_IDS.fridayFellowship}-live-${isoDay(now)}`,
+      title: 'Friday Fellowship',
+      seriesId: SERIES_IDS.fridayFellowship,
+      startAt,
+      endAt,
+      checkInOpensAt: addMinutes(startAt, -60),
+      checkInClosesAt: addMinutes(endAt, 60),
+      isPast: false,
+    });
+  }
+
   return events.sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
 }
 

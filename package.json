@@ -32,7 +32,8 @@
     "e2e": "playwright test",
     "e2e:chromium": "playwright test --project=chromium-desktop --project=chromium-mobile",
     "e2e:install": "playwright install --with-deps chromium webkit",
-    "e2e:report": "playwright show-report"
+    "e2e:report": "playwright show-report",
+    "typecheck:e2e": "tsc -p tsconfig.e2e.json"
   },
   "dependencies": {
     "clsx": "^2.1.1",

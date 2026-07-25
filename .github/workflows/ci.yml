@@ -1,0 +1,188 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+# A second push to the same branch makes the first one's result irrelevant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  quality:
+    name: Lint & types
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm --prefix functions ci
+      - run: npm run lint
+      - name: Typecheck the app
+        run: npx tsc --noEmit -p tsconfig.json
+      - name: Typecheck the end-to-end suite
+        run: npm run typecheck:e2e
+      - name: Typecheck the Cloud Functions, tests included
+        run: npm --prefix functions run typecheck
+      - name: Build the Cloud Functions
+        run: npm run functions:build
+      - name: Build the app
+        run: npm run build
+
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm --prefix functions ci
+      - name: App unit tests
+        run: npm test
+      - name: Cloud Functions tests
+        run: npm run test:functions
+
+  rules:
+    name: Firestore security rules
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      # The Firestore emulator is a Java program.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Cache the emulator jars
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}
+      - run: npm ci
+      - run: npm run test:rules
+
+  e2e:
+    name: E2E (${{ matrix.project }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      # One browser failing says nothing about the others, and knowing which
+      # ones are broken is the whole point of the matrix.
+      fail-fast: false
+      matrix:
+        project:
+          - chromium-desktop
+          - chromium-mobile
+          - webkit-desktop
+          - webkit-mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - run: npm ci
+      - run: npm --prefix functions ci
+
+      - name: Resolve the Playwright version
+        id: playwright
+        run: |
+          version=$(node -p "require('./package-lock.json').packages['node_modules/@playwright/test'].version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the browsers
+        id: browser-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
+      # System dependencies are not cached, so they are installed either way;
+      # only the browser binaries themselves come from the cache.
+      - name: Install browsers
+        run: npm run e2e:install
+
+      - name: Cache the emulator jars
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}
+
+      - name: Run ${{ matrix.project }}
+        run: npx playwright test --project=${{ matrix.project }}
+
+      - name: Upload the report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          # Named per project so two failing browsers do not overwrite each other.
+          name: playwright-report-${{ matrix.project }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+  docker-e2e:
+    name: E2E image builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build the end-to-end image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/e2e/Dockerfile
+          # Built, never pushed: this repository deploys to Firebase Hosting, so
+          # the image exists only to make an e2e run reproducible on any machine.
+          push: false
+          load: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+    needs: [quality, unit, rules, e2e, docker-e2e]
+    if: always()
+    steps:
+      # One required status check is far easier to protect a branch with than
+      # five, and it cannot pass by accident when a needed job was skipped.
+      - name: Fail if any job did not succeed
+        run: |
+          echo "quality:    ${{ needs.quality.result }}"
+          echo "unit:       ${{ needs.unit.result }}"
+          echo "rules:      ${{ needs.rules.result }}"
+          echo "e2e:        ${{ needs.e2e.result }}"
+          echo "docker-e2e: ${{ needs.docker-e2e.result }}"
+          [ "${{ needs.quality.result }}" = "success" ] \
+            && [ "${{ needs.unit.result }}" = "success" ] \
+            && [ "${{ needs.rules.result }}" = "success" ] \
+            && [ "${{ needs.e2e.result }}" = "success" ] \
+            && [ "${{ needs.docker-e2e.result }}" = "success" ]

@@ -28,6 +28,10 @@
       "@/*": ["src/*"]
     }
   },
+  // `e2e` and `playwright.config.ts` are Node code with their own config
+  // (tsconfig.e2e.json); including them here would drag Node globals into the
+  // app's browser-only type environment.
+  "exclude": ["e2e", "playwright.config.ts"],
   "include": [
     "src",
     "tests",

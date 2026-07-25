@@ -10,15 +10,18 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useNavigate } from 'react-router-dom';
 import {
   GoogleAuthProvider,
+  getRedirectResult,
   isSignInWithEmailLink,
   onAuthStateChanged,
   sendSignInLinkToEmail,
   signInWithEmailLink,
   signInWithPopup,
+  signInWithRedirect,
   signOut as firebaseSignOut,
   type User,
 } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { auth, firebaseApp } from '@/lib/firebase';
+import { googleSignInStrategy, isEmbeddedBrowser } from '@/lib/embeddedBrowser';
 import { subscribeUserProfile, touchLastSeen } from '@/services/users';
 import { roleAtLeast, type Role, type UserProfile } from '@/types';
 import { AuthContext, type AuthContextValue, type AuthStatus } from '@/context/authContext';
@@ -44,6 +47,10 @@ function describeAuthError(error: unknown): string {
     case 'auth/popup-closed-by-user':
     case 'auth/cancelled-popup-request':
       return 'Sign-in was cancelled.';
+    case 'auth/popup-blocked':
+      return 'The sign-in window was blocked. Use the email link instead.';
+    case 'auth/operation-not-supported-in-this-environment':
+      return 'This browser cannot do Google sign-in. Use the email link instead.';
     case 'auth/unauthorized-continue-uri':
       return 'This domain is not authorised for sign-in links. Add it in the Firebase console.';
     case 'auth/network-request-failed':
@@ -105,6 +112,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [user]);
 
+  /*
+   * Finish a `signInWithRedirect` round-trip. Harmless when none is pending —
+   * it resolves to null — and without it a redirect sign-in silently does
+   * nothing on return.
+   */
+  useEffect(() => {
+    getRedirectResult(auth).catch((cause: unknown) => {
+      setError(describeAuthError(cause));
+    });
+  }, []);
+
   /* Finish a magic-link sign-in when the browser lands back on the app. */
   useEffect(() => {
     if (completingLink.current) return;
@@ -150,13 +168,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /**
+   * Google sign-in, routed by what the current browser can actually do.
+   *
+   * `signInWithPopup` is the nicest flow and the default in a normal tab, but
+   * it cannot be used blindly: in an installed PWA on Android the popup opens a
+   * Custom Tab whose handshake never returns and the call *hangs* — no catch
+   * block ever runs — and on iOS it is blocked outright. Those contexts are
+   * detected before the attempt, not after it.
+   *
+   * The email link works everywhere, so "unavailable" is a real answer here
+   * rather than a dead end.
+   */
   const signInWithGoogle = useCallback(async () => {
     setError(null);
+
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+
+    const strategy = googleSignInStrategy(firebaseApp.options.authDomain);
+
+    if (strategy === 'unavailable') {
+      setError(
+        isEmbeddedBrowser()
+          ? 'This in-app browser cannot do Google sign-in. Use the email link, or open Tally in Safari or Chrome.'
+          : 'Google sign-in is not available in the installed app. Use the email link instead.',
+      );
+      return;
+    }
+
     try {
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
+      if (strategy === 'redirect') {
+        await signInWithRedirect(auth, provider);
+        return;
+      }
       await signInWithPopup(auth, provider);
     } catch (cause) {
+      // A blocked popup in a normal tab is recoverable: hand it to the redirect.
+      if ((cause as { code?: string })?.code === 'auth/popup-blocked') {
+        try {
+          await signInWithRedirect(auth, provider);
+          return;
+        } catch (redirectCause) {
+          setError(describeAuthError(redirectCause));
+          throw redirectCause;
+        }
+      }
       setError(describeAuthError(cause));
       throw cause;
     }

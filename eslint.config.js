@@ -38,6 +38,19 @@ export default tseslint.config(
     languageOptions: { globals: globals.node },
   },
   {
+    /*
+     * Playwright code, not React. Its fixture signature is `async ({}, use)`,
+     * which trips both the empty-pattern rule and the hooks rule — `use` is a
+     * fixture callback, not a React hook.
+     */
+    files: ['e2e/**/*.ts', 'playwright.config.ts'],
+    languageOptions: { globals: globals.node },
+    rules: {
+      'react-hooks/rules-of-hooks': 'off',
+      'no-empty-pattern': 'off',
+    },
+  },
+  {
     files: ['**/*.test.{ts,tsx}', 'tests/**/*.ts', 'firestore-tests/**/*.ts'],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
     rules: {

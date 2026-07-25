@@ -23,7 +23,7 @@ export function AuthGate({ children }: { children: ReactNode }): ReactNode {
 
   switch (status) {
     case 'loading':
-      return <LoadingScreen />;
+      return <RestoringSession />;
     case 'signedOut':
       return <Navigate to="/login" replace />;
     case 'pending':
@@ -31,6 +31,54 @@ export function AuthGate({ children }: { children: ReactNode }): ReactNode {
     case 'ready':
       return children;
   }
+}
+
+/** How long to wait before admitting that restoring the session is not going well. */
+const SLOW_RESTORE_MS = 8000;
+
+/**
+ * The "am I signed in?" screen, with a way out.
+ *
+ * Restoring a Firebase session normally takes a moment, but it can stall
+ * indefinitely — a network that blocks Google's auth endpoints (school and
+ * church filtering does this), a wedged service worker, an IndexedDB the
+ * browser will not open in private mode. Left alone the app shows a spinner
+ * forever, which is the single worst thing to hand a volunteer with a queue at
+ * the door: nothing to read, nothing to press, no way to tell broken from slow.
+ */
+function RestoringSession() {
+  const [slow, setSlow] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setSlow(true), SLOW_RESTORE_MS);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (!slow) return <LoadingScreen message="Signing you in…" />;
+
+  return (
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-4 px-6 text-center">
+      <Spinner className="size-8" />
+      <div>
+        <p className="font-medium text-ink-200">This is taking longer than usual.</p>
+        <p className="mt-1 max-w-sm text-sm text-ink-500">
+          Tally is still trying to restore your session. Check the wifi, then reload — or sign in
+          again to start fresh.
+        </p>
+      </div>
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        <Button variant="secondary" onClick={() => window.location.reload()}>
+          Reload
+        </Button>
+        <Link
+          to="/login"
+          className="inline-flex min-h-11 items-center justify-center rounded-xl bg-brand-500 px-4 text-sm font-semibold text-white"
+        >
+          Sign in again
+        </Link>
+      </div>
+    </div>
+  );
 }
 
 export function RequireRole({ role, children }: { role: Role; children: ReactNode }): ReactNode {

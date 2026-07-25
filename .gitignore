@@ -10,8 +10,11 @@ dist-ssr/
 !.env.emulated
 
 # Planning Center credentials for the local functions emulator.
+# `.env.demo-tally` is deliberately NOT ignored: it holds only simulator
+# settings for the emulator-only `demo-` project namespace.
 functions/.secret.local
 functions/.env
+functions/.env.local
 functions/lib/
 
 # Firebase
