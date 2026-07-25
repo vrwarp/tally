@@ -23,17 +23,14 @@ import {
 } from '@firebase/rules-unit-testing';
 import { paths } from '@/lib/paths';
 import type {
-  AccessRosterEntryDoc,
   AppSettingsDoc,
   AttendanceRecordDoc,
-  PcoSyncStateDoc,
   RsvpDoc,
   SmallGroupDoc,
   StudentDoc,
   TallyEventDoc,
   UserProfileDoc,
 } from '@/types';
-import { EMPTY_PCO_COUNTS } from '@/types';
 
 // `node:process` is CommonJS-only under this tsconfig, and @types/node's
 // globals are not in `types`. One structural declaration is cheaper than
@@ -118,18 +115,11 @@ export function studentDoc(overrides: Partial<StudentDoc> = {}): StudentDoc {
     grade: 8,
     gender: 'unspecified',
     smallGroupId: null,
-    parentName: 'Alex Rivera',
-    parentPhone: '555-0100',
-    parentEmail: null,
-    allergies: null,
     notes: null,
     status: 'active',
     isVisitor: false,
     pcoPersonId: null,
-    pcoUpdatedAt: null,
-    pcoSyncedAt: null,
     pcoPushPending: true,
-    profileComplete: true,
     searchName: 'jamie rivera',
     firstAttendedAt: null,
     lastAttendedAt: null,
@@ -209,33 +199,6 @@ function smallGroupDoc(): SmallGroupDoc {
   return { name: '8th Grade Boys', grades: [8], gender: 'male', order: 0 };
 }
 
-function pcoSyncDoc(): PcoSyncStateDoc {
-  return {
-    status: 'ok',
-    startedAt: T0,
-    finishedAt: T1,
-    cursor: T1,
-    lastFullSyncAt: T0,
-    counts: EMPTY_PCO_COUNTS,
-    lastError: null,
-    rosterSource: 'list',
-    writeBack: 'create',
-    triggeredBy: UID.admin,
-  };
-}
-
-function accessRosterDoc(): AccessRosterEntryDoc {
-  return {
-    email: 'sam@example.org',
-    displayName: 'Sam Counselor',
-    role: 'counselor',
-    pcoPersonId: 'pco-1',
-    assignedGroupId: null,
-    active: true,
-    syncedAt: T0,
-  };
-}
-
 /* -------------------------------------------------------------------------- */
 /* Seeding                                                                     */
 /* -------------------------------------------------------------------------- */
@@ -274,8 +237,6 @@ export async function seedContent(env: RulesTestEnvironment): Promise<void> {
     await setDoc(doc(db, paths.rsvp(ID.event, ID.student)), rsvpDoc());
     await setDoc(doc(db, paths.smallGroup(ID.group)), smallGroupDoc());
     await setDoc(doc(db, paths.settings()), settingsDoc());
-    await setDoc(doc(db, paths.pcoSync()), pcoSyncDoc());
-    await setDoc(doc(db, paths.accessRosterEntry('sam@example,org')), accessRosterDoc());
   });
 }
 

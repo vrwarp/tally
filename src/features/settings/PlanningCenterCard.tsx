@@ -1,195 +1,176 @@
 /**
- * Planning Center sync status and the manual trigger.
+ * The Planning Center connection, as a question a leader can ask.
  *
- * The sync itself lives in a Cloud Function — the Personal Access Token must
- * never reach a browser — so this card's whole job is to explain what that
- * function last did, in terms a youth pastor can act on. It states the roster
- * source and write-back mode it ran with, because "why is this student not in
- * Tally?" is almost always answered by one of those two settings rather than by
- * a failure.
+ * This card used to be a sync console: a status badge, six counters, a "last
+ * full sweep" timestamp and a Sync now button. All of that existed because Tally
+ * kept a copy of the church's people and somebody had to be able to see whether
+ * the copy was current.
+ *
+ * There is no copy any more. The roster is read from Planning Center when it is
+ * needed and held for at most `cacheTtlSeconds`, so there is nothing to fall out
+ * of date and nothing to watch. What is left is the only question anyone
+ * actually had: *is this working, and how many of my students can Tally see?*
+ *
+ * It still states the roster source and write-back mode, because "why is this
+ * student not in Tally?" is almost always answered by one of those two rather
+ * than by a failure.
  */
-import { useEffect, useState } from 'react';
-import {
-  Badge,
-  Button,
-  Card,
-  CardHeader,
-  ErrorBanner,
-  Spinner,
-  type BadgeProps,
-} from '@/components/ui';
+import { useCallback, useEffect, useState } from 'react';
+import { Badge, Button, Card, CardHeader, ErrorBanner, SkeletonRows } from '@/components/ui';
+import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
-import { formatDateTime, formatRelative } from '@/lib/time';
-import { syncPlanningCenterNow } from '@/services/functions';
-import { subscribePcoSyncState } from '@/services/pcoSync';
-import type {
-  PcoRosterSource,
-  PcoSyncCounts,
-  PcoSyncState,
-  PcoSyncStatus,
-  PcoWriteBackMode,
-} from '@/types';
+import { formatRelative } from '@/lib/time';
+import { getPlanningCenterStatus, refreshPlanningCenter } from '@/services/functions';
+import type { PcoRosterSource, PcoStatus, PcoWriteBackMode } from '@/types';
 
-const STATUS_META: Record<PcoSyncStatus, { label: string; tone: BadgeProps['tone'] }> = {
-  never: { label: 'Not set up', tone: 'neutral' },
-  running: { label: 'Running', tone: 'brand' },
-  ok: { label: 'Healthy', tone: 'success' },
-  error: { label: 'Last run failed', tone: 'danger' },
-};
-
-const ROSTER_SOURCE_LABEL: Record<PcoRosterSource, string> = {
+const SOURCE_LABEL: Record<PcoRosterSource, string> = {
   list: 'a Planning Center list',
   grade: 'grade fields on each person',
 };
 
 const WRITE_BACK_LABEL: Record<PcoWriteBackMode, string> = {
-  off: 'Tally never writes to Planning Center.',
-  create: 'Tally creates new people in Planning Center but never edits existing ones.',
-  full: 'Tally creates and updates people in Planning Center.',
+  off: 'Tally never writes to Planning Center. Visitors stay queued until this is turned on.',
+  create: 'Tally creates people it has not seen before, but never edits an existing one.',
+  full: 'Tally creates people, and updates the fields Planning Center lets it manage.',
 };
 
-const COUNTS: readonly { key: keyof PcoSyncCounts; label: string }[] = [
-  { key: 'peopleScanned', label: 'Scanned' },
-  { key: 'studentsCreated', label: 'Created' },
-  { key: 'studentsUpdated', label: 'Updated' },
-  { key: 'studentsDeactivated', label: 'Deactivated' },
-  { key: 'teamMembersMapped', label: 'Team mapped' },
-  { key: 'visitorsPushed', label: 'Pushed out' },
-];
+function describeCache(seconds: number): string {
+  if (seconds === 0) {
+    return 'Caching is off. Every screen asks Planning Center directly — slower, and always current.';
+  }
+  return `An answer is reused for up to ${seconds} ${
+    seconds === 1 ? 'second' : 'seconds'
+  } before Tally asks Planning Center again.`;
+}
 
 export function PlanningCenterCard() {
   const { show } = useToast();
-  const [state, setState] = useState<PcoSyncState | null>(null);
-  const [streamError, setStreamError] = useState<string | null>(null);
+  const { refreshRoster, rosterFetchedAt, rosterOffline } = useData();
+
+  const [status, setStatus] = useState<PcoStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  useEffect(
-    () => subscribePcoSyncState(setState, (cause) => setStreamError(cause.message)),
-    [],
-  );
+  const check = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await getPlanningCenterStatus();
+      setStatus(response.data);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not ask Tally about the connection.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const runSync = async (full: boolean) => {
+  useEffect(() => {
+    void check();
+  }, [check]);
+
+  const refresh = async () => {
+    if (busy) return;
     setBusy(true);
     try {
-      const result = await syncPlanningCenterNow(full ? { full: true } : {});
-      const { status, message } = result.data;
-      show(message || (status === 'ok' ? 'Sync finished.' : 'Sync did not finish.'), {
-        tone: status === 'ok' ? 'success' : status === 'already-running' ? 'info' : 'error',
-      });
-    } catch (cause) {
-      show(cause instanceof Error ? cause.message : 'Could not reach the sync function.', {
-        tone: 'error',
-      });
+      // Drop the server's held answer first, or "Refresh" would cheerfully hand
+      // back the same cached roster and look broken.
+      await refreshPlanningCenter();
+      await Promise.all([check(), refreshRoster()]);
+      show('Read the roster again from Planning Center', { tone: 'success' });
+    } catch {
+      show('Could not refresh from Planning Center.', { tone: 'error' });
     } finally {
       setBusy(false);
     }
   };
 
-  const running = state?.status === 'running';
-  const meta = state ? STATUS_META[state.status] : null;
-  const lastRunAt = state?.finishedAt ?? state?.startedAt ?? null;
-
   return (
     <Card>
       <CardHeader
         title="Planning Center"
-        description="People come from Planning Center; Tally mirrors them."
+        description="Where Tally reads your people from. It keeps no copy of them."
         action={
-          meta ? (
-            <Badge tone={meta.tone}>
-              {running ? <Spinner className="size-3 border-current" label="Sync running" /> : null}
-              {meta.label}
-            </Badge>
-          ) : null
+          <Button variant="secondary" size="sm" onClick={() => void refresh()} loading={busy}>
+            Refresh
+          </Button>
         }
       />
 
       <div className="flex flex-col gap-3 px-4 py-3">
-        {streamError ? <ErrorBanner message={`Could not read sync status. ${streamError}`} /> : null}
+        {error ? <ErrorBanner message={error} /> : null}
 
-        {!state ? (
-          <p className="flex items-center gap-2 text-sm text-ink-400">
-            <Spinner className="size-4" /> Checking sync status…
-          </p>
-        ) : state.status === 'never' ? (
-          <p className="text-sm text-ink-300">
-            No sync has run yet — Planning Center has not been connected. Add the Personal Access
-            Token and roster settings described in{' '}
-            <code className="rounded bg-ink-800 px-1 text-xs text-ink-200">
-              docs/planning-center.md
-            </code>
-            , then run the first sync. Nothing is broken until then; Tally simply has no people to
-            mirror.
-          </p>
-        ) : (
+        {loading && !status ? (
+          <SkeletonRows count={3} />
+        ) : status ? (
           <>
-            <p className="text-sm text-ink-300">
-              Last run{' '}
-              {lastRunAt ? (
-                <span className="font-semibold text-ink-100" title={formatDateTime(lastRunAt)}>
-                  {formatRelative(lastRunAt)}
-                </span>
+            <div className="flex flex-wrap items-center gap-2">
+              {!status.configured ? (
+                <Badge tone="warn">Not set up</Badge>
+              ) : status.reachable ? (
+                <Badge tone="success">Connected</Badge>
               ) : (
-                'unknown'
+                <Badge tone="danger">Unreachable</Badge>
               )}
-              {state.triggeredBy ? ' · run by hand' : ' · scheduled run'}
-              {state.lastFullSyncAt
-                ? ` · full sweep ${formatRelative(state.lastFullSyncAt)}`
-                : ''}
-              .
-            </p>
 
-            <dl className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-              {COUNTS.map((entry) => (
-                <div key={entry.key} className="rounded-xl bg-ink-950/60 px-2 py-1.5 ring-1 ring-ink-800">
-                  <dt className="text-[10px] font-medium uppercase tracking-wide text-ink-400">
-                    {entry.label}
-                  </dt>
-                  <dd className="text-lg font-bold tabular-nums text-ink-50">
-                    {state.counts[entry.key]}
-                  </dd>
-                </div>
-              ))}
-            </dl>
+              {status.peopleVisible !== null ? (
+                <span className="text-sm text-ink-300">
+                  <span className="font-semibold tabular-nums text-ink-100">
+                    {status.peopleVisible}
+                  </span>{' '}
+                  {status.peopleVisible === 1 ? 'student' : 'students'} visible
+                </span>
+              ) : null}
 
-            <p className="text-xs text-ink-500">
-              Roster comes from {ROSTER_SOURCE_LABEL[state.rosterSource]}.{' '}
-              {WRITE_BACK_LABEL[state.writeBack]}
-              {state.cursor
-                ? ` Incremental runs pick up from ${formatDateTime(state.cursor)}.`
-                : ''}
-            </p>
+              {status.baseUrlOverridden ? (
+                // Somebody pointed this at a test rig. That must never be a
+                // silent state on a screen that otherwise says "Connected".
+                <Badge tone="warn">Not the real Planning Center</Badge>
+              ) : null}
+            </div>
 
-            {state.counts.errors > 0 && state.status !== 'error' ? (
-              <p className="text-xs text-warn-400">
-                {state.counts.errors} {state.counts.errors === 1 ? 'record' : 'records'} were
-                skipped on the last run.
+            {status.problem ? (
+              <p className="rounded-xl bg-warn-500/10 px-3 py-2 text-sm text-warn-400 ring-1 ring-warn-500/25">
+                {status.problem}
               </p>
             ) : null}
 
-            {state.status === 'error' && state.lastError ? (
-              <ErrorBanner message={state.lastError} />
+            {rosterOffline ? (
+              <p className="rounded-xl bg-warn-500/10 px-3 py-2 text-sm text-warn-400 ring-1 ring-warn-500/25">
+                This device is showing a roster it saved earlier. Check-in still works; anyone added
+                since will not appear until Planning Center is reachable again.
+              </p>
             ) : null}
-          </>
-        )}
 
-        <div className="flex flex-wrap gap-2">
-          <Button onClick={() => void runSync(false)} loading={busy} disabled={running}>
-            {running ? 'Sync in progress…' : 'Sync now'}
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() => void runSync(true)}
-            disabled={busy || running}
-          >
-            Full re-sync
-          </Button>
-        </div>
-        <p className="text-xs text-ink-500">
-          A normal sync only asks Planning Center for people changed since the last run. A full
-          re-sync ignores that cursor and walks the whole roster — slower, and the thing to reach
-          for when somebody was edited in Planning Center but never appeared here.
-        </p>
+            <dl className="flex flex-col gap-2 text-sm">
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-ink-500">Roster</dt>
+                <dd className="text-ink-300">
+                  Students come from {SOURCE_LABEL[status.rosterSource]}.
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-ink-500">
+                  Write-back
+                </dt>
+                <dd className="text-ink-300">{WRITE_BACK_LABEL[status.writeBack]}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-ink-500">
+                  Freshness
+                </dt>
+                <dd className="text-ink-300">
+                  {describeCache(status.cacheTtlSeconds)}
+                  {rosterFetchedAt ? (
+                    <span className="block text-ink-500">
+                      This device last read it {formatRelative(rosterFetchedAt)}.
+                    </span>
+                  ) : null}
+                </dd>
+              </div>
+            </dl>
+          </>
+        ) : null}
       </div>
     </Card>
   );

@@ -37,8 +37,7 @@ import { SERIES_IDS, paths } from '../src/lib/paths';
 import {
   DEFAULT_SETTINGS,
   buildSearchName,
-  computeProfileComplete,
-  emailKey,
+  pcoStudentId,
   type Gender,
   type Grade,
   type Role,
@@ -442,6 +441,90 @@ function parentEmail(seed: SeedStudent): string {
   return `${slug(seed.parent ?? '')}@example.org`.replace(/-/g, '.');
 }
 
+/* -------------------------------------------------------------------------- */
+/* Planning Center                                                             */
+/* -------------------------------------------------------------------------- */
+
+/** Where the simulator's control plane lives. */
+const SIMULATOR_URL = proc.env.PCO_SIM_URL ?? 'http://127.0.0.1:4010';
+
+/**
+ * The same ministry, described to Planning Center.
+ *
+ * Tally reads its roster from here rather than from Firestore, so this is where
+ * names, grades, parent contact and allergies actually live. The awkward cases
+ * are deliberate and belong upstream too: the student with no reachable parent
+ * has to be missing a parent *in Planning Center*, or the incomplete-profiles
+ * list has nothing to find.
+ *
+ * Quick-added visitors are excluded — they exist only in Tally until a push
+ * lands, which is exactly the state the write-back tests need.
+ */
+function simulatorPayload(students: readonly BuiltStudent[]) {
+  return {
+    empty: true,
+    students: students
+      .filter((student) => student.pcoPersonId !== null)
+      .map((student, index) => {
+        const { seed } = student;
+        const contact = seed.parent ? (seed.contact ?? 'phone') : null;
+        return {
+          firstName: seed.first,
+          lastName: seed.last,
+          grade: seed.grade,
+          gender: seed.gender,
+          allergies: seed.allergies ?? null,
+          status: seed.band === 'inactive' ? ('inactive' as const) : ('active' as const),
+          parentName: seed.parent ?? null,
+          parentPhone: contact === 'phone' || contact === 'both' ? parentPhone(index) : null,
+          parentEmail: contact === 'email' || contact === 'both' ? parentEmail(seed) : null,
+        };
+      }),
+    team: SEED_TEAM.map((member) => {
+      const [first, ...rest] = member.name.split(/\s+/);
+      return {
+        firstName: first ?? member.name,
+        lastName: rest.join(' '),
+        email: member.email,
+        permissions: member.role === 'core' ? 'Manager' : 'Viewer',
+        siteAdministrator: member.role === 'admin',
+      };
+    }),
+  };
+}
+
+/**
+ * Loads the roster into the Planning Center simulator.
+ *
+ * Not fatal when the simulator is not running: `npm run seed` is also used to
+ * fill Firestore for a plain `npm run dev:emulated`, where a counselor is
+ * looking at events rather than at people. It says so loudly instead, because
+ * an empty roster with no explanation looks exactly like a broken app.
+ */
+async function seedPlanningCenter(students: readonly BuiltStudent[]): Promise<number | null> {
+  try {
+    const response = await fetch(`${SIMULATOR_URL}/_sim/seed`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(simulatorPayload(students)),
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} ${await response.text()}`);
+    }
+    const body = (await response.json()) as { people?: number };
+    return body.people ?? 0;
+  } catch (cause) {
+    console.warn(
+      `\n  ⚠ Could not seed the Planning Center simulator at ${SIMULATOR_URL}.\n` +
+        `    ${cause instanceof Error ? cause.message : String(cause)}\n` +
+        '    Firestore is seeded, but the roster comes from Planning Center — the check-in\n' +
+        '    screen will be empty until the simulator is running:\n\n' +
+        '      npm run pco-sim\n',
+    );
+    return null;
+  }
+}
+
 function buildEvents(now: Date): BuiltEvent[] {
   const events: BuiltEvent[] = [];
 
@@ -527,13 +610,27 @@ function buildEvents(now: Date): BuiltEvent[] {
   return events.sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
 }
 
+/**
+ * The ministry, as two populations.
+ *
+ * Most students are people Planning Center knows: they are seeded *there*, and
+ * their Tally id is `pco_{personId}` because that is what the roster read will
+ * return. A handful are quick-added visitors who exist only in Tally, with a
+ * generated id and a push still pending — the state a counselor leaves behind
+ * when they type a name at the door.
+ *
+ * Getting this split right is the whole point of the demo data: it is what
+ * proves the join in `mergeRoster` works against something realistic.
+ */
 function buildStudents(now: Date, rng: () => number): BuiltStudent[] {
   const yearStart = schoolYearStart(now);
 
   return SEED_STUDENTS.map((seed, index) => {
     const isQuickAdd = seed.band === 'firstTimer' || seed.band === 'newcomer';
+    const pcoPersonId = isQuickAdd ? null : String(SEED_PCO_ID_BASE + index);
+
     return {
-      id: `student-${slug(`${seed.first}-${seed.last}`)}`,
+      id: pcoPersonId ? pcoStudentId(pcoPersonId) : `student-${slug(`${seed.first}-${seed.last}`)}`,
       seed,
       propensity: BASE_PROPENSITY[seed.band],
       sundayBias: 0.35 + rng() * 0.65,
@@ -542,12 +639,13 @@ function buildStudents(now: Date, rng: () => number): BuiltStudent[] {
       createdAt: yearStart,
       firstAttendedAt: null,
       lastAttendedAt: null,
-      // Roughly half are linked to Planning Center, so the UI shows both the
-      // synced and the Tally-only state. Quick-adds are never linked yet.
-      pcoPersonId: !isQuickAdd && index % 2 === 0 ? String(4_100_000 + index) : null,
+      pcoPersonId,
     };
   });
 }
+
+/** Where the seeded Planning Center person ids start. */
+const SEED_PCO_ID_BASE = 4_100_000;
 
 /* -------------------------------------------------------------------------- */
 /* Attendance                                                                  */
@@ -832,45 +930,54 @@ function collectWrites(now: Date): {
     });
   }
 
+  /*
+   * `students` holds what Tally owns, and nothing else.
+   *
+   * Names, grades, parent contact and allergies are Planning Center's and are
+   * seeded there instead (see `simulatorPayload`). What lands here is the small
+   * group somebody assigned, a note somebody typed, and when each student
+   * turned up — plus the complete record for a quick-added visitor, who does
+   * not exist upstream yet.
+   */
   students.forEach((student, index) => {
     const { seed } = student;
     const isVisitor = seed.band === 'firstTimer' || seed.band === 'newcomer';
-    const contact = seed.parent ? (seed.contact ?? 'phone') : null;
-    const phone = contact === 'phone' || contact === 'both' ? parentPhone(index) : null;
-    const email = contact === 'email' || contact === 'both' ? parentEmail(seed) : null;
+    // Every fifth student is left unassigned so the grade/gender fallback in
+    // `studentMatchesGroup` is visible in Sunday School scoping.
+    const smallGroupId = isVisitor || index % 5 === 4 ? null : groupIdFor(seed.grade, seed.gender);
 
-    writes.push({
-      path: paths.student(student.id),
-      data: {
-        firstName: seed.first,
-        lastName: seed.last,
-        grade: seed.grade,
-        gender: seed.gender,
-        // Every fifth student is left unassigned so the grade/gender fallback in
-        // `studentMatchesGroup` is visible in Sunday School scoping.
-        smallGroupId: isVisitor || index % 5 === 4 ? null : groupIdFor(seed.grade, seed.gender),
-        parentName: seed.parent ?? null,
-        parentPhone: phone,
-        parentEmail: email,
-        allergies: seed.allergies ?? null,
-        notes: seed.notes ?? null,
-        status: seed.band === 'inactive' ? 'inactive' : 'active',
-        isVisitor,
-        profileComplete: computeProfileComplete({ parentPhone: phone, parentEmail: email }),
-        searchName: buildSearchName(seed.first, seed.last),
-        firstAttendedAt: student.firstAttendedAt,
-        lastAttendedAt: student.lastAttendedAt,
-        pcoPersonId: student.pcoPersonId,
-        pcoUpdatedAt: student.pcoPersonId ? addDays(now, -3) : null,
-        pcoSyncedAt: student.pcoPersonId ? addDays(now, -1) : null,
-        // A Tally-only student is queued for the next write-back sweep, which is
-        // exactly the state a quick-added visitor is left in.
-        pcoPushPending: student.pcoPersonId === null,
-        createdAt: student.createdAt,
-        updatedAt: student.createdAt,
-        createdBy: student.pcoPersonId ? 'planning-center' : SEED_AUTHOR,
-      },
-    });
+    const owned: Record<string, unknown> = {
+      firstName: seed.first,
+      lastName: seed.last,
+      grade: seed.grade,
+      gender: seed.gender,
+      smallGroupId,
+      notes: seed.notes ?? null,
+      status: seed.band === 'inactive' ? 'inactive' : 'active',
+      isVisitor,
+      searchName: buildSearchName(seed.first, seed.last),
+      firstAttendedAt: student.firstAttendedAt,
+      lastAttendedAt: student.lastAttendedAt,
+      pcoPersonId: student.pcoPersonId,
+      // A Tally-only student is queued for write-back, which is exactly the
+      // state a quick-added visitor is left in.
+      pcoPushPending: student.pcoPersonId === null,
+      createdAt: student.createdAt,
+      updatedAt: student.createdAt,
+      createdBy: student.pcoPersonId ? 'planning-center' : SEED_AUTHOR,
+      updatedBy: null,
+    };
+
+    // A Planning Center student Tally has nothing to say about gets no document
+    // at all — which is the normal case, and worth the demo data showing.
+    const worthWriting =
+      student.pcoPersonId === null ||
+      smallGroupId !== null ||
+      seed.notes !== undefined ||
+      student.firstAttendedAt !== null;
+    if (!worthWriting) return;
+
+    writes.push({ path: paths.student(student.id), data: owned });
   });
 
   for (const row of attendance) {
@@ -905,21 +1012,11 @@ function collectWrites(now: Date): {
     });
   }
 
-  /* ---- accessRoster ------------------------------------------------------ */
-  for (const member of SEED_TEAM) {
-    writes.push({
-      path: paths.accessRosterEntry(emailKey(member.email)),
-      data: {
-        email: member.email,
-        displayName: member.name,
-        role: member.role,
-        pcoPersonId: member.pcoPersonId,
-        assignedGroupId: member.assignedGroupId,
-        active: true,
-        syncedAt: addDays(now, -1),
-      },
-    });
-  }
+  /*
+   * No `accessRoster`. Who may sign in is a question `provisionAccess` asks
+   * Planning Center at the moment somebody knocks, so the team is seeded into
+   * the simulator instead — see `simulatorPayload`.
+   */
 
   return { writes, events, students, attendance, rsvps };
 }
@@ -985,7 +1082,11 @@ async function main(): Promise<void> {
   await terminate(db);
   await deleteApp(app);
 
-  report({ target, now, writes, events, students, attendance, rsvps });
+  // The roster is Planning Center's, so seeding Firestore alone leaves the app
+  // with events and no people.
+  const seededPeople = await seedPlanningCenter(students);
+
+  report({ target, now, writes, events, students, attendance, rsvps, seededPeople });
 }
 
 function report(input: {
@@ -996,6 +1097,8 @@ function report(input: {
   students: readonly BuiltStudent[];
   attendance: readonly AttendanceRow[];
   rsvps: readonly RsvpRow[];
+  /** People loaded into the Planning Center simulator, or null if it was down. */
+  seededPeople: number | null;
 }): void {
   const { events, students, attendance, now } = input;
   const upcoming = events.filter((event) => !event.isPast);
@@ -1010,13 +1113,18 @@ function report(input: {
     `Seeded ${input.writes.length} documents into ${input.target.projectId} ` +
       `(${input.target.host}:${input.target.port}).`,
     '',
-    `  students      ${students.length} (${students.filter((s) => s.pcoPersonId).length} linked to Planning Center, ` +
-      `${students.filter((s) => s.seed.band === 'inactive').length} inactive)`,
+    `  students      ${students.length} in the ministry — ` +
+      `${students.filter((s) => s.pcoPersonId).length} from Planning Center, ` +
+      `${students.filter((s) => !s.pcoPersonId).length} quick-added in Tally only`,
+    `  documents     ${input.writes.filter((w) => w.path.startsWith('students/')).length} student documents ` +
+      '(Tally writes one only when it has something of its own to record)',
     `  events        ${events.length} (${events.filter((e) => e.isPast).length} past, ${upcoming.length} upcoming)`,
     `  attendance    ${attendance.length} check-ins across the past gatherings`,
     `  rsvps         ${input.rsvps.length} for the Winter Retreat`,
     `  smallGroups   ${SEED_GROUPS.length}`,
-    `  accessRoster  ${SEED_TEAM.length} (${SEED_TEAM.map((m) => m.role).join(', ')})`,
+    input.seededPeople === null
+      ? '  planningCentre  NOT SEEDED — the simulator was unreachable'
+      : `  planningCenter  ${input.seededPeople} people (students, their parents, and ${SEED_TEAM.length} team members)`,
     '',
     'What the dashboard should now show:',
     `  • ${drifted} students last seen 4+ weeks ago, on the MIA list`,

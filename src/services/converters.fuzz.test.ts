@@ -15,7 +15,6 @@ import type { DocumentData, DocumentSnapshot } from 'firebase/firestore';
 import { forAll } from '../../tests/fuzz/property';
 import { arbitraryFirestoreData } from '../../tests/fuzz/arbitrary';
 import {
-  toAccessRosterEntry,
   toAttendance,
   toEvent,
   toEventSeries,
@@ -65,7 +64,6 @@ describe('converter properties', () => {
     expect(() => toSmallGroup(snap)).not.toThrow();
     expect(() => toEventSeries(snap)).not.toThrow();
     expect(() => toSettings(snap)).not.toThrow();
-    expect(() => toAccessRosterEntry(snap)).not.toThrow();
   });
 
   forAll('toStudent always yields a student the rest of the app can trust', arbitrarySnapshot, (snap) => {
@@ -86,15 +84,17 @@ describe('converter properties', () => {
   });
 
   /**
-   * The stored flag is not trusted: a profile edited in the Firebase console or
-   * by an import can leave it stale, and a stale `true` hides a student from the
-   * very list the core team uses to chase missing contact details.
+   * A Firestore student document is Tally's own annotation, never a copy of a
+   * Planning Center person. Whatever a stored document claims — including a
+   * leftover `profileComplete: true` from before this collection stopped being a
+   * mirror — the converter must not assert a fact only Planning Center can know.
    */
-  forAll('toStudent derives profileComplete from the contact fields', arbitrarySnapshot, (snap) => {
+  forAll('toStudent never claims to speak for Planning Center', arbitrarySnapshot, (snap) => {
     const student = toStudent(snap);
-    const reachable = Boolean(student.parentPhone?.trim() || student.parentEmail?.trim());
 
-    expect(student.profileComplete).toBe(reachable);
+    expect(student.fromPlanningCenter).toBe(false);
+    expect(student.profileComplete).toBe(false);
+    expect(student.hasAllergies).toBe(false);
   });
 
   forAll('toEvent always yields real dates and a valid mode', arbitrarySnapshot, (snap) => {
@@ -144,12 +144,7 @@ describe('converter properties', () => {
     if (typeof snap.data()?.active !== 'boolean') expect(profile.active).toBe(false);
   });
 
-  forAll('toAccessRosterEntry never invents privilege either', arbitrarySnapshot, (snap) => {
-    const entry = toAccessRosterEntry(snap);
 
-    expect(['counselor', 'core', 'admin']).toContain(entry.role);
-    if (typeof snap.data()?.role !== 'string') expect(entry.role).toBe('counselor');
-  });
 
   /**
    * `predictiveOfLastN` of 0 would make the Recent block silently vanish, and a

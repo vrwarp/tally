@@ -161,7 +161,7 @@ export function computeWarnings(
   const warnings: RosterWarning[] = [];
   if (event.requiresWaiver && !rsvp?.waiverSigned) warnings.push('missing-waiver');
   if (event.requiresPayment && !rsvp?.paymentReceived) warnings.push('missing-payment');
-  if (student.allergies) warnings.push('allergy');
+  if (student.hasAllergies) warnings.push('allergy');
   if (!student.profileComplete) warnings.push('incomplete-profile');
   return warnings;
 }

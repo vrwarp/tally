@@ -125,6 +125,20 @@ export async function resetSimulator(): Promise<void> {
   if (!response.ok) throw new Error(`Could not reset the simulator: HTTP ${response.status}.`);
 }
 
+/**
+ * Disarms fault injection, leaving the seeded ministry alone.
+ *
+ * Deliberately not `resetSimulator`: the roster the app renders *is* the
+ * simulator now, so a reset between tests would swap the seeded church for the
+ * built-in fixtures and every later assertion would be about the wrong people.
+ */
+export async function clearSimulatorFaults(): Promise<void> {
+  const response = await fetch(`${E2E.simulatorUrl}/_sim/clear-faults`, { method: 'POST' });
+  if (!response.ok) {
+    throw new Error(`Could not clear simulator faults: HTTP ${response.status}.`);
+  }
+}
+
 /** Arms the simulator to answer the next `count` requests with an error. */
 export async function failSimulator(status: number, message: string, count = 99): Promise<void> {
   await fetch(`${E2E.simulatorUrl}/_sim/fail`, {
@@ -132,6 +146,38 @@ export async function failSimulator(status: number, message: string, count = 99)
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ status, message, count }),
   });
+}
+
+/**
+ * Adds one student to Planning Center, the way the church office would.
+ *
+ * With no mirror to wait for, "somebody was added upstream" is a thing a test
+ * can just *do*, and then check that the app noticed.
+ */
+export async function createSimulatorStudent(input: {
+  firstName: string;
+  lastName: string;
+  grade: number;
+  parentName?: string;
+  parentPhone?: string;
+  parentEmail?: string;
+  allergies?: string;
+}): Promise<void> {
+  const response = await fetch(`${E2E.simulatorUrl}/_sim/seed`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ students: [input] }),
+  });
+  if (!response.ok) {
+    throw new Error(`Could not add a student to the simulator: HTTP ${response.status}.`);
+  }
+}
+
+/** Every request the simulator has answered, for asserting on what was asked. */
+export async function simulatorRequests(): Promise<Array<{ method: string; path: string }>> {
+  const response = await fetch(`${E2E.simulatorUrl}/_sim/requests`);
+  const body = (await response.json()) as { requests: Array<{ method: string; path: string }> };
+  return body.requests;
 }
 
 export async function simulatorPeople(): Promise<Array<Record<string, unknown>>> {

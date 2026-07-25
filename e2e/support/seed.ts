@@ -17,7 +17,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { E2E } from '../../playwright.config';
-import { clearFirestore, readCollection, resetSimulator } from './emulator';
+import { clearFirestore, readCollection, resetSimulator, simulatorPeople } from './emulator';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -44,8 +44,8 @@ function run(command: string, args: string[]): Promise<void> {
 /**
  * Wipes Firestore and the Planning Center simulator, then reseeds both.
  *
- * Throws with an actionable message rather than letting an empty database
- * become thirty confusing test failures.
+ * Throws with an actionable message rather than letting an empty roster become
+ * thirty confusing test failures that all look like application bugs.
  */
 export async function seedWorld(label: string): Promise<void> {
   await clearFirestore();
@@ -53,19 +53,25 @@ export async function seedWorld(label: string): Promise<void> {
 
   await run('npx', ['tsx', 'scripts/seed.ts']);
 
-  const [students, roster] = await Promise.all([
-    readCollection('students'),
-    readCollection('accessRoster'),
-  ]);
+  // The roster lives in Planning Center now, so an empty `students` collection
+  // is normal and proves nothing. What has to be true is that the simulator
+  // holds a ministry and Firestore holds the events to check them into.
+  const [people, events] = await Promise.all([simulatorPeople(), readCollection('events')]);
 
-  if (students.length === 0 || roster.length === 0) {
+  if (people.length === 0) {
     throw new Error(
-      `Seeding produced ${students.length} students and ${roster.length} access-roster entries. ` +
-        'The suite cannot sign anyone in or show a roster; check scripts/seed.ts against the emulator.',
+      'The Planning Center simulator holds nobody after seeding. Every roster in the suite ' +
+        'would be empty, which reads exactly like a broken app; check scripts/seed.ts.',
+    );
+  }
+  if (events.length === 0) {
+    throw new Error(
+      'Seeding produced no events. There is nothing to check anybody into; check ' +
+        'scripts/seed.ts against the emulator.',
     );
   }
 
   console.log(
-    `[e2e] ${label}: seeded ${students.length} students, ${roster.length} team members; simulator reset.`,
+    `[e2e] ${label}: ${people.length} people in Planning Center, ${events.length} events in Firestore.`,
   );
 }

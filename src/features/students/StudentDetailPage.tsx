@@ -29,6 +29,7 @@ import { orderSnapshotsNewestFirst, recurringSnapshots } from '@/features/dashbo
 import { StudentEditorModal } from '@/features/students/StudentEditorModal';
 import { useEventSnapshots } from '@/hooks/useEventSnapshots';
 import { useNow } from '@/hooks/useNow';
+import { usePersonDetails } from '@/hooks/usePersonDetails';
 import { formatRelative, formatShortDate } from '@/lib/time';
 import { formatPhone, initials, ordinalGrade } from '@/lib/utils';
 import { pushStudentToPlanningCenter } from '@/services/functions';
@@ -63,6 +64,9 @@ export function StudentDetailPage() {
   });
 
   const student = students.find((candidate) => candidate.id === studentId) ?? null;
+  // Eager: this screen exists to answer "who do I call?", so waiting for a tap
+  // would just add a step to the one thing it is for.
+  const { details, loading: detailsLoading, error: detailsError } = usePersonDetails(student, true);
 
   // Only finished gatherings: a night still in progress is not an absence.
   const recentEvents = useMemo(
@@ -128,9 +132,9 @@ export function StudentDetailPage() {
 
   const name = studentFullName(student);
   const groupName = groups.find((group) => group.id === student.smallGroupId)?.name ?? null;
-  const phone = student.parentPhone?.trim() ?? '';
-  const email = student.parentEmail?.trim() ?? '';
-  const parentLabel = student.parentName?.trim() || `${name}'s parent`;
+  const phone = details?.parentPhone?.trim() ?? '';
+  const email = details?.parentEmail?.trim() ?? '';
+  const parentLabel = details?.parentName?.trim() || `${name}'s parent`;
 
   const toggleStatus = async () => {
     if (!user || statusBusy) return;
@@ -189,7 +193,7 @@ export function StudentDetailPage() {
             {student.isVisitor ? <Badge tone="brand">Visitor</Badge> : null}
             {!student.profileComplete ? <Badge tone="warn">Missing parent contact</Badge> : null}
             {student.status === 'inactive' ? <Badge tone="neutral">Inactive</Badge> : null}
-            {student.allergies ? <Badge tone="warn">Allergies</Badge> : null}
+            {student.hasAllergies ? <Badge tone="warn">Allergies</Badge> : null}
           </div>
         </div>
       </header>
@@ -223,7 +227,13 @@ export function StudentDetailPage() {
             <h3 className="text-xs font-medium uppercase tracking-wide text-ink-400">
               Parent contact
             </h3>
-            {phone || email ? (
+            {detailsError ? (
+              // A Planning Center outage must not read as "this family has no
+              // phone number" — those look identical and mean opposite things.
+              <p className="mt-1 text-sm text-danger-400">{detailsError}</p>
+            ) : detailsLoading ? (
+              <p className="mt-1 text-sm text-ink-500">Looking this up in Planning Center…</p>
+            ) : phone || email ? (
               <>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   {phone ? (
@@ -255,7 +265,7 @@ export function StudentDetailPage() {
                   ) : null}
                 </div>
                 <p className="mt-2 text-sm text-ink-300">
-                  {student.parentName ? `${student.parentName} · ` : ''}
+                  {details?.parentName ? `${details.parentName} · ` : ''}
                   {phone ? <span className="tabular-nums">{formatPhone(phone)}</span> : null}
                   {phone && email ? ' · ' : ''}
                   {email ? <span className="break-all">{email}</span> : null}
@@ -263,17 +273,19 @@ export function StudentDetailPage() {
               </>
             ) : (
               <p className="mt-1 text-sm text-warn-400">
-                Nothing on file — nobody can reach this family in an emergency.
+                Nothing in Planning Center — nobody can reach this family in an emergency.
               </p>
             )}
           </div>
 
-          {student.allergies ? (
+          {student.hasAllergies ? (
             <div className="rounded-xl bg-warn-500/10 px-3 py-2 ring-1 ring-warn-500/25">
               <p className="text-xs font-semibold uppercase tracking-wide text-warn-400">
                 Allergies
               </p>
-              <p className="mt-0.5 text-sm text-ink-100">{student.allergies}</p>
+              <p className="mt-0.5 text-sm text-ink-100">
+                {details?.allergies ?? (detailsLoading ? 'Loading…' : 'Recorded in Planning Center.')}
+              </p>
             </div>
           ) : null}
 
@@ -303,8 +315,9 @@ export function StudentDetailPage() {
             </h3>
             {student.pcoPersonId ? (
               <p className="mt-1 text-sm text-ink-300">
-                Synced from Planning Center
-                {student.pcoSyncedAt ? ` · ${formatRelative(student.pcoSyncedAt)}` : ''}.{' '}
+                {/* Not "synced": nothing was copied. This screen read Planning
+                    Center a moment ago and is showing what it said. */}
+                Read from Planning Center.{' '}
                 <a
                   href={pcoPersonUrl(student.pcoPersonId)}
                   target="_blank"

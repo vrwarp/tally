@@ -70,6 +70,10 @@ const planningCenterEnv = {
   PCO_STUDENT_LIST_ID: 'FOOTPRINTS_STUDENTS',
   PCO_COUNSELOR_LIST_ID: 'FOOTPRINTS_TEAM',
   PCO_WRITE_BACK: 'create',
+  // Short but non-zero, so the suite exercises the cache rather than routing
+  // around it — and so a run does not depend on `functions/.env.demo-tally`
+  // being in sync with the params the code declares.
+  PCO_CACHE_TTL_SECONDS: '5',
 };
 
 export default defineConfig({

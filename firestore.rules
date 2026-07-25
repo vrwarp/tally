@@ -118,46 +118,72 @@ service cloud.firestore {
     /* students                                                          */
     /* ---------------------------------------------------------------- */
 
+    /*
+     * This collection is *not* the roster.
+     *
+     * The roster comes from Planning Center through a callable, and none of it
+     * is stored. What lives here is only what Planning Center has no opinion
+     * about — a small group, a note, when somebody first turned up — plus the
+     * whole record for a quick-added visitor until the push lands.
+     *
+     * Two consequences for these rules. A document is sparse, so field
+     * validation only applies to fields that are present. And parent contact
+     * and allergies are not writable at all: Tally does not hold them, and a
+     * client that could write them here would be recreating the mirror one
+     * document at a time.
+     */
     match /students/{studentId} {
       function validStudent() {
         let d = request.resource.data;
-        return d.firstName is string
-          && d.firstName.size() > 0
-          && d.lastName is string
-          && d.lastName.size() > 0
-          && d.grade is int
-          && d.grade >= 6
-          && d.grade <= 12
-          && d.status in ['active', 'inactive'];
+        return (!('firstName' in d.keys()) || (d.firstName is string && d.firstName.size() > 0))
+          && (!('lastName' in d.keys()) || (d.lastName is string && d.lastName.size() > 0))
+          && (!('grade' in d.keys()) || (d.grade is int && d.grade >= 6 && d.grade <= 12))
+          && (!('status' in d.keys()) || d.status in ['active', 'inactive']);
       }
 
       /**
-       * Planning Center owns the linkage fields. A client may declare a student
-       * as "mine, not yet pushed" (`pcoPersonId: null`, `pcoPushPending: true`)
+       * Fields Tally must never store, whatever a client sends.
+       *
+       * This is the mirror-removal made enforceable rather than merely
+       * intended: a future screen that "just" saves a phone number here would
+       * be rejected by the database, not caught in review.
+       */
+      function noMirroredPersonalData() {
+        let keys = request.resource.data.keys();
+        return !('parentName' in keys)
+          && !('parentPhone' in keys)
+          && !('parentEmail' in keys)
+          && !('allergies' in keys);
+      }
+
+      /**
+       * Planning Center owns the linkage. A client may declare a student as
+       * "mine, not yet pushed" (`pcoPersonId: null`, `pcoPushPending: true`)
        * but may never assert an id — forging one would let a browser rebind a
-       * Tally student onto an arbitrary Planning Center person at the next sync.
+       * Tally student onto an arbitrary Planning Center person.
        */
       function pcoLinkageUnclaimed() {
-        let d = request.resource.data;
-        return d.get('pcoPersonId', null) == null
-          && d.get('pcoUpdatedAt', null) == null
-          && d.get('pcoSyncedAt', null) == null;
+        return request.resource.data.get('pcoPersonId', null) == null;
       }
 
       function pcoLinkageUnchanged() {
         let after = request.resource.data;
         let before = resource == null ? {} : resource.data;
-        return after.get('pcoPersonId', null) == before.get('pcoPersonId', null)
-          && after.get('pcoUpdatedAt', null) == before.get('pcoUpdatedAt', null)
-          && after.get('pcoSyncedAt', null) == before.get('pcoSyncedAt', null);
+        return after.get('pcoPersonId', null) == before.get('pcoPersonId', null);
       }
 
       allow get, list: if isActive();
 
       // Quick-add happens at the door, and check-in itself writes
       // firstAttendedAt/lastAttendedAt, so counselors need create and update.
-      allow create: if isCounselor() && validStudent() && pcoLinkageUnclaimed();
-      allow update: if isCounselor() && validStudent() && pcoLinkageUnchanged();
+      allow create: if isCounselor()
+                    && validStudent()
+                    && noMirroredPersonalData()
+                    && pcoLinkageUnclaimed();
+      allow update: if isCounselor()
+                    && validStudent()
+                    && noMirroredPersonalData()
+                    && pcoLinkageUnchanged();
 
       // Never. Attendance documents reference students by id; deleting one
       // would silently orphan history. Set `status: 'inactive'` instead.
@@ -260,22 +286,14 @@ service cloud.firestore {
       allow write: if isCore() && validSettings();
     }
 
-    match /config/pcoSync {
-      allow get: if isCore();
-      // Written only by the sync function, on the Admin SDK.
-      allow write: if false;
-    }
-
-    /* ---------------------------------------------------------------- */
-    /* accessRoster — the Planning-Center-derived allowlist              */
-    /* ---------------------------------------------------------------- */
-
-    match /accessRoster/{emailKey} {
-      allow get, list: if isCore();
-      // A client that could write here could mint itself an admin entry and
-      // then claim it through `provisionAccess`. Functions only.
-      allow write: if false;
-    }
+    /*
+     * `config/pcoSync` and `accessRoster` used to be matched here.
+     *
+     * Both are gone. `pcoSync` tracked a scheduled sweep that no longer exists;
+     * `accessRoster` was a mirrored allowlist that `provisionAccess` now asks
+     * Planning Center for directly, at the moment somebody signs in. Neither is
+     * written any more, and the default-deny below covers anything that tries.
+     */
 
     /* ---------------------------------------------------------------- */
     /* Default deny                                                      */

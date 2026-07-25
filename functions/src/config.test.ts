@@ -3,7 +3,7 @@
  *
  * `loadConfig()` must never throw. A missing or malformed value is a state the
  * Settings screen has to be able to explain, not a crash that kills the
- * container on every scheduled tick and leaves the core team staring at an
+ * container on every request and leaves the core team staring at an
  * empty sync card.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -139,6 +139,46 @@ describe('loadConfig', () => {
 
       expect(config.studentListId).toBe('L1');
       expect(config.configError).toBeNull();
+    });
+  });
+
+  describe('cache TTL', () => {
+    it('defaults to half a minute', () => {
+      expect(loadConfig().cacheTtlSeconds).toBe(30);
+    });
+
+    it('accepts zero, which turns retention off', () => {
+      // Not a degenerate case to be defended against — a supported way to run.
+      // Tally works with no cache at all; it just asks every time.
+      process.env.PCO_CACHE_TTL_SECONDS = '0';
+      expect(loadConfig().cacheTtlSeconds).toBe(0);
+    });
+
+    it('refuses to hold people for longer than a cache should', () => {
+      // Past a couple of minutes this stops being a cache and starts being the
+      // mirror this design exists to remove.
+      process.env.PCO_CACHE_TTL_SECONDS = '86400';
+      expect(loadConfig().cacheTtlSeconds).toBe(300);
+    });
+
+    it('never goes negative', () => {
+      process.env.PCO_CACHE_TTL_SECONDS = '-60';
+      expect(loadConfig().cacheTtlSeconds).toBe(0);
+    });
+
+    it('falls back to the default rather than to zero on a typo', () => {
+      // Silently disabling the cache because somebody wrote "thirty" would look
+      // like Planning Center got slow, which is far harder to diagnose than a
+      // wrong number.
+      process.env.PCO_CACHE_TTL_SECONDS = 'thirty';
+      expect(loadConfig().cacheTtlSeconds).toBe(30);
+    });
+
+    it('is not a reason to refuse to start', () => {
+      // An unusable TTL has a sane fallback, so it never joins the list of
+      // things that stop Tally talking to Planning Center at all.
+      process.env.PCO_CACHE_TTL_SECONDS = 'nonsense';
+      expect(loadConfig().configError ?? '').not.toMatch(/cache/i);
     });
   });
 

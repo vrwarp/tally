@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   subscribeEventSeries,
   subscribeEvents,
@@ -6,18 +6,57 @@ import {
   subscribeSmallGroups,
 } from '@/services/events';
 import { subscribeStudents } from '@/services/students';
-import { DEFAULT_SETTINGS, type AppSettings, type EventSeries, type SmallGroup, type Student, type TallyEvent } from '@/types';
+import { cachedRoster, fetchRoster, mergeRoster } from '@/services/roster';
+import {
+  DEFAULT_SETTINGS,
+  type AppSettings,
+  type EventSeries,
+  type SmallGroup,
+  type Student,
+  type TallyEvent,
+} from '@/types';
 import { DataContext, type DataContextValue } from '@/context/dataContext';
 
 /** How much event history to keep in memory for prediction and the dashboard. */
 const EVENT_WINDOW_DAYS = 120;
 
+/**
+ * How often the roster is re-read while the app is open.
+ *
+ * This is not the cache — that lives on the server and is measured in seconds.
+ * This is "a counselor has had Tally open on the check-in screen for an hour and
+ * somebody was added to Planning Center in the meantime".
+ */
+const ROSTER_REFRESH_MS = 10 * 60 * 1000;
+
+function describeRosterError(cause: unknown): string {
+  const code = (cause as { code?: string })?.code ?? '';
+  if (code.includes('unauthenticated')) return 'Your session expired. Sign in again.';
+  if (code.includes('permission-denied')) return 'Your access to Tally is not active.';
+  if (code.includes('resource-exhausted')) {
+    return 'Planning Center is rate-limiting us. The roster will refresh shortly.';
+  }
+  if (code.includes('failed-precondition')) {
+    return (cause as { message?: string })?.message ?? 'Planning Center is not configured.';
+  }
+  return 'Could not reach Planning Center for the roster.';
+}
+
 export function DataProvider({ children }: { children: ReactNode }) {
-  const [students, setStudents] = useState<Student[]>([]);
+  const [documents, setDocuments] = useState<Student[]>([]);
   const [events, setEvents] = useState<TallyEvent[]>([]);
   const [series, setSeries] = useState<EventSeries[]>([]);
   const [groups, setGroups] = useState<SmallGroup[]>([]);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+
+  // Seeded from this device so a cold start on bad signal draws names
+  // immediately rather than an empty roster with a spinner over it.
+  const [roster, setRoster] = useState<Student[]>(() => cachedRoster()?.students ?? []);
+  const [rosterLoading, setRosterLoading] = useState(true);
+  const [rosterError, setRosterError] = useState<string | null>(null);
+  const [rosterOffline, setRosterOffline] = useState(() => cachedRoster() !== null);
+  const [rosterFetchedAt, setRosterFetchedAt] = useState<Date | null>(null);
+
   const [ready, setReady] = useState({
     students: false,
     events: false,
@@ -40,7 +79,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     const unsubscribers = [
       subscribeStudents((next) => {
-        setStudents(next);
+        setDocuments(next);
         markReady('students');
       }, fail('students')),
 
@@ -72,11 +111,84 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
   }, []);
 
+  /* ---- The roster -------------------------------------------------------- */
+
+  const inFlight = useRef(false);
+
+  const refreshRoster = useCallback(async () => {
+    // Two screens mounting at once must not become two Planning Center reads.
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setRosterLoading(true);
+
+    try {
+      const snapshot = await fetchRoster();
+      setRoster(snapshot.students);
+      setRosterFetchedAt(snapshot.fetchedAt);
+      setRosterOffline(false);
+      setRosterError(null);
+    } catch (cause) {
+      // Deliberately not clearing `roster`: whatever is already on screen is
+      // more useful than nothing, and `rosterOffline` says where it came from.
+      setRosterError(describeRosterError(cause));
+      setRosterOffline(true);
+    } finally {
+      inFlight.current = false;
+      setRosterLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshRoster();
+
+    const timer = setInterval(() => void refreshRoster(), ROSTER_REFRESH_MS);
+
+    // Coming back to a phone that has been in a pocket is the moment the roster
+    // is most likely to be stale and most likely to matter.
+    const resync = () => {
+      if (document.visibilityState === 'visible') void refreshRoster();
+    };
+    document.addEventListener('visibilitychange', resync);
+
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', resync);
+    };
+  }, [refreshRoster]);
+
+  const students = useMemo(() => mergeRoster(roster, documents), [roster, documents]);
+
   const loading = !Object.values(ready).every(Boolean);
 
   const value = useMemo<DataContextValue>(
-    () => ({ students, events, series, groups, settings, loading, error }),
-    [students, events, series, groups, settings, loading, error],
+    () => ({
+      students,
+      events,
+      series,
+      groups,
+      settings,
+      loading,
+      error,
+      rosterLoading,
+      rosterError,
+      rosterOffline,
+      rosterFetchedAt,
+      refreshRoster,
+    }),
+    [
+      students,
+      events,
+      series,
+      groups,
+      settings,
+      loading,
+      error,
+      rosterLoading,
+      rosterError,
+      rosterOffline,
+      rosterFetchedAt,
+      refreshRoster,
+    ],
   );
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

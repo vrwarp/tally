@@ -9,7 +9,6 @@
 import { describe, expect, it } from 'vitest';
 import { Timestamp, type DocumentData, type DocumentSnapshot } from 'firebase/firestore';
 import {
-  toAccessRosterEntry,
   toAttendance,
   toDate,
   toDateOrNull,
@@ -72,91 +71,20 @@ describe('toDate / toDateOrNull', () => {
 /* -------------------------------------------------------------------------- */
 
 describe('toStudent', () => {
-  it('recomputes profileComplete instead of trusting the stored flag', () => {
-    // A console edit removed the phone but left the denormalised flag behind.
-    const stale = toStudent(
-      fakeSnapshot({
-        data: {
-          firstName: 'Ana',
-          lastName: 'Martinez',
-          profileComplete: true,
-          parentPhone: null,
-          parentEmail: null,
-        },
-      }),
-    );
-    expect(stale.profileComplete).toBe(false);
-
-    // ...and the reverse: contact details present, flag never written.
+  it('never claims a profile is complete', () => {
+    // Only Planning Center knows whether a parent can be reached, and a Tally
+    // document is not Planning Center. A leftover `profileComplete: true` from
+    // before this collection stopped being a mirror must not be believed —
+    // it would hide a student from the list the core team uses to chase
+    // missing contact details.
     const understated = toStudent(
       fakeSnapshot({
-        data: {
-          firstName: 'Ana',
-          lastName: 'Martinez',
-          profileComplete: false,
-          parentPhone: '555-0100',
-        },
-      }),
-    );
-    expect(understated.profileComplete).toBe(true);
-  });
-
-  it('accepts either a phone or an email as reachable', () => {
-    const emailOnly = toStudent(
-      fakeSnapshot({ data: { parentEmail: 'parent@example.org', parentPhone: null } }),
-    );
-    expect(emailOnly.profileComplete).toBe(true);
-  });
-
-  it('does not treat empty or whitespace-only contact details as complete', () => {
-    expect(toStudent(fakeSnapshot({ data: { parentPhone: '' } })).profileComplete).toBe(false);
-    expect(toStudent(fakeSnapshot({ data: { parentPhone: '   ' } })).profileComplete).toBe(false);
-  });
-
-  it('takes its id from the document and derives searchName when absent', () => {
-    const student = toStudent(
-      fakeSnapshot({ id: 'student-42', data: { firstName: 'José', lastName: 'García' } }),
-    );
-    expect(student.id).toBe('student-42');
-    expect(student.searchName).toBe('josé garcía');
-  });
-
-  it('keeps a stored searchName', () => {
-    const student = toStudent(
-      fakeSnapshot({ data: { firstName: 'José', lastName: 'García', searchName: 'jose garcia' } }),
-    );
-    expect(student.searchName).toBe('jose garcia');
-  });
-
-  it('coerces an out-of-range grade and an unknown gender to safe defaults', () => {
-    const student = toStudent(fakeSnapshot({ data: { grade: 4, gender: 'other' } }));
-    expect(student.grade).toBe(6);
-    expect(student.gender).toBe('unspecified');
-  });
-
-  it('defaults status to active and only honours an explicit "inactive"', () => {
-    expect(toStudent(fakeSnapshot({ data: {} })).status).toBe('active');
-    expect(toStudent(fakeSnapshot({ data: { status: 'weird' } })).status).toBe('active');
-    expect(toStudent(fakeSnapshot({ data: { status: 'inactive' } })).status).toBe('inactive');
-  });
-
-  it('maps the Planning Center linkage fields', () => {
-    const syncedAt = new Date(2026, 1, 10, 3, 0);
-    const student = toStudent(
-      fakeSnapshot({
-        data: {
-          pcoPersonId: '12345',
-          pcoUpdatedAt: ts(syncedAt),
-          pcoSyncedAt: ts(syncedAt),
-          pcoPushPending: true,
-        },
+        data: { profileComplete: true, parentPhone: '555-0100', parentEmail: 'a@b.org' },
       }),
     );
 
-    expect(student.pcoPersonId).toBe('12345');
-    expect(student.pcoUpdatedAt).toEqual(syncedAt);
-    expect(student.pcoSyncedAt).toEqual(syncedAt);
-    expect(student.pcoPushPending).toBe(true);
+    expect(understated.profileComplete).toBe(false);
+    expect(understated.fromPlanningCenter).toBe(false);
   });
 
   it('leaves attendance markers null until the student has been checked in', () => {
@@ -300,7 +228,7 @@ describe('toRsvp', () => {
 });
 
 /* -------------------------------------------------------------------------- */
-/* toUserProfile & toAccessRosterEntry                                         */
+/* toUserProfile                                                               */
 /* -------------------------------------------------------------------------- */
 
 describe('toUserProfile', () => {
@@ -326,12 +254,7 @@ describe('toUserProfile', () => {
   });
 });
 
-describe('toAccessRosterEntry', () => {
-  it('applies the same least-privilege fallback', () => {
-    expect(toAccessRosterEntry(fakeSnapshot({ data: { role: 'root' } })).role).toBe('counselor');
-    expect(toAccessRosterEntry(fakeSnapshot({ data: { active: undefined } })).active).toBe(false);
-  });
-});
+
 
 /* -------------------------------------------------------------------------- */
 /* toSmallGroup & toEventSeries                                                */

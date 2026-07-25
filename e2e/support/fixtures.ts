@@ -7,10 +7,13 @@
 import { test as base, expect, type Page } from '@playwright/test';
 import { TEAM, signIn, type TeamRole } from './auth';
 import {
+  clearSimulatorFaults,
+  createSimulatorStudent,
   failSimulator,
   readCollection,
   resetSimulator,
   simulatorPeople,
+  simulatorRequests,
   type FirestoreDoc,
 } from './emulator';
 
@@ -29,6 +32,18 @@ export interface TallyFixtures {
     reset: () => Promise<void>;
     fail: (status: number, message: string, count?: number) => Promise<void>;
     people: () => Promise<Array<Record<string, unknown>>>;
+    /** Adds a student upstream, the way the church office would. */
+    createStudent: (input: {
+      firstName: string;
+      lastName: string;
+      grade: number;
+      parentName?: string;
+      parentPhone?: string;
+      parentEmail?: string;
+      allergies?: string;
+    }) => Promise<void>;
+    /** What the app actually asked Planning Center for. */
+    requests: () => Promise<Array<{ method: string; path: string }>>;
   };
 }
 
@@ -57,10 +72,18 @@ export const test = base.extend<TallyFixtures>({
   },
 
   planningCenter: async ({}, use) => {
-    await use({ reset: resetSimulator, fail: failSimulator, people: simulatorPeople });
+    await use({
+      reset: resetSimulator,
+      fail: failSimulator,
+      people: simulatorPeople,
+      createStudent: createSimulatorStudent,
+      requests: simulatorRequests,
+    });
     // Faults are armed per-test; leaving one armed would break whatever ran next
-    // in a way that pointed at the wrong test.
-    await resetSimulator();
+    // in a way that pointed at the wrong test. Only the faults are cleared —
+    // resetting the organisation would replace the seeded ministry with the
+    // built-in fixtures, and the roster on screen comes from here.
+    await clearSimulatorFaults();
   },
 });
 

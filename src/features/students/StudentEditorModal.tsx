@@ -47,10 +47,6 @@ interface FormState {
   grade: Grade;
   gender: Gender;
   smallGroupId: string;
-  parentName: string;
-  parentPhone: string;
-  parentEmail: string;
-  allergies: string;
   notes: string;
   status: StudentStatus;
 }
@@ -61,10 +57,6 @@ const BLANK: FormState = {
   grade: 9,
   gender: 'unspecified',
   smallGroupId: '',
-  parentName: '',
-  parentPhone: '',
-  parentEmail: '',
-  allergies: '',
   notes: '',
   status: 'active',
 };
@@ -77,10 +69,6 @@ function fromStudent(student: Student | null): FormState {
     grade: student.grade,
     gender: student.gender,
     smallGroupId: student.smallGroupId ?? '',
-    parentName: student.parentName ?? '',
-    parentPhone: student.parentPhone ?? '',
-    parentEmail: student.parentEmail ?? '',
-    allergies: student.allergies ?? '',
     notes: student.notes ?? '',
     status: student.status,
   };
@@ -118,13 +106,6 @@ export function StudentEditorModal({ open, onClose, student }: StudentEditorModa
   const update = <K extends keyof FormState>(field: K, value: FormState[K]) =>
     setForm((current) => ({ ...current, [field]: value }));
 
-  // Journey 3's payoff: a visitor stops being "missing info" the moment a
-  // counselor can reach a parent, and `updateStudent` clears the flag for us.
-  const clearsMissingInfo =
-    Boolean(student?.isVisitor) &&
-    !student?.profileComplete &&
-    Boolean(form.parentPhone.trim() || form.parentEmail.trim());
-
   const handleSubmit = async (submitted: FormEvent<HTMLFormElement>) => {
     submitted.preventDefault();
     if (!user || saving) return;
@@ -146,9 +127,6 @@ export function StudentEditorModal({ open, onClose, student }: StudentEditorModa
       if (student) {
         const patch: Partial<StudentDraft> = {
           smallGroupId: form.smallGroupId || null,
-          parentName: form.parentName,
-          parentPhone: form.parentPhone,
-          parentEmail: form.parentEmail,
           notes: form.notes,
         };
         // Managed fields are left out of the patch entirely rather than written
@@ -159,7 +137,6 @@ export function StudentEditorModal({ open, onClose, student }: StudentEditorModa
           patch.lastName = lastName;
           patch.grade = form.grade;
           patch.gender = form.gender;
-          patch.allergies = form.allergies;
           patch.status = form.status;
         }
         await updateStudent(student.id, patch, user.uid, student);
@@ -172,10 +149,6 @@ export function StudentEditorModal({ open, onClose, student }: StudentEditorModa
             grade: form.grade,
             gender: form.gender,
             smallGroupId: form.smallGroupId || null,
-            parentName: form.parentName,
-            parentPhone: form.parentPhone,
-            parentEmail: form.parentEmail,
-            allergies: form.allergies,
             notes: form.notes,
             status: form.status,
           },
@@ -302,48 +275,37 @@ export function StudentEditorModal({ open, onClose, student }: StudentEditorModa
           ))}
         </SelectField>
 
-        <TextField
-          label="Parent name"
-          value={form.parentName}
-          onChange={(changed) => update('parentName', changed.target.value)}
-          autoCapitalize="words"
-          autoComplete="off"
-        />
-        <TextField
-          label="Parent phone"
-          type="tel"
-          inputMode="tel"
-          value={form.parentPhone}
-          onChange={(changed) => update('parentPhone', changed.target.value)}
-          autoComplete="off"
-        />
-        <TextField
-          label="Parent email"
-          type="email"
-          inputMode="email"
-          value={form.parentEmail}
-          onChange={(changed) => update('parentEmail', changed.target.value)}
-          autoCapitalize="off"
-          autoComplete="off"
-        />
-
-        {clearsMissingInfo ? (
-          <p className="rounded-xl bg-present-500/10 px-3 py-2 text-xs text-present-400 ring-1 ring-present-500/25">
-            Saving this clears the “Missing info” flag and takes {student?.firstName} off the
-            incomplete-profiles list.
+        {/*
+          Parent contact and allergies used to be edited here and stored in
+          Firestore. They are Planning Center's, and Tally no longer keeps a
+          copy — so this is a pointer rather than a form. It is a real
+          reduction: a leader who wants to record an emergency number does it
+          upstream, where the church's own records are, instead of in a second
+          place that has to be reconciled.
+        */}
+        <div className="rounded-xl bg-ink-900 px-3 py-2.5 ring-1 ring-ink-800">
+          <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+            Parent contact and allergies
           </p>
-        ) : null}
-
-        <TextField
-          label="Allergies"
-          value={form.allergies}
-          onChange={(changed) => update('allergies', changed.target.value)}
-          hint={
-            locked('allergies') ? managedHint : 'Shown as a warning badge wherever they appear.'
-          }
-          disabled={locked('allergies')}
-          autoComplete="off"
-        />
+          <p className="mt-1 text-sm text-ink-300">
+            {student?.pcoPersonId ? (
+              <>
+                Kept in Planning Center, not in Tally.{' '}
+                <a
+                  href={pcoPersonUrl(student.pcoPersonId)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-semibold text-brand-300 underline"
+                >
+                  Edit them there
+                </a>
+                .
+              </>
+            ) : (
+              'Once this student reaches Planning Center, their parent contact and allergies are edited there.'
+            )}
+          </p>
+        </div>
 
         <TextAreaField
           label="Notes"

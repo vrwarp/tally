@@ -6,16 +6,25 @@
  *   users/{uid}                              counselor & core team profiles
  *   smallGroups/{groupId}                    Sunday School groupings
  *   eventSeries/{seriesId}                   recurring templates (friday, sunday)
- *   students/{studentId}                     the youth roster
+ *   students/{studentId}                     what Tally owns about a person
  *   events/{eventId}                         a single dated gathering
  *   events/{eventId}/attendance/{studentId}  who showed up
  *   events/{eventId}/rsvps/{studentId}       who said they were coming (one-offs)
  *   config/settings                          tunable thresholds
- *   config/pcoSync                           Planning Center sync state
- *   accessRoster/{emailKey}                  Planning-Center-derived allowlist
  *
  * Attendance and RSVP documents are keyed by student id on purpose: it makes
  * concurrent check-in from multiple counselor devices idempotent (PRD 4.1).
+ *
+ * Note what is *not* here. The youth roster is not a collection: it is read
+ * from Planning Center on demand (see src/services/roster.ts), and `students`
+ * holds only Tally's own annotations plus visitors it created. There is no
+ * mirrored allowlist either — `provisionAccess` asks Planning Center at
+ * sign-in.
+ *
+ * A student id is `pco_{planningCenterId}` for somebody Planning Center knows,
+ * and a generated Firestore id for a visitor Tally created. That is what lets
+ * an attendance record written at the door still resolve to a person on a
+ * device that has never seen a `students` document for them.
  */
 
 export const COLLECTIONS = {
@@ -25,14 +34,12 @@ export const COLLECTIONS = {
   students: 'students',
   events: 'events',
   config: 'config',
-  accessRoster: 'accessRoster',
   /** Subcollection names. */
   attendance: 'attendance',
   rsvps: 'rsvps',
 } as const;
 
 export const SETTINGS_DOC_ID = 'settings';
-export const PCO_SYNC_DOC_ID = 'pcoSync';
 
 export const paths = {
   users: () => COLLECTIONS.users,
@@ -60,10 +67,6 @@ export const paths = {
     `${COLLECTIONS.events}/${eventId}/${COLLECTIONS.rsvps}/${studentId}`,
 
   settings: () => `${COLLECTIONS.config}/${SETTINGS_DOC_ID}`,
-  pcoSync: () => `${COLLECTIONS.config}/${PCO_SYNC_DOC_ID}`,
-
-  accessRoster: () => COLLECTIONS.accessRoster,
-  accessRosterEntry: (emailKey: string) => `${COLLECTIONS.accessRoster}/${emailKey}`,
 } as const;
 
 /** Well-known recurring series ids, seeded by `scripts/seed.ts`. */

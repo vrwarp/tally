@@ -4,13 +4,14 @@
  * Two kinds of input, both from `firebase-functions/params`:
  *   - secrets  (Secret Manager) — the Personal Access Token pair.
  *   - params   (deploy-time)    — which people count as the roster, how much
- *                                 write-back is allowed, how often to run.
+ *                                 write-back is allowed, how long a read may be
+ *                                 reused.
  *
  * `loadConfig()` never throws. A missing credential is a *configuration* state,
- * not a crash: the container would otherwise die on every scheduled tick and the
- * core team would see nothing but an empty sync card. Instead the config carries
- * `configError`, the sync writes a terminal `error` state with that message, and
- * the Settings screen can say exactly which value is missing.
+ * not a crash: a throw here would surface to a counselor as an opaque "internal"
+ * error on a screen that has nothing to do with credentials. Instead the config
+ * carries `configError`, every entry point checks it first, and the Settings
+ * screen can say exactly which value is missing.
  */
 import { defineSecret, defineString } from 'firebase-functions/params';
 import { PCO_BASE_URL } from './pco/types.js';
@@ -46,8 +47,26 @@ const PCO_COUNSELOR_LIST_ID = defineString('PCO_COUNSELOR_LIST_ID', { default: '
 const PCO_MIN_GRADE = defineString('PCO_MIN_GRADE', { default: '6' });
 const PCO_MAX_GRADE = defineString('PCO_MAX_GRADE', { default: '12' });
 const PCO_WRITE_BACK = defineString('PCO_WRITE_BACK', { default: 'create' });
-const PCO_SYNC_SCHEDULE = defineString('PCO_SYNC_SCHEDULE', { default: 'every 6 hours' });
 const PCO_SMALL_GROUP_FIELD = defineString('PCO_SMALL_GROUP_FIELD', { default: '' });
+
+/**
+ * How long a Planning Center read may be reused, in seconds.
+ *
+ * Tally holds no copy of the church's people: every roster and every profile is
+ * read from Planning Center when it is needed. This is the only thing standing
+ * between that design and eight identical roster pulls when eight counselors
+ * open the app in the same minute.
+ *
+ * `0` turns retention off entirely, which is a supported way to run — the app
+ * works, it just asks every time. The ceiling is deliberately low: a cache
+ * measured in minutes would be a mirror again, and a name corrected in Planning
+ * Center should show up on the next tap.
+ */
+const PCO_CACHE_TTL_SECONDS = defineString('PCO_CACHE_TTL_SECONDS', { default: '30' });
+
+export const DEFAULT_CACHE_TTL_SECONDS = 30;
+/** Beyond a couple of minutes this stops being a cache and starts being state. */
+export const MAX_CACHE_TTL_SECONDS = 300;
 
 /** Attach to every function that talks to Planning Center. */
 export const PCO_SECRETS = [PCO_APP_ID, PCO_SECRET];
@@ -77,7 +96,11 @@ export interface PcoConfig {
   minGrade: number;
   maxGrade: number;
   writeBack: PcoWriteBackMode;
-  syncSchedule: string;
+  /**
+   * Seconds a Planning Center read may be reused. `0` means no retention at
+   * all — every request goes upstream.
+   */
+  cacheTtlSeconds: number;
   /** Name or slug of the custom field holding a small-group name, if any. */
   smallGroupField: string | null;
   /**
@@ -169,8 +192,15 @@ export function loadConfig(): PcoConfig {
   const studentListId = readValue(PCO_STUDENT_LIST_ID, 'PCO_STUDENT_LIST_ID') || null;
   const counselorListId = readValue(PCO_COUNSELOR_LIST_ID, 'PCO_COUNSELOR_LIST_ID') || null;
   const smallGroupField = readValue(PCO_SMALL_GROUP_FIELD, 'PCO_SMALL_GROUP_FIELD') || null;
-  const syncSchedule =
-    readValue(PCO_SYNC_SCHEDULE, 'PCO_SYNC_SCHEDULE') || 'every 6 hours';
+
+  // An unreadable value falls back to the default rather than to zero: silently
+  // disabling the cache because of a typo would look like Planning Center got
+  // slow, which is a much harder thing to diagnose than a wrong number.
+  const cacheTtlSeconds = clamp(
+    readInt(PCO_CACHE_TTL_SECONDS, 'PCO_CACHE_TTL_SECONDS', DEFAULT_CACHE_TTL_SECONDS),
+    0,
+    MAX_CACHE_TTL_SECONDS,
+  );
 
   const problems: string[] = [];
   if (!appId) problems.push('PCO_APP_ID is not set');
@@ -191,17 +221,8 @@ export function loadConfig(): PcoConfig {
     minGrade,
     maxGrade,
     writeBack,
-    syncSchedule,
+    cacheTtlSeconds,
     smallGroupField,
     configError: problems.length > 0 ? `Planning Center is not configured: ${problems.join('; ')}.` : null,
   };
-}
-
-/**
- * The cron expression for the scheduled sync. Read at module load because
- * `onSchedule` takes a plain string, and deploy-time params are already
- * resolved by then.
- */
-export function syncSchedule(): string {
-  return readValue(PCO_SYNC_SCHEDULE, 'PCO_SYNC_SCHEDULE') || 'every 6 hours';
 }

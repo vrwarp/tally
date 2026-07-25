@@ -272,7 +272,7 @@ describe('isEligible', () => {
 describe('computeWarnings', () => {
   const noPaperwork = { requiresWaiver: false, requiresPayment: false };
   const fullPaperwork = { requiresWaiver: true, requiresPayment: true };
-  const clean = makeStudent({ allergies: null, profileComplete: true });
+  const clean = makeStudent({ hasAllergies: false, profileComplete: true });
 
   it('stays quiet about paperwork the event does not require', () => {
     expect(computeWarnings(clean, noPaperwork, undefined)).toEqual([]);
@@ -293,7 +293,7 @@ describe('computeWarnings', () => {
   });
 
   it('flags allergies and incomplete profiles regardless of the event', () => {
-    const needsCare = makeStudent({ allergies: 'peanuts', profileComplete: false });
+    const needsCare = makeStudent({ hasAllergies: true, profileComplete: false });
     expect(computeWarnings(needsCare, noPaperwork, undefined)).toEqual([
       'allergy',
       'incomplete-profile',

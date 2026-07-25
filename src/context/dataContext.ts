@@ -4,13 +4,19 @@ import type { AppSettings, EventSeries, SmallGroup, Student, TallyEvent } from '
 /**
  * App-wide live data.
  *
- * These four collections are small, needed on nearly every screen, and change
- * rarely — so Tally opens exactly one `onSnapshot` listener for each at the
- * root instead of re-subscribing per screen. Per-event attendance and RSVPs are
- * deliberately *not* here: those are hot, scoped to one event, and torn down
- * when the counselor leaves it.
+ * The Firestore collections here are small, needed on nearly every screen, and
+ * change rarely — so Tally opens exactly one `onSnapshot` listener for each at
+ * the root instead of re-subscribing per screen. Per-event attendance and RSVPs
+ * are deliberately *not* here: those are hot, scoped to one event, and torn
+ * down when the counselor leaves it.
+ *
+ * `students` is the odd one out and worth reading carefully. It is not a
+ * Firestore collection: it is the Planning Center roster, read on demand, with
+ * Tally's own student documents merged on top. It therefore does not stream —
+ * it is fetched, and `refreshRoster` is how a screen asks for it again.
  */
 export interface DataContextValue {
+  /** The Planning Center roster merged with Tally's own documents. */
   students: Student[];
   events: TallyEvent[];
   series: EventSeries[];
@@ -20,6 +26,22 @@ export interface DataContextValue {
   loading: boolean;
   /** Set when a listener was rejected, usually by security rules. */
   error: string | null;
+
+  /* ---- Roster ------------------------------------------------------------ */
+  /** True while the roster is being read from Planning Center. */
+  rosterLoading: boolean;
+  /**
+   * Set when Planning Center could not be reached. The roster may still hold
+   * a copy from a previous session, so this is a warning rather than an empty
+   * screen — `rosterOffline` says which.
+   */
+  rosterError: string | null;
+  /** True when what is on screen came from this device, not from the network. */
+  rosterOffline: boolean;
+  /** When Planning Center was last successfully read. */
+  rosterFetchedAt: Date | null;
+  /** Asks Planning Center again. Safe to call from a pull-to-refresh. */
+  refreshRoster: () => Promise<void>;
 }
 
 export const DataContext = createContext<DataContextValue | null>(null);

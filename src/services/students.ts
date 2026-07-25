@@ -1,27 +1,36 @@
 /**
- * Student roster reads and writes.
+ * Student documents — what Tally owns about a person.
+ *
+ * The `students` collection is deliberately *not* a roster. The roster comes
+ * from Planning Center, on demand, through `@/services/roster`. What lives here
+ * is only what Planning Center has no opinion about:
+ *
+ *   - the small group a counselor assigned
+ *   - a note somebody typed
+ *   - when this student first and last turned up
+ *   - the whole record for a quick-added visitor, until the push lands
+ *
+ * Most students never get a document. One is written the first time Tally has
+ * something of its own to record, which for a typical student is the first time
+ * they are checked in.
+ *
+ * Parent contact and allergies are *not* here, on purpose — see the note in
+ * src/types/index.ts. They live in Planning Center and are read one person at a
+ * time by the screens that show them.
  */
 import {
   collection,
   doc,
   onSnapshot,
-  orderBy,
   query,
   serverTimestamp,
   setDoc,
-  updateDoc,
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { paths } from '@/lib/paths';
 import { toStudent } from '@/services/converters';
-import {
-  buildSearchName,
-  computeProfileComplete,
-  type Grade,
-  type Student,
-  type StudentStatus,
-} from '@/types';
+import { buildSearchName, type Grade, type Student, type StudentStatus } from '@/types';
 
 export interface StudentDraft {
   firstName: string;
@@ -29,30 +38,24 @@ export interface StudentDraft {
   grade: Grade;
   gender?: Student['gender'];
   smallGroupId?: string | null;
-  parentName?: string | null;
-  parentPhone?: string | null;
-  parentEmail?: string | null;
-  allergies?: string | null;
   notes?: string | null;
   status?: StudentStatus;
 }
 
 /**
- * Live roster stream. Ordered by name so the "everyone else" block below the
- * predictive section is alphabetical and scannable.
+ * Live stream of Tally's own student documents.
  *
- * Includes inactive students; callers filter. Keeping one shared listener for
- * the whole collection means the check-in screen, the dashboard and the admin
- * roster all read from the same cached snapshot instead of opening three
- * separate streams (Footprints is a few hundred students, not a few million).
+ * Not ordered in the query any more: this collection is sparse and unordered
+ * relative to the roster it annotates, and `mergeRoster` sorts the result. An
+ * `orderBy` here would also have required every document to carry a `lastName`,
+ * which an annotation-only record has no reason to.
  */
 export function subscribeStudents(
   onChange: (students: Student[]) => void,
   onError?: (error: Error) => void,
 ): Unsubscribe {
-  const q = query(collection(db, paths.students()), orderBy('lastName'), orderBy('firstName'));
   return onSnapshot(
-    q,
+    query(collection(db, paths.students())),
     (snapshot) => onChange(snapshot.docs.map(toStudent)),
     (error) => onError?.(error),
   );
@@ -69,26 +72,16 @@ export function buildStudentPayload(draft: StudentDraft, uid: string) {
     grade: draft.grade,
     gender: draft.gender ?? 'unspecified',
     smallGroupId: draft.smallGroupId ?? null,
-    parentName: draft.parentName?.trim() || null,
-    parentPhone: draft.parentPhone?.trim() || null,
-    parentEmail: draft.parentEmail?.trim().toLowerCase() || null,
-    allergies: draft.allergies?.trim() || null,
     notes: draft.notes?.trim() || null,
     status: draft.status ?? 'active',
     isVisitor: false,
-    profileComplete: computeProfileComplete({
-      parentPhone: draft.parentPhone,
-      parentEmail: draft.parentEmail,
-    }),
     searchName: buildSearchName(firstName, lastName),
     firstAttendedAt: null,
     lastAttendedAt: null,
 
-    // Created in Tally, not pulled from Planning Center. The sync function
-    // picks `pcoPushPending` up and creates the matching Person there.
+    // Created in Tally, not read from Planning Center. `onStudentCreated` picks
+    // `pcoPushPending` up and creates the matching Person there.
     pcoPersonId: null,
-    pcoUpdatedAt: null,
-    pcoSyncedAt: null,
     pcoPushPending: true,
 
     createdAt: serverTimestamp(),
@@ -109,11 +102,18 @@ export async function createStudent(draft: StudentDraft, uid: string): Promise<s
   return ref.id;
 }
 
+/**
+ * Writes Tally's own fields for a student.
+ *
+ * `merge: true` rather than `update`, because most students have no document
+ * until the moment somebody annotates them: assigning a small group to a
+ * Planning Center student creates `students/pco_123` on the spot.
+ */
 export async function updateStudent(
   studentId: string,
   patch: Partial<StudentDraft>,
   uid: string,
-  current?: Pick<Student, 'firstName' | 'lastName' | 'parentPhone' | 'parentEmail' | 'isVisitor'>,
+  current?: Pick<Student, 'firstName' | 'lastName' | 'grade' | 'pcoPersonId'>,
 ): Promise<void> {
   const payload: Record<string, unknown> = { updatedAt: serverTimestamp(), updatedBy: uid };
 
@@ -122,46 +122,30 @@ export async function updateStudent(
   if (patch.grade !== undefined) payload.grade = patch.grade;
   if (patch.gender !== undefined) payload.gender = patch.gender;
   if (patch.smallGroupId !== undefined) payload.smallGroupId = patch.smallGroupId || null;
-  if (patch.parentName !== undefined) payload.parentName = patch.parentName?.trim() || null;
-  if (patch.parentPhone !== undefined) payload.parentPhone = patch.parentPhone?.trim() || null;
-  if (patch.parentEmail !== undefined) {
-    payload.parentEmail = patch.parentEmail?.trim().toLowerCase() || null;
-  }
-  if (patch.allergies !== undefined) payload.allergies = patch.allergies?.trim() || null;
   if (patch.notes !== undefined) payload.notes = patch.notes?.trim() || null;
   if (patch.status !== undefined) payload.status = patch.status;
 
-  // `searchName` and `profileComplete` are denormalised, so they must be
-  // recomputed from the merged result whenever their inputs move.
+  // A document created purely to hold an annotation still needs enough identity
+  // to be readable on its own — a bare `{ smallGroupId }` in Firestore is not
+  // debuggable, and the rules check the name fields.
   const firstName = (payload.firstName as string | undefined) ?? current?.firstName;
   const lastName = (payload.lastName as string | undefined) ?? current?.lastName;
   if (firstName !== undefined && lastName !== undefined) {
+    payload.firstName ??= firstName;
+    payload.lastName ??= lastName;
     payload.searchName = buildSearchName(firstName, lastName);
   }
+  if (payload.grade === undefined && current?.grade !== undefined) payload.grade = current.grade;
+  if (current?.pcoPersonId) payload.pcoPersonId = current.pcoPersonId;
 
-  const parentPhone =
-    patch.parentPhone !== undefined ? (payload.parentPhone as string | null) : current?.parentPhone;
-  const parentEmail =
-    patch.parentEmail !== undefined ? (payload.parentEmail as string | null) : current?.parentEmail;
-  if (parentPhone !== undefined || parentEmail !== undefined) {
-    const complete = computeProfileComplete({ parentPhone, parentEmail });
-    payload.profileComplete = complete;
-    // Filling in the missing contact is exactly what clears the visitor badge
-    // in the core-team handoff (Journey 3).
-    if (complete && current?.isVisitor) payload.isVisitor = false;
-  }
-
-  await updateDoc(doc(db, paths.student(studentId)), payload);
+  await setDoc(doc(db, paths.student(studentId)), payload, { merge: true });
 }
 
 export async function setStudentStatus(
   studentId: string,
   status: StudentStatus,
   uid: string,
+  current?: Pick<Student, 'firstName' | 'lastName' | 'grade' | 'pcoPersonId'>,
 ): Promise<void> {
-  await updateDoc(doc(db, paths.student(studentId)), {
-    status,
-    updatedAt: serverTimestamp(),
-    updatedBy: uid,
-  });
+  await updateStudent(studentId, { status }, uid, current);
 }

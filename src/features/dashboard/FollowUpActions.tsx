@@ -8,8 +8,9 @@
  * text — and the list offers a clipboard copy for the chat.
  */
 import type { ReactNode } from 'react';
-import { Button } from '@/components/ui';
+import { Button, Spinner } from '@/components/ui';
 import { useToast } from '@/context/toastContext';
+import { usePersonDetails } from '@/hooks/usePersonDetails';
 import { cn, formatPhone } from '@/lib/utils';
 import { buildContactList } from '@/features/dashboard/contactList';
 import { studentFullName, type Student } from '@/types';
@@ -48,20 +49,73 @@ export interface FollowUpActionsProps {
 }
 
 /**
- * Contact affordances for one student, driven by whatever contact actually
- * exists. A phone gets both call and text — a leader chasing a 9th grader on a
- * Tuesday morning usually texts first and calls if that goes nowhere.
+ * Contact affordances for one student — behind a tap.
+ *
+ * Tally does not hold parent contact details; Planning Center does, and they are
+ * read one person at a time. That constraint turns out to make a better screen
+ * than the one it replaced. A follow-up list of twenty students used to put
+ * twenty parents' phone numbers on a leader's phone at once, which is both more
+ * information than anyone needed at that moment and a lot of other people's
+ * personal data sitting on a screen in a coffee shop. Now the row says who to
+ * chase, and asks before it fetches how.
+ *
+ * A leader chasing a 9th grader on a Tuesday morning usually texts first and
+ * calls if that goes nowhere, so a phone number gets both.
  */
 export function FollowUpActions({ student, className }: FollowUpActionsProps) {
-  const phone = student.parentPhone?.trim() ?? '';
-  const email = student.parentEmail?.trim() ?? '';
+  const { details, loading, error, unavailable, load } = usePersonDetails(student);
+
   const name = studentFullName(student);
-  const parent = student.parentName?.trim() || `${name}'s parent`;
+  const phone = details?.parentPhone?.trim() ?? '';
+  const email = details?.parentEmail?.trim() ?? '';
+  const parent = details?.parentName?.trim() || `${name}'s parent`;
+
+  if (unavailable) {
+    return (
+      <p className={cn('text-xs text-warn-400', className)}>
+        Not in Planning Center yet, so there is nobody to call. Add them there to follow up.
+      </p>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={cn('flex flex-wrap items-center gap-2', className)}>
+        <p className="text-xs text-danger-400">{error}</p>
+        <Button variant="ghost" size="sm" onClick={load}>
+          Try again
+        </Button>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <p className={cn('flex items-center gap-2 text-xs text-ink-500', className)}>
+        <Spinner /> Looking up contact details…
+      </p>
+    );
+  }
+
+  if (!details) {
+    return (
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={load}
+        className={className}
+        aria-label={`Look up contact details for ${name}`}
+      >
+        Show contact
+      </Button>
+    );
+  }
 
   if (!phone && !email) {
     return (
       <p className={cn('text-xs text-warn-400', className)}>
-        No parent contact on file — nobody can follow up until somebody adds one.
+        Planning Center has no parent contact for {name}. Nobody can follow up until somebody adds
+        one there.
       </p>
     );
   }
@@ -120,6 +174,9 @@ export function CopyContactsButton({ students, title }: CopyContactsButtonProps)
     }
 
     try {
+      // Names and grades only. Pulling contact details for everybody would mean
+      // one Planning Center read per student to build a list that mostly gets
+      // skimmed — and would put a screenful of parents' numbers on a clipboard.
       await navigator.clipboard.writeText(buildContactList(title, students));
       show(`Copied ${students.length} ${students.length === 1 ? 'name' : 'names'}`, {
         tone: 'success',

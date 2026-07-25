@@ -19,7 +19,7 @@ import type {
   FirestoreLike,
   QuerySnapshotLike,
   WriteBatchLike,
-} from '../sync/state.js';
+} from '../firestore.js';
 
 export class FakeFirestore implements FirestoreLike {
   readonly data = new Map<string, Record<string, unknown>>();

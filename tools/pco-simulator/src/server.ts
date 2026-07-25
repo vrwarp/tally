@@ -14,6 +14,9 @@ import { handleRequest } from './handler.js';
 import { SimulatorStore, type SimulatorOptions } from './store.js';
 import type { SimRequest } from './types.js';
 
+type SeedStudentInput = Parameters<SimulatorStore['seedStudent']>[0];
+type SeedTeamInput = Parameters<SimulatorStore['seedTeamMember']>[0];
+
 export interface SimulatorServerOptions extends SimulatorOptions {
   port?: number;
   host?: string;
@@ -82,6 +85,31 @@ export async function startSimulator(
         }
         if (action === 'people' && req.method === 'GET') {
           return send(res, 200, { count: store.people.length, people: store.people });
+        }
+        /*
+         * Loads a whole ministry in one request.
+         *
+         * `scripts/seed.ts` builds a deliberately awkward roster — a student
+         * with no grade, one with no reachable parent, a 5th grader who should
+         * not appear — and it needs that roster to be what Planning Center
+         * says, because Tally no longer stores people of its own. Doing it
+         * through the public API would be a dozen round-trips per student.
+         */
+        if (action === 'seed' && req.method === 'POST') {
+          const body = (await readBody(req)) as
+            | { empty?: boolean; students?: SeedStudentInput[]; team?: SeedTeamInput[] }
+            | null;
+
+          if (body?.empty) store.reset({ empty: true });
+
+          for (const student of body?.students ?? []) store.seedStudent(student);
+          for (const member of body?.team ?? []) store.seedTeamMember(member);
+
+          return send(res, 200, { ok: true, people: store.people.length });
+        }
+        if (action === 'clear-faults' && req.method === 'POST') {
+          store.clearFaults();
+          return send(res, 200, { ok: true });
         }
         if (action === 'rate-limit' && req.method === 'POST') {
           const body = (await readBody(req)) as { count?: number; retryAfterSeconds?: number } | null;
@@ -174,7 +202,7 @@ if (isDirectRun) {
   console.log(
     `[pco-sim] Planning Center simulator listening on ${running.url}\n` +
       `[pco-sim]   ${running.store.people.length} people seeded, page size ${running.store.pageSize}\n` +
-      `[pco-sim]   control plane: POST /_sim/reset, GET /_sim/requests, POST /_sim/rate-limit`,
+      `[pco-sim]   control plane: POST /_sim/reset, POST /_sim/seed, POST /_sim/clear-faults, GET /_sim/requests, POST /_sim/rate-limit`,
   );
 
   const shutdown = () => {

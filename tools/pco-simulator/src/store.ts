@@ -3,7 +3,13 @@
  * it. Everything here is synchronous and in-memory; `handler.ts` owns all HTTP
  * concerns.
  */
-import { createFixtureOrg, DEFAULT_APP_ID, DEFAULT_SECRET } from './fixtures.js';
+import {
+  createFixtureOrg,
+  DEFAULT_APP_ID,
+  DEFAULT_SECRET,
+  STUDENT_LIST_ID,
+  TEAM_LIST_ID,
+} from './fixtures.js';
 import type {
   SimEmail,
   SimHousehold,
@@ -89,12 +95,30 @@ export class SimulatorStore {
   }
 
   /** Restores the seeded organisation and clears logs and fault injection. */
-  reset(): void {
-    this.org = this.options.empty ? emptyOrg() : createFixtureOrg();
+  /**
+   * @param overrides `{ empty: true }` starts from nothing, for a caller that
+   *        is about to seed its own ministry rather than use the fixtures.
+   */
+  reset(overrides: Pick<SimulatorOptions, 'empty'> = {}): void {
+    const empty = overrides.empty ?? this.options.empty;
+    this.org = empty ? emptyOrg() : createFixtureOrg();
     this.requestLog.length = 0;
     this.rateLimit = null;
     this.failWith = null;
     this.nextPersonId = 6_600_001;
+  }
+
+  /**
+   * Disarms fault injection without touching the organisation.
+   *
+   * A test that armed a 500 needs to put that back; it does *not* want the
+   * seeded ministry replaced by the built-in fixtures, which is what `reset`
+   * would do. Since Tally reads its roster from here rather than from Firestore,
+   * that would leave the next test looking at a different church.
+   */
+  clearFaults(): void {
+    this.rateLimit = null;
+    this.failWith = null;
   }
 
   /* ---- fault injection ------------------------------------------------- */
@@ -243,6 +267,111 @@ export class SimulatorStore {
     return person;
   }
 
+  /**
+   * Adds a whole family in one go: the student, a parent, the household that
+   * ties them together, and the contact details on the parent.
+   *
+   * Exists because seeding a realistic ministry through the public API alone
+   * would be a dozen round-trips per student — Planning Center has no bulk
+   * create, and household membership is not settable from `POST /people`. The
+   * seed script drives this through `/_sim/seed`.
+   */
+  seedStudent(input: {
+    firstName: string;
+    lastName: string;
+    grade: number;
+    gender?: string;
+    nickname?: string | null;
+    allergies?: string | null;
+    status?: 'active' | 'inactive';
+    parentName?: string | null;
+    parentPhone?: string | null;
+    parentEmail?: string | null;
+  }): SimPerson {
+    const student = this.createPerson({
+      first_name: input.firstName,
+      last_name: input.lastName,
+      nickname: input.nickname ?? null,
+      grade: input.grade,
+      gender: input.gender ?? null,
+      child: true,
+      medical_notes: input.allergies ?? null,
+      status: input.status ?? 'active',
+    });
+
+    // A seeded student belongs on the youth pastor's List, or a deployment
+    // configured for list mode would see an empty ministry.
+    const studentList = this.org.lists.find((entry) => entry.id === STUDENT_LIST_ID);
+    if (studentList) studentList.member_ids.push(student.id);
+
+    // No parent named means a student the church has on file but cannot reach —
+    // exactly the case the "incomplete profile" list exists for, so it has to
+    // be expressible here.
+    if (!input.parentName) return student;
+
+    const [parentFirst, ...rest] = input.parentName.trim().split(/\s+/);
+    const parent = this.createPerson({
+      first_name: parentFirst ?? input.parentName,
+      last_name: rest.join(' ') || input.lastName,
+      child: false,
+    });
+
+    if (input.parentPhone) this.addPhone(parent.id, input.parentPhone);
+    if (input.parentEmail) this.addEmail(parent.id, input.parentEmail);
+
+    const household: SimHousehold = {
+      id: `H${this.org.households.length + 1000}`,
+      name: `${input.lastName} Household`,
+      primary_contact_id: parent.id,
+      primary_contact_name: `${parent.first_name} ${parent.last_name}`.trim(),
+    };
+    this.org.households.push(household);
+
+    this.org.memberships.push(
+      {
+        id: `M${this.org.memberships.length + 1000}`,
+        household_id: household.id,
+        person_id: parent.id,
+        household_role: 'parent_guardian',
+        person_name: household.primary_contact_name,
+        pending: false,
+      },
+      {
+        id: `M${this.org.memberships.length + 1001}`,
+        household_id: household.id,
+        person_id: student.id,
+        household_role: 'child_or_dependent',
+        person_name: `${student.first_name} ${student.last_name}`.trim(),
+        pending: false,
+      },
+    );
+
+    return student;
+  }
+
+  /** Adds somebody to the team list, so `provisionAccess` will let them in. */
+  seedTeamMember(input: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    permissions?: string;
+    siteAdministrator?: boolean;
+  }): SimPerson {
+    const person = this.createPerson({
+      first_name: input.firstName,
+      last_name: input.lastName,
+      child: false,
+      people_permissions: input.permissions ?? 'Viewer',
+      site_administrator: input.siteAdministrator === true,
+    });
+    this.addEmail(person.id, input.email);
+
+    const list = this.org.lists.find((entry) => entry.id === TEAM_LIST_ID);
+    if (list) list.member_ids.push(person.id);
+
+    return person;
+  }
+
   addEmail(personId: string, address: string, primary = true): SimEmail {
     const email: SimEmail = {
       id: `E${this.nextEmailId++}`,
@@ -282,6 +411,16 @@ export class SimulatorStore {
   }
 }
 
+/**
+ * An organisation with nobody in it — but with the two Lists still there.
+ *
+ * The Lists are deliberately not empty-as-in-absent. A configuration pointing
+ * at `PCO_STUDENT_LIST_ID` has to resolve to *an empty list* rather than to a
+ * 404, because those mean different things: one is "no students yet", the
+ * other is "your List id is wrong", and Tally reports them differently on
+ * purpose. Seeding into a fresh organisation must not silently produce the
+ * second.
+ */
 function emptyOrg(): SimOrg {
   return {
     people: [],
@@ -291,7 +430,10 @@ function emptyOrg(): SimOrg {
     memberships: [],
     fieldDefinitions: [],
     fieldData: [],
-    lists: [],
+    lists: [
+      { id: STUDENT_LIST_ID, name: 'Footprints Students', member_ids: [] },
+      { id: TEAM_LIST_ID, name: 'Footprints Team', member_ids: [] },
+    ],
   };
 }
 

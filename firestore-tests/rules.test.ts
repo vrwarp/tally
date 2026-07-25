@@ -56,7 +56,6 @@ describe('unauthenticated access', () => {
     await assertFails(getDoc(doc(db, paths.event(ID.event))));
     await assertFails(getDoc(doc(db, paths.user(UID.counselor))));
     await assertFails(getDoc(doc(db, paths.settings())));
-    await assertFails(getDocs(collection(db, paths.accessRoster())));
   });
 
   it('denies every write', async () => {
@@ -219,9 +218,58 @@ describe('students', () => {
     await assertFails(updateDoc(doc(db, paths.student(ID.student)), { pcoPersonId: 'pco-999' }));
   });
 
-  it('rejects rewriting the sync timestamps', async () => {
+  /*
+   * The mirror removal, made enforceable.
+   *
+   * Parent contact and allergies live in Planning Center and nowhere else. A
+   * future screen that "just" saves a phone number here would be rebuilding the
+   * copy this design exists to remove — one document at a time, and without
+   * anybody deciding to. The database says no, so it cannot happen quietly.
+   */
+  it('refuses to store a minor\'s parent contact', async () => {
     const db = asUser(env, UID.counselor);
-    await assertFails(updateDoc(doc(db, paths.student(ID.student)), { pcoSyncedAt: new Date() }));
+
+    await assertFails(
+      updateDoc(doc(db, paths.student(ID.student)), { parentPhone: '555-0100' }),
+    );
+    await assertFails(
+      updateDoc(doc(db, paths.student(ID.student)), { parentEmail: 'parent@example.org' }),
+    );
+    await assertFails(
+      updateDoc(doc(db, paths.student(ID.student)), { parentName: 'Alex Rivera' }),
+    );
+  });
+
+  it('refuses to store medical notes', async () => {
+    const db = asUser(env, UID.counselor);
+    await assertFails(updateDoc(doc(db, paths.student(ID.student)), { allergies: 'Peanuts' }));
+  });
+
+  it('refuses them on create too, not only on update', async () => {
+    const db = asUser(env, UID.counselor);
+    await assertFails(
+      setDoc(doc(db, paths.student('student-contact')), {
+        ...studentDoc(),
+        parentPhone: '555-0100',
+      }),
+    );
+  });
+
+  it('lets a counselor annotate a Planning Center student', async () => {
+    // `students/pco_*` documents are created on demand — most students never
+    // have one until somebody assigns a group or checks them in.
+    const db = asUser(env, UID.counselor);
+    await assertSucceeds(
+      setDoc(doc(db, paths.student('pco_4100010')), {
+        firstName: 'Amara',
+        lastName: 'Okonkwo',
+        grade: 8,
+        searchName: 'amara okonkwo',
+        smallGroupId: 'grade-8-girls',
+        updatedAt: new Date(),
+        updatedBy: UID.counselor,
+      }),
+    );
   });
 
   it('lets check-in stamp the attendance dates', async () => {
@@ -491,62 +539,29 @@ describe('config/settings', () => {
   });
 });
 
-describe('config/pcoSync', () => {
-  it('is invisible to counselors', async () => {
-    await assertFails(getDoc(doc(asUser(env, UID.counselor), paths.pcoSync())));
-  });
-
-  it('is readable by core and admin', async () => {
-    await assertSucceeds(getDoc(doc(asUser(env, UID.core), paths.pcoSync())));
-    await assertSucceeds(getDoc(doc(asUser(env, UID.admin), paths.pcoSync())));
-  });
-
-  it('is writable by nobody — the sync function owns it', async () => {
-    await assertFails(updateDoc(doc(asUser(env, UID.counselor), paths.pcoSync()), { status: 'ok' }));
-    await assertFails(updateDoc(doc(asUser(env, UID.core), paths.pcoSync()), { status: 'ok' }));
-    await assertFails(updateDoc(doc(asUser(env, UID.admin), paths.pcoSync()), { status: 'ok' }));
-  });
-});
-
-describe('accessRoster', () => {
-  const entry = 'sam@example,org';
-
-  it('is invisible to counselors', async () => {
-    await assertFails(
-      getDoc(doc(asUser(env, UID.counselor), paths.accessRosterEntry(entry))),
-    );
-    await assertFails(getDocs(collection(asUser(env, UID.counselor), paths.accessRoster())));
-  });
-
-  it('is readable by core and admin', async () => {
-    await assertSucceeds(getDocs(collection(asUser(env, UID.core), paths.accessRoster())));
-    await assertSucceeds(getDocs(collection(asUser(env, UID.admin), paths.accessRoster())));
-  });
-
-  it('is writable by nobody — an admin who could write it could mint their own allowlist entry', async () => {
-    await assertFails(
-      updateDoc(doc(asUser(env, UID.core), paths.accessRosterEntry(entry)), { role: 'admin' }),
-    );
-    await assertFails(
-      updateDoc(doc(asUser(env, UID.admin), paths.accessRosterEntry(entry)), { role: 'admin' }),
-    );
-    await assertFails(
-      setDoc(doc(asUser(env, UID.admin), paths.accessRosterEntry('mallory@example,org')), {
-        email: 'mallory@example.org',
-        displayName: null,
-        role: 'admin',
-        pcoPersonId: 'pco-x',
-        assignedGroupId: null,
-        active: true,
-        syncedAt: new Date(),
-      }),
-    );
-  });
-});
+/*
+ * `config/pcoSync` and `accessRoster` had their own suites here.
+ *
+ * Both collections are gone: there is no scheduled sync to track, and the
+ * allowlist is a live Planning Center lookup rather than a mirrored list. The
+ * "default deny" suite below is what now covers them — an attempt to write
+ * either path is an unmodelled collection, which is exactly the right answer.
+ */
 
 describe('default deny', () => {
   it('denies an unmodelled collection to every role', async () => {
     await assertFails(getDoc(doc(asUser(env, UID.admin), 'auditLog/entry-1')));
     await assertFails(setDoc(doc(asUser(env, UID.admin), 'auditLog/entry-1'), { note: 'hi' }));
+  });
+
+  it('denies the collections the Planning Center rework removed', async () => {
+    // An admin who could recreate `accessRoster` could mint themselves an entry
+    // and claim it; one who could write `config/pcoSync` could fake a healthy
+    // sync. Neither path is modelled any more, and neither should come back by
+    // accident.
+    const db = asUser(env, UID.admin);
+    await assertFails(setDoc(doc(db, 'accessRoster/mallory@example,org'), { role: 'admin' }));
+    await assertFails(setDoc(doc(db, 'config/pcoSync'), { status: 'ok' }));
+    await assertFails(getDocs(collection(db, 'accessRoster')));
   });
 });

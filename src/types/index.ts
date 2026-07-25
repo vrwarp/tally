@@ -99,11 +99,10 @@ export interface StudentDoc {
   gender: Gender;
   smallGroupId: string | null;
 
-  /* Data minimisation (PRD 4.5): parent contact + allergies, nothing more. */
-  parentName: string | null;
-  parentPhone: string | null;
-  parentEmail: string | null;
-  allergies: string | null;
+  /**
+   * Notes a counselor typed, about the ministry rather than about the child.
+   * Parent contact and allergies are deliberately *not* here — see below.
+   */
   notes: string | null;
 
   status: StudentStatus;
@@ -117,20 +116,8 @@ export interface StudentDoc {
    * one created while write-back is disabled.
    */
   pcoPersonId: string | null;
-  /**
-   * Planning Center's own `updated_at` for that person at the last successful
-   * pull. The incremental sync uses the maximum of these as its cursor.
-   */
-  pcoUpdatedAt: Timestamp | null;
-  pcoSyncedAt: Timestamp | null;
   /** A Tally-created student still waiting to be pushed to Planning Center. */
   pcoPushPending: boolean;
-  /**
-   * False until a parent contact method exists. Denormalised so the
-   * "Incomplete Profiles" dashboard list is a single indexed query rather than
-   * a full-collection scan. Always write via `computeProfileComplete`.
-   */
-  profileComplete: boolean;
 
   /** Lowercased "first last", used for the substring search fallback. */
   searchName: string;
@@ -141,46 +128,62 @@ export interface StudentDoc {
   createdAt: Timestamp;
   updatedAt: Timestamp;
   createdBy: string;
-  /**
-   * Who last edited the record. Null for a student the sync has only ever
-   * written, so "a person changed this" stays distinguishable from "Planning
-   * Center changed this" when someone asks why a minor's data moved.
-   */
+  /** Who last edited the record, or null for one Tally created on its own. */
   updatedBy: string | null;
 }
 
+/*
+ * What is deliberately absent from `StudentDoc`
+ * ---------------------------------------------
+ * `parentName`, `parentPhone`, `parentEmail`, `allergies`.
+ *
+ * Tally used to mirror all four out of Planning Center and keep them in step
+ * with a sweep every six hours. That meant a permanent second copy of several
+ * hundred minors' medical notes and their parents' contact details, in a
+ * database whose only real job is counting who turned up.
+ *
+ * They now live where they already lived — Planning Center — and are read one
+ * person at a time, by a screen that shows them, through `getPersonDetails`.
+ * The data minimisation the PRD asks for is structural rather than a policy:
+ * a door volunteer's phone never receives a parent's phone number because
+ * nothing it renders asks for one.
+ */
+
 export interface Student
-  extends Omit<
-    StudentDoc,
-    | 'firstAttendedAt'
-    | 'lastAttendedAt'
-    | 'createdAt'
-    | 'updatedAt'
-    | 'pcoUpdatedAt'
-    | 'pcoSyncedAt'
-  > {
+  extends Omit<StudentDoc, 'firstAttendedAt' | 'lastAttendedAt' | 'createdAt' | 'updatedAt'> {
   id: string;
   firstAttendedAt: Date | null;
   lastAttendedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
-  pcoUpdatedAt: Date | null;
-  pcoSyncedAt: Date | null;
+  /**
+   * True when this student came from Planning Center rather than from a Tally
+   * document. A roster is the union of the two, and the difference decides what
+   * may be edited here.
+   */
+  fromPlanningCenter: boolean;
+  /**
+   * Whether Planning Center holds a way to reach a parent. Derived server-side
+   * so the "Incomplete profiles" list works without shipping the contact
+   * details themselves.
+   */
+  profileComplete: boolean;
+  /** *That* there is an allergy, never what it is. See `PcoRosterPerson`. */
+  hasAllergies: boolean;
 }
 
 /**
  * Fields Planning Center owns once a student is linked.
  *
- * Editing these in Tally would be overwritten on the next pull, so the student
- * editor shows them read-only with a "managed in Planning Center" note unless
- * write-back is enabled.
+ * Editing these in Tally would be pointless — the next read comes from Planning
+ * Center and would show the old value — so the student editor shows them
+ * read-only with a "managed in Planning Center" note unless write-back is on.
  */
 export const PCO_MANAGED_STUDENT_FIELDS = [
   'firstName',
   'lastName',
   'grade',
   'gender',
-  'allergies',
   'status',
 ] as const satisfies readonly (keyof Student)[];
 
@@ -385,10 +388,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
 };
 
 /* -------------------------------------------------------------------------- */
-/* Planning Center sync                                                        */
+/* Planning Center                                                             */
 /* -------------------------------------------------------------------------- */
-
-export type PcoSyncStatus = 'never' | 'running' | 'ok' | 'error';
 
 /** How the youth roster is selected out of Planning Center. */
 export type PcoRosterSource = 'list' | 'grade';
@@ -396,80 +397,76 @@ export type PcoRosterSource = 'list' | 'grade';
 /** How much Tally is allowed to write back to Planning Center. */
 export type PcoWriteBackMode = 'off' | 'create' | 'full';
 
-export interface PcoSyncCounts {
-  peopleScanned: number;
-  studentsCreated: number;
-  studentsUpdated: number;
-  studentsDeactivated: number;
-  teamMembersMapped: number;
-  visitorsPushed: number;
-  errors: number;
+/**
+ * One student, as Planning Center describes them.
+ *
+ * Returned by the `getRoster` callable. This is *not* a Firestore document —
+ * there is no `students/{pcoPersonId}` mirror to read it back from, which is
+ * the whole design. A roster is this list merged with the handful of Tally
+ * documents that exist for visitors and for students somebody has annotated.
+ */
+export interface PcoRosterPerson {
+  /** Already in Tally's student-id form: `pco_{personId}`. */
+  id: string;
+  pcoPersonId: string;
+  firstName: string;
+  lastName: string;
+  grade: number;
+  gender: Gender;
+  status: StudentStatus;
+  searchName: string;
+  profileComplete: boolean;
+  /**
+   * *That* there is an allergy, never what it is.
+   *
+   * A counselor at a door needs to know to check; the note itself is medical
+   * information about a minor and stays behind `getPersonDetails`. A boolean is
+   * enough to render the badge that makes somebody look.
+   */
+  hasAllergies: boolean;
 }
 
-/** Stored as the single document `config/pcoSync`. Written only by Cloud Functions. */
-export interface PcoSyncStateDoc {
-  status: PcoSyncStatus;
-  startedAt: Timestamp | null;
-  finishedAt: Timestamp | null;
-  /** Max `Person.updated_at` observed, used as the incremental cursor. */
-  cursor: Timestamp | null;
-  /** Set when the last run needed a full sweep rather than an incremental one. */
-  lastFullSyncAt: Timestamp | null;
-  counts: PcoSyncCounts;
-  lastError: string | null;
-  /** Echo of the effective server config, so the UI can explain what it did. */
-  rosterSource: PcoRosterSource;
-  writeBack: PcoWriteBackMode;
-  triggeredBy: string | null;
+/** The fields the roster deliberately withholds, fetched one person at a time. */
+export interface PcoPersonDetails {
+  pcoPersonId: string;
+  parentName: string | null;
+  parentPhone: string | null;
+  parentEmail: string | null;
+  allergies: string | null;
 }
-
-export interface PcoSyncState
-  extends Omit<PcoSyncStateDoc, 'startedAt' | 'finishedAt' | 'cursor' | 'lastFullSyncAt'> {
-  startedAt: Date | null;
-  finishedAt: Date | null;
-  cursor: Date | null;
-  lastFullSyncAt: Date | null;
-}
-
-export const EMPTY_PCO_COUNTS: PcoSyncCounts = {
-  peopleScanned: 0,
-  studentsCreated: 0,
-  studentsUpdated: 0,
-  studentsDeactivated: 0,
-  teamMembersMapped: 0,
-  visitorsPushed: 0,
-  errors: 0,
-};
 
 /**
- * The Planning-Center-derived allowlist, stored at `accessRoster/{emailKey}`
- * where `emailKey` is the lowercased email with `.` replaced by `,` (Firestore
- * document ids cannot contain `/`, and `.` is legal but awkward to read).
+ * What the Settings screen shows about the connection.
  *
- * A counselor signing in has no `users/{uid}` document yet. The `provisionAccess`
- * callable matches their verified email against this collection and creates one,
- * which is how "who may use Tally" stays governed by Planning Center rather than
- * by a separate list somebody has to remember to update.
+ * Asked for, not watched. There is no `config/pcoSync` document any more:
+ * the old sweep wrote its progress into Firestore so a bar could follow it,
+ * which lit up every core-team member's phone on a schedule. A read has no
+ * progress to follow, and "is it working" is a question somebody asks.
  */
-export interface AccessRosterEntryDoc {
-  email: string;
-  displayName: string | null;
-  role: Role;
-  pcoPersonId: string;
-  /** Small group derived from the counselor's Planning Center data, if any. */
-  assignedGroupId: string | null;
-  active: boolean;
-  syncedAt: Timestamp;
+export interface PcoStatus {
+  configured: boolean;
+  reachable: boolean;
+  /** Null when everything is fine; otherwise the reason, in plain language. */
+  problem: string | null;
+  rosterSource: PcoRosterSource;
+  writeBack: PcoWriteBackMode;
+  /** Seconds a read may be reused server-side. `0` means the cache is off. */
+  cacheTtlSeconds: number;
+  /** True when the API root is not the real Planning Center — a test rig. */
+  baseUrlOverridden: boolean;
+  peopleVisible: number | null;
 }
 
-export interface AccessRosterEntry extends Omit<AccessRosterEntryDoc, 'syncedAt'> {
-  id: string;
-  syncedAt: Date;
+/** The id Tally uses for a Planning Center person, everywhere. */
+export const PCO_ID_PREFIX = 'pco_';
+
+export function pcoStudentId(personId: string): string {
+  return `${PCO_ID_PREFIX}${personId}`;
 }
 
-/** `sam.smith@example.org` -> `sam,smith@example,org` */
-export function emailKey(email: string): string {
-  return email.trim().toLowerCase().replace(/\./g, ',');
+/** Null for a Tally-owned id — a visitor whose push has not landed. */
+export function personIdFromStudentId(studentId: string): string | null {
+  return studentId.startsWith(PCO_ID_PREFIX) ? studentId.slice(PCO_ID_PREFIX.length) : null;
 }
 
 /* -------------------------------------------------------------------------- */

@@ -18,8 +18,13 @@ import type { PcoConfig } from '../config.js';
 import { PcoApiError, type PcoClient } from '../pco/client.js';
 import { compareIds, mapPersonToStudent, nameGradeKey } from '../pco/mapping.js';
 import type { PcoPerson } from '../pco/types.js';
-import { PATHS, type FirestoreLike } from './state.js';
-import type { SyncLogger } from './syncPeople.js';
+import {
+  PATHS,
+  SILENT_LOGGER,
+  type DocumentSnapshotLike,
+  type FirestoreLike,
+  type FunctionLogger,
+} from '../firestore.js';
 
 /** Mirrors `PushStudentResult` in src/services/functions.ts. */
 export interface PushStudentResult {
@@ -34,10 +39,8 @@ export interface PushStudentOptions {
   config: PcoConfig;
   studentId: string;
   now?: Date;
-  logger?: SyncLogger;
+  logger?: FunctionLogger;
 }
-
-const SILENT_LOGGER: SyncLogger = { info: () => {}, warn: () => {}, error: () => {} };
 
 /** How many search hits to consider before giving up on an exact match. */
 const SEARCH_PAGE_SIZE = 25;
@@ -258,7 +261,7 @@ export async function pushPendingStudents(options: {
   client: PcoClient;
   config: PcoConfig;
   now?: Date;
-  logger?: SyncLogger;
+  logger?: FunctionLogger;
   limit?: number;
 }): Promise<PushPendingResult> {
   const logger = options.logger ?? SILENT_LOGGER;
@@ -268,7 +271,7 @@ export async function pushPendingStudents(options: {
 
   const snapshot = await options.db.collection(PATHS.students).get();
   const pending = snapshot.docs
-    .filter((doc) => {
+    .filter((doc: DocumentSnapshotLike) => {
       const data = doc.data() ?? {};
       return data.pcoPushPending === true && !readString(data, 'pcoPersonId');
     })

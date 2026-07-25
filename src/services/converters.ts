@@ -11,16 +11,13 @@ import { Timestamp, type DocumentData, type DocumentSnapshot } from 'firebase/fi
 import {
   DEFAULT_SETTINGS,
   buildSearchName,
-  computeProfileComplete,
   isGrade,
-  type AccessRosterEntry,
   type AppSettings,
   type AppSettingsDoc,
   type AttendanceRecord,
   type EventSeries,
   type Grade,
-  type PcoSyncCounts,
-  type PcoSyncState,
+  type PcoRosterPerson,
   type Rsvp,
   type SmallGroup,
   type Student,
@@ -46,13 +43,28 @@ function usable(date: Date): Date | null {
   return Number.isFinite(date.getTime()) ? date : null;
 }
 
+/**
+ * A real Date, not merely something that answers to `instanceof`.
+ *
+ * `instanceof` walks the prototype chain, so any object whose `__proto__` was
+ * assigned a Date passes it — and then `getTime()` throws `TypeError: this is
+ * not a Date object`, from inside a converter, on the check-in screen. The brand
+ * check is the only test that actually asks "was this constructed as a Date".
+ *
+ * Exotic, and this is exactly the boundary where exotic input arrives: every
+ * value here was written by something else. Found by the fuzz suite.
+ */
+function isDate(value: unknown): value is Date {
+  return Object.prototype.toString.call(value) === '[object Date]';
+}
+
 export function toDate(value: unknown, fallback: Date): Date {
   return toDateOrNull(value) ?? fallback;
 }
 
 export function toDateOrNull(value: unknown): Date | null {
   if (value instanceof Timestamp) return usable(value.toDate());
-  if (value instanceof Date) return usable(value);
+  if (isDate(value)) return usable(value);
   if (typeof value === 'number') return usable(new Date(value));
   return null;
 }
@@ -108,23 +120,17 @@ export function toStudent(snapshot: DocumentSnapshot<DocumentData>): Student {
       ? data.gender
       : 'unspecified') as Student['gender'],
     smallGroupId: strOrNull(data.smallGroupId),
-    parentName: strOrNull(data.parentName),
-    parentPhone: strOrNull(data.parentPhone),
-    parentEmail: strOrNull(data.parentEmail),
-    allergies: strOrNull(data.allergies),
     notes: strOrNull(data.notes),
     status: data.status === 'inactive' ? 'inactive' : 'active',
     isVisitor: bool(data.isVisitor),
     pcoPersonId: strOrNull(data.pcoPersonId),
-    pcoUpdatedAt: toDateOrNull(data.pcoUpdatedAt),
-    pcoSyncedAt: toDateOrNull(data.pcoSyncedAt),
     pcoPushPending: bool(data.pcoPushPending),
-    // Recompute rather than trust the stored flag: a profile edited outside the
-    // app (console, import script) can leave the denormalised value stale.
-    profileComplete: computeProfileComplete({
-      parentPhone: strOrNull(data.parentPhone),
-      parentEmail: strOrNull(data.parentEmail),
-    }),
+    // A Tally document describes somebody Planning Center has not told us
+    // about, so this is false by construction. When Planning Center *does* know
+    // them, the roster entry wins and carries the real value.
+    fromPlanningCenter: false,
+    profileComplete: false,
+    hasAllergies: false,
     searchName: str(data.searchName) || buildSearchName(firstName, lastName),
     firstAttendedAt: toDateOrNull(data.firstAttendedAt),
     lastAttendedAt: toDateOrNull(data.lastAttendedAt),
@@ -240,54 +246,6 @@ export function toUserProfile(snapshot: DocumentSnapshot<DocumentData>): UserPro
   };
 }
 
-export function toPcoSyncState(snapshot: DocumentSnapshot<DocumentData>): PcoSyncState {
-  const data = snapshot.data() ?? {};
-  const status = data.status;
-  const counts = (data.counts ?? {}) as Partial<PcoSyncCounts>;
-
-  return {
-    status:
-      status === 'running' || status === 'ok' || status === 'error' ? status : 'never',
-    startedAt: toDateOrNull(data.startedAt),
-    finishedAt: toDateOrNull(data.finishedAt),
-    cursor: toDateOrNull(data.cursor),
-    lastFullSyncAt: toDateOrNull(data.lastFullSyncAt),
-    counts: {
-      peopleScanned: num(counts.peopleScanned, 0),
-      studentsCreated: num(counts.studentsCreated, 0),
-      studentsUpdated: num(counts.studentsUpdated, 0),
-      studentsDeactivated: num(counts.studentsDeactivated, 0),
-      teamMembersMapped: num(counts.teamMembersMapped, 0),
-      visitorsPushed: num(counts.visitorsPushed, 0),
-      errors: num(counts.errors, 0),
-    },
-    lastError: strOrNull(data.lastError),
-    // Mirrors PCO_ROSTER_SOURCE's default in functions/src/config.ts.
-    rosterSource: data.rosterSource === 'list' ? 'list' : 'grade',
-    writeBack:
-      data.writeBack === 'off' || data.writeBack === 'full' ? data.writeBack : 'create',
-    triggeredBy: strOrNull(data.triggeredBy),
-  };
-}
-
-export function toAccessRosterEntry(
-  snapshot: DocumentSnapshot<DocumentData>,
-): AccessRosterEntry {
-  const data = snapshot.data() ?? {};
-  const role = data.role;
-
-  return {
-    id: snapshot.id,
-    email: str(data.email),
-    displayName: strOrNull(data.displayName),
-    role: role === 'admin' || role === 'core' ? role : 'counselor',
-    pcoPersonId: str(data.pcoPersonId),
-    assignedGroupId: strOrNull(data.assignedGroupId),
-    active: bool(data.active, false),
-    syncedAt: toDate(data.syncedAt, pendingFallback(snapshot)),
-  };
-}
-
 export function toSmallGroup(snapshot: DocumentSnapshot<DocumentData>): SmallGroup {
   const data = snapshot.data() ?? {};
   const rawGrades = Array.isArray(data.grades) ? data.grades : [];
@@ -345,5 +303,59 @@ export function toSettings(snapshot: DocumentSnapshot<DocumentData>): AppSetting
     ),
     updatedAt: toDateOrNull(data.updatedAt),
     updatedBy: strOrNull(data.updatedBy),
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Planning Center -> Student                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A roster row from Planning Center, in the shape the rest of the app already
+ * speaks.
+ *
+ * The fields Tally owns and Planning Center knows nothing about — small group,
+ * notes, when this student first turned up — are absent here and merged in from
+ * the student's Firestore document if one exists. Most students never get one:
+ * a document is written only when Tally has something of its own to record.
+ */
+/** See the note on `createdAt` in `fromRosterPerson`. */
+const EPOCH = new Date(0);
+
+export function fromRosterPerson(person: PcoRosterPerson, now: Date): Student {
+  return {
+    id: person.id,
+    firstName: person.firstName,
+    lastName: person.lastName,
+    grade: grade(person.grade),
+    gender: person.gender,
+    smallGroupId: null,
+    notes: null,
+    status: person.status,
+    isVisitor: false,
+    pcoPersonId: person.pcoPersonId,
+    pcoPushPending: false,
+    fromPlanningCenter: true,
+    profileComplete: person.profileComplete,
+    hasAllergies: person.hasAllergies,
+    searchName: person.searchName,
+    firstAttendedAt: null,
+    lastAttendedAt: null,
+    /*
+     * Deliberately the epoch, not "now".
+     *
+     * `createdAt` has exactly one job in Tally: deciding whether a student could
+     * plausibly have attended a past gathering, so a visitor entered last Friday
+     * is not reported as having missed the three Fridays before they existed.
+     * Stamping a Planning Center student with the time we happened to read them
+     * would make *every* past event predate *every* student, and the MIA list —
+     * the whole point of the dashboard — would silently be empty forever.
+     *
+     * Somebody the church already had on file counts as having been around.
+     */
+    createdAt: EPOCH,
+    updatedAt: now,
+    createdBy: 'planning-center',
+    updatedBy: null,
   };
 }
