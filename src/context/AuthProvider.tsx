@@ -20,7 +20,7 @@ import {
   signOut as firebaseSignOut,
   type User,
 } from 'firebase/auth';
-import { auth, firebaseApp } from '@/lib/firebase';
+import { auth, firebaseApp, popupRedirectResolver } from '@/lib/firebase';
 import { googleSignInStrategy, isEmbeddedBrowser } from '@/lib/embeddedBrowser';
 import { subscribeUserProfile, touchLastSeen } from '@/services/users';
 import { roleAtLeast, type Role, type UserProfile } from '@/types';
@@ -28,6 +28,36 @@ import { AuthContext, type AuthContextValue, type AuthStatus } from '@/context/a
 
 /** Where the magic link lands. Kept in one place so it matches the auth domain allowlist. */
 const EMAIL_STORAGE_KEY = 'tally:magic-link-email';
+
+/**
+ * Set immediately before `signInWithRedirect`, so the return leg knows there is
+ * a result worth collecting.
+ *
+ * `sessionStorage` rather than `localStorage` on purpose: a redirect comes back
+ * to the tab that started it, and a marker left in shared storage would make
+ * every *other* tab pay for a handshake it never began.
+ */
+const REDIRECT_PENDING_KEY = 'tally:google-redirect-pending';
+
+function redirectPending(): boolean {
+  try {
+    return window.sessionStorage.getItem(REDIRECT_PENDING_KEY) === '1';
+  } catch {
+    // Safari in private mode throws on sessionStorage. Assume no redirect is in
+    // flight: the cost of being wrong is one Google sign-in that has to be
+    // retried, against making every cold start pay for the check.
+    return false;
+  }
+}
+
+function setRedirectPending(pending: boolean): void {
+  try {
+    if (pending) window.sessionStorage.setItem(REDIRECT_PENDING_KEY, '1');
+    else window.sessionStorage.removeItem(REDIRECT_PENDING_KEY);
+  } catch {
+    /* Storage is a nicety here, never a failure path. */
+  }
+}
 
 function magicLinkSettings() {
   return {
@@ -113,14 +143,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   /*
-   * Finish a `signInWithRedirect` round-trip. Harmless when none is pending —
-   * it resolves to null — and without it a redirect sign-in silently does
-   * nothing on return.
+   * Finish a `signInWithRedirect` round-trip — but only when this tab actually
+   * started one.
+   *
+   * `getRedirectResult` reads as a cheap "is there anything waiting?", and it is
+   * documented to resolve to null when there is not. What that description hides
+   * is *how* it finds out: it boots Firebase's hidden auth iframe, which pulls
+   * `apis.google.com/js/api.js`. On a network that cannot reach Google — a
+   * church guest wifi with a captive portal, a school filter, a phone with one
+   * bar — that request does not fail fast. It sits there for the better part of
+   * fifteen seconds and then resets, three times over, while a counselor stares
+   * at a spinner on the check-in screen.
+   *
+   * Nobody signing in with a magic link ever needs this, and they are most of
+   * the users. So the app remembers that it started a redirect, and only pays
+   * for the answer when there is a question.
    */
   useEffect(() => {
-    getRedirectResult(auth).catch((cause: unknown) => {
-      setError(describeAuthError(cause));
-    });
+    if (!redirectPending()) return;
+
+    popupRedirectResolver()
+      .then((resolver) => getRedirectResult(auth, resolver))
+      .catch((cause: unknown) => {
+        setError(describeAuthError(cause));
+      })
+      .finally(() => {
+        // Cleared either way: a redirect that was abandoned must not make every
+        // later mount in this tab repeat the handshake.
+        setRedirectPending(false);
+      });
   }, []);
 
   /* Finish a magic-link sign-in when the browser lands back on the app. */
@@ -197,17 +248,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // Marked *before* the call, because `signInWithRedirect` navigates away and
+    // never returns to this line.
+    // Loaded once, here, rather than at app start — this is the first moment
+    // anything actually needs the iframe machinery.
+    const resolver = await popupRedirectResolver();
+
+    const startRedirect = async () => {
+      setRedirectPending(true);
+      try {
+        await signInWithRedirect(auth, provider, resolver);
+      } catch (cause) {
+        setRedirectPending(false);
+        throw cause;
+      }
+    };
+
     try {
       if (strategy === 'redirect') {
-        await signInWithRedirect(auth, provider);
+        await startRedirect();
         return;
       }
-      await signInWithPopup(auth, provider);
+      await signInWithPopup(auth, provider, resolver);
     } catch (cause) {
       // A blocked popup in a normal tab is recoverable: hand it to the redirect.
       if ((cause as { code?: string })?.code === 'auth/popup-blocked') {
         try {
-          await signInWithRedirect(auth, provider);
+          await startRedirect();
           return;
         } catch (redirectCause) {
           setError(describeAuthError(redirectCause));
@@ -222,6 +289,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     await firebaseSignOut(auth);
     window.localStorage.removeItem(EMAIL_STORAGE_KEY);
+    setRedirectPending(false);
     setMagicLinkSentTo(null);
   }, []);
 

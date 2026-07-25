@@ -5,9 +5,18 @@
  * check-in, and a flag the core team can work later.
  */
 import { gotoReady } from './support/auth';
-import { expect, test } from './support/fixtures';
+import { expect, resetWorld, test } from './support/fixtures';
 
 const VISITOR = { first: 'Tamsin', last: 'Okorie', grade: '9' };
+
+/*
+ * A known world, whatever ran before this file.
+ *
+ * Specs mutate shared state on purpose, so running them in any order other than
+ * the one they were written in would otherwise produce failures describing bugs
+ * that are not there.
+ */
+test.beforeAll(resetWorld);
 
 test.describe('quick-add visitor', () => {
   test('asks for a name and grade and nothing else', async ({ page, signedInAs }) => {

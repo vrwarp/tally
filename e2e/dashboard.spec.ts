@@ -7,7 +7,16 @@
  * exactly what this should catch.
  */
 import { gotoReady } from './support/auth';
-import { expect, test } from './support/fixtures';
+import { expect, resetWorld, test } from './support/fixtures';
+
+/*
+ * A known world, whatever ran before this file.
+ *
+ * Specs mutate shared state on purpose, so running them in any order other than
+ * the one they were written in would otherwise produce failures describing bugs
+ * that are not there.
+ */
+test.beforeAll(resetWorld);
 
 test.describe('dashboard', () => {
   test('surfaces the three follow-up lists with real names in them', async ({

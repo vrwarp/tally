@@ -11,7 +11,14 @@
  * path is the default developer experience (`npm run dev:emulated`).
  */
 import { initializeApp, type FirebaseApp, type FirebaseOptions } from 'firebase/app';
-import { connectAuthEmulator, getAuth, type Auth } from 'firebase/auth';
+import {
+  browserLocalPersistence,
+  connectAuthEmulator,
+  indexedDBLocalPersistence,
+  initializeAuth,
+  type Auth,
+  type PopupRedirectResolver,
+} from 'firebase/auth';
 import {
   connectFirestoreEmulator,
   initializeFirestore,
@@ -60,7 +67,40 @@ export const db: Firestore = initializeFirestore(firebaseApp, {
   localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
 });
 
-export const auth: Auth = getAuth(firebaseApp);
+/**
+ * Auth, built *without* a popup/redirect resolver.
+ *
+ * `getAuth()` is the obvious call, and it is the wrong one here. It bundles
+ * `browserPopupRedirectResolver`, and Firebase initialises that resolver while
+ * it is working out who is signed in — which means every cold start, for every
+ * user, opens a hidden iframe against `apis.google.com` before the app renders
+ * anything. On a network that cannot reach Google (church guest wifi behind a
+ * captive portal, a school filter, a phone with one bar) that request does not
+ * fail fast; it hangs for the better part of fifteen seconds, several times
+ * over, while a counselor watches a spinner on the check-in screen.
+ *
+ * Almost nobody needs it: the magic link is the primary path and never touches
+ * the resolver. So it is left out here and passed explicitly to the three calls
+ * that genuinely require it — see `popupRedirectResolver()` below.
+ *
+ * Persistence is listed in preference order. IndexedDB survives an iOS home
+ * screen launch where `localStorage` sometimes does not; `localStorage` is the
+ * fallback for browsers that block IndexedDB in private mode.
+ */
+export const auth: Auth = initializeAuth(firebaseApp, {
+  persistence: [indexedDBLocalPersistence, browserLocalPersistence],
+});
+
+/**
+ * Loads the popup/redirect resolver, on demand.
+ *
+ * Dynamically imported so the iframe machinery is neither initialised nor even
+ * downloaded until somebody actually chooses Google sign-in.
+ */
+export async function popupRedirectResolver(): Promise<PopupRedirectResolver> {
+  const { browserPopupRedirectResolver } = await import('firebase/auth');
+  return browserPopupRedirectResolver;
+}
 
 if (USE_EMULATORS) {
   const host = env.VITE_EMULATOR_HOST || '127.0.0.1';

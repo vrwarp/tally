@@ -7,7 +7,7 @@
  * between is the production code path; only the far end is simulated.
  */
 import { gotoReady } from './support/auth';
-import { expect, test } from './support/fixtures';
+import { expect, resetWorld, test } from './support/fixtures';
 
 /**
  * People who exist only in the simulator's organisation, never in the Firestore
@@ -20,6 +20,15 @@ const SIMULATOR_ONLY_STUDENT = 'Amara Okonkwo';
 const SIMULATOR_ONLY_TEAM_MEMBER = 'priya.raman@footprints.example.org';
 /** The 5th grader, who must never reach a 6-12 roster. */
 const OLIVER_PCO_ID = '4200016';
+
+/*
+ * A known world, whatever ran before this file.
+ *
+ * Specs mutate shared state on purpose, so running them in any order other than
+ * the one they were written in would otherwise produce failures describing bugs
+ * that are not there.
+ */
+test.beforeAll(resetWorld);
 
 test.describe('Planning Center sync', () => {
   test('starts out with none of Planning Center’s people', async ({ page, signedInAs, firestore }) => {

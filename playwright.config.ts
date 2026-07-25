@@ -40,6 +40,27 @@ const webkitExecutable = process.env.PLAYWRIGHT_WEBKIT_EXECUTABLE;
 const launchOptions = (executablePath: string | undefined) =>
   executablePath ? { launchOptions: { executablePath } } : {};
 
+/**
+ * The four shapes a counselor might be holding: Chrome and Safari, phone and
+ * desktop. Safari matters disproportionately — an iPhone is the single most
+ * likely device at a church door — and it is also the engine most likely to
+ * disagree about layout and storage.
+ */
+/*
+ * The walkthrough is a documentation build, not a test: it photographs the app
+ * rather than asserting on it, and it mutates the seeded data as it goes. It is
+ * opted in with `WALKTHROUGH=1` rather than ignored outright, so it can still
+ * be run by path.
+ */
+const SPEC_IGNORE = process.env.WALKTHROUGH ? [] : ['**/walkthrough.spec.ts'];
+
+const BROWSERS = [
+  { name: 'chromium-desktop', use: { ...devices['Desktop Chrome'], ...launchOptions(chromiumExecutable) } },
+  { name: 'webkit-desktop', use: { ...devices['Desktop Safari'], ...launchOptions(webkitExecutable) } },
+  { name: 'chromium-mobile', use: { ...devices['Pixel 7'], ...launchOptions(chromiumExecutable) } },
+  { name: 'webkit-mobile', use: { ...devices['iPhone 14'], ...launchOptions(webkitExecutable) } },
+] as const;
+
 /** Environment the Functions emulator needs to reach the simulator. */
 const planningCenterEnv = {
   PCO_API_BASE_URL: `http://127.0.0.1:${PORTS.planningCenter}/people/v2`,
@@ -53,13 +74,7 @@ const planningCenterEnv = {
 
 export default defineConfig({
   testDir: './e2e',
-  /*
-   * The walkthrough is a documentation build, not a test: it photographs the app
-   * rather than asserting on it, and it mutates the seeded data as it goes. It
-   * is opted in with `WALKTHROUGH=1` rather than ignored outright, so it can
-   * still be run by path.
-   */
-  testIgnore: process.env.WALKTHROUGH ? [] : ['**/walkthrough.spec.ts'],
+  testIgnore: SPEC_IGNORE,
   globalSetup: './e2e/support/globalSetup.ts',
 
   /*
@@ -93,24 +108,7 @@ export default defineConfig({
     actionTimeout: 15_000,
   },
 
-  projects: [
-    {
-      name: 'chromium-desktop',
-      use: { ...devices['Desktop Chrome'], ...launchOptions(chromiumExecutable) },
-    },
-    {
-      name: 'webkit-desktop',
-      use: { ...devices['Desktop Safari'], ...launchOptions(webkitExecutable) },
-    },
-    {
-      name: 'chromium-mobile',
-      use: { ...devices['Pixel 7'], ...launchOptions(chromiumExecutable) },
-    },
-    {
-      name: 'webkit-mobile',
-      use: { ...devices['iPhone 14'], ...launchOptions(webkitExecutable) },
-    },
-  ],
+  projects: BROWSERS.map(({ name, use }) => ({ name, use })),
 
   webServer: [
     {
