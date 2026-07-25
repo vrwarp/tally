@@ -332,6 +332,14 @@ rules it deploys on merge with no prompt.
 - `VITE_FIREBASE_CONFIG` — the web config object as one line of JSON, the same value
   `.env.local` holds. Vite embeds it at build time, so the Hosting workflows need it even
   though it is not a secret.
+- `FUNCTIONS_ENV` — the contents of your local, gitignored `functions/.env`: the Planning Center
+  settings (`PCO_ROSTER_SOURCE`, the list ids, the grade range, and so on — not `PCO_APP_ID` or
+  `PCO_SECRET`, which live in Secret Manager). The backend workflow writes it to
+  `functions/.env.tally-76406` before deploying, because the CLI resolves the `defineString`
+  params in `functions/src/config.ts` from that file and stops to ask when it is missing, whatever
+  defaults the code declares — the same trap `functions/.env.demo-tally` documents for the
+  emulator. Keeping it in a secret rather than the repository keeps the ministry's list ids out of
+  git history.
 
 ---
 

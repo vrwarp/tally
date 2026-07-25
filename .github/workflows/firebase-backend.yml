@@ -56,17 +56,28 @@ jobs:
       # The deploy job deliberately does *not* do this. A deploy that quietly
       # skipped itself because a key was missing would be a silent no-op, so it
       # is left to fail loudly.
-      - name: Is the backend key configured?
+      - name: Are the backend secrets configured?
         id: creds
         env:
           KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TALLY_BACKEND }}
+          FUNCTIONS_ENV: ${{ secrets.FUNCTIONS_ENV }}
         run: |
-          if [ -n "$KEY" ]; then
+          if [ -n "$KEY" ] && [ -n "$FUNCTIONS_ENV" ]; then
             echo 'present=true' >> "$GITHUB_OUTPUT"
           else
             echo 'present=false' >> "$GITHUB_OUTPUT"
-            echo '::notice::FIREBASE_SERVICE_ACCOUNT_TALLY_BACKEND is not set, so the deploy dry run was skipped. See README.md#repository-secrets.'
+            echo '::notice::FIREBASE_SERVICE_ACCOUNT_TALLY_BACKEND or FUNCTIONS_ENV is not set, so the deploy dry run was skipped. See README.md#repository-secrets.'
           fi
+
+      # The CLI resolves the functions' defineString params from
+      # .env.<project> before running anything, and stops to ask when the file
+      # is missing — see the note in functions/.env.demo-tally. `.env.*` is
+      # gitignored at every level, so this file cannot be committed by accident.
+      - name: Write the Planning Center settings
+        if: steps.creds.outputs.present == 'true'
+        env:
+          FUNCTIONS_ENV: ${{ secrets.FUNCTIONS_ENV }}
+        run: printf '%s\n' "$FUNCTIONS_ENV" > "functions/.env.$FIREBASE_PROJECT"
 
       - uses: google-github-actions/auth@v2
         if: steps.creds.outputs.present == 'true'
@@ -121,6 +132,19 @@ jobs:
         run: npm run test:rules
       - name: Cloud Functions tests must pass before they ship
         run: npm run test:functions
+
+      # Loud on purpose, unlike the pull-request job: deploying without the
+      # Planning Center settings would either stop at a prompt nobody can answer
+      # or quietly ship the empty defaults from src/config.ts.
+      - name: Write the Planning Center settings
+        env:
+          FUNCTIONS_ENV: ${{ secrets.FUNCTIONS_ENV }}
+        run: |
+          if [ -z "$FUNCTIONS_ENV" ]; then
+            echo "::error::FUNCTIONS_ENV is not set. See README.md#repository-secrets."
+            exit 1
+          fi
+          printf '%s\n' "$FUNCTIONS_ENV" > "functions/.env.$FIREBASE_PROJECT"
 
       - uses: google-github-actions/auth@v2
         with:
