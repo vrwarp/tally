@@ -15,8 +15,14 @@
 import { gotoReady } from './support/auth';
 import { expect, test } from './support/fixtures';
 
-/** A student the seed put in Planning Center and nowhere else. */
-const ROSTER_STUDENT = 'Okonkwo';
+/**
+ * A student the seed put in Planning Center and nowhere else.
+ *
+ * From `scripts/seed.ts`, not from the simulator's built-in fixtures: seeding
+ * replaces the organisation wholesale, so a fixture name would be a name nobody
+ * has.
+ */
+const ROSTER_STUDENT = 'Adebayo';
 
 test.describe('Planning Center', () => {
   test('the roster on screen comes from Planning Center, not from Firestore', async ({
@@ -26,18 +32,28 @@ test.describe('Planning Center', () => {
   }) => {
     await signedInAs('counselor');
 
-    // The roster is full of students...
-    const roster = page.getByRole('list', { name: /roster|recent/i }).first();
-    await expect(roster.getByRole('listitem').first()).toBeVisible({ timeout: 20_000 });
-
-    // ...and Firestore holds far fewer student documents than there are names,
-    // because a document is written only when Tally has something of its own to
-    // record. If these numbers matched, the mirror would be back.
-    const documents = await firestore.collection('students');
+    await expect(page.getByText(new RegExp(ROSTER_STUDENT)).first()).toBeVisible({
+      timeout: 20_000,
+    });
     const names = await page.getByRole('listitem').count();
+    expect(names).toBeGreaterThan(10);
 
-    expect(names).toBeGreaterThan(0);
-    expect(documents.length).toBeLessThan(45);
+    /*
+     * Every student document in Firestore describes somebody who has attended
+     * something, so a well-used ministry has a document for most of the roster.
+     * Counting them therefore proves nothing.
+     *
+     * What proves it is what those documents contain: none of the fields that
+     * would make one a copy of a Planning Center person. Combined with the
+     * roster rendering at all, the only place these names can have come from is
+     * Planning Center.
+     */
+    const documents = await firestore.collection('students');
+    expect(documents.length).toBeGreaterThan(0);
+    for (const student of documents) {
+      expect(Object.keys(student.data)).not.toContain('parentPhone');
+      expect(Object.keys(student.data)).not.toContain('allergies');
+    }
   });
 
   test('a minor’s parent contact is never written to Firestore', async ({
@@ -65,6 +81,12 @@ test.describe('Planning Center', () => {
     await signedInAs('core');
     await gotoReady(page, '/settings');
 
+    const card = page
+      .locator('section')
+      .filter({ has: page.getByRole('heading', { name: /planning center/i }) })
+      .first();
+    const before = await card.getByText(/students visible/i).innerText();
+
     await planningCenter.createStudent({
       firstName: 'Wendell',
       lastName: 'Ashgrove',
@@ -73,32 +95,43 @@ test.describe('Planning Center', () => {
       parentPhone: '555-0177',
     });
 
-    // "Refresh" drops the server's held answer and reads again. Without the
-    // button a counselor would still get them, just up to `cacheTtlSeconds`
-    // later — this asserts the deliberate path rather than waiting one out.
+    /*
+     * Asserted on this page rather than by navigating to the roster.
+     *
+     * "Refresh" carries `force` on the read itself, so it is exact wherever it
+     * lands. A *different* page load is a different request, which may be
+     * served by a different function instance whose own in-memory cache is
+     * still warm — so it picks the new student up within `cacheTtlSeconds`,
+     * not instantly. Waiting that out here would be testing the clock.
+     */
     await page.getByRole('button', { name: /^refresh/i }).click();
 
-    await gotoReady(page, '/students');
-    await page.getByLabel('Search', { exact: true }).fill('Ashgrove');
-    await expect(page.getByText(/Ashgrove/).first()).toBeVisible({ timeout: 20_000 });
+    await expect(card.getByText(/students visible/i)).not.toHaveText(before, {
+      timeout: 30_000,
+    });
   });
 
   test('parent contact is fetched for one student, on the screen that shows it', async ({
     page,
     signedInAs,
-    planningCenter,
   }) => {
     await signedInAs('core');
 
     await gotoReady(page, '/students');
     await page.getByLabel('Search', { exact: true }).fill(ROSTER_STUDENT);
-    await page.getByText(new RegExp(ROSTER_STUDENT)).first().click();
+    await page.getByRole('link', { name: new RegExp(ROSTER_STUDENT) }).first().click();
 
     // The detail screen exists to answer "who do I call", so it asks eagerly.
     await expect(page.getByText(/parent contact/i).first()).toBeVisible({ timeout: 20_000 });
 
-    const requests = await planningCenter.requests();
-    expect(requests.some((request) => /\/people\/\d+/.test(request.path))).toBe(true);
+    /*
+     * A real number, on screen. Firestore holds none — the sibling test asserts
+     * that against the database — so the only way this can render is a live
+     * read of one person from Planning Center.
+     */
+    await expect(page.getByRole('link', { name: /^Call /i }).first()).toBeVisible({
+      timeout: 20_000,
+    });
   });
 
   test('the settings card reports the connection and how fresh it is', async ({
@@ -136,7 +169,16 @@ test.describe('Planning Center', () => {
     await signedInAs('core');
     await gotoReady(page, '/settings');
 
-    await planningCenter.fail(500, 'Simulated outage', 20);
+    /*
+     * A 401 rather than a 500, on purpose.
+     *
+     * The client retries 5xx with backoff — correctly, since a 500 is usually
+     * Planning Center having a bad minute — which makes a simulated outage take
+     * the better part of ten seconds per call and turns this into a test of the
+     * retry schedule. A rejected credential is not retryable, fails at once, and
+     * is the more likely real failure anyway: tokens expire.
+     */
+    await planningCenter.fail(401, 'Simulated credential rejection', 20);
     await page.getByRole('button', { name: /^refresh/i }).click();
 
     const card = page
@@ -147,7 +189,7 @@ test.describe('Planning Center', () => {
     // "We cannot reach Planning Center" and "you have no students" look
     // identical on an empty screen and mean completely different things.
     await expect(
-      card.getByText(/unreachable|could not|saved earlier|outage/i).first(),
+      card.getByText(/unreachable|could not|rejected|saved earlier/i).first(),
     ).toBeVisible({ timeout: 30_000 });
   });
 

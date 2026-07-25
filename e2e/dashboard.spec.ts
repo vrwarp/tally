@@ -44,7 +44,10 @@ test.describe('dashboard', () => {
      * longer puts twenty parents' phone numbers on a leader's screen at once.
      * "Actionable" therefore means the row offers to fetch it, and then does.
      */
-    const reveal = page.getByRole('button', { name: /show contact/i }).first();
+    // The accessible name is the aria-label, not the visible text: fifty rows
+    // of identically-labelled "Show contact" would be unusable with a screen
+    // reader, so each one names its student.
+    const reveal = page.getByRole('button', { name: /look up contact details for/i }).first();
     await expect(reveal).toBeVisible();
     await reveal.click();
 

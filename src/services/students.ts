@@ -113,7 +113,7 @@ export async function updateStudent(
   studentId: string,
   patch: Partial<StudentDraft>,
   uid: string,
-  current?: Pick<Student, 'firstName' | 'lastName' | 'grade' | 'pcoPersonId'>,
+  current?: Pick<Student, 'firstName' | 'lastName' | 'grade'>,
 ): Promise<void> {
   const payload: Record<string, unknown> = { updatedAt: serverTimestamp(), updatedBy: uid };
 
@@ -136,7 +136,12 @@ export async function updateStudent(
     payload.searchName = buildSearchName(firstName, lastName);
   }
   if (payload.grade === undefined && current?.grade !== undefined) payload.grade = current.grade;
-  if (current?.pcoPersonId) payload.pcoPersonId = current.pcoPersonId;
+
+  // Deliberately *not* writing `pcoPersonId`. For a Planning Center student the
+  // document id already is the link (`pco_{personId}`), and the rules forbid a
+  // client asserting the field — forging one would let a browser rebind a Tally
+  // student onto an arbitrary person. Only the server writes it, when a push
+  // links a visitor it just created.
 
   await setDoc(doc(db, paths.student(studentId)), payload, { merge: true });
 }
@@ -145,7 +150,7 @@ export async function setStudentStatus(
   studentId: string,
   status: StudentStatus,
   uid: string,
-  current?: Pick<Student, 'firstName' | 'lastName' | 'grade' | 'pcoPersonId'>,
+  current?: Pick<Student, 'firstName' | 'lastName' | 'grade'>,
 ): Promise<void> {
   await updateStudent(studentId, { status }, uid, current);
 }

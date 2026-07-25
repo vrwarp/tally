@@ -115,14 +115,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const inFlight = useRef(false);
 
-  const refreshRoster = useCallback(async () => {
+  const refreshRoster = useCallback(async (force = false) => {
     // Two screens mounting at once must not become two Planning Center reads.
     if (inFlight.current) return;
     inFlight.current = true;
     setRosterLoading(true);
 
     try {
-      const snapshot = await fetchRoster();
+      const snapshot = await fetchRoster(new Date(), force);
       setRoster(snapshot.students);
       setRosterFetchedAt(snapshot.fetchedAt);
       setRosterOffline(false);

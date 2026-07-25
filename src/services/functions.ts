@@ -58,7 +58,10 @@ export interface RosterResponse {
  * from — not a Firestore collection somebody swept into shape overnight. Names
  * and grades only; parent contact and allergies are a separate call.
  */
-export const getRoster = httpsCallable<void, RosterResponse>(functions, 'getRoster');
+export const getRoster = httpsCallable<{ force?: boolean } | void, RosterResponse>(
+  functions,
+  'getRoster',
+);
 
 /**
  * Parent contact and allergies for one student, for a screen that shows them.
@@ -72,7 +75,7 @@ export const getPersonDetails = httpsCallable<{ pcoPersonId: string }, PcoPerson
 );
 
 /** What Settings shows about the connection, asked for rather than watched. */
-export const getPlanningCenterStatus = httpsCallable<void, PcoStatus>(
+export const getPlanningCenterStatus = httpsCallable<{ force?: boolean } | void, PcoStatus>(
   functions,
   'getPlanningCenterStatus',
 );

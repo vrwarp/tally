@@ -40,8 +40,12 @@ export interface DataContextValue {
   rosterOffline: boolean;
   /** When Planning Center was last successfully read. */
   rosterFetchedAt: Date | null;
-  /** Asks Planning Center again. Safe to call from a pull-to-refresh. */
-  refreshRoster: () => Promise<void>;
+  /**
+   * Asks for the roster again. `force` skips whatever the server is holding —
+   * needed because that cache lives in one function instance, so clearing it
+   * from here would only ever clear one of them.
+   */
+  refreshRoster: (force?: boolean) => Promise<void>;
 }
 
 export const DataContext = createContext<DataContextValue | null>(null);

@@ -116,6 +116,54 @@ describe('createTtlCache', () => {
     });
   });
 
+  describe('forced reads', () => {
+    it('skips a held value and asks again', async () => {
+      const time = clock();
+      const cache = createTtlCache({ ttlMs: 30_000, now: time.now });
+      const source = counter();
+
+      expect(await cache.get('k', source.load)).toBe('value-1');
+      expect(await cache.get('k', source.load, true)).toBe('value-2');
+      expect(source.calls).toBe(2);
+    });
+
+    it('leaves the fresh answer behind for everyone else', async () => {
+      const cache = createTtlCache({ ttlMs: 30_000 });
+      const source = counter();
+
+      await cache.get('k', source.load);
+      await cache.get('k', source.load, true);
+      // The next ordinary caller gets what the forced read fetched, not what it
+      // replaced — otherwise "Refresh" would help one person and nobody else.
+      expect(await cache.get('k', source.load)).toBe('value-2');
+      expect(source.calls).toBe(2);
+    });
+
+    it('does not join a flight that started before it', async () => {
+      // The whole point of forcing is to escape an answer already in motion.
+      const cache = createTtlCache({ ttlMs: 30_000 });
+      let calls = 0;
+      let release!: (value: string) => void;
+      const first = new Promise<string>((resolve) => (release = resolve));
+
+      const slow = () => {
+        calls += 1;
+        return first;
+      };
+
+      const joined = cache.get('k', slow);
+      const forced = cache.get('k', async () => {
+        calls += 1;
+        return 'forced';
+      }, true);
+
+      release('stale');
+      expect(await joined).toBe('stale');
+      expect(await forced).toBe('forced');
+      expect(calls).toBe(2);
+    });
+  });
+
   describe('failures', () => {
     it('never remembers a rejection', async () => {
       const cache = createTtlCache({ ttlMs: 30_000 });

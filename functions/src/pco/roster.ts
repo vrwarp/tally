@@ -137,6 +137,8 @@ export interface RosterOptions {
   config: PcoConfig;
   cache: TtlCache;
   now?: Date;
+  /** Skip any held answer and ask Planning Center. See `TtlCache.get`. */
+  force?: boolean;
 }
 
 /**
@@ -159,57 +161,61 @@ export async function fetchYouthRoster(options: RosterOptions): Promise<RosterRe
   });
 
   const before = cache.stats.misses;
-  const people = await cache.get(key, async () => {
-    const collected: RosterPerson[] = [];
-    const seen = new Set<string>();
+  const people = await cache.get(
+    key,
+    async () => {
+      const collected: RosterPerson[] = [];
+      const seen = new Set<string>();
 
-    for await (const page of client.paginate<PcoPerson>(rosterPath(config), rosterQuery(config))) {
-      const index = buildIncludedIndex(page.included);
+      for await (const page of client.paginate<PcoPerson>(rosterPath(config), rosterQuery(config))) {
+        const index = buildIncludedIndex(page.included);
 
-      for (const person of page.data) {
-        // In list mode the youth pastor's list *is* the roster; second-guessing
-        // it on grade would drop the 5th grader who comes with an older sibling.
-        const youth =
-          config.rosterSource === 'list'
-            ? true
-            : isYouth(person, { minGrade: config.minGrade, maxGrade: config.maxGrade, now });
-        if (!youth) continue;
-        // A person on two Lists comes back twice; the door does not need to see
-        // them twice.
-        if (seen.has(person.id)) continue;
-        seen.add(person.id);
+        for (const person of page.data) {
+          // In list mode the youth pastor's list *is* the roster; second-guessing
+          // it on grade would drop the 5th grader who comes with an older sibling.
+          const youth =
+            config.rosterSource === 'list'
+              ? true
+              : isYouth(person, { minGrade: config.minGrade, maxGrade: config.maxGrade, now });
+          if (!youth) continue;
+          // A person on two Lists comes back twice; the door does not need to see
+          // them twice.
+          if (seen.has(person.id)) continue;
+          seen.add(person.id);
 
-        const mapped = mapPersonToStudent(person, {
-          minGrade: config.minGrade,
-          maxGrade: config.maxGrade,
-          now,
-        });
+          const mapped = mapPersonToStudent(person, {
+            minGrade: config.minGrade,
+            maxGrade: config.maxGrade,
+            now,
+          });
 
-        // Cheap when the email came down with the page; this never triggers a
-        // household fetch, so "can we reach a parent" is best-effort on a
-        // roster row and authoritative on a detail read.
-        const contact = extractParentContact(person, index);
+          // Cheap when the email came down with the page; this never triggers a
+          // household fetch, so "can we reach a parent" is best-effort on a
+          // roster row and authoritative on a detail read.
+          const contact = extractParentContact(person, index);
 
-        collected.push({
-          id: pcoStudentId(person.id),
-          pcoPersonId: person.id,
-          firstName: mapped.firstName,
-          lastName: mapped.lastName,
-          grade: mapped.grade,
-          gender: mapped.gender,
-          status: mapped.status,
-          searchName: mapped.searchName,
-          profileComplete: computeProfileComplete(contact),
-          hasAllergies: mapped.allergies !== null && mapped.allergies.length > 0,
-        });
+          collected.push({
+            id: pcoStudentId(person.id),
+            pcoPersonId: person.id,
+            firstName: mapped.firstName,
+            lastName: mapped.lastName,
+            grade: mapped.grade,
+            gender: mapped.gender,
+            status: mapped.status,
+            searchName: mapped.searchName,
+            profileComplete: computeProfileComplete(contact),
+            hasAllergies: mapped.allergies !== null && mapped.allergies.length > 0,
+          });
+        }
       }
-    }
 
-    collected.sort((a, b) =>
-      a.searchName < b.searchName ? -1 : a.searchName > b.searchName ? 1 : 0,
-    );
-    return collected;
-  });
+      collected.sort((a, b) =>
+        a.searchName < b.searchName ? -1 : a.searchName > b.searchName ? 1 : 0,
+      );
+      return collected;
+    },
+    options.force,
+  );
 
   return {
     people,

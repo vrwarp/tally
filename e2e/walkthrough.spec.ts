@@ -211,7 +211,7 @@ test('capture the walkthrough', async ({ page, signedInAs }) => {
   });
 
   await gotoReady(page, '/students');
-  await page.getByLabel('Search', { exact: true }).fill('Okonkwo');
+  await page.getByLabel('Search', { exact: true }).fill('Adebayo');
   await page.waitForTimeout(1200);
   await capture(page, {
     journey: 'Planning Center',

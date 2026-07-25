@@ -64,7 +64,19 @@ function attendancePayload(args: {
  */
 export async function checkIn(args: {
   event: Pick<TallyEvent, 'id' | 'seriesId' | 'startAt'>;
-  student: Pick<Student, 'id' | 'firstAttendedAt' | 'lastAttendedAt'>;
+  /*
+   * The name and grade are needed even though check-in does not change them.
+   *
+   * Most students have no Firestore document at all — the roster comes from
+   * Planning Center, and Tally writes one only when it has something of its own
+   * to record. Being checked in *is* that something, so this write frequently
+   * creates the document, and a document with nothing in it but two timestamps
+   * is unreadable in the console and fails the rules' identity check.
+   */
+  student: Pick<
+    Student,
+    'id' | 'firstName' | 'lastName' | 'grade' | 'searchName' | 'firstAttendedAt' | 'lastAttendedAt'
+  >;
   uid: string;
   method: CheckInMethod;
 }): Promise<void> {
@@ -84,7 +96,23 @@ export async function checkIn(args: {
     studentPatch.lastAttendedAt = event.startAt;
   }
   if (Object.keys(studentPatch).length > 0) {
-    batch.update(doc(db, paths.student(student.id)), studentPatch);
+    // `set(..., { merge: true })` rather than `update`, which requires the
+    // document to already exist. For a Planning Center student it usually does
+    // not, and an `update` that fails takes the *attendance* write down with it
+    // — the tap would flash green and then quietly not have happened.
+    batch.set(
+      doc(db, paths.student(student.id)),
+      {
+        ...studentPatch,
+        firstName: student.firstName,
+        lastName: student.lastName,
+        grade: student.grade,
+        searchName: student.searchName,
+        updatedAt: serverTimestamp(),
+        updatedBy: uid,
+      },
+      { merge: true },
+    );
   }
 
   await batch.commit();

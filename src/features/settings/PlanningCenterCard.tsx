@@ -52,11 +52,11 @@ export function PlanningCenterCard() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const check = useCallback(async () => {
+  const check = useCallback(async (force = false) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await getPlanningCenterStatus();
+      const response = await getPlanningCenterStatus({ force });
       setStatus(response.data);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not ask Tally about the connection.');
@@ -73,10 +73,12 @@ export function PlanningCenterCard() {
     if (busy) return;
     setBusy(true);
     try {
-      // Drop the server's held answer first, or "Refresh" would cheerfully hand
-      // back the same cached roster and look broken.
+      // `force` on each read rather than trusting the cache drop: the server's
+      // cache is per-instance, so clearing it only clears whichever instance
+      // took that call. Carrying the intent on the read itself works wherever
+      // the read lands.
       await refreshPlanningCenter();
-      await Promise.all([check(), refreshRoster()]);
+      await Promise.all([check(true), refreshRoster(true)]);
       show('Read the roster again from Planning Center', { tone: 'success' });
     } catch {
       show('Could not refresh from Planning Center.', { tone: 'error' });

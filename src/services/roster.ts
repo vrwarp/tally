@@ -120,8 +120,8 @@ export function cachedRoster(now = new Date()): RosterSnapshot | null {
  * roster because we cannot reach Planning Center" is something a counselor
  * should be told rather than something that should look like success.
  */
-export async function fetchRoster(now = new Date()): Promise<RosterSnapshot> {
-  const response = await getRoster();
+export async function fetchRoster(now = new Date(), force = false): Promise<RosterSnapshot> {
+  const response = await getRoster({ force });
   const people = response.data.people ?? [];
 
   writeStored(people);

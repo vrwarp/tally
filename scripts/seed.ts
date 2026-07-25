@@ -469,6 +469,11 @@ function simulatorPayload(students: readonly BuiltStudent[]) {
         const { seed } = student;
         const contact = seed.parent ? (seed.contact ?? 'phone') : null;
         return {
+          // The id is fixed here, not allocated by the simulator. Tally's
+          // student ids are `pco_{personId}`, and the attendance this script
+          // writes is keyed by them — an id chosen at the far end would leave
+          // every seeded check-in pointing at a student who does not exist.
+          id: student.pcoPersonId ?? undefined,
           firstName: seed.first,
           lastName: seed.last,
           grade: seed.grade,

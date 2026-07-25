@@ -92,8 +92,25 @@ export async function signIn(page: Page, email: string): Promise<void> {
 
   await page.goto(toAppUrl(link));
 
-  // `provisionAccess` may have to mint the users/{uid} document on first sign-in,
-  // so allow for the callable round-trip before the shell appears.
+  /*
+   * Wait for the sign-in form to *go away*, not for a landmark to appear.
+   *
+   * The login screen has its own `banner`, and a counselor — who sees only one
+   * tab — gets no `navigation` landmark at all, so waiting for either accepted
+   * the page we were trying to leave. A failed sign-in then looked like a
+   * successful one, and the test failed several steps later pointing at a
+   * missing button instead of at the sign-in that never happened.
+   *
+   * `provisionAccess` may have to mint the users/{uid} document on first
+   * sign-in, so this allows for a callable round-trip.
+   */
+  const signInForm = page.getByRole('button', { name: /send sign-in link/i });
+  await signInForm.waitFor({ state: 'detached', timeout: 30_000 }).catch(() => {
+    throw new Error(
+      `Signing in as ${email} left the login form on screen. Either provisionAccess refused ` +
+        'the address, or it could not reach Planning Center to check the team roster.',
+    );
+  });
   await page.getByRole('navigation').or(page.getByRole('banner')).first().waitFor({ timeout: 30_000 });
 }
 

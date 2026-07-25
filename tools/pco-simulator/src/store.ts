@@ -277,6 +277,13 @@ export class SimulatorStore {
    * seed script drives this through `/_sim/seed`.
    */
   seedStudent(input: {
+    /**
+     * The Planning Center id to assign, when the caller needs to know it in
+     * advance. `scripts/seed.ts` does: Tally's student ids are derived from it,
+     * and so are the attendance records it writes, so letting the simulator
+     * allocate one would leave every seeded check-in pointing at nobody.
+     */
+    id?: string;
     firstName: string;
     lastName: string;
     grade: number;
@@ -298,6 +305,7 @@ export class SimulatorStore {
       medical_notes: input.allergies ?? null,
       status: input.status ?? 'active',
     });
+    if (input.id) student.id = input.id;
 
     // A seeded student belongs on the youth pastor's List, or a deployment
     // configured for list mode would see an empty ministry.

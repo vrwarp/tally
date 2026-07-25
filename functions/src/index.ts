@@ -130,7 +130,7 @@ interface RosterResponse {
  * contact and allergies come from `getPersonDetails`, one person at a time, to
  * somebody with a reason to look.
  */
-export const getRoster = onCall<void, Promise<RosterResponse>>(
+export const getRoster = onCall<{ force?: boolean } | undefined, Promise<RosterResponse>>(
   { secrets: PCO_SECRETS, timeoutSeconds: 120, memory: '512MiB' },
   async (request): Promise<RosterResponse> => {
     await requireMember(request.auth?.uid);
@@ -144,6 +144,7 @@ export const getRoster = onCall<void, Promise<RosterResponse>>(
         client,
         config,
         cache: sharedCache(config),
+        force: request.data?.force === true,
       });
       return { ...result, cacheTtlSeconds: config.cacheTtlSeconds };
     } catch (error) {
@@ -212,7 +213,10 @@ interface PcoStatusResult {
  * which meant every core-team member's phone lit up on a schedule. A read has no
  * progress to follow.
  */
-export const getPlanningCenterStatus = onCall<void, Promise<PcoStatusResult>>(
+export const getPlanningCenterStatus = onCall<
+  { force?: boolean } | undefined,
+  Promise<PcoStatusResult>
+>(
   { secrets: PCO_SECRETS, timeoutSeconds: 120, memory: '512MiB' },
   async (request): Promise<PcoStatusResult> => {
     await requireCoreTeam(request.auth?.uid);
@@ -244,7 +248,12 @@ export const getPlanningCenterStatus = onCall<void, Promise<PcoStatusResult>>(
       // Deliberately the real roster query rather than a cheap ping: "we can
       // reach the API" and "we can see your students" are different claims, and
       // only the second is worth showing a leader.
-      const result = await fetchYouthRoster({ client, config, cache: sharedCache(config) });
+      const result = await fetchYouthRoster({
+        client,
+        config,
+        cache: sharedCache(config),
+        force: request.data?.force === true,
+      });
       return {
         ...base,
         configured: true,
@@ -267,7 +276,15 @@ export const getPlanningCenterStatus = onCall<void, Promise<PcoStatusResult>>(
   },
 );
 
-/** Drops the cached roster, for a leader who has just changed something upstream. */
+/**
+ * Drops this instance's cached roster.
+ *
+ * Best effort by construction, and worth being clear about: the cache lives in
+ * memory, so this clears the instance the call happens to land on and does
+ * nothing for the others. That is why "Refresh" in the app does not rely on it
+ * — it passes `force` on the read itself, which works wherever the read lands.
+ * This exists for the case where a leader wants the *next* read to be fresh too.
+ */
 export const refreshPlanningCenter = onCall<void, Promise<{ status: 'ok' }>>(
   { timeoutSeconds: 30, memory: '256MiB' },
   async (request) => {

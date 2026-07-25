@@ -44,8 +44,14 @@ export interface TtlCache {
    * Returns the cached value for `key`, or calls `load` and remembers the
    * result for the TTL. A rejected `load` is never cached — an outage must not
    * be remembered as an answer.
+   *
+   * `force` skips any held value and asks upstream, then stores the answer.
+   * This is how "Refresh" is made to mean what it says: an in-memory cache
+   * lives in one function instance, so dropping it there does nothing for the
+   * nine other instances that might serve the next read. Carrying the intent
+   * along with the request works wherever the request lands.
    */
-  get<T>(key: string, load: () => Promise<T>): Promise<T>;
+  get<T>(key: string, load: () => Promise<T>, force?: boolean): Promise<T>;
   /** Drops `key`, or everything when called with no argument. */
   invalidate(key?: string): void;
   readonly stats: TtlCacheStats;
@@ -93,11 +99,11 @@ export function createTtlCache(options: TtlCacheOptions): TtlCache {
     },
     stats,
 
-    async get<T>(key: string, load: () => Promise<T>): Promise<T> {
+    async get<T>(key: string, load: () => Promise<T>, force = false): Promise<T> {
       const existing = entries.get(key);
       const at = now();
 
-      if (existing) {
+      if (existing && !force) {
         // A load already in the air answers this caller too, whatever the TTL.
         if (existing.inFlight) {
           stats.coalesced += 1;
@@ -107,6 +113,10 @@ export function createTtlCache(options: TtlCacheOptions): TtlCache {
           stats.hits += 1;
           return existing.value as T;
         }
+        entries.delete(key);
+      } else if (existing) {
+        // A forced read must not join a flight that started before the caller
+        // asked — that is exactly the stale answer they are trying to escape.
         entries.delete(key);
       }
 
