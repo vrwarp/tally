@@ -28,7 +28,11 @@
     "seed": "tsx scripts/seed.ts",
     "verify:seed": "tsx scripts/verify-seed.ts",
     "dev:emulated": "npm run functions:build && concurrently -k -n emulators,vite -c magenta,cyan \"firebase emulators:start --project demo-tally\" \"vite --mode emulated\"",
-    "pco-sim": "tsx tools/pco-simulator/src/server.ts"
+    "pco-sim": "tsx tools/pco-simulator/src/server.ts",
+    "e2e": "playwright test",
+    "e2e:chromium": "playwright test --project=chromium-desktop --project=chromium-mobile",
+    "e2e:install": "playwright install --with-deps chromium webkit",
+    "e2e:report": "playwright show-report"
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -42,6 +46,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.5",
     "@firebase/rules-unit-testing": "^4.0.1",
+    "@playwright/test": "^1.62.0",
     "@tailwindcss/vite": "^4.1.10",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
