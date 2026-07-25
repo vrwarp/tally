@@ -14,10 +14,21 @@ import type {
   SimRequestLogEntry,
 } from './types.js';
 
+/** Origin the simulator claims to be reachable at, used to build `links`. */
+export const DEFAULT_PUBLIC_URL = 'https://pco.simulator.test/people/v2';
+
 export interface SimulatorOptions {
   /** Personal Access Token pair the simulator will accept. */
   appId?: string;
   secret?: string;
+  /**
+   * API root echoed back in `links.self` / `links.next`.
+   *
+   * The real API returns pagination links as absolute URLs, so the simulator
+   * must too — a relative link would let a client that cannot handle absolute
+   * ones pass here and fail in production.
+   */
+  publicUrl?: string;
   /**
    * How the simulator advertises the next page.
    *
@@ -25,8 +36,13 @@ export interface SimulatorOptions {
    * Both are exercised because the client supports both, and a client that
    * silently handled only one would look fine right up until Planning Center
    * changed which it sent.
+   *
+   * `no-cursor` advertises nothing at all. A client that treats "no cursor" as
+   * "no more data" truncates the roster silently — students just vanish — so
+   * this mode exists to prove Tally's client keeps walking while pages come
+   * back full.
    */
-  pagination?: 'links' | 'meta' | 'short-page';
+  pagination?: 'links' | 'meta' | 'no-cursor';
   /** Records served per page. The real API caps at 100. */
   pageSize?: number;
   /** Start the org empty instead of seeded — used by write-back tests. */
@@ -51,6 +67,7 @@ export class SimulatorStore {
   readonly appId: string;
   readonly secret: string;
   readonly pagination: NonNullable<SimulatorOptions['pagination']>;
+  readonly publicUrl: string;
   readonly pageSize: number;
   private readonly clock: () => Date;
 
@@ -65,6 +82,7 @@ export class SimulatorStore {
     this.appId = options.appId ?? DEFAULT_APP_ID;
     this.secret = options.secret ?? DEFAULT_SECRET;
     this.pagination = options.pagination ?? 'links';
+    this.publicUrl = (options.publicUrl ?? DEFAULT_PUBLIC_URL).replace(/\/+$/, '');
     this.pageSize = Math.max(1, Math.min(100, options.pageSize ?? 25));
     this.clock = options.now ?? (() => new Date());
     this.org = options.empty ? emptyOrg() : createFixtureOrg();

@@ -7,11 +7,11 @@
  * it the way it always does.
  */
 import { handleRequest } from './handler.js';
-import type { SimulatorStore } from './store.js';
+import { DEFAULT_PUBLIC_URL, type SimulatorStore } from './store.js';
 import type { SimRequest } from './types.js';
 
 /** Base URL the injected fetch answers on. Any host works; nothing resolves it. */
-export const SIMULATOR_ORIGIN = 'https://pco.simulator.test/people/v2';
+export const SIMULATOR_ORIGIN = DEFAULT_PUBLIC_URL;
 
 export interface SimulatorFetchOptions {
   /** Origin prefix stripped before routing. Defaults to `SIMULATOR_ORIGIN`. */

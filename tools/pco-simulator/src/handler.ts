@@ -402,7 +402,7 @@ function route(request: SimRequest, store: SimulatorStore): SimResponse {
   const method = request.method.toUpperCase();
 
   if (method === 'GET' && request.path === '/people') {
-    return servePeople(collectionFor(query, store), query, store, request.path);
+    return servePeople(collectionFor(query, store), query, store, request.path, request.query);
   }
 
   const listMatch = LIST_PEOPLE_PATH.exec(request.path);
@@ -412,7 +412,7 @@ function route(request: SimRequest, store: SimulatorStore): SimResponse {
     const members = list.member_ids
       .map((id) => store.personById(id))
       .filter((person): person is SimPerson => person !== undefined);
-    return servePeople(members, query, store, request.path);
+    return servePeople(members, query, store, request.path, request.query);
   }
 
   const personMatch = PERSON_PATH.exec(request.path);
@@ -473,11 +473,34 @@ function collectionFor(
   return store.people;
 }
 
+/**
+ * Rebuilds a page URL, preserving every filter the caller sent.
+ *
+ * The real API's `links.next` carries the whole query forward. Dropping it
+ * would make page two of a filtered sweep return the *unfiltered* collection —
+ * which reads as a client bug and is anything but.
+ */
+function pageUrl(store: SimulatorStore, selfPath: string, rawQuery: string, offset: number): string {
+  const params = new URLSearchParams();
+  for (const pair of rawQuery.split('&')) {
+    if (!pair) continue;
+    const eq = pair.indexOf('=');
+    const key = eq === -1 ? pair : pair.slice(0, eq);
+    if (key === 'offset') continue;
+    params.append(key, eq === -1 ? '' : pair.slice(eq + 1));
+  }
+  params.append('offset', String(offset));
+  // Bracket characters are left literal, matching the client's own encoder and
+  // keeping a logged URL readable.
+  return `${store.publicUrl}${selfPath}?${params.toString().replace(/%5B/g, '[').replace(/%5D/g, ']')}`;
+}
+
 function servePeople(
   candidates: readonly SimPerson[],
   query: Record<string, QueryNode>,
   store: SimulatorStore,
   selfPath: string,
+  rawQuery: string,
 ): SimResponse {
   const filtered = applyWhere(candidates, nested(query.where));
   const ordered = applyOrder(filtered, scalar(query.order));
@@ -494,7 +517,7 @@ function servePeople(
   const hasMore = nextOffset < ordered.length;
 
   const body: Record<string, unknown> = {
-    links: { self: `${selfPath}?offset=${offset}` },
+    links: { self: pageUrl(store, selfPath, rawQuery, offset) },
     data: page.map((person) => personResource(person, store)),
     included: buildIncluded(page, csv(query.include), store),
     meta: {
@@ -505,10 +528,10 @@ function servePeople(
   };
 
   if (hasMore) {
-    // `short-page` advertises nothing and relies on the client noticing a full
-    // page followed by a short one — the least forgiving of the three shapes.
+    // `no-cursor` deliberately advertises nothing: the client has to keep
+    // walking on its own while pages arrive full.
     if (store.pagination === 'links') {
-      (body.links as Record<string, string>).next = `${selfPath}?offset=${nextOffset}`;
+      (body.links as Record<string, string>).next = pageUrl(store, selfPath, rawQuery, nextOffset);
     } else if (store.pagination === 'meta') {
       (body.meta as Record<string, unknown>).next = { offset: nextOffset };
     }
@@ -556,7 +579,7 @@ function serveMemberships(
   }
 
   return json(200, {
-    links: { self: `/households/${householdId}/household_memberships` },
+    links: { self: `${store.publicUrl}/households/${householdId}/household_memberships` },
     data: memberships.map((membership) => ({
       type: 'HouseholdMembership',
       id: membership.id,

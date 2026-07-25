@@ -284,8 +284,17 @@ export function createPcoClient(options: PcoClientOptions): PcoClient {
       } else if (typeof nextOffset === 'number' && nextOffset > offset) {
         offset = nextOffset;
         url = toUrl(path, { ...query, per_page: perPage, offset });
+      } else if (data.length >= perPage) {
+        // A *full* page with no cursor is ambiguous, and the two readings have
+        // very different costs: guessing "that was the end" silently truncates
+        // the roster — students simply vanish from Tally with no error anywhere
+        // — while guessing "there is more" costs one extra request that returns
+        // nothing. So we step the offset ourselves. `maxPages` and the
+        // already-seen-cursor check above still bound the loop.
+        offset += perPage;
+        url = toUrl(path, { ...query, per_page: perPage, offset });
       } else {
-        // No cursor of any kind: this was the last page, short or not.
+        // A short page is unambiguous: there was nothing more to send.
         url = null;
       }
     }

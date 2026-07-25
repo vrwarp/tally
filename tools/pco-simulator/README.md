@@ -49,7 +49,7 @@ Planning Center sent something else:
 | --- | --- |
 | `links` (default) | Advertises `links.next` |
 | `meta` | Advertises `meta.next.offset` |
-| `short-page` | Advertises nothing; the client must notice the short page |
+| `no-cursor` | Advertises nothing; the client must keep walking while pages come back full |
 
 ### Faithful in the awkward places
 

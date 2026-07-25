@@ -53,9 +53,16 @@ function send(response: ServerResponse, status: number, body: unknown): void {
 export async function startSimulator(
   options: SimulatorServerOptions = {},
 ): Promise<RunningSimulator> {
-  const store = new SimulatorStore(options);
   const basePath = (options.basePath ?? DEFAULT_BASE_PATH).replace(/\/+$/, '');
   const host = options.host ?? '0.0.0.0';
+  const advertisedHost = host === '0.0.0.0' ? '127.0.0.1' : host;
+  // Pagination links have to be absolute and reachable by the caller, so the
+  // store is told the address it will actually be dialled on.
+  const store = new SimulatorStore({
+    ...options,
+    publicUrl:
+      options.publicUrl ?? `http://${advertisedHost}:${options.port ?? 4010}${basePath}`,
+  });
   const verbose = options.verbose ?? true;
 
   const server = createServer((req, res) => {
@@ -135,7 +142,7 @@ export async function startSimulator(
     server,
     store,
     port,
-    url: `http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${port}${basePath}`,
+    url: `http://${advertisedHost}:${port}${basePath}`,
     close: () =>
       new Promise<void>((resolve, reject) =>
         server.close((cause) => (cause ? reject(cause) : resolve())),

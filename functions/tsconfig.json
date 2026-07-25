@@ -23,5 +23,6 @@
     "types": ["node"]
   },
   "include": ["src"],
-  "exclude": ["src/**/*.test.ts", "lib", "node_modules"]
+  // `src/testing` holds test doubles; it must never reach `lib/`.
+  "exclude": ["src/**/*.test.ts", "src/testing", "lib", "node_modules"]
 }
