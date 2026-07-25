@@ -24,7 +24,7 @@ import {
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { StudentEditorModal } from '@/features/students/StudentEditorModal';
-import { cn, initials, matchesQuery, ordinalGrade } from '@/lib/utils';
+import { cn, createSearchMatcher, initials, ordinalGrade } from '@/lib/utils';
 import { GRADES, studentFullName, type Grade, type Student } from '@/types';
 
 type StatusFilter = 'active' | 'inactive' | 'all';
@@ -48,7 +48,7 @@ export function StudentsPage() {
   );
 
   const visible = useMemo(() => {
-    const needle = query.trim();
+    const matcher = createSearchMatcher(query);
     return students.filter((student) => {
       if (status !== 'all' && student.status !== status) return false;
       if (grade !== null && student.grade !== grade) return false;
@@ -58,7 +58,7 @@ export function StudentsPage() {
       // checked. Filtering on truthiness listed the entire ministry.
       if (quick === 'incomplete' && student.profileComplete !== false) return false;
       if (quick === 'visitors' && !student.isVisitor) return false;
-      if (needle && !matchesQuery(student.searchName, needle)) return false;
+      if (!matcher.matches(student.searchName)) return false;
       return true;
     });
   }, [students, status, grade, groupId, quick, query]);

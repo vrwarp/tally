@@ -58,9 +58,91 @@ describe('matchesQuery', () => {
   });
 });
 
+describe('matchesQuery: punctuation and separators', () => {
+  it('closes up apostrophes, in both spellings and both directions', () => {
+    expect(matchesQuery("shannon o'brien", 'obrien')).toBe(true);
+    expect(matchesQuery('shannon obrien', "o'brien")).toBe(true);
+    // A phone keyboard substitutes the curly one without asking.
+    expect(matchesQuery('shannon o’brien', "o'brien")).toBe(true);
+    expect(matchesQuery("shannon o'brien", 'o’brien')).toBe(true);
+  });
+
+  it('treats hyphens, periods and spaces as the same word gap', () => {
+    expect(matchesQuery('mary-jane watson', 'mary jane')).toBe(true);
+    expect(matchesQuery('mary jane watson', 'mary-jane')).toBe(true);
+    expect(matchesQuery('mary-jane watson', 'maryjane')).toBe(true);
+    expect(matchesQuery('st. john', 'st john')).toBe(true);
+    expect(matchesQuery('st john', 'st. john')).toBe(true);
+  });
+
+  it('finds a multi-word surname typed as one word', () => {
+    expect(matchesQuery('sofia de la cruz', 'delacruz')).toBe(true);
+    expect(matchesQuery('sofia delacruz', 'de la cruz')).toBe(true);
+  });
+
+  it('still refuses a query that is only punctuation', () => {
+    // Nothing searchable was typed, so this narrows to nobody — it matches
+    // everyone, exactly like an empty box.
+    expect(matchesQuery('marcus lee', "-'.")).toBe(true);
+  });
+});
+
+describe('matchesQuery: typos', () => {
+  it('forgives a dropped, doubled or wrong letter', () => {
+    expect(matchesQuery('marcus lee', 'marcs')).toBe(true); // dropped
+    expect(matchesQuery('marcus lee', 'marccus')).toBe(true); // doubled
+    expect(matchesQuery('marcus lee', 'marcys')).toBe(true); // wrong key
+    expect(matchesQuery('josé garcía', 'garcai')).toBe(true);
+  });
+
+  it('forgives two letters typed in the wrong order', () => {
+    // One edit, not two: this is how a name gets mistyped at speed.
+    expect(matchesQuery('marcus lee', 'mracus')).toBe(true);
+    expect(matchesQuery('ana martinez', 'martinze')).toBe(true);
+  });
+
+  it('forgives a typo in the middle of a full name', () => {
+    expect(matchesQuery('marcus lee', 'marcus lea')).toBe(true);
+    expect(matchesQuery('ana martinez', 'ana martinnez')).toBe(true);
+  });
+
+  it('scales the allowance to the length of the query', () => {
+    // Under four characters the search stays literal: one edit at that length
+    // reaches half a roster, which reads as a broken search.
+    expect(matchesQuery('marcus lee', 'zee')).toBe(false);
+    expect(matchesQuery('marcus lee', 'zzz')).toBe(false);
+    // Two edits only once the query is long enough to still mean one person.
+    expect(matchesQuery('ana martinez', 'martinnezz')).toBe(true);
+    expect(matchesQuery('marcus lee', 'leeroy')).toBe(false);
+  });
+
+  it('does not turn into a match-anything', () => {
+    expect(matchesQuery('marcus lee', 'fatima')).toBe(false);
+    expect(matchesQuery('ana martinez', 'gabriel')).toBe(false);
+    expect(matchesQuery('josé garcía', 'ibrahim')).toBe(false);
+  });
+});
+
 describe('normalizeForSearch', () => {
   it('strips accents, lowercases and collapses whitespace', () => {
     expect(normalizeForSearch('  José   GARCÍA ')).toBe('jose garcia');
+  });
+
+  it('drops apostrophes and turns every other separator into one space', () => {
+    expect(normalizeForSearch("O'Brien-Smith, Jr.")).toBe('obrien smith jr');
+  });
+
+  it('is idempotent, so an already-normalized name survives a second pass', () => {
+    const once = normalizeForSearch(' Mary-Jane   O’Neill ');
+    expect(once).toBe('mary jane oneill');
+    expect(normalizeForSearch(once)).toBe(once);
+  });
+
+  it('keeps the marks that are part of the letter in non-Latin scripts', () => {
+    // Latin diacritics are decoration and get stripped; a Devanagari matra is
+    // not, and dropping it would shred the name into pieces.
+    expect(normalizeForSearch('अनुज')).toBe('अनुज');
+    expect(normalizeForSearch('مرحبا بالعالم')).toBe('مرحبا بالعالم');
   });
 });
 
