@@ -5,7 +5,10 @@
  *  - Emulated (`VITE_USE_EMULATORS=true`) — points Auth and Firestore at the
  *    local Emulator Suite. Firebase config values are not required; a demo
  *    project id is synthesised so `firebase emulators:start` and the app agree.
- *  - Live — reads the web config from `VITE_FIREBASE_*`.
+ *  - Live — reads the whole web config as one JSON object from
+ *    `VITE_FIREBASE_CONFIG`, exactly as the Firebase console prints it. One
+ *    variable rather than six: the console hands it over as an object, so
+ *    transcribing it field by field only creates opportunities to get it wrong.
  *
  * PRD 6 mandates the Emulator Suite for all local development, so the emulated
  * path is the default developer experience (`npm run dev:emulated`).
@@ -36,26 +39,68 @@ export const USE_EMULATORS = env.VITE_USE_EMULATORS === 'true';
 /** Project id used when running fully emulated and none was supplied. */
 const DEMO_PROJECT_ID = 'demo-tally';
 
-function readConfig(): FirebaseOptions {
-  const projectId = env.VITE_FIREBASE_PROJECT_ID || (USE_EMULATORS ? DEMO_PROJECT_ID : '');
+/**
+ * The emulators never validate any of this, but the SDK insists on non-empty
+ * strings, so emulated runs get a synthetic config and need no real project.
+ */
+function demoConfig(): FirebaseOptions {
+  return {
+    apiKey: 'demo-api-key',
+    authDomain: `${DEMO_PROJECT_ID}.firebaseapp.com`,
+    projectId: DEMO_PROJECT_ID,
+    storageBucket: `${DEMO_PROJECT_ID}.firebasestorage.app`,
+    messagingSenderId: '000000000000',
+    appId: '1:000000000000:web:0000000000000000000000',
+  };
+}
 
-  if (!projectId) {
+/** The three the SDK can neither synthesise nor do without. */
+const REQUIRED = ['apiKey', 'projectId', 'appId'] as const;
+
+function readConfig(): FirebaseOptions {
+  const raw = env.VITE_FIREBASE_CONFIG?.trim();
+
+  if (!raw) {
+    if (USE_EMULATORS) return demoConfig();
     throw new Error(
-      'Missing Firebase configuration. Copy .env.example to .env.local and fill in the ' +
-        'VITE_FIREBASE_* values, or set VITE_USE_EMULATORS=true to run against the ' +
+      'Missing Firebase configuration. Copy .env.example to .env.local and paste the web ' +
+        'config object from the Firebase console (Project settings -> General -> Your apps) ' +
+        'into VITE_FIREBASE_CONFIG, or set VITE_USE_EMULATORS=true to run against the ' +
         'Firebase Emulator Suite.',
     );
   }
 
-  return {
-    // The emulators never validate these, but the SDK insists on non-empty strings.
-    apiKey: env.VITE_FIREBASE_API_KEY || (USE_EMULATORS ? 'demo-api-key' : ''),
-    authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || `${projectId}.firebaseapp.com`,
-    projectId,
-    storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET || `${projectId}.appspot.com`,
-    messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID || '000000000000',
-    appId: env.VITE_FIREBASE_APP_ID || '1:000000000000:web:0000000000000000000000',
-  };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error(
+      'VITE_FIREBASE_CONFIG is not valid JSON. It holds the whole config object from the ' +
+        'Firebase console on one line, e.g. {"apiKey":"...","projectId":"...","appId":"..."}. ' +
+        'Replacing the six old VITE_FIREBASE_API_KEY / _PROJECT_ID / … variables? All six ' +
+        'become this one.',
+    );
+  }
+
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error('VITE_FIREBASE_CONFIG must be a JSON object, not a bare value or array.');
+  }
+
+  const config = parsed as FirebaseOptions;
+
+  // An emulated run may still supply a partial config; fill the rest with the
+  // synthetic values rather than making the developer write fields nothing reads.
+  if (USE_EMULATORS) return { ...demoConfig(), ...config };
+
+  const missing = REQUIRED.filter((key) => !config[key]);
+  if (missing.length > 0) {
+    throw new Error(
+      `VITE_FIREBASE_CONFIG is missing ${missing.join(', ')}. Copy the whole object from the ` +
+        'Firebase console rather than assembling it by hand.',
+    );
+  }
+
+  return config;
 }
 
 export const firebaseApp: FirebaseApp = initializeApp(readConfig());

@@ -62,14 +62,34 @@ The container is the reference environment for e2e. It is the only place WebKit
 is guaranteed to be present with the right system libraries, so a failure that
 reproduces there but not on your machine is the container being right.
 
-## What CI does not do
+## What CI deploys
 
-**It does not deploy.** Tally ships to Firebase Hosting with
-`npm run build && firebase deploy`, and that stays a deliberate human action —
-this is a roster of minors' data for one ministry, not a service that benefits
-from continuous deployment. Adding a deploy job would mean putting a Firebase
-service-account key in repository secrets, which is a real risk to accept only
-in exchange for a real need.
+Merging to `main` ships everything: Hosting from the two `firebase-hosting-*`
+workflows, and Cloud Functions, Firestore security rules and Firestore indexes
+from `firebase-backend.yml`. A pull request gets a Hosting preview channel and a
+`--dry-run` of the backend. See
+[Deployment](../README.md#deployment) for the secrets and roles.
+
+The two halves are deliberately separate, because they carry different risk.
+Hosting is a static bundle; a bad one is fixed by redeploying, and its key is
+scoped to Firebase Hosting Admin so it cannot reach Firestore. Rules are the
+opposite: they are the only thing standing between a roster of minors' data and
+the internet, and a bad ruleset is not visibly broken — it silently permits.
+Three things guard that, and all three are load-bearing:
+
+1. **The rules suite runs inside the deploy job**, not just in CI. CI is a
+   separate workflow that the deploy cannot depend on, so re-running
+   `npm run test:rules` there is what makes "rules never deploy while their
+   tests fail" a guarantee rather than a coincidence of timing.
+2. **The deploy job targets the `production` environment**, so adding required
+   reviewers to that environment turns a merge into an approval prompt.
+3. **The backend key is a second, separate secret** from the Hosting one. The
+   privileged credential is only ever exposed to the gated merge job, never to
+   the preview deploy that runs on every pull request.
+
+What is still a human action: **deleting** a Cloud Function (the deploy runs
+without `--force`, so a function missing from the source is left alone) and
+anything touching production *data*, which no workflow does.
 
 **It does not publish an image.** The e2e image is built to prove it still
 builds. There is no application image, because a Firebase Hosting app does not

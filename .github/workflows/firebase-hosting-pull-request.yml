@@ -1,0 +1,52 @@
+name: Deploy to Firebase Hosting on PR
+
+on: pull_request
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+jobs:
+  build_and_preview:
+    name: Build & deploy preview
+    # Forked PRs cannot see repository secrets, so a preview cannot be built
+    # for them; only PRs from branches within this repository run here.
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Build the app
+        run: npm run build
+        env:
+          VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
+      # As in firebase-backend.yml: a pull request should not go red merely
+      # because the deploy key has not been created yet, which says nothing
+      # about the change being reviewed. The build above still runs either way,
+      # so a change that cannot compile is still caught. The merge workflow is
+      # deliberately strict — a live deploy that skipped itself over a missing
+      # key would be a silent no-op.
+      - name: Is the Hosting key configured?
+        id: creds
+        env:
+          KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TALLY }}
+        run: |
+          if [ -n "$KEY" ]; then
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+            echo '::notice::FIREBASE_SERVICE_ACCOUNT_TALLY is not set, so no preview channel was deployed. See README.md#repository-secrets.'
+          fi
+
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        if: steps.creds.outputs.present == 'true'
+        with:
+          repoToken: '${{ secrets.GITHUB_TOKEN }}'
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_TALLY }}'
+          projectId: tally-76406

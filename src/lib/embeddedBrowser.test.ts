@@ -104,7 +104,7 @@ describe('isFirstPartyAuthDomain', () => {
   it('is true only when the auth handler shares the app origin', () => {
     // jsdom serves the app from localhost.
     expect(isFirstPartyAuthDomain(window.location.host)).toBe(true);
-    expect(isFirstPartyAuthDomain('tally-footprints.firebaseapp.com')).toBe(false);
+    expect(isFirstPartyAuthDomain('tally-76406.firebaseapp.com')).toBe(false);
   });
 
   it('ignores case and treats a missing domain as third-party', () => {
@@ -136,6 +136,6 @@ describe('googleSignInStrategy', () => {
    */
   it('refuses in an installed app when the auth handler is third-party', () => {
     setDisplayMode('standalone');
-    expect(googleSignInStrategy('tally-footprints.firebaseapp.com')).toBe('unavailable');
+    expect(googleSignInStrategy('tally-76406.firebaseapp.com')).toBe('unavailable');
   });
 });

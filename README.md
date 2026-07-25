@@ -116,6 +116,16 @@ that follows the same `accessRoster` path.
 | `npm run walkthrough` | Captures the screenshot walkthrough from the running app and builds the page. |
 | `npm run functions:install` / `functions:build` | Dependency install / TypeScript build for `functions/`. |
 
+### Why `typescript` is an alias
+
+TypeScript 7.0 ships no programmatic API, and typescript-eslint refuses to load
+against it. So the two run side by side, per the
+[upstream recommendation](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/):
+`typescript` is aliased to `@typescript/typescript6`, which is the 6.x API that
+typescript-eslint and friends import, while `@typescript/native` is TypeScript 7
+and provides the `tsc` that `npm run build` and the typecheck scripts call. `tsc`
+is therefore 7.x and `tsc6` is 6.x.
+
 ---
 
 ## Layout
@@ -198,9 +208,11 @@ Setup, configuration parameters, role mapping and troubleshooting live in
 
 ## Deployment
 
-Deploying is a deliberate, manual, human action (see [docs/ci.md](docs/ci.md#what-ci-does-not-do)) —
-there is no CI job for it. It ships to the `tally-footprints` Firebase project configured in
-`.firebaserc`.
+Merging to `main` deploys everything — Hosting, Cloud Functions, Firestore rules and Firestore
+indexes — to the `tally-76406` Firebase project configured in `.firebaserc`. See
+[Deploying from CI](#deploying-from-ci) below and [docs/ci.md](docs/ci.md#what-ci-deploys) for why
+the backend half is gated more tightly than Hosting. `npm run deploy` does the same thing by hand,
+which is still the way to deploy from a branch or when CI is unavailable.
 
 ### One-time setup, per machine
 
@@ -209,18 +221,42 @@ there is no CI job for it. It ships to the `tally-footprints` Firebase project c
    dependency of this repo, not something you install globally — always run it through `npx` or an
    npm script so the pinned version is used.)
 2. **Get access to the Firebase project.** Your Google account needs at least Editor on
-   `tally-footprints` in the [Firebase console](https://console.firebase.google.com/) — ask whoever
-   administers it to add you. `npx firebase projects:list` should show `tally-footprints` once you do.
-3. **Fill in `.env.local`.** Copy `.env.example` to `.env.local` and fill it from the console
-   (Project settings → General → Your apps → Web app config) if you haven't already for local dev.
-   This is what the production build embeds, so it has to exist even though these values are not
-   secret — see below.
+   `tally-76406` in the [Firebase console](https://console.firebase.google.com/) — ask whoever
+   administers it to add you. `npx firebase projects:list` should show `tally-76406` once you do.
+3. **Fill in `.env.local`.** Copy `.env.example` to `.env.local` and paste the config object from
+   the console (Project settings → General → Your apps → Web app config) into
+   `VITE_FIREBASE_CONFIG`, as one line of JSON. The console prints it as JavaScript, so the keys
+   need double quotes. This is what the production build embeds, so it has to exist even though
+   these values are not secret — see below.
 4. **Set the Planning Center secrets**, once, in Secret Manager:
    ```bash
    npx firebase functions:secrets:set PCO_APP_ID
    npx firebase functions:secrets:set PCO_SECRET
    ```
 5. **Generate the PWA icons** — see [public/icons/README.md](public/icons/README.md).
+
+### One-time setup, per project
+
+Deploying Cloud Functions needs a handful of Google Cloud APIs turned on. A project **owner** has
+to do this once — a deploy service account deliberately cannot enable APIs itself, and a first
+deploy otherwise fails with "Cloud Functions deployment requires the Cloud Build API to be
+enabled":
+
+```bash
+gcloud services enable \
+  cloudbuild.googleapis.com cloudfunctions.googleapis.com artifactregistry.googleapis.com \
+  run.googleapis.com eventarc.googleapis.com pubsub.googleapis.com \
+  secretmanager.googleapis.com firebaseextensions.googleapis.com --project tally-76406
+```
+
+`run`, `eventarc` and `pubsub` are there because the functions are 2nd gen: `onCall` runs on Cloud
+Run, and `onDocumentCreated` is delivered through Eventarc. `firebaseextensions` is needed even
+though Tally uses no extensions — the CLI checks for them on every deploy.
+
+Or click through the console, starting with
+[Cloud Build](https://console.cloud.google.com/apis/library/cloudbuild.googleapis.com?project=tally-76406).
+Deploying by hand from an owner account enables them along the way, which is why this only bites
+the first time CI deploys.
 
 ### Deploying
 
@@ -243,6 +279,67 @@ to every browser by design, and access control lives in `firestore.rules`, not i
 The Planning Center Personal Access Token **is** a secret. It lives in Secret Manager in production
 and in `functions/.secret.local` (gitignored) for the emulator. It never reaches the browser, which
 is why every call into Planning Center goes through a Cloud Function.
+
+### Deploying from CI
+
+Three workflows, split by what they can reach:
+
+| Workflow | On a pull request | On merge to `main` |
+| --- | --- | --- |
+| `firebase-hosting-pull-request.yml` | Deploys a preview channel, posts the link on the PR | — |
+| `firebase-hosting-merge.yml` | — | Publishes the Hosting live channel |
+| `firebase-backend.yml` | Builds the functions, then `firebase deploy --dry-run` validates rules and indexes without deploying | Deploys Cloud Functions, Firestore rules and Firestore indexes |
+
+Both pull-request jobs are skipped for forked PRs (`head.repo.full_name == github.repository`),
+because a fork cannot read repository secrets. Until the secrets below exist the backend dry run
+skips itself with a notice rather than failing the PR — the functions build and the emulator-based
+rules suite in `ci.yml` need no credentials, so they still gate every pull request. The merge-time
+deploy has no such escape hatch: without its key it fails loudly rather than silently doing nothing.
+
+The backend deploy is deliberately the strict one. It re-runs `npm run test:rules` and
+`npm run test:functions` *inside the deploy job* before it deploys anything — CI is a separate
+workflow it cannot depend on, so this is what guarantees a failing ruleset never reaches
+production. It also runs without `--force`, so a Cloud Function deleted from the source is left
+running rather than torn down by a robot; remove one with `npx firebase functions:delete`.
+
+**Require an approval for backend deploys** (recommended): the `deploy` job declares
+`environment: production`, so adding required reviewers to that environment under
+Settings → Environments turns every backend deploy into an approval prompt. Without protection
+rules it deploys on merge with no prompt.
+
+#### Repository secrets
+
+- `FIREBASE_SERVICE_ACCOUNT_TALLY` — service account JSON key holding **only** Firebase Hosting
+  Admin. `npx firebase init hosting:github` creates one and stores it for you; otherwise generate
+  it in the [Google Cloud console](https://console.cloud.google.com/iam-admin/serviceaccounts).
+- `FIREBASE_SERVICE_ACCOUNT_TALLY_BACKEND` — a **second, separate** key for the backend workflow.
+  Keeping it apart from the Hosting key is the point: the privileged credential is only ever
+  exposed to the gated merge job, never to the preview deploy that runs on every pull request.
+  Prefer [Workload Identity Federation](https://github.com/google-github-actions/auth#workload-identity-federation)
+  over a long-lived JSON key if you are willing to do the extra GCP setup. It needs:
+
+  | Role | Why |
+  | --- | --- |
+  | `roles/firebase.viewer` | Reads the project's `adminSdkConfig`. Without it every deploy stops at `403 The caller does not have permission` before it does anything. |
+  | `roles/cloudfunctions.admin` | Creates and updates the functions. |
+  | `roles/firebaserules.admin` | Deploys `firestore.rules` and the indexes. |
+  | `roles/iam.serviceAccountUser` | Lets the deploy act as the functions' own runtime service account. |
+  | `roles/artifactregistry.writer` | Holds the container image each function is built into. |
+  | `roles/secretmanager.viewer` | Reads `PCO_APP_ID` and `PCO_SECRET` to bind them to the deployed functions. `secretAccessor` is the obvious guess and the wrong one — it grants `versions.access`, the payload, but not `secrets.get`, so the deploy fails looking up the very secret it is about to bind. The deploy never needs the payload itself; the functions' runtime account reads that. |
+
+  `roles/firebase.admin` covers all of these in one, but it also carries Hosting, which would
+  undo the point of keeping two keys. The list above is the narrower equivalent.
+- `VITE_FIREBASE_CONFIG` — the web config object as one line of JSON, the same value
+  `.env.local` holds. Vite embeds it at build time, so the Hosting workflows need it even
+  though it is not a secret.
+- `FUNCTIONS_ENV` — the contents of your local, gitignored `functions/.env`: the Planning Center
+  settings (`PCO_ROSTER_SOURCE`, the list ids, the grade range, and so on — not `PCO_APP_ID` or
+  `PCO_SECRET`, which live in Secret Manager). The backend workflow writes it to
+  `functions/.env.tally-76406` before deploying, because the CLI resolves the `defineString`
+  params in `functions/src/config.ts` from that file and stops to ask when it is missing, whatever
+  defaults the code declares — the same trap `functions/.env.demo-tally` documents for the
+  emulator. Keeping it in a secret rather than the repository keeps the ministry's list ids out of
+  git history.
 
 ---
 
