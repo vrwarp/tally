@@ -136,6 +136,17 @@ export function StudentDetailPage() {
   const email = details?.parentEmail?.trim() ?? '';
   const parentLabel = details?.parentName?.trim() || `${name}'s parent`;
 
+  /*
+   * Whether anyone can actually be reached — answered from what is on screen.
+   *
+   * This screen is the one place that has the contact details in hand, so it
+   * does not have to trust the roster's flag. That matters because the flag is
+   * usually `null`: a roster read does not hydrate households, and reading
+   * `null` as "incomplete" put a warning badge directly above a parent's phone
+   * number. Until the lookup lands, nobody is accused of anything.
+   */
+  const unreachable = details ? !phone && !email : student.profileComplete === false;
+
   const toggleStatus = async () => {
     if (!user || statusBusy) return;
     const next = student.status === 'active' ? 'inactive' : 'active';
@@ -191,7 +202,7 @@ export function StudentDetailPage() {
           </p>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {student.isVisitor ? <Badge tone="brand">Visitor</Badge> : null}
-            {!student.profileComplete ? <Badge tone="warn">Missing parent contact</Badge> : null}
+            {unreachable ? <Badge tone="warn">Missing parent contact</Badge> : null}
             {student.status === 'inactive' ? <Badge tone="neutral">Inactive</Badge> : null}
             {student.hasAllergies ? <Badge tone="warn">Allergies</Badge> : null}
           </div>

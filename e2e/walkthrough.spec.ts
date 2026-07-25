@@ -54,6 +54,16 @@ test('capture the walkthrough', async ({ page, signedInAs }) => {
 
   /* ---- Journey 0: the way in ------------------------------------------- */
 
+  /*
+   * Photograph the app the way it is met.
+   *
+   * Tally follows the device by default, and Playwright's default device
+   * prefers light — so without this the tour would be a daylight tour of an app
+   * whose home is a dim room on a Friday night. The light theme gets its own
+   * frame later, chosen explicitly, which is how a person would meet it too.
+   */
+  await page.emulateMedia({ colorScheme: 'dark' });
+
   await page.goto('/login');
   await page.waitForTimeout(600);
   await capture(page, {
@@ -130,7 +140,7 @@ test('capture the walkthrough', async ({ page, signedInAs }) => {
     journey: 'Journey 3 — bring a friend',
     title: 'The visitor is already checked in',
     caption:
-      'Back on the roster with no interruption. Behind the scenes the profile carries a “missing info” flag, which is what puts them on the core team’s follow-up list later that evening.',
+      'Back on the roster with no interruption. The record is Tally’s own and is queued for Planning Center — a Cloud Function pushes it upstream, and until it lands the student carries a “not pushed yet” flag rather than a half-filled profile.',
   });
 
   /* ---- Journey 5: the dashboard ---------------------------------------- */
@@ -150,7 +160,7 @@ test('capture the walkthrough', async ({ page, signedInAs }) => {
     journey: 'Journey 5 — pastoral follow-up',
     title: 'New faces and incomplete profiles',
     caption:
-      'First-timers from the past week, and the profiles still missing a way to reach a parent — the visitors quick-added at the door. “Copy list” puts names and numbers on the clipboard for a group chat, which is what actually happens.',
+      'First-timers from the past week, and the profiles with no way to reach a parent — the visitors quick-added at the door, before anyone in the church office has met them. “Copy list” puts names and numbers on the clipboard for a group chat, which is what actually happens.',
   });
 
   await page.mouse.wheel(0, 900);
@@ -195,29 +205,54 @@ test('capture the walkthrough', async ({ page, signedInAs }) => {
 
   await gotoReady(page, '/settings');
   await capture(page, {
-    journey: 'Planning Center',
-    title: 'Settings and the sync',
+    journey: 'Settings',
+    title: 'Thresholds, in plain language',
     caption:
-      'The predictive thresholds are configurable with a plain-language preview. Below them, the Planning Center card: what the last sync did, and a button to run one now.',
+      'The prediction window is the one genuinely dangerous control here — it silently reshapes what every counselor sees at the door — so each number is restated as the behaviour it causes, and the panel beside it counts the students the change would actually move. Nobody should have to reason about “2 of 3” at 6:55pm.',
   });
 
-  await page.getByRole('button', { name: /^sync now/i }).click();
-  await page.waitForTimeout(6000);
+  await page.getByRole('button', { name: /^refresh/i }).click();
+  await page.waitForTimeout(4000);
   await capture(page, {
     journey: 'Planning Center',
-    title: 'A sync, end to end',
+    title: 'Connected, and holding nothing',
     caption:
-      'Browser → callable → Cloud Function → the Planning Center API → Firestore → back through onSnapshot. Students and counselors both come from Planning Center; access is derived from it rather than from a list somebody maintains by hand.',
+      'Tally reads its people from Planning Center and keeps no copy of them. “Refresh” is a live read: browser → callable → Cloud Function → the Planning Center API → back. Between reads a short cache (30 seconds by default, 0 to turn it off) keeps a busy door from becoming a rate limit.',
   });
+
+  /* ---- Themes ---------------------------------------------------------- */
+
+  await page.getByRole('radio', { name: /^light$/i }).click();
+  await page.waitForTimeout(500);
+  await capture(page, {
+    journey: 'Settings',
+    title: 'The same screen, in daylight',
+    caption:
+      'Dark is the default because Tally’s home is a dim room on a Friday night, but a Sunday morning classroom is not that room. Light, dark, or follow the device — the choice is per-person and local, unlike the thresholds above it, which are ministry-wide the instant they save.',
+  });
+
+  await page.getByRole('radio', { name: /match device/i }).click();
+  await page.waitForTimeout(400);
+
+  /* ---- Data minimisation ------------------------------------------------ */
 
   await gotoReady(page, '/students');
   await page.getByLabel('Search', { exact: true }).fill('Adebayo');
   await page.waitForTimeout(1200);
   await capture(page, {
-    journey: 'Planning Center',
-    title: 'People pulled from Planning Center',
+    journey: 'The roster',
+    title: 'A roster nobody stores',
     caption:
-      'Amara Okonkwo existed only in Planning Center a moment ago. Her grade, allergies and parent contact all came across — the contact resolved through her household, since Planning Center keeps it on the parent’s record, not the child’s.',
+      'These names are not in Tally’s database. They arrived from Planning Center on this page load, merged with the handful of things Planning Center has no opinion about — a small group, a note, when somebody first turned up.',
+  });
+
+  await page.getByRole('link', { name: /Adebayo/ }).first().click();
+  await page.waitForTimeout(2500);
+  await capture(page, {
+    journey: 'The roster',
+    title: 'Who do I call, and only when asked',
+    caption:
+      'A parent’s number, fetched for one student at the moment somebody needs it — resolved through her household, since Planning Center keeps contact on the parent’s record rather than the child’s. Firestore holds none of it: no parent name, no phone, no email, no allergies. For a database full of minors, the safest copy is the one that was never made.',
   });
 
   await writeFile(

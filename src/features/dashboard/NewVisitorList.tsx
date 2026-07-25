@@ -76,7 +76,7 @@ function NewVisitorRow({ visitor }: { visitor: NewVisitor }) {
           </span>
         </Link>
 
-        {!student.profileComplete ? (
+        {student.profileComplete === false ? (
           <Badge tone="warn" title="No parent contact on file">
             <span aria-hidden="true">⚠</span>
             Incomplete
@@ -84,7 +84,11 @@ function NewVisitorRow({ visitor }: { visitor: NewVisitor }) {
         ) : null}
       </div>
 
-      {student.profileComplete ? (
+      {/* Only a known-incomplete profile gets the prompt instead of the actions.
+          `FollowUpActions` looks the contact up itself and says so when there is
+          nobody to call, which beats guessing from a flag that is usually
+          `null` — nobody has checked — rather than false. */}
+      {student.profileComplete !== false ? (
         <FollowUpActions student={student} className="mt-1 pb-1 pl-14" />
       ) : (
         <Link

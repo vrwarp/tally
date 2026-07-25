@@ -53,7 +53,10 @@ export function StudentsPage() {
       if (status !== 'all' && student.status !== status) return false;
       if (grade !== null && student.grade !== grade) return false;
       if (groupId && student.smallGroupId !== groupId) return false;
-      if (quick === 'incomplete' && student.profileComplete) return false;
+      // `profileComplete` has three states and only `false` is a problem:
+      // `null` means a roster read did not hydrate households, so nobody has
+      // checked. Filtering on truthiness listed the entire ministry.
+      if (quick === 'incomplete' && student.profileComplete !== false) return false;
       if (quick === 'visitors' && !student.isVisitor) return false;
       if (needle && !matchesQuery(student.searchName, needle)) return false;
       return true;
@@ -61,7 +64,9 @@ export function StudentsPage() {
   }, [students, status, grade, groupId, quick, query]);
 
   const incompleteCount = useMemo(
-    () => students.filter((student) => student.status === 'active' && !student.profileComplete).length,
+    () =>
+      students.filter((student) => student.status === 'active' && student.profileComplete === false)
+        .length,
     [students],
   );
   const visitorCount = useMemo(
@@ -267,7 +272,7 @@ const StudentListRow = memo(function StudentListRow({
               {studentFullName(student)}
             </span>
             {student.isVisitor ? <Badge tone="brand">Visitor</Badge> : null}
-            {!student.profileComplete ? <Badge tone="warn">Missing info</Badge> : null}
+            {student.profileComplete === false ? <Badge tone="warn">Missing info</Badge> : null}
             {student.status === 'inactive' ? <Badge tone="neutral">Inactive</Badge> : null}
           </span>
           <span className="mt-0.5 flex items-center gap-2 text-xs text-ink-500">

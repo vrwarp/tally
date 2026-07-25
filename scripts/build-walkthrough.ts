@@ -63,8 +63,10 @@ const markdown: string[] = [
   '# Tally — a walkthrough',
   '',
   'Every screenshot below is the real application, captured by Playwright against a',
-  'live Firebase Emulator Suite and a seeded 45-student ministry. Nothing is a mockup;',
-  'the Planning Center sync in the last three shots really did make HTTP calls.',
+  'live Firebase Emulator Suite and a seeded 45-student ministry. Nothing is a mockup:',
+  'the taps are real writes, the roster arrived over HTTP from a Planning Center standing',
+  'in for the real one, and the parent contact near the end was fetched while the shutter',
+  'was open.',
   '',
   'Regenerate with:',
   '',
@@ -315,8 +317,10 @@ const html = `<title>Tally — a walkthrough</title>
     </p>
     <p class="provenance">
       Every screenshot is the running application, captured by Playwright against a live
-      Firebase Emulator Suite and a seeded 45-student ministry. Nothing here is a mockup, and
-      the Planning Center sync near the end really did make HTTP requests.
+      Firebase Emulator Suite and a seeded 45-student ministry. Nothing here is a mockup: the
+      taps are real writes, the roster arrived over HTTP from a Planning Center standing in for
+      the real one, and the parent’s phone number near the end was fetched while the shutter
+      was open.
     </p>
 
     <div class="toggle" role="group" aria-label="Choose a screen size">
