@@ -1,6 +1,13 @@
 # Continuous integration
 
-One workflow, `.github/workflows/ci.yml`, on every push and every pull request.
+One workflow, `.github/workflows/ci.yml`, on every pull request and on every push to `main`.
+
+A push to a *branch* runs nothing on its own. That is deliberate: a branch push and its pull
+request are separate events on the same commit, they land in different concurrency groups
+(`refs/heads/<branch>` versus `refs/pull/<n>/merge`) so neither cancels the other, and the
+result was two full runs per push — including two sets of four E2E jobs that then queued each
+other for the better part of an hour. The pull request run is the one that matters anyway,
+because it tests `main` merged into the branch rather than the branch on its own.
 
 ## The jobs
 
