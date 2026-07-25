@@ -20,7 +20,11 @@ export default tseslint.config(
       'react-refresh': reactRefresh,
     },
     rules: {
-      ...reactHooks.configs.recommended.rules,
+      // Pinned to the two rules this project has always enforced. The plugin's
+      // `recommended` set now also carries the React Compiler rules, which flag
+      // existing hooks; adopting those is its own change, not a dependency bump.
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
       '@typescript-eslint/consistent-type-imports': [
         'error',

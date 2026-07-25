@@ -116,6 +116,16 @@ that follows the same `accessRoster` path.
 | `npm run walkthrough` | Captures the screenshot walkthrough from the running app and builds the page. |
 | `npm run functions:install` / `functions:build` | Dependency install / TypeScript build for `functions/`. |
 
+### Why `typescript` is an alias
+
+TypeScript 7.0 ships no programmatic API, and typescript-eslint refuses to load
+against it. So the two run side by side, per the
+[upstream recommendation](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/):
+`typescript` is aliased to `@typescript/typescript6`, which is the 6.x API that
+typescript-eslint and friends import, while `@typescript/native` is TypeScript 7
+and provides the `tsc` that `npm run build` and the typecheck scripts call. `tsc`
+is therefore 7.x and `tsc6` is 6.x.
+
 ---
 
 ## Layout

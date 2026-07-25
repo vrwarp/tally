@@ -23,9 +23,8 @@
     "exactOptionalPropertyTypes": false,
     "types": ["vite/client", "vite-plugin-pwa/client"],
 
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"]
     }
   },
   // `e2e` and `playwright.config.ts` are Node code with their own config
