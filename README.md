@@ -308,13 +308,23 @@ rules it deploys on merge with no prompt.
 - `FIREBASE_SERVICE_ACCOUNT_TALLY` — service account JSON key holding **only** Firebase Hosting
   Admin. `npx firebase init hosting:github` creates one and stores it for you; otherwise generate
   it in the [Google Cloud console](https://console.cloud.google.com/iam-admin/serviceaccounts).
-- `FIREBASE_SERVICE_ACCOUNT_TALLY_BACKEND` — a **second, separate** key for the backend workflow,
-  needing Cloud Functions Admin, Firebase Rules Admin, Service Account User, and Secret Manager
-  Secret Accessor (so the deployed functions can bind `PCO_APP_ID` and `PCO_SECRET`). Keeping it
-  apart from the Hosting key is the point: the privileged credential is only ever exposed to the
-  gated merge job, never to the preview deploy that runs on every pull request. Prefer
-  [Workload Identity Federation](https://github.com/google-github-actions/auth#workload-identity-federation)
-  over a long-lived JSON key if you are willing to do the extra GCP setup.
+- `FIREBASE_SERVICE_ACCOUNT_TALLY_BACKEND` — a **second, separate** key for the backend workflow.
+  Keeping it apart from the Hosting key is the point: the privileged credential is only ever
+  exposed to the gated merge job, never to the preview deploy that runs on every pull request.
+  Prefer [Workload Identity Federation](https://github.com/google-github-actions/auth#workload-identity-federation)
+  over a long-lived JSON key if you are willing to do the extra GCP setup. It needs:
+
+  | Role | Why |
+  | --- | --- |
+  | `roles/firebase.viewer` | Reads the project's `adminSdkConfig`. Without it every deploy stops at `403 The caller does not have permission` before it does anything. |
+  | `roles/cloudfunctions.admin` | Creates and updates the functions. |
+  | `roles/firebaserules.admin` | Deploys `firestore.rules` and the indexes. |
+  | `roles/iam.serviceAccountUser` | Lets the deploy act as the functions' own runtime service account. |
+  | `roles/artifactregistry.writer` | Holds the container image each function is built into. |
+  | `roles/secretmanager.secretAccessor` | Binds `PCO_APP_ID` and `PCO_SECRET` to the deployed functions. |
+
+  `roles/firebase.admin` covers all of these in one, but it also carries Hosting, which would
+  undo the point of keeping two keys. The list above is the narrower equivalent.
 - `VITE_FIREBASE_CONFIG` — the web config object as one line of JSON, the same value
   `.env.local` holds. Vite embeds it at build time, so the Hosting workflows need it even
   though it is not a secret.
