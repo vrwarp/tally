@@ -54,7 +54,11 @@ function db(): FirestoreLike {
  */
 function clientFor(config: PcoConfig): PcoClient | null {
   if (config.configError) return null;
-  return createPcoClient({ appId: config.appId, secret: config.secret });
+  return createPcoClient({
+    appId: config.appId,
+    secret: config.secret,
+    baseUrl: config.baseUrl,
+  });
 }
 
 async function recordConfigError(config: PcoConfig, triggeredBy: string | null): Promise<void> {

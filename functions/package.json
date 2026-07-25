@@ -10,6 +10,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "typecheck": "tsc -p tsconfig.test.json",
     "watch": "tsc -w",
     "test": "vitest run",
     "serve": "npm run build && firebase emulators:start --only functions,firestore,auth --project demo-tally",

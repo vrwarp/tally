@@ -1,0 +1,13 @@
+{
+  // The build config (tsconfig.json) excludes tests so they never reach `lib/`.
+  // This one type-checks them, plus the Planning Center simulator they drive the
+  // real client against.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "..",
+    "types": ["node"]
+  },
+  "include": ["src", "../tools/pco-simulator/src"],
+  "exclude": ["lib", "node_modules"]
+}

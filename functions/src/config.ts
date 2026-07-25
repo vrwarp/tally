@@ -13,6 +13,7 @@
  * the Settings screen can say exactly which value is missing.
  */
 import { defineSecret, defineString } from 'firebase-functions/params';
+import { PCO_BASE_URL } from './pco/types.js';
 
 /** Mirrors `PcoRosterSource` in src/types — duplicated because Cloud Functions
  * compile as a separate package and must not import from the browser bundle. */
@@ -27,6 +28,17 @@ export type PcoWriteBackMode = 'off' | 'create' | 'full';
 
 export const PCO_APP_ID = defineSecret('PCO_APP_ID');
 export const PCO_SECRET = defineSecret('PCO_SECRET');
+
+/**
+ * Where the Planning Center API lives.
+ *
+ * Configurable because production is not the only place this code runs: the
+ * end-to-end suite points it at a local Planning Center simulator, and a church
+ * behind an outbound proxy may need to route through their own host. Anything
+ * that is not the real API is a deliberate act, so `loadConfig` reports the
+ * override rather than letting it pass silently.
+ */
+const PCO_API_BASE_URL = defineString('PCO_API_BASE_URL', { default: '' });
 
 const PCO_ROSTER_SOURCE = defineString('PCO_ROSTER_SOURCE', { default: 'grade' });
 const PCO_STUDENT_LIST_ID = defineString('PCO_STUDENT_LIST_ID', { default: '' });
@@ -55,6 +67,10 @@ export const ABSOLUTE_MAX_GRADE = 12;
 export interface PcoConfig {
   appId: string;
   secret: string;
+  /** API root, without a trailing slash. Defaults to the real Planning Center. */
+  baseUrl: string;
+  /** True when `baseUrl` was overridden — surfaced so a test rig is never mistaken for production. */
+  baseUrlOverridden: boolean;
   rosterSource: PcoRosterSource;
   studentListId: string | null;
   counselorListId: string | null;
@@ -96,9 +112,41 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+/**
+ * Normalises an API root and rejects anything that is not an absolute http(s)
+ * URL. A typo here would otherwise turn every request into a relative path and
+ * fail with a confusing `Invalid URL` deep inside the client.
+ */
+function readBaseUrl(): { baseUrl: string; overridden: boolean; problem: string | null } {
+  const raw = readValue(PCO_API_BASE_URL, 'PCO_API_BASE_URL');
+  if (!raw) return { baseUrl: PCO_BASE_URL, overridden: false, problem: null };
+
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return {
+      baseUrl: PCO_BASE_URL,
+      overridden: false,
+      problem: `PCO_API_BASE_URL="${raw}" is not a valid URL`,
+    };
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return {
+      baseUrl: PCO_BASE_URL,
+      overridden: false,
+      problem: `PCO_API_BASE_URL="${raw}" must be http or https`,
+    };
+  }
+
+  return { baseUrl: raw.replace(/\/+$/, ''), overridden: true, problem: null };
+}
+
 export function loadConfig(): PcoConfig {
   const appId = readValue(PCO_APP_ID, 'PCO_APP_ID');
   const secret = readValue(PCO_SECRET, 'PCO_SECRET');
+  const base = readBaseUrl();
 
   const rawSource = readValue(PCO_ROSTER_SOURCE, 'PCO_ROSTER_SOURCE').toLowerCase();
   const rosterSource: PcoRosterSource = rawSource === 'list' ? 'list' : 'grade';
@@ -130,10 +178,13 @@ export function loadConfig(): PcoConfig {
   if (rosterSource === 'list' && !studentListId) {
     problems.push('PCO_ROSTER_SOURCE is "list" but PCO_STUDENT_LIST_ID is not set');
   }
+  if (base.problem) problems.push(base.problem);
 
   return {
     appId,
     secret,
+    baseUrl: base.baseUrl,
+    baseUrlOverridden: base.overridden,
     rosterSource,
     studentListId,
     counselorListId,

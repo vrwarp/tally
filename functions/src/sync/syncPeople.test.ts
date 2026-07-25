@@ -161,6 +161,8 @@ const OLD = Timestamp.fromDate(new Date('2026-01-01T00:00:00Z'));
 const CONFIG: PcoConfig = {
   appId: 'app',
   secret: 'secret',
+  baseUrl: 'https://api.planningcenteronline.com/people/v2',
+  baseUrlOverridden: false,
   rosterSource: 'grade',
   studentListId: null,
   counselorListId: null,
