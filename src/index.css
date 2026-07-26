@@ -193,7 +193,8 @@
     padding-top: calc(0.5rem + env(safe-area-inset-top, 0px));
   }
 
-  /* Momentum scrolling for the roster list on iOS. */
+  /* Momentum scrolling for the boxes that still scroll on their own — the
+     filter row, the grade checklist, a modal's body — on iOS. */
   .scroll-touch {
     -webkit-overflow-scrolling: touch;
   }

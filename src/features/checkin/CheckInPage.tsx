@@ -28,6 +28,7 @@ import { SearchBar } from '@/features/checkin/SearchBar';
 import { buildRoster, type RosterFocus } from '@/features/roster/predictiveRoster';
 import { useActiveEvent, useSeriesHistoryEvents } from '@/hooks/useActiveEvent';
 import { useAttendance, useRsvps } from '@/hooks/useAttendance';
+import { useHeightVar } from '@/hooks/useHeightVar';
 import { invalidateSnapshotCache, useEventSnapshots } from '@/hooks/useEventSnapshots';
 import { haptic } from '@/lib/utils';
 import { checkIn, undoCheckIn } from '@/services/attendance';
@@ -83,6 +84,10 @@ export function CheckInPage() {
   const [focus, setFocus] = useState<RosterFocus>("recent");
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [announcement, setAnnouncement] = useState("");
+
+  // Published for the roster heading below it, which sticks to the underside of
+  // the search box rather than to the top of the window.
+  const searchBar = useHeightVar<HTMLDivElement>('--checkin-search-h');
 
   const [flashing, setFlashing] = useState<ReadonlySet<string>>(
     () => new Set(),
@@ -279,7 +284,7 @@ export function CheckInPage() {
   if (!event || !roster) {
     if (dataLoading) {
       return (
-        <div className="min-h-0 flex-1 pt-3">
+        <div className="mx-auto w-full max-w-3xl pt-3">
           <SkeletonRows />
         </div>
       );
@@ -295,52 +300,68 @@ export function CheckInPage() {
   const canFocusRecent = !roster.isFiltered && !group && counts.recent > 0;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="shrink-0 border-b border-ink-800 bg-ink-950">
+    <div className="flex flex-col">
+      {/* Scrolls away, and is meant to. Which event, what time, how many are
+          here — a counselor reads that on arrival and then works the queue for
+          an hour without needing it again, so it is the one part of the screen
+          that can afford to cost nothing once it has been read. */}
+      <div className="mx-auto w-full max-w-3xl">
+        <EventHeader
+          event={event}
+          autoEvent={autoEvent}
+          isOverridden={isOverridden}
+          selectableEvents={selectableEvents}
+          now={now}
+          present={counts.present}
+          eligible={counts.eligible}
+        />
+      </div>
+
+      {/* The one thing that stays. Search is how a counselor finds the student
+          in front of them in a list of two hundred, and it has to be reachable
+          from anywhere in that list — so it rides the page down and then pins
+          itself under the app bar, whose height is measured rather than assumed
+          (safe-area inset on a notched phone, nothing at all on desktop).
+
+          Opaque, not translucent: roster rows are `bg-ink-900` cards passing
+          underneath, and a blurred band would let them smear through the
+          placeholder text. */}
+      <div
+        className="sticky z-20 bg-ink-950 pt-2"
+        style={{ top: 'var(--app-header-h, 0px)' }}
+        ref={searchBar}
+      >
         <div className="mx-auto w-full max-w-3xl">
-          <EventHeader
-            event={event}
-            autoEvent={autoEvent}
-            isOverridden={isOverridden}
-            selectableEvents={selectableEvents}
-            now={now}
+          <SearchBar value={query} onChange={setQuery} />
+        </div>
+      </div>
+
+      <div className="border-b border-ink-800">
+        <div className="mx-auto w-full max-w-3xl">
+          <ScopeBar
+            groups={groups}
+            scopeGroupId={scopeGroupId}
+            onScopeChange={handleScopeChange}
+            grades={grades}
+            onGradesChange={setGrades}
+            focus={appliedFocus}
+            onFocusChange={setFocus}
+            showRecent={canFocusRecent}
+            recentCount={counts.recent}
+            assignedGroupId={profile?.assignedGroupId ?? null}
             present={counts.present}
             eligible={counts.eligible}
+            absent={counts.absent}
           />
-          <div className="pt-2">
-            <SearchBar value={query} onChange={setQuery} />
-            <ScopeBar
-              groups={groups}
-              scopeGroupId={scopeGroupId}
-              onScopeChange={handleScopeChange}
-              grades={grades}
-              onGradesChange={setGrades}
-              focus={appliedFocus}
-              onFocusChange={setFocus}
-              showRecent={canFocusRecent}
-              recentCount={counts.recent}
-              assignedGroupId={profile?.assignedGroupId ?? null}
-              present={counts.present}
-              eligible={counts.eligible}
-              absent={counts.absent}
-            />
-          </div>
         </div>
       </div>
 
       {/* Capped width on desktop: stretched to a 27-inch monitor a roster row puts
           the student's name and the control that checks them in a foot apart, so
-          the eye and the mouse both have to travel the whole way. The bottom
-          padding clears the floating add button, which otherwise sits on top of
-          the last student in the list.
-
-          `relative` is doing real work: `overflow` only clips an absolutely
-          positioned descendant when the scroller is also its containing block.
-          Every roster row that carries a warning badge holds an `sr-only` span,
-          which is `position: absolute` — left static, those escaped the box and
-          added their offsets to the *page*, so the whole app frame could be
-          scrolled off into empty space below the roster. */}
-      <div className="scroll-touch relative mx-auto min-h-0 w-full max-w-3xl flex-1 overflow-y-auto pb-36 lg:pb-8">
+          the eye and the mouse both have to travel the whole way. What clears
+          the floating add button at the end of the list is the frame's own
+          bottom padding, which every screen gets. */}
+      <div className="mx-auto w-full max-w-3xl">
         {attendanceError ? (
           <div className="px-3 pt-3">
             <ErrorBanner message={attendanceError} />

@@ -1,7 +1,8 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
+import { useHeightVar } from '@/hooks/useHeightVar';
 import { useOccurrenceHorizon } from '@/hooks/useOccurrenceHorizon';
 import { cn } from '@/lib/utils';
 import { ErrorBanner } from '@/components/ui';
@@ -42,10 +43,26 @@ export function AppShell({ children }: { children: ReactNode }) {
   // advance for a leader who only ever opens the check-in screen.
   useOccurrenceHorizon();
 
+  /*
+   * Every screen scrolls the document, so every screen shares one scroller —
+   * and a browser does not reset it on a client-side route change. Without
+   * this, a counselor who worked to the bottom of the roster and then tapped
+   * "Students" arrived halfway down the student list.
+   *
+   * Keyed on the path alone: `/event/:eventId` re-renders check-in from the
+   * event picker, and landing at the top of the new event is right there too.
+   */
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
+
+  // Measured, not assumed: the bar carries a safe-area inset on a notched
+  // phone and vanishes at `lg`. Check-in's search box sticks below whatever
+  // this comes out to.
+  const header = useHeightVar<HTMLElement>('--app-header-h');
+
   const items = NAV.filter((item) => !item.core || can('core'));
   const showNav = items.length > 1;
-  // The check-in screen manages its own scrolling and sticky chrome.
-  const isCheckIn = location.pathname === '/' || location.pathname.startsWith('/event/');
 
   const displayName = profile?.displayName || profile?.email || 'Signed in';
   const initial = displayName.charAt(0).toUpperCase();
@@ -111,29 +128,20 @@ export function AppShell({ children }: { children: ReactNode }) {
     </div>
   );
 
+  /*
+   * One scroller for the whole app: every screen, check-in included, is an
+   * ordinary document that scrolls as a whole.
+   *
+   * Check-in used to be framed instead — the viewport capped at `h-dvh` and the
+   * roster scrolling inside its own box, so the event header, the search box
+   * and the scope chips stayed put. It kept everything under the thumb at the
+   * cost of about a third of a phone screen, permanently, including the parts a
+   * counselor reads once and never looks at again. Now the header scrolls away
+   * and only the search box stays, by sticking to the top on its way past — see
+   * `CheckInPage`.
+   */
   return (
-    <div
-      className={cn(
-        'flex flex-col bg-ink-950 lg:flex-row',
-        /*
-         * Check-in owns the viewport; every other screen owns the document.
-         *
-         * The roster is meant to scroll *inside* the frame, so the event
-         * header, the search box and the scope chips stay under the thumb no
-         * matter how far down the list you are. That only works if something
-         * actually caps the frame's height: `min-h-dvh` sets a floor, not a
-         * ceiling, so the roster grew the page instead and the inner
-         * `overflow-y-auto` never had anything to scroll.
-         *
-         * The visible cost was on the way out. With check-in scrolling the
-         * document, it shared a scroller with the rest of the app and nothing
-         * resets that on a route change — so a counselor who scrolled to the
-         * bottom of the roster and tapped "Students" arrived halfway down the
-         * student list.
-         */
-        isCheckIn ? 'h-dvh overflow-hidden' : 'min-h-dvh',
-      )}
-    >
+    <div className="flex min-h-dvh flex-col bg-ink-950 lg:flex-row">
       {/* Desktop: a persistent sidebar. */}
       {showNav ? (
         <aside className="hidden lg:flex lg:w-56 lg:shrink-0 lg:flex-col lg:gap-1 lg:border-r lg:border-ink-800 lg:px-3 lg:py-4">
@@ -166,10 +174,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         </aside>
       ) : null}
 
-      <div className={cn('flex min-w-0 flex-1 flex-col', isCheckIn && 'min-h-0')}>
+      <div className="flex min-w-0 flex-1 flex-col">
         {/* Phone: a top bar for identity, since navigation lives at the bottom.
             Also the only chrome a counselor with one tab ever sees. */}
         <header
+          ref={header}
           className={cn(
             'sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-ink-800 bg-ink-950/95 px-4 py-2 pt-safe backdrop-blur',
             showNav && 'lg:hidden',
@@ -185,9 +194,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         ) : null}
 
-        <main className={cn('flex-1', isCheckIn ? 'flex min-h-0 flex-col' : 'pb-24 lg:pb-8')}>
-          {children}
-        </main>
+        <main className="flex-1 pb-24 lg:pb-8">{children}</main>
 
         {/* Phone: bottom tabs, within thumb reach. */}
         {showNav ? (

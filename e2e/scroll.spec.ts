@@ -1,23 +1,22 @@
 /**
  * Where the scrolling happens.
  *
- * Check-in is a framed screen: the event header, the search box and the scope
- * chips are pinned, and only the roster underneath them moves. Every other
- * screen is an ordinary document that scrolls as a whole.
+ * Every screen is an ordinary document that scrolls as a whole — check-in
+ * included, since a framed roster spent about a third of a phone on chrome a
+ * counselor reads once. What replaced the frame is one sticky bar: the search
+ * box rides the page down and then pins itself under the app bar, so looking a
+ * student up never costs a scroll back to the top.
  *
- * That distinction is load-bearing in a way that is easy to lose, because
- * losing it still looks fine on the screen you are on. If the roster scrolls
- * the document instead of its own box, check-in shares a scroller with the rest
- * of the app — and nothing resets a document's scroll offset on a client-side
- * route change. A counselor who worked to the bottom of the roster and then
- * tapped "Students" landed halfway down the student list.
+ * Two things can break independently here and both still look fine on the
+ * screen you are on. If the search box stops sticking, the loss only shows up
+ * 200 names down. And because check-in now shares the document scroller with
+ * the rest of the app — which nothing resets on a client-side route change — a
+ * counselor who worked to the bottom of the roster and then tapped "Students"
+ * would land halfway down the student list.
  */
 import type { Page } from '@playwright/test';
 import { expect, test } from './support/fixtures';
 import { gotoReady } from './support/auth';
-
-/** The roster's own scroll box — the only thing on check-in that should move. */
-const rosterScroller = (page: Page) => page.locator('main div.overflow-y-auto').first();
 
 /**
  * Waits until the roster is longer than the screen.
@@ -25,13 +24,18 @@ const rosterScroller = (page: Page) => page.locator('main div.overflow-y-auto').
  * Check-in paints the handful of students already in Firestore and then grows
  * by forty more when the Planning Center read lands, so measuring as soon as
  * the search box appears measures a list that would fit on any phone — and a
- * broken frame passes. Counting rows rather than pixels keeps the wait honest
- * on a build where the frame is the thing that is broken.
+ * page that never scrolls proves nothing about what happens when it does.
+ * Counting rows rather than pixels keeps the wait honest on a build where the
+ * scrolling itself is the thing that is broken.
+ *
+ * Rows, not "Check in" buttons: the suite shares one seeded dataset, so by the
+ * time this file runs some of the roster has been checked in by an earlier spec
+ * and those rows answer to "Undo" instead.
  */
 async function longRoster(page: Page): Promise<void> {
   await expect(page.getByLabel(/search students by name/i)).toBeVisible();
   await expect
-    .poll(() => page.getByRole('button', { name: /^Check in / }).count(), {
+    .poll(() => page.locator('main li').count(), {
       message: 'the seeded roster never filled in, so there was nothing to scroll',
     })
     .toBeGreaterThan(20);
@@ -42,31 +46,60 @@ const documentOverflow = (page: Page) =>
     () => document.documentElement.scrollHeight - document.documentElement.clientHeight,
   );
 
+/**
+ * How far down the window the app bar reaches — nothing on a desktop, where it
+ * is replaced by the sidebar, and a safe-area inset more than you would guess
+ * on a notched phone. The app measures it for the same reason this test does.
+ */
+const appBarHeight = (page: Page) =>
+  page.evaluate(
+    () =>
+      parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue('--app-header-h'),
+      ) || 0,
+  );
+
 test.describe('scrolling', () => {
   test.beforeEach(async ({ signedInAs }) => {
     // Core, because this is about leaving check-in for a screen only they have.
     await signedInAs('core');
   });
 
-  test('the roster scrolls inside the frame, not the page', async ({ page }) => {
+  test('the roster scrolls the page, and the search box comes along', async ({ page }) => {
     await gotoReady(page, '/');
     await longRoster(page);
 
-    const scroller = rosterScroller(page);
-    expect(
-      await scroller.evaluate((element) => element.scrollHeight - element.clientHeight),
-      'the roster box has nothing to scroll, so the frame is not capping its height',
-    ).toBeGreaterThan(200);
-
-    await scroller.evaluate((element) => {
-      element.scrollTop = element.scrollHeight;
-    });
-
-    expect(await scroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(200);
     expect(
       await documentOverflow(page),
-      'check-in grew the page instead of scrolling its own roster',
-    ).toBeLessThanOrEqual(1);
+      'check-in never grew past the window, so the page has nothing to scroll',
+    ).toBeGreaterThan(200);
+
+    const searchBox = page.getByLabel(/search students by name/i);
+    const eventTitle = page.getByRole('heading', { level: 1 });
+    const start = (await searchBox.boundingBox())!;
+
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(200);
+
+    // The event header is the space this change bought back: read on arrival,
+    // then gone.
+    expect(
+      (await eventTitle.boundingBox())!.y,
+      'the event header stayed on screen, so the page is still framed',
+    ).toBeLessThan(start.y);
+
+    // The search box is not: it stops at the underside of the app bar.
+    const offset = await appBarHeight(page);
+    const stuck = (await searchBox.boundingBox())!;
+    await expect(searchBox).toBeVisible();
+    expect(
+      stuck.y,
+      'the search box scrolled up under the app bar instead of sticking below it',
+    ).toBeGreaterThanOrEqual(offset - 1);
+    expect(
+      stuck.y,
+      'the search box scrolled away with the page instead of sticking to the top',
+    ).toBeLessThanOrEqual(offset + 24);
   });
 
   test('leaving a scrolled roster for Students starts at the top', async ({ page }) => {
@@ -75,8 +108,8 @@ test.describe('scrolling', () => {
      * outright there, and synthetic touch events do not drive native scrolling,
      * so the gesture this test is *about* cannot be performed at all.
      *
-     * Skipped rather than downgraded to a scripted `scrollTop`, which would
-     * pass on precisely the broken build the comment below is guarding against.
+     * Skipped rather than downgraded to a scripted `scrollTo`, which would pass
+     * on precisely the broken build the comment below is guarding against.
      * Neither axis goes uncovered: chromium-mobile keeps the phone viewport and
      * webkit-desktop keeps Safari.
      */
@@ -90,22 +123,17 @@ test.describe('scrolling', () => {
     await longRoster(page);
 
     /*
-     * A flick over the list rather than a scripted `scrollTop`, because the
-     * whole question is *what* moves when a counselor does that. Driving the
-     * scroller directly would assume the answer, and would pass on a build
-     * where the gesture scrolled the page instead.
+     * A flick over the list rather than a scripted `scrollTo`, because the whole
+     * question is what a counselor's thumb actually moves. Driving the scroller
+     * directly would assume the answer.
      */
-    const scroller = rosterScroller(page);
-    const box = (await scroller.boundingBox())!;
+    const box = (await page.locator('main').boundingBox())!;
     await page.mouse.move(box.x + box.width / 2, box.y + Math.min(box.height, 400) / 2);
     await page.mouse.wheel(0, 2000);
     await expect
-      .poll(
-        async () =>
-          (await scroller.evaluate((element) => element.scrollTop)) +
-          (await page.evaluate(() => window.scrollY)),
-        { message: 'nothing moved, so the test never reached the thing it is about' },
-      )
+      .poll(() => page.evaluate(() => window.scrollY), {
+        message: 'nothing moved, so the test never reached the thing it is about',
+      })
       .toBeGreaterThan(200);
 
     await page.getByRole('link', { name: 'Students' }).first().click();
