@@ -1,3 +1,12 @@
+/*
+ * GENERATED FILE — DO NOT EDIT.
+ *
+ * Copied from src/lib/materialize.ts by scripts/sync-functions-shared.mjs, because the
+ * functions package deploys on its own and cannot import from src/. Edit the
+ * original; `npm run functions:build` regenerates this, and a unit test fails
+ * if the two ever disagree.
+ */
+
 /**
  * Turning a recurrence rule into real event documents.
  *
@@ -34,7 +43,7 @@ import {
   recurrenceOccurrences,
   toDateOnlyValue,
   type RecurrenceRule,
-} from '@/lib/recurrenceCore';
+} from './recurrenceCore.js';
 
 /**
  * The slice of an event this module reasons about.

@@ -54,6 +54,20 @@ export const PCO_SECRET = defineSecret('PCO_SECRET');
  */
 const PCO_API_BASE_URL = defineString('PCO_API_BASE_URL', { default: '' });
 
+/**
+ * The ministry's own timezone, as an IANA name.
+ *
+ * The occurrence sweep builds dates with the local-time `Date` constructor, so
+ * a "19:00 Friday" gathering only lands at 19:00 if the container agrees about
+ * what local means — and a Cloud Functions container is UTC. Getting this wrong
+ * moves a Friday evening onto Saturday morning across a DST boundary, so it is
+ * a deploy-time setting rather than a constant somebody has to remember to
+ * change. The default is where Footprints is.
+ */
+export const MINISTRY_TIME_ZONE = defineString('MINISTRY_TIME_ZONE', {
+  default: 'America/New_York',
+});
+
 const PCO_MIN_GRADE = defineString('PCO_MIN_GRADE', { default: '6' });
 const PCO_MAX_GRADE = defineString('PCO_MAX_GRADE', { default: '12' });
 const PCO_WRITE_BACK = defineString('PCO_WRITE_BACK', { default: 'create' });

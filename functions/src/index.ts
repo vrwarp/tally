@@ -6,19 +6,21 @@
  * by string. Everything a handler does lives in ./pco and ./access; this file is
  * only wiring, permission checks and the shapes the client expects back.
  *
- * There is no scheduled anything. Tally used to sweep Planning Center every six
- * hours and mirror every person into Firestore; it now reads people when it
- * needs them and holds the answer for `PCO_CACHE_TTL_SECONDS` at most. What is
- * left is three reads, one write-back, and the trigger that pushes a
- * quick-added visitor before the counselor has walked back to the door.
+ * Nothing here sweeps Planning Center. Tally used to mirror every person into
+ * Firestore every six hours; it now reads people when it needs them and holds
+ * the answer for `PCO_CACHE_TTL_SECONDS` at most. The one scheduled job left
+ * writes down the gatherings a recurrence rule says are coming, which is work
+ * that has to happen whether or not anybody opened the app.
  */
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { logger, setGlobalOptions } from 'firebase-functions/v2';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
-import { PCO_SECRETS, resolveConfig, type PcoConfig } from './config.js';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
+import { MINISTRY_TIME_ZONE, PCO_SECRETS, resolveConfig, type PcoConfig } from './config.js';
 import { asFirestoreLike, PATHS, type FirestoreLike } from './firestore.js';
+import { materializeDueOccurrences } from './occurrences.js';
 import { createPcoClient, PcoApiError, type PcoClient } from './pco/client.js';
 import { describePcoFailure } from './pco/debug.js';
 import { fetchListMemberIds, fetchLists, type PcoListSummary } from './pco/lists.js';
@@ -716,5 +718,47 @@ export const onStudentCreated = onDocumentCreated(
         error: String(error),
       });
     }
+  },
+);
+
+/* -------------------------------------------------------------------------- */
+/* Scheduled                                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Writes down the gatherings the recurrence rules say are coming.
+ *
+ * Nightly rather than hourly: the horizon is sixty days, so a run that fails or
+ * is skipped costs nothing — the next one catches up, and the app tops itself
+ * up whenever a leader has it open. This is the floor, not the mechanism.
+ *
+ * `MINISTRY_TIME_ZONE` is what makes a "19:00 Friday" gathering land at 19:00.
+ * The expander builds every date with the local-time `Date` constructor, and a
+ * Cloud Functions container is UTC, which either side of a DST change would put
+ * a Friday evening on a Saturday morning. It governs both when this fires and —
+ * via `process.env.TZ` below — what the handler's own date arithmetic means.
+ *
+ * Writing here bypasses the security rules, which are otherwise the only gate
+ * on creating an event. That is deliberate and narrow: the payload is derived
+ * entirely from documents that already passed those rules, and the ids are
+ * derived rather than supplied, so this cannot create a gathering no rule
+ * already described.
+ */
+export const materializeOccurrences = onSchedule(
+  {
+    schedule: 'every day 03:15',
+    timeZone: MINISTRY_TIME_ZONE,
+    retryCount: 1,
+    maxInstances: 1,
+  },
+  async () => {
+    // `timeZone` above schedules the run; this is what makes the dates it
+    // *writes* come out in the same zone. Set inside the handler because params
+    // cannot be read at module load, and safe to set globally because a v2
+    // function is its own service — nothing else shares this container.
+    process.env.TZ = MINISTRY_TIME_ZONE.value();
+
+    const result = await materializeDueOccurrences(db(), new Date(), logger);
+    logger.info('Occurrence sweep finished', result);
   },
 );

@@ -9,6 +9,7 @@
     "node": "22"
   },
   "scripts": {
+    "prebuild": "node ../scripts/sync-functions-shared.mjs",
     "build": "tsc",
     "typecheck": "tsc -p tsconfig.test.json",
     "watch": "tsc -w",

@@ -20,6 +20,13 @@ export interface DocumentRefLike {
   /** Full collection-qualified path; a batched write carries nothing else. */
   readonly path: string;
   get(): Promise<DocumentSnapshotLike>;
+  /**
+   * Write only if the document does not exist; rejects with `ALREADY_EXISTS`
+   * otherwise. The admin SDK does this atomically, which is what lets the
+   * occurrence job write a derived id without a transaction and without ever
+   * overwriting a gathering somebody has already moved.
+   */
+  create(data: Record<string, unknown>): Promise<unknown>;
   set(data: Record<string, unknown>, options?: { merge?: boolean }): Promise<unknown>;
   update(data: Record<string, unknown>): Promise<unknown>;
 }
