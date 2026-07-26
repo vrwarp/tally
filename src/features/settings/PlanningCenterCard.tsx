@@ -156,9 +156,14 @@ export function PlanningCenterCard() {
               ) : null}
 
               {status.baseUrlOverridden ? (
-                // Somebody pointed this at a test rig. That must never be a
-                // silent state on a screen that otherwise says "Connected".
-                <Badge tone="warn">Not the real Planning Center</Badge>
+                // Requests are going somewhere other than Planning Center's own
+                // API — a proxy, a cache, a test rig. Which of those it is, only
+                // the person who set it knows, so the badge states the fact and
+                // the address rather than guessing at the intent. It must never
+                // be a silent state on a screen that otherwise says "Connected".
+                <Badge tone="warn" title={`Requests go to ${status.settings.baseUrl}`}>
+                  Custom API address
+                </Badge>
               ) : null}
             </div>
 

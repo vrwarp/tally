@@ -132,7 +132,7 @@ export interface PcoConfig {
   secret: string;
   /** API root, without a trailing slash. Defaults to the real Planning Center. */
   baseUrl: string;
-  /** True when `baseUrl` was overridden — surfaced so a test rig is never mistaken for production. */
+  /** True when `baseUrl` was overridden — surfaced so a proxy or test rig is never mistaken for the real API. */
   baseUrlOverridden: boolean;
   minGrade: number;
   maxGrade: number;
