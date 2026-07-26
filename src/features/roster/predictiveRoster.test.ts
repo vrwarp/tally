@@ -81,13 +81,11 @@ const REGULAR = 'regular-who-never-misses';
 const held = (event: TallyEvent, present: readonly string[] = []) =>
   makeSnapshot(event, [REGULAR, ...present]);
 
-/**
- * `makeEvent` coalesces overrides with `??`, so it cannot express a null
- * `seriesId` — which is exactly what makes an event a one-off. Patch it after.
- */
+/** A retreat: one date, no series and no chain behind it. */
 const makeOneOff = (overrides: Partial<TallyEvent>): TallyEvent => ({
   ...makeEvent({ mode: 'oneoff', ...overrides }),
   seriesId: null,
+  recurrenceRootId: null,
 });
 
 /** buildRoster with everything defaulted to a plain recurring Friday. */
@@ -248,6 +246,70 @@ describe('buildSeriesHistory', () => {
     const snapshots = pastFridays(3).map((event) => held(event));
 
     expect(buildSeriesHistory(retreat, snapshots, settings)).toEqual([]);
+  });
+
+  /*
+   * The case a series document does not cover: a weekly gathering created in
+   * the app. Nothing carries a `seriesId` — the chain is held together by the
+   * root its occurrences were copied forward from — and reading `seriesId`
+   * alone left it predicting from nothing for as long as it ran.
+   */
+  describe('a chain with no series document', () => {
+    const ROOT = 'saturday-root';
+
+    /** Instance `weeksBack` weeks ago, rooted at ROOT and in no series. */
+    const rooted = (weeksBack: number) => {
+      const [instance] = makeWeeklyEvents({ count: weeksBack, seriesId: ROOT });
+      return makeEvent({ ...instance!, seriesId: null, recurrenceRootId: ROOT });
+    };
+
+    const upcoming = makeEvent({
+      id: 'next-saturday',
+      seriesId: null,
+      recurrenceRootId: ROOT,
+    });
+
+    it('predicts from the instances sharing its recurrence root', () => {
+      const snapshots = [rooted(1), rooted(2)].map((event) => held(event));
+
+      const history = buildSeriesHistory(upcoming, snapshots, settings);
+
+      expect(history.map((snapshot) => snapshot.event.id)).toEqual([`${ROOT}-1`, `${ROOT}-2`]);
+    });
+
+    it('counts the root itself — it is a gathering that happened', () => {
+      // The hand-made event the chain grew from carries no root of its own.
+      const root = makeEvent({ ...rooted(3), id: ROOT, recurrenceRootId: null });
+      const snapshots = [held(rooted(1)), held(root)];
+
+      const history = buildSeriesHistory(upcoming, snapshots, settings);
+
+      expect(history.map((snapshot) => snapshot.event.id)).toEqual([`${ROOT}-1`, ROOT]);
+    });
+
+    it('does not cross with another rootless chain, or with a series', () => {
+      const other = makeEvent({
+        ...rooted(1),
+        id: 'other-chain-1',
+        recurrenceRootId: 'other-root',
+      });
+      const snapshots = [
+        held(rooted(1)),
+        held(other),
+        ...pastFridays(2).map((event) => held(event)),
+      ];
+
+      const history = buildSeriesHistory(upcoming, snapshots, settings);
+
+      expect(history.map((snapshot) => snapshot.event.id)).toEqual([`${ROOT}-1`]);
+    });
+
+    it('is still no history at all for a one-off, whatever ids collide', () => {
+      const retreat = makeOneOff({ id: ROOT });
+      const snapshots = [rooted(1), rooted(2)].map((event) => held(event));
+
+      expect(buildSeriesHistory(retreat, snapshots, settings)).toEqual([]);
+    });
   });
 });
 

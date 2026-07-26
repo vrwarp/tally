@@ -200,8 +200,10 @@ One dated gathering.
 | --- | --- | --- |
 | `title` | string | |
 | `mode` | `'recurring' \| 'oneoff'` | Recurring is speed-first with a predictive roster; one-off is accountability-first with an RSVP roster. |
-| `seriesId` | string \| null | Set for recurring events. Identifies which history informs prediction. |
-| `startAt`, `endAt` | Timestamp | |
+| `seriesId` | string \| null | Optional link to an `eventSeries` template, on recurring events only. Nothing in the app creates one — a series document comes from the seed — so most recurring events leave this null. |
+| `recurrence` | object \| null | How the event repeats (RFC 5545 subset, anchored on `startAt`). Occurrences are written down ahead of time rather than expanded at read time — see `lib/materialize.ts`. |
+| `recurrenceRootId` | string \| null | The hand-made event a chain of repeats grew from, or null when this event *is* that root. Copied onto every occurrence, so the chain has an identity that outlives any one instance. |
+| `startAt`, `endAt` | Timestamp | For a recurring event these are the *next* occurrence, not the first ever. Instances already held are their own documents and keep the times they ran at. |
 | `checkInOpensAt`, `checkInClosesAt` | Timestamp | The window during which this event is auto-selected as "active". Materialised per event rather than recomputed from the series, so moving one Friday does not need the template edited. |
 | `location`, `notes` | string \| null | |
 | `requiresRsvp`, `requiresWaiver`, `requiresPayment` | boolean | One-off accountability switches. A one-off with no explicit flag still defaults to an RSVP roster. |
@@ -263,7 +265,7 @@ A single document holding the four thresholds the core team can tune:
 | Field | Default | Meaning |
 | --- | --- | --- |
 | `predictiveMinAttended` | 2 | A student is "Recent" when they attended at least this many… |
-| `predictiveOfLastN` | 3 | …of the last this-many instances of the *same* series. |
+| `predictiveOfLastN` | 3 | …of the last this-many instances of the *same* series — meaning the same repeat chain: a shared `seriesId` when there is one, a shared `recurrenceRootId` otherwise. Friday history never predicts Sunday either way. |
 | `miaConsecutiveMisses` | 3 | Consecutive missed recurring gatherings before a student lands on the MIA list. |
 | `newVisitorWindowDays` | 7 | How far back "New Visitors" looks. |
 
@@ -326,7 +328,9 @@ immediately with nothing to backfill.
 
 `firestore.indexes.json` declares what the queries above need:
 
-- `events` by `seriesId` + `startAt desc` — the predictive roster's per-series history.
+- `events` by `seriesId` + `startAt desc` — no live query needs it today: the client loads a window of
+  events once and picks a series' history out of it in memory, which is also how a chain with no
+  series document gets predicted at all. Kept for a server-side reader that wants one series directly.
 - `events` by `status` + `startAt asc` — upcoming events.
 - `students` by `status` + `lastName` + `firstName` — the roster stream, alphabetical.
 - `students` by `status` + `profileComplete` + `createdAt desc` — the Incomplete Profiles list, which
