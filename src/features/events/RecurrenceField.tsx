@@ -85,7 +85,7 @@ function WeekdayPicker({
               }}
               className={cn(
                 'flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold',
-                'ring-1 transition-colors',
+                'ring-1 transition-colors pointer-fine:size-8 pointer-fine:text-xs',
                 on
                   ? 'bg-brand-500 text-white ring-brand-400'
                   : 'bg-ink-900 text-ink-300 ring-ink-700 active:bg-ink-800',

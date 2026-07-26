@@ -7,11 +7,24 @@
  * accountability switches, because they are what turns a retreat roster into an
  * RSVP list with waiver and payment warnings (Journey 4).
  *
+ * Load-bearing is not the same as needing to be on screen, though: the window
+ * is collapsed behind a row that states the two times it resolved to, because
+ * it defaults correctly and follows the event unless somebody pins it. See
+ * `CheckInWindowField`.
+ *
  * The form keeps its own string state rather than editing dates in place:
  * `<input type="datetime-local">` speaks strings, and a half-typed date must not
  * be able to produce an `Invalid Date` mid-keystroke.
+ *
+ * ## Shape
+ *
+ * Two columns of sections on a desktop, one on a phone — the dialog it sits in
+ * is a window above `sm` and a sheet below it (see `components/ui/Modal`), and
+ * this form is what made that worth doing: stacked at thumb density it is
+ * around a dozen controls, taller than a laptop viewport, and it was scrolling
+ * inside a panel two thousand pixels wide.
  */
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import {
   Button,
   CheckboxField,
@@ -23,8 +36,10 @@ import {
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
+import { CheckInWindowField } from '@/features/events/CheckInWindowField';
 import { RecurrenceField } from '@/features/events/RecurrenceField';
 import { defaultRecurrence, retimeRecurrence, validateRecurrence } from '@/lib/recurrence';
+import { cn } from '@/lib/utils';
 import {
   addMinutes,
   fromDateTimeLocalValue,
@@ -189,6 +204,36 @@ function validateForm(form: EditorForm): { errors: EditorErrors; times: ParsedTi
       : null;
 
   return { errors, times };
+}
+
+/**
+ * A column of the form, named.
+ *
+ * On a phone these are section breaks in one long column. On a desktop they are
+ * what lets the form sit in two columns without turning into a maze: a reader
+ * scanning across finds a heading, not the middle of a sentence they started on
+ * the left. Two columns of *sections* is legible; two columns of wrapped fields
+ * is the layout every form study warns about.
+ */
+function Section({
+  title,
+  className,
+  children,
+}: {
+  title: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    // `@container` so the fields inside can ask how wide *this column* is
+    // rather than how wide the window is — the two are unrelated once the form
+    // splits in half, and a pair of date pickers that fits the viewport can
+    // still be 40px too wide for the pane it landed in.
+    <section className={cn('@container flex min-w-0 flex-col gap-4 pointer-fine:gap-3', className)}>
+      <h3 className="text-xs font-bold uppercase tracking-wider text-ink-500">{title}</h3>
+      {children}
+    </section>
+  );
 }
 
 export interface EventEditorModalProps {
@@ -390,194 +435,200 @@ export function EventEditorModal({
             : 'Changes apply to this gathering only.'
           : 'Recurring gatherings predict their roster from past instances.'
       }
+      size="lg"
       footer={
-        <div className="flex gap-2">
-          <Button variant="secondary" size="lg" className="flex-1" onClick={onClose}>
+        <>
+          <Button variant="secondary" size="lg" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" form={formId} size="lg" className="flex-[2]" loading={saving}>
+          <Button type="submit" form={formId} size="lg" loading={saving}>
             {isEditing ? 'Save changes' : 'Schedule event'}
           </Button>
-        </div>
+        </>
       }
     >
-      <form id={formId} onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
-        <TextField
-          label="Title"
-          value={form.title}
-          onChange={(changed) => patch({ title: changed.target.value })}
-          error={errors.title ?? null}
-          autoCapitalize="words"
-          autoComplete="off"
-          required
-        />
+      {/*
+        * Two columns of sections above `lg`, one below it.
+        *
+        * Stacked, this form is around a dozen controls — taller than a laptop
+        * window, so scheduling a Friday night meant scrolling a form that had
+        * room to spare on either side of it. Split, the whole thing lands on
+        * one screen: what the gathering is on the left, how the roster behaves
+        * on the right, and the save button in view the entire time.
+        */}
+      <form
+        id={formId}
+        onSubmit={handleSubmit}
+        className="grid gap-6 lg:grid-cols-2 lg:gap-x-0"
+        noValidate
+      >
+        <Section title="The gathering" className="lg:pr-7">
+          <TextField
+            label="Title"
+            value={form.title}
+            onChange={(changed) => patch({ title: changed.target.value })}
+            error={errors.title ?? null}
+            autoCapitalize="words"
+            autoComplete="off"
+            required
+          />
 
-        <SelectField
-          label="Type"
-          value={form.mode}
-          onChange={(changed) => handleModeChange(changed.target.value as EventMode)}
-          hint={
-            form.mode === 'recurring'
-              ? 'Everyone active is on the roster, with a predicted “Recent” block on top.'
-              : 'Only students who RSVP’d are on the roster, with waiver and payment warnings.'
-          }
-        >
-          <option value="recurring">Recurring</option>
-          <option value="oneoff">One-off — retreat, outing</option>
-        </SelectField>
-
-        {form.mode === 'recurring' ? (
           <SelectField
-            label="Series"
-            value={form.seriesId}
-            onChange={(changed) => handleSeriesChange(changed.target.value)}
-            hint="The series decides which past gatherings predict this roster."
+            label="Type"
+            value={form.mode}
+            onChange={(changed) => handleModeChange(changed.target.value as EventMode)}
+            hint={
+              form.mode === 'recurring'
+                ? 'Everyone active is on the roster, with a predicted “Recent” block on top.'
+                : 'Only students who RSVP’d are on the roster, with waiver and payment warnings.'
+            }
           >
-            <option value="">No series — no predicted roster</option>
-            {seriesOptions.map((candidate) => (
-              <option key={candidate.id} value={candidate.id}>
-                {candidate.title}
-              </option>
-            ))}
+            <option value="recurring">Recurring</option>
+            <option value="oneoff">One-off — retreat, outing</option>
           </SelectField>
-        ) : null}
 
-        {/*
-          * "Next start" rather than "Starts", for a recurring gathering.
-          *
-          * The dates on a repeating event are the *coming* one, not the one it
-          * began at: every instance already held is its own document with the
-          * times it actually ran. Saying "next" is what makes an edit legible —
-          * moving a Friday night to 19:30 moves the Fridays still ahead, and
-          * leaves the attendance history alone.
-          */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <TextField
-            label={form.mode === 'recurring' ? 'Next start' : 'Starts'}
-            type="datetime-local"
-            value={form.start}
-            onChange={(changed) => handleStartChange(changed.target.value)}
-            error={errors.start ?? null}
-            required
-          />
-          <TextField
-            label={form.mode === 'recurring' ? 'Next end' : 'Ends'}
-            type="datetime-local"
-            value={form.end}
-            onChange={(changed) => handleEndChange(changed.target.value)}
-            error={errors.end ?? null}
-            required
-          />
-        </div>
+          {form.mode === 'recurring' ? (
+            <SelectField
+              label="Series"
+              value={form.seriesId}
+              onChange={(changed) => handleSeriesChange(changed.target.value)}
+              hint="The series decides which past gatherings predict this roster."
+            >
+              <option value="">No series — no predicted roster</option>
+              {seriesOptions.map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {candidate.title}
+                </option>
+              ))}
+            </SelectField>
+          ) : null}
 
-        {form.mode === 'recurring' ? (
-          <>
-            <p className="-mt-2 text-xs text-ink-500">
-              The upcoming gathering. Instances already held keep the times they ran at.
-            </p>
+          {/*
+            * "Next start" rather than "Starts", for a recurring gathering.
+            *
+            * The dates on a repeating event are the *coming* one, not the one it
+            * began at: every instance already held is its own document with the
+            * times it actually ran. Saying "next" is what makes an edit legible —
+            * moving a Friday night to 19:30 moves the Fridays still ahead, and
+            * leaves the attendance history alone.
+            */}
+          <div className="grid grid-cols-1 gap-4 @min-[26rem]:grid-cols-2 pointer-fine:gap-3">
+            <TextField
+              label={form.mode === 'recurring' ? 'Next start' : 'Starts'}
+              type="datetime-local"
+              value={form.start}
+              onChange={(changed) => handleStartChange(changed.target.value)}
+              error={errors.start ?? null}
+              required
+            />
+            <TextField
+              label={form.mode === 'recurring' ? 'Next end' : 'Ends'}
+              type="datetime-local"
+              value={form.end}
+              onChange={(changed) => handleEndChange(changed.target.value)}
+              error={errors.end ?? null}
+              required
+            />
+            {form.mode === 'recurring' ? (
+              // Spanning both dates rather than hanging off one of them: it is
+              // a fact about the pair, and hung off "Next start" alone it wraps
+              // to two lines and leaves the column ragged.
+              <p className="text-xs leading-snug text-ink-500 @min-[26rem]:col-span-2">
+                The upcoming gathering. Instances already held keep the times they ran at.
+              </p>
+            ) : null}
+          </div>
 
-            {/* Below the date on purpose: every option here is phrased from it. */}
+          {/* Below the date on purpose: every option here is phrased from it. */}
+          {form.mode === 'recurring' ? (
             <RecurrenceField
               anchor={parseLocal(form.start)}
               value={form.recurrence}
               onChange={(recurrence) => patch({ recurrence })}
               error={errors.recurrence ?? null}
             />
-          </>
-        ) : null}
+          ) : null}
+        </Section>
 
-        <fieldset className="flex flex-col gap-4 rounded-xl bg-ink-950/40 p-3 ring-1 ring-ink-800">
-          <legend className="px-1 text-xs font-bold uppercase tracking-wider text-ink-400">
-            Check-in window
-          </legend>
-          <p className="text-xs text-ink-500">
-            Tally opens this event automatically while the window is open. It defaults to an hour
-            either side.
-          </p>
-          <TextField
-            label="Opens"
-            type="datetime-local"
-            value={form.checkInOpens}
-            onChange={(changed) => patch({ checkInOpens: changed.target.value, opensPinned: true })}
-            error={errors.checkInOpens ?? null}
+        <Section title="Roster & details" className="lg:border-l lg:border-ink-800 lg:pl-7">
+          <CheckInWindowField
+            opens={form.checkInOpens}
+            closes={form.checkInCloses}
+            start={form.start}
+            pinned={form.opensPinned || form.closesPinned}
+            errors={errors}
+            onOpensChange={(value) => patch({ checkInOpens: value, opensPinned: true })}
+            onClosesChange={(value) => patch({ checkInCloses: value, closesPinned: true })}
           />
-          <TextField
-            label="Closes"
-            type="datetime-local"
-            value={form.checkInCloses}
+
+          <SelectField
+            label="Roster opens on"
+            value={form.defaultGroupingMode}
             onChange={(changed) =>
-              patch({ checkInCloses: changed.target.value, closesPinned: true })
+              patch({ defaultGroupingMode: changed.target.value as RosterGroupingMode })
             }
-            error={errors.checkInCloses ?? null}
-          />
-        </fieldset>
+            hint="“Split by small group” is what makes Sunday School open on a counselor’s own group instead of the whole ministry."
+          >
+            <option value="all">One flat roster</option>
+            <option value="smallGroup">Split by small group</option>
+          </SelectField>
 
-        <TextField
-          label="Location"
-          value={form.location}
-          onChange={(changed) => patch({ location: changed.target.value })}
-          placeholder="Youth room"
-          autoComplete="off"
-        />
+          {form.mode === 'oneoff' ? (
+            <fieldset className="flex flex-col gap-3 rounded-xl bg-ink-950/40 p-3 ring-1 ring-ink-800">
+              <legend className="px-1 text-xs font-bold uppercase tracking-wider text-ink-400">
+                Accountability
+              </legend>
 
-        <SelectField
-          label="Roster opens on"
-          value={form.defaultGroupingMode}
-          onChange={(changed) =>
-            patch({ defaultGroupingMode: changed.target.value as RosterGroupingMode })
-          }
-          hint="“Split by small group” is what makes Sunday School open on a counselor’s own group instead of the whole ministry."
-        >
-          <option value="all">One flat roster</option>
-          <option value="smallGroup">Split by small group</option>
-        </SelectField>
-
-        {form.mode === 'oneoff' ? (
-          <fieldset className="flex flex-col gap-3 rounded-xl bg-ink-950/40 p-3 ring-1 ring-ink-800">
-            <legend className="px-1 text-xs font-bold uppercase tracking-wider text-ink-400">
-              Accountability
-            </legend>
-
-            <CheckboxField
-              label="Limit the roster to students who RSVP’d"
-              hint="Nobody else appears at check-in, so the bus list stays closed."
-              checked={form.requiresRsvp}
-              onChange={(changed) => patch({ requiresRsvp: changed.target.checked })}
-            />
-            <CheckboxField
-              label="Requires a signed waiver"
-              hint="Students without one are flagged red at check-in."
-              checked={form.requiresWaiver}
-              onChange={(changed) => patch({ requiresWaiver: changed.target.checked })}
-            />
-            <CheckboxField
-              label="Requires payment"
-              checked={form.requiresPayment}
-              onChange={(changed) => patch({ requiresPayment: changed.target.checked })}
-            />
-
-            {form.requiresPayment ? (
-              <TextField
-                label="Fee per student"
-                type="number"
-                inputMode="decimal"
-                min="0"
-                step="0.01"
-                value={form.fee}
-                onChange={(changed) => patch({ fee: changed.target.value })}
-                error={errors.fee ?? null}
-                hint="Dollars. Used to total up what is still outstanding."
+              <CheckboxField
+                label="Limit the roster to students who RSVP’d"
+                hint="Nobody else appears at check-in, so the bus list stays closed."
+                checked={form.requiresRsvp}
+                onChange={(changed) => patch({ requiresRsvp: changed.target.checked })}
               />
-            ) : null}
-          </fieldset>
-        ) : null}
+              <CheckboxField
+                label="Requires a signed waiver"
+                hint="Students without one are flagged red at check-in."
+                checked={form.requiresWaiver}
+                onChange={(changed) => patch({ requiresWaiver: changed.target.checked })}
+              />
+              <CheckboxField
+                label="Requires payment"
+                checked={form.requiresPayment}
+                onChange={(changed) => patch({ requiresPayment: changed.target.checked })}
+              />
 
-        <TextAreaField
-          label="Notes"
-          value={form.notes}
-          onChange={(changed) => patch({ notes: changed.target.value })}
-          placeholder="Bring a jacket, meet at the church car park…"
-        />
+              {form.requiresPayment ? (
+                <TextField
+                  label="Fee per student"
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.01"
+                  className="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  value={form.fee}
+                  onChange={(changed) => patch({ fee: changed.target.value })}
+                  error={errors.fee ?? null}
+                  hint="Dollars. Used to total up what is still outstanding."
+                />
+              ) : null}
+            </fieldset>
+          ) : null}
+
+          <TextField
+            label="Location"
+            value={form.location}
+            onChange={(changed) => patch({ location: changed.target.value })}
+            placeholder="Youth room"
+            autoComplete="off"
+          />
+
+          <TextAreaField
+            label="Notes"
+            value={form.notes}
+            onChange={(changed) => patch({ notes: changed.target.value })}
+            placeholder="Bring a jacket, meet at the church car park…"
+          />
+        </Section>
       </form>
     </Modal>
   );

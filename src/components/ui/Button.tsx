@@ -15,9 +15,13 @@ const VARIANTS: Record<Variant, string> = {
 const SIZES: Record<Size, string> = {
   // 44px minimum height throughout: these are thumb targets on a phone held in
   // one hand, not mouse targets.
+  //
+  // Where there *is* a mouse, they come down a step. A 56px "Schedule event" is
+  // a thumb landing zone at the bottom of a phone; the same button on a desktop
+  // dialog is just a large rectangle, and it pushes everything above it down.
   sm: 'min-h-9 px-3 text-sm',
-  md: 'min-h-11 px-4 text-sm',
-  lg: 'min-h-14 px-5 text-base',
+  md: 'min-h-11 px-4 text-sm pointer-fine:min-h-9',
+  lg: 'min-h-14 px-5 text-base pointer-fine:min-h-10 pointer-fine:px-4 pointer-fine:text-sm',
 };
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
