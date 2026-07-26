@@ -23,12 +23,12 @@ const rosterList = (page: Page) =>
  * The check-in screen paints names the moment it has them — that is the whole
  * point of it — and two slower sources then land on top. Who is *already*
  * present arrives with the `onSnapshot` stream; the prediction arrives with a
- * one-shot read of the past instances' attendance, and until it does there are
- * no regulars, so the screen shows the whole roster before narrowing to Recent.
+ * one-shot read of the past instances' attendance, and the list waits behind a
+ * skeleton for that rather than narrowing under the reader.
  *
  * A test that reads a row during either beat picks a student the next render is
- * about to move, and then spends fifteen seconds waiting for a button that will
- * never come back. The region's own accessible name ("Recent, 12") is what
+ * about to replace, and then spends fifteen seconds waiting for a button that
+ * will never come back. The region's own accessible name ("Recent, 12") is what
  * catches the second one — the header counts describe the event and do not
  * move when the prediction lands.
  */
@@ -69,6 +69,21 @@ async function rosterRows(page: Page): Promise<{ name: string; here: boolean }[]
 }
 
 /**
+ * Waits for the roster to settle *and* for the prediction to have landed.
+ *
+ * `rosterSettled` alone is not enough here: the roster arrives from Planning
+ * Center through a callable and can hold still long enough mid-flight to look
+ * finished.
+ */
+async function settledOnRecent(page: Page): Promise<void> {
+  await page
+    .getByRole('region', { name: /^Recent,/ })
+    .waitFor({ timeout: 30_000 })
+    .catch(() => {});
+  await rosterSettled(page);
+}
+
+/**
  * Picks a student off the roster and returns their name.
  *
  * Reading the label and clicking are two steps, and the roster is live: another
@@ -86,6 +101,90 @@ async function tapFirstRoster(page: Page): Promise<string> {
   await page.getByRole('button', { name: new RegExp(`^Check in ${name},`) }).first().click();
   return name;
 }
+
+/*
+ * Its own block because the observer has to be installed before the app boots,
+ * and the suite below signs in — and therefore navigates — in a `beforeEach`.
+ */
+test.describe('the first paint', () => {
+  /**
+   * The prediction is a one-shot read, so it lands after the roster could
+   * otherwise be painted. Showing all 43 names and then deleting 18 of them a
+   * beat later is the same jump the three blocks used to cause, just at load
+   * rather than on a tap, so the skeleton stays up until the prediction is in.
+   *
+   * This records every roster heading the page has ever rendered and checks the
+   * first one was already the narrow list. Polling could not catch it: the
+   * whole failure is a frame that has come and gone.
+   */
+  test('never flashes the whole roster on the way to Recent', async ({ page, signedInAs }) => {
+    await page.addInitScript(() => {
+      const seen: string[] = [];
+      (window as unknown as { __rosterHeadings: string[] }).__rosterHeadings = seen;
+
+      const record = () => {
+        for (const section of document.querySelectorAll('section[aria-label]')) {
+          const label = section.getAttribute('aria-label') ?? '';
+          if (!/^(Recent|Roster|Checked in|Results), \d+$/.test(label)) continue;
+          if (seen[seen.length - 1] !== label) seen.push(label);
+        }
+      };
+
+      // `document`, not `document.documentElement`: an init script runs before
+      // the root element exists, and observing null throws — silently, in the
+      // page, where a failing assertion here would never see it.
+      new MutationObserver(record).observe(document, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        attributeFilter: ['aria-label'],
+      });
+    });
+
+    await signedInAs('counselor');
+    await settledOnRecent(page);
+
+    /*
+     * The reload is the point. On a cold start the roster itself is the slow
+     * thing — it comes from Planning Center through a callable — so it lands
+     * after the prediction and there is no race to lose. The second load is the
+     * one a counselor actually meets: students served from Firestore's local
+     * cache in a frame, while the prediction goes back to the network for the
+     * past instances' attendance. That is when the screen is tempted to paint
+     * the whole ministry and then take two thirds of it away.
+     *
+     * The init script re-runs on the new document, so the recording starts over.
+     */
+    await reloadReady(page);
+    await settledOnRecent(page);
+
+    const headings = await page.evaluate(
+      () => (window as unknown as { __rosterHeadings: string[] }).__rosterHeadings,
+    );
+    // Guards the instrumentation itself: an observer that recorded nothing would
+    // otherwise "pass" this test forever.
+    expect(headings.length).toBeGreaterThan(0);
+    test.skip(
+      !headings.some((heading) => heading.startsWith('Recent,')),
+      'this seed has no regulars to narrow to',
+    );
+
+    /*
+     * The list is allowed to *grow* — students stream in, and a warm Firestore
+     * cache paints whoever it already had first. What it must never do is show
+     * the whole roster and then take names away.
+     */
+    const size = (heading: string) => Number(/(\d+)$/.exec(heading)?.[1] ?? 0);
+    const narrowed = headings.some(
+      (heading, index) =>
+        heading.startsWith('Roster,') &&
+        headings[index + 1]?.startsWith('Recent,') &&
+        size(headings[index + 1]!) < size(heading),
+    );
+
+    expect(narrowed, `the roster narrowed on load: ${headings.join(' → ')}`).toBe(false);
+  });
+});
 
 test.describe('check-in', () => {
   test.beforeEach(async ({ signedInAs }) => {

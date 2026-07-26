@@ -18,7 +18,9 @@ students who attended at least two of the last three Friday Fellowships — with
 and a "Checked in" chip beside it. Tapping a row flashes green and buzzes before the write reaches
 the server, and the row stays exactly where it was: with two counselors working one queue, a list
 that re-sorted on every check-in slid the next name out from under a thumb already moving toward it.
-Search reaches the whole roster as you type and stands the Recent filter down while it runs.
+The list will not narrow under a reader either — the prediction is a one-shot read, so the rows wait
+behind a skeleton for it rather than showing all 43 names and then taking 18 away. Search reaches the
+whole roster as you type and stands the Recent filter down while it runs.
 
 **Journey 2 — Sunday School by small group.** Sunday School opens pre-scoped to a counselor's
 assigned group ("8th Grade Boys"), so the list is twelve names rather than two hundred. Prediction

@@ -36,6 +36,15 @@ import { studentFullName, type Grade, type RosterEntry } from '@/types';
 /** Long enough to register as confirmation, short enough not to lag the queue. */
 const FLASH_MS = 700;
 
+/**
+ * How long the screen waits for the prediction before giving up on it.
+ *
+ * One round trip is worth waiting behind the skeleton that is already up. A
+ * stalled one is not: a counselor cannot check anybody in against a skeleton,
+ * and the whole roster is never the *wrong* answer, only a longer one.
+ */
+const PREDICTION_GRACE_MS = 1500;
+
 /** What the one list is called, given the filter currently applied to it. */
 const FOCUS_TITLE: Record<RosterFocus, string> = {
   all: "Roster",
@@ -146,6 +155,31 @@ export function CheckInPage() {
     focus,
     group,
   ]);
+
+  /* ---- Waiting for the prediction ---------------------------------------- */
+
+  /**
+   * The prediction arrives a beat after the roster does — it is a one-shot read
+   * of the past instances' attendance, not a listener, and on a second visit
+   * the students come straight back out of Firestore's local cache while that
+   * read goes to the network. Painting the whole ministry and then deleting two
+   * thirds of it when the read lands is the same jump this screen exists to
+   * avoid, so the list waits behind a skeleton until the prediction is in.
+   *
+   * Derived from the data rather than from `useEventSnapshots`'s own `loading`,
+   * which is only raised inside an effect — one frame after the wide roster
+   * would already have been painted.
+   */
+  const predictionPending = historyEvents.length > snapshots.length;
+  const waitingForPrediction = focus === "recent" && predictionPending;
+
+  useEffect(() => {
+    if (!waitingForPrediction) return;
+    // Giving up switches the filter off rather than leaving it armed to narrow
+    // the list later, under a thumb that has already started tapping.
+    const timer = setTimeout(() => setFocus("all"), PREDICTION_GRACE_MS);
+    return () => clearTimeout(timer);
+  }, [waitingForPrediction]);
 
   /* ---- The tap ----------------------------------------------------------- */
 
@@ -318,7 +352,15 @@ export function CheckInPage() {
             student is not on it and quick-add a duplicate. */}
         <RosterErrorBanner className="mx-3 mt-3" />
 
-        {counts.eligible === 0 ? (
+        {/* The list, and only the list, waits for the prediction. The header,
+            the search box and the quick-add button are all still usable — a
+            visitor walking in while the history read is in flight must not find
+            a screen with nothing on it. */}
+        {waitingForPrediction ? (
+          <div className="pt-3">
+            <SkeletonRows />
+          </div>
+        ) : counts.eligible === 0 ? (
           <EmptyState
             className="pt-10"
             icon={rosterError ? "⚠️" : "👋"}
