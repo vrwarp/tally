@@ -478,6 +478,11 @@ and, only if you have chosen to run the emulator against real Planning Center da
 Planning Center goes through a Cloud Function. See [Configuration](#configuration) for the full set
 of files and which one applies when.
 
+Putting it in `FUNCTIONS_ENV` alongside the other settings would also work, and is worth not doing:
+a dotenv value is printed by `gcloud functions describe`, uploaded with the source into the retained
+container image, and copied into a third place. See
+[why Secret Manager](docs/planning-center.md#why-secret-manager-when-the-env-file-would-work).
+
 ### Deploying from CI
 
 Three workflows, split by what they can reach:
