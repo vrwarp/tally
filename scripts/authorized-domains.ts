@@ -47,6 +47,19 @@ const SCOPE = 'https://www.googleapis.com/auth/cloud-platform';
 /** How many times to re-read and re-write when another job races us. */
 const ATTEMPTS = 3;
 
+/**
+ * Which service account is acting, named in every error.
+ *
+ * A project has several — the Hosting deploy key, the backend one, whatever
+ * `firebase init` left behind, `firebase-adminsdk-*` — and a 403 here almost
+ * always means the role went to a different one than the key in
+ * `FIREBASE_SERVICE_ACCOUNT_TALLY`. Without the address in the message the only
+ * way to tell which is to open each key and compare, so it is worth printing.
+ * The address is an identifier, not a credential; the secret is the private key
+ * beside it, which never leaves this process.
+ */
+let caller = '(unknown)';
+
 interface ServiceAccountKey {
   client_email: string;
   private_key: string;
@@ -131,9 +144,14 @@ async function readDomains(projectId: string, token: string): Promise<string[]> 
   if (!response.ok) {
     fail(
       `Could not read the Firebase Auth config for ${projectId}: ${response.status} ${body}\n` +
-        'The deploy key needs roles/firebaseauth.admin on the project, and Identity Toolkit ' +
-        '(identitytoolkit.googleapis.com) must be enabled. See ' +
-        'docs/deployment-setup.md#preview-channels-and-sign-in.',
+        `The account in FIREBASE_SERVICE_ACCOUNT_TALLY is ${caller}. It needs ` +
+        `roles/firebaseauth.admin on ${projectId} — grant it to that address exactly, since a ` +
+        'project has several service accounts and the role does nothing on the others:\n' +
+        `  gcloud projects add-iam-policy-binding ${projectId} \\\n` +
+        `    --member=serviceAccount:${caller} --role=roles/firebaseauth.admin\n` +
+        'PERMISSION_DENIED means the grant is missing or on another account; a message about the ' +
+        'API being disabled means Identity Toolkit (identitytoolkit.googleapis.com) needs ' +
+        'enabling instead. See docs/deployment-setup.md#preview-channels-and-sign-in.',
     );
   }
 
@@ -151,9 +169,9 @@ async function writeDomains(projectId: string, token: string, domains: string[])
     const body = await response.text();
     fail(
       `Could not update the authorized domains for ${projectId}: ${response.status} ${body}\n` +
-        'The deploy key needs roles/firebaseauth.admin — read access is not enough, and the ' +
-        'read above having succeeded does not imply it. See ' +
-        'docs/deployment-setup.md#preview-channels-and-sign-in.',
+        `${caller} can read the Auth config but not write it, so it holds something narrower ` +
+        'than roles/firebaseauth.admin — the read above succeeding does not imply the write. ' +
+        'See docs/deployment-setup.md#preview-channels-and-sign-in.',
     );
   }
 }
@@ -258,6 +276,9 @@ async function main(): Promise<void> {
   if (!key.client_email || !key.private_key) {
     fail('FIREBASE_SERVICE_ACCOUNT has no client_email/private_key — is it a service account key?');
   }
+
+  caller = key.client_email;
+  console.log(`Acting as ${caller} on ${projectId}.`);
 
   const token = await accessToken(key);
 

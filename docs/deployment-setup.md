@@ -170,6 +170,12 @@ gcloud projects add-iam-policy-binding tally-76406 \
   --role=roles/firebaseauth.admin
 ```
 
+The address has to be that key's, exactly. A project accumulates service accounts — the backend
+deploy key, `firebase-adminsdk-*`, whatever `firebase init` created — and the role granted to any of
+the others does nothing here, which looks identical to not having granted it at all. The step prints
+the account it is acting as (`Acting as … on tally-76406.`) and names it again in the failure, so
+the log says which address to grant rather than leaving you to open each key and compare.
+
 That is broader than the rest of that key, which is Hosting-only by design: it can read and write
 Auth *configuration* — providers, templates, the domain list — though not the roster, which lives in
 Firestore behind rules the Hosting key cannot reach either way. Skipping the grant is a supported
