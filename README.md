@@ -421,6 +421,39 @@ that can hand any principal access to the Planning Center token. Rotating the se
 slightly easier and the blast radius of a leaked key slightly worse; the grant above is the safer
 default.
 
+#### The artifact cleanup policy
+
+Every functions deploy builds a container image and leaves it in Artifact Registry, so without a
+cleanup policy the images pile up and quietly bill for storage. The CLI offers to set one up with
+`--force`, which this repository does not pass — `--force` also authorises *deleting* functions that
+have vanished from the source, which is not a decision to hand a robot. So the deploy ends at:
+
+```
+Error: Functions successfully deployed but could not set up cleanup policy in location us-central1.
+```
+
+Note "successfully deployed": the functions are live and this is the step after them. Set the policy
+once and the message goes away for good:
+
+```bash
+npx firebase functions:artifacts:setpolicy --project tally-76406
+```
+
+#### The first deploy needs a second run
+
+The very first 2nd-gen deploy usually leaves `onStudentCreated` behind, because its Eventarc trigger
+is created before Google has finished propagating permissions to the Eventarc service agent:
+
+```
+Validation failed for trigger ...: Permission denied while using the Eventarc Service Agent.
+If you recently started to use Eventarc, it may take a few minutes...
+⚠  Since this is your first time using 2nd gen functions, we need a little bit longer...
+```
+
+Nothing is misconfigured and nothing needs granting — wait a few minutes and re-run the job. The
+callable functions deploy fine on the first pass; only the event-triggered one is affected, and only
+once per project.
+
 ### Deploying
 
 ```bash
