@@ -73,20 +73,20 @@ test.describe('Planning Center', () => {
     }
   });
 
-  test('a student added upstream appears without anybody running a sync', async ({
+  test('somebody new in Planning Center joins the roster when a leader says so', async ({
     page,
     signedInAs,
     planningCenter,
+    firestore,
   }) => {
-    await signedInAs('core');
-    await gotoReady(page, '/settings');
-
-    const card = page
-      .locator('section')
-      .filter({ has: page.getByRole('heading', { name: /planning center/i }) })
-      .first();
-    const before = await card.getByText(/students visible/i).innerText();
-
+    /*
+     * The whole point of moving membership into Tally.
+     *
+     * A new person in the church database is *not* automatically a Footprints
+     * student — that was the flaw in pointing Tally at a Planning Center List,
+     * which is a saved query and moves on its own. Somebody decides, and the
+     * decision is a document in Tally.
+     */
     await planningCenter.createStudent({
       firstName: 'Wendell',
       lastName: 'Ashgrove',
@@ -95,20 +95,47 @@ test.describe('Planning Center', () => {
       parentPhone: '555-0177',
     });
 
-    /*
-     * Asserted on this page rather than by navigating to the roster.
-     *
-     * "Refresh" carries `force` on the read itself, so it is exact wherever it
-     * lands. A *different* page load is a different request, which may be
-     * served by a different function instance whose own in-memory cache is
-     * still warm — so it picks the new student up within `cacheTtlSeconds`,
-     * not instantly. Waiting that out here would be testing the clock.
-     */
-    await page.getByRole('button', { name: /^refresh/i }).click();
+    await signedInAs('core');
+    await gotoReady(page, '/students');
 
-    await expect(card.getByText(/students visible/i)).not.toHaveText(before, {
-      timeout: 30_000,
-    });
+    // Not on the roster yet, however real they are upstream.
+    await expect(page.getByRole('link', { name: /Wendell/ })).toHaveCount(0);
+
+    await page.getByRole('button', { name: /add from planning center/i }).click();
+    const dialog = page.getByRole('dialog', { name: /add from planning center/i });
+    await dialog.getByLabel(/search planning center/i).fill('Ashgrove');
+
+    /*
+     * The student's row, not the first row.
+     *
+     * The search is over the whole church directory, so "Ashgrove" also finds
+     * Wendell's mother — which is the search working correctly, and exactly the
+     * mistake a leader could make too. That is why the list shows the grade and
+     * whether Planning Center calls somebody a child.
+     */
+    const wendell = dialog.locator('li').filter({ hasText: 'Wendell' });
+    await wendell.waitFor({ timeout: 20_000 });
+    await wendell.getByRole('button', { name: /^add$/i }).click();
+
+    // The membership is Tally's own document, keyed by the Planning Center id.
+    await firestore.until(
+      'students',
+      (docs) => docs.some((document) => document.id.startsWith('pco_') && document.data.addedToRosterBy != null),
+      'the new roster membership',
+    );
+
+    await dialog.getByRole('button', { name: /done/i }).click();
+
+    /*
+     * Asserted after a reload rather than against the open screen.
+     *
+     * What matters is that the roster *is* different now, not how quickly one
+     * already-mounted list caught up — and a fresh load is what the next
+     * counselor to open Tally actually gets. Scoped to the rows, because the
+     * dialog leaves its own search result in the DOM.
+     */
+    await gotoReady(page, '/students');
+    await expect(page.getByRole('link', { name: /Wendell/ })).toBeVisible({ timeout: 30_000 });
   });
 
   test('parent contact is fetched for one student, on the screen that shows it', async ({
@@ -152,13 +179,15 @@ test.describe('Planning Center', () => {
     await expect(card.getByText(/reused for up to|caching is off/i).first()).toBeVisible();
   });
 
-  test('the 5th grader never reaches a 6-12 roster', async ({ page, signedInAs }) => {
+  test('nobody below 6th grade is on the roster', async ({ page, signedInAs }) => {
     await signedInAs('core');
     await gotoReady(page, '/students');
 
-    // The seed puts nobody below 6th grade in Planning Center, and the grade
-    // filter is enforced server-side; this checks the screen agrees.
-    await expect(page.getByText(/5th grade/i)).toHaveCount(0);
+    // Scoped to the rows: the "add from Planning Center" dialog explains the
+    // 5th-grade case in prose, and matching that would prove nothing.
+    const rows = page.getByRole('link');
+    await rows.first().waitFor({ timeout: 30_000 });
+    await expect(rows.filter({ hasText: /5th grade/i })).toHaveCount(0);
   });
 
   test('an unreachable Planning Center says so rather than showing an empty roster', async ({
@@ -200,82 +229,52 @@ test.describe('Planning Center', () => {
     await expect(page.getByRole('button', { name: /^refresh/i })).toHaveCount(0);
   });
 
-  test('a leader moves the roster onto a different list, with no deploy', async ({
+  test('a leader takes a student off the roster without losing their history', async ({
     page,
     signedInAs,
     firestore,
   }) => {
-    /*
-     * The whole feature, from the button to the roster.
-     *
-     * Which list is the roster used to be a deploy-time parameter, so changing
-     * it meant finding whoever runs `firebase deploy` — and the value was an id
-     * copied out of a browser address bar, which is unverifiable by eye. Here a
-     * leader picks a list by name, sees what it would select, and the very next
-     * read comes from it.
-     *
-     * The decoy is doing real work: "Footprints Camp 2019" is a plausible name
-     * with real members, and it is the wrong answer. That is exactly the
-     * mistake a bare id invites.
-     */
     await signedInAs('core');
-    await gotoReady(page, '/settings');
+    await gotoReady(page, '/students');
 
-    const card = page
-      .locator('section')
-      .filter({ has: page.getByRole('heading', { name: /planning center/i }) })
-      .first();
+    const first = page.getByRole('link').filter({ hasText: new RegExp(ROSTER_STUDENT) }).first();
+    await first.waitFor({ timeout: 30_000 });
+    await first.click();
 
-    await expect(card.getByText(/students visible/i)).toBeVisible({ timeout: 20_000 });
-    const before = await card.getByText(/students visible/i).innerText();
+    await page.getByRole('button', { name: /remove from roster/i }).click();
 
-    try {
-      await card.getByRole('button', { name: /^change$/i }).click();
+    /*
+     * Deactivated, not deleted, and that is the point rather than an
+     * implementation detail: every attendance row references a student id, so
+     * erasing the document would quietly drop past head counts and leave
+     * history pointing at nobody.
+     */
+    // Waiting on the removal *stamp*, not on "some inactive student": the seed
+    // ships a few of those, so the looser predicate passes before anything has
+    // happened.
+    await firestore.until(
+      'students',
+      (all) => all.some((document) => document.data.removedFromRosterBy != null),
+      'the removed student',
+    );
 
-      const dialog = page.getByRole('dialog', { name: /planning center settings/i });
-      // Scoped to the student picker: the counselor list offers the same lists,
-      // which is correct — a church may keep its team on any of them.
-      const camp = dialog
-        .getByRole('group', { name: 'Student list' })
-        .getByRole('button', { name: /Footprints Camp 2019/ });
+    // Off the roster is off the screen: their name is Planning Center's, and
+    // Tally only asks about people it has on the roster.
+    await gotoReady(page, '/students');
+    await expect(page.getByRole('link', { name: new RegExp(ROSTER_STUDENT) })).toHaveCount(0);
 
-      await expect(camp).toBeVisible({ timeout: 20_000 });
-      // The count and the health note are the point of the picker: nobody can
-      // tell these lists apart by id, and everybody can tell 12 from 43 — or
-      // read that Planning Center has given up on this one's rules.
-      await expect(camp).toContainText(/12 people/);
-      await expect(camp).toContainText(/rules no longer work/i);
+    // And back again, because a student who left in March comes back in June.
+    await page.getByRole('button', { name: /add from planning center/i }).click();
+    const dialog = page.getByRole('dialog', { name: /add from planning center/i });
+    await dialog.getByLabel(/search planning center/i).fill(ROSTER_STUDENT);
+    const restore = dialog.getByRole('button', { name: /^add$/i }).first();
+    await restore.waitFor({ timeout: 20_000 });
+    await restore.click();
+    await dialog.getByRole('button', { name: /done/i }).click();
 
-      await camp.click();
-      await dialog.getByRole('button', { name: /save settings/i }).click();
-
-      // Saved as an ordinary document under the security rules — no callable,
-      // no deploy, no restart.
-      const saved = await firestore.until(
-        'config',
-        (docs) => docs.some((document) => document.id === 'planningCenter'),
-        'the saved Planning Center settings',
-      );
-      expect(
-        saved.find((document) => document.id === 'planningCenter')?.data.studentListId,
-      ).toBe('FOOTPRINTS_CAMP_2019');
-
-      // And the server is already reading from it: a smaller roster, named on
-      // the card by the list it now comes from.
-      await expect(card.getByText(/students visible/i)).not.toHaveText(before, {
-        timeout: 30_000,
-      });
-      // Named, not numbered. The card used to be able to say only "list mode";
-      // the id it was configured with told nobody anything.
-      await expect(card.getByText(/Students come from the .Footprints Camp 2019. list/)).toBeVisible();
-      // And the reason that was the wrong choice is on the card, not buried in
-      // a picker somebody has already closed.
-      await expect(card.getByText(/rules behind .Footprints Camp 2019. no longer work/)).toBeVisible();
-    } finally {
-      // One dataset, one worker: a spec that walks away leaving the roster
-      // pointed at a camp list from 2019 does not fail here, it fails somewhere
-      // else entirely.
-      await firestore.remove('config/planningCenter');
-    }
+    await gotoReady(page, '/students');
+    await expect(page.getByRole('link', { name: new RegExp(ROSTER_STUDENT) }).first()).toBeVisible({
+      timeout: 30_000,
+    });
   });
 });

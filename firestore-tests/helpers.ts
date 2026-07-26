@@ -25,6 +25,7 @@ import { paths } from '@/lib/paths';
 import type {
   AppSettingsDoc,
   AttendanceRecordDoc,
+  InvitationDoc,
   PcoRuntimeConfigDoc,
   RsvpDoc,
   SmallGroupDoc,
@@ -205,17 +206,31 @@ export function settingsDoc(overrides: Partial<AppSettingsDoc> = {}): AppSetting
  */
 export function pcoConfigDoc(overrides: Partial<PcoRuntimeConfigDoc> = {}): PcoRuntimeConfigDoc {
   return {
-    rosterSource: 'list',
-    studentListId: 'FOOTPRINTS_STUDENTS',
-    counselorListId: 'FOOTPRINTS_TEAM',
     minGrade: 6,
     maxGrade: 12,
     writeBack: 'create',
-    smallGroupField: '',
     cacheTtlSeconds: 30,
     baseUrl: '',
     updatedAt: T0,
     updatedBy: UID.core,
+    ...overrides,
+  };
+}
+
+/**
+ * An invitation, as an admin leaves it.
+ *
+ * This is the allowlist that used to be a Planning Center List — the one thing
+ * a List genuinely could not express, since "these particular twelve adults"
+ * is not a filter rule.
+ */
+export function invitationDoc(overrides: Partial<InvitationDoc> = {}): InvitationDoc {
+  return {
+    email: 'newcomer@footprints.example.org',
+    role: 'counselor',
+    active: true,
+    invitedAt: T0,
+    invitedBy: UID.admin,
     ...overrides,
   };
 }

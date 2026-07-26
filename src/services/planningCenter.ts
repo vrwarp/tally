@@ -29,20 +29,17 @@ function toList(payload: PcoListPayload): PcoList {
 
 /** The connection, plus the settings in force behind it. */
 export async function fetchPlanningCenterStatus(force = false): Promise<PcoStatus> {
-  const response = await getPlanningCenterStatus({ force });
-  return {
-    ...response.data,
-    studentList: response.data.studentList ? toList(response.data.studentList) : null,
-    counselorList: response.data.counselorList ? toList(response.data.counselorList) : null,
-  };
+  return (await getPlanningCenterStatus({ force })).data;
 }
 
 /**
- * The lists this church has, for the picker.
+ * The lists this church has, for the one-off import.
  *
- * `search` is passed through to Planning Center rather than filtered here: a
- * church with hundreds of lists should send one small page over the wire, not
- * all of them so a browser can hide most of it.
+ * A list is no longer the roster — it cannot be, being a saved query — but it
+ * is a perfectly good starting point for one, and importing from it is how a
+ * church moves across. `search` is passed through to Planning Center rather
+ * than filtered here: a church with hundreds of lists should send one small
+ * page over the wire, not all of them so a browser can hide most of it.
  */
 export async function fetchPlanningCenterLists(search?: string): Promise<PcoList[]> {
   const response = await listPlanningCenterLists(search ? { search } : {});

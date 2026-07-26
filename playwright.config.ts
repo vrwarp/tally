@@ -70,6 +70,15 @@ const planningCenterEnv = {
   PCO_STUDENT_LIST_ID: 'FOOTPRINTS_STUDENTS',
   PCO_COUNSELOR_LIST_ID: 'FOOTPRINTS_TEAM',
   PCO_WRITE_BACK: 'create',
+  /*
+   * The bootstrap admin, exactly as a real deploy would set it.
+   *
+   * Deliberately only the admin: the other two roles arrive on invitations the
+   * seed writes into Firestore, so the suite exercises both halves of the
+   * access model — the break-glass that cannot be revoked from inside the app,
+   * and the ordinary invitation that can.
+   */
+  TALLY_ADMIN_EMAILS: 'dana.ruiz@footprints.example.org',
   // Short but non-zero, so the suite exercises the cache rather than routing
   // around it — and so a run does not depend on `functions/.env.demo-tally`
   // being in sync with the params the code declares.

@@ -1,33 +1,30 @@
 /**
  * Reading people out of Planning Center, on demand.
  *
- * This module replaced a scheduled sweep that copied every person in the church
- * into Firestore and kept the copy in step. That was a lot of machinery, and a
- * lot of stored personal data about minors, to answer questions as small as
- * "what grade is Marcus in".
+ * Two questions are easy to run together and are worth keeping apart:
  *
- * So: Planning Center owns people. Tally asks when it needs to know, and holds
- * the answer for at most `cacheTtlSeconds` (see ./cache.ts). Nothing here writes
- * to Firestore — that is the entire point, and it is worth keeping true.
+ *   *Who is on the roster* is Tally's. A `students/{id}` document exists for
+ *   everyone somebody has put on it, and that document is the decision. It used
+ *   to be a Planning Center List, which could not express it: a List is
+ *   generated from filter rules, so a hand-picked group of teenagers was only
+ *   expressible by inventing a custom field on every person in the church and
+ *   filtering on that.
  *
- * The one thing Tally does still own about a person is the parts Planning
- * Center has no opinion about: which small group they are in, and when they
- * turned up. Those live in `students/{id}` and are written only when Tally
- * itself has something to record, so that collection is sparse rather than a
- * mirror.
+ *   *What those people are called* is Planning Center's. Tally asks when it
+ *   needs to know and holds the answer for at most `cacheTtlSeconds` (see
+ *   ./cache.ts). Nothing here writes to Firestore, and nothing here stores a
+ *   name, a grade or a parent's phone number — that is the entire point, and it
+ *   is worth keeping true.
  */
 import type { PcoConfig } from '../config.js';
-import type { PcoClient, PcoQuery } from './client.js';
+import type { PcoClient } from './client.js';
 import { cacheKey, type TtlCache } from './cache.js';
 import {
   addToIncludedIndex,
   buildIncludedIndex,
   extractParentContact,
-  isYouth,
-  mapPersonToAccessEntry,
   mapPersonToStudent,
   type IncludedIndex,
-  type MappedAccessEntry,
   type ParentContact,
 } from './mapping.js';
 import {
@@ -100,6 +97,12 @@ export interface PersonDetails extends ParentContact {
 
 export interface RosterResult {
   people: RosterPerson[];
+  /**
+   * Roster entries whose Planning Center person could not be read. Reported so
+   * a screen can say "three students are missing" instead of just showing three
+   * fewer students.
+   */
+  unresolved: string[];
   /** True when the answer came from cache rather than from Planning Center. */
   cached: boolean;
   fetchedAt: string;
@@ -111,9 +114,6 @@ export interface RosterResult {
 
 /** Everything a roster row needs in one request. */
 const ROSTER_INCLUDES = ['emails', 'phone_numbers', 'households'] as const;
-/** A counselor needs no household; only their own address and small-group field. */
-const TEAM_INCLUDES = ['emails', 'phone_numbers'] as const;
-const FIELD_INCLUDES = ['field_data', 'field_data.field_definition'] as const;
 
 /**
  * Households are one request each (JSON:API cannot include
@@ -122,26 +122,119 @@ const FIELD_INCLUDES = ['field_data', 'field_data.field_definition'] as const;
  */
 const MAX_HOUSEHOLD_FETCHES = 8;
 
-function rosterPath(config: PcoConfig): string {
-  return config.rosterSource === 'list'
-    ? `/lists/${encodeURIComponent(config.studentListId ?? '')}/people`
-    : '/people';
+/**
+ * People fetched one at a time before the roster gives up and says so.
+ *
+ * The sweep below catches everyone Planning Center has flagged as a child, which
+ * is nearly always the whole roster. Anyone else — the graduated senior who
+ * still comes, the 5th grader with an older sibling — costs a request each, and
+ * that is fine for a handful and ruinous for four hundred. Past this cap the
+ * remaining ids are *reported* rather than dropped: a roster quietly missing
+ * students is the one failure nobody would notice.
+ */
+const MAX_INDIVIDUAL_LOOKUPS = 60;
+
+/* -------------------------------------------------------------------------- */
+/* The roster                                                                  */
+/* -------------------------------------------------------------------------- */
+
+export interface RosterHydration {
+  people: RosterPerson[];
+  /**
+   * Planning Center ids Tally has on its roster but could not read.
+   *
+   * Deleted upstream, merged into another record, or simply more stragglers
+   * than `MAX_INDIVIDUAL_LOOKUPS` allows. Either way the caller has to be able
+   * to say so — these are students somebody added on purpose.
+   */
+  unresolved: string[];
 }
 
-function rosterQuery(config: PcoConfig): PcoQuery {
-  // Grade mode cannot express a grade *range*, so `where[child]` narrows the
-  // query as far as the API allows and `isYouth` enforces the band locally.
-  const where: PcoQuery = config.rosterSource === 'grade' ? { child: true } : {};
-  return {
+/**
+ * Turns the Planning Center ids on Tally's roster into people.
+ *
+ * The membership itself is Tally's — a `students/{id}` document exists for
+ * everyone on the roster, and that document is the decision somebody made.
+ * Planning Center still owns what those people are *called*, and this is where
+ * the two meet.
+ *
+ * Two passes, for cost rather than for correctness. One sweep of
+ * `where[child]=true` answers for nearly everybody in a single request per
+ * hundred people; whoever is left is fetched individually. Doing it the other
+ * way around — a request per student — is four hundred requests against an API
+ * that rate-limits, on the path a counselor is waiting on at a door.
+ */
+async function hydratePeople(
+  client: PcoClient,
+  config: PcoConfig,
+  personIds: readonly string[],
+  now: Date,
+): Promise<RosterHydration> {
+  const wanted = new Set(personIds);
+  if (wanted.size === 0) return { people: [], unresolved: [] };
+
+  const found = new Map<string, PcoPerson>();
+
+  for await (const page of client.paginate<PcoPerson>('/people', {
     include: [...ROSTER_INCLUDES],
     order: 'last_name',
-    where,
-  };
-}
+    where: { child: true },
+  })) {
+    for (const person of page.data) {
+      if (wanted.has(person.id)) found.set(person.id, person);
+    }
+    // Nothing left to look for. The rest of the church is not our business.
+    if (found.size === wanted.size) break;
+  }
 
-/* -------------------------------------------------------------------------- */
-/* The youth roster                                                            */
-/* -------------------------------------------------------------------------- */
+  const stragglers = [...wanted].filter((id) => !found.has(id));
+  const unresolved: string[] = [];
+
+  for (const personId of stragglers.slice(0, MAX_INDIVIDUAL_LOOKUPS)) {
+    try {
+      const body = await client.get<PcoPerson>(`/people/${encodeURIComponent(personId)}`, {
+        include: [...ROSTER_INCLUDES],
+      });
+      const person = Array.isArray(body.data) ? body.data[0] : body.data;
+      if (person) found.set(personId, person);
+      else unresolved.push(personId);
+    } catch {
+      // A 404 is the ordinary case here: somebody deleted or merged the person
+      // upstream while Tally still has them on the roster. That is a thing to
+      // report, not a thing to fail the whole roster over.
+      unresolved.push(personId);
+    }
+  }
+  unresolved.push(...stragglers.slice(MAX_INDIVIDUAL_LOOKUPS));
+
+  const people: RosterPerson[] = [];
+  for (const person of found.values()) {
+    const mapped = mapPersonToStudent(person, {
+      minGrade: config.minGrade,
+      maxGrade: config.maxGrade,
+      now,
+    });
+
+    people.push({
+      id: pcoStudentId(person.id),
+      pcoPersonId: person.id,
+      firstName: mapped.firstName,
+      lastName: mapped.lastName,
+      grade: mapped.grade,
+      gender: mapped.gender,
+      status: mapped.status,
+      searchName: mapped.searchName,
+      // Not looked up — see the note on the field. Hydrating households here
+      // would be one request per family on the path a counselor waits for at a
+      // door.
+      profileComplete: null,
+      hasAllergies: mapped.allergies !== null && mapped.allergies.length > 0,
+    });
+  }
+
+  people.sort((a, b) => (a.searchName < b.searchName ? -1 : a.searchName > b.searchName ? 1 : 0));
+  return { people, unresolved };
+}
 
 export interface RosterOptions {
   client: PcoClient;
@@ -153,89 +246,107 @@ export interface RosterOptions {
 }
 
 /**
- * The whole youth roster, as the check-in screen needs it.
+ * The roster, as the check-in screen needs it.
  *
- * One pull, no household hydration: the roster does not show parent contact, so
- * paying one request per family to build a list of names would be the old
- * sweep's cost with none of its (dubious) benefit.
+ * `personIds` comes from Tally's own membership and is *not* itself cached —
+ * only the Planning Center half is. A student added a moment ago changes the
+ * set, which changes the cache key, so they appear on the next read instead of
+ * whenever the previous answer happens to expire. Membership is Tally's own
+ * data and reading it again costs one Firestore query.
  */
-export async function fetchYouthRoster(options: RosterOptions): Promise<RosterResult> {
+export async function fetchRoster(
+  options: RosterOptions & { personIds: readonly string[] },
+): Promise<RosterResult> {
   const { client, config, cache } = options;
   const now = options.now ?? new Date();
 
-  // Every input that changes *which people come back* is part of the key, so a
-  // setting changed in Settings takes effect on the next read rather than
-  // whenever the previous answer happens to expire. `base` is in here for the
-  // same reason it is the most alarming thing to get wrong: an instance that
-  // has just been repointed at a different Planning Center must not serve the
-  // old one's roster for another half-minute.
+  const ids = [...new Set(options.personIds)].sort();
   const key = cacheKey({
     kind: 'roster',
     base: config.baseUrl,
-    source: config.rosterSource,
-    list: config.studentListId,
     min: config.minGrade,
     max: config.maxGrade,
+    ids,
   });
 
   const before = cache.stats.misses;
-  const people = await cache.get(
-    key,
-    async () => {
-      const collected: RosterPerson[] = [];
-      const seen = new Set<string>();
-
-      for await (const page of client.paginate<PcoPerson>(rosterPath(config), rosterQuery(config))) {
-        for (const person of page.data) {
-          // In list mode the youth pastor's list *is* the roster; second-guessing
-          // it on grade would drop the 5th grader who comes with an older sibling.
-          const youth =
-            config.rosterSource === 'list'
-              ? true
-              : isYouth(person, { minGrade: config.minGrade, maxGrade: config.maxGrade, now });
-          if (!youth) continue;
-          // A person on two Lists comes back twice; the door does not need to see
-          // them twice.
-          if (seen.has(person.id)) continue;
-          seen.add(person.id);
-
-          const mapped = mapPersonToStudent(person, {
-            minGrade: config.minGrade,
-            maxGrade: config.maxGrade,
-            now,
-          });
-
-          collected.push({
-            id: pcoStudentId(person.id),
-            pcoPersonId: person.id,
-            firstName: mapped.firstName,
-            lastName: mapped.lastName,
-            grade: mapped.grade,
-            gender: mapped.gender,
-            status: mapped.status,
-            searchName: mapped.searchName,
-            // Not looked up — see the note on the field. Hydrating households
-          // here would be one request per family on the path a counselor waits
-          // for at a door.
-          profileComplete: null,
-            hasAllergies: mapped.allergies !== null && mapped.allergies.length > 0,
-          });
-        }
-      }
-
-      collected.sort((a, b) =>
-        a.searchName < b.searchName ? -1 : a.searchName > b.searchName ? 1 : 0,
-      );
-      return collected;
-    },
-    options.force,
-  );
+  const hydrated = await cache.get(key, () => hydratePeople(client, config, ids, now), options.force);
 
   return {
-    people,
+    people: hydrated.people,
+    unresolved: hydrated.unresolved,
     cached: cache.stats.misses === before,
     fetchedAt: now.toISOString(),
   };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Searching for somebody to add                                               */
+/* -------------------------------------------------------------------------- */
+
+/** One candidate for the "add a student" flow. */
+export interface PersonSearchResult {
+  pcoPersonId: string;
+  /** Tally student id, so the caller can tell whether they are already on the roster. */
+  id: string;
+  firstName: string;
+  lastName: string;
+  grade: number;
+  /** What Planning Center thinks: a child, or an adult. Shown, never enforced. */
+  child: boolean;
+  status: 'active' | 'inactive';
+}
+
+/** Enough to choose from, few enough to render as a list on a phone. */
+const MAX_SEARCH_RESULTS = 25;
+
+/**
+ * Finds people in Planning Center by name, for somebody building the roster.
+ *
+ * Deliberately unfiltered by grade or by `child`. The whole reason the roster is
+ * hand-picked is that those filters are wrong at the edges — the 5th grader who
+ * comes with an older sibling, the senior who graduated in May and still leads
+ * worship. Both attributes are *shown* so the person choosing can see what they
+ * are picking; neither excludes anybody from the list.
+ */
+export async function searchPeople(options: {
+  client: PcoClient;
+  config: PcoConfig;
+  query: string;
+  now?: Date;
+  limit?: number;
+}): Promise<PersonSearchResult[]> {
+  const query = options.query.trim();
+  if (!query) return [];
+
+  const now = options.now ?? new Date();
+  const limit = Math.max(1, Math.min(MAX_SEARCH_RESULTS, options.limit ?? MAX_SEARCH_RESULTS));
+  const results: PersonSearchResult[] = [];
+
+  for await (const page of options.client.paginate<PcoPerson>('/people', {
+    where: { search_name_or_email: query },
+    order: 'last_name',
+  })) {
+    for (const person of page.data) {
+      const mapped = mapPersonToStudent(person, {
+        minGrade: options.config.minGrade,
+        maxGrade: options.config.maxGrade,
+        now,
+      });
+      results.push({
+        pcoPersonId: person.id,
+        id: pcoStudentId(person.id),
+        firstName: mapped.firstName,
+        lastName: mapped.lastName,
+        grade: mapped.grade,
+        child: person.attributes?.child === true,
+        status: mapped.status,
+      });
+      if (results.length >= limit) return results;
+    }
+  }
+
+  return results;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -325,89 +436,4 @@ async function hydrateHouseholds(
       addToIncludedIndex(index, page.included);
     }
   }
-}
-
-/* -------------------------------------------------------------------------- */
-/* The team                                                                    */
-/* -------------------------------------------------------------------------- */
-
-/**
- * Looks up one email address on the team roster.
- *
- * This is how `provisionAccess` decides whether somebody signing in is allowed
- * in, and with what role. It used to read a mirrored `accessRoster` collection;
- * asking Planning Center directly means the allowlist is never stale, and Tally
- * never stores a list of staff email addresses at all.
- *
- * Returns null for "not on the roster", which the caller reports as a refusal
- * rather than an error — a volunteer who has not been added yet is a normal
- * thing to be, not a failure.
- */
-export async function findTeamMemberByEmail(
-  options: RosterOptions & { email: string },
-): Promise<MappedAccessEntry | null> {
-  const { client, config, cache } = options;
-  const email = options.email.trim().toLowerCase();
-  if (!email) return null;
-
-  return cache.get(
-    cacheKey({
-      kind: 'team-member',
-      base: config.baseUrl,
-      email,
-      list: config.counselorListId,
-      // The small-group field decides the `assignedGroupId` on the entry, so a
-      // leader who fixes a mistyped field name should not have to wait out a
-      // cached answer that was mapped with the old one.
-      group: config.smallGroupField,
-    }),
-    () => lookupTeamMember(client, config, email),
-  );
-}
-
-async function lookupTeamMember(
-  client: PcoClient,
-  config: PcoConfig,
-  email: string,
-): Promise<MappedAccessEntry | null> {
-  const include = [...TEAM_INCLUDES, ...(config.smallGroupField ? FIELD_INCLUDES : [])];
-
-  // A configured List is the authoritative team roster: being findable in
-  // Planning Center is not the same as being on the youth team.
-  if (config.counselorListId) {
-    for await (const page of client.paginate<PcoPerson>(
-      `/lists/${encodeURIComponent(config.counselorListId)}/people`,
-      { include },
-    )) {
-      const index = buildIncludedIndex(page.included);
-      for (const person of page.data) {
-        const entry = mapPersonToAccessEntry(person, {
-          index,
-          smallGroupField: config.smallGroupField,
-        });
-        if (entry?.emailKey && entry.email.trim().toLowerCase() === email) return entry;
-      }
-    }
-    return null;
-  }
-
-  // No List configured. Search by email address, then confirm the address
-  // actually belongs to the person we got back — Planning Center's search is
-  // fuzzy, and "close enough" is not a basis for granting access to a roster of
-  // minors.
-  for await (const page of client.paginate<PcoPerson>('/people', {
-    where: { search_name_or_email: email },
-    include,
-  })) {
-    const index = buildIncludedIndex(page.included);
-    for (const person of page.data) {
-      const entry = mapPersonToAccessEntry(person, {
-        index,
-        smallGroupField: config.smallGroupField,
-      });
-      if (entry && entry.email.trim().toLowerCase() === email) return entry;
-    }
-  }
-
-  return null;
 }

@@ -29,7 +29,7 @@ import {
   readPlanningCenterConfig,
   type PcoStoredConfig,
 } from '@/services/planningCenter';
-import type { PcoList, PcoStatus, PcoWriteBackMode } from '@/types';
+import type { PcoStatus, PcoWriteBackMode } from '@/types';
 
 const WRITE_BACK_LABEL: Record<PcoWriteBackMode, string> = {
   off: 'Tally never writes to Planning Center. Visitors stay queued until this is turned on.',
@@ -44,49 +44,6 @@ function describeCache(seconds: number): string {
   return `An answer is reused for up to ${seconds} ${
     seconds === 1 ? 'second' : 'seconds'
   } before Tally asks Planning Center again.`;
-}
-
-/**
- * How the roster is selected, said the way a leader would say it.
- *
- * Naming the list rather than its id is the point: an id is what this setting
- * used to be, and an id on a status screen is unverifiable — nobody can tell
- * whether 1234567 is this year's roster or a camp list from 2019.
- */
-function describeSource(status: PcoStatus): string {
-  if (status.settings.rosterSource === 'grade') {
-    return `Students are everyone marked as a child in grades ${status.settings.minGrade}–${status.settings.maxGrade}.`;
-  }
-  if (status.studentList) {
-    return `Students come from the “${status.studentList.name}” list.`;
-  }
-  return status.settings.studentListId
-    ? `Students come from list ${status.settings.studentListId}, which Tally could not read.`
-    : 'Students come from a Planning Center list, but none has been chosen yet.';
-}
-
-function describeTeam(status: PcoStatus): string {
-  if (status.counselorList) return `Sign-in is allowed for the “${status.counselorList.name}” list.`;
-  return status.settings.counselorListId
-    ? `Sign-in is allowed for list ${status.settings.counselorListId}, which Tally could not read.`
-    : 'No counselor list is set, so sign-in falls back to your Planning Center administrators.';
-}
-
-/** Worth saying out loud on the status card, not just inside the picker. */
-function listWarning(list: PcoList | null): string | null {
-  if (!list) return null;
-  if (list.invalid) {
-    return `Planning Center says the rules behind “${list.name}” no longer work, so its members may be wrong.`;
-  }
-  if (!list.autoRefresh && list.refreshedAt) {
-    const months = (Date.now() - list.refreshedAt.getTime()) / (1000 * 60 * 60 * 24 * 30);
-    if (months >= 6) {
-      return `“${list.name}” does not refresh itself and was last run ${formatRelative(
-        list.refreshedAt,
-      )}. Anybody added since is not on it.`;
-    }
-  }
-  return null;
 }
 
 export function PlanningCenterCard() {
@@ -156,9 +113,6 @@ export function PlanningCenterCard() {
     show('Planning Center settings saved', { tone: 'success' });
   };
 
-  const studentWarning = status ? listWarning(status.studentList) : null;
-  const teamWarning = status ? listWarning(status.counselorList) : null;
-
   return (
     <Card>
       <CardHeader
@@ -214,12 +168,6 @@ export function PlanningCenterCard() {
               </p>
             ) : null}
 
-            {studentWarning ?? teamWarning ? (
-              <p className="rounded-xl bg-warn-500/10 px-3 py-2 text-sm text-warn-400 ring-1 ring-warn-500/25">
-                {studentWarning ?? teamWarning}
-              </p>
-            ) : null}
-
             {rosterOffline ? (
               <p className="rounded-xl bg-warn-500/10 px-3 py-2 text-sm text-warn-400 ring-1 ring-warn-500/25">
                 This device is showing a roster it saved earlier. Check-in still works; anyone added
@@ -231,8 +179,16 @@ export function PlanningCenterCard() {
               <div>
                 <dt className="text-xs font-medium uppercase tracking-wide text-ink-500">Roster</dt>
                 <dd className="text-ink-300">
-                  {describeSource(status)}
-                  <span className="block text-ink-500">{describeTeam(status)}</span>
+                  Who is on the roster is Tally's own list — add and remove students on the Students
+                  screen. Planning Center supplies their names, grades and parent contact, and Tally
+                  stores none of it.
+                  {status.unresolved > 0 ? (
+                    <span className="block text-warn-400">
+                      {status.unresolved}{' '}
+                      {status.unresolved === 1 ? 'student is' : 'students are'} on the roster but can
+                      no longer be read from Planning Center — deleted or merged upstream.
+                    </span>
+                  ) : null}
                 </dd>
               </div>
               <div>

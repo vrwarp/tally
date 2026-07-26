@@ -75,6 +75,13 @@ function normalizeName(value: string): string {
   return value.toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
+/** Name match shared by both search filters: full name or nickname, normalised. */
+function matchesName(person: SimPerson, needle: string): boolean {
+  const full = normalizeName(`${person.first_name} ${person.last_name}`);
+  const nick = person.nickname ? normalizeName(`${person.nickname} ${person.last_name}`) : '';
+  return full.includes(needle) || (nick !== '' && nick.includes(needle));
+}
+
 /**
  * Applies the `where[...]` clauses Tally uses. Unknown clauses are ignored, in
  * line with the real API, which quietly drops filters it does not recognise.
@@ -82,6 +89,8 @@ function normalizeName(value: string): string {
 export function applyWhere(
   people: readonly SimPerson[],
   where: Record<string, QueryNode>,
+  /** Only needed by the filters that reach past the person record itself. */
+  store?: SimulatorStore,
 ): SimPerson[] {
   let result = [...people];
 
@@ -110,13 +119,30 @@ export function applyWhere(
   const searchName = scalar(where.search_name);
   if (searchName !== undefined) {
     const needle = normalizeName(searchName);
-    result = result.filter((person) => {
-      const full = normalizeName(`${person.first_name} ${person.last_name}`);
-      const nick = person.nickname
-        ? normalizeName(`${person.nickname} ${person.last_name}`)
-        : '';
-      return full.includes(needle) || (nick !== '' && nick.includes(needle));
-    });
+    result = result.filter((person) => matchesName(person, needle));
+  }
+
+  /*
+   * `where[search_name_or_email]` — what the "add a student" search sends.
+   *
+   * Modelled as name-or-email rather than as an alias for `search_name`,
+   * because the difference is the whole reason the app picks this parameter:
+   * a leader looking for somebody they only know by address gets nothing from
+   * a name search, and a simulator that quietly ignored the distinction would
+   * let that ship.
+   */
+  const searchNameOrEmail = scalar(where.search_name_or_email);
+  if (searchNameOrEmail !== undefined) {
+    const needle = normalizeName(searchNameOrEmail);
+    const address = searchNameOrEmail.trim().toLowerCase();
+    result = result.filter(
+      (person) =>
+        matchesName(person, needle) ||
+        (address !== '' &&
+          (store?.emailsFor(person.id) ?? []).some((email) =>
+            email.address.toLowerCase().includes(address),
+          )),
+    );
   }
 
   const updatedAt = nested(where.updated_at);
@@ -539,7 +565,7 @@ function servePeople(
   selfPath: string,
   rawQuery: string,
 ): SimResponse {
-  const filtered = applyWhere(candidates, nested(query.where));
+  const filtered = applyWhere(candidates, nested(query.where), store);
   const ordered = applyOrder(filtered, scalar(query.order));
 
   const requestedPerPage = Number(scalar(query.per_page) ?? store.pageSize);

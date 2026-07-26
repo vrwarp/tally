@@ -4,6 +4,7 @@
  * Collection layout:
  *
  *   users/{uid}                              counselor & core team profiles
+ *   invitations/{emailKey}                   who an admin has said may sign in
  *   smallGroups/{groupId}                    Sunday School groupings
  *   eventSeries/{seriesId}                   recurring templates (friday, sunday)
  *   students/{studentId}                     what Tally owns about a person
@@ -16,11 +17,16 @@
  * Attendance and RSVP documents are keyed by student id on purpose: it makes
  * concurrent check-in from multiple counselor devices idempotent (PRD 4.1).
  *
- * Note what is *not* here. The youth roster is not a collection: it is read
- * from Planning Center on demand (see src/services/roster.ts), and `students`
- * holds only Tally's own annotations plus visitors it created. There is no
- * mirrored allowlist either — `provisionAccess` asks Planning Center at
- * sign-in.
+ * `students` is the roster itself: a document exists for everyone somebody put
+ * on it, and that document *is* the membership. What it does not hold is who
+ * they are — for a student Planning Center knows, the name and grade are read
+ * live through a callable (see src/services/roster.ts) and stored nowhere.
+ *
+ * Both memberships used to be Planning Center Lists. A List is generated from
+ * filter rules, so neither "these teenagers" nor "these adults may sign in" was
+ * expressible without inventing a custom field on every person in the church.
+ * `students` and `invitations` are those two decisions, kept where they are
+ * made.
  *
  * A student id is `pco_{planningCenterId}` for somebody Planning Center knows,
  * and a generated Firestore id for a visitor Tally created. That is what lets
@@ -30,6 +36,7 @@
 
 export const COLLECTIONS = {
   users: 'users',
+  invitations: 'invitations',
   smallGroups: 'smallGroups',
   eventSeries: 'eventSeries',
   students: 'students',
@@ -54,6 +61,10 @@ export const PCO_CONFIG_DOC_ID = 'planningCenter';
 export const paths = {
   users: () => COLLECTIONS.users,
   user: (uid: string) => `${COLLECTIONS.users}/${uid}`,
+
+  invitations: () => COLLECTIONS.invitations,
+  /** Keyed by `emailKey`, because an invitation predates the uid it grants. */
+  invitation: (key: string) => `${COLLECTIONS.invitations}/${key}`,
 
   smallGroups: () => COLLECTIONS.smallGroups,
   smallGroup: (groupId: string) => `${COLLECTIONS.smallGroups}/${groupId}`,

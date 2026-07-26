@@ -1,26 +1,26 @@
 /**
- * Server-side configuration for the Planning Center integration.
+ * Server-side configuration.
  *
- * Three kinds of input:
+ * Four kinds of input:
  *   - secrets  (Secret Manager) — the Personal Access Token pair. Never
  *                                 editable from the app, never sent to a
  *                                 browser.
- *   - runtime  (Firestore)      — everything else, owned by the core team from
- *                                 Settings: which people count as the roster,
- *                                 how much write-back is allowed, how long a
- *                                 read may be reused.
+ *   - runtime  (Firestore)      — the Planning Center settings the core team
+ *                                 owns from Settings: the grade band, how much
+ *                                 write-back is allowed, how long a read may be
+ *                                 reused.
  *   - params   (deploy-time)    — the same non-secret values, as the defaults a
  *                                 fresh install starts from before anybody has
  *                                 opened Settings.
+ *   - the admin seed (param)    — the addresses that are admins no matter what
+ *                                 the database says. See `seededAdminEmails`.
  *
- * The split used to be two ways: everything non-secret was a deploy-time param,
- * so moving the youth roster onto a different Planning Center list meant a
- * `firebase deploy`. That is a strange thing to ask of a youth pastor in
- * September, and it made the most commonly changed setting the hardest one to
- * change. Now `config/planningCenter` wins wherever it has an opinion and the
- * params are the fallback — which means an install with no document behaves
- * exactly as it did before, and the end-to-end suite can keep configuring
- * itself through the environment.
+ * Who is on the roster is *not* here any more, and neither is who may sign in.
+ * Both used to be Planning Center Lists, which cannot express either: a List is
+ * generated from filter rules, so a hand-picked roster is only expressible by
+ * inventing a custom field on every person and filtering on that. Tally now
+ * keeps both memberships itself, and Planning Center is what it is good at —
+ * the system of record for *people*, read live and never copied.
  *
  * `loadConfig()`/`resolveConfig()` never throw. A missing credential is a
  * *configuration* state, not a crash: a throw here would surface to a counselor
@@ -32,10 +32,6 @@
 import { defineSecret, defineString } from 'firebase-functions/params';
 import { PATHS, type FirestoreLike } from './firestore.js';
 import { PCO_BASE_URL } from './pco/types.js';
-
-/** Mirrors `PcoRosterSource` in src/types — duplicated because Cloud Functions
- * compile as a separate package and must not import from the browser bundle. */
-export type PcoRosterSource = 'list' | 'grade';
 
 /** Mirrors `PcoWriteBackMode` in src/types. */
 export type PcoWriteBackMode = 'off' | 'create' | 'full';
@@ -58,13 +54,9 @@ export const PCO_SECRET = defineSecret('PCO_SECRET');
  */
 const PCO_API_BASE_URL = defineString('PCO_API_BASE_URL', { default: '' });
 
-const PCO_ROSTER_SOURCE = defineString('PCO_ROSTER_SOURCE', { default: 'grade' });
-const PCO_STUDENT_LIST_ID = defineString('PCO_STUDENT_LIST_ID', { default: '' });
-const PCO_COUNSELOR_LIST_ID = defineString('PCO_COUNSELOR_LIST_ID', { default: '' });
 const PCO_MIN_GRADE = defineString('PCO_MIN_GRADE', { default: '6' });
 const PCO_MAX_GRADE = defineString('PCO_MAX_GRADE', { default: '12' });
 const PCO_WRITE_BACK = defineString('PCO_WRITE_BACK', { default: 'create' });
-const PCO_SMALL_GROUP_FIELD = defineString('PCO_SMALL_GROUP_FIELD', { default: '' });
 
 /**
  * How long a Planning Center read may be reused, in seconds.
@@ -80,6 +72,41 @@ const PCO_SMALL_GROUP_FIELD = defineString('PCO_SMALL_GROUP_FIELD', { default: '
  * Center should show up on the next tap.
  */
 const PCO_CACHE_TTL_SECONDS = defineString('PCO_CACHE_TTL_SECONDS', { default: '30' });
+
+/**
+ * Google addresses that are admins, always.
+ *
+ * Not Planning Center configuration at all — this is the bootstrap for Tally's
+ * own access control, and the reason a fresh install is not a locked door. The
+ * first person to sign in has no profile and nobody to grant them one; naming
+ * them here is what breaks that circle.
+ *
+ * It is a *standing* grant rather than a one-time seed. Re-asserted on every
+ * sign-in, so it also cannot be undone from inside the app: an admin who
+ * accidentally deactivates the last other admin has not locked the ministry
+ * out, because whoever is named here still gets in. The way to remove someone's
+ * standing admin rights is to take them out of this list and deploy — which is
+ * the point. The break-glass should require a key.
+ *
+ * Comma- or whitespace-separated, case-insensitive.
+ */
+const TALLY_ADMIN_EMAILS = defineString('TALLY_ADMIN_EMAILS', { default: '' });
+
+/**
+ * The addresses from `TALLY_ADMIN_EMAILS`, lowercased, with the empties dropped.
+ *
+ * Returns an empty list when unset, which is a legitimate — if unhelpful —
+ * state: nobody is a standing admin, and access is whatever the database says.
+ * `provisionAccess` reports it as a configuration problem when there is also no
+ * profile to fall back on, because "nobody can sign in and nothing says why" is
+ * the failure this list exists to prevent.
+ */
+export function seededAdminEmails(): readonly string[] {
+  return readValue(TALLY_ADMIN_EMAILS, 'TALLY_ADMIN_EMAILS')
+    .split(/[\s,;]+/)
+    .map((entry) => entry.trim().toLowerCase())
+    .filter((entry) => entry.length > 0);
+}
 
 export const DEFAULT_CACHE_TTL_SECONDS = 30;
 /** Beyond a couple of minutes this stops being a cache and starts being state. */
@@ -107,9 +134,6 @@ export interface PcoConfig {
   baseUrl: string;
   /** True when `baseUrl` was overridden — surfaced so a test rig is never mistaken for production. */
   baseUrlOverridden: boolean;
-  rosterSource: PcoRosterSource;
-  studentListId: string | null;
-  counselorListId: string | null;
   minGrade: number;
   maxGrade: number;
   writeBack: PcoWriteBackMode;
@@ -118,8 +142,6 @@ export interface PcoConfig {
    * all — every request goes upstream.
    */
   cacheTtlSeconds: number;
-  /** Name or slug of the custom field holding a small-group name, if any. */
-  smallGroupField: string | null;
   /**
    * True when `config/planningCenter` exists, i.e. somebody has saved these
    * settings from inside the app. Decides where an error message sends them:
@@ -143,26 +165,18 @@ export interface PcoConfig {
  */
 export interface PcoConfigOverrides {
   baseUrl?: string;
-  rosterSource?: string;
-  studentListId?: string;
-  counselorListId?: string;
   minGrade?: string;
   maxGrade?: string;
   writeBack?: string;
-  smallGroupField?: string;
   cacheTtlSeconds?: string;
 }
 
 /** Every key a leader may set from Settings. The rules mirror this list. */
 export const PCO_CONFIG_KEYS = [
   'baseUrl',
-  'rosterSource',
-  'studentListId',
-  'counselorListId',
   'minGrade',
   'maxGrade',
   'writeBack',
-  'smallGroupField',
   'cacheTtlSeconds',
 ] as const satisfies readonly (keyof PcoConfigOverrides)[];
 
@@ -194,13 +208,9 @@ function readParams(): RawConfig {
     appId: readValue(PCO_APP_ID, 'PCO_APP_ID'),
     secret: readValue(PCO_SECRET, 'PCO_SECRET'),
     baseUrl: readValue(PCO_API_BASE_URL, 'PCO_API_BASE_URL'),
-    rosterSource: readValue(PCO_ROSTER_SOURCE, 'PCO_ROSTER_SOURCE'),
-    studentListId: readValue(PCO_STUDENT_LIST_ID, 'PCO_STUDENT_LIST_ID'),
-    counselorListId: readValue(PCO_COUNSELOR_LIST_ID, 'PCO_COUNSELOR_LIST_ID'),
     minGrade: readValue(PCO_MIN_GRADE, 'PCO_MIN_GRADE'),
     maxGrade: readValue(PCO_MAX_GRADE, 'PCO_MAX_GRADE'),
     writeBack: readValue(PCO_WRITE_BACK, 'PCO_WRITE_BACK'),
-    smallGroupField: readValue(PCO_SMALL_GROUP_FIELD, 'PCO_SMALL_GROUP_FIELD'),
     cacheTtlSeconds: readValue(PCO_CACHE_TTL_SECONDS, 'PCO_CACHE_TTL_SECONDS'),
   };
 }
@@ -251,8 +261,6 @@ function parseBaseUrl(raw: string): { baseUrl: string; overridden: boolean; prob
 function normalizeConfig(raw: RawConfig, managedInApp: boolean): PcoConfig {
   const base = parseBaseUrl(raw.baseUrl.trim());
 
-  const rosterSource: PcoRosterSource = raw.rosterSource.trim().toLowerCase() === 'list' ? 'list' : 'grade';
-
   const rawWriteBack = raw.writeBack.trim().toLowerCase();
   const writeBack: PcoWriteBackMode =
     rawWriteBack === 'off' || rawWriteBack === 'full' ? rawWriteBack : 'create';
@@ -263,10 +271,6 @@ function normalizeConfig(raw: RawConfig, managedInApp: boolean): PcoConfig {
     ABSOLUTE_MAX_GRADE,
   );
   const maxGrade = clamp(parseInteger(raw.maxGrade, ABSOLUTE_MAX_GRADE), minGrade, ABSOLUTE_MAX_GRADE);
-
-  const studentListId = raw.studentListId.trim() || null;
-  const counselorListId = raw.counselorListId.trim() || null;
-  const smallGroupField = raw.smallGroupField.trim() || null;
 
   // An unreadable value falls back to the default rather than to zero: silently
   // disabling the cache because of a typo would look like Planning Center got
@@ -280,16 +284,6 @@ function normalizeConfig(raw: RawConfig, managedInApp: boolean): PcoConfig {
   const problems: string[] = [];
   if (!raw.appId) problems.push('PCO_APP_ID is not set');
   if (!raw.secret) problems.push('PCO_SECRET is not set');
-  if (rosterSource === 'list' && !studentListId) {
-    // Where somebody is told to go and fix it depends on who owns the value.
-    // Naming a deploy-time parameter at a leader who has been editing Settings
-    // all afternoon sends them to the wrong person entirely.
-    problems.push(
-      managedInApp
-        ? 'the roster is set to a Planning Center list, but no list is chosen (Settings → Planning Center)'
-        : 'PCO_ROSTER_SOURCE is "list" but PCO_STUDENT_LIST_ID is not set',
-    );
-  }
   if (base.problem) problems.push(base.problem);
 
   return {
@@ -297,14 +291,10 @@ function normalizeConfig(raw: RawConfig, managedInApp: boolean): PcoConfig {
     secret: raw.secret,
     baseUrl: base.baseUrl,
     baseUrlOverridden: base.overridden,
-    rosterSource,
-    studentListId,
-    counselorListId,
     minGrade,
     maxGrade,
     writeBack,
     cacheTtlSeconds,
-    smallGroupField,
     managedInApp,
     configError:
       problems.length > 0 ? `Planning Center is not configured: ${problems.join('; ')}.` : null,

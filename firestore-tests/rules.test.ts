@@ -27,6 +27,7 @@ import {
   attendanceDoc,
   eventDoc,
   initTestEnv,
+  invitationDoc,
   pcoConfigDoc,
   rsvpDoc,
   seedAll,
@@ -187,6 +188,73 @@ describe('users', () => {
     const db = asUser(env, UID.admin);
     await assertFails(updateDoc(doc(db, paths.user(UID.admin)), { role: 'counselor' }));
     await assertFails(updateDoc(doc(db, paths.user(UID.admin)), { active: false }));
+  });
+});
+
+/**
+ * The allowlist that decides who may sign in at all.
+ *
+ * It moved out of Planning Center because a List is generated from filter
+ * rules, so "these particular twelve adults may see a roster of minors" was
+ * only expressible by inventing a custom field on every person in the church —
+ * an access decision stored in a system edited by a different set of people
+ * from the ones who should be making it.
+ */
+describe('invitations', () => {
+  const key = 'newcomer@footprints,example,org';
+
+  it('lets an admin invite somebody', async () => {
+    const db = asUser(env, UID.admin);
+    await assertSucceeds(setDoc(doc(db, paths.invitation(key)), invitationDoc()));
+    await assertSucceeds(getDoc(doc(db, paths.invitation(key))));
+    await assertSucceeds(deleteDoc(doc(db, paths.invitation(key))));
+  });
+
+  it('keeps the list away from the core team, let alone counselors', async () => {
+    /*
+     * Not a hierarchy oversight. This is a list of church staff email
+     * addresses and who may do what with a roster of minors; the core team runs
+     * the ministry, and granting access is a different job from running it.
+     */
+    for (const uid of [UID.core, UID.counselor]) {
+      const db = asUser(env, uid);
+      await assertFails(getDocs(collection(db, paths.invitations())));
+      await assertFails(setDoc(doc(db, paths.invitation(key)), invitationDoc()));
+    }
+  });
+
+  it('rejects a role nobody wrote code for', async () => {
+    // The invitation decides the role somebody arrives with, so a made-up value
+    // here is an attempt to arrive as something the app does not model.
+    await assertFails(
+      setDoc(
+        doc(asUser(env, UID.admin), paths.invitation(key)),
+        invitationDoc({ role: 'superuser' as never }),
+      ),
+    );
+  });
+
+  it('rejects an invitation with no address on it', async () => {
+    await assertFails(
+      setDoc(doc(asUser(env, UID.admin), paths.invitation(key)), invitationDoc({ email: '' })),
+    );
+  });
+
+  it('refuses fields the shape does not admit', async () => {
+    // Closed on purpose: an invitation is an access decision, and a field
+    // nobody validates is a field somebody will later trust.
+    await assertFails(
+      setDoc(doc(asUser(env, UID.admin), paths.invitation(key)), {
+        ...invitationDoc(),
+        grantsEverything: true,
+      }),
+    );
+  });
+
+  it('lets an admin pause an invitation without retyping it in September', async () => {
+    const db = asUser(env, UID.admin);
+    await assertSucceeds(setDoc(doc(db, paths.invitation(key)), invitationDoc()));
+    await assertSucceeds(setDoc(doc(db, paths.invitation(key)), invitationDoc({ active: false })));
   });
 });
 
@@ -561,15 +629,6 @@ describe('config/planningCenter', () => {
     await assertFails(setDoc(doc(db, paths.planningCenter()), pcoConfigDoc()));
   });
 
-  it('rejects a roster source that is neither of the two things it can be', async () => {
-    await assertFails(
-      setDoc(
-        doc(asUser(env, UID.core), paths.planningCenter()),
-        pcoConfigDoc({ rosterSource: 'spreadsheet' as never }),
-      ),
-    );
-  });
-
   it('rejects a write-back mode nobody wrote code for', async () => {
     // The stakes are asymmetric: an unrecognised mode that fell through to
     // `full` would start editing the church's real people database.
@@ -640,7 +699,7 @@ describe('config/planningCenter', () => {
     await assertSucceeds(
       setDoc(
         doc(asUser(env, UID.core), paths.planningCenter()),
-        pcoConfigDoc({ baseUrl: 'https://proxy.example.org/people/v2', studentListId: 'OTHER_LIST' }),
+        pcoConfigDoc({ baseUrl: 'https://proxy.example.org/people/v2', minGrade: 7 }),
       ),
     );
   });

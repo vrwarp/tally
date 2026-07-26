@@ -61,6 +61,15 @@ export function asFirestoreLike(db: Firestore): FirestoreLike {
 export const PATHS = {
   students: 'students',
   users: 'users',
+  /**
+   * Who an admin has said may sign in, keyed by `emailKey`.
+   *
+   * The allowlist has to be keyed by address rather than by uid, because it is
+   * written before the person has ever signed in and a uid does not exist until
+   * they do. Once they have, `users/{uid}` is the live authorisation and this is
+   * only the record of how they got in.
+   */
+  invitations: 'invitations',
   /** Connection health for the Settings screen. Written only by functions. */
   pcoStatus: 'config/pcoStatus',
   /**

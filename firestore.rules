@@ -115,22 +115,63 @@ service cloud.firestore {
     }
 
     /* ---------------------------------------------------------------- */
+    /* invitations — who may sign in at all                              */
+    /* ---------------------------------------------------------------- */
+
+    /*
+     * Keyed by address, because it is written before the person has ever
+     * signed in and a uid does not exist until they do.
+     *
+     * This is the allowlist that used to be a Planning Center List. A List is
+     * generated from filter rules, so "these particular twelve adults may see a
+     * roster of minors" was only expressible by inventing a custom field on
+     * every person in the church — an access decision stored in a system whose
+     * editors are a different set of people from the ones who should be making
+     * it. It belongs here, where an admin makes it deliberately.
+     *
+     * Admin-only in both directions. The read matters as much as the write:
+     * this is a list of church staff email addresses, and a counselor's phone
+     * has no reason to hold one.
+     */
+    match /invitations/{emailKey} {
+      function validInvitation() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['email', 'role', 'active', 'invitedAt', 'invitedBy', 'note'])
+          && d.email is string
+          && d.email.size() > 0
+          && d.role in ['counselor', 'core', 'admin']
+          && d.active is bool
+          && (!('note' in d.keys()) || d.note is string);
+      }
+
+      allow get, list: if isAdmin();
+      allow create, update: if isAdmin() && validInvitation();
+      allow delete: if isAdmin();
+    }
+
+    /* ---------------------------------------------------------------- */
     /* students                                                          */
     /* ---------------------------------------------------------------- */
 
     /*
-     * This collection is *not* the roster.
+     * This collection *is* the roster — the membership, not the people.
      *
-     * The roster comes from Planning Center through a callable, and none of it
-     * is stored. What lives here is only what Planning Center has no opinion
-     * about — a small group, a note, when somebody first turned up — plus the
-     * whole record for a quick-added visitor until the push lands.
+     * A document here says somebody put this student on Tally's roster. What it
+     * does not say is who they are: for a student linked to Planning Center the
+     * name, grade and everything else are read live through a callable and
+     * stored nowhere. What lives here is the membership itself plus what
+     * Planning Center has no opinion about — a small group, a note, when
+     * somebody first turned up — plus the whole record for a quick-added
+     * visitor until the push lands.
      *
-     * Two consequences for these rules. A document is sparse, so field
-     * validation only applies to fields that are present. And parent contact
-     * and allergies are not writable at all: Tally does not hold them, and a
-     * client that could write them here would be recreating the mirror one
-     * document at a time.
+     * Three consequences for these rules. A document is sparse, so field
+     * validation only applies to fields that are present. Parent contact and
+     * allergies are not writable at all: Tally does not hold them, and a client
+     * that could write them here would be recreating the mirror one document at
+     * a time. And the Planning Center linkage is still not a client's to
+     * assert — putting a person on the roster goes through a callable that
+     * checks the id upstream first, because `students/pco_123` is a claim about
+     * a real child, not a preference.
      */
     match /students/{studentId} {
       function validStudent() {

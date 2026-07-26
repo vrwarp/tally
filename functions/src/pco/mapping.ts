@@ -18,8 +18,6 @@ import {
   type JsonApiIdentifier,
   type JsonApiResource,
   type PcoEmail,
-  type PcoFieldDatum,
-  type PcoFieldDefinition,
   type PcoHousehold,
   type PcoHouseholdMembership,
   type PcoPerson,
@@ -55,17 +53,6 @@ export interface ParentContact {
   parentEmail: string | null;
 }
 
-export interface MappedAccessEntry {
-  /** Firestore document id for `accessRoster/{emailKey}`. */
-  emailKey: string;
-  email: string;
-  displayName: string | null;
-  role: Role;
-  pcoPersonId: string;
-  assignedGroupId: string | null;
-  active: boolean;
-}
-
 export interface GradeRange {
   minGrade: number;
   maxGrade: number;
@@ -78,12 +65,6 @@ export interface StudentMappingContext extends GradeRange {
    * would be worse than admitting we do not know.
    */
   now?: Date;
-}
-
-export interface AccessMappingContext {
-  index: IncludedIndex;
-  /** Name or slug of the custom field carrying a small-group name. */
-  smallGroupField?: string | null;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -440,115 +421,5 @@ export function extractParentContact(person: PcoPerson, householdIndex: Included
       pickContactValue(emails, (email) => trimmed(email.attributes?.address)?.toLowerCase() ?? null) ??
       trimmed(attributes.primary_email_address)?.toLowerCase() ??
       null,
-  };
-}
-
-/* -------------------------------------------------------------------------- */
-/* Person -> access roster entry                                               */
-/* -------------------------------------------------------------------------- */
-
-/**
- * Planning Center permission -> Tally role.
- *
- * Only two Planning Center levels imply the dashboard: Manager and Editor are
- * the people who already maintain the roster. Everyone else is a door
- * volunteer, and `site_administrator` is the church's own super-user.
- */
-export function mapRole(person: PcoPerson): Role {
-  const attributes: PcoPersonAttributes = person.attributes ?? {};
-  if (attributes.site_administrator === true) return 'admin';
-  const permission = trimmed(attributes.people_permissions)?.toLowerCase();
-  if (permission === 'manager' || permission === 'editor') return 'core';
-  return 'counselor';
-}
-
-function primaryEmailFor(person: PcoPerson, index: IncludedIndex): string | null {
-  const emails = listIncluded<PcoEmail>(index, PCO_TYPES.email).filter((email) =>
-    ownedBy(email, person.id),
-  );
-  return (
-    pickContactValue(emails, (email) => trimmed(email.attributes?.address)?.toLowerCase() ?? null) ??
-    trimmed(person.attributes?.primary_email_address)?.toLowerCase() ??
-    null
-  );
-}
-
-/**
- * Reads a Planning Center custom field by definition name or slug.
- * Returns null when the field is not configured or the person has no value.
- */
-export function extractCustomFieldValue(
-  person: PcoPerson,
-  index: IncludedIndex,
-  fieldNameOrSlug: string | null | undefined,
-): string | null {
-  const wanted = trimmed(fieldNameOrSlug)?.toLowerCase();
-  if (!wanted) return null;
-
-  for (const datum of listIncluded<PcoFieldDatum>(index, PCO_TYPES.fieldDatum)) {
-    const owner = datum.relationships?.customizable?.data;
-    if (!owner || Array.isArray(owner) || owner.id !== person.id) continue;
-
-    const definitionRef = datum.relationships?.field_definition?.data;
-    if (!definitionRef || Array.isArray(definitionRef)) continue;
-    const definition = getIncluded<PcoFieldDefinition>(
-      index,
-      PCO_TYPES.fieldDefinition,
-      definitionRef.id,
-    );
-    const name = trimmed(definition?.attributes?.name)?.toLowerCase();
-    const slug = trimmed(definition?.attributes?.slug)?.toLowerCase();
-    if (name !== wanted && slug !== wanted) continue;
-
-    const value = trimmed(datum.attributes?.value);
-    if (value) return value;
-  }
-  return null;
-}
-
-/** Turns "8th Grade Boys" into the `smallGroups/{id}` convention used by the seed. */
-function slugify(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
-
-/**
- * Builds the allowlist row that lets a counselor sign in at all.
- *
- * Returns null when the person has no email address: Tally authenticates by
- * email, so there is nothing to match a sign-in against. The caller counts that
- * as a skip rather than an error — it is normal for a Planning Center list to
- * contain a volunteer who never gave the church an address.
- */
-export function mapPersonToAccessEntry(
-  person: PcoPerson,
-  ctx: AccessMappingContext,
-): MappedAccessEntry | null {
-  const email = primaryEmailFor(person, ctx.index);
-  if (!email) return null;
-
-  const attributes: PcoPersonAttributes = person.attributes ?? {};
-  const displayName =
-    firstNonEmpty(
-      [firstNonEmpty(attributes.nickname, attributes.first_name), trimmed(attributes.last_name)]
-        .filter(Boolean)
-        .join(' '),
-      attributes.name,
-    ) ?? null;
-
-  const groupName = extractCustomFieldValue(person, ctx.index, ctx.smallGroupField);
-
-  return {
-    emailKey: emailKey(email),
-    email,
-    displayName,
-    role: mapRole(person),
-    pcoPersonId: person.id,
-    assignedGroupId: groupName ? slugify(groupName) : null,
-    active: normaliseStatus(person) === 'active',
   };
 }

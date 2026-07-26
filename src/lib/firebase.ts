@@ -287,4 +287,40 @@ if (USE_EMULATORS) {
   console.info(
     `[tally] Using Firebase emulators — auth :${authPort}, firestore :${firestorePort}`,
   );
+
+  /**
+   * Emulator-only: mint the Google credential a popup would have produced.
+   *
+   * The end-to-end suite drives the real button and the real callables, but it
+   * cannot drive the *handshake*: `signInWithPopup` boots Firebase's hidden
+   * iframe from `apis.google.com`, and a CI sandbox with no route to Google
+   * fails there rather than at anything Tally owns. The Auth emulator accepts a
+   * JSON "ID token" in place of a real one for exactly this reason, so this
+   * produces a session with `sign_in_provider: google.com` — which is what
+   * `provisionAccess` actually inspects.
+   *
+   * Everything that matters downstream is therefore still exercised for real:
+   * the invitation lookup, the seeded-admin grant, the role, and every security
+   * rule that reads the profile. Only the Google round-trip is stubbed.
+   *
+   * This block is inside `if (USE_EMULATORS)`, so it is dead code that Vite
+   * drops from a production build — the flag is a compile-time constant.
+   */
+  (window as unknown as Record<string, unknown>).__tallyEmulatorSignIn = async (
+    email: string,
+    displayName?: string,
+  ): Promise<void> => {
+    const { GoogleAuthProvider, signInWithCredential } = await import('firebase/auth');
+    await signInWithCredential(
+      auth,
+      GoogleAuthProvider.credential(
+        JSON.stringify({
+          sub: `google-${email}`,
+          email,
+          email_verified: true,
+          name: displayName ?? email,
+        }),
+      ),
+    );
+  };
 }

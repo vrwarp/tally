@@ -1,14 +1,17 @@
 /**
- * The door between "signed in to Firebase" and "allowed to use Tally".
+ * The door between "signed in to Google" and "allowed to use Tally".
  *
  * Every test here is about a decision that, if wrong, either locks a volunteer
  * out of a check-in they are running or lets a stranger read a roster of minors.
- * The Planning Center lookup is injected, so these exercise the decision rather
- * than the HTTP.
+ * There is no Planning Center in any of them any more: who may sign in is
+ * Tally's own record, because a Planning Center List is a saved query and
+ * "these particular twelve adults" is not a query.
  */
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { Timestamp } from 'firebase-admin/firestore';
-import { isVerifiedEmail, provisionAccessForCaller, type TeamEntry } from './access.js';
+import { isGoogleSignIn, provisionAccessForCaller } from './access.js';
+import { PATHS } from './firestore.js';
+import { emailKey } from './pco/mapping.js';
 import { FakeFirestore } from './testing/fakeFirestore.js';
 
 const NOW = new Date('2026-03-06T19:00:00Z');
@@ -19,204 +22,260 @@ const CALLER = {
   displayName: 'Miriam Achebe',
 };
 
-function entry(overrides: Partial<TeamEntry> = {}): TeamEntry {
-  return {
-    displayName: 'Miriam Achebe',
-    role: 'core',
-    pcoPersonId: '9100002',
-    assignedGroupId: null,
-    active: true,
-    ...overrides,
-  };
+const ADMIN_EMAIL = 'dana.ruiz@footprints.example.org';
+
+function invitationPath(email: string): string {
+  return `${PATHS.invitations}/${emailKey(email)}`;
 }
 
-/** A lookup that returns `result` for any address. */
-const lookupReturning = (result: TeamEntry | null) => vi.fn().mockResolvedValue(result);
+function userPath(uid = CALLER.uid): string {
+  return `${PATHS.users}/${uid}`;
+}
 
-describe('isVerifiedEmail', () => {
-  it('accepts an address the provider has verified', () => {
-    expect(isVerifiedEmail({ email: 'a@b.org', email_verified: true })).toBe(true);
+describe('isGoogleSignIn', () => {
+  it('accepts a Google account', () => {
+    expect(isGoogleSignIn({ email: 'a@b.org', firebase: { sign_in_provider: 'google.com' } })).toBe(
+      true,
+    );
   });
 
-  it('accepts a magic link, which proves the address by construction', () => {
+  it('refuses an email link, however verified the address is', () => {
+    /*
+     * A magic link really does prove the address, and it was accepted for that
+     * reason. It is refused now for a different one: one way in is one way to
+     * explain at a church door, one set of failure modes, and no mailbox left
+     * signed in on a shared phone.
+     */
     expect(
-      isVerifiedEmail({ email: 'a@b.org', firebase: { sign_in_provider: 'emailLink' } }),
-    ).toBe(true);
+      isGoogleSignIn({
+        email: 'a@b.org',
+        email_verified: true,
+        firebase: { sign_in_provider: 'emailLink' },
+      }),
+    ).toBe(false);
   });
 
-  it('accepts Google, which has already verified it', () => {
+  it('refuses a password account, verified or not', () => {
     expect(
-      isVerifiedEmail({ email: 'a@b.org', firebase: { sign_in_provider: 'google.com' } }),
-    ).toBe(true);
-  });
-
-  it('refuses an unverified password account', () => {
-    // Otherwise anyone could register youth.pastor@church.org and inherit
-    // their role.
-    expect(
-      isVerifiedEmail({
-        email: 'youth.pastor@church.org',
-        email_verified: false,
+      isGoogleSignIn({
+        email: 'a@b.org',
+        email_verified: true,
         firebase: { sign_in_provider: 'password' },
       }),
     ).toBe(false);
   });
 
   it('refuses a token with no address at all', () => {
-    expect(isVerifiedEmail({})).toBe(false);
+    expect(isGoogleSignIn({ firebase: { sign_in_provider: 'google.com' } })).toBe(false);
   });
 });
 
 describe('provisionAccessForCaller', () => {
-  it('grants access and creates the profile for somebody on the roster', async () => {
+  it('refuses somebody nobody has invited', async () => {
     const db = new FakeFirestore();
-    const result = await provisionAccessForCaller(db, CALLER, NOW, lookupReturning(entry()));
-
-    expect(result.status).toBe('granted');
-    expect(result.role).toBe('core');
-
-    const stored = db.get('users/uid-miriam');
-    expect(stored?.role).toBe('core');
-    expect(stored?.active).toBe(true);
-    expect(stored?.pcoPersonId).toBe('9100002');
-  });
-
-  it('refuses somebody Planning Center has never heard of', async () => {
-    const db = new FakeFirestore();
-    const result = await provisionAccessForCaller(db, CALLER, NOW, lookupReturning(null));
+    const result = await provisionAccessForCaller(db, CALLER, NOW, []);
 
     expect(result.status).toBe('not-on-roster');
-    expect(result.role).toBeNull();
-    // The message has to say what to do next, because the person reading it
-    // cannot see Planning Center.
-    expect(result.message).toMatch(/ask a leader/i);
-    // And nothing is created: a refused caller must not leave a profile behind.
-    expect(db.get('users/uid-miriam')).toBeUndefined();
+    expect(result.message).toContain(CALLER.email);
+    // Nothing written: a stranger signing in must not leave a profile behind.
+    expect(db.get(userPath())).toBeUndefined();
   });
 
-  it('pauses access for an inactive Planning Center profile', async () => {
+  it('grants access on an invitation and creates the profile', async () => {
     const db = new FakeFirestore();
-    const result = await provisionAccessForCaller(
-      db,
-      CALLER,
-      NOW,
-      lookupReturning(entry({ active: false })),
-    );
+    db.seed(invitationPath(CALLER.email), { role: 'core', active: true });
 
-    expect(result.status).toBe('inactive');
-    expect(db.get('users/uid-miriam')).toBeUndefined();
-  });
+    const result = await provisionAccessForCaller(db, CALLER, NOW, []);
 
-  it('lets a role granted inside Tally outrank what Planning Center says', async () => {
-    // An admin who promoted somebody in Tally must not be demoted the next time
-    // that person signs in.
-    const db = new FakeFirestore();
-    db.seed('users/uid-miriam', {
-      role: 'admin',
+    expect(result).toMatchObject({ status: 'granted', role: 'core' });
+    expect(db.get(userPath())).toMatchObject({
+      email: CALLER.email,
+      role: 'core',
       active: true,
-      createdAt: Timestamp.fromDate(new Date('2025-09-01T00:00:00Z')),
+      displayName: 'Miriam Achebe',
     });
-
-    const result = await provisionAccessForCaller(
-      db,
-      CALLER,
-      NOW,
-      lookupReturning(entry({ role: 'counselor' })),
-    );
-
-    expect(result.role).toBe('admin');
-    expect(db.get('users/uid-miriam')?.role).toBe('admin');
   });
 
-  it('defaults to the least privilege when nobody has said otherwise', async () => {
+  it('defaults to the least privilege when an invitation names no role', async () => {
     const db = new FakeFirestore();
-    const result = await provisionAccessForCaller(
-      db,
-      CALLER,
-      NOW,
-      // A role Planning Center does not map to anything Tally understands.
-      lookupReturning(entry({ role: 'counselor' })),
-    );
+    db.seed(invitationPath(CALLER.email), { active: true });
 
+    const result = await provisionAccessForCaller(db, CALLER, NOW, []);
     expect(result.role).toBe('counselor');
   });
 
-  it('does not reset "member since" on a returning volunteer', async () => {
-    const joined = Timestamp.fromDate(new Date('2025-09-01T00:00:00Z'));
+  it('refuses a role the invitation made up', async () => {
+    // An invitation is written by an admin through the app, but it is still a
+    // database document; a `role: "superuser"` must not become anything.
     const db = new FakeFirestore();
-    db.seed('users/uid-miriam', { role: 'core', active: true, createdAt: joined });
+    db.seed(invitationPath(CALLER.email), { role: 'superuser', active: true });
 
-    await provisionAccessForCaller(db, CALLER, NOW, lookupReturning(entry()));
-
-    expect(db.get('users/uid-miriam')?.createdAt).toBe(joined);
+    expect((await provisionAccessForCaller(db, CALLER, NOW, [])).role).toBe('counselor');
   });
 
-  it('keeps a small group chosen in Tally over the one Planning Center suggests', async () => {
+  it('pauses access for an invitation somebody turned off', async () => {
     const db = new FakeFirestore();
-    db.seed('users/uid-miriam', { role: 'core', active: true, assignedGroupId: 'grade-8-girls' });
+    db.seed(invitationPath(CALLER.email), { role: 'counselor', active: false });
 
-    await provisionAccessForCaller(
+    const result = await provisionAccessForCaller(db, CALLER, NOW, []);
+
+    expect(result.status).toBe('inactive');
+    expect(db.get(userPath())).toBeUndefined();
+  });
+
+  it('matches the invitation however the address was typed', async () => {
+    const db = new FakeFirestore();
+    db.seed(invitationPath('Miriam.Achebe@Footprints.Example.ORG'), { role: 'core', active: true });
+
+    const result = await provisionAccessForCaller(
       db,
-      CALLER,
+      { ...CALLER, email: '  MIRIAM.ACHEBE@footprints.example.org ' },
       NOW,
-      lookupReturning(entry({ assignedGroupId: 'grade-6-boys' })),
+      [],
     );
 
-    expect(db.get('users/uid-miriam')?.assignedGroupId).toBe('grade-8-girls');
+    expect(result.status).toBe('granted');
+    expect(db.get(userPath())?.email).toBe(CALLER.email);
   });
 
-  it('takes the small group from Planning Center when Tally has none', async () => {
-    const db = new FakeFirestore();
-    await provisionAccessForCaller(
-      db,
-      CALLER,
-      NOW,
-      lookupReturning(entry({ assignedGroupId: 'grade-6-boys' })),
-    );
+  describe('the seeded admin', () => {
+    it('is an admin without an invitation, because nobody could have sent one', async () => {
+      // The bootstrap: on a fresh install there is no admin to grant the first
+      // admin anything, and this is what breaks that circle.
+      const db = new FakeFirestore();
+      const result = await provisionAccessForCaller(
+        db,
+        { ...CALLER, email: ADMIN_EMAIL },
+        NOW,
+        [ADMIN_EMAIL],
+      );
 
-    expect(db.get('users/uid-miriam')?.assignedGroupId).toBe('grade-6-boys');
+      expect(result).toMatchObject({ status: 'granted', role: 'admin' });
+      expect(db.get(userPath())).toMatchObject({ role: 'admin', active: true });
+    });
+
+    it('is an admin again even after somebody demoted them in the app', async () => {
+      const db = new FakeFirestore();
+      db.seed(userPath(), { email: ADMIN_EMAIL, role: 'counselor', active: true });
+
+      const result = await provisionAccessForCaller(
+        db,
+        { ...CALLER, email: ADMIN_EMAIL },
+        NOW,
+        [ADMIN_EMAIL],
+      );
+
+      expect(result.role).toBe('admin');
+      expect(db.get(userPath())?.role).toBe('admin');
+    });
+
+    it('gets back in even after being deactivated, which is the whole point', async () => {
+      /*
+       * Deactivating the last admin is exactly the accident the standing grant
+       * exists for. Honouring `active: false` here would mean the break-glass
+       * breaks along with everything else.
+       */
+      const db = new FakeFirestore();
+      db.seed(userPath(), { email: ADMIN_EMAIL, role: 'admin', active: false });
+
+      const result = await provisionAccessForCaller(
+        db,
+        { ...CALLER, email: ADMIN_EMAIL },
+        NOW,
+        [ADMIN_EMAIL],
+      );
+
+      expect(result.status).toBe('granted');
+      expect(db.get(userPath())?.active).toBe(true);
+    });
+
+    it('is matched case-insensitively, the way an env var gets typed', async () => {
+      const db = new FakeFirestore();
+      const result = await provisionAccessForCaller(
+        db,
+        { ...CALLER, email: 'Dana.Ruiz@Footprints.Example.org' },
+        NOW,
+        [ADMIN_EMAIL],
+      );
+
+      expect(result.role).toBe('admin');
+    });
+
+    it('does not make everybody else an admin', async () => {
+      const db = new FakeFirestore();
+      db.seed(invitationPath(CALLER.email), { role: 'counselor', active: true });
+
+      const result = await provisionAccessForCaller(db, CALLER, NOW, [ADMIN_EMAIL]);
+      expect(result.role).toBe('counselor');
+    });
   });
 
-  it('prefers the name the caller signed in with', async () => {
-    const db = new FakeFirestore();
-    await provisionAccessForCaller(
-      db,
-      CALLER,
-      NOW,
-      lookupReturning(entry({ displayName: 'M. Achebe' })),
-    );
+  describe('somebody who has signed in before', () => {
+    it('keeps the role an admin gave them, over the invitation they arrived on', async () => {
+      const db = new FakeFirestore();
+      db.seed(invitationPath(CALLER.email), { role: 'counselor', active: true });
+      db.seed(userPath(), { email: CALLER.email, role: 'core', active: true });
 
-    expect(db.get('users/uid-miriam')?.displayName).toBe('Miriam Achebe');
-  });
+      const result = await provisionAccessForCaller(db, CALLER, NOW, []);
 
-  it('falls back to the Planning Center name when the token carries none', async () => {
-    const db = new FakeFirestore();
-    await provisionAccessForCaller(
-      db,
-      { ...CALLER, displayName: null },
-      NOW,
-      lookupReturning(entry({ displayName: 'M. Achebe' })),
-    );
+      expect(result.role).toBe('core');
+      expect(db.get(userPath())?.role).toBe('core');
+    });
 
-    expect(db.get('users/uid-miriam')?.displayName).toBe('M. Achebe');
-  });
+    it('is refused once an admin deactivates them', async () => {
+      const db = new FakeFirestore();
+      db.seed(userPath(), { email: CALLER.email, role: 'core', active: false });
 
-  it('lets a lookup failure propagate rather than reading as a refusal', async () => {
-    // "Planning Center is unreachable" and "you are not on the roster" look the
-    // same to a volunteer at a door and mean completely different things. One
-    // is "try again"; the other sends them hunting for a leader.
-    const db = new FakeFirestore();
-    const lookup = vi.fn().mockRejectedValue(new Error('ECONNRESET'));
+      const result = await provisionAccessForCaller(db, CALLER, NOW, []);
 
-    await expect(provisionAccessForCaller(db, CALLER, NOW, lookup)).rejects.toThrow('ECONNRESET');
-    expect(db.get('users/uid-miriam')).toBeUndefined();
-  });
+      expect(result.status).toBe('inactive');
+      expect(db.get(userPath())?.active).toBe(false);
+    });
 
-  it('asks about the address the caller actually signed in with', async () => {
-    const db = new FakeFirestore();
-    const lookup = lookupReturning(entry());
-    await provisionAccessForCaller(db, CALLER, NOW, lookup);
+    it('gets in on their profile even after the invitation is gone', async () => {
+      // Invitations are how somebody arrives, not what keeps them here. Tidying
+      // the invitation list must not throw the team out of the app.
+      const db = new FakeFirestore();
+      db.seed(userPath(), { email: CALLER.email, role: 'counselor', active: true });
 
-    expect(lookup).toHaveBeenCalledWith(CALLER.email);
+      expect((await provisionAccessForCaller(db, CALLER, NOW, [])).status).toBe('granted');
+    });
+
+    it('does not reset "member since"', async () => {
+      const joined = Timestamp.fromDate(new Date('2025-09-01T00:00:00Z'));
+      const db = new FakeFirestore();
+      db.seed(userPath(), { email: CALLER.email, role: 'core', active: true, createdAt: joined });
+
+      await provisionAccessForCaller(db, CALLER, NOW, []);
+      expect(db.get(userPath())?.createdAt).toBe(joined);
+    });
+
+    it('leaves the small group they chose alone', async () => {
+      // The counselor's own answer to "which group am I teaching this term".
+      // A sign-in has no opinion about it.
+      const db = new FakeFirestore();
+      db.seed(userPath(), {
+        email: CALLER.email,
+        role: 'core',
+        active: true,
+        assignedGroupId: '8th-grade-boys',
+      });
+
+      await provisionAccessForCaller(db, CALLER, NOW, []);
+      expect(db.get(userPath())?.assignedGroupId).toBe('8th-grade-boys');
+    });
+
+    it('keeps the name it already had when the token carries none', async () => {
+      const db = new FakeFirestore();
+      db.seed(userPath(), {
+        email: CALLER.email,
+        role: 'core',
+        active: true,
+        displayName: 'Miriam A.',
+      });
+
+      await provisionAccessForCaller(db, { ...CALLER, displayName: null }, NOW, []);
+      expect(db.get(userPath())?.displayName).toBe('Miriam A.');
+    });
   });
 });

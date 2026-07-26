@@ -1,50 +1,27 @@
 /**
- * Changing where Tally reads its people from, without a deploy.
+ * The Planning Center connection, as settings a leader can change.
  *
- * These settings used to be deploy-time parameters, which made the most
- * commonly changed thing in the whole integration — *which list is the roster*
- * — the hardest one to change: a youth pastor who reorganised their lists in
- * September had to find whoever runs `firebase deploy`. Worse, the setting was
- * an id copied out of a browser address bar, so the failure mode was a roster
- * that silently described some other group of children.
- *
- * So the list is chosen from the lists themselves, with the two facts that
- * distinguish the right one from a plausible wrong one: how many people it
- * holds, and whether Planning Center has refreshed it this decade.
- *
- * Creating a list is not offered because Planning Center's API cannot do it —
- * `/lists` is read-only, and there is no way to add a person to one either.
- * Lists are built in People, which is where they should be built; this links
- * out and re-reads when the leader comes back.
+ * Much smaller than it was, because most of what used to be here was about
+ * *which list is the roster* — and a Planning Center List turned out to be the
+ * wrong tool for the job. A List is generated from filter rules, so a
+ * hand-picked roster was only expressible by inventing a custom field on every
+ * person in the church and filtering on it. The roster now lives in Tally,
+ * where somebody can just put a student on it, and this screen is left with the
+ * things that genuinely are Planning Center's business: how much Tally may
+ * write back, how long a read may be reused, and where the API lives.
  */
 import { useEffect, useRef, useState } from 'react';
 import {
-  Badge,
   Button,
   ErrorBanner,
   Modal,
   NumberStepperField,
   SelectField,
-  SkeletonRows,
   TextField,
 } from '@/components/ui';
 import { useAuth } from '@/context/authContext';
-import { formatRelative } from '@/lib/time';
-import { cn } from '@/lib/utils';
-import {
-  fetchPlanningCenterLists,
-  savePlanningCenterConfig,
-  type PcoConfigDraft,
-} from '@/services/planningCenter';
-import type { PcoEffectiveSettings, PcoList, PcoRosterSource, PcoWriteBackMode } from '@/types';
-
-/** Where a leader goes to build a list, since Tally cannot. */
-const PCO_LISTS_URL = 'https://people.planningcenteronline.com/lists';
-
-const SOURCE_HINT: Record<PcoRosterSource, string> = {
-  list: 'Tally shows exactly who is on the list — including the 5th grader who comes with an older sibling, and the senior whose grade nobody filled in.',
-  grade: 'Tally sweeps everyone marked as a child whose grade falls in the band below. Anybody with no grade at all is left out, and nothing says so.',
-};
+import { savePlanningCenterConfig, type PcoConfigDraft } from '@/services/planningCenter';
+import type { PcoEffectiveSettings, PcoWriteBackMode } from '@/types';
 
 const WRITE_BACK_HINT: Record<PcoWriteBackMode, string> = {
   off: 'Tally never writes to Planning Center. Visitors added at the door stay queued until this is turned on.',
@@ -68,13 +45,9 @@ const MAX_CACHE_TTL = 300;
  */
 function toDraft(settings: PcoEffectiveSettings, storedBaseUrl: string): PcoConfigDraft {
   return {
-    rosterSource: settings.rosterSource,
-    studentListId: settings.studentListId ?? '',
-    counselorListId: settings.counselorListId ?? '',
     minGrade: settings.minGrade,
     maxGrade: settings.maxGrade,
     writeBack: settings.writeBack,
-    smallGroupField: settings.smallGroupField ?? '',
     cacheTtlSeconds: settings.cacheTtlSeconds,
     baseUrl: storedBaseUrl,
   };
@@ -122,15 +95,12 @@ export function PlanningCenterEditor({
     setError(null);
   }, [open]);
 
-  const listMissing = draft.rosterSource === 'list' && draft.studentListId.trim() === '';
-  const valid = !listMissing;
-
   const set = <K extends keyof PcoConfigDraft>(key: K, value: PcoConfigDraft[K]) => {
     setDraft((current) => ({ ...current, [key]: value }));
   };
 
   const handleSave = async () => {
-    if (!user || !valid || saving) return;
+    if (!user || saving) return;
     setSaving(true);
     setError(null);
     try {
@@ -140,9 +110,6 @@ export function PlanningCenterEditor({
           // A band that crossed over would be clamped server-side anyway;
           // fixing it here means the number a leader sees is the number saved.
           maxGrade: Math.max(draft.minGrade, draft.maxGrade),
-          studentListId: draft.studentListId.trim(),
-          counselorListId: draft.counselorListId.trim(),
-          smallGroupField: draft.smallGroupField.trim(),
           baseUrl: draft.baseUrl.trim(),
         },
         user.uid,
@@ -168,7 +135,7 @@ export function PlanningCenterEditor({
           <Button variant="ghost" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={() => void handleSave()} loading={saving} disabled={!valid}>
+          <Button onClick={() => void handleSave()} loading={saving}>
             Save settings
           </Button>
         </div>
@@ -176,35 +143,6 @@ export function PlanningCenterEditor({
     >
       <div className="flex flex-col gap-5">
         {error ? <ErrorBanner message={error} /> : null}
-
-        <SelectField
-          label="Where students come from"
-          value={draft.rosterSource}
-          onChange={(event) => set('rosterSource', event.target.value as PcoRosterSource)}
-          hint={SOURCE_HINT[draft.rosterSource]}
-        >
-          <option value="list">A Planning Center list</option>
-          <option value="grade">Grade fields on each person</option>
-        </SelectField>
-
-        {draft.rosterSource === 'list' ? (
-          <ListPicker
-            label="Student list"
-            open={open}
-            value={draft.studentListId}
-            onChange={(id) => set('studentListId', id)}
-            error={listMissing ? 'Choose the list that holds your students.' : null}
-          />
-        ) : null}
-
-        <ListPicker
-          label="Counselor list"
-          description="Everyone on it with an email address may sign in to Tally. Leave it empty and Tally falls back to your Planning Center administrators."
-          open={open}
-          value={draft.counselorListId}
-          onChange={(id) => set('counselorListId', id)}
-          allowNone
-        />
 
         <div>
           <div className="grid grid-cols-2 gap-3">
@@ -225,9 +163,9 @@ export function PlanningCenterEditor({
             />
           </div>
           <p className="mt-1.5 text-xs text-ink-500">
-            {draft.rosterSource === 'list'
-              ? 'In list mode the list decides who is on the roster. The band only says where a student with no grade of their own lands.'
-              : 'Only students inside this band are read at all.'}
+            Who is on the roster is decided on the Students screen, one student at a time. This band
+            only says where a student Planning Center has no grade for lands, and it is the range the
+            app understands at all.
           </p>
         </div>
 
@@ -241,14 +179,6 @@ export function PlanningCenterEditor({
           <option value="create">Create new people only</option>
           <option value="full">Create and update managed fields</option>
         </SelectField>
-
-        <TextField
-          label="Small-group custom field"
-          value={draft.smallGroupField}
-          onChange={(event) => set('smallGroupField', event.target.value)}
-          placeholder="Small Group"
-          hint="Name or slug of a Planning Center custom field holding a counselor's small group. Set it and Sunday School opens straight to their own group."
-        />
 
         <NumberStepperField
           label="Reuse an answer for (seconds)"
@@ -275,213 +205,4 @@ export function PlanningCenterEditor({
       </div>
     </Modal>
   );
-}
-
-/* -------------------------------------------------------------------------- */
-/* The picker                                                                  */
-/* -------------------------------------------------------------------------- */
-
-interface ListPickerProps {
-  label: string;
-  description?: string;
-  /** The modal's open state, so a closed editor holds no stale results. */
-  open: boolean;
-  value: string;
-  error?: string | null;
-  allowNone?: boolean;
-  onChange: (listId: string) => void;
-}
-
-/** Long enough that a typed word is one request, short enough to feel live. */
-const SEARCH_DEBOUNCE_MS = 300;
-
-/**
- * A list of lists, with the two facts that tell them apart.
- *
- * A dropdown of names would be prettier and would reintroduce the exact problem
- * this replaces: "Footprints Students" and "Footprints Camp 2019" are equally
- * plausible until you can see that one holds 47 people and refreshes itself,
- * and the other holds 12 and last ran in 2019.
- *
- * Searching goes to Planning Center rather than filtering what is already here.
- * A church that has used People for a decade can have hundreds of lists, and
- * filtering a truncated first page is the kind of search that quietly fails to
- * find the thing you are looking for.
- */
-function ListPicker({
-  label,
-  description,
-  open,
-  value,
-  error,
-  allowNone,
-  onChange,
-}: ListPickerProps) {
-  const [query, setQuery] = useState('');
-  const [lists, setLists] = useState<PcoList[] | null>(null);
-  const [failure, setFailure] = useState<string | null>(null);
-  const [reloads, setReloads] = useState(0);
-
-  useEffect(() => {
-    if (!open) return;
-
-    let cancelled = false;
-    const search = query.trim();
-    const timer = setTimeout(
-      () => {
-        setFailure(null);
-        fetchPlanningCenterLists(search || undefined)
-          .then((result) => {
-            if (!cancelled) setLists(result);
-          })
-          .catch((cause: unknown) => {
-            if (cancelled) return;
-            setLists([]);
-            setFailure(
-              cause instanceof Error ? cause.message : 'Could not read your Planning Center lists.',
-            );
-          });
-      },
-      // The first load should not sit behind a debounce nobody typed into.
-      search ? SEARCH_DEBOUNCE_MS : 0,
-    );
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [open, query, reloads]);
-
-  const missing = value !== '' && query === '' && lists !== null && !lists.some((l) => l.id === value);
-
-  return (
-    <fieldset className="flex flex-col gap-2">
-      <legend className="mb-1 text-sm font-medium text-ink-200">{label}</legend>
-      {description ? <p className="-mt-1 text-xs text-ink-500">{description}</p> : null}
-
-      <TextField
-        label={`Search ${label.toLowerCase()}s`}
-        type="search"
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        placeholder="Search lists by name…"
-      />
-
-      {lists === null ? (
-        <SkeletonRows count={3} />
-      ) : (
-        <div className="flex max-h-64 flex-col gap-1.5 overflow-y-auto rounded-xl bg-ink-900/60 p-1.5 ring-1 ring-ink-800">
-          {allowNone && query === '' ? (
-            <ListOption
-              selected={value === ''}
-              onSelect={() => onChange('')}
-              name="No list"
-              detail="Fall back to your Planning Center administrators."
-            />
-          ) : null}
-
-          {lists.map((list) => (
-            <ListOption
-              key={list.id}
-              selected={value === list.id}
-              onSelect={() => onChange(list.id)}
-              name={list.name}
-              detail={describeList(list)}
-              warn={list.invalid || isStale(list)}
-            />
-          ))}
-
-          {lists.length === 0 ? (
-            <p className="px-2 py-3 text-sm text-ink-400">
-              {query
-                ? `No list matches “${query}”.`
-                : 'Planning Center returned no lists for this token.'}
-            </p>
-          ) : null}
-        </div>
-      )}
-
-      {missing ? (
-        <p className="text-xs text-warn-400">
-          The list currently configured ({value}) was not among these. It may have been deleted, or
-          this token may not be allowed to read it.
-        </p>
-      ) : null}
-
-      {error ? <p className="text-xs text-danger-400">{error}</p> : null}
-      {failure ? <p className="text-xs text-danger-400">{failure}</p> : null}
-
-      <p className="text-xs text-ink-500">
-        Lists are built in Planning Center — Tally can only choose among them.{' '}
-        <a
-          href={PCO_LISTS_URL}
-          target="_blank"
-          rel="noreferrer"
-          className="font-medium text-brand-300 underline"
-        >
-          Open Lists ↗
-        </a>{' '}
-        <button
-          type="button"
-          onClick={() => setReloads((count) => count + 1)}
-          className="font-medium text-brand-300 underline"
-        >
-          Reload
-        </button>
-      </p>
-    </fieldset>
-  );
-}
-
-interface ListOptionProps {
-  selected: boolean;
-  onSelect: () => void;
-  name: string;
-  detail: string;
-  warn?: boolean;
-}
-
-function ListOption({ selected, onSelect, name, detail, warn }: ListOptionProps) {
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      aria-pressed={selected}
-      className={cn(
-        'flex w-full items-start justify-between gap-3 rounded-lg px-3 py-2 text-left',
-        selected ? 'bg-brand-500/15 ring-1 ring-brand-400' : 'hover:bg-ink-800/60',
-      )}
-    >
-      <span className="min-w-0">
-        <span className="block truncate text-sm font-medium text-ink-100">{name}</span>
-        <span className="block text-xs text-ink-500">{detail}</span>
-      </span>
-      {warn ? <Badge tone="warn">Check this</Badge> : null}
-    </button>
-  );
-}
-
-/** Six months without a refresh, on a list nobody has automated. */
-const STALE_AFTER_MS = 1000 * 60 * 60 * 24 * 180;
-
-function isStale(list: PcoList): boolean {
-  if (list.autoRefresh || !list.refreshedAt) return false;
-  return Date.now() - list.refreshedAt.getTime() > STALE_AFTER_MS;
-}
-
-function describeList(list: PcoList): string {
-  const parts: string[] = [];
-
-  if (list.totalPeople !== null) {
-    parts.push(`${list.totalPeople} ${list.totalPeople === 1 ? 'person' : 'people'}`);
-  }
-  if (list.invalid) {
-    parts.push('Planning Center says its rules no longer work');
-  } else if (list.autoRefresh) {
-    parts.push('refreshes itself');
-  } else if (list.refreshedAt) {
-    parts.push(`last refreshed ${formatRelative(list.refreshedAt)}`);
-  }
-
-  return parts.join(' · ') || 'No details from Planning Center.';
 }

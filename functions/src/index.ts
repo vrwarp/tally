@@ -13,18 +13,22 @@
  * quick-added visitor before the counselor has walked back to the door.
  */
 import { initializeApp } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { logger, setGlobalOptions } from 'firebase-functions/v2';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { PCO_SECRETS, resolveConfig, type PcoConfig } from './config.js';
 import { asFirestoreLike, PATHS, type FirestoreLike } from './firestore.js';
 import { createPcoClient, PcoApiError, type PcoClient } from './pco/client.js';
-import { fetchList, fetchLists, type PcoListSummary } from './pco/lists.js';
+import { fetchListMemberIds, fetchLists, type PcoListSummary } from './pco/lists.js';
 import {
   fetchPersonDetails,
-  fetchYouthRoster,
+  fetchRoster,
+  pcoStudentId,
+  personIdFromStudentId,
+  searchPeople,
   type PersonDetails,
+  type PersonSearchResult,
   type RosterPerson,
 } from './pco/roster.js';
 import { resetSharedCache, sharedCache } from './pco/sharedCache.js';
@@ -117,6 +121,8 @@ function reportPcoFailure(error: unknown, what: string): never {
 /** Mirrors `RosterResponse` in src/services/functions.ts. */
 interface RosterResponse {
   people: RosterPerson[];
+  /** Roster entries whose Planning Center person could not be read. */
+  unresolved: string[];
   cached: boolean;
   fetchedAt: string;
   /** Echoed so the app can say how stale what it is showing might be. */
@@ -124,12 +130,47 @@ interface RosterResponse {
 }
 
 /**
- * The youth roster, read from Planning Center on demand.
+ * Every Planning Center person Tally has on its roster.
+ *
+ * The membership is Tally's own: a `students/{id}` document whose id is
+ * `pco_{personId}`. Read here rather than trusted from the caller, because the
+ * whole point of the id prefix is that it says which upstream person a row
+ * refers to — a browser that could name the ids would be choosing whose
+ * personal details the server fetches.
+ */
+async function rosterPersonIds(database: FirestoreLike): Promise<string[]> {
+  const snapshot = await database.collection(PATHS.students).get();
+  const ids: string[] = [];
+  for (const document of snapshot.docs) {
+    const personId = personIdFromStudentId(document.id);
+    if (!personId) continue;
+
+    /*
+     * A student taken off the roster keeps their document — every attendance
+     * record points at it, so deleting the row would drop past head counts —
+     * but stops being somebody Tally asks Planning Center about. Skipping them
+     * here is what makes "remove" mean anything, and it also means Tally reads
+     * no personal data at all about a child who has left the ministry.
+     */
+    if ((document.data() ?? {}).status === 'inactive') continue;
+
+    ids.push(personId);
+  }
+  return ids;
+}
+
+/**
+ * The youth roster: Tally's membership, with Planning Center's names on it.
  *
  * Open to any active member of the team, not just the core: a door volunteer
  * cannot check anybody in without it. It returns names and grades only — parent
  * contact and allergies come from `getPersonDetails`, one person at a time, to
  * somebody with a reason to look.
+ *
+ * Students Tally created itself — a visitor quick-added at the door who has not
+ * been pushed upstream yet — are not here at all. They live entirely in
+ * Firestore, which the app already reads live, and merging the two is the
+ * client's job (`mergeRoster`).
  */
 export const getRoster = onCall<{ force?: boolean } | undefined, Promise<RosterResponse>>(
   { secrets: PCO_SECRETS, timeoutSeconds: 120, memory: '512MiB' },
@@ -141,10 +182,11 @@ export const getRoster = onCall<{ force?: boolean } | undefined, Promise<RosterR
     if (!client) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
 
     try {
-      const result = await fetchYouthRoster({
+      const result = await fetchRoster({
         client,
         config,
         cache: sharedCache(config),
+        personIds: await rosterPersonIds(db()),
         force: request.data?.force === true,
       });
       return { ...result, cacheTtlSeconds: config.cacheTtlSeconds };
@@ -153,6 +195,32 @@ export const getRoster = onCall<{ force?: boolean } | undefined, Promise<RosterR
     }
   },
 );
+
+/**
+ * Finds somebody in Planning Center to put on the roster.
+ *
+ * Core team only: this searches the *whole* church directory, which is a wider
+ * view of the congregation than a door volunteer has any reason to hold.
+ */
+export const searchPlanningCenterPeople = onCall<
+  { query: string },
+  Promise<{ people: PersonSearchResult[] }>
+>({ secrets: PCO_SECRETS, timeoutSeconds: 60, memory: '256MiB' }, async (request) => {
+  await requireCoreTeam(request.auth?.uid);
+
+  const query = typeof request.data?.query === 'string' ? request.data.query.trim() : '';
+  if (!query) return { people: [] };
+
+  const config = await resolveConfig(db());
+  const client = clientFor(config);
+  if (!client) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
+
+  try {
+    return { people: await searchPeople({ client, config, query }) };
+  } catch (error) {
+    return reportPcoFailure(error, 'search Planning Center');
+  }
+});
 
 /**
  * Parent contact and allergies for one student.
@@ -199,11 +267,13 @@ interface PcoStatusResult {
   reachable: boolean;
   /** Null when everything is fine; otherwise the reason, in plain language. */
   problem: string | null;
-  rosterSource: 'list' | 'grade';
   writeBack: 'off' | 'create' | 'full';
   cacheTtlSeconds: number;
   baseUrlOverridden: boolean;
+  /** How many of Tally's roster entries Planning Center could actually name. */
   peopleVisible: number | null;
+  /** Roster entries whose upstream person could not be read. */
+  unresolved: number;
   /**
    * The effective settings, so Settings can both describe the connection and
    * open an editor already filled in with what is actually in force — rather
@@ -213,54 +283,14 @@ interface PcoStatusResult {
    * part of this shape, and `baseUrl` is an API root, not a credential.
    */
   settings: {
-    rosterSource: 'list' | 'grade';
-    studentListId: string | null;
-    counselorListId: string | null;
     minGrade: number;
     maxGrade: number;
     writeBack: 'off' | 'create' | 'full';
-    smallGroupField: string | null;
     cacheTtlSeconds: number;
     baseUrl: string;
     /** True when these came from `config/planningCenter` rather than a deploy. */
     managedInApp: boolean;
   };
-  /**
-   * The names behind the configured list ids, when they could be read.
-   *
-   * A bare id is exactly as opaque on a status screen as it was in a deploy
-   * parameter, and "Footprints Students (47 people)" is the difference between
-   * a leader recognising their own configuration and hoping it is right.
-   */
-  studentList: PcoListSummary | null;
-  counselorList: PcoListSummary | null;
-}
-
-/**
- * Looks up the configured lists so the screen can name them.
- *
- * Never allowed to fail the status call: a deleted list, a token without
- * permission to read Lists, or a slow response are all things the roster
- * question itself answers better. The names are a nicety on top.
- */
-async function describeConfiguredLists(
-  client: PcoClient,
-  config: PcoConfig,
-): Promise<{ studentList: PcoListSummary | null; counselorList: PcoListSummary | null }> {
-  const lookup = async (listId: string | null): Promise<PcoListSummary | null> => {
-    if (!listId) return null;
-    try {
-      return await fetchList(client, listId);
-    } catch {
-      return null;
-    }
-  };
-
-  const [studentList, counselorList] = await Promise.all([
-    lookup(config.rosterSource === 'list' ? config.studentListId : null),
-    lookup(config.counselorListId),
-  ]);
-  return { studentList, counselorList };
 }
 
 /**
@@ -281,7 +311,6 @@ export const getPlanningCenterStatus = onCall<
 
     const config = await resolveConfig(db());
     const base = {
-      rosterSource: config.rosterSource,
       writeBack: config.writeBack,
       cacheTtlSeconds: config.cacheTtlSeconds,
       baseUrlOverridden: config.baseUrlOverridden,
@@ -289,19 +318,14 @@ export const getPlanningCenterStatus = onCall<
       // exactly where somebody goes to fix a broken connection, so it must open
       // filled in rather than empty.
       settings: {
-        rosterSource: config.rosterSource,
-        studentListId: config.studentListId,
-        counselorListId: config.counselorListId,
         minGrade: config.minGrade,
         maxGrade: config.maxGrade,
         writeBack: config.writeBack,
-        smallGroupField: config.smallGroupField,
         cacheTtlSeconds: config.cacheTtlSeconds,
         baseUrl: config.baseUrl,
         managedInApp: config.managedInApp,
       },
-      studentList: null,
-      counselorList: null,
+      unresolved: 0,
     } satisfies Omit<PcoStatusResult, 'configured' | 'reachable' | 'problem' | 'peopleVisible'>;
 
     if (config.configError) {
@@ -323,25 +347,29 @@ export const getPlanningCenterStatus = onCall<
       // Deliberately the real roster query rather than a cheap ping: "we can
       // reach the API" and "we can see your students" are different claims, and
       // only the second is worth showing a leader.
-      const [result, lists] = await Promise.all([
-        fetchYouthRoster({
-          client,
-          config,
-          cache: sharedCache(config),
-          force: request.data?.force === true,
-        }),
-        describeConfiguredLists(client, config),
-      ]);
+      const personIds = await rosterPersonIds(db());
+      const result = await fetchRoster({
+        client,
+        config,
+        cache: sharedCache(config),
+        personIds,
+        force: request.data?.force === true,
+      });
+
+      const problem =
+        personIds.length === 0
+          ? 'Nobody is on the roster yet. Add students from the Students screen.'
+          : result.unresolved.length > 0
+            ? `${result.unresolved.length} of ${personIds.length} students on the roster could not be read from Planning Center. They may have been deleted or merged upstream.`
+            : null;
+
       return {
         ...base,
-        ...lists,
         configured: true,
         reachable: true,
-        problem:
-          result.people.length === 0
-            ? 'Planning Center answered, but no students matched. Check the roster source and grade range.'
-            : null,
+        problem,
         peopleVisible: result.people.length,
+        unresolved: result.unresolved.length,
       };
     } catch (error) {
       return {
@@ -413,6 +441,173 @@ export const refreshPlanningCenter = onCall<void, Promise<{ status: 'ok' }>>(
     return { status: 'ok' };
   },
 );
+
+/* -------------------------------------------------------------------------- */
+/* The roster itself                                                           */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Puts a Planning Center person on Tally's roster.
+ *
+ * Server-side rather than a Firestore write, because the document id *is* the
+ * claim: `students/pco_123` says "this row is Planning Center person 123", and
+ * a browser that could write that could bind a student record onto any person
+ * in the church — which is why the security rules forbid a client asserting the
+ * linkage at all. Here the linkage is checked against Planning Center before it
+ * is written.
+ *
+ * Idempotent: adding somebody who is already on the roster reactivates them
+ * rather than failing, because "they are back this term" is far more common
+ * than a mistake.
+ */
+export const addRosterMember = onCall<
+  { pcoPersonId: string },
+  Promise<{ status: 'added' | 'restored' | 'already-on-roster'; studentId: string }>
+>({ secrets: PCO_SECRETS, timeoutSeconds: 60, memory: '256MiB' }, async (request) => {
+  await requireCoreTeam(request.auth?.uid);
+
+  const personId = request.data?.pcoPersonId;
+  if (typeof personId !== 'string' || personId.trim().length === 0) {
+    throw new HttpsError('invalid-argument', 'pcoPersonId is required.');
+  }
+
+  const config = await resolveConfig(db());
+  const client = clientFor(config);
+  if (!client) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
+
+  // Confirm the person is real before recording that they are on the roster: a
+  // typo'd id would otherwise become a permanent row that renders as nothing.
+  try {
+    await client.get(`/people/${encodeURIComponent(personId)}`);
+  } catch (error) {
+    if (error instanceof PcoApiError && error.status === 404) {
+      throw new HttpsError('not-found', 'Planning Center has no person with that id.');
+    }
+    return reportPcoFailure(error, 'check that person in Planning Center');
+  }
+
+  const studentId = pcoStudentId(personId);
+  const ref = db().doc(`${PATHS.students}/${studentId}`);
+  const snapshot = await ref.get();
+  const existing = snapshot.exists ? (snapshot.data() ?? {}) : {};
+  const wasActive = existing.status === 'active';
+
+  await ref.set(
+    {
+      pcoPersonId: personId,
+      status: 'active',
+      addedToRosterAt: Timestamp.now(),
+      addedToRosterBy: request.auth?.uid ?? null,
+      ...(snapshot.exists ? {} : { createdAt: Timestamp.now() }),
+    },
+    { merge: true },
+  );
+
+  return {
+    status: !snapshot.exists ? 'added' : wasActive ? 'already-on-roster' : 'restored',
+    studentId,
+  };
+});
+
+/**
+ * Takes somebody off the roster without erasing that they were ever here.
+ *
+ * Deactivation rather than deletion, and not only out of caution: every
+ * attendance record references a student by id, so deleting the row would
+ * silently drop those events' head counts and leave history pointing at
+ * nobody. An inactive student stops appearing at the door and keeps their past.
+ */
+export const removeRosterMember = onCall<{ studentId: string }, Promise<{ status: 'removed' }>>(
+  { timeoutSeconds: 30, memory: '256MiB' },
+  async (request) => {
+    await requireCoreTeam(request.auth?.uid);
+
+    const studentId = request.data?.studentId;
+    if (typeof studentId !== 'string' || studentId.trim().length === 0) {
+      throw new HttpsError('invalid-argument', 'studentId is required.');
+    }
+
+    const ref = db().doc(`${PATHS.students}/${studentId}`);
+    const snapshot = await ref.get();
+    if (!snapshot.exists) throw new HttpsError('not-found', 'No such student.');
+
+    await ref.set(
+      {
+        status: 'inactive',
+        removedFromRosterAt: Timestamp.now(),
+        removedFromRosterBy: request.auth?.uid ?? null,
+      },
+      { merge: true },
+    );
+    return { status: 'removed' };
+  },
+);
+
+/**
+ * Copies everybody on a Planning Center list onto Tally's roster, once.
+ *
+ * The migration path for a church that has been running Tally on list mode, and
+ * a shortcut for one that keeps a list for its own reasons. Deliberately a copy
+ * and not a link: a List is a saved *query*, so its membership moves on its own
+ * — which is precisely why it makes a poor roster and a decent starting point.
+ */
+export const importPlanningCenterList = onCall<
+  { listId: string },
+  Promise<{ added: number; alreadyOnRoster: number; restored: number; total: number }>
+>({ secrets: PCO_SECRETS, timeoutSeconds: 300, memory: '512MiB' }, async (request) => {
+  await requireCoreTeam(request.auth?.uid);
+
+  const listId = request.data?.listId;
+  if (typeof listId !== 'string' || listId.trim().length === 0) {
+    throw new HttpsError('invalid-argument', 'listId is required.');
+  }
+
+  const config = await resolveConfig(db());
+  const client = clientFor(config);
+  if (!client) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
+
+  let personIds: string[];
+  try {
+    personIds = await fetchListMemberIds(client, listId);
+  } catch (error) {
+    return reportPcoFailure(error, 'read that Planning Center list');
+  }
+
+  const database = db();
+  const batch = database.batch();
+  const now = Timestamp.now();
+  let added = 0;
+  let restored = 0;
+  let alreadyOnRoster = 0;
+
+  for (const personId of personIds) {
+    const ref = database.doc(`${PATHS.students}/${pcoStudentId(personId)}`);
+    const snapshot = await ref.get();
+    const existing = snapshot.exists ? (snapshot.data() ?? {}) : {};
+
+    if (snapshot.exists && existing.status === 'active') {
+      alreadyOnRoster += 1;
+      continue;
+    }
+    if (snapshot.exists) restored += 1;
+    else added += 1;
+
+    batch.set(
+      ref,
+      {
+        pcoPersonId: personId,
+        status: 'active',
+        addedToRosterAt: now,
+        addedToRosterBy: request.auth?.uid ?? null,
+        ...(snapshot.exists ? {} : { createdAt: now }),
+      },
+      { merge: true },
+    );
+  }
+
+  if (added + restored > 0) await batch.commit();
+  return { added, restored, alreadyOnRoster, total: personIds.length };
+});
 
 /* -------------------------------------------------------------------------- */
 /* Write-back                                                                  */

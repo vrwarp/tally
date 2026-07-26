@@ -3,10 +3,8 @@ import {
   buildIncludedIndex,
   compareIds,
   emailKey,
-  extractCustomFieldValue,
   extractParentContact,
   isYouth,
-  mapPersonToAccessEntry,
   mapPersonToStudent,
   nameGradeKey,
   normaliseGender,
@@ -313,104 +311,6 @@ describe('extractParentContact', () => {
     expect(contact.parentPhone).toBe('555-0123');
   });
 });
-
-/* -------------------------------------------------------------------------- */
-/* mapPersonToAccessEntry                                                      */
-/* -------------------------------------------------------------------------- */
-
-describe('mapPersonToAccessEntry', () => {
-  const counselor = (attributes: PcoPersonAttributes) =>
-    person('500', { first_name: 'Sam', last_name: 'Counselor', ...attributes });
-
-  it.each([
-    [{ site_administrator: true }, 'admin'],
-    [{ site_administrator: true, people_permissions: 'Editor' }, 'admin'],
-    [{ people_permissions: 'Manager' }, 'core'],
-    [{ people_permissions: 'Editor' }, 'core'],
-    [{ people_permissions: 'editor' }, 'core'],
-    [{ people_permissions: 'Viewer' }, 'counselor'],
-    [{ people_permissions: '' }, 'counselor'],
-    [{}, 'counselor'],
-  ])('maps %o to the %s role', (attributes, role) => {
-    const entry = mapPersonToAccessEntry(counselor(attributes), {
-      index: index([email('e1', '500', 'sam@example.org', true)]),
-    });
-
-    expect(entry?.role).toBe(role);
-  });
-
-  it('builds the emailKey document id the app looks up', () => {
-    const entry = mapPersonToAccessEntry(counselor({}), {
-      index: index([email('e1', '500', 'Sam.Smith@Example.org', true)]),
-    });
-
-    expect(entry?.email).toBe('sam.smith@example.org');
-    expect(entry?.emailKey).toBe('sam,smith@example,org');
-    expect(entry?.displayName).toBe('Sam Counselor');
-    expect(entry?.pcoPersonId).toBe('500');
-    expect(entry?.active).toBe(true);
-  });
-
-  it('returns null for a person with no email address', () => {
-    expect(mapPersonToAccessEntry(counselor({}), { index: index() })).toBeNull();
-  });
-
-  it('uses the fielded primary email when no Email resources were included', () => {
-    const entry = mapPersonToAccessEntry(counselor({ primary_email_address: 'Sam@example.org' }), {
-      index: index(),
-    });
-
-    expect(entry?.email).toBe('sam@example.org');
-  });
-
-  it('marks an inactive counselor as inactive rather than dropping them', () => {
-    const entry = mapPersonToAccessEntry(counselor({ inactivated_at: '2026-01-01T00:00:00Z' }), {
-      index: index([email('e1', '500', 'sam@example.org', true)]),
-    });
-
-    expect(entry?.active).toBe(false);
-  });
-
-  it('slugifies the configured small-group custom field', () => {
-    const fieldData = [
-      {
-        id: 'fd1',
-        type: 'FieldDatum',
-        attributes: { value: '8th Grade Boys' },
-        relationships: {
-          customizable: { data: { type: 'Person', id: '500' } },
-          field_definition: { data: { type: 'FieldDefinition', id: 'fd-def' } },
-        },
-      },
-      {
-        id: 'fd-def',
-        type: 'FieldDefinition',
-        attributes: { name: 'Small Group', slug: 'small_group' },
-      },
-    ];
-
-    const entry = mapPersonToAccessEntry(counselor({}), {
-      index: index([email('e1', '500', 'sam@example.org', true)], fieldData),
-      smallGroupField: 'small_group',
-    });
-
-    expect(entry?.assignedGroupId).toBe('8th-grade-boys');
-  });
-
-  it('ignores custom field data when no field is configured', () => {
-    const entry = mapPersonToAccessEntry(counselor({}), {
-      index: index([email('e1', '500', 'sam@example.org', true)]),
-      smallGroupField: null,
-    });
-
-    expect(entry?.assignedGroupId).toBeNull();
-    expect(extractCustomFieldValue(counselor({}), index(), null)).toBeNull();
-  });
-});
-
-/* -------------------------------------------------------------------------- */
-/* Keys and ordering                                                           */
-/* -------------------------------------------------------------------------- */
 
 describe('keys', () => {
   it('indexes included resources by type and id', () => {

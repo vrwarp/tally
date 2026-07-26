@@ -30,10 +30,16 @@ export interface AuthContextValue {
   profile: UserProfile | null;
   /** Set when a sign-in attempt failed; cleared on the next attempt. */
   error: string | null;
-  /** True between requesting a magic link and the user leaving for their inbox. */
-  magicLinkSentTo: string | null;
 
-  sendMagicLink: (email: string) => Promise<void>;
+  /**
+   * The only way in.
+   *
+   * Tally used to accept an email magic link as well, and for a while that was
+   * the *primary* path — most counselors are handed a phone at the door. It is
+   * gone: authorisation is keyed on an address, so what matters is that a
+   * provider Tally trusts has confirmed the address belongs to the person, and
+   * one door is easier to watch than two.
+   */
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   /**

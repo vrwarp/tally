@@ -136,3 +136,32 @@ export async function fetchList(client: PcoClient, listId: string): Promise<PcoL
   const resource = Array.isArray(body.data) ? body.data[0] : body.data;
   return resource ? toSummary(resource) : null;
 }
+
+/**
+ * The Planning Center ids of everyone currently on a list.
+ *
+ * This is the migration path off list-as-roster, and it is deliberately a
+ * one-way copy rather than a link. A List is a *query* — its members change
+ * whenever somebody's grade rolls over or a rule is edited — which is exactly
+ * why Tally no longer treats one as its roster. Importing takes the answer the
+ * list gives today and hands it to a human, who then owns it.
+ */
+export async function fetchListMemberIds(
+  client: PcoClient,
+  listId: string,
+  maxMembers = 1000,
+): Promise<string[]> {
+  const ids: string[] = [];
+
+  for await (const page of client.paginate<{ id: string }>(
+    `/lists/${encodeURIComponent(listId)}/people`,
+    { order: 'last_name' },
+  )) {
+    for (const person of page.data) {
+      if (person.id) ids.push(person.id);
+      if (ids.length >= maxMembers) return ids;
+    }
+  }
+
+  return ids;
+}

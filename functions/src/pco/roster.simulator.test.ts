@@ -19,8 +19,6 @@ import {
   DEFAULT_APP_ID,
   DEFAULT_SECRET,
   FIXTURE_IDS,
-  STUDENT_LIST_ID,
-  TEAM_LIST_ID,
   type SimulatorOptions,
 } from '../../../tools/pco-simulator/src/index.js';
 import type { PcoConfig } from '../config.js';
@@ -28,10 +26,10 @@ import { createTtlCache, type TtlCache } from './cache.js';
 import { createPcoClient, type PcoClient } from './client.js';
 import {
   fetchPersonDetails,
-  fetchYouthRoster,
-  findTeamMemberByEmail,
+  fetchRoster,
   pcoStudentId,
   personIdFromStudentId,
+  searchPeople,
 } from './roster.js';
 
 function baseConfig(overrides: Partial<PcoConfig> = {}): PcoConfig {
@@ -40,14 +38,10 @@ function baseConfig(overrides: Partial<PcoConfig> = {}): PcoConfig {
     secret: DEFAULT_SECRET,
     baseUrl: SIMULATOR_ORIGIN,
     baseUrlOverridden: true,
-    rosterSource: 'grade',
-    studentListId: null,
-    counselorListId: null,
     minGrade: 6,
     maxGrade: 12,
     writeBack: 'create',
     cacheTtlSeconds: 30,
-    smallGroupField: null,
     managedInApp: false,
     configError: null,
     ...overrides,
@@ -94,118 +88,141 @@ describe('student ids', () => {
   });
 });
 
-describe('fetchYouthRoster', () => {
+describe('fetchRoster', () => {
   let world: Harness;
+
+  /** Everyone the fixture's youth pastor would have put on the roster. */
+  const YOUTH_IDS = [
+    FIXTURE_IDS.amara,
+    FIXTURE_IDS.benjiWithNickname,
+    FIXTURE_IDS.sofiaWithAllergy,
+    FIXTURE_IDS.ivyNoGrade,
+  ];
 
   beforeEach(() => {
     world = harness();
   });
 
-  it('returns the youth, and only the youth', async () => {
-    const { people } = await fetchYouthRoster({ ...world, config: baseConfig() });
-
-    expect(people.length).toBeGreaterThan(0);
-    for (const person of people) {
-      expect(person.grade).toBeGreaterThanOrEqual(6);
-      expect(person.grade).toBeLessThanOrEqual(12);
-    }
-  });
-
-  it('leaves the 5th grader off a 6-12 roster', async () => {
-    const { people } = await fetchYouthRoster({ ...world, config: baseConfig() });
-    expect(people.map((person) => person.pcoPersonId)).not.toContain(FIXTURE_IDS.oliverFifthGrader);
-  });
-
-  it('takes the hand-maintained list at its word', async () => {
-    // In list mode the list *is* the roster. The fixture models a youth pastor
-    // overruling the grade filter in both directions: the 5th grader is left
-    // off, and the student Planning Center has no grade for is kept on.
-    const { people } = await fetchYouthRoster({
+  it('returns exactly the people Tally has on its roster', async () => {
+    const { people } = await fetchRoster({
       ...world,
-      config: baseConfig({ rosterSource: 'list', studentListId: STUDENT_LIST_ID }),
+      config: baseConfig(),
+      personIds: YOUTH_IDS,
     });
-    const ids = people.map((person) => person.pcoPersonId);
 
-    expect(ids).toContain(FIXTURE_IDS.ivyNoGrade);
-    expect(ids).not.toContain(FIXTURE_IDS.oliverFifthGrader);
+    expect(people.map((person) => person.pcoPersonId).sort()).toEqual([...YOUTH_IDS].sort());
   });
 
-  it('reads the list endpoint in list mode, not the whole church', async () => {
-    const listWorld = harness();
-    await fetchYouthRoster({
-      ...listWorld,
-      config: baseConfig({ rosterSource: 'list', studentListId: STUDENT_LIST_ID }),
+  it('does not second-guess the roster on grade', async () => {
+    /*
+     * The entire reason membership moved into Tally. A Planning Center List is
+     * generated from filter rules, so the two cases a real youth pastor cares
+     * about — the 5th grader who comes with an older sibling, the student
+     * nobody ever gave a grade — could only be expressed by inventing a custom
+     * field on every person in the church. Here they are just on the roster.
+     */
+    const { people } = await fetchRoster({
+      ...world,
+      config: baseConfig(),
+      personIds: [FIXTURE_IDS.oliverFifthGrader, FIXTURE_IDS.ivyNoGrade],
     });
 
-    expect(
-      listWorld.requests.every((url) => url.includes('/lists/' + STUDENT_LIST_ID + '/people')),
-    ).toBe(true);
+    expect(people.map((person) => person.pcoPersonId).sort()).toEqual(
+      [FIXTURE_IDS.oliverFifthGrader, FIXTURE_IDS.ivyNoGrade].sort(),
+    );
+  });
+
+  it('reports somebody who is on the roster and no longer in Planning Center', async () => {
+    // Deleted or merged upstream. Dropping them silently would mean a roster
+    // that is quietly short by one, which is the failure nobody notices.
+    const { people, unresolved } = await fetchRoster({
+      ...world,
+      config: baseConfig(),
+      personIds: [FIXTURE_IDS.amara, '4209999'],
+    });
+
+    expect(people.map((person) => person.pcoPersonId)).toEqual([FIXTURE_IDS.amara]);
+    expect(unresolved).toEqual(['4209999']);
+  });
+
+  it('answers an empty roster without asking Planning Center anything', async () => {
+    const { people } = await fetchRoster({ ...world, config: baseConfig(), personIds: [] });
+
+    expect(people).toEqual([]);
+    expect(world.requests).toHaveLength(0);
   });
 
   it('carries no parent contact and no allergies', async () => {
-    // The whole point of splitting the roster from the details: a door volunteer
-    // never receives a minor's medical notes or a parent's phone number, because
-    // the screen they are on never asks for them.
-    //
-    // `profileComplete` is null here for the same reason — a roster read does
-    // not hydrate households, so it cannot know, and saying `false` would put an
-    // "incomplete profile" badge on every student in the ministry.
-    const { people } = await fetchYouthRoster({ ...world, config: baseConfig() });
-    const sofia = people.find((person) => person.pcoPersonId === FIXTURE_IDS.sofiaWithAllergy);
+    const { people } = await fetchRoster({
+      ...world,
+      config: baseConfig(),
+      personIds: YOUTH_IDS,
+    });
 
-    expect(sofia).toBeDefined();
-    expect(Object.keys(sofia ?? {}).sort()).toEqual([
-      'firstName',
-      'gender',
-      'grade',
-      'hasAllergies',
-      'id',
-      'lastName',
-      'pcoPersonId',
-      'profileComplete',
-      'searchName',
-      'status',
-    ]);
-    // The *fact* of an allergy travels, so the badge can be drawn. The note
-    // does not.
-    expect(sofia?.hasAllergies).toBe(true);
-    expect(sofia?.profileComplete).toBeNull();
-  });
-
-  it('prefers the nickname a counselor would actually say', async () => {
-    const { people } = await fetchYouthRoster({ ...world, config: baseConfig() });
-    const benji = people.find((person) => person.pcoPersonId === FIXTURE_IDS.benjiWithNickname);
-    expect(benji?.firstName).toBe('Benji');
-  });
-
-  it('returns ids the rest of Tally can use as student ids', async () => {
-    const { people } = await fetchYouthRoster({ ...world, config: baseConfig() });
     for (const person of people) {
-      expect(person.id).toBe(pcoStudentId(person.pcoPersonId));
+      expect(Object.keys(person)).not.toContain('parentPhone');
+      expect(Object.keys(person)).not.toContain('allergies');
     }
   });
 
+  it('reports *that* there is an allergy, so the badge can render', async () => {
+    const { people } = await fetchRoster({
+      ...world,
+      config: baseConfig(),
+      personIds: [FIXTURE_IDS.sofiaWithAllergy],
+    });
+
+    expect(people[0]?.hasAllergies).toBe(true);
+  });
+
+  it('prefers the nickname a counselor would actually say', async () => {
+    const { people } = await fetchRoster({
+      ...world,
+      config: baseConfig(),
+      personIds: [FIXTURE_IDS.benjiWithNickname],
+    });
+
+    expect(people[0]?.firstName).toBe('Benji');
+  });
+
+  it('returns ids the rest of Tally can use as student ids', async () => {
+    const { people } = await fetchRoster({
+      ...world,
+      config: baseConfig(),
+      personIds: [FIXTURE_IDS.amara],
+    });
+
+    expect(people[0]?.id).toBe(pcoStudentId(FIXTURE_IDS.amara));
+  });
+
   it('is sorted, so the roster does not reshuffle between reads', async () => {
-    const { people } = await fetchYouthRoster({ ...world, config: baseConfig() });
+    const { people } = await fetchRoster({
+      ...world,
+      config: baseConfig(),
+      personIds: YOUTH_IDS,
+    });
+
     const names = people.map((person) => person.searchName);
     expect(names).toEqual([...names].sort());
   });
 
   it('follows every page rather than stopping at the first', async () => {
     const small = harness({ pageSize: 3 });
-    const { people } = await fetchYouthRoster({ ...small, config: baseConfig() });
+    const { people } = await fetchRoster({
+      ...small,
+      config: baseConfig(),
+      personIds: YOUTH_IDS,
+    });
 
-    const ids = new Set(people.map((person) => person.pcoPersonId));
-    expect(ids.size).toBe(people.length);
-    expect(people.length).toBeGreaterThan(3);
+    expect(people).toHaveLength(YOUTH_IDS.length);
   });
 
   describe('caching', () => {
     it('asks Planning Center once for two readers inside the TTL', async () => {
       const config = baseConfig();
-      const first = await fetchYouthRoster({ ...world, config });
+      const first = await fetchRoster({ ...world, config, personIds: YOUTH_IDS });
       const before = world.requests.length;
-      const second = await fetchYouthRoster({ ...world, config });
+      const second = await fetchRoster({ ...world, config, personIds: YOUTH_IDS });
 
       expect(second.people).toEqual(first.people);
       expect(second.cached).toBe(true);
@@ -216,9 +233,9 @@ describe('fetchYouthRoster', () => {
       const off = harness({}, 0);
       const config = baseConfig({ cacheTtlSeconds: 0 });
 
-      await fetchYouthRoster({ ...off, config });
+      await fetchRoster({ ...off, config, personIds: YOUTH_IDS });
       const before = off.requests.length;
-      const second = await fetchYouthRoster({ ...off, config });
+      const second = await fetchRoster({ ...off, config, personIds: YOUTH_IDS });
 
       expect(second.cached).toBe(false);
       expect(off.requests.length).toBeGreaterThan(before);
@@ -226,29 +243,45 @@ describe('fetchYouthRoster', () => {
       expect(second.people.length).toBeGreaterThan(0);
     });
 
-    it('does not serve a list-mode roster from a grade-mode read', async () => {
-      // These two contain the same people in this fixture, so equal output
-      // proves nothing. What matters is that the second read went and asked,
-      // rather than being answered from the first one's entry.
-      await fetchYouthRoster({ ...world, config: baseConfig() });
-      const afterGrade = world.requests.length;
+    it('shows a student added a moment ago without waiting out the TTL', async () => {
+      /*
+       * Membership is Tally's, and it changes when somebody presses a button.
+       * The cache key is the roster itself, so adding a student is a different
+       * question rather than the same question with a stale answer.
+       */
+      const config = baseConfig();
+      await fetchRoster({ ...world, config, personIds: [FIXTURE_IDS.amara] });
 
-      const listMode = await fetchYouthRoster({
+      const grown = await fetchRoster({
         ...world,
-        config: baseConfig({ rosterSource: 'list', studentListId: STUDENT_LIST_ID }),
+        config,
+        personIds: [FIXTURE_IDS.amara, FIXTURE_IDS.sofiaWithAllergy],
       });
 
-      expect(listMode.cached).toBe(false);
-      expect(world.requests.slice(afterGrade).some((url) => url.includes('/lists/'))).toBe(true);
+      expect(grown.cached).toBe(false);
+      expect(grown.people).toHaveLength(2);
+    });
+
+    it('does not care what order the roster arrived in', async () => {
+      const config = baseConfig();
+      await fetchRoster({ ...world, config, personIds: YOUTH_IDS });
+      const reordered = await fetchRoster({
+        ...world,
+        config,
+        personIds: [...YOUTH_IDS].reverse(),
+      });
+
+      expect(reordered.cached).toBe(true);
     });
 
     it('does not serve one grade band from a read of another', async () => {
-      await fetchYouthRoster({ ...world, config: baseConfig() });
+      await fetchRoster({ ...world, config: baseConfig(), personIds: YOUTH_IDS });
       const afterFull = world.requests.length;
 
-      const narrow = await fetchYouthRoster({
+      const narrow = await fetchRoster({
         ...world,
         config: baseConfig({ minGrade: 9, maxGrade: 12 }),
+        personIds: YOUTH_IDS,
       });
 
       expect(narrow.cached).toBe(false);
@@ -260,12 +293,53 @@ describe('fetchYouthRoster', () => {
       const config = baseConfig();
       world.store.scheduleFailure(500, 'Planning Center is having a minute', 10);
 
-      await expect(fetchYouthRoster({ ...world, config })).rejects.toThrow();
+      await expect(fetchRoster({ ...world, config, personIds: YOUTH_IDS })).rejects.toThrow();
 
       world.store.reset();
-      const recovered = await fetchYouthRoster({ ...world, config });
+      const recovered = await fetchRoster({ ...world, config, personIds: YOUTH_IDS });
       expect(recovered.people.length).toBeGreaterThan(0);
     });
+  });
+});
+
+describe('searchPeople', () => {
+  it('finds somebody to put on the roster by name', async () => {
+    const world = harness();
+    const results = await searchPeople({
+      ...world,
+      config: baseConfig(),
+      query: 'Amara',
+    });
+
+    expect(results.map((person) => person.pcoPersonId)).toContain(FIXTURE_IDS.amara);
+  });
+
+  it('offers people the grade band would have excluded', async () => {
+    // A search that pre-filtered on grade would hide exactly the students a
+    // hand-picked roster exists to include.
+    const world = harness();
+    const results = await searchPeople({
+      ...world,
+      config: baseConfig(),
+      query: 'Oliver',
+    });
+
+    expect(results.map((person) => person.pcoPersonId)).toContain(FIXTURE_IDS.oliverFifthGrader);
+  });
+
+  it('says whether Planning Center thinks somebody is a child', async () => {
+    const world = harness();
+    const results = await searchPeople({ ...world, config: baseConfig(), query: 'Amara' });
+
+    expect(results.find((person) => person.pcoPersonId === FIXTURE_IDS.amara)?.child).toBe(true);
+  });
+
+  it('answers an empty query without asking', async () => {
+    const world = harness();
+    const results = await searchPeople({ ...world, config: baseConfig(), query: '   ' });
+
+    expect(results).toEqual([]);
+    expect(world.requests).toHaveLength(0);
   });
 });
 
@@ -311,74 +385,5 @@ describe('fetchPersonDetails', () => {
 
     await fetchPersonDetails({ ...world, config, personId: FIXTURE_IDS.sofiaWithAllergy });
     expect(world.requests.length).toBeGreaterThan(before);
-  });
-});
-
-describe('findTeamMemberByEmail', () => {
-  it('finds a leader on the counselor list and reads their role', async () => {
-    const world = harness();
-    const entry = await findTeamMemberByEmail({
-      ...world,
-      config: baseConfig({ counselorListId: TEAM_LIST_ID }),
-      email: 'dana.ruiz@footprints.example.org',
-    });
-
-    expect(entry?.pcoPersonId).toBe(FIXTURE_IDS.adminDana);
-    expect(entry?.role).toBe('admin');
-    expect(entry?.active).toBe(true);
-  });
-
-  it('is case- and whitespace-insensitive, the way a typed address is', async () => {
-    const world = harness();
-    const entry = await findTeamMemberByEmail({
-      ...world,
-      config: baseConfig({ counselorListId: TEAM_LIST_ID }),
-      email: '  Dana.Ruiz@Footprints.Example.ORG ',
-    });
-
-    expect(entry?.pcoPersonId).toBe(FIXTURE_IDS.adminDana);
-  });
-
-  it('refuses somebody who is not on the configured list', async () => {
-    // Being findable in Planning Center is not the same as being on the youth
-    // team, and the difference is a roster of minors.
-    const world = harness();
-    const entry = await findTeamMemberByEmail({
-      ...world,
-      config: baseConfig({ counselorListId: TEAM_LIST_ID }),
-      email: 'nobody@example.org',
-    });
-
-    expect(entry).toBeNull();
-  });
-
-  it('falls back to a search when no list is configured', async () => {
-    const world = harness();
-    const entry = await findTeamMemberByEmail({
-      ...world,
-      config: baseConfig(),
-      email: 'miriam.achebe@footprints.example.org',
-    });
-
-    expect(entry?.pcoPersonId).toBe(FIXTURE_IDS.managerMiriam);
-  });
-
-  it('rejects a near-miss the search happened to return', async () => {
-    // Planning Center's search is fuzzy. "Close enough" is not a basis for
-    // granting access, so the address is confirmed against what came back.
-    const world = harness();
-    const entry = await findTeamMemberByEmail({
-      ...world,
-      config: baseConfig(),
-      email: 'miriam.achebe@footprints.example.ORG.uk',
-    });
-
-    expect(entry).toBeNull();
-  });
-
-  it('never grants access from an empty address', async () => {
-    const world = harness();
-    expect(await findTeamMemberByEmail({ ...world, config: baseConfig(), email: '   ' })).toBeNull();
-    expect(world.requests.length).toBe(0);
   });
 });

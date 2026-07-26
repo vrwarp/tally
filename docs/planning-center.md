@@ -1,8 +1,26 @@
 # Planning Center People integration
 
 Planning Center People is the system of record for *people*. Students and counselors are created,
-edited and retired there; Tally pulls them in on a schedule and owns only what Planning Center has no
-concept of — attendance, small groups, RSVPs, waivers.
+edited and retired there, and Tally reads them live and stores none of it.
+
+**Tally owns the two memberships.** Who is a Footprints student, and who may sign in to Tally, are
+Tally's own lists. They used to be Planning Center Lists, and that was a mistake worth explaining,
+because it is the reason this page reads the way it does now: a List is *generated from filter
+rules*. There is no way to say "these forty-three teenagers" in a List — only "everyone in grades
+6–12 flagged as a child", which is wrong in both directions at the edges every ministry has. The
+5th grader who comes every week with an older sibling is excluded; the senior who graduated in May
+and still leads worship is dropped the moment the grades roll over. The only workaround is to invent
+a custom field on every person in the church and filter on that, which is a schema change to the
+church database in order to express a decision that was never Planning Center's to hold.
+
+So the split is now:
+
+| | Owner | Where |
+| --- | --- | --- |
+| Who is on the roster | Tally | `students/{id}` — a document *is* the membership |
+| Who may sign in | Tally | `invitations/{emailKey}`, plus `TALLY_ADMIN_EMAILS` |
+| Names, grades, parent contact, allergies | Planning Center | read on demand, stored nowhere |
+| Attendance, small groups, RSVPs, waivers | Tally | Planning Center has no concept of them |
 
 This is the operational guide: how to get credentials, what every setting does, how counselor access
 actually flows, and what to do when it breaks. `functions/src/config.ts` is the source of truth for
@@ -55,10 +73,11 @@ callables in `src/services/functions.ts`.
 
 There are two layers, and only the first one needs a deploy.
 
-**Settings → Planning Center → Change** is where the core team edits everything non-secret: which
-list is the roster, the counselor list, the grade band, write-back, the small-group field, how long a
-read may be reused. Saving writes `config/planningCenter`, the server reads it on the next call, and
-the change is live for every counselor's next read. No redeploy, no restart.
+**Settings → Planning Center → Change** is where the core team edits everything non-secret: the
+grade band, write-back, and how long a read may be reused. Saving writes `config/planningCenter`, the
+server reads it on the next call, and the change is live for every counselor's next read. No
+redeploy, no restart. (Who is on the roster is not here — that is the Students screen, one student at
+a time.)
 
 **Deploy-time parameters** are the defaults an install starts from, before anybody has opened
 Settings. They still matter — a fresh deploy, a CI environment and the end-to-end suite all configure
@@ -71,8 +90,7 @@ live in Secret Manager, because a value a browser can write is a value a browser
 
 For each setting: the saved document wins where it has an opinion, otherwise the deploy-time
 parameter, otherwise the built-in default. A key that is *absent* from the document means "no
-opinion"; a key that is present but empty means "deliberately cleared" — which is how a leader
-removes a counselor list without a deploy.
+opinion"; a key that is present but empty means "deliberately cleared".
 
 `PCO_API_BASE_URL` is the one exception: an empty saved value means "no override" rather than
 "cleared". The app writes every field on save, including ones the person cannot see, so the other
@@ -92,19 +110,17 @@ closed set of keys, so credentials cannot be stashed in it even by an admin.
 | --- | --- | --- |
 | `PCO_APP_ID` | *(secret, required)* | Personal Access Token application id. Sent as the HTTP Basic username. Secret Manager only. |
 | `PCO_SECRET` | *(secret, required)* | Personal Access Token secret. Sent as the HTTP Basic password. Secret Manager only. |
-| `PCO_ROSTER_SOURCE` | `grade` | How the youth roster is selected: `list` (a curated Planning Center List) or `grade` (everyone in the grade band). Any other value falls back to `grade`. |
-| `PCO_STUDENT_LIST_ID` | *(empty)* | The List whose members are the roster. **Required** in list mode; reads refuse to run without it. The id is the number in the List's URL — or just pick it by name in Settings. |
-| `PCO_COUNSELOR_LIST_ID` | *(empty)* | Optional second List holding adult counselors and core team. Everyone on it with an email address may sign in. Left blank, access falls back to Planning Center's own administrators. |
-| `PCO_MIN_GRADE` | `6` | Bottom of the grade band. Clamped into 6–12, because those are the only grades the app's `Grade` type admits. |
+| `TALLY_ADMIN_EMAILS` | *(empty)* | Google addresses that are admins on every sign-in, whatever the database says. The bootstrap for a fresh install and the break-glass for a lockout. Comma- or whitespace-separated. Not a Planning Center setting at all — see §5. |
+| `PCO_MIN_GRADE` | `6` | Bottom of the grade band. Clamped into 6–12, because those are the only grades the app's `Grade` type admits. Selects nobody; see §3. |
 | `PCO_MAX_GRADE` | `12` | Top of the grade band. Clamped into `PCO_MIN_GRADE`–12. |
 | `PCO_WRITE_BACK` | `create` | How much Tally may change in Planning Center: `off`, `create` or `full`. See §4. Any other value falls back to `create`. |
 | `PCO_CACHE_TTL_SECONDS` | `30` | How long a Planning Center read may be reused. `0` turns retention off; the ceiling is 300, past which a cache becomes a mirror. |
-| `PCO_SMALL_GROUP_FIELD` | *(empty)* | Name or slug of a Planning Center custom field holding a person's small-group name. When set, a counselor's access entry carries a slugified group id so Sunday School check-in opens pre-filtered. |
 | `PCO_API_BASE_URL` | *(empty)* | API root. Empty means the real Planning Center. Anything else is reported as an override wherever the connection is shown, because a test rig must never be mistaken for production. |
 
-Every one of these except the two secrets can be changed from Settings, and every one is re-parsed,
-re-clamped and re-validated server-side whichever way it arrived — the security rules are the first
-check, not the only one.
+Every one of these except the two secrets and `TALLY_ADMIN_EMAILS` can be changed from Settings, and
+every one is re-parsed, re-clamped and re-validated server-side whichever way it arrived — the
+security rules are the first check, not the only one. `TALLY_ADMIN_EMAILS` is deliberately *not*
+editable from the app: it is what gets you back in when the app is what went wrong.
 
 A missing or contradictory setting is a *configuration state*, not a crash: `loadConfig()` and
 `resolveConfig()` never throw, every entry point checks `configError` first, and the Settings screen
@@ -116,42 +132,37 @@ app is pointed at Settings.
 
 ## 3. Which people are "the roster"
 
-### List mode (recommended)
+The ones somebody put on it. **Students → Add from Planning Center** searches the church directory
+and adds the person you pick; a `students/pco_{personId}` document is the membership, and it holds
+no name, grade or contact detail of its own.
 
-Go to **Settings → Planning Center → Change** and pick the list. Tally shows every list the token can
-see, with how many people are on it and whether Planning Center still refreshes it — which is the
-whole reason to choose it here rather than by id. "Footprints Students" and "Footprints Camp 2019"
-are indistinguishable as numbers in a URL, and obvious as *47 people, refreshes itself* next to
-*12 people, rules no longer work*.
+The search is deliberately unfiltered — no grade band, no "is a child" — because those filters are
+wrong at exactly the edges a hand-picked roster exists for. Both facts are *shown* on each result so
+the leader can see what they are choosing.
 
-Tally cannot create a list, and does not pretend to: `/lists` is read-only in Planning Center's API,
-and there is no endpoint for adding a person to one either. The picker links out to People, where
-lists are built, and re-reads when you come back.
+Adding goes through a callable rather than a direct write. The document id is a claim about which
+real child a row refers to, so the security rules forbid a browser asserting it; the server checks
+the person exists upstream first.
 
-For a deploy that has to be configured before anybody can sign in, the same thing is
-`PCO_ROSTER_SOURCE=list` plus `PCO_STUDENT_LIST_ID`, where the id is the number in the list's URL:
+### Taking somebody off
 
-```
-https://people.planningcenteronline.com/lists/1234567    ->    PCO_STUDENT_LIST_ID=1234567
-```
+**Remove from roster** on the student's page. That marks the membership inactive rather than
+deleting it, for two reasons: every attendance record points at the student id, so deleting the row
+would silently drop past head counts, and an inactive membership stops Tally reading anything at all
+about a child who has left the ministry. Adding them again later restores the same record, with
+their history intact.
 
-**Use a List.** A youth pastor already maintains one, so there is no second thing to keep in sync,
-and it survives all the cases a grade band cannot: the 5th grader who comes every week with an older
-sibling, the graduated senior who still leads worship, the kid whose grade nobody ever filled in. In
-list mode Tally does not second-guess the list on grade — if the pastor put them on it, they are on
-the roster.
+### Moving across from a Planning Center list
 
-### Grade mode
+**Students → Add from Planning Center → Import a Planning Center list.** Everyone on the list today
+joins the roster. It is a copy, not a link, and that is the point — a list is a saved query whose
+membership moves on its own, which is what made it a poor roster in the first place.
 
-`PCO_ROSTER_SOURCE=grade` sweeps every person flagged as a child whose grade falls inside
-`PCO_MIN_GRADE`–`PCO_MAX_GRADE`. Zero setup, and a reasonable way to start. Its cost is silent: a
-person with neither a grade nor a graduation year is *not* assumed to be a youth (an adult volunteer
-with a blank grade would otherwise be swept into the student roster), so anyone whose grade is empty
-simply never appears, and nothing tells you.
+### What the grade band is still for
 
-Grade mode also queries children only, which means it maps no counselors. Choose a counselor list in
-Settings (or set `PCO_COUNSELOR_LIST_ID`), or access falls back to Planning Center's own
-administrators so a fresh install is not locked out of its own app.
+`PCO_MIN_GRADE`/`PCO_MAX_GRADE` no longer select anybody. They are the range the app understands
+(`Grade` is 6–12) and the landing spot for a student Planning Center has no grade for. A student
+outside the band can be on the roster; their grade is clamped for display.
 
 ---
 
@@ -187,87 +198,85 @@ Authentication grants nothing. Authorisation is an active `users/{uid}` document
 create one — a rule that lets you write your own role is a rule that lets anyone with a Google
 account become an admin.
 
+**Google sign-in only.** Tally decides what somebody may do from their email address, so what
+matters is not that they typed one but that a provider Tally trusts has confirmed it is theirs. The
+email magic link that used to be the primary path is gone: one door is easier to watch than two, and
+a mailbox left signed in on a shared phone was a way in that nobody was watching.
+
 ```mermaid
 flowchart LR
-  A["Person in Planning Center<br/>counselor list, or the non-youth sweep"]
-    --> B["syncPeople<br/>scheduled Cloud Function"]
-  B --> C["accessRoster doc, keyed by email<br/>email · role · pcoPersonId · active"]
-  D["Counselor signs in<br/>magic link or Google"] --> E["Firebase uid, no profile<br/>status: pending"]
+  A["Admin invites an address<br/>Settings → Team"] --> B["invitations/{emailKey}<br/>email · role · active"]
+  C["TALLY_ADMIN_EMAILS<br/>deploy-time"] --> F
+  D["Volunteer signs in with Google"] --> E["Firebase uid, no profile<br/>status: pending"]
   E --> F["provisionAccess<br/>callable"]
-  C --> F
-  F --> G["users doc, keyed by uid<br/>role · active · assignedGroupId"]
+  B --> F
+  F --> G["users/{uid}<br/>role · active · assignedGroupId"]
   G --> H["status: ready"]
 ```
 
-1. The scheduled sync maps each team member to `accessRoster/{emailKey}`, where `emailKey` is the
-   lowercased address with `.` replaced by `,` (`sam.smith@example.org` → `sam,smith@example,org`).
-   A person with no email address is skipped, not failed: Tally authenticates by email, so there is
-   nothing to match a sign-in against.
-2. The counselor signs in. They now have a Firebase uid and no `users/{uid}` document, which the app
-   shows as "Checking your access".
-3. The app calls `provisionAccess`. It verifies the email was actually *proven* — a magic link or a
-   Google account, not an unverified password registration — looks the address up in `accessRoster`,
-   and creates the profile server-side. The role comes from the roster, never from anything the
-   caller sent.
-4. The live listener on `users/{uid}` flips the app to ready. No reload.
+`provisionAccess` checks three things, in this order:
 
-Revoking works the same way in reverse: marking the person inactive in Planning Center sets
-`active: false` on the roster entry, and an admin flipping `active` on the user document takes effect
-mid-event without anyone reloading.
+1. **`TALLY_ADMIN_EMAILS`** — a standing admin grant, re-asserted on every sign-in. Nobody can invite
+   the first admin of a fresh install, because there is nobody to do the inviting; this breaks that
+   circle. It is also the break-glass: an admin who deactivates the last other admin has not locked
+   the ministry out, because whoever is named here still gets in — even if their own profile says
+   `active: false`. Removing somebody's standing admin rights means editing the variable and
+   deploying, which is the point. A break-glass should need a key.
+2. **An existing `users/{uid}` profile** — somebody who has signed in before. Their role is whatever
+   an admin has since made it, so this path deliberately does *not* reset it from the invitation they
+   originally arrived on.
+3. **`invitations/{emailKey}`** — an admin said this address may sign in, and with what starting
+   role. Consumed on first sign-in.
+
+Anything else is "not on the roster", reported as a refusal rather than an error: a volunteer who has
+not been added yet is a normal thing to be.
+
+### Inviting and revoking
+
+**Settings → Team** (admin only). Invite a Google address with a role; they appear in the "Signed in"
+list the first time they use it.
+
+The two lists do different jobs, and the difference matters when somebody has to be removed:
+
+- **Withdrawing an invitation** stops somebody *arriving*. It does nothing to anybody who already
+  has a profile.
+- **Deactivating a profile** is how access is actually removed. It takes effect on their next
+  operation, not at their next sign-in, because the security rules read that document on every
+  request.
+
+The invitation list is admin-only to read as well as to write: it is a list of church staff email
+addresses, and a counselor's phone has no reason to hold one.
 
 ### Role mapping
 
-| Planning Center | Tally role | Gets |
+Roles are set in Tally, by an admin, and no longer derived from Planning Center permissions — the
+people who administer a church database are not necessarily the people who should decide who sees a
+roster of minors.
+
+| Role | Gets |
+| --- | --- |
+| `counselor` | Check-in. The door volunteer. |
+| `core` | Counselor, plus the dashboard, roster management, events, RSVPs and settings. |
+| `admin` | Core, plus granting access: invitations, roles, and deactivation. |
+
+## 6. What Tally reads, and when
+
+There is no scheduled anything. Three reads, and each one is somebody looking at a screen:
+
+| Read | Triggered by | Cost |
 | --- | --- | --- |
-| `site_administrator: true` | `admin` | Everything, plus granting roles to other people. |
-| `people_permissions` = `Manager` | `core` | Dashboard, roster editing, events, RSVPs, settings. |
-| `people_permissions` = `Editor` | `core` | The same. |
-| anything else | `counselor` | Check-in only. |
+| The roster | Opening check-in, the students list, or a refresh | One sweep of `where[child]=true`, plus one request per roster member the sweep did not cover |
+| One person's details | Opening a student's page | One request, plus one per household |
+| A directory search | Typing in "Add from Planning Center" | One request per keystroke burst |
 
-Manager and Editor are the people who already maintain the roster in Planning Center, which is why
-they are the two levels that imply the dashboard. Everyone else is a door volunteer.
+The roster read is the interesting one, because it has to turn Tally's membership into people. It
+sweeps the children in one request per hundred, which answers for nearly everybody, and then fetches
+whoever is left individually — the graduated senior, the 5th grader. Past sixty stragglers it stops
+and *reports* the remainder rather than dropping them: a roster quietly short by three students is
+the failure nobody notices. Settings shows the count.
 
-One deliberate exception: **a role already set in Tally wins over the roster's.** An admin who
-promoted a volunteer inside Tally must not be silently demoted by the next sync.
-
----
-
-## 6. Sync cadence and the incremental cursor
-
-The scheduled function runs on `PCO_SYNC_SCHEDULE` (default every 6 hours). The core team can also
-force a run from Settings, which calls `syncPlanningCenterNow`.
-
-Most runs are **incremental**. The sync records the maximum `Person.updated_at` it has ever observed
-in `config/pcoSync.cursor` and asks Planning Center only for people modified since
-(`where[updated_at][gt]`). On a few hundred students that is usually a single page.
-
-The cursor is advanced **only on success**. A run that throws half-way finishes with an `error`
-status and the previous cursor intact, so the next attempt re-reads from the last known-good point
-rather than skipping whatever it never got to.
-
-A **full sweep** is promoted automatically when there is no cursor, no record of a previous full
-sweep, or the last one was more than 24 hours ago. It is not optional, because an incremental pull is
-defined by what *changed* and can therefore never see what *disappeared*: a student removed from the
-roster list, or a person deleted outright, produces no `updated_at` for anyone. Only a full sweep can
-notice that a linked student is no longer returned — at which point they are marked `inactive` in
-Tally. They are never deleted; the attendance history at `events/{id}/attendance/{studentId}` has to
-outlive them.
-
-Two more properties worth knowing:
-
-- **No churn.** Every write is diffed against the stored document first, and an unchanged student
-  produces no write at all — not even a touched `pcoSyncedAt`. The app holds a live listener on the
-  whole roster, so a sweep that bumped 400 unchanged students would wake every counselor's phone for
-  nothing.
-- **No duplicates.** A student is keyed by `pcoPersonId`. A quick-added visitor who has not been
-  pushed yet is additionally matched on normalised name + grade, so the kid a counselor thumb-typed
-  as "Jose" at the door and the "José" the office entered on Monday collapse into one record.
-
-Progress is written to `config/pcoSync`, throttled to one update every five seconds, and always lands
-on a terminal `ok` or `error` — a status stuck on `running` forever is indistinguishable from a hung
-integration.
-
----
+Every answer is held for `PCO_CACHE_TTL_SECONDS`, keyed by the roster itself. Adding a student
+changes the key, so they appear on the next read rather than whenever the previous answer expires.
 
 ## 7. Troubleshooting
 
@@ -287,9 +296,9 @@ account that already has it.
 
 **`429 Too Many Requests`** — Planning Center is rate limiting. Nothing to do: the client honours the
 `Retry-After` header, backs off exponentially up to 20 seconds, and retries four times before giving
-up. If it keeps happening, the roster source is probably too wide — a `PCO_ROSTER_SOURCE=grade`
-sweep pointed at a large church fetches one request per household. Switch to list mode. (The run is
-also capped at 400 household fetches so a misconfiguration stops rather than billing for it.)
+up. If it keeps happening on the roster read, the likely cause is a roster full of people the child
+sweep does not cover, each costing a request of their own — Settings shows how many. Otherwise raise
+`PCO_CACHE_TTL_SECONDS` so eight counselors arriving at once cost one read instead of eight.
 
 **A student appears twice** — the name + grade match failed, so a quick-added visitor was never
 collapsed onto the Planning Center person. Usually a nickname ("Nate" vs "Nathaniel"), a hyphenated
@@ -305,15 +314,16 @@ surname typed one way at the door, or a grade that was off by one. To fix it by 
    actually call the student, and correct the grade.
 
 **It says it is not configured** — the config refused to build a client, and the message names the
-value: a missing `PCO_APP_ID` or `PCO_SECRET`, or list mode with no list chosen. Credentials are a
-Secret Manager job. The list is a Settings job, and the picker still works while the connection is in
-this state — it needs only the credentials, so "list mode with no list" is never a dead end you have
-to deploy your way out of.
+value: a missing `PCO_APP_ID` or `PCO_SECRET`. Both are a Secret Manager job.
 
-**A saved list shows as "which Tally could not read"** — the id is stored but Planning Center will
-not return it. Either somebody deleted the list, or the token's owner lost access to it. Pick another
-list in Settings, or restore the person's People permissions.
+**Settings says N students could not be read** — those roster entries name a Planning Center person
+that is gone: deleted upstream, or merged into another record. Their attendance history is intact.
+Add the surviving record from **Students → Add from Planning Center**, and remove the stale entry.
 
-**Nobody can sign in after a fresh install** — no counselor list is set, so access falls back to
-Planning Center's own site administrators. Choose a counselor list in Settings; everyone on it with
-an email address may then sign in.
+**Nobody can sign in after a fresh install** — `TALLY_ADMIN_EMAILS` is unset or does not match the
+address anybody is actually using. Nobody can invite the first admin, so that variable is the only
+way in; set it to a Google address and redeploy.
+
+**Somebody was invited and still cannot get in** — check the address on the invitation is the *Google
+account* they sign in with, not a forwarding alias. Tally matches on the address the provider
+confirms, and an alias is a different string.

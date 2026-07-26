@@ -8,7 +8,12 @@
  */
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'firebase/functions';
 import { USE_EMULATORS, firebaseApp } from '@/lib/firebase';
-import type { PcoRosterPerson, PcoStatus, PcoPersonDetails } from '@/types';
+import type {
+  PcoPersonSearchResult,
+  PcoRosterPerson,
+  PcoStatus,
+  PcoPersonDetails,
+} from '@/types';
 
 /**
  * A Planning Center list on the wire.
@@ -48,8 +53,9 @@ export interface ProvisionAccessResult {
  *
  * A counselor who has just signed in has a Firebase uid but no `users/{uid}`
  * document — and cannot create one, because rules forbid self-granted access.
- * This callable looks their verified email up in Planning Center — live, not
- * against a mirrored allowlist — and provisions the profile server-side.
+ * This callable decides from Tally's own records — the seeded admin list and
+ * the invitations an admin wrote — and provisions the profile server-side. The
+ * role never comes from anything the caller sent.
  */
 export const provisionAccess = httpsCallable<void, ProvisionAccessResult>(
   functions,
@@ -62,6 +68,12 @@ export const provisionAccess = httpsCallable<void, ProvisionAccessResult>(
 
 export interface RosterResponse {
   people: PcoRosterPerson[];
+  /**
+   * Roster entries whose Planning Center person could not be read — deleted or
+   * merged upstream. Reported rather than dropped, because these are students
+   * somebody put on the roster on purpose.
+   */
+  unresolved: string[];
   /** True when Planning Center was not asked, because a recent answer was reused. */
   cached: boolean;
   fetchedAt: string;
@@ -70,11 +82,12 @@ export interface RosterResponse {
 }
 
 /**
- * The youth roster, read from Planning Center on demand.
+ * The youth roster: Tally's own membership, with Planning Center's names on it.
  *
- * Tally keeps no copy of the church's people, so this is where the roster comes
- * from — not a Firestore collection somebody swept into shape overnight. Names
- * and grades only; parent contact and allergies are a separate call.
+ * Who is on it comes from `students/` — a decision somebody made in this app.
+ * What they are called comes from Planning Center, read on demand and stored
+ * nowhere. Names and grades only; parent contact and allergies are a separate
+ * call.
  */
 export const getRoster = httpsCallable<{ force?: boolean } | void, RosterResponse>(
   functions,
@@ -92,12 +105,6 @@ export const getPersonDetails = httpsCallable<{ pcoPersonId: string }, PcoPerson
   'getPersonDetails',
 );
 
-/** `PcoStatus` as it arrives: list timestamps are still ISO strings. */
-export type PcoStatusPayload = Omit<PcoStatus, 'studentList' | 'counselorList'> & {
-  studentList: PcoListPayload | null;
-  counselorList: PcoListPayload | null;
-};
-
 /**
  * What Settings shows about the connection, asked for rather than watched.
  *
@@ -106,7 +113,7 @@ export type PcoStatusPayload = Omit<PcoStatus, 'studentList' | 'counselorList'> 
  * deployed parameters with the saved document layered over them, and only the
  * server can see both halves.
  */
-export const getPlanningCenterStatus = httpsCallable<{ force?: boolean } | void, PcoStatusPayload>(
+export const getPlanningCenterStatus = httpsCallable<{ force?: boolean } | void, PcoStatus>(
   functions,
   'getPlanningCenterStatus',
 );
@@ -121,6 +128,58 @@ export const listPlanningCenterLists = httpsCallable<
   { search?: string; limit?: number } | void,
   { lists: PcoListPayload[] }
 >(functions, 'listPlanningCenterLists');
+
+/* -------------------------------------------------------------------------- */
+/* Building the roster                                                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Finds somebody in Planning Center to put on the roster.
+ *
+ * Searches the whole church directory, so it is core team only — a door
+ * volunteer has no reason to hold a view of the congregation.
+ */
+export const searchPlanningCenterPeople = httpsCallable<
+  { query: string },
+  { people: PcoPersonSearchResult[] }
+>(functions, 'searchPlanningCenterPeople');
+
+/**
+ * Puts a Planning Center person on the roster.
+ *
+ * A callable rather than a Firestore write because the document id *is* the
+ * claim — `students/pco_123` says "this row is Planning Center person 123" —
+ * and the rules forbid a browser asserting that. The server checks the person
+ * exists upstream before writing it.
+ */
+export const addRosterMember = httpsCallable<
+  { pcoPersonId: string },
+  { status: 'added' | 'restored' | 'already-on-roster'; studentId: string }
+>(functions, 'addRosterMember');
+
+/**
+ * Takes somebody off the roster.
+ *
+ * Deactivation, not deletion: every attendance record points at a student id,
+ * so erasing the row would drop past head counts and leave history pointing at
+ * nobody.
+ */
+export const removeRosterMember = httpsCallable<{ studentId: string }, { status: 'removed' }>(
+  functions,
+  'removeRosterMember',
+);
+
+/**
+ * Copies everybody on a Planning Center list onto the roster, once.
+ *
+ * The way off list-as-roster for a church that was running Tally that way, and
+ * a shortcut for one that keeps a list for its own reasons. A copy rather than
+ * a link, because a list is a saved query whose membership moves on its own.
+ */
+export const importPlanningCenterList = httpsCallable<
+  { listId: string },
+  { added: number; restored: number; alreadyOnRoster: number; total: number }
+>(functions, 'importPlanningCenterList');
 
 /** Drops the server's cached roster, for a leader who just changed something upstream. */
 export const refreshPlanningCenter = httpsCallable<void, { status: 'ok' }>(

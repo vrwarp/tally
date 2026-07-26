@@ -37,6 +37,7 @@ import { SERIES_IDS, paths } from '../src/lib/paths';
 import {
   DEFAULT_SETTINGS,
   buildSearchName,
+  emailKey,
   pcoStudentId,
   type Gender,
   type Grade,
@@ -977,14 +978,43 @@ function collectWrites(now: Date): {
       updatedBy: null,
     };
 
-    // A Planning Center student Tally has nothing to say about gets no document
-    // at all — which is the normal case, and worth the demo data showing.
-    const worthWriting =
-      student.pcoPersonId === null ||
-      smallGroupId !== null ||
-      seed.notes !== undefined ||
-      student.firstAttendedAt !== null;
-    if (!worthWriting) return;
+    /*
+     * Every student gets a document, because the document *is* the roster.
+     *
+     * This used to be sparse — a Planning Center student Tally had nothing to
+     * say about got no document at all — back when the roster was a Planning
+     * Center List and this collection was only annotations. A List turned out
+     * to be unable to express a hand-picked roster, so membership moved here,
+     * and "no document" now means "not on the roster".
+     *
+     * What a linked student's document does *not* carry is who they are. The
+     * name, grade and gender are Planning Center's, read live and stored
+     * nowhere; writing them here would rebuild the mirror this design removed.
+     */
+    if (student.pcoPersonId) {
+      writes.push({
+        path: paths.student(student.id),
+        data: {
+          pcoPersonId: student.pcoPersonId,
+          status: owned.status,
+          smallGroupId,
+          notes: seed.notes ?? null,
+          isVisitor: false,
+          pcoPushPending: false,
+          firstAttendedAt: student.firstAttendedAt,
+          lastAttendedAt: student.lastAttendedAt,
+          // No `addedToRosterBy`: nobody pressed a button for these. The field
+          // means "a leader put this student on the roster in the app", and
+          // demo data that claimed it would be a small lie the end-to-end suite
+          // then has to reason around.
+          createdAt: student.createdAt,
+          updatedAt: student.createdAt,
+          createdBy: SEED_AUTHOR,
+          updatedBy: null,
+        },
+      });
+      return;
+    }
 
     writes.push({ path: paths.student(student.id), data: owned });
   });
@@ -1022,10 +1052,30 @@ function collectWrites(now: Date): {
   }
 
   /*
-   * No `accessRoster`. Who may sign in is a question `provisionAccess` asks
-   * Planning Center at the moment somebody knocks, so the team is seeded into
-   * the simulator instead — see `simulatorPayload`.
+   * Who may sign in.
+   *
+   * Tally's own list now, not Planning Center's: a List is generated from
+   * filter rules, so "these particular adults" was never expressible there
+   * without inventing a custom field on every person in the church.
+   *
+   * The admin is deliberately *not* seeded here. They come from
+   * `TALLY_ADMIN_EMAILS`, which is the bootstrap for a real install — nobody
+   * can invite the first admin, because there is nobody to do the inviting —
+   * and seeding an invitation for them would hide whether that path works.
    */
+  for (const member of SEED_TEAM) {
+    if (member.role === 'admin') continue;
+    writes.push({
+      path: paths.invitation(emailKey(member.email)),
+      data: {
+        email: member.email,
+        role: member.role,
+        active: true,
+        invitedAt: schoolYearStart(now),
+        invitedBy: SEED_AUTHOR,
+      },
+    });
+  }
 
   return { writes, events, students, attendance, rsvps };
 }
