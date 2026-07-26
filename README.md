@@ -198,7 +198,7 @@ the same process.
 | File | Committed? | Read when | Holds |
 | --- | --- | --- | --- |
 | `.env.example` | yes | never — it is a template | The shape of `.env.local`. |
-| `.env.local` | no | `npm run dev`, `npm run build` | `VITE_FIREBASE_CONFIG`, the web config object as one line of JSON. |
+| `.env.local` | no | `npm run dev`, `npm run build` | `VITE_FIREBASE_CONFIG`, the web config object — the console's `const firebaseConfig = { … };` snippet or JSON, either works. |
 | `.env.emulated` | yes | `vite --mode emulated` (`npm run dev:emulated`) | Emulator hosts and ports. No project config needed at all. |
 
 The Firebase **web config is not a secret** — `apiKey`, `projectId` and friends are shipped to every

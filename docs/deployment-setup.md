@@ -22,8 +22,9 @@ is in [docs/ci.md](ci.md#what-ci-deploys).
    administers it to add you. `npx firebase projects:list` should show `tally-76406` once you do.
 3. **Fill in `.env.local`.** Copy `.env.example` to `.env.local` and paste the config object from
    the console (Project settings → General → Your apps → Web app config) into
-   `VITE_FIREBASE_CONFIG`, as one line of JSON. The console prints it as JavaScript, so the keys
-   need double quotes. This is what the production build embeds, so it has to exist even though
+   `VITE_FIREBASE_CONFIG`. Paste it in whichever form the console gives you — the
+   `const firebaseConfig = { … };` snippet is accepted as-is, and so is JSON. This is what the
+   production build embeds, so it has to exist even though
    [none of it is secret](../README.md#deploying).
 4. **Set the Planning Center secrets**, once, in Secret Manager:
    ```bash
@@ -174,9 +175,9 @@ once per project.
   and write access to Firestore itself, so a leaked CI credential would reach the roster rather than
   merely the deploy machinery. The list above is the narrower equivalent: everything needed to
   *deploy*, nothing that can read a student.
-- `VITE_FIREBASE_CONFIG` — the web config object as one line of JSON, the same value
-  `.env.local` holds. Vite embeds it at build time, so the Hosting workflows need it even
-  though it is not a secret.
+- `VITE_FIREBASE_CONFIG` — the web config object, the same value `.env.local` holds, in either the
+  console's `const firebaseConfig = { … };` form or JSON. Vite embeds it at build time, so the
+  Hosting workflows need it even though it is not a secret.
 - `FUNCTIONS_ENV` — the deploy-time Planning Center settings for `tally-76406`, as the literal
   contents of a `.env` file: `PCO_ROSTER_SOURCE`, the list ids, the grade range,
   `PCO_CACHE_TTL_SECONDS` and so on — **not** `PCO_APP_ID` or `PCO_SECRET`, which live in Secret
