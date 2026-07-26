@@ -14,11 +14,6 @@ import type { RecurrenceRule } from '@/types';
 /** Tue 21 Jul 2026, 19:00 — the third Tuesday, as in the Google screenshots. */
 const TUESDAY = new Date(2026, 6, 21, 19, 0);
 
-function Harness({ anchor = TUESDAY, initial = null }: { anchor?: Date | null; initial?: RecurrenceRule | null }) {
-  const [rule, setRule] = useState<RecurrenceRule | null>(initial);
-  return <RecurrenceField anchor={anchor} value={rule} onChange={setRule} />;
-}
-
 const WEEKLY_ON_TUESDAY: RecurrenceRule = {
   frequency: 'weekly',
   interval: 1,
@@ -28,6 +23,17 @@ const WEEKLY_ON_TUESDAY: RecurrenceRule = {
   count: null,
 };
 
+function Harness({
+  anchor = TUESDAY,
+  initial = WEEKLY_ON_TUESDAY,
+}: {
+  anchor?: Date | null;
+  initial?: RecurrenceRule;
+}) {
+  const [rule, setRule] = useState<RecurrenceRule>(initial);
+  return <RecurrenceField anchor={anchor} value={rule} onChange={setRule} />;
+}
+
 function repeatsSelect() {
   return screen.getByLabelText('Repeats') as HTMLSelectElement;
 }
@@ -36,16 +42,16 @@ describe('RecurrenceField', () => {
   it('phrases every option against the date the event starts on', () => {
     render(<Harness />);
 
+    // No "does not repeat": the event is already typed as Recurring. No "every
+    // weekday" either — that is Monday to Friday in the day picker.
     expect(
       [...repeatsSelect().options].map((option) => option.textContent),
     ).toEqual([
-      'Does not repeat',
       'Daily',
       'Weekly on Tuesday',
       'Monthly on day 21',
       'Monthly on the third Tuesday',
       'Annually on July 21',
-      'Every weekday (Monday to Friday)',
       'Custom…',
     ]);
   });
@@ -62,8 +68,44 @@ describe('RecurrenceField', () => {
     expect(repeatsSelect().value).toBe('weekly');
   });
 
+  it('offers no unit smaller than a week, because days are the picker’s job', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    await user.selectOptions(repeatsSelect(), 'custom');
+    const unit = screen.getByLabelText('Unit') as HTMLSelectElement;
+    expect([...unit.options].map((option) => option.textContent)).toEqual([
+      'weeks',
+      'months',
+      'years',
+    ]);
+  });
+
+  it('reaches every weekday through the day picker', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    await user.selectOptions(repeatsSelect(), 'custom');
+    for (const day of ['Monday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']) {
+      await user.click(screen.getByRole('button', { name: day }));
+    }
+
+    // All seven ticked is Daily, and the shortlist recognises it as such.
+    expect(repeatsSelect().value).toBe('custom');
+    expect(screen.getByText(/Then Jul 22, Jul 23, Jul 24/)).toBeInTheDocument();
+  });
+
   it('shows the next few dates, which is what makes a pattern legible', () => {
-    render(<Harness initial={{ ...WEEKLY_ON_TUESDAY, frequency: 'monthly', weekdays: [], monthlyMode: 'dayOfWeek' }} />);
+    render(
+      <Harness
+        initial={{
+          ...WEEKLY_ON_TUESDAY,
+          frequency: 'monthly',
+          weekdays: [],
+          monthlyMode: 'dayOfWeek',
+        }}
+      />,
+    );
     // Third Tuesday of the next three months.
     expect(screen.getByText(/Then Aug 18, Sep 15, Oct 20/)).toBeInTheDocument();
   });
@@ -133,11 +175,10 @@ describe('RecurrenceField', () => {
     expect(screen.getByLabelText('Last date')).toHaveValue('2026-10-13');
   });
 
-  it('says so when the end condition leaves nothing after this one', async () => {
-    const user = userEvent.setup();
+  it('says so when the end condition leaves nothing after this one', () => {
     render(<Harness initial={{ ...WEEKLY_ON_TUESDAY, count: 1 }} />);
 
-    await user.selectOptions(repeatsSelect(), 'none');
     expect(screen.queryByText(/^Then /)).not.toBeInTheDocument();
+    expect(screen.getByText(/only gathering the repeat covers/)).toBeInTheDocument();
   });
 });

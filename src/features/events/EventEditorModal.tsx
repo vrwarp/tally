@@ -24,7 +24,7 @@ import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { RecurrenceField } from '@/features/events/RecurrenceField';
-import { retimeRecurrence, validateRecurrence } from '@/lib/recurrence';
+import { defaultRecurrence, retimeRecurrence, validateRecurrence } from '@/lib/recurrence';
 import {
   addMinutes,
   fromDateTimeLocalValue,
@@ -42,8 +42,12 @@ interface EditorForm {
   title: string;
   mode: EventMode;
   seriesId: string;
-  /** Null means "does not repeat". Anchored on `start`, never on its own date. */
-  recurrence: RecurrenceRule | null;
+  /**
+  * Anchored on `start`, never on a date of its own. Always present — a
+  * recurring gathering repeats by definition — and simply unused while the
+  * event is a one-off.
+  */
+  recurrence: RecurrenceRule;
   start: string;
   end: string;
   checkInOpens: string;
@@ -113,24 +117,13 @@ function buildForm(
     event?.checkInClosesAt ?? defaults?.checkInClosesAt ?? addMinutes(endAt, CLOSES_AFTER_MIN);
   const feeCents = event?.feeCents ?? defaults?.feeCents ?? null;
 
-  // A brand-new recurring gathering is presumed weekly on the day it starts —
-  // that is what almost every one of them is, and "Recurring" that repeats
-  // nothing is a contradiction on the face of the form. An *existing* event
-  // keeps exactly what was stored, so opening the editor never invents a
-  // pattern for a gathering that was scheduled before this field existed.
-  const recurrence: RecurrenceRule | null = event
-    ? event.recurrence
-    : (defaults?.recurrence ??
-      (mode === 'recurring'
-        ? {
-            frequency: 'weekly',
-            interval: 1,
-            weekdays: [startAt.getDay()],
-            monthlyMode: 'dayOfMonth',
-            until: null,
-            count: null,
-          }
-        : null));
+  // Weekly on the day it starts, unless something more specific is known. That
+  // is what almost every gathering here is, and it is the only honest default
+  // now that "Recurring" means the event repeats: there is no rule to inherit
+  // from an event scheduled before this field existed, and leaving the control
+  // blank would just be a required field nobody was asked to fill in.
+  const recurrence: RecurrenceRule =
+    event?.recurrence ?? defaults?.recurrence ?? defaultRecurrence(startAt);
 
   return {
     title: event?.title ?? defaults?.title ?? '',
@@ -288,8 +281,6 @@ export function EventEditorModal({
       // the switches entirely rather than leaving a waiver requirement on a
       // Friday night, where it would flag every student at the door.
       seriesId: mode === 'recurring' ? current.seriesId : '',
-      // A retreat happens once, so it carries no pattern at all.
-      recurrence: mode === 'recurring' ? current.recurrence : null,
       requiresRsvp: mode === 'oneoff',
       requiresWaiver: mode === 'oneoff' && current.requiresWaiver,
       requiresPayment: mode === 'oneoff' && current.requiresPayment,

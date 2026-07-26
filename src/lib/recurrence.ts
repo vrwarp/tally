@@ -6,7 +6,7 @@
  * `COUNT` — with everything the anchor date already implies left out. See the
  * `RecurrenceRule` doc comment for why. In RRULE terms:
  *
- *   Daily                        FREQ=DAILY
+ *   Daily                        FREQ=WEEKLY;BYDAY=SU,MO,TU,WE,TH,FR,SA
  *   Every 2 weeks on Mon, Wed    FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE
  *   Monthly on day 21            FREQ=MONTHLY;BYMONTHDAY=21     (21 from the anchor)
  *   Monthly on the third Tuesday FREQ=MONTHLY;BYDAY=3TU         (3 and TU from the anchor)
@@ -35,9 +35,6 @@ export const WEEKDAY_NAMES = [
 export const WEEKDAY_INITIALS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] as const;
 
 export const WEEKDAY_SHORT_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
-
-/** Monday–Friday, the "every weekday" preset. */
-const WEEKDAYS_MON_FRI = [1, 2, 3, 4, 5];
 
 const ORDINAL_NAMES = ['first', 'second', 'third', 'fourth'] as const;
 
@@ -198,7 +195,7 @@ export function normalizeRecurrence(rule: RecurrenceRule, anchor: Date): Recurre
 }
 
 export function isRecurrenceFrequency(value: unknown): value is RecurrenceFrequency {
-  return value === 'daily' || value === 'weekly' || value === 'monthly' || value === 'yearly';
+  return value === 'weekly' || value === 'monthly' || value === 'yearly';
 }
 
 /**
@@ -211,11 +208,11 @@ export function isRecurrenceFrequency(value: unknown): value is RecurrenceFreque
  * from the anchor at render time and needs no migration.
  */
 export function retimeRecurrence(
-  rule: RecurrenceRule | null,
+  rule: RecurrenceRule,
   previousAnchor: Date | null,
   nextAnchor: Date,
-): RecurrenceRule | null {
-  if (!rule || !previousAnchor) return rule;
+): RecurrenceRule {
+  if (!previousAnchor) return rule;
   if (rule.frequency !== 'weekly') return rule;
   if (rule.weekdays.length !== 1 || rule.weekdays[0] !== previousAnchor.getDay()) return rule;
   return { ...rule, weekdays: [nextAnchor.getDay()] };
@@ -242,14 +239,11 @@ function describePattern(rule: RecurrenceRule, anchor: Date): string {
   const { frequency, interval, weekdays, monthlyMode } = rule;
 
   switch (frequency) {
-    case 'daily':
-      return interval === 1 ? 'Daily' : `Every ${interval} days`;
-
     case 'weekly': {
-      const isMonFri =
-        weekdays.length === WEEKDAYS_MON_FRI.length &&
-        weekdays.every((day, index) => day === WEEKDAYS_MON_FRI[index]);
-      if (interval === 1 && isMonFri) return 'Every weekday (Monday to Friday)';
+      // All seven days every week is every day, and that is what it should be
+      // called. Saying "Weekly on Sun, Mon, Tue, Wed, Thu, Fri and Sat" would
+      // be accurate and useless.
+      if (interval === 1 && weekdays.length === 7) return 'Daily';
 
       // Three or more full weekday names is a sentence nobody reads to the end.
       const names = weekdays.map((day) =>
@@ -294,20 +288,18 @@ export function describeRecurrence(rule: RecurrenceRule | null, anchor: Date): s
 /* -------------------------------------------------------------------------- */
 
 export type RecurrencePresetId =
-  | 'none'
   | 'daily'
   | 'weekly'
   | 'monthlyDay'
   | 'monthlyWeekday'
   | 'yearly'
-  | 'weekdays'
   | 'custom';
 
 export interface RecurrencePreset {
   id: RecurrencePresetId;
   label: string;
-  /** Null for `none`; absent for `custom`, which is a mode rather than a rule. */
-  rule: RecurrenceRule | null;
+  /** Absent for `custom`, which is a mode rather than a rule. */
+  rule: RecurrenceRule;
 }
 
 function rule(
@@ -325,25 +317,41 @@ function rule(
   };
 }
 
+/** Every day of the week, the `BYDAY` list that spells "daily". */
+export const EVERY_WEEKDAY = [0, 1, 2, 3, 4, 5, 6];
+
+/**
+ * A weekly rule on just the day the event falls on. The default, and the shape
+ * of nearly every gathering this app exists for.
+ */
+export function defaultRecurrence(anchor: Date): RecurrenceRule {
+  return rule('weekly', { weekdays: [anchor.getDay()] });
+}
+
 /**
  * The shortlist, phrased against the date the event actually starts — which is
  * why this takes an anchor and why the control sits below the date field. On
  * 21 July 2026 (a Tuesday) it reads: Daily / Weekly on Tuesday / Monthly on day
- * 21 / Monthly on the third Tuesday / Annually on July 21 / Every weekday.
+ * 21 / Monthly on the third Tuesday / Annually on July 21.
+ *
+ * There is no "does not repeat": this list only ever describes an event whose
+ * type is already Recurring, and an option contradicting the field above it is
+ * a trap rather than a choice. A gathering that happens once is a one-off.
+ *
+ * There is no "every weekday" either — that is Monday to Friday ticked in the
+ * day picker, which is one place to choose days rather than two.
  *
  * Anything not on this list is reachable through Custom, which is the same
  * split every mainstream calendar makes: a handful of taps for the common case,
  * a full editor behind one more.
  */
 export function recurrencePresets(anchor: Date): RecurrencePreset[] {
-  const candidates: { id: RecurrencePresetId; rule: RecurrenceRule | null }[] = [
-    { id: 'none', rule: null },
-    { id: 'daily', rule: rule('daily') },
-    { id: 'weekly', rule: rule('weekly', { weekdays: [anchor.getDay()] }) },
+  const candidates: { id: RecurrencePresetId; rule: RecurrenceRule }[] = [
+    { id: 'daily', rule: rule('weekly', { weekdays: [...EVERY_WEEKDAY] }) },
+    { id: 'weekly', rule: defaultRecurrence(anchor) },
     { id: 'monthlyDay', rule: rule('monthly', { monthlyMode: 'dayOfMonth' }) },
     { id: 'monthlyWeekday', rule: rule('monthly', { monthlyMode: 'dayOfWeek' }) },
     { id: 'yearly', rule: rule('yearly') },
-    { id: 'weekdays', rule: rule('weekly', { weekdays: [...WEEKDAYS_MON_FRI] }) },
   ];
 
   return candidates.map((candidate) => ({
@@ -370,14 +378,12 @@ function sameRule(a: RecurrenceRule, b: RecurrenceRule): boolean {
  * stored rule happens to be spelled out in full.
  */
 export function matchRecurrencePreset(
-  candidate: RecurrenceRule | null,
+  candidate: RecurrenceRule,
   anchor: Date,
 ): RecurrencePresetId {
-  if (!candidate) return 'none';
-
   const normalized = normalizeRecurrence(candidate, anchor);
-  const found = recurrencePresets(anchor).find(
-    (preset) => preset.rule !== null && sameRule(preset.rule, normalized),
+  const found = recurrencePresets(anchor).find((preset) =>
+    sameRule(preset.rule, normalized),
   );
 
   // `monthlyDay` and `monthlyWeekday` coincide when the anchor is, say, the
@@ -409,13 +415,6 @@ function* patternDates(rule: RecurrenceRule, anchor: Date): Generator<Date> {
   const anchorTime = anchor.getTime();
 
   switch (rule.frequency) {
-    case 'daily': {
-      for (let step = 1; step <= MAX_CANDIDATE_STEPS; step += 1) {
-        yield at(year, month, day + step * rule.interval);
-      }
-      return;
-    }
-
     case 'weekly': {
       // Weeks are measured from the Sunday of the anchor's own week, so
       // "every 2 weeks" alternates around the event rather than around an
@@ -543,17 +542,19 @@ export function validateRecurrence(rule: RecurrenceRule | null, anchor: Date): s
 /**
  * How many occurrences an end condition should default to, per frequency.
  *
- * Roughly a horizon rather than a number: a month of dailies, a term of
- * weeklies, a year of monthlies, five years of annuals. Someone turning "ends"
- * on has a rough span in mind, and a default in the right order of magnitude is
- * the difference between adjusting a number and computing one.
+ * A rough horizon rather than a number: a term of weeklies, a year of monthlies,
+ * five years of annuals. Someone turning "ends" on has a span in mind, and a
+ * default in the right order of magnitude is the difference between adjusting a
+ * number and computing one.
  */
 const DEFAULT_END_COUNTS: Record<RecurrenceFrequency, number> = {
-  daily: 30,
   weekly: 13,
   monthly: 12,
   yearly: 5,
 };
+
+/** A month of daily gatherings is as far ahead as anybody plans one. */
+const MAX_SUGGESTED_WEEKLY_COUNT = 30;
 
 /**
  * The prefill for both end conditions, kept consistent with each other: the
@@ -565,7 +566,15 @@ export function suggestedRecurrenceEnd(
   anchor: Date,
 ): { count: number; until: string } {
   const rule = normalizeRecurrence(candidate, anchor);
-  const count = DEFAULT_END_COUNTS[rule.frequency];
+
+  // A weekly rule's tally is per occurrence, not per week, so "a term" of a
+  // three-day-a-week gathering is three times as many. Capped, because the
+  // suggestion for Daily should read as a month rather than as a term.
+  const count =
+    rule.frequency === 'weekly'
+      ? Math.min(DEFAULT_END_COUNTS.weekly * rule.weekdays.length, MAX_SUGGESTED_WEEKLY_COUNT)
+      : DEFAULT_END_COUNTS[rule.frequency];
+
   const dates = recurrenceOccurrences({ ...rule, until: null, count: null }, anchor, {
     limit: count,
   });
@@ -583,7 +592,9 @@ export function defaultRuleForFrequency(
     {
       frequency,
       interval: previous?.interval ?? 1,
-      weekdays: frequency === 'weekly' ? [anchor.getDay()] : [],
+      // Coming back to weekly keeps the days already chosen, so flicking
+      // through the units to look at them does not wipe the selection.
+      weekdays: frequency === 'weekly' ? (previous?.weekdays ?? []) : [],
       monthlyMode: previous?.monthlyMode ?? 'dayOfMonth',
       until: previous?.until ?? null,
       count: previous?.count ?? null,

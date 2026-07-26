@@ -249,6 +249,9 @@ service cloud.firestore {
        */
       function validRecurrence(r) {
         return r is map
+          // `daily` is no longer written — it is every weekday of a weekly
+          // rule — but it stays accepted so a stale cached bundle's write is
+          // not rejected outright. The converter folds it on read.
           && r.frequency in ['daily', 'weekly', 'monthly', 'yearly']
           && r.interval is int && r.interval >= 1 && r.interval <= 99
           && r.weekdays is list && r.weekdays.size() <= 7

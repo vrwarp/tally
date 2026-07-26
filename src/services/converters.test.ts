@@ -227,6 +227,15 @@ describe('toEvent', () => {
     expect(event.recurrence?.until).toBeNull();
   });
 
+  it('reads a legacy "daily" rule as the every-weekday rule it always meant', () => {
+    const event = toEvent(
+      fakeSnapshot({ data: { recurrence: { frequency: 'daily', interval: 1 } } }),
+    );
+
+    expect(event.recurrence?.frequency).toBe('weekly');
+    expect(event.recurrence?.weekdays).toEqual([0, 1, 2, 3, 4, 5, 6]);
+  });
+
   it('ignores a recurrence on a one-off, which happens once by definition', () => {
     expect(
       toEvent(fakeSnapshot({ data: { mode: 'oneoff', recurrence: { frequency: 'weekly' } } }))

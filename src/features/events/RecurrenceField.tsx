@@ -35,8 +35,11 @@ import { formatShortDate } from '@/lib/time';
 import { cn, haptic } from '@/lib/utils';
 import type { RecurrenceFrequency, RecurrenceRule } from '@/types';
 
+/**
+ * No "days". Every day is every weekday of a weekly rule, chosen in the picker
+ * below — one control for days rather than a unit that quietly duplicates it.
+ */
 const FREQUENCY_UNITS: { value: RecurrenceFrequency; label: string }[] = [
-  { value: 'daily', label: 'days' },
   { value: 'weekly', label: 'weeks' },
   { value: 'monthly', label: 'months' },
   { value: 'yearly', label: 'years' },
@@ -103,8 +106,13 @@ export interface RecurrenceFieldProps {
    * there is nothing to phrase the options against, so the control waits.
    */
   anchor: Date | null;
-  value: RecurrenceRule | null;
-  onChange: (rule: RecurrenceRule | null) => void;
+  /**
+   * Never null. This field only appears on an event whose type is already
+   * Recurring, and offering "does not repeat" underneath that would contradict
+   * the field above it. A gathering that happens once is a one-off.
+   */
+  value: RecurrenceRule;
+  onChange: (rule: RecurrenceRule) => void;
   error?: string | null;
 }
 
@@ -116,8 +124,8 @@ export function RecurrenceField({ anchor, value, onChange, error }: RecurrenceFi
 
   if (!anchor) {
     return (
-      <SelectField label="Repeats" defaultValue="none" disabled hint="Pick a start date first.">
-        <option value="none">Does not repeat</option>
+      <SelectField label="Repeats" defaultValue="weekly" disabled hint="Pick a start date first.">
+        <option value="weekly">Weekly</option>
       </SelectField>
     );
   }
@@ -127,22 +135,16 @@ export function RecurrenceField({ anchor, value, onChange, error }: RecurrenceFi
   const isCustom = matched === 'custom' || customOpen;
   const selected: RecurrencePresetId = isCustom ? 'custom' : matched;
 
-  const patch = (changes: Partial<RecurrenceRule>) => {
-    if (!value) return;
-    onChange({ ...value, ...changes });
-  };
+  const patch = (changes: Partial<RecurrenceRule>) => onChange({ ...value, ...changes });
 
   const handlePresetChange = (id: string) => {
-    if (id === 'custom') {
-      setCustomOpen(true);
-      // Custom needs something to edit. A rule already in hand is kept so the
-      // panel opens on what the leader was looking at.
-      onChange(value ?? defaultRuleForFrequency('weekly', anchor, null));
-      return;
-    }
+    // Custom edits whatever is already in hand, so the panel opens on what the
+    // leader was looking at rather than resetting under them.
+    if (id === 'custom') return setCustomOpen(true);
 
     setCustomOpen(false);
-    onChange(presets.find((preset) => preset.id === id)?.rule ?? null);
+    const preset = presets.find((candidate) => candidate.id === id);
+    if (preset) onChange(preset.rule);
   };
 
   const handleFrequencyChange = (frequency: RecurrenceFrequency) => {
@@ -150,7 +152,6 @@ export function RecurrenceField({ anchor, value, onChange, error }: RecurrenceFi
   };
 
   const handleWeekdayToggle = (weekday: number) => {
-    if (!value) return;
     const on = value.weekdays.includes(weekday);
     // Never let the last day be cleared: an empty weekly rule is not a
     // schedule, and silently repairing it on save would repeat on a day the
@@ -164,7 +165,6 @@ export function RecurrenceField({ anchor, value, onChange, error }: RecurrenceFi
   };
 
   const handleEndsChange = (mode: EndsMode) => {
-    if (!value) return;
     if (mode === 'never') return patch({ until: null, count: null });
 
     const suggestion = suggestedRecurrenceEnd(value, anchor);
@@ -176,12 +176,10 @@ export function RecurrenceField({ anchor, value, onChange, error }: RecurrenceFi
   // says "every Friday" in a way no sentence about intervals does — and it is
   // the only thing that catches a rule that skips: set one on the 31st and the
   // preview names the months it lands in.
-  const preview = value
-    ? recurrenceOccurrences(value, anchor, {
-        limit: 3,
-        from: new Date(anchor.getTime() + 1),
-      })
-    : [];
+  const preview = recurrenceOccurrences(value, anchor, {
+    limit: 3,
+    from: new Date(anchor.getTime() + 1),
+  });
 
   return (
     <div className="flex flex-col gap-3">
@@ -199,7 +197,7 @@ export function RecurrenceField({ anchor, value, onChange, error }: RecurrenceFi
         <option value="custom">Custom…</option>
       </SelectField>
 
-      {isCustom && value ? (
+      {isCustom ? (
         <fieldset className="flex flex-col gap-4 rounded-xl bg-ink-950/40 p-3 ring-1 ring-ink-800">
           <legend className="px-1 text-xs font-bold uppercase tracking-wider text-ink-400">
             Custom repeat
@@ -290,9 +288,9 @@ export function RecurrenceField({ anchor, value, onChange, error }: RecurrenceFi
           Then {preview.map((date) => formatShortDate(date)).join(', ')}
           {preview.length === 3 ? '…' : ''}
         </p>
-      ) : value ? (
+      ) : (
         <p className="text-xs text-ink-500">This is the only gathering the repeat covers.</p>
-      ) : null}
+      )}
     </div>
   );
 }

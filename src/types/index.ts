@@ -280,8 +280,17 @@ export interface EventSeries extends EventSeriesDoc {
 /* Recurrence                                                                  */
 /* -------------------------------------------------------------------------- */
 
-/** RFC 5545 `FREQ`, narrowed to the four a ministry calendar actually uses. */
-export type RecurrenceFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly';
+/**
+ * RFC 5545 `FREQ`, narrowed to the three a ministry calendar actually uses.
+ *
+ * There is deliberately no `daily`. "Daily on Monday and Wednesday" and "weekly
+ * on Monday and Wednesday" are the same schedule, and offering both would mean
+ * two controls that produce one result and a rule that cannot be matched back
+ * to the option it came from. Every day is `weekly` with all seven days
+ * selected — which is a legal `FREQ=WEEKLY;BYDAY=SU,MO,TU,WE,TH,FR,SA` — so
+ * there is exactly one place to choose days.
+ */
+export type RecurrenceFrequency = 'weekly' | 'monthly' | 'yearly';
 
 /**
  * Which of the two readings of "monthly" a rule means, because a date is

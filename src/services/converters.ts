@@ -9,6 +9,7 @@
  */
 import { Timestamp, type DocumentData, type DocumentSnapshot } from 'firebase/firestore';
 import {
+  EVERY_WEEKDAY,
   fromDateOnlyValue,
   isRecurrenceFrequency,
   normalizeRecurrence,
@@ -23,6 +24,7 @@ import {
   type EventSeries,
   type Grade,
   type PcoRosterPerson,
+  type RecurrenceFrequency,
   type RecurrenceRule,
   type Rsvp,
   type SmallGroup,
@@ -164,13 +166,24 @@ function toRecurrence(value: unknown, anchor: Date): RecurrenceRule | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
 
   const raw = value as Record<string, unknown>;
-  if (!isRecurrenceFrequency(raw.frequency)) return null;
+
+  // `daily` was once a frequency of its own. It is every weekday of a weekly
+  // rule, which is the same schedule and the only one the editor can now
+  // produce — so an older document, or a write from a stale cached bundle,
+  // reads back as what it always meant rather than as no rule at all.
+  const legacyDaily = raw.frequency === 'daily';
+  if (!legacyDaily && !isRecurrenceFrequency(raw.frequency)) return null;
+  const frequency = legacyDaily ? 'weekly' : (raw.frequency as RecurrenceFrequency);
 
   return normalizeRecurrence(
     {
-      frequency: raw.frequency,
-      interval: num(raw.interval, 1),
-      weekdays: Array.isArray(raw.weekdays) ? (raw.weekdays as number[]) : [],
+      frequency,
+      interval: legacyDaily ? 1 : num(raw.interval, 1),
+      weekdays: legacyDaily
+        ? [...EVERY_WEEKDAY]
+        : Array.isArray(raw.weekdays)
+          ? (raw.weekdays as number[])
+          : [],
       monthlyMode: raw.monthlyMode === 'dayOfWeek' ? 'dayOfWeek' : 'dayOfMonth',
       // A malformed `until` reads as "no end date" rather than as "ended", so a
       // corrupt field never makes a live weekly gathering look finished.

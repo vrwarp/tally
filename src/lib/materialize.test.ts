@@ -218,7 +218,7 @@ describe('pendingOccurrences', () => {
   });
 
   it('caps a daily rule rather than writing out the whole horizon at once', () => {
-    const daily = friday({ recurrence: { ...WEEKLY, frequency: 'daily', weekdays: [] } });
+    const daily = friday({ recurrence: { ...WEEKLY, weekdays: [0, 1, 2, 3, 4, 5, 6] } });
     const drafts = pendingOccurrences([daily], FRIDAY);
 
     expect(drafts).toHaveLength(10);

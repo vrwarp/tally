@@ -7,7 +7,9 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  EVERY_WEEKDAY,
   MAX_INTERVAL,
+  defaultRecurrence,
   defaultRuleForFrequency,
   describeMonthlyWeekday,
   describeRecurrence,
@@ -110,6 +112,14 @@ describe('normalizeRecurrence', () => {
     ).toEqual([]);
   });
 
+  it('reads an unknown frequency as weekly rather than throwing it away', () => {
+    // `daily` used to be one of these. Anything unrecognised lands somewhere
+    // renderable, because the alternative is a crash on the event page.
+    expect(
+      normalizeRecurrence(rule({ frequency: 'daily' as never }), FRIDAY).frequency,
+    ).toBe('weekly');
+  });
+
   it('clamps a nonsensical interval', () => {
     expect(normalizeRecurrence(rule({ interval: 0 }), FRIDAY).interval).toBe(1);
     expect(normalizeRecurrence(rule({ interval: -4 }), FRIDAY).interval).toBe(1);
@@ -127,22 +137,21 @@ describe('normalizeRecurrence', () => {
 describe('describeRecurrence', () => {
   it('names the presets the way a calendar does', () => {
     expect(describeRecurrence(null, TUESDAY)).toBe('Does not repeat');
-    expect(describeRecurrence(rule({ frequency: 'daily' }), TUESDAY)).toBe('Daily');
+    // Every day of the week is every day, and says so.
+    expect(describeRecurrence(rule({ weekdays: [...EVERY_WEEKDAY] }), TUESDAY)).toBe('Daily');
     expect(describeRecurrence(rule({ weekdays: [2] }), TUESDAY)).toBe('Weekly on Tuesday');
     expect(describeRecurrence(rule({ frequency: 'monthly' }), TUESDAY)).toBe('Monthly on day 21');
     expect(
       describeRecurrence(rule({ frequency: 'monthly', monthlyMode: 'dayOfWeek' }), TUESDAY),
     ).toBe('Monthly on the third Tuesday');
     expect(describeRecurrence(rule({ frequency: 'yearly' }), TUESDAY)).toBe('Annually on July 21');
+    // Monday to Friday is spelled out rather than given a name of its own.
     expect(describeRecurrence(rule({ weekdays: [1, 2, 3, 4, 5] }), TUESDAY)).toBe(
-      'Every weekday (Monday to Friday)',
+      'Weekly on Mon, Tue, Wed, Thu and Fri',
     );
   });
 
   it('phrases intervals and multi-day weeks', () => {
-    expect(describeRecurrence(rule({ frequency: 'daily', interval: 10 }), TUESDAY)).toBe(
-      'Every 10 days',
-    );
     expect(describeRecurrence(rule({ interval: 2, weekdays: [1, 3] }), TUESDAY)).toBe(
       'Every 2 weeks on Monday and Wednesday',
     );
@@ -174,14 +183,14 @@ describe('describeRecurrence', () => {
 
 describe('recurrencePresets', () => {
   it('phrases every option against the chosen date', () => {
+    // No "does not repeat" — this list only describes an event already typed as
+    // Recurring — and no "every weekday", which is the day picker's job.
     expect(recurrencePresets(TUESDAY).map((preset) => preset.label)).toEqual([
-      'Does not repeat',
       'Daily',
       'Weekly on Tuesday',
       'Monthly on day 21',
       'Monthly on the third Tuesday',
       'Annually on July 21',
-      'Every weekday (Monday to Friday)',
     ]);
   });
 
@@ -195,16 +204,16 @@ describe('recurrencePresets', () => {
 
 describe('matchRecurrencePreset', () => {
   it('reopens the dropdown on the entry a rule was saved from', () => {
-    expect(matchRecurrencePreset(null, FRIDAY)).toBe('none');
     expect(matchRecurrencePreset(rule(), FRIDAY)).toBe('weekly');
-    expect(matchRecurrencePreset(rule({ frequency: 'daily' }), FRIDAY)).toBe('daily');
-    expect(matchRecurrencePreset(rule({ weekdays: [1, 2, 3, 4, 5] }), FRIDAY)).toBe('weekdays');
+    expect(matchRecurrencePreset(rule({ weekdays: [...EVERY_WEEKDAY] }), FRIDAY)).toBe('daily');
   });
 
   it('falls to custom for anything the shortlist cannot say', () => {
     expect(matchRecurrencePreset(rule({ interval: 2 }), FRIDAY)).toBe('custom');
     expect(matchRecurrencePreset(rule({ count: 13 }), FRIDAY)).toBe('custom');
     expect(matchRecurrencePreset(rule({ weekdays: [1, 3] }), FRIDAY)).toBe('custom');
+    // Monday to Friday is now a custom selection, not a preset of its own.
+    expect(matchRecurrencePreset(rule({ weekdays: [1, 2, 3, 4, 5] }), FRIDAY)).toBe('custom');
   });
 
   it('follows the anchor: the same rule stops being "weekly" once the day moves', () => {
@@ -224,11 +233,11 @@ describe('recurrenceOccurrences', () => {
     expect(next?.getMinutes()).toBe(0);
   });
 
-  it('walks a daily interval', () => {
-    const found = recurrenceOccurrences(rule({ frequency: 'daily', interval: 10 }), FRIDAY, {
-      limit: 3,
+  it('lands every day when every day is selected', () => {
+    const found = recurrenceOccurrences(rule({ weekdays: [...EVERY_WEEKDAY] }), FRIDAY, {
+      limit: 4,
     });
-    expect(days(found)).toEqual(['2026-7-24', '2026-8-3', '2026-8-13']);
+    expect(days(found)).toEqual(['2026-7-24', '2026-7-25', '2026-7-26', '2026-7-27']);
   });
 
   it('fires on every selected day of a multi-day week', () => {
@@ -331,7 +340,10 @@ describe('retimeRecurrence', () => {
   it('leaves rules with no weekday of their own alone', () => {
     const monthly = rule({ frequency: 'monthly' });
     expect(retimeRecurrence(monthly, FRIDAY, new Date(2026, 6, 25))).toBe(monthly);
-    expect(retimeRecurrence(null, FRIDAY, new Date(2026, 6, 25))).toBeNull();
+
+    // Every day is every day wherever the event moves to.
+    const daily = rule({ weekdays: [...EVERY_WEEKDAY] });
+    expect(retimeRecurrence(daily, FRIDAY, new Date(2026, 6, 25))).toBe(daily);
   });
 });
 
@@ -364,12 +376,27 @@ describe('suggestedRecurrenceEnd', () => {
       count: 5,
       until: '2030-07-24',
     });
+    // A tally is per gathering, not per week, so more days a week means more of
+    // them — capped so that Daily suggests about a month rather than a term.
+    expect(suggestedRecurrenceEnd(rule({ weekdays: [1, 4] }), FRIDAY).count).toBe(26);
+    expect(suggestedRecurrenceEnd(rule({ weekdays: [...EVERY_WEEKDAY] }), FRIDAY)).toEqual({
+      count: 30,
+      until: '2026-08-22',
+    });
   });
 });
 
 describe('defaultRuleForFrequency', () => {
   it('seeds a weekly rule with the day the event is on', () => {
     expect(defaultRuleForFrequency('weekly', FRIDAY, null).weekdays).toEqual([5]);
+    expect(defaultRecurrence(FRIDAY)).toEqual(rule({ weekdays: [5] }));
+  });
+
+  it('keeps the days already chosen when weekly comes back around', () => {
+    const previous = rule({ weekdays: [1, 3] });
+    const away = defaultRuleForFrequency('monthly', FRIDAY, previous);
+    expect(defaultRuleForFrequency('weekly', FRIDAY, away).weekdays).toEqual([5]);
+    expect(defaultRuleForFrequency('weekly', FRIDAY, previous).weekdays).toEqual([1, 3]);
   });
 
   it('carries the interval and end condition across a frequency change', () => {
