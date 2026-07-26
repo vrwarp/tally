@@ -3,9 +3,9 @@
  *
  * The example tests in `predictiveRoster.test.ts` say what the roster does for
  * a Friday with three students. These say what must be true of *every* roster:
- * that no student is ever lost or duplicated between the sections, that the
- * counts add up, and that typing in the search box cannot make a student
- * disappear from the ministry.
+ * that no student is ever lost or duplicated, that the counts add up, that a
+ * focus only ever narrows, and that typing in the search box cannot make a
+ * student disappear from the ministry.
  *
  * Conservation is the one that matters most. A counselor cannot tell a missing
  * student from an absent one, so a bug that silently drops somebody from the
@@ -29,11 +29,10 @@ describe('buildRoster properties', () => {
   );
 
   forAll(
-    'places every student in exactly one section, never twice',
+    'lists every student at most once',
     arbitraryRosterInput,
     (input) => {
-      const view = buildRoster(input);
-      const all = [...ids(view.recent), ...ids(view.roster), ...ids(view.checkedIn)];
+      const all = ids(buildRoster(input).entries);
 
       expect(new Set(all).size).toBe(all.length);
     },
@@ -50,29 +49,20 @@ describe('buildRoster properties', () => {
       expect(counts.absent).toBeGreaterThanOrEqual(0);
       expect(counts.eligible).toBeGreaterThanOrEqual(0);
       expect(counts.historyWindow).toBeGreaterThanOrEqual(0);
+      expect(counts.recent).toBeGreaterThanOrEqual(0);
+      expect(counts.recent).toBeLessThanOrEqual(counts.eligible);
     },
   );
 
   forAll(
-    'only puts checked-in students in the checked-in section',
-    arbitraryRosterInput,
-    (input) => {
-      const view = buildRoster(input);
-
-      for (const entry of view.checkedIn) expect(entry.attendance).not.toBeNull();
-      for (const entry of [...view.recent, ...view.roster]) expect(entry.attendance).toBeNull();
-    },
-  );
-
-  forAll(
-    'only surfaces students who actually meet the threshold in Recent',
+    'flags a student as recent exactly when they meet the threshold',
     arbitraryRosterInput,
     (input) => {
       const view = buildRoster(input);
       const threshold = effectiveThreshold(input.settings, view.counts.historyWindow);
 
-      for (const entry of view.recent) {
-        expect(entry.recentHits).toBeGreaterThanOrEqual(threshold);
+      for (const entry of view.entries) {
+        expect(entry.isRecent).toBe(entry.recentHits >= threshold);
       }
     },
   );
@@ -86,33 +76,68 @@ describe('buildRoster properties', () => {
     'search only ever narrows, and never changes the counts',
     arbitraryRosterInput,
     (input) => {
-      const unfiltered = buildRoster({ ...input, filters: { ...input.filters, query: '' } });
-      const filtered = buildRoster({ ...input, filters: { ...input.filters, query: 'a' } });
+      // Focus pinned: a search stands the Recent filter down, so comparing a
+      // focused view against an unfocused one would be measuring that, not the
+      // query.
+      const filters = { ...input.filters, focus: 'all' as const };
+      const unfiltered = buildRoster({ ...input, filters: { ...filters, query: '' } });
+      const filtered = buildRoster({ ...input, filters: { ...filters, query: 'a' } });
 
-      const universe = new Set([
-        ...ids(unfiltered.recent),
-        ...ids(unfiltered.roster),
-        ...ids(unfiltered.checkedIn),
-      ]);
-
-      for (const id of [...ids(filtered.recent), ...ids(filtered.roster), ...ids(filtered.checkedIn)]) {
-        expect(universe.has(id)).toBe(true);
-      }
+      const universe = new Set(ids(unfiltered.entries));
+      for (const id of ids(filtered.entries)) expect(universe.has(id)).toBe(true);
 
       // The header describes the event, not the query.
       expect(filtered.counts.present).toBe(unfiltered.counts.present);
       expect(filtered.counts.eligible).toBe(unfiltered.counts.eligible);
+      expect(filtered.counts.recent).toBe(unfiltered.counts.recent);
+    },
+  );
+
+  /**
+   * A focus is a view of the roster, never a different roster. Every focus must
+   * be a subset of the unfocused list, or a chip could conjure up a student the
+   * event was never open to.
+   */
+  forAll(
+    'every focus is a subset of the whole roster',
+    arbitraryRosterInput,
+    (input) => {
+      const all = buildRoster({ ...input, filters: { ...input.filters, focus: 'all' } });
+      const universe = new Set(ids(all.entries));
+
+      for (const focus of ['recent', 'checkedIn'] as const) {
+        const view = buildRoster({ ...input, filters: { ...input.filters, focus } });
+        for (const id of ids(view.entries)) expect(universe.has(id)).toBe(true);
+      }
     },
   );
 
   forAll(
-    'collapses Recent into the roster while a query is active',
+    'stands the Recent focus down rather than applying it to nothing',
     arbitraryRosterInput,
     (input) => {
-      const view = buildRoster({ ...input, filters: { ...input.filters, query: 'a' } });
+      const view = buildRoster({ ...input, filters: { ...input.filters, focus: 'recent' } });
 
-      expect(view.isFiltered).toBe(true);
-      expect(view.recent).toEqual([]);
+      if (view.focus === 'recent') {
+        expect(view.counts.recent).toBeGreaterThan(0);
+        // Everyone on the list is either expected or already through the door.
+        for (const entry of view.entries) {
+          expect(entry.isRecent || entry.attendance !== null).toBe(true);
+        }
+      } else {
+        expect(view.focus).toBe('all');
+      }
+    },
+  );
+
+  forAll(
+    'shows only students who are here under the checked-in focus',
+    arbitraryRosterInput,
+    (input) => {
+      const view = buildRoster({ ...input, filters: { ...input.filters, focus: 'checkedIn' } });
+
+      expect(view.focus).toBe('checkedIn');
+      for (const entry of view.entries) expect(entry.attendance).not.toBeNull();
     },
   );
 
@@ -123,46 +148,41 @@ describe('buildRoster properties', () => {
       const first = buildRoster(input);
       const second = buildRoster(input);
 
-      expect(ids(second.recent)).toEqual(ids(first.recent));
-      expect(ids(second.roster)).toEqual(ids(first.roster));
-      expect(ids(second.checkedIn)).toEqual(ids(first.checkedIn));
+      expect(ids(second.entries)).toEqual(ids(first.entries));
       expect(second.counts).toEqual(first.counts);
+      expect(second.focus).toEqual(first.focus);
     },
   );
 
+  /**
+   * The no-movement rule, as a property.
+   *
+   * Checking a student in must not change anybody's position in the list. This
+   * is the whole reason the check-in screen is one list and not three: with two
+   * counselors working the same queue, a roster that re-sorts on every write
+   * moves the row out from under the slower thumb.
+   */
   forAll(
-    'sorts Recent by how consistently a student attends',
+    'never reorders the list when a student is checked in',
     arbitraryRosterInput,
     (input) => {
-      const { recent } = buildRoster(input);
+      const before = buildRoster({ ...input, attendance: [], filters: { ...input.filters, focus: 'all' } });
+      const after = buildRoster({ ...input, filters: { ...input.filters, focus: 'all' } });
 
-      for (let i = 1; i < recent.length; i += 1) {
-        expect(recent[i - 1]!.recentHits).toBeGreaterThanOrEqual(recent[i]!.recentHits);
-      }
-    },
-  );
+      // Everyone who was eligible before is still in place; attendance can only
+      // *add* students (someone inactive, checked in by mistake).
+      const positions = ids(after.entries);
+      const kept = ids(before.entries).filter((id) => positions.includes(id));
 
-  forAll(
-    'sorts the checked-in list newest first, so the last tap is on top',
-    arbitraryRosterInput,
-    (input) => {
-      const { checkedIn } = buildRoster(input);
-
-      for (let i = 1; i < checkedIn.length; i += 1) {
-        const previous = checkedIn[i - 1]!.attendance!.checkedInAt.getTime();
-        const current = checkedIn[i]!.attendance!.checkedInAt.getTime();
-        // NaN from an Invalid Date is not an ordering violation, just unknowable.
-        if (Number.isFinite(previous) && Number.isFinite(current)) {
-          expect(previous).toBeGreaterThanOrEqual(current);
-        }
-      }
+      expect(positions.filter((id) => kept.includes(id))).toEqual(kept);
     },
   );
 
   /**
    * The undo path. A student who was checked in by mistake — inactive, not on
    * the RSVP list, whatever — must stay on screen, or there is no way to take
-   * it back.
+   * it back. That holds under the Recent focus too, which is why it admits
+   * checked-in students it never predicted.
    */
   forAll(
     'never hides a student who is already checked in',
@@ -191,10 +211,12 @@ describe('buildRoster properties', () => {
       };
     },
     (input) => {
-      const view = buildRoster(input);
       const checkedInId = input.attendance.at(-1)!.studentId;
 
-      expect(ids(view.checkedIn)).toContain(checkedInId);
+      for (const focus of ['all', 'recent', 'checkedIn'] as const) {
+        const view = buildRoster({ ...input, filters: { ...input.filters, focus } });
+        expect(ids(view.entries)).toContain(checkedInId);
+      }
     },
   );
 
@@ -220,7 +242,8 @@ describe('buildRoster properties', () => {
       const view = buildRoster(input);
 
       expect(view.counts.historyWindow).toBe(0);
-      expect(view.recent).toEqual([]);
+      expect(view.counts.recent).toBe(0);
+      expect(view.entries.every((entry) => !entry.isRecent)).toBe(true);
     },
   );
 
@@ -230,7 +253,7 @@ describe('buildRoster properties', () => {
     (input) => {
       const view = buildRoster(input);
 
-      for (const entry of [...view.recent, ...view.roster, ...view.checkedIn]) {
+      for (const entry of view.entries) {
         for (const warning of entry.warnings) {
           const blocking = isBlocking(warning);
           expect(blocking).toBe(warning === 'missing-waiver' || warning === 'missing-payment');

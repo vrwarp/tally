@@ -814,12 +814,6 @@ export function personIdFromStudentId(studentId: string): string | null {
 /* Derived view models                                                         */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Which block of the check-in screen a student belongs to.
- * `recent` is the predictive block that sits at the top of a recurring roster.
- */
-export type RosterSection = 'recent' | 'roster' | 'checkedIn';
-
 /** Non-blocking flags rendered as badges on a roster row. */
 export type RosterWarning =
   | 'missing-waiver'
@@ -829,7 +823,13 @@ export type RosterWarning =
 
 export interface RosterEntry {
   student: Student;
-  section: RosterSection;
+  /**
+   * True when the prediction expects this student tonight — they attended at
+   * least `predictiveMinAttended` of the last `predictiveOfLastN` instances of
+   * this series. Deliberately independent of `attendance`: checking someone in
+   * must not change which slice of the roster they belong to.
+   */
+  isRecent: boolean;
   /** Present when the student is already checked in to this event. */
   attendance: AttendanceRecord | null;
   /** Present for one-off events with an RSVP roster. */

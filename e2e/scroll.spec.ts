@@ -70,6 +70,22 @@ test.describe('scrolling', () => {
   });
 
   test('leaving a scrolled roster for Students starts at the top', async ({ page }) => {
+    /*
+     * Mobile WebKit has no wheel to dispatch — Playwright refuses `mouse.wheel`
+     * outright there, and synthetic touch events do not drive native scrolling,
+     * so the gesture this test is *about* cannot be performed at all.
+     *
+     * Skipped rather than downgraded to a scripted `scrollTop`, which would
+     * pass on precisely the broken build the comment below is guarding against.
+     * Neither axis goes uncovered: chromium-mobile keeps the phone viewport and
+     * webkit-desktop keeps Safari.
+     */
+    const project = test.info().project.name;
+    test.skip(
+      project.includes('webkit') && project.includes('mobile'),
+      'mobile WebKit cannot dispatch a wheel event',
+    );
+
     await gotoReady(page, '/');
     await longRoster(page);
 

@@ -108,7 +108,7 @@ no attendance as cancelled, whether or not it is marked. The rule is one predica
 | Where | Without the rule | With it |
 | --- | --- | --- |
 | MIA list | Every student in the ministry gains a miss for a night that did not happen, and three snow weeks flag all of them. | The night is neither a miss nor a reprieve; streaks close over it. |
-| Recent block | The cancelled Friday consumes one of the last three slots, and "2 of 3" becomes unreachable for regulars. | The window filters *before* it slices, so it reaches a week further back for a third real Friday. |
+| Recent filter | The cancelled Friday consumes one of the last three slots, and "2 of 3" becomes unreachable for regulars. | The window filters *before* it slices, so it reaches a week further back for a third real Friday. |
 | Trend strip | A zero bar mid-strip, which reads as attendance collapsing, and an average dragged down with it. | The gathering is simply not plotted. |
 | Student page | A row labelled "Missed", accusing a student of an absence at an event nobody attended. | A row labelled "No attendance", and the streak above it skips the night. |
 
@@ -268,7 +268,7 @@ A single document holding the four thresholds the core team can tune:
 | `newVisitorWindowDays` | 7 | How far back "New Visitors" looks. |
 
 **Who writes:** core and up, and the rules validate the relationship — `predictiveOfLastN` must be at
-least `predictiveMinAttended`, or the Recent block could never be satisfied and would silently render
+least `predictiveMinAttended`, or the Recent filter could never be satisfied and would silently render
 empty, which reads as a bug rather than a setting. The converter clamps on read as a second belt.
 
 ### `config/planningCenter`
@@ -315,7 +315,7 @@ single allergy line, and no payment details — a retreat payment is a boolean a
 never a card. See the data-handling note in the [README](../README.md#handling-minors-data).
 
 Everything the dashboard and the check-in screen display beyond the fields above is derived in the
-browser: the Recent block, MIA students, new visitors, roster warnings, head-count trends. Those live
+browser: the Recent filter, MIA students, new visitors, roster warnings, head-count trends. Those live
 in `src/features/roster/predictiveRoster.ts` and `src/features/dashboard/insights.ts` as pure
 functions over data that is already loaded, so a threshold change in Settings takes effect everywhere
 immediately with nothing to backfill.

@@ -10,7 +10,7 @@
  * So every derivation over history reads zero attendance at a finished gathering
  * as "this one did not happen" rather than as "everybody missed it". Without
  * that reading, one snowed-out Friday puts the whole ministry on the MIA list,
- * empties the Recent block of its regulars, and drops a zero into the trend strip
+ * empties the Recent list of its regulars, and drops a zero into the trend strip
  * that looks like a collapse in attendance.
  *
  * The unavoidable cost is that a gathering somebody genuinely forgot to take

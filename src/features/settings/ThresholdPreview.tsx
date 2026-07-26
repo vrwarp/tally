@@ -54,7 +54,7 @@ export function ThresholdPreview({ draft, saved, valid }: ThresholdPreviewProps)
     ...overrides,
   });
 
-  /** How many students the Recent block would hold, per series. */
+  /** How many students the Recent filter would hold, per series. */
   const predicted = useMemo(() => {
     if (snapshots.length === 0) return [];
 
@@ -98,7 +98,12 @@ export function ThresholdPreview({ draft, saved, valid }: ThresholdPreviewProps)
           settings: withDraft({}),
         });
 
-        return { id: entry.id, title: entry.title, recent: view.recent.length, eligible: view.counts.eligible };
+        return {
+          id: entry.id,
+          title: entry.title,
+          recent: view.counts.recent,
+          eligible: view.counts.eligible,
+        };
       })
       .filter((entry) => entry.eligible > 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps

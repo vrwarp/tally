@@ -147,7 +147,7 @@ describe('converter properties', () => {
 
 
   /**
-   * `predictiveOfLastN` of 0 would make the Recent block silently vanish, and a
+   * `predictiveOfLastN` of 0 would make the Recent filter silently vanish, and a
    * minimum above the window would do the same. Both read to a counselor as
    * "the app is broken", so the converter clamps rather than trusting.
    */

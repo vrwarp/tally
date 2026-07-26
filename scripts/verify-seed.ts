@@ -67,16 +67,18 @@ const sunday = rosterFor(sundayEvent);
 
 console.log(`\nPredictive roster — "at least ${settings.predictiveMinAttended} of the last ${settings.predictiveOfLastN}"\n`);
 console.log(
-  `  Friday  ${friday.recent.length} predicted / ${friday.counts.eligible} eligible ` +
+  `  Friday  ${friday.counts.recent} predicted / ${friday.counts.eligible} eligible ` +
     `(${friday.counts.historyWindow} past Fridays)`,
 );
 console.log(
-  `  Sunday  ${sunday.recent.length} predicted / ${sunday.counts.eligible} eligible ` +
+  `  Sunday  ${sunday.counts.recent} predicted / ${sunday.counts.eligible} eligible ` +
     `(${sunday.counts.historyWindow} past Sundays)`,
 );
 
-const fridayIds = new Set(friday.recent.map((entry) => entry.student.id));
-const sundayIds = new Set(sunday.recent.map((entry) => entry.student.id));
+const regulars = (view: ReturnType<typeof rosterFor>) =>
+  new Set(view.entries.filter((entry) => entry.isRecent).map((entry) => entry.student.id));
+const fridayIds = regulars(friday);
+const sundayIds = regulars(sunday);
 const fridayOnly = [...fridayIds].filter((id) => !sundayIds.has(id)).length;
 const sundayOnly = [...sundayIds].filter((id) => !fridayIds.has(id)).length;
 console.log(
@@ -102,7 +104,7 @@ if (oneOff) {
     oneOff,
     rsvpDocs.docs.map((d) => toRsvp(d, oneOff.id)),
   );
-  const blocked = view.roster.filter((entry) => entry.warnings.some(isBlocking)).length;
+  const blocked = view.entries.filter((entry) => entry.warnings.some(isBlocking)).length;
   console.log(`\nOne-off "${oneOff.title}"\n`);
   console.log(
     `  Roster restricted to ${view.counts.eligible} RSVPs (of ${students.length} students)`,

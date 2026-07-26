@@ -1,40 +1,46 @@
 /**
- * One titled block of the check-in roster (Recent / Roster / Checked in).
+ * The check-in roster: one list, and only ever one.
+ *
+ * It used to be three blocks — Recent, Everyone else, Checked in — and a tap
+ * moved a student from one to another. That reads well on a screenshot and
+ * badly on a Friday: the row a counselor just pressed jumps to a different part
+ * of the screen, and with two phones checking the same queue in, the list
+ * reorders under a thumb that is already on its way down. Now the filters
+ * change what the list holds and a tap changes only the colour of one row.
  *
  * The heading sticks to the top of the scroll container so a counselor halfway
- * down a 200-name list always knows which block they are in.
+ * down a 200-name list still knows which filter they are looking through.
  */
 import { StudentRow } from '@/features/checkin/StudentRow';
 import { cn } from '@/lib/utils';
 import type { RosterEntry } from '@/types';
 
-export interface RosterSectionProps {
+export interface RosterListProps {
   title: string;
   entries: readonly RosterEntry[];
   /** Small right-aligned note, e.g. what the prediction was based on. */
   description?: string;
-  /** Rendered instead of rows when `entries` is empty. Omit to hide the block. */
+  /** Rendered instead of rows when `entries` is empty. */
   emptyLabel?: string;
   tone?: 'default' | 'present';
+  /** Show the "2 of 3" prediction hint on the rows the prediction picked out. */
   showRecentHint?: boolean;
   onPress: (entry: RosterEntry) => void;
   flashing: ReadonlySet<string>;
   busy: ReadonlySet<string>;
 }
 
-export function RosterSection({
+export function RosterList({
   title,
   entries,
   description,
-  emptyLabel,
+  emptyLabel = 'Nobody matches these filters.',
   tone = 'default',
   showRecentHint = false,
   onPress,
   flashing,
   busy,
-}: RosterSectionProps) {
-  if (entries.length === 0 && !emptyLabel) return null;
-
+}: RosterListProps) {
   return (
     <section className="px-3 pb-3" aria-label={`${title}, ${entries.length}`}>
       <h2 className="sticky top-0 z-10 -mx-3 flex items-baseline gap-2 bg-ink-950/95 px-3 py-2 text-xs font-bold uppercase tracking-wider backdrop-blur">

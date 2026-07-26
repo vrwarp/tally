@@ -5,10 +5,13 @@
  * shows is derived here from plain data, which keeps the interesting logic
  * fully testable and keeps the components dumb.
  *
- * The rule: a student is surfaced in the "Recent" block when they attended at
- * least `predictiveMinAttended` of the last `predictiveOfLastN` instances of
- * *this specific series*. Friday history predicts Friday; Sunday history
- * predicts Sunday. They never cross.
+ * The rule: a student is flagged `isRecent` when they attended at least
+ * `predictiveMinAttended` of the last `predictiveOfLastN` instances of *this
+ * specific series*. Friday history predicts Friday; Sunday history predicts
+ * Sunday. They never cross.
+ *
+ * The prediction is a *filter* on one list, not a block above it. See
+ * `RosterFocus` for why the check-in screen stopped moving students around.
  */
 import { wasHeld } from '@/lib/sessionHistory';
 import { createSearchMatcher, sortByName } from '@/lib/utils';
@@ -25,25 +28,44 @@ import type {
   TallyEvent,
 } from '@/types';
 
+/**
+ * Which slice of the one roster list is on screen.
+ *
+ * These are *filters*, not sections. The check-in screen renders a single list
+ * and a tap never moves a student out of it — that was the old three-block
+ * layout's worst habit, and with two counselors checking the same queue in at
+ * once the list reshuffled under whichever thumb was slower.
+ *
+ * `recent` therefore includes anyone already checked in, regardless of what the
+ * prediction thought of them: a visitor quick-added mid-queue has to be visible
+ * without the counselor changing filters, and an accidental tap has to stay
+ * reachable so it can be undone.
+ */
+export type RosterFocus = 'all' | 'recent' | 'checkedIn';
+
 export interface RosterFilters {
   /** Free text from the persistent search bar. */
   query?: string;
   /** Restrict to one small group (Journey 2). */
   smallGroupId?: string | null;
-  /** Restrict to one grade. */
-  grade?: Grade | null;
+  /** Restrict to these grades. Empty or omitted means every grade. */
+  grades?: readonly Grade[];
   /** Only students still missing parent contact info. */
   incompleteOnly?: boolean;
+  /** Which slice of the list to show. Defaults to all of it. */
+  focus?: RosterFocus;
 }
 
 export interface RosterView {
-  /** Predicted likely attendees, most consistent first. Empty when filtering. */
-  recent: RosterEntry[];
-  /** Everyone else still expected but not yet checked in. */
-  roster: RosterEntry[];
-  /** Already present, most recent tap first. */
-  checkedIn: RosterEntry[];
-  /** True when a search query collapsed `recent` into `roster`. */
+  /** The one roster list, A–Z, already narrowed by `focus` and the query. */
+  entries: RosterEntry[];
+  /**
+   * The focus actually applied. A requested `recent` degrades to `all` when the
+   * prediction has nothing to say, so callers can render the chip from this and
+   * never show an active filter that is not doing anything.
+   */
+  focus: RosterFocus;
+  /** True when a search query is narrowing the list. */
   isFiltered: boolean;
   counts: {
     present: number;
@@ -53,6 +75,8 @@ export interface RosterView {
     absent: number;
     /** How many past instances the prediction actually had to work with. */
     historyWindow: number;
+    /** Eligible students the prediction expects, before search filtering. */
+    recent: number;
   };
 }
 
@@ -80,7 +104,7 @@ export function countRecentHits(
  * The threshold actually applied, given how much history exists.
  *
  * A brand-new series has fewer past instances than `ofLastN`. Demanding "2 of
- * 3" when only one Friday has ever happened would leave the Recent block empty
+ * 3" when only one Friday has ever happened would leave the Recent list empty
  * and make the feature look broken, so the requirement is clamped to the
  * available window. With no history at all there is nothing to predict from.
  */
@@ -199,6 +223,24 @@ export interface BuildRosterInput {
   group?: SmallGroup | null;
 }
 
+/**
+ * Whether a requested focus can actually be honoured.
+ *
+ * `recent` is the default the check-in screen opens on, so it has to fail
+ * gracefully rather than present an empty list. A search is a direct lookup and
+ * must reach the whole roster; inside a small group the list is nine names and
+ * narrowing it further only hides the absences the leader came for; and with no
+ * regulars to show there is no filter to apply.
+ */
+function resolveFocus(
+  requested: RosterFocus,
+  context: { isFiltered: boolean; scoped: boolean; recent: number },
+): RosterFocus {
+  if (requested !== 'recent') return requested;
+  if (context.isFiltered || context.scoped || context.recent === 0) return 'all';
+  return 'recent';
+}
+
 export function buildRoster(input: BuildRosterInput): RosterView {
   const { event, students, attendance, rsvps, settings, group } = input;
   const filters = input.filters ?? {};
@@ -215,14 +257,14 @@ export function buildRoster(input: BuildRosterInput): RosterView {
   // actually typed (a query of pure punctuation narrows nothing).
   const matcher = createSearchMatcher(filters.query ?? '');
   const isFiltered = !matcher.isEmpty;
+  const grades = filters.grades ?? [];
 
-  const checkedIn: RosterEntry[] = [];
-  const recent: RosterEntry[] = [];
-  const roster: RosterEntry[] = [];
+  const matched: RosterEntry[] = [];
   // Counted before the search filter: the header must keep reading "12 of 34"
   // while a counselor types, not "1 of 34".
   let eligible = 0;
   let presentTotal = 0;
+  let recentTotal = 0;
 
   for (const student of students) {
     const record = attendanceByStudent.get(student.id) ?? null;
@@ -235,57 +277,57 @@ export function buildRoster(input: BuildRosterInput): RosterView {
     // the whole ministry.
     if (group && !studentMatchesGroup(student, group)) continue;
     if (filters.smallGroupId && student.smallGroupId !== filters.smallGroupId) continue;
-    if (filters.grade != null && student.grade !== filters.grade) continue;
+    if (grades.length > 0 && !grades.includes(student.grade)) continue;
     if (filters.incompleteOnly && student.profileComplete !== false) continue;
+
+    const recentHits = countRecentHits(student.id, history);
+    const isRecent = recentHits >= threshold;
 
     eligible += 1;
     if (record) presentTotal += 1;
+    if (isRecent) recentTotal += 1;
 
     if (!matcher.matches(student.searchName)) continue;
 
-    const recentHits = countRecentHits(student.id, history);
-    const entry: RosterEntry = {
+    matched.push({
       student,
-      section: record ? 'checkedIn' : 'roster',
+      isRecent,
       attendance: record,
       rsvp: rsvp ?? null,
       warnings: computeWarnings(student, event, rsvp),
       recentHits,
       recentWindow: historyWindow,
-    };
-
-    if (record) {
-      checkedIn.push({ ...entry, section: 'checkedIn' });
-    } else if (!isFiltered && recentHits >= threshold) {
-      recent.push({ ...entry, section: 'recent' });
-    } else {
-      roster.push(entry);
-    }
+    });
   }
 
-  // Most consistent attendees first: the regulars a counselor is about to tap
-  // should be reachable without scrolling.
-  recent.sort(
-    (a, b) => b.recentHits - a.recentHits || sortByName(a.student, b.student),
-  );
-  roster.sort((a, b) => sortByName(a.student, b.student));
-  // Newest tap on top, so the counselor can confirm (and undo) what just happened.
-  checkedIn.sort(
-    (a, b) =>
-      (b.attendance?.checkedInAt.getTime() ?? 0) - (a.attendance?.checkedInAt.getTime() ?? 0) ||
-      sortByName(a.student, b.student),
-  );
+  const focus = resolveFocus(filters.focus ?? 'all', {
+    isFiltered,
+    scoped: group != null,
+    recent: recentTotal,
+  });
+
+  const entries = matched.filter((entry) => {
+    if (focus === 'checkedIn') return entry.attendance !== null;
+    if (focus === 'recent') return entry.isRecent || entry.attendance !== null;
+    return true;
+  });
+
+  // One ordering for the one list, and it depends on nothing that a tap can
+  // change. A student's position is a function of their name alone, so checking
+  // somebody in paints their row green exactly where the thumb already is
+  // instead of teleporting it past the four names underneath.
+  entries.sort((a, b) => sortByName(a.student, b.student));
 
   return {
-    recent,
-    roster,
-    checkedIn,
+    entries,
+    focus,
     isFiltered,
     counts: {
       present: presentTotal,
       eligible,
       absent: Math.max(0, eligible - presentTotal),
       historyWindow,
+      recent: recentTotal,
     },
   };
 }
