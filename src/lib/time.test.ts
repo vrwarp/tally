@@ -15,7 +15,7 @@ import {
   nextSeriesOccurrence,
   parseTimeOfDay,
   pickActiveEvent,
-  recentSeriesInstances,
+  recentChainInstances,
   startOfDay,
   toDateTimeLocalValue,
 } from '@/lib/time';
@@ -238,7 +238,7 @@ describe('pickActiveEvent', () => {
   });
 });
 
-describe('recentSeriesInstances', () => {
+describe('recentChainInstances', () => {
   /** Weekly Friday instances, each closing check-in at 22:00. */
   const friday = (weeksBack: number) => {
     const startAt = new Date(2026, 1, 13 - weeksBack * 7, 19, 0);
@@ -255,14 +255,14 @@ describe('recentSeriesInstances', () => {
   const past = [friday(1), friday(2), friday(3), friday(4)];
 
   it('returns the most recent closed instances, newest first', () => {
-    const result = recentSeriesInstances(past, 'friday-fellowship', FRIDAY_EVENING, 3);
+    const result = recentChainInstances(past, 'friday-fellowship', FRIDAY_EVENING, 3);
     expect(result.map((event) => event.id)).toEqual(['friday-1', 'friday-2', 'friday-3']);
   });
 
   it('excludes an instance whose check-in window has not closed yet', () => {
     // Tonight's gathering is still in progress at 19:30.
     const tonight = friday(0);
-    const result = recentSeriesInstances([tonight, ...past], 'friday-fellowship', FRIDAY_EVENING, 5);
+    const result = recentChainInstances([tonight, ...past], 'friday-fellowship', FRIDAY_EVENING, 5);
     expect(result.map((event) => event.id)).not.toContain('friday-0');
     expect(result).toHaveLength(4);
   });
@@ -276,7 +276,7 @@ describe('recentSeriesInstances', () => {
       checkInOpensAt: new Date(2026, 1, 8, 8, 30),
       checkInClosesAt: new Date(2026, 1, 8, 11, 0),
     });
-    const result = recentSeriesInstances([sunday, ...past], 'friday-fellowship', FRIDAY_EVENING, 10);
+    const result = recentChainInstances([sunday, ...past], 'friday-fellowship', FRIDAY_EVENING, 10);
     expect(result.map((event) => event.seriesId)).toEqual([
       'friday-fellowship',
       'friday-fellowship',
@@ -287,7 +287,7 @@ describe('recentSeriesInstances', () => {
 
   it('excludes cancelled instances', () => {
     const cancelled = makeEvent({ ...friday(1), status: 'cancelled' });
-    const result = recentSeriesInstances(
+    const result = recentChainInstances(
       [cancelled, friday(2), friday(3)],
       'friday-fellowship',
       FRIDAY_EVENING,
@@ -297,10 +297,50 @@ describe('recentSeriesInstances', () => {
   });
 
   it('respects the requested count, including zero and negatives', () => {
-    expect(recentSeriesInstances(past, 'friday-fellowship', FRIDAY_EVENING, 1)).toHaveLength(1);
-    expect(recentSeriesInstances(past, 'friday-fellowship', FRIDAY_EVENING, 0)).toHaveLength(0);
-    expect(recentSeriesInstances(past, 'friday-fellowship', FRIDAY_EVENING, -3)).toHaveLength(0);
-    expect(recentSeriesInstances(past, 'friday-fellowship', FRIDAY_EVENING, 99)).toHaveLength(4);
+    expect(recentChainInstances(past, 'friday-fellowship', FRIDAY_EVENING, 1)).toHaveLength(1);
+    expect(recentChainInstances(past, 'friday-fellowship', FRIDAY_EVENING, 0)).toHaveLength(0);
+    expect(recentChainInstances(past, 'friday-fellowship', FRIDAY_EVENING, -3)).toHaveLength(0);
+    expect(recentChainInstances(past, 'friday-fellowship', FRIDAY_EVENING, 99)).toHaveLength(4);
+  });
+
+  /*
+   * A repeating event created in the app: no series document anywhere, the
+   * chain held together by the root the occurrences were copied forward from.
+   * Its own root counts as history — it is a gathering that happened.
+   */
+  it('gathers a rootless chain by its recurrence root, root included', () => {
+    const rooted = (weeksBack: number) =>
+      makeEvent({ ...friday(weeksBack), seriesId: null, recurrenceRootId: 'saturday-root' });
+
+    const root = makeEvent({
+      ...friday(3),
+      id: 'saturday-root',
+      seriesId: null,
+      recurrenceRootId: null,
+    });
+
+    const result = recentChainInstances(
+      [rooted(1), rooted(2), root],
+      'saturday-root',
+      FRIDAY_EVENING,
+      5,
+    );
+
+    expect(result.map((event) => event.id)).toEqual(['friday-1', 'friday-2', 'saturday-root']);
+  });
+
+  it('keeps two rootless chains apart', () => {
+    const ours = makeEvent({ ...friday(1), seriesId: null, recurrenceRootId: 'ours' });
+    const theirs = makeEvent({
+      ...friday(2),
+      id: 'theirs-1',
+      seriesId: null,
+      recurrenceRootId: 'theirs',
+    });
+
+    const result = recentChainInstances([ours, theirs], 'ours', FRIDAY_EVENING, 5);
+
+    expect(result.map((event) => event.id)).toEqual(['friday-1']);
   });
 });
 

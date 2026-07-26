@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { useData } from '@/context/dataContext';
 import { useNow } from '@/hooks/useNow';
-import { pickActiveEvent, recentSeriesInstances } from '@/lib/time';
+import { chainKey } from '@/lib/materialize';
+import { pickActiveEvent, recentChainInstances } from '@/lib/time';
 import type { TallyEvent } from '@/types';
 
 export interface ActiveEventResult {
@@ -68,16 +69,21 @@ const CANCELLED_ALLOWANCE = 2;
  * The past instances of an event's series that feed its predictive roster.
  * Returns event records only — attendance for them is loaded by
  * `useEventSnapshots`.
+ *
+ * "Series" here means the repeat chain (`chainKey`), which is the series
+ * document when there is one and the recurrence root otherwise. A one-off has
+ * neither and predicts from nothing, by design: a retreat is not evidence about
+ * who turns up to a retreat.
  */
 export function useSeriesHistoryEvents(event: TallyEvent | null): TallyEvent[] {
   const { events, settings } = useData();
   const now = useNow(60_000);
 
   return useMemo(() => {
-    if (!event?.seriesId) return [];
-    return recentSeriesInstances(
+    if (!event || event.mode === 'oneoff') return [];
+    return recentChainInstances(
       events,
-      event.seriesId,
+      chainKey(event),
       now,
       settings.predictiveOfLastN + CANCELLED_ALLOWANCE,
     ).filter((instance) => instance.id !== event.id);

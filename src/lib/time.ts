@@ -6,6 +6,7 @@
  * is deterministic under test. Nothing in this module reads the clock on its own.
  */
 import { format, formatDistanceToNowStrict, isSameDay, isToday, isTomorrow } from 'date-fns';
+import { chainKey } from '@/lib/materialize';
 import type { EventSeries, TallyEvent } from '@/types';
 
 /** Parses a wall-clock "HH:mm" into hours/minutes. Throws on malformed input. */
@@ -80,22 +81,25 @@ export function pickActiveEvent(
 }
 
 /**
- * Returns the `count` most recent *past* instances of a series, newest first.
+ * Returns the `count` most recent *past* instances of one chain, newest first.
  * "Past" means the check-in window has closed, so an event still in progress
  * never pollutes the history that predicts its own roster.
+ *
+ * `chain` is a `chainKey`, not a `seriesId`: a repeating event created in the
+ * app has no series document, and its history is held together by the root it
+ * was copied forward from. Passing a bare `seriesId` still works — that is what
+ * `chainKey` returns whenever one is set.
  */
-export function recentSeriesInstances(
+export function recentChainInstances(
   events: readonly TallyEvent[],
-  seriesId: string,
+  chain: string,
   now: Date,
   count: number,
 ): TallyEvent[] {
   return events
     .filter(
       (event) =>
-        event.seriesId === seriesId &&
-        event.status !== 'cancelled' &&
-        event.checkInClosesAt < now,
+        chainKey(event) === chain && event.status !== 'cancelled' && event.checkInClosesAt < now,
     )
     .sort((a, b) => b.startAt.getTime() - a.startAt.getTime())
     .slice(0, Math.max(0, count));

@@ -365,7 +365,14 @@ export type EventStatus = 'scheduled' | 'cancelled';
 export interface TallyEventDoc {
   title: string;
   mode: EventMode;
-  /** Set for `recurring` events; identifies which history informs prediction. */
+  /**
+   * Optional link to an `eventSeries` template, on `recurring` events only.
+   *
+   * Not required for prediction: history is grouped by the repeat chain
+   * (`chainKey` — this when set, the recurrence root otherwise), so a weekly
+   * gathering created in the app predicts from its own past instances with no
+   * series document anywhere.
+   */
   seriesId: string | null;
   /**
    * How this gathering repeats, or null when it does not.
@@ -383,8 +390,9 @@ export interface TallyEventDoc {
    *
    * Gives a recurrence chain an identity that survives being copied forward,
    * which is what lets an occurrence's document id be derived rather than
-   * generated — see `lib/materialize.ts`. Redundant when `seriesId` is set,
-   * which is the more readable key and wins; this covers everything else.
+   * generated — see `lib/materialize.ts` — and what the predictive roster
+   * groups history by. Redundant when `seriesId` is set, which is the more
+   * readable key and wins; this covers everything else.
    */
   recurrenceRootId: string | null;
   startAt: Timestamp;

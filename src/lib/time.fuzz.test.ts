@@ -16,9 +16,10 @@ import {
   isCheckInOpen,
   nextSeriesOccurrence,
   pickActiveEvent,
-  recentSeriesInstances,
+  recentChainInstances,
   toDateTimeLocalValue,
 } from './time';
+import { chainKey } from '@/lib/materialize';
 import type { TallyEvent } from '@/types';
 
 const NOW = new Date('2026-02-13T19:30:00');
@@ -57,15 +58,18 @@ describe('time helper properties', () => {
     }
   });
 
-  forAll('recentSeriesInstances only returns finished events of one series', (rng) => {
+  forAll('recentChainInstances only returns finished events of one chain', (rng) => {
     const { events, now } = arbitraryEvents(rng);
-    return { events, now, seriesId: rng.pick(['friday', 'sunday']), count: rng.int(0, 6) };
-  }, ({ events, now, seriesId, count }) => {
-    const history = recentSeriesInstances(events, seriesId, now, count);
+    // Some draws ask for a chain nothing is keyed on, which is the shape of a
+    // brand-new repeating event: the answer has to be empty, not everything.
+    const chain = rng.pick(['friday', 'sunday', 'a-root-nothing-shares', events[0]?.id ?? 'none']);
+    return { events, now, chain, count: rng.int(0, 6) };
+  }, ({ events, now, chain, count }) => {
+    const history = recentChainInstances(events, chain, now, count);
 
     expect(history.length).toBeLessThanOrEqual(count);
     for (const event of history) {
-      expect(event.seriesId).toBe(seriesId);
+      expect(chainKey(event)).toBe(chain);
       expect(event.status).not.toBe('cancelled');
       // An event still in progress must never predict its own roster.
       expect(event.checkInClosesAt.getTime()).toBeLessThan(now.getTime());

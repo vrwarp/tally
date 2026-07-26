@@ -13,6 +13,7 @@
  * The prediction is a *filter* on one list, not a block above it. See
  * `RosterFocus` for why the check-in screen stopped moving students around.
  */
+import { chainKey } from '@/lib/materialize';
 import { wasHeld } from '@/lib/sessionHistory';
 import { createSearchMatcher, sortByName } from '@/lib/utils';
 import type {
@@ -120,6 +121,14 @@ export function effectiveThreshold(settings: AppSettings, historyWindow: number)
  * finished, and only the most recent `ofLastN` of them. The event being checked
  * into is excluded — an event never predicts itself.
  *
+ * "Same series" is `chainKey`, not `seriesId`. A series document is one way to
+ * say two gatherings are the same gathering; a shared recurrence root is the
+ * other, and it is the only one a weekly event created in the app has. Reading
+ * `seriesId` alone meant such an event predicted from nothing forever, however
+ * many Saturdays it had behind it, which looked exactly like a broken feature.
+ * One-off events are still excluded outright — a retreat has no series to be
+ * the latest instance of.
+ *
  * A gathering that never happened is excluded too, whether it was marked
  * cancelled or merely has nobody checked in (see `wasHeld`). That filter runs
  * *before* the slice on purpose: a snowed-out Friday must cost the window
@@ -127,16 +136,18 @@ export function effectiveThreshold(settings: AppSettings, historyWindow: number)
  * regular in the ministry to "not recent".
  */
 export function buildSeriesHistory(
-  event: Pick<TallyEvent, 'id' | 'seriesId'>,
+  event: Pick<TallyEvent, 'id' | 'mode' | 'seriesId' | 'recurrenceRootId'>,
   snapshots: readonly EventAttendanceSnapshot[],
   settings: AppSettings,
 ): EventAttendanceSnapshot[] {
-  if (!event.seriesId) return [];
+  if (event.mode === 'oneoff') return [];
+  const chain = chainKey(event);
   return snapshots
     .filter(
       (snapshot) =>
         snapshot.event.id !== event.id &&
-        snapshot.event.seriesId === event.seriesId &&
+        snapshot.event.mode !== 'oneoff' &&
+        chainKey(snapshot.event) === chain &&
         wasHeld(snapshot),
     )
     .sort((a, b) => b.event.startAt.getTime() - a.event.startAt.getTime())

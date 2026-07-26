@@ -85,8 +85,21 @@ export const MAX_PER_CHAIN = 10;
  * (`friday-fellowship-2026-08-07`). Failing that, the root — the id of the
  * hand-made event the chain grew from. Failing that the event is itself a root
  * that has never been materialised, so it is its own key.
+ *
+ * This is also what the predictive roster groups history by, and the two uses
+ * have to agree: whatever the horizon copies forward as one chain is exactly
+ * the set of gatherings that predict each other. Keying prediction on
+ * `seriesId` alone was the older, narrower rule, and it meant a weekly event
+ * created in the app — which has a root but no series document — accumulated
+ * months of attendance that its own roster then refused to read.
+ *
+ * Narrowed to the three fields it reads so a caller holding less than a whole
+ * event — the roster asks this of a `Pick`, and its tests of a fixture — can
+ * still ask. `OccurrenceSource` and `TallyEvent` both satisfy it.
  */
-export function chainKey(event: OccurrenceSource): string {
+export function chainKey(
+  event: Pick<OccurrenceSource, 'id' | 'seriesId' | 'recurrenceRootId'>,
+): string {
   return event.seriesId ?? event.recurrenceRootId ?? event.id;
 }
 
