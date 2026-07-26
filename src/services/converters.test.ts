@@ -192,6 +192,57 @@ describe('toEvent', () => {
     expect(toEvent(fakeSnapshot({ data: {} })).title).toBe('Untitled event');
   });
 
+  it('normalises a stored recurrence against the event’s own start', () => {
+    const startAt = new Date(2026, 6, 24, 19, 0); // a Friday
+    const event = toEvent(
+      fakeSnapshot({
+        data: {
+          startAt: ts(startAt),
+          recurrence: { frequency: 'weekly', interval: 0, weekdays: [5, 5, 9], count: 13 },
+        },
+      }),
+    );
+
+    expect(event.recurrence).toEqual({
+      frequency: 'weekly',
+      interval: 1,
+      weekdays: [5],
+      monthlyMode: 'dayOfMonth',
+      until: null,
+      count: 13,
+    });
+  });
+
+  it('reads anything that is not a recurrence rule as "does not repeat"', () => {
+    const cases = [undefined, null, 'weekly', 42, [], {}, { frequency: 'fortnightly' }];
+    for (const recurrence of cases) {
+      expect(toEvent(fakeSnapshot({ data: { recurrence } })).recurrence).toBeNull();
+    }
+  });
+
+  it('drops a malformed end date rather than making a live series look finished', () => {
+    const event = toEvent(
+      fakeSnapshot({ data: { recurrence: { frequency: 'weekly', until: '2026-02-31' } } }),
+    );
+    expect(event.recurrence?.until).toBeNull();
+  });
+
+  it('reads a legacy "daily" rule as the every-weekday rule it always meant', () => {
+    const event = toEvent(
+      fakeSnapshot({ data: { recurrence: { frequency: 'daily', interval: 1 } } }),
+    );
+
+    expect(event.recurrence?.frequency).toBe('weekly');
+    expect(event.recurrence?.weekdays).toEqual([0, 1, 2, 3, 4, 5, 6]);
+  });
+
+  it('ignores a recurrence on a one-off, which happens once by definition', () => {
+    expect(
+      toEvent(fakeSnapshot({ data: { mode: 'oneoff', recurrence: { frequency: 'weekly' } } }))
+        .recurrence,
+    ).toBeNull();
+  });
+
   it('only honours an explicit "cancelled" status', () => {
     expect(toEvent(fakeSnapshot({ data: {} })).status).toBe('scheduled');
     expect(toEvent(fakeSnapshot({ data: { status: 'postponed' } })).status).toBe('scheduled');

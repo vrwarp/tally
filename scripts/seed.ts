@@ -915,6 +915,18 @@ function collectWrites(now: Date): {
         title: event.title,
         mode: isRetreat ? 'oneoff' : 'recurring',
         seriesId: event.seriesId,
+        // A retreat happens once; everything else is the weekly slot its series
+        // describes, phrased from the day the instance itself lands on.
+        recurrence: isRetreat
+          ? null
+          : {
+              frequency: 'weekly',
+              interval: 1,
+              weekdays: [event.startAt.getDay()],
+              monthlyMode: 'dayOfMonth',
+              until: null,
+              count: null,
+            },
         startAt: event.startAt,
         endAt: event.endAt,
         checkInOpensAt: event.checkInOpensAt,

@@ -68,6 +68,10 @@ export function ThresholdPreview({ draft, saved, valid }: ThresholdPreviewProps)
           title: entry.title,
           mode: 'recurring',
           seriesId: entry.id,
+          // Irrelevant to the preview: prediction reads the series' history,
+          // not the pattern that will schedule the next one.
+          recurrence: null,
+          recurrenceRootId: null,
           startAt: now,
           endAt: now,
           checkInOpensAt: now,

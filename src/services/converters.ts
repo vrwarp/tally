@@ -9,6 +9,12 @@
  */
 import { Timestamp, type DocumentData, type DocumentSnapshot } from 'firebase/firestore';
 import {
+  EVERY_WEEKDAY,
+  fromDateOnlyValue,
+  isRecurrenceFrequency,
+  normalizeRecurrence,
+} from '@/lib/recurrence';
+import {
   DEFAULT_SETTINGS,
   buildSearchName,
   isGrade,
@@ -18,6 +24,8 @@ import {
   type EventSeries,
   type Grade,
   type PcoRosterPerson,
+  type RecurrenceFrequency,
+  type RecurrenceRule,
   type Rsvp,
   type SmallGroup,
   type Student,
@@ -145,6 +153,47 @@ export function toStudent(snapshot: DocumentSnapshot<DocumentData>): Student {
 /* Events                                                                      */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * A stored recurrence, or null.
+ *
+ * Nothing downstream may see a half-formed rule: `describeRecurrence` would
+ * phrase a nonsense sentence on the event page, and the expander would loop
+ * over a frequency it has no case for. `normalizeRecurrence` repairs the
+ * *values* — this decides whether there is a rule at all, which it can only do
+ * once the shape is known to be a rule.
+ */
+function toRecurrence(value: unknown, anchor: Date): RecurrenceRule | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+
+  const raw = value as Record<string, unknown>;
+
+  // `daily` was once a frequency of its own. It is every weekday of a weekly
+  // rule, which is the same schedule and the only one the editor can now
+  // produce — so an older document, or a write from a stale cached bundle,
+  // reads back as what it always meant rather than as no rule at all.
+  const legacyDaily = raw.frequency === 'daily';
+  if (!legacyDaily && !isRecurrenceFrequency(raw.frequency)) return null;
+  const frequency = legacyDaily ? 'weekly' : (raw.frequency as RecurrenceFrequency);
+
+  return normalizeRecurrence(
+    {
+      frequency,
+      interval: legacyDaily ? 1 : num(raw.interval, 1),
+      weekdays: legacyDaily
+        ? [...EVERY_WEEKDAY]
+        : Array.isArray(raw.weekdays)
+          ? (raw.weekdays as number[])
+          : [],
+      monthlyMode: raw.monthlyMode === 'dayOfWeek' ? 'dayOfWeek' : 'dayOfMonth',
+      // A malformed `until` reads as "no end date" rather than as "ended", so a
+      // corrupt field never makes a live weekly gathering look finished.
+      until: typeof raw.until === 'string' && fromDateOnlyValue(raw.until) ? raw.until : null,
+      count: numOrNull(raw.count),
+    },
+    anchor,
+  );
+}
+
 export function toEvent(snapshot: DocumentSnapshot<DocumentData>): TallyEvent {
   const data = snapshot.data() ?? {};
   const fallback = pendingFallback(snapshot);
@@ -157,6 +206,10 @@ export function toEvent(snapshot: DocumentSnapshot<DocumentData>): TallyEvent {
     title: str(data.title, 'Untitled event'),
     mode,
     seriesId: strOrNull(data.seriesId),
+    // A one-off does not repeat by definition, so a stray rule on one is
+    // dropped rather than rendered.
+    recurrence: mode === 'recurring' ? toRecurrence(data.recurrence, startAt) : null,
+    recurrenceRootId: strOrNull(data.recurrenceRootId),
     startAt,
     endAt,
     checkInOpensAt: toDate(data.checkInOpensAt, startAt),

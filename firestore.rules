@@ -236,13 +236,40 @@ service cloud.firestore {
     /* ---------------------------------------------------------------- */
 
     match /events/{eventId} {
+      /**
+       * A recurrence rule is a small closed vocabulary, and the client expands
+       * it into dates without re-checking. An unknown `frequency` or a
+       * negative `interval` written straight to the collection would have the
+       * event page describing a schedule nobody can read, so the shape is
+       * pinned here as well as in the converter.
+       *
+       * The anchor-derived parts (day of month, weekday position, month of a
+       * yearly rule) are deliberately absent — they come from `startAt`, so
+       * there is nothing here that can contradict the event's own date.
+       */
+      function validRecurrence(r) {
+        return r is map
+          // `daily` is no longer written — it is every weekday of a weekly
+          // rule — but it stays accepted so a stale cached bundle's write is
+          // not rejected outright. The converter folds it on read.
+          && r.frequency in ['daily', 'weekly', 'monthly', 'yearly']
+          && r.interval is int && r.interval >= 1 && r.interval <= 99
+          && r.weekdays is list && r.weekdays.size() <= 7
+          && r.monthlyMode in ['dayOfMonth', 'dayOfWeek']
+          && (r.until == null || r.until is string)
+          // RFC 5545: an end date and an occurrence tally must not both apply.
+          && (r.count == null || (r.count is int && r.count >= 1 && r.until == null));
+      }
+
       function validEvent() {
         let d = request.resource.data;
+        let recurrence = d.get('recurrence', null);
         return d.startAt is timestamp
           && d.endAt is timestamp
           && d.checkInOpensAt is timestamp
           && d.checkInClosesAt is timestamp
-          && d.mode in ['recurring', 'oneoff'];
+          && d.mode in ['recurring', 'oneoff']
+          && (recurrence == null || validRecurrence(recurrence));
       }
 
       allow get, list: if isActive();

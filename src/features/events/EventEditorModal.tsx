@@ -23,6 +23,8 @@ import {
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
+import { RecurrenceField } from '@/features/events/RecurrenceField';
+import { defaultRecurrence, retimeRecurrence, validateRecurrence } from '@/lib/recurrence';
 import {
   addMinutes,
   fromDateTimeLocalValue,
@@ -30,7 +32,7 @@ import {
   toDateTimeLocalValue,
 } from '@/lib/time';
 import { createEvent, updateEvent, type EventDraft } from '@/services/events';
-import type { EventMode, RosterGroupingMode, TallyEvent } from '@/types';
+import type { EventMode, RecurrenceRule, RosterGroupingMode, TallyEvent } from '@/types';
 
 /** House defaults for the check-in window, in minutes around the event. */
 const OPENS_BEFORE_MIN = 60;
@@ -40,6 +42,12 @@ interface EditorForm {
   title: string;
   mode: EventMode;
   seriesId: string;
+  /**
+  * Anchored on `start`, never on a date of its own. Always present — a
+  * recurring gathering repeats by definition — and simply unused while the
+  * event is a one-off.
+  */
+  recurrence: RecurrenceRule;
   start: string;
   end: string;
   checkInOpens: string;
@@ -61,7 +69,10 @@ interface EditorForm {
 }
 
 type EditorErrors = Partial<
-  Record<'title' | 'start' | 'end' | 'checkInOpens' | 'checkInCloses' | 'fee', string>
+  Record<
+    'title' | 'start' | 'end' | 'checkInOpens' | 'checkInCloses' | 'fee' | 'recurrence',
+    string
+  >
 >;
 
 interface ParsedTimes {
@@ -106,10 +117,19 @@ function buildForm(
     event?.checkInClosesAt ?? defaults?.checkInClosesAt ?? addMinutes(endAt, CLOSES_AFTER_MIN);
   const feeCents = event?.feeCents ?? defaults?.feeCents ?? null;
 
+  // Weekly on the day it starts, unless something more specific is known. That
+  // is what almost every gathering here is, and it is the only honest default
+  // now that "Recurring" means the event repeats: there is no rule to inherit
+  // from an event scheduled before this field existed, and leaving the control
+  // blank would just be a required field nobody was asked to fill in.
+  const recurrence: RecurrenceRule =
+    event?.recurrence ?? defaults?.recurrence ?? defaultRecurrence(startAt);
+
   return {
     title: event?.title ?? defaults?.title ?? '',
     mode,
     seriesId: event?.seriesId ?? defaults?.seriesId ?? '',
+    recurrence,
     start: toDateTimeLocalValue(startAt),
     end: toDateTimeLocalValue(endAt),
     checkInOpens: toDateTimeLocalValue(opensAt),
@@ -154,6 +174,13 @@ function validateForm(form: EditorForm): { errors: EditorErrors; times: ParsedTi
 
   if (form.mode === 'oneoff' && form.requiresPayment && dollarsToCents(form.fee) === null) {
     errors.fee = 'Enter the amount, or turn payment tracking off.';
+  }
+
+  // Only checkable once there is a start to anchor against — the rule is
+  // phrased relative to it, so an unparseable date has already failed above.
+  if (form.mode === 'recurring' && startAt) {
+    const problem = validateRecurrence(form.recurrence, startAt);
+    if (problem) errors.recurrence = problem;
   }
 
   const times =
@@ -222,6 +249,12 @@ export function EventEditorModal({
           startAt && !current.opensPinned
             ? toDateTimeLocalValue(addMinutes(startAt, -OPENS_BEFORE_MIN))
             : current.checkInOpens,
+        // Dragging a plain weekly gathering from Friday to Saturday means it is
+        // now a Saturday gathering. A rule that names several days is left
+        // alone — see `retimeRecurrence`.
+        recurrence: startAt
+          ? retimeRecurrence(current.recurrence, parseLocal(current.start), startAt)
+          : current.recurrence,
       };
     });
   };
@@ -267,6 +300,17 @@ export function EventEditorModal({
         ...current,
         seriesId,
         title: picked.title,
+        // The series *is* a weekly pattern — that is what `dayOfWeek` means —
+        // so picking one fills the rule in rather than making somebody restate
+        // it directly underneath.
+        recurrence: {
+          frequency: 'weekly',
+          interval: 1,
+          weekdays: [picked.dayOfWeek],
+          monthlyMode: 'dayOfMonth',
+          until: null,
+          count: null,
+        },
         start: toDateTimeLocalValue(occurrence.startAt),
         end: toDateTimeLocalValue(occurrence.endAt),
         checkInOpens: toDateTimeLocalValue(occurrence.checkInOpensAt),
@@ -285,6 +329,7 @@ export function EventEditorModal({
       title: form.title.trim(),
       mode: form.mode,
       seriesId: form.mode === 'recurring' ? form.seriesId || null : null,
+      recurrence: form.mode === 'recurring' ? form.recurrence : null,
       startAt: times.startAt,
       endAt: times.endAt,
       checkInOpensAt: times.checkInOpensAt,
@@ -340,7 +385,9 @@ export function EventEditorModal({
       title={isEditing ? 'Edit event' : 'New event'}
       description={
         isEditing
-          ? 'Changes apply to this gathering only.'
+          ? form.mode === 'recurring'
+            ? 'Changes apply to the upcoming gathering and the ones after it.'
+            : 'Changes apply to this gathering only.'
           : 'Recurring gatherings predict their roster from past instances.'
       }
       footer={
@@ -375,7 +422,7 @@ export function EventEditorModal({
               : 'Only students who RSVP’d are on the roster, with waiver and payment warnings.'
           }
         >
-          <option value="recurring">Recurring — Friday / Sunday</option>
+          <option value="recurring">Recurring</option>
           <option value="oneoff">One-off — retreat, outing</option>
         </SelectField>
 
@@ -395,9 +442,18 @@ export function EventEditorModal({
           </SelectField>
         ) : null}
 
+        {/*
+          * "Next start" rather than "Starts", for a recurring gathering.
+          *
+          * The dates on a repeating event are the *coming* one, not the one it
+          * began at: every instance already held is its own document with the
+          * times it actually ran. Saying "next" is what makes an edit legible —
+          * moving a Friday night to 19:30 moves the Fridays still ahead, and
+          * leaves the attendance history alone.
+          */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <TextField
-            label="Starts"
+            label={form.mode === 'recurring' ? 'Next start' : 'Starts'}
             type="datetime-local"
             value={form.start}
             onChange={(changed) => handleStartChange(changed.target.value)}
@@ -405,7 +461,7 @@ export function EventEditorModal({
             required
           />
           <TextField
-            label="Ends"
+            label={form.mode === 'recurring' ? 'Next end' : 'Ends'}
             type="datetime-local"
             value={form.end}
             onChange={(changed) => handleEndChange(changed.target.value)}
@@ -413,6 +469,22 @@ export function EventEditorModal({
             required
           />
         </div>
+
+        {form.mode === 'recurring' ? (
+          <>
+            <p className="-mt-2 text-xs text-ink-500">
+              The upcoming gathering. Instances already held keep the times they ran at.
+            </p>
+
+            {/* Below the date on purpose: every option here is phrased from it. */}
+            <RecurrenceField
+              anchor={parseLocal(form.start)}
+              value={form.recurrence}
+              onChange={(recurrence) => patch({ recurrence })}
+              error={errors.recurrence ?? null}
+            />
+          </>
+        ) : null}
 
         <fieldset className="flex flex-col gap-4 rounded-xl bg-ink-950/40 p-3 ring-1 ring-ink-800">
           <legend className="px-1 text-xs font-bold uppercase tracking-wider text-ink-400">

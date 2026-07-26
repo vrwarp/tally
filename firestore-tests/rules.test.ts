@@ -419,6 +419,33 @@ describe('events', () => {
       setDoc(doc(db, paths.event('event-bad')), { ...eventDoc(), mode: 'retreat' }),
     );
   });
+
+  it('accepts an event that does not repeat', async () => {
+    const db = asUser(env, UID.core);
+    await assertSucceeds(
+      setDoc(doc(db, paths.event('event-plain')), { ...eventDoc(), recurrence: null }),
+    );
+  });
+
+  it('rejects a malformed recurrence rule', async () => {
+    const db = asUser(env, UID.core);
+    const base = eventDoc().recurrence!;
+
+    for (const recurrence of [
+      { ...base, frequency: 'fortnightly' },
+      { ...base, interval: 0 },
+      { ...base, interval: 'weekly' },
+      { ...base, weekdays: 'MO' },
+      { ...base, monthlyMode: 'whenever' },
+      // RFC 5545: an end date and an occurrence tally must not both apply.
+      { ...base, until: '2026-10-20', count: 13 },
+      'weekly',
+    ]) {
+      await assertFails(
+        setDoc(doc(db, paths.event('event-bad-recurrence')), { ...eventDoc(), recurrence }),
+      );
+    }
+  });
 });
 
 describe('attendance', () => {

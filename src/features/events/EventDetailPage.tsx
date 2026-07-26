@@ -27,6 +27,7 @@ import { EventEditorModal } from '@/features/events/EventEditorModal';
 import { RsvpManager } from '@/features/events/RsvpManager';
 import { useAttendance } from '@/hooks/useAttendance';
 import { useNow } from '@/hooks/useNow';
+import { describeRecurrence } from '@/lib/recurrence';
 import { formatClock, formatEventDay, formatEventWindow, isCheckInOpen } from '@/lib/time';
 import { cn, ordinalGrade } from '@/lib/utils';
 import { fetchAttendance } from '@/services/attendance';
@@ -181,6 +182,12 @@ export function EventDetailPage() {
 
           <dl className="divide-y divide-ink-800 border-t border-ink-800 pt-1">
             {seriesTitle ? <DetailRow label="Series" value={seriesTitle} /> : null}
+            {event.recurrence ? (
+              <DetailRow
+                label="Repeats"
+                value={describeRecurrence(event.recurrence, event.startAt)}
+              />
+            ) : null}
             {event.location ? <DetailRow label="Location" value={event.location} /> : null}
             <DetailRow
               label="Check-in"

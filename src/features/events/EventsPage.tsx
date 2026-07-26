@@ -204,6 +204,17 @@ export function EventsPage() {
         title: candidate.title,
         mode: 'recurring',
         seriesId: candidate.id,
+        // A series is a weekly slot by definition, so the editor opens on
+        // "Weekly on Friday" already filled in rather than on a blank pattern
+        // the leader would have to restate.
+        recurrence: {
+          frequency: 'weekly',
+          interval: 1,
+          weekdays: [candidate.dayOfWeek],
+          monthlyMode: 'dayOfMonth',
+          until: null,
+          count: null,
+        },
         defaultGroupingMode: candidate.defaultGroupingMode,
         ...occurrence,
       },
