@@ -124,6 +124,7 @@ holding screen, which is what a real volunteer sees before an admin adds them.
 | `npm run e2e:report` | Opens the last HTML report. |
 | `npm run walkthrough` | Captures the screenshot walkthrough from the running app and builds the page. |
 | `npm run functions:install` / `functions:build` | Dependency install / TypeScript build for `functions/`. |
+| `npm run functions:invokers` | Checks that every deployed callable still answers unauthenticated requests, and fixes the ones that do not. Run it when a callable starts failing in the browser with a CORS error — see [callable functions must allow unauthenticated invocations](docs/deployment-setup.md#callable-functions-must-allow-unauthenticated-invocations). |
 
 ### Why `typescript` is an alias
 
@@ -330,6 +331,12 @@ thing, without the checks: `npm run build && firebase deploy`.
 
 To deploy only one piece — e.g. after a rules-only change — use the Firebase CLI's `--only` flag
 directly: `npx firebase deploy --only firestore:rules`.
+
+Deploying by hand skips one thing CI does: `npm run functions:invokers`, which re-asserts that each
+callable's Cloud Run service still answers unauthenticated requests. A callable that has lost that
+binding fails in the browser as a CORS error and cannot be fixed from this repository — the details,
+and why it does not weaken authentication, are in
+[callable functions must allow unauthenticated invocations](docs/deployment-setup.md#callable-functions-must-allow-unauthenticated-invocations).
 
 The Firebase **web config in `.env` is not a secret** — `apiKey`, `projectId` and friends are shipped
 to every browser by design, and access control lives in `firestore.rules`, not in those values.

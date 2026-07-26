@@ -214,6 +214,70 @@ that can hand any principal access to the Planning Center token. Rotating the se
 slightly easier and the blast radius of a leaked key slightly worse; the grant above is the safer
 default.
 
+### Callable functions must allow unauthenticated invocations
+
+Not a setup step so much as a thing that can come undone later, with a symptom that points
+everywhere except at the cause. A call from the app dies in the browser with:
+
+```
+Access to fetch at 'https://us-central1-tally-76406.cloudfunctions.net/getPersonDetails'
+from origin 'https://tally.cfcchayward.org' has been blocked by CORS policy: Response to
+preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin'
+header is present on the requested resource.
+```
+
+Nothing in this repository can fix that, because the request never reaches the function. In Cloud
+Logging the same moment is an `OPTIONS` that got a **403** with *"Empty Authorization header
+value"*: a 2nd-gen callable is a Cloud Run service, and a Cloud Run service that does not grant
+`roles/run.invoker` to `allUsers` rejects the CORS preflight before the container sees it. A
+preflight carries no `Authorization` header — by specification, it cannot — so it is rejected every
+time, and the browser is never told why. `onCall` answers preflights itself and always has.
+
+**That binding is not what keeps callers out.** Authentication is the Firebase ID token inside the
+request, which `onCall` verifies and every function here then checks against Tally's own roles —
+`requireCoreTeam` on `getPersonDetails`, and its siblings elsewhere. "Allow unauthenticated
+invocations" means the door answers when knocked on, not that it is open; it is what
+[Firebase's own callable documentation](https://firebase.google.com/docs/functions/callable#deploying)
+requires. A signed-out caller still gets `unauthenticated`, and a door volunteer still gets
+`permission-denied` on a minor's parent's phone number.
+
+`firebase deploy` grants it when it **creates** a function and never re-checks it afterwards. So a
+binding removed later — an org-wide IAM tidy-up, a hand edit in the console, a policy sweep —
+survives every subsequent deploy, and the function stays broken while its code is plainly correct
+and CI is green.
+
+So the backend workflow asserts it after each deploy, and the same check runs by hand:
+
+```bash
+npm run functions:invokers
+```
+
+It reads every function Firebase labelled callable, adds the binding to any Cloud Run service
+missing it, and leaves the rest alone — idempotent, and safe to run at any time.
+`onStudentCreated` is untouched on purpose: Eventarc invokes it as the compute service account, it
+carries no callable label, and it must stay private. In CI the credential is
+`FIREBASE_SERVICE_ACCOUNT_TALLY_BACKEND`, whose `roles/cloudfunctions.admin` already carries the
+Cloud Run permissions this needs; run by hand it uses whoever `gcloud auth login` left behind. If
+the write 403s for a *permission* reason, `roles/run.admin` on the project is the direct grant.
+
+One service at a time, without this repository, is:
+
+```bash
+gcloud run services add-iam-policy-binding getpersondetails \
+  --region us-central1 --project tally-76406 \
+  --member=allUsers --role=roles/run.invoker
+```
+
+Note the service name is the **function name lowercased** — `getpersondetails`, not
+`getPersonDetails`.
+
+The one failure no credential can fix is an organisation policy: with
+`constraints/iam.allowedPolicyMemberDomains` enforced, `allUsers` cannot be granted anything, and
+the call is refused however it is made. Then the choice is to exempt this project from the
+constraint, or to serve the callables through a Firebase Hosting rewrite and give the Hosting
+service agent the invoker role instead — a larger change than it sounds, since it moves every
+callable's URL.
+
 ### The artifact cleanup policy
 
 Every functions deploy builds a container image and leaves it in Artifact Registry, so without a
