@@ -2,7 +2,7 @@
   "name": "tally-functions",
   "private": true,
   "version": "0.1.0",
-  "description": "Planning Center People integration for Tally: the scheduled roster sync, write-back and access provisioning.",
+  "description": "Planning Center People integration for Tally: on-demand roster reads, write-back and access provisioning.",
   "type": "module",
   "main": "lib/index.js",
   "engines": {

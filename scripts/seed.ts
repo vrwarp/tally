@@ -342,7 +342,7 @@ const BASE_PROPENSITY: Record<Band, number> = {
 };
 
 /* -------------------------------------------------------------------------- */
-/* The team (Planning Center allowlist)                                        */
+/* The team (in Planning Center)                                               */
 /* -------------------------------------------------------------------------- */
 
 interface SeedTeamMember {
@@ -354,9 +354,13 @@ interface SeedTeamMember {
 }
 
 /**
- * `accessRoster` is normally written by the Planning Center sync. Seeding it by
- * hand is what lets the `provisionAccess` flow be exercised in the emulator with
- * no token: sign in as one of these addresses and Tally provisions the profile.
+ * The team, as Planning Center knows them.
+ *
+ * `provisionAccess` asks Planning Center who a person is at the moment they sign
+ * in, so these go into the simulator rather than into Firestore (see
+ * `simulatorPayload`). That is what lets the whole sign-in flow be exercised in
+ * the emulator with no token: sign in as one of these addresses and Tally
+ * provisions the profile with the role below.
  */
 const SEED_TEAM: readonly SeedTeamMember[] = [
   {

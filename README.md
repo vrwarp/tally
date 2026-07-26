@@ -44,22 +44,35 @@ You need Node 20+ and a JDK (the Firebase emulators are Java).
 
 ```bash
 npm install                 # app dependencies
-npm run functions:install   # Cloud Functions dependencies
+npm run functions:install   # Cloud Functions dependencies — a separate npm package, see below
 npm run dev:emulated        # builds functions, starts the emulators, starts Vite
 ```
 
 That leaves the app on <http://localhost:5173> and the Emulator UI on <http://127.0.0.1:4000>.
 
-In a second terminal, fill the emulators with a believable ministry:
+**You also need the Planning Center simulator running.** Tally holds no copy of the church's people:
+the roster, every profile, and the answer to "may this person sign in" all come from Planning Center
+through a Cloud Function. Locally that is a bundled in-memory stand-in, and nothing starts it for
+you. In a second terminal:
+
+```bash
+npm run pco-sim       # http://127.0.0.1:4010, needs no account and no token
+```
+
+Then, in a third, fill both the emulators and the simulator with a believable ministry:
 
 ```bash
 npm run seed          # then, to see the roster logic working on it:
 npm run verify:seed
 ```
 
-The seed refuses to run against anything whose project id does not start with `demo-`, so it cannot
-be pointed at a real project by accident, and it checks that an emulator is actually listening before
-it writes anything. It prints what it created and which fake team addresses you can sign in as.
+`npm run seed` writes events, attendance and RSVPs into Firestore, and pushes the students and the
+team into the simulator — because that is where people live. It refuses to run against anything whose
+project id does not start with `demo-`, so it cannot be pointed at a real project by accident, and it
+checks that an emulator is actually listening before it writes anything. If the simulator is not up
+it says so loudly and carries on with Firestore, because an empty check-in screen with no explanation
+looks exactly like a broken app. It prints what it created and which fake team addresses you can sign
+in as.
 
 `verify:seed` reads the seeded data back and re-derives the product's own claims from it — how far
 the predictive roster narrows the list, that Friday and Sunday histories stay independent, and what
@@ -81,12 +94,14 @@ The Auth emulator never sends mail. It prints the magic link instead, so "check 
 3. Open the link **in the same browser you requested it from**. Firebase stores the address in
    `localStorage` to prevent session fixation; a different browser will prompt you to retype it.
 4. You land back on the app as a signed-in stranger with no `users/{uid}` document. Tally calls the
-   `provisionAccess` Cloud Function, which matches your address against the seeded `accessRoster`
-   and creates the profile. This is why the functions emulator has to be running — `npm run dev:emulated`
-   builds and starts it for you, plain `npm run emulators` will not have compiled it.
+   `provisionAccess` Cloud Function, which asks Planning Center — the simulator, locally — whether
+   that address belongs to the team, and creates the profile with the role it gets back. This is why
+   the functions emulator has to be running (`npm run dev:emulated` builds and starts it for you;
+   plain `npm run emulators` will not have compiled it) **and** why the simulator has to be running
+   and seeded. Without it the answer is an honest "not on the roster".
 
 **Continue with Google** works too: the emulator shows a fake account chooser, and everything after
-that follows the same `accessRoster` path.
+that follows the same `provisionAccess` path.
 
 ---
 
@@ -104,11 +119,12 @@ that follows the same `accessRoster` path.
 | `npm test` | Unit tests (Vitest, jsdom) — the pure logic and the components. |
 | `npm run test:watch` | The same, in watch mode. |
 | `npm run test:rules` | Boots the Firestore emulator and runs the security-rules suite against it. |
-| `npm run test:functions` | The Cloud Functions suite (mapping, sync, access), no emulator needed. |
+| `npm run test:functions` | The Cloud Functions suite (mapping, roster reads, cache, write-back, access), no emulator needed — it drives the real client against the simulator in-process. |
 | `npm run test:all` | All three, in that order. |
 | `npm run emulators` | Emulator Suite with an empty datastore, exporting to `./.emulator-data` on exit. |
 | `npm run emulators:resume` | The same, but importing `./.emulator-data` first so seeded data survives a restart. |
-| `npm run seed` | Fills the emulators with the demo ministry. |
+| `npm run pco-sim` | The Planning Center simulator on port 4010. Needed for anything involving people — the roster and sign-in both read through it locally. Not started by `dev:emulated`. |
+| `npm run seed` | Fills the emulators *and* the simulator with the demo ministry. |
 | `npm run verify:seed` | Re-derives the roster and dashboard from the seeded data, as an end-to-end check. |
 | `npm run e2e` | Playwright end-to-end suite: chromium and webkit, desktop and phone. |
 | `npm run e2e:install` | Downloads the browsers matching the pinned Playwright version. |
@@ -139,11 +155,91 @@ is therefore 7.x and `tsc6` is 6.x.
 | `src/hooks/` | Live-data hooks: active event, series history, attendance, RSVPs, ticking clock. |
 | `src/features/` | One folder per screen: `auth`, `checkin`, `dashboard`, `events`, `students`, `settings`, `roster`. |
 | `src/components/ui/` | The design system: buttons, fields, modals, badges, cards, empty and loading states. |
-| `functions/src/` | The Planning Center integration: API client, mapping, pull, write-back, access provisioning. |
+| `functions/` | The Cloud Functions package — **its own npm package**, see below. |
+| `functions/src/` | The Planning Center integration: API client, mapping, on-demand reads, write-back, access provisioning. |
+| `tools/pco-simulator/` | An in-memory stand-in for the Planning Center API, shared by the functions' unit tests and the e2e suite. |
 | `tests/` | Unit tests and shared factories. |
 | `firestore-tests/` | Security-rules tests, run against the emulator. |
 | `scripts/` | `seed.ts`, the emulator data set. |
+| `e2e/` | Playwright suite. |
 | `docs/` | [Planning Center operations](docs/planning-center.md) and the [data model](docs/data-model.md). |
+
+### `functions/` is a separate npm package
+
+Not a workspace — a genuinely separate package with its own `package.json`, its own `node_modules`,
+its own `tsconfig.json` and its own Vitest config. That is a Firebase convention rather than a taste:
+`firebase.json` names `functions` as the deploy source and the CLI installs and builds it in place,
+so its dependency tree has to stand alone.
+
+What follows from that, and catches people out:
+
+- **`npm install` at the root does not install it.** Run `npm run functions:install` too. A fresh
+  clone that skips it fails at `npm run dev:emulated` with missing `firebase-admin`.
+- **It has its own test command.** `npm test` at the root runs the app suite only; the functions
+  suite is `npm run test:functions`. `npm run test:all` runs both plus the rules suite.
+- **It is built, not transpiled on the fly.** `npm run dev:emulated` runs `functions:build` first,
+  and `firebase.json`'s `predeploy` hook does the same on deploy. Editing `functions/src` while the
+  emulator is running has no effect until you rebuild.
+- **It has its own TypeScript.** The root aliases `typescript` for typescript-eslint's sake (see
+  above); `functions/` does not, and compiles with plain `tsc`.
+- **It configures itself from files the app never reads** — see [Configuration](#configuration).
+
+---
+
+## Configuration
+
+Two independent config surfaces, because Tally is two deployables. The browser bundle is configured
+by Vite at build time from `.env*` files at the root; the Cloud Functions are configured by the
+Firebase CLI from `.env*` files inside `functions/`. They share no variables and are never read by
+the same process.
+
+### The app (root)
+
+| File | Committed? | Read when | Holds |
+| --- | --- | --- | --- |
+| `.env.example` | yes | never — it is a template | The shape of `.env.local`. |
+| `.env.local` | no | `npm run dev`, `npm run build` | `VITE_FIREBASE_CONFIG`, the web config object as one line of JSON. |
+| `.env.emulated` | yes | `vite --mode emulated` (`npm run dev:emulated`) | Emulator hosts and ports. No project config needed at all. |
+
+The Firebase **web config is not a secret** — `apiKey`, `projectId` and friends are shipped to every
+browser by design, and access control lives in `firestore.rules`, not in those values. `.env.local`
+is gitignored anyway, because it is per-developer rather than because it is sensitive.
+
+### The functions (`functions/`)
+
+Every parameter is declared in [`functions/src/config.ts`](functions/src/config.ts) with
+`defineString`/`defineSecret`. That file is the source of truth for names and defaults; the files
+below only supply values, and which one applies depends on how the functions are being run. `config.ts`
+also falls back to `process.env`, which is how `playwright.config.ts` overrides the API base URL for
+a test run.
+
+| File | Committed? | Read when | Holds |
+| --- | --- | --- | --- |
+| `functions/.env.demo-tally` | **yes, deliberately** | The emulator under the `demo-tally` project: `dev:emulated`, `e2e`, CI | Simulator settings. Not credentials — a `demo-` project id can only ever reach emulators, and the simulator accepts any Basic auth pair. |
+| `functions/.secret.local.example` | yes | never — it is a template | The shape of `.secret.local`, with every parameter documented. |
+| `functions/.secret.local` | no | The emulator, when it is running | A **real** Planning Center token, for pointing the emulator at your church's own data instead of the simulator. |
+| `functions/.env.<projectId>` | no | `firebase deploy` against that project | Non-secret params for a real deployment. CI writes `functions/.env.tally-76406` from the `FUNCTIONS_ENV` secret. |
+| Secret Manager | n/a | Deployed functions, at runtime | `PCO_APP_ID` and `PCO_SECRET`, and nothing else. |
+
+**Why `.env.demo-tally` and `.secret.local.example` both exist.** They look like duplicates and are
+not. The first is *data*: the Firebase CLI loads it by project id and it configures the simulator
+path, which is how everybody normally runs Tally locally. The second is a *template* for a file you
+create yourself when you need the emulator to talk to real Planning Center. Different mechanism,
+different purpose, and only one of them is ever read by a running emulator at a time.
+
+**`.env.demo-tally` has to be committed.** The CLI resolves the functions' params when it *starts*
+the emulator, before any function runs. With the file missing it stops and asks at the terminal; an
+emulator sitting on a prompt loads no functions at all, so `provisionAccess` answers 404 and every
+sign-in dies on "Could not reach the access service" after 30 seconds. `.gitignore` spells out a
+negation for it, because `.env.*` otherwise matches at every level.
+
+**Adding a parameter is a four-file change.** Declare it in `functions/src/config.ts`, add it to
+`functions/.env.demo-tally` (or the emulator will stop and ask), add it to
+`functions/.secret.local.example` (or nobody running against real data can discover it), and document
+it in [docs/planning-center.md](docs/planning-center.md#2-configuration-parameters).
+
+What each parameter *means* — roster modes, write-back, cache TTL, troubleshooting — is in
+**[docs/planning-center.md](docs/planning-center.md)**.
 
 ---
 
@@ -195,11 +291,22 @@ still narrows on the first keystroke.
 ## Planning Center
 
 Planning Center People is the system of record for *people*: students and counselors originate there,
-and a scheduled Cloud Function pulls them into Firestore rather than asking anyone to maintain a
-second roster. Counselor authorisation comes from the same place — a person in Planning Center
-becomes an `accessRoster/{emailKey}` document, which the `provisionAccess` callable exchanges for a
-`users/{uid}` profile the first time they sign in. Tally writes back only what the church asked for:
-by default it creates a Person for a quick-added visitor and changes nothing else.
+and Tally reads them when it needs them rather than asking anyone to maintain a second roster.
+
+**Tally keeps no copy.** There is no scheduled sync and no mirrored roster collection — every screen
+that shows a person is answered by a Cloud Function that asks Planning Center and holds the answer
+for at most `PCO_CACHE_TTL_SECONDS` (default 30). That replaced a sweep that copied every person in
+the church into Firestore, which was a lot of machinery, and a lot of stored personal data about
+minors, to answer questions as small as "what grade is Marcus in".
+
+Counselor authorisation comes from the same place, and just as live: `provisionAccess` asks Planning
+Center whether the address that just signed in belongs to the team, and exchanges the answer for a
+`users/{uid}` profile. Tally stores no list of church staff email addresses at all. Write-back is
+only what the church asked for: by default it creates a Person for a quick-added visitor and changes
+nothing else.
+
+The one thing Tally still owns about a person is what Planning Center has no opinion about — which
+small group they are in, and when they first turned up.
 
 Setup, configuration parameters, role mapping and troubleshooting live in
 **[docs/planning-center.md](docs/planning-center.md)**.
@@ -277,8 +384,10 @@ The Firebase **web config in `.env` is not a secret** — `apiKey`, `projectId` 
 to every browser by design, and access control lives in `firestore.rules`, not in those values.
 
 The Planning Center Personal Access Token **is** a secret. It lives in Secret Manager in production
-and in `functions/.secret.local` (gitignored) for the emulator. It never reaches the browser, which
-is why every call into Planning Center goes through a Cloud Function.
+and, only if you have chosen to run the emulator against real Planning Center data, in
+`functions/.secret.local` (gitignored). It never reaches the browser, which is why every call into
+Planning Center goes through a Cloud Function. See [Configuration](#configuration) for the full set
+of files and which one applies when.
 
 ### Deploying from CI
 
@@ -332,14 +441,15 @@ rules it deploys on merge with no prompt.
 - `VITE_FIREBASE_CONFIG` — the web config object as one line of JSON, the same value
   `.env.local` holds. Vite embeds it at build time, so the Hosting workflows need it even
   though it is not a secret.
-- `FUNCTIONS_ENV` — the contents of your local, gitignored `functions/.env`: the Planning Center
-  settings (`PCO_ROSTER_SOURCE`, the list ids, the grade range, and so on — not `PCO_APP_ID` or
-  `PCO_SECRET`, which live in Secret Manager). The backend workflow writes it to
-  `functions/.env.tally-76406` before deploying, because the CLI resolves the `defineString`
-  params in `functions/src/config.ts` from that file and stops to ask when it is missing, whatever
-  defaults the code declares — the same trap `functions/.env.demo-tally` documents for the
-  emulator. Keeping it in a secret rather than the repository keeps the ministry's list ids out of
-  git history.
+- `FUNCTIONS_ENV` — the deploy-time Planning Center settings for `tally-76406`, as the literal
+  contents of a `.env` file: `PCO_ROSTER_SOURCE`, the list ids, the grade range,
+  `PCO_CACHE_TTL_SECONDS` and so on — **not** `PCO_APP_ID` or `PCO_SECRET`, which live in Secret
+  Manager. Use `functions/.secret.local.example` as the list of what can go in it, minus the two
+  credentials. The backend workflow writes it to `functions/.env.tally-76406` before deploying,
+  because the CLI resolves the `defineString` params in `functions/src/config.ts` from that file and
+  stops to ask when it is missing, whatever defaults the code declares — the same trap
+  `functions/.env.demo-tally` documents for the emulator. Keeping it in a secret rather than the
+  repository keeps the ministry's list ids out of git history.
 
 ---
 
@@ -358,10 +468,20 @@ number or email, medical information beyond a single allergy line, or any paymen
 retreat payment is a boolean and an amount, never a card number. Nothing is stored that would not
 already be on a church check-in card.
 
-Students are never deleted. Removing one would orphan attendance history that other records point
-at, so leaving the ministry sets `status: 'inactive'` instead. If a family asks for their child's
-record to be removed, delete the person in Planning Center — the next full sync deactivates the Tally
-record — and then remove the student document and its attendance rows directly.
+Most of that list is not Tally's to hold. Names, grades, parent contact and allergies live in
+Planning Center and are read when needed; `students/{id}` holds only what Tally owns — small group,
+notes, when they first turned up — plus the complete record for a quick-added visitor who does not
+exist upstream yet.
+
+A student who leaves the ministry is marked inactive in Planning Center and simply stops coming back
+in the roster read. Nothing in Tally deletes them, and that is deliberate: attendance history at
+`events/{id}/attendance/{studentId}` is keyed by student id and has to outlive the roster entry, or
+the head count for past events silently drops.
+
+If a family asks for their child's record to be removed: delete the person in Planning Center, which
+takes effect on the next read (at most `PCO_CACHE_TTL_SECONDS`), and then delete the `students/{id}`
+document and their attendance and RSVP rows directly. There is no sweep that will do the second half
+for you.
 
 Access is not a matter of knowing the URL: signing in grants nothing on its own. Every read requires
 an active `users/{uid}` document whose role Planning Center governs, and the security rules in
