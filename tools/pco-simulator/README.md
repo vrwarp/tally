@@ -41,15 +41,20 @@ Access Token) and can be overridden with `PCO_APP_ID` / `PCO_SECRET`.
 - HTTP Basic auth, returning 401 on a bad token
 - 429 with `Retry-After`, and arbitrary injected failures
 
-Three pagination shapes are selectable, because the client supports all three
-and one that silently handled only `links.next` would look fine right up until
+Four pagination shapes are selectable, because the client supports all four and
+one that silently handled a single shape would look fine right up until
 Planning Center sent something else:
 
 | `pagination` | Behaviour |
 | --- | --- |
-| `links` (default) | Advertises `links.next` |
+| `links` (default) | Advertises `links.next` as a *relative* path — `/people/v2/people?offset=100`, which is what the real API sends |
+| `absolute-links` | Advertises `links.next` as a whole URL, as a link-rewriting proxy would |
 | `meta` | Advertises `meta.next.offset` |
 | `no-cursor` | Advertises nothing; the client must keep walking while pages come back full |
+
+The default used to be the absolute form, and it was the single most expensive
+inaccuracy in here: `fetch` refuses a relative URL, so every roster larger than
+one page failed on page two in production while every test passed.
 
 ### Faithful in the awkward places
 

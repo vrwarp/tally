@@ -67,7 +67,7 @@ describe('PcoClient against the simulator', () => {
      * page rather than truncating it, so a length check would pass while the
      * sync quietly processed the same students twice.
      */
-    it.each(['links', 'meta', 'no-cursor'] as const)(
+    it.each(['links', 'absolute-links', 'meta', 'no-cursor'] as const)(
       'walks the whole collection when the API advertises the next page via %s',
       async (pagination) => {
         const { client, store } = harness({ pagination, pageSize: 4 });

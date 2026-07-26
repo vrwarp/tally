@@ -59,8 +59,9 @@ export async function startSimulator(
   const basePath = (options.basePath ?? DEFAULT_BASE_PATH).replace(/\/+$/, '');
   const host = options.host ?? '0.0.0.0';
   const advertisedHost = host === '0.0.0.0' ? '127.0.0.1' : host;
-  // Pagination links have to be absolute and reachable by the caller, so the
-  // store is told the address it will actually be dialled on.
+  // `links.self`, and `links.next` under `absolute-links`, have to be reachable
+  // by the caller, so the store is told the address it will actually be dialled
+  // on.
   const store = new SimulatorStore({
     ...options,
     publicUrl:

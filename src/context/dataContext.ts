@@ -1,5 +1,12 @@
 import { createContext, useContext } from 'react';
-import type { AppSettings, EventSeries, SmallGroup, Student, TallyEvent } from '@/types';
+import type {
+  AppSettings,
+  EventSeries,
+  PcoErrorReport,
+  SmallGroup,
+  Student,
+  TallyEvent,
+} from '@/types';
 
 /**
  * App-wide live data.
@@ -34,8 +41,13 @@ export interface DataContextValue {
    * Set when Planning Center could not be reached. The roster may still hold
    * a copy from a previous session, so this is a warning rather than an empty
    * screen — `rosterOffline` says which.
+   *
+   * The whole report rather than a sentence, because the roster is the one read
+   * whose failure looks *exactly* like success: no names came back, so the
+   * screens draw an empty roster. Somebody has to be able to forward the status
+   * code and the URL — see `@/components/RosterErrorBanner`.
    */
-  rosterError: string | null;
+  rosterError: PcoErrorReport | null;
   /** True when what is on screen came from this device, not from the network. */
   rosterOffline: boolean;
   /** When Planning Center was last successfully read. */
