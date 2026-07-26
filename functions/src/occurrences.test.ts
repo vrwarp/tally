@@ -7,7 +7,7 @@
  * night forever. Chiefly: running it twice must write nothing the second time.
  */
 import { describe, expect, it } from 'vitest';
-import { materializeDueOccurrences, EVENTS } from './occurrences.js';
+import { materializeDueOccurrences, EVENTS, MINISTRY_TIME_ZONE } from './occurrences.js';
 import { SILENT_LOGGER } from './firestore.js';
 import { FakeFirestore } from './testing/fakeFirestore.js';
 
@@ -227,20 +227,44 @@ describe('materializeDueOccurrences', () => {
   it('writes wall-clock times in the ministry\'s timezone, not the container\'s', async () => {
     // The failure this guards: a Cloud Functions container is UTC, and the
     // expander builds dates with the local-time constructor. Without the TZ the
-    // entry point sets, a 19:00 Friday would be written as 19:00 UTC — an
-    // afternoon in New York, and a different calendar day either side of a DST
-    // change.
+    // entry point sets from MINISTRY_TIME_ZONE, a 19:00 Friday would be written
+    // as 19:00 UTC — lunchtime in Hayward, and the wrong calendar day either
+    // side of a clock change.
     const original = process.env.TZ;
     try {
-      process.env.TZ = 'America/New_York';
+      process.env.TZ = MINISTRY_TIME_ZONE;
       const friday = new Date(2026, 6, 24, 19, 0);
       const db = new FakeFirestore();
       db.seed(`${EVENTS}/friday-fellowship-2026-07-24`, eventDoc({ startAt: friday }));
 
       await materializeDueOccurrences(db, friday, SILENT_LOGGER);
 
+      // 19:00 Pacific on the Friday, which is 02:00Z the next morning.
       const next = db.get(`${EVENTS}/friday-fellowship-2026-07-31`)?.startAt as Date;
-      expect(next.toISOString()).toBe('2026-07-31T23:00:00.000Z');
+      expect(next.toISOString()).toBe('2026-08-01T02:00:00.000Z');
+    } finally {
+      process.env.TZ = original;
+    }
+  });
+
+  it('holds the same evening across the autumn clock change', async () => {
+    // Pacific goes back an hour on 1 November 2026. A 19:00 gathering on the
+    // Friday before has to still be a 19:00 gathering on the Friday after —
+    // the whole reason dates are built locally rather than by adding 604800000
+    // milliseconds to the last one.
+    const original = process.env.TZ;
+    try {
+      process.env.TZ = MINISTRY_TIME_ZONE;
+      const beforeChange = new Date(2026, 9, 30, 19, 0); // Fri 30 Oct, PDT
+      const db = new FakeFirestore();
+      db.seed(`${EVENTS}/friday-fellowship-2026-10-30`, eventDoc({ startAt: beforeChange }));
+
+      await materializeDueOccurrences(db, beforeChange, SILENT_LOGGER);
+
+      const after = db.get(`${EVENTS}/friday-fellowship-2026-11-06`)?.startAt as Date;
+      expect(after.getHours()).toBe(19);
+      // An hour further from UTC than the one before it: PDT became PST.
+      expect(after.toISOString()).toBe('2026-11-07T03:00:00.000Z');
     } finally {
       process.env.TZ = original;
     }

@@ -32,6 +32,22 @@ import { toDateOrNull, type FirestoreLike, type FunctionLogger } from './firesto
 export const EVENTS = 'events';
 
 /**
+ * Where the ministry is, as an IANA timezone.
+ *
+ * Load-bearing, not decoration. Every date here is built with the local-time
+ * `Date` constructor so a rule means the same wall-clock evening across a DST
+ * boundary — but a Cloud Functions container runs in UTC, where "19:00 Friday"
+ * would be written as a Friday lunchtime in Hayward, and would land on the
+ * wrong calendar day either side of a clock change. The entry point sets
+ * `process.env.TZ` from this before the sweep runs.
+ *
+ * A constant rather than a deploy-time parameter: Footprints is one ministry in
+ * one place, and a setting nobody will ever change is a setting that can be
+ * wrong in an environment nobody thought to check.
+ */
+export const MINISTRY_TIME_ZONE = 'America/Los_Angeles';
+
+/**
  * How far back to bother reading.
  *
  * Each chain is copied forward from its most recent live instance, so history

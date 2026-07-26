@@ -18,9 +18,9 @@ import { logger, setGlobalOptions } from 'firebase-functions/v2';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
-import { MINISTRY_TIME_ZONE, PCO_SECRETS, resolveConfig, type PcoConfig } from './config.js';
+import { PCO_SECRETS, resolveConfig, type PcoConfig } from './config.js';
 import { asFirestoreLike, PATHS, type FirestoreLike } from './firestore.js';
-import { materializeDueOccurrences } from './occurrences.js';
+import { materializeDueOccurrences, MINISTRY_TIME_ZONE } from './occurrences.js';
 import { createPcoClient, PcoApiError, type PcoClient } from './pco/client.js';
 import { describePcoFailure } from './pco/debug.js';
 import { fetchListMemberIds, fetchLists, type PcoListSummary } from './pco/lists.js';
@@ -735,8 +735,8 @@ export const onStudentCreated = onDocumentCreated(
  * `MINISTRY_TIME_ZONE` is what makes a "19:00 Friday" gathering land at 19:00.
  * The expander builds every date with the local-time `Date` constructor, and a
  * Cloud Functions container is UTC, which either side of a DST change would put
- * a Friday evening on a Saturday morning. It governs both when this fires and —
- * via `process.env.TZ` below — what the handler's own date arithmetic means.
+ * a Friday evening on the wrong day. It governs both when this fires and — via
+ * `process.env.TZ` below — what the handler's own date arithmetic means.
  *
  * Writing here bypasses the security rules, which are otherwise the only gate
  * on creating an event. That is deliberate and narrow: the payload is derived
@@ -753,10 +753,9 @@ export const materializeOccurrences = onSchedule(
   },
   async () => {
     // `timeZone` above schedules the run; this is what makes the dates it
-    // *writes* come out in the same zone. Set inside the handler because params
-    // cannot be read at module load, and safe to set globally because a v2
+    // *writes* come out in the same zone. Safe to set globally because a v2
     // function is its own service — nothing else shares this container.
-    process.env.TZ = MINISTRY_TIME_ZONE.value();
+    process.env.TZ = MINISTRY_TIME_ZONE;
 
     const result = await materializeDueOccurrences(db(), new Date(), logger);
     logger.info('Occurrence sweep finished', result);
