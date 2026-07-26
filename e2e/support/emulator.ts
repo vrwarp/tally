@@ -13,9 +13,9 @@ const FIRESTORE_ROOT =
 
 /**
  * The emulator's admin token. Tests read collections the security rules
- * deliberately deny to clients — `accessRoster` is the allowlist, so a client
- * that could read it could enumerate the team. Asserting through an admin
- * channel keeps the rules strict *and* the assertions honest.
+ * deliberately deny to clients — `users`, for one, since a client that could
+ * enumerate it could enumerate the team. Asserting through an admin channel
+ * keeps the rules strict *and* the assertions honest.
  */
 const ADMIN = { Authorization: 'Bearer owner' } as const;
 

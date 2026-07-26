@@ -10,7 +10,7 @@
 import type { Page } from '@playwright/test';
 import { E2E } from '../../playwright.config';
 
-/** Seeded by `scripts/seed.ts` into `accessRoster`. */
+/** Seeded by `scripts/seed.ts` into the Planning Center simulator. */
 export const TEAM = {
   admin: 'dana.ruiz@footprints.example.org',
   core: 'miriam.achebe@footprints.example.org',

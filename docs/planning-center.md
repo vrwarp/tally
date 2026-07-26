@@ -1,8 +1,12 @@
 # Planning Center People integration
 
 Planning Center People is the system of record for *people*. Students and counselors are created,
-edited and retired there; Tally pulls them in on a schedule and owns only what Planning Center has no
-concept of — attendance, small groups, RSVPs, waivers.
+edited and retired there; Tally reads them when it needs them and owns only what Planning Center has
+no concept of — attendance, small groups, RSVPs, waivers.
+
+Tally keeps no copy of the church's people. There is no scheduled sync and no mirrored roster
+collection: every screen that shows a person is answered by a Cloud Function that asks Planning
+Center, holding the answer for at most `PCO_CACHE_TTL_SECONDS`. See §6.
 
 This is the operational guide: how to get credentials, what every setting does, how counselor access
 actually flows, and what to do when it breaks. `functions/src/config.ts` is the source of truth for
@@ -21,14 +25,39 @@ Tally authenticates to Planning Center with a **Personal Access Token**, sent as
 4. Copy the **Application ID** and the **Secret**. Planning Center shows the secret exactly once.
 
 A Personal Access Token belongs to a *person* and inherits that person's People permissions. Create
-it under a shared office account rather than a volunteer's personal login, or the sync stops working
-the week they leave the church.
+it under a shared office account rather than a volunteer's personal login, or Tally stops being able
+to read the roster the week they leave the church.
 
-### Where the two values go
+### Where the settings live
 
-**For the emulator**, copy `functions/.secret.local.example` to `functions/.secret.local` and fill it
-in. That file is gitignored; the Firebase emulator loads it and binds each line to the matching
-`defineSecret` / `defineString` parameter, so local runs behave like production.
+Four places, and which one applies is decided by how the functions are being run — not by anything in
+the code. `functions/src/config.ts` declares every parameter; the files below only supply values.
+Use one local path or the other rather than both: `.env.demo-tally` and `.secret.local` are both read
+by the emulator, and there is no reason to make yourself guess which one won.
+
+| File | Committed? | Used when | Holds |
+| --- | --- | --- | --- |
+| `functions/.env.demo-tally` | **yes, deliberately** | The emulator, under the `demo-tally` project — `npm run dev:emulated`, `npm run e2e`, CI | Simulator settings only. No credentials: a `demo-` project id can only reach emulators, and the simulator accepts any Basic auth pair. |
+| `functions/.secret.local` | no (gitignored) | The emulator, when you want your church's **real** data instead of the simulator | Your real token and params. Copy from `functions/.secret.local.example`. |
+| `functions/.env.<projectId>` | no (gitignored) | `firebase deploy` against that project | Non-secret params for a real deployment. CI writes `functions/.env.tally-76406` from the `FUNCTIONS_ENV` repository secret. |
+| Secret Manager | n/a | Deployed functions at runtime | `PCO_APP_ID` and `PCO_SECRET` only. |
+
+`.env.demo-tally` **has to be committed.** The CLI resolves the params when it *starts* the Functions
+emulator, before any function runs. With the file missing it stops and asks at the terminal, an
+emulator sitting on a prompt loads no functions at all, and every sign-in dies on a 404 from
+`provisionAccess`. Add a param to `config.ts` and you must add it there too.
+
+**For the emulator against the simulator** — the normal way to work — there is nothing to do. That is
+what `.env.demo-tally` already configures; just start the simulator alongside the emulators:
+
+```bash
+npm run pco-sim         # in its own terminal
+npm run seed            # loads the demo ministry into it
+```
+
+**For the emulator against a real Planning Center account**, copy the example and fill it in. The
+emulator loads that file and binds each line to the matching `defineSecret` / `defineString`
+parameter, so local runs behave like production:
 
 ```bash
 cp functions/.secret.local.example functions/.secret.local
@@ -43,11 +72,9 @@ firebase functions:secrets:set PCO_SECRET
 firebase deploy --only functions        # prompts for any unset param
 ```
 
-Non-secret parameters can also be committed per project in `functions/.env.<projectId>`.
-
 Nothing here ever reaches the browser. Planning Center does not serve CORS headers for API clients
-anyway, so every call runs inside a Cloud Function and the app talks to it through the three
-callables in `src/services/functions.ts`.
+anyway, so every call runs inside a Cloud Function and the app talks to it through the callables in
+`src/services/functions.ts`.
 
 ---
 
@@ -58,17 +85,17 @@ callables in `src/services/functions.ts`.
 | `PCO_APP_ID` | *(secret, required)* | Personal Access Token application id. Sent as the HTTP Basic username. |
 | `PCO_SECRET` | *(secret, required)* | Personal Access Token secret. Sent as the HTTP Basic password. |
 | `PCO_ROSTER_SOURCE` | `grade` | How the youth roster is selected: `list` (a curated Planning Center List) or `grade` (everyone in the grade band). Any other value falls back to `grade`. |
-| `PCO_STUDENT_LIST_ID` | *(empty)* | The List whose members are the roster. **Required** when `PCO_ROSTER_SOURCE=list`; the sync refuses to run without it. The id is the number in the List's URL. |
-| `PCO_COUNSELOR_LIST_ID` | *(empty)* | Optional second List holding adult counselors and core team. Everyone on it with an email address becomes an `accessRoster` entry. Left blank, the team is derived from the non-youth people the main sweep saw, or failing that from Planning Center's own administrators. |
+| `PCO_STUDENT_LIST_ID` | *(empty)* | The List whose members are the roster. **Required** when `PCO_ROSTER_SOURCE=list`; the read refuses to run without it. The id is the number in the List's URL. |
+| `PCO_COUNSELOR_LIST_ID` | *(empty)* | Optional second List holding adult counselors and core team. This is the list `provisionAccess` looks a sign-in up against, so anyone who needs to use Tally at all belongs on it. Left blank, the team is derived from the non-youth people the roster read saw, or failing that from Planning Center's own administrators. |
 | `PCO_MIN_GRADE` | `6` | Bottom of the grade band. Clamped into 6–12, because those are the only grades the app's `Grade` type admits. |
 | `PCO_MAX_GRADE` | `12` | Top of the grade band. Clamped into `PCO_MIN_GRADE`–12. |
 | `PCO_WRITE_BACK` | `create` | How much Tally may change in Planning Center: `off`, `create` or `full`. See §4. Any other value falls back to `create`. |
-| `PCO_SYNC_SCHEDULE` | `every 6 hours` | Schedule for the background sync. App Engine cron syntax or `every N <unit>`. |
-| `PCO_SMALL_GROUP_FIELD` | *(empty)* | Name or slug of a Planning Center custom field holding a person's small-group name. When set, a counselor's access entry carries a slugified group id so Sunday School check-in opens pre-filtered. |
+| `PCO_CACHE_TTL_SECONDS` | `30` | How long a Planning Center read may be reused, in seconds. `0` disables reuse entirely; anything above `300` is clamped to `300`. See §6. |
+| `PCO_SMALL_GROUP_FIELD` | *(empty)* | Name or slug of a Planning Center custom field holding a person's small-group name. When set, a counselor's group comes back with their access check as a slugified id, so Sunday School check-in opens pre-filtered. |
 
 A missing or contradictory setting is a *configuration state*, not a crash: `loadConfig()` never
-throws, the sync writes a terminal `error` status carrying the exact problem, and the Settings screen
-names the value that is missing.
+throws, it carries a `configError` that every entry point checks first, and the Settings screen names
+the value that is missing rather than showing a counselor an opaque internal error.
 
 ---
 
@@ -98,8 +125,8 @@ with a blank grade would otherwise be swept into the student roster), so anyone 
 simply never appears, and nothing tells you.
 
 Grade mode also queries children only, which means it maps no counselors. Set
-`PCO_COUNSELOR_LIST_ID`, or the sync falls back to Planning Center's own administrators so a fresh
-install is not locked out of its own app.
+`PCO_COUNSELOR_LIST_ID`, or the team lookup falls back to Planning Center's own administrators so a
+fresh install is not locked out of its own app.
 
 ---
 
@@ -123,9 +150,9 @@ duplicates and Tally links to the lowest id rather than adding a third.
 
 The fields Planning Center owns once a student is linked are listed in `PCO_MANAGED_STUDENT_FIELDS`:
 first name, last name, grade, gender, allergies, status. The student editor shows them read-only with
-a "managed in Planning Center" note unless write-back is `full`, because editing them in Tally would
-just be overwritten on the next pull. Small group, notes, attendance and RSVP data are Tally's alone
-and are never written from the sync.
+a "managed in Planning Center" note unless write-back is `full`, because Planning Center is where
+they are read from and a Tally-side edit would simply not survive the next read. Small group, notes,
+attendance and RSVP data are Tally's alone and are never pushed upstream.
 
 ---
 
@@ -137,31 +164,40 @@ account become an admin.
 
 ```mermaid
 flowchart LR
-  A["Person in Planning Center<br/>counselor list, or the non-youth sweep"]
-    --> B["syncPeople<br/>scheduled Cloud Function"]
-  B --> C["accessRoster doc, keyed by email<br/>email · role · pcoPersonId · active"]
   D["Counselor signs in<br/>magic link or Google"] --> E["Firebase uid, no profile<br/>status: pending"]
   E --> F["provisionAccess<br/>callable"]
-  C --> F
+  F --> A["Planning Center, asked live<br/>counselor list, or the non-youth read"]
+  A --> F
   F --> G["users doc, keyed by uid<br/>role · active · assignedGroupId"]
   G --> H["status: ready"]
 ```
 
-1. The scheduled sync maps each team member to `accessRoster/{emailKey}`, where `emailKey` is the
-   lowercased address with `.` replaced by `,` (`sam.smith@example.org` → `sam,smith@example,org`).
-   A person with no email address is skipped, not failed: Tally authenticates by email, so there is
-   nothing to match a sign-in against.
-2. The counselor signs in. They now have a Firebase uid and no `users/{uid}` document, which the app
+1. The counselor signs in. They now have a Firebase uid and no `users/{uid}` document, which the app
    shows as "Checking your access".
-3. The app calls `provisionAccess`. It verifies the email was actually *proven* — a magic link or a
-   Google account, not an unverified password registration — looks the address up in `accessRoster`,
-   and creates the profile server-side. The role comes from the roster, never from anything the
-   caller sent.
-4. The live listener on `users/{uid}` flips the app to ready. No reload.
+2. The app calls `provisionAccess`. It verifies the email was actually *proven* — a magic link or a
+   Google account, not an unverified password registration — asks Planning Center for the person
+   with that address, and creates the profile server-side. The role comes from Planning Center, never
+   from anything the caller sent. A person with no email address there can never be matched: Tally
+   authenticates by email, so there is nothing to match a sign-in against.
+3. The live listener on `users/{uid}` flips the app to ready. No reload.
 
-Revoking works the same way in reverse: marking the person inactive in Planning Center sets
-`active: false` on the roster entry, and an admin flipping `active` on the user document takes effect
-mid-event without anyone reloading.
+**The lookup is live, and that is the point.** Tally used to mirror an `accessRoster` collection,
+refreshed by a scheduled sweep — which meant a volunteer added in Planning Center on Friday afternoon
+could not sign in until the next sweep, and a volunteer removed could still sign in until then too.
+Asking at the moment somebody knocks is both fresher and less to store: Tally now holds no list of
+church staff email addresses at all.
+
+A failure reaching Planning Center is deliberately *not* collapsed into "not on the roster". Those
+two outcomes look identical to a volunteer standing at the door and mean completely different things
+— one is "ask a leader to add you", the other is "the integration is down".
+
+**Revoke in Planning Center, not in Tally.** Marking the person inactive there makes the next
+`provisionAccess` call return `inactive` and refuse the profile. Clearing `active` on the
+`users/{uid}` document does take effect immediately — the live listener drops them mid-event with no
+reload — but it does not last: an inactive profile puts the app back in the `pending` state
+(`src/context/AuthProvider.tsx:398`), which calls `provisionAccess` again, which restores
+`active: true` for anyone Planning Center still says is active. Use it to eject someone right now,
+and Planning Center to keep them out.
 
 ### Role mapping
 
@@ -175,45 +211,63 @@ mid-event without anyone reloading.
 Manager and Editor are the people who already maintain the roster in Planning Center, which is why
 they are the two levels that imply the dashboard. Everyone else is a door volunteer.
 
-One deliberate exception: **a role already set in Tally wins over the roster's.** An admin who
-promoted a volunteer inside Tally must not be silently demoted by the next sync.
+One deliberate exception: **a role already set in Tally wins over Planning Center's.** An admin who
+promoted a volunteer inside Tally must not be silently demoted the next time that volunteer is
+provisioned.
 
 ---
 
-## 6. Sync cadence and the incremental cursor
+## 6. Freshness: a cache, not a cadence
 
-The scheduled function runs on `PCO_SYNC_SCHEDULE` (default every 6 hours). The core team can also
-force a run from Settings, which calls `syncPlanningCenterNow`.
+There is no schedule. Tally does not sweep Planning Center, does not mirror it into Firestore, and
+holds no cursor. Every screen that needs a person calls a function that asks Planning Center:
 
-Most runs are **incremental**. The sync records the maximum `Person.updated_at` it has ever observed
-in `config/pcoSync.cursor` and asks Planning Center only for people modified since
-(`where[updated_at][gt]`). On a few hundred students that is usually a single page.
+| Callable | Asks for | Called by |
+| --- | --- | --- |
+| `getRoster` | The whole youth roster | Check-in, roster, dashboard |
+| `getPersonDetails` | One person's profile and parent contact | A student's page |
+| `provisionAccess` | Is this email on the team, and as what | The sign-in handoff (§5) |
+| `getPlanningCenterStatus` | A real roster query, used as a health check | Settings → Planning Center |
 
-The cursor is advanced **only on success**. A run that throws half-way finishes with an `error`
-status and the previous cursor intact, so the next attempt re-reads from the last known-good point
-rather than skipping whatever it never got to.
+That design replaced a scheduled sweep that copied every person in the church into Firestore and kept
+the copy in step. It was a lot of machinery, and a lot of stored personal data about minors, to
+answer questions as small as "what grade is Marcus in". The trade it makes is a Planning Center
+round-trip on the cold path, and `PCO_CACHE_TTL_SECONDS` is what pays for it.
 
-A **full sweep** is promoted automatically when there is no cursor, no record of a previous full
-sweep, or the last one was more than 24 hours ago. It is not optional, because an incremental pull is
-defined by what *changed* and can therefore never see what *disappeared*: a student removed from the
-roster list, or a person deleted outright, produces no `updated_at` for anyone. Only a full sweep can
-notice that a linked student is no longer returned — at which point they are marked `inactive` in
-Tally. They are never deleted; the attendance history at `events/{id}/attendance/{studentId}` has to
-outlive them.
+**The cache.** A read is held in memory for `PCO_CACHE_TTL_SECONDS` (default 30, `0` to disable, hard
+ceiling 300). It exists for one shape of load: eight counselors opening the app in the same minute at
+the door, which without it is eight identical roster pulls. The ceiling is deliberately low — a cache
+measured in minutes is a mirror again, and a name corrected in Planning Center should show up on the
+next tap.
 
-Two more properties worth knowing:
+It lives in the function instance's memory, not in Firestore, which has two consequences worth
+knowing:
 
-- **No churn.** Every write is diffed against the stored document first, and an unchanged student
-  produces no write at all — not even a touched `pcoSyncedAt`. The app holds a live listener on the
-  whole roster, so a sweep that bumped 400 unchanged students would wake every counselor's phone for
-  nothing.
-- **No duplicates.** A student is keyed by `pcoPersonId`. A quick-added visitor who has not been
-  pushed yet is additionally matched on normalised name + grade, so the kid a counselor thumb-typed
-  as "Jose" at the door and the "José" the office entered on Monday collapse into one record.
+- **It is per-instance.** Two warm instances can hold two copies with different ages. This is fine at
+  a 30-second TTL and would not be at 30 minutes.
+- **`refreshPlanningCenter` is best-effort.** It drops the cache on whichever instance the call
+  happens to land on and does nothing for the others. "Refresh" in the app therefore does not rely on
+  it: it passes `force` on the read itself, which works wherever the read lands.
 
-Progress is written to `config/pcoSync`, throttled to one update every five seconds, and always lands
-on a terminal `ok` or `error` — a status stuck on `running` forever is indistinguishable from a hung
-integration.
+**What Tally still owns about a person** is only what Planning Center has no opinion about — which
+small group they are in, and when they first turned up. Those live in `students/{id}`, written only
+when Tally itself has something to record, so that collection is sparse rather than a mirror.
+
+**Nothing disappears.** With no sweep there is no pass that marks a departed student `inactive`: a
+person removed in Planning Center simply stops coming back in the roster read. Their attendance
+history at `events/{id}/attendance/{studentId}` stays exactly where it is, which is the point — it
+has to outlive them.
+
+**No duplicates.** A student read from Planning Center is keyed `pco_{personId}`, which can never
+collide with an id Tally minted for a visitor itself. A quick-added visitor who has not been pushed
+yet is additionally matched on normalised name + grade, so the kid a counselor thumb-typed as "Jose"
+at the door and the "José" the office entered on Monday collapse into one record.
+
+There is no `config/pcoSync` document and nothing subscribes to one. The old sweep wrote its progress
+into Firestore so a bar could follow it, which meant every core-team member's phone lit up on a
+schedule. A read has no progress to follow — Settings asks `getPlanningCenterStatus` instead, and
+that call runs the real roster query rather than a cheap ping, because "we can reach the API" and "we
+can see your students" are different claims and only the second is worth showing a leader.
 
 ---
 
@@ -235,8 +289,9 @@ account that already has it.
 
 **`429 Too Many Requests`** — Planning Center is rate limiting. Nothing to do: the client honours the
 `Retry-After` header, backs off exponentially up to 20 seconds, and retries four times before giving
-up. If it keeps happening, the roster source is probably too wide — a `PCO_ROSTER_SOURCE=grade`
-sweep pointed at a large church fetches one request per household. Switch to list mode. (The run is
+up. If it keeps happening, the roster source is probably too wide — a `PCO_ROSTER_SOURCE=grade` read
+pointed at a large church fetches one request per household. Switch to list mode, and consider
+raising `PCO_CACHE_TTL_SECONDS` so a busy door reuses one read instead of making several. (A read is
 also capped at 400 household fetches so a misconfiguration stops rather than billing for it.)
 
 **A student appears twice** — the name + grade match failed, so a quick-added visitor was never
@@ -252,11 +307,16 @@ surname typed one way at the door, or a grade that was off by one. To fix it by 
 5. To stop it recurring, make Planning Center's `first_name` (or nickname) match what counselors
    actually call the student, and correct the grade.
 
-**The sync says it is not configured** — `loadConfig()` refused to build a client. The message names
+**Settings says it is not configured** — `loadConfig()` refused to build a client. The message names
 the value: a missing `PCO_APP_ID` or `PCO_SECRET`, or `PCO_ROSTER_SOURCE=list` with no
-`PCO_STUDENT_LIST_ID`.
+`PCO_STUDENT_LIST_ID`. Locally, this is usually the emulator having been started before the settings
+file existed; the params are resolved at emulator start, so restart it after editing.
 
-**Nobody can sign in after a fresh install** — `accessRoster` is empty. In grade mode the sweep sees
-only children, so no team members are mapped; set `PCO_COUNSELOR_LIST_ID`. The fallback to Planning
-Center's own administrators exists for exactly this case, but only fires when the sweep produced no
-non-youth candidates at all.
+**Nobody can sign in after a fresh install** — Planning Center is returning no team members for
+`provisionAccess` to match against. In grade mode the read sees only children, so set
+`PCO_COUNSELOR_LIST_ID`. The fallback to Planning Center's own administrators exists for exactly this
+case, but only fires when the read produced no non-youth candidates at all.
+
+**Everyone is locked out locally** — the simulator is not running. Against `demo-tally` the roster
+and the team both come from `npm run pco-sim`, seeded by `npm run seed`; without it `provisionAccess`
+correctly reports that nobody is on the roster. `npm run dev:emulated` does not start it for you.
