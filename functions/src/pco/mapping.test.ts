@@ -10,7 +10,7 @@ import {
   nameGradeKey,
   normaliseGender,
   pcoGrade,
-  splitDisplayFirstName,
+  splitFirstName,
 } from './mapping.js';
 import type {
   JsonApiResource,
@@ -235,30 +235,30 @@ describe('displayFirstName', () => {
   });
 });
 
-describe('splitDisplayFirstName', () => {
+describe('splitFirstName', () => {
   it('undoes displayFirstName, so a name survives a round trip', () => {
     const attributes = { first_name: 'Benson', nickname: '蔡秉洲' };
-    expect(splitDisplayFirstName(displayFirstName(attributes))).toEqual({
+    expect(splitFirstName(displayFirstName(attributes))).toEqual({
       firstName: 'Benson',
       nickname: '蔡秉洲',
     });
   });
 
   it('leaves a plain name alone', () => {
-    expect(splitDisplayFirstName('Benson')).toEqual({ firstName: 'Benson', nickname: null });
-    expect(splitDisplayFirstName('  Mary Jane ')).toEqual({ firstName: 'Mary Jane', nickname: null });
+    expect(splitFirstName('Benson')).toEqual({ firstName: 'Benson', nickname: null });
+    expect(splitFirstName('  Mary Jane ')).toEqual({ firstName: 'Mary Jane', nickname: null });
   });
 
   it('reads straight quotes too, since a person may have typed them', () => {
-    expect(splitDisplayFirstName('Benson "蔡秉洲"')).toEqual({
+    expect(splitFirstName('Benson "蔡秉洲"')).toEqual({
       firstName: 'Benson',
       nickname: '蔡秉洲',
     });
   });
 
   it('treats a bare quoted name as the name itself', () => {
-    expect(splitDisplayFirstName('“Benji”')).toEqual({ firstName: 'Benji', nickname: null });
-    expect(splitDisplayFirstName('Benson “”')).toEqual({ firstName: 'Benson', nickname: null });
+    expect(splitFirstName('“Benji”')).toEqual({ firstName: 'Benji', nickname: null });
+    expect(splitFirstName('Benson “”')).toEqual({ firstName: 'Benson', nickname: null });
   });
 });
 

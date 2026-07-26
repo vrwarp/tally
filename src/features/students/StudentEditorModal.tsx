@@ -25,6 +25,8 @@ import { createStudent, updateStudent, type StudentDraft } from '@/services/stud
 import {
   GRADES,
   PCO_MANAGED_STUDENT_FIELDS,
+  composeFirstName,
+  splitFirstName,
   studentFullName,
   type Gender,
   type Grade,
@@ -41,8 +43,17 @@ function isPcoManaged(field: keyof Student): boolean {
   return (PCO_MANAGED_STUDENT_FIELDS as readonly string[]).includes(field);
 }
 
+/**
+ * `firstName` and `nickname` are two boxes here and one field on the student.
+ *
+ * Planning Center's own edit form splits them, and `Student.firstName` holds
+ * the composite it builds — so offering a single box would mean asking a leader
+ * to type the quotes themselves, and getting a name Planning Center cannot
+ * store back if they typed them wrong.
+ */
 interface FormState {
   firstName: string;
+  nickname: string;
   lastName: string;
   grade: Grade;
   gender: Gender;
@@ -53,6 +64,7 @@ interface FormState {
 
 const BLANK: FormState = {
   firstName: '',
+  nickname: '',
   lastName: '',
   grade: 9,
   gender: 'unspecified',
@@ -63,8 +75,10 @@ const BLANK: FormState = {
 
 function fromStudent(student: Student | null): FormState {
   if (!student) return BLANK;
+  const name = splitFirstName(student.firstName);
   return {
-    firstName: student.firstName,
+    firstName: name.firstName,
+    nickname: name.nickname ?? '',
     lastName: student.lastName,
     grade: student.grade,
     gender: student.gender,
@@ -110,15 +124,17 @@ export function StudentEditorModal({ open, onClose, student }: StudentEditorModa
     submitted.preventDefault();
     if (!user || saving) return;
 
-    const firstName = form.firstName.trim();
     const lastName = form.lastName.trim();
-    if (!firstName || !lastName) {
+    // Validated on the box the leader typed into; stored as the one composite
+    // field the rest of Tally — and Planning Center's display name — uses.
+    if (!form.firstName.trim() || !lastName) {
       setErrors({
-        firstName: firstName ? undefined : 'Required',
+        firstName: form.firstName.trim() ? undefined : 'Required',
         lastName: lastName ? undefined : 'Required',
       });
       return;
     }
+    const firstName = composeFirstName(form.firstName, form.nickname);
 
     setSaving(true);
     setSaveError(null);
@@ -209,29 +225,44 @@ export function StudentEditorModal({ open, onClose, student }: StudentEditorModa
           </p>
         ) : null}
 
-        <div className="grid grid-cols-2 gap-3">
-          <TextField
-            label="First name"
-            value={form.firstName}
-            onChange={(changed) => update('firstName', changed.target.value)}
-            error={errors.firstName ?? null}
-            hint={locked('firstName') ? managedHint : undefined}
-            disabled={locked('firstName')}
-            autoCapitalize="words"
-            autoComplete="off"
-            required
-          />
-          <TextField
-            label="Last name"
-            value={form.lastName}
-            onChange={(changed) => update('lastName', changed.target.value)}
-            error={errors.lastName ?? null}
-            hint={locked('lastName') ? managedHint : undefined}
-            disabled={locked('lastName')}
-            autoCapitalize="words"
-            autoComplete="off"
-            required
-          />
+        {/* First / Last, then Nickname beneath — the shape of Planning Center's
+            own edit form, so the two screens can be read side by side. */}
+        <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-2 gap-3">
+            <TextField
+              label="First name"
+              value={form.firstName}
+              onChange={(changed) => update('firstName', changed.target.value)}
+              error={errors.firstName ?? null}
+              hint={locked('firstName') ? managedHint : undefined}
+              disabled={locked('firstName')}
+              autoCapitalize="words"
+              autoComplete="off"
+              required
+            />
+            <TextField
+              label="Last name"
+              value={form.lastName}
+              onChange={(changed) => update('lastName', changed.target.value)}
+              error={errors.lastName ?? null}
+              hint={locked('lastName') ? managedHint : undefined}
+              disabled={locked('lastName')}
+              autoCapitalize="words"
+              autoComplete="off"
+              required
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <TextField
+              label="Nickname"
+              value={form.nickname}
+              onChange={(changed) => update('nickname', changed.target.value)}
+              hint={locked('firstName') ? managedHint : 'Optional. Shown beside the first name.'}
+              disabled={locked('firstName')}
+              autoCapitalize="words"
+              autoComplete="off"
+            />
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">

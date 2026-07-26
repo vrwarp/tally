@@ -20,7 +20,7 @@ import {
   compareIds,
   mapPersonToStudent,
   nameGradeKey,
-  splitDisplayFirstName,
+  splitFirstName,
 } from '../pco/mapping.js';
 import type { PcoPerson } from '../pco/types.js';
 import {
@@ -76,7 +76,7 @@ async function findExistingPerson(
   // The server's fuzzy `search_name` has never seen `Benson “蔡秉洲” Tsai` — it
   // indexes the halves — so it is asked for the plain name and the composite is
   // matched locally below.
-  const plainFirstName = splitDisplayFirstName(firstName).firstName;
+  const plainFirstName = splitFirstName(firstName).firstName;
   const body = await client.get<PcoPerson[]>('/people', {
     where: { search_name: `${plainFirstName} ${lastName}`, grade },
     per_page: SEARCH_PAGE_SIZE,
@@ -116,7 +116,7 @@ function createAttributes(data: Record<string, unknown>): Record<string, unknown
   // Tally holds Planning Center's *display* name, `Benson “蔡秉洲”`. Planning
   // Center holds the two halves separately and composes them itself, so they go
   // back the way they came.
-  const name = splitDisplayFirstName(readString(data, 'firstName') ?? '');
+  const name = splitFirstName(readString(data, 'firstName') ?? '');
   return {
     first_name: name.firstName,
     ...(name.nickname ? { nickname: name.nickname } : {}),
@@ -150,7 +150,7 @@ function driftedAttributes(
   // the same way Planning Center composes it — and only then split apart again
   // for the patch, so an unedited nickname is never rewritten.
   if (firstName && firstName !== mapped.firstName) {
-    const wanted = splitDisplayFirstName(firstName);
+    const wanted = splitFirstName(firstName);
     attributes.first_name = wanted.firstName;
     const held = readString(person.attributes ?? {}, 'nickname');
     if ((wanted.nickname ?? null) !== held) attributes.nickname = wanted.nickname ?? '';

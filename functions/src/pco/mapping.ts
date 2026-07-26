@@ -110,33 +110,34 @@ const NICKNAME_OPEN = '“';
 const NICKNAME_CLOSE = '”';
 
 /**
- * The first-name half of Planning Center's display name.
+ * The two halves, joined. A nickname equal to the first name is dropped rather
+ * than repeated — `Ben “Ben”` is noise.
  *
- * `given_name` is the legal-name fallback, present when `first_name` has been
- * overridden. A nickname equal to the first name is dropped rather than
- * repeated — `Ben “Ben”` is noise.
+ * Must stay identical to `composeFirstName` in src/types/index.ts.
  */
-export function displayFirstName(attributes: PcoPersonAttributes): string {
-  const legal = firstNonEmpty(attributes.first_name, attributes.given_name);
-  const nickname = trimmed(attributes.nickname);
+export function composeFirstName(firstName: unknown, nickname: unknown): string {
+  const legal = trimmed(firstName);
+  const nick = trimmed(nickname);
 
-  if (nickname === null) return legal ?? '';
-  if (legal === null) return nickname;
+  if (nick === null) return legal ?? '';
+  if (legal === null) return nick;
   // The first name is the canonical spelling of the two.
-  if (legal.toLowerCase() === nickname.toLowerCase()) return legal;
-  return `${legal} ${NICKNAME_OPEN}${nickname}${NICKNAME_CLOSE}`;
+  if (legal.toLowerCase() === nick.toLowerCase()) return legal;
+  return `${legal} ${NICKNAME_OPEN}${nick}${NICKNAME_CLOSE}`;
 }
 
 /**
- * The inverse, for write-back.
+ * The composite pulled apart again.
  *
- * Planning Center stores the two halves in separate fields, so pushing the
- * composite string into `first_name` would render as `Benson “蔡秉洲” “蔡秉洲” Tsai`
- * on the next read — and a moment later as a duplicate person, because the
- * matcher would stop recognising them. Anything without the quoted section
- * comes back unchanged, which covers every hand-typed visitor name.
+ * Planning Center stores the halves in separate fields, so pushing the whole
+ * string into `first_name` would render as `Benson “蔡秉洲” “蔡秉洲” Tsai` on the
+ * next read — and a moment later as a duplicate person, because the matcher
+ * would stop recognising them. Anything without the quoted section comes back
+ * unchanged, which covers every hand-typed visitor name.
+ *
+ * Must stay identical to `splitFirstName` in src/types/index.ts.
  */
-export function splitDisplayFirstName(value: string): { firstName: string; nickname: string | null } {
+export function splitFirstName(value: string): { firstName: string; nickname: string | null } {
   const match = /^(.*?)\s*[“"]([^”"]*)[”"]\s*$/.exec(value.trim());
   if (!match) return { firstName: value.trim(), nickname: null };
 
@@ -146,6 +147,19 @@ export function splitDisplayFirstName(value: string): { firstName: string; nickn
   // `“Benji”` with nothing in front of it is just a name in quotes.
   if (legal.length === 0) return { firstName: nickname, nickname: null };
   return { firstName: legal, nickname };
+}
+
+/**
+ * The first-name half of a Planning Center person's display name.
+ *
+ * `given_name` is the legal-name fallback, present when `first_name` has been
+ * overridden.
+ */
+export function displayFirstName(attributes: PcoPersonAttributes): string {
+  return composeFirstName(
+    firstNonEmpty(attributes.first_name, attributes.given_name),
+    attributes.nickname,
+  );
 }
 
 /** Must stay identical to `emailKey` in src/types/index.ts. */
