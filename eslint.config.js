@@ -6,7 +6,16 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 
 export default tseslint.config(
   {
-    ignores: ['dist', 'functions/lib', 'functions/node_modules', '.emulator-data', 'coverage'],
+    // `functions/src/generated` is a verbatim copy of files already linted at
+    // their origin in `src/lib`; linting it again only double-reports.
+    ignores: [
+      'dist',
+      'functions/lib',
+      'functions/node_modules',
+      'functions/src/generated',
+      '.emulator-data',
+      'coverage',
+    ],
   },
   {
     files: ['**/*.{ts,tsx}'],

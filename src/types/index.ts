@@ -332,69 +332,21 @@ export interface EventSeries extends EventSeriesDoc {
 /* Recurrence                                                                  */
 /* -------------------------------------------------------------------------- */
 
-/**
- * RFC 5545 `FREQ`, narrowed to the three a ministry calendar actually uses.
- *
- * There is deliberately no `daily`. "Daily on Monday and Wednesday" and "weekly
- * on Monday and Wednesday" are the same schedule, and offering both would mean
- * two controls that produce one result and a rule that cannot be matched back
- * to the option it came from. Every day is `weekly` with all seven days
- * selected — which is a legal `FREQ=WEEKLY;BYDAY=SU,MO,TU,WE,TH,FR,SA` — so
- * there is exactly one place to choose days.
+/*
+ * Defined in `lib/recurrenceCore.ts` rather than here, because that module is
+ * shared verbatim with the Cloud Functions and this one imports `Timestamp`
+ * from the *client* Firestore SDK, which the functions package does not have.
+ * Re-exported so `@/types` stays the import site for app code.
  */
-export type RecurrenceFrequency = 'weekly' | 'monthly' | 'yearly';
+export type {
+  MonthlyRecurrenceMode,
+  RecurrenceFrequency,
+  RecurrenceRule,
+} from '@/lib/recurrenceCore';
 
-/**
- * Which of the two readings of "monthly" a rule means, because a date is
- * ambiguous on its own:
- * `dayOfMonth` — RFC 5545 `BYMONTHDAY`. "the 21st", whatever weekday that is.
- * `dayOfWeek`  — RFC 5545 `BYDAY` with a position. "the third Tuesday".
- */
-export type MonthlyRecurrenceMode = 'dayOfMonth' | 'dayOfWeek';
-
-/**
- * How an event repeats — an RFC 5545 subset, *anchored on the event's own
- * `startAt`* rather than restating it.
- *
- * The anchoring is the whole design. A rule carries only what the start date
- * cannot imply: which weekdays a weekly rule fires on, and which reading of
- * "monthly" is meant. Day-of-month, the weekday position within the month, the
- * month of a yearly rule and the wall-clock time all come from `startAt`, so
- * moving the event moves its pattern with it and the two can never disagree.
- * That is also why the editor puts this control *below* the date: the options
- * do not exist until there is a date to phrase them against.
- *
- * Skip semantics follow the RFC: a rule that lands on a date the month has no
- * room for (day 31 in February, 29 February in a common year, a fifth Friday
- * in a month with four) skips that period rather than sliding to a neighbour.
- */
-export interface RecurrenceRule {
-  frequency: RecurrenceFrequency;
-  /** RFC 5545 `INTERVAL`. At least 1. */
-  interval: number;
-  /**
-   * RFC 5545 `BYDAY` for weekly rules. 0 = Sunday … 6 = Saturday, ascending.
-   * Empty for every other frequency.
-   */
-  weekdays: number[];
-  /** Only meaningful when `frequency` is `monthly`. */
-  monthlyMode: MonthlyRecurrenceMode;
-  /**
-   * RFC 5545 `UNTIL`, as an inclusive local calendar day `"YYYY-MM-DD"`.
-   *
-   * A day rather than an instant: "repeat until 20 October" is a date on a
-   * form, and storing it as a `Timestamp` would make the last occurrence
-   * depend on a time of day nobody chose. Null when the rule has no end date.
-   */
-  until: string | null;
-  /**
-   * RFC 5545 `COUNT` — total occurrences *including* the first one at
-   * `startAt`. Null when the rule is not bounded by a tally.
-   *
-   * Mutually exclusive with `until`, as the RFC requires.
-   */
-  count: number | null;
-}
+// A re-export does not bring the name into this file's own scope, and
+// `TallyEventDoc` below has a field of this type.
+import type { RecurrenceRule } from '@/lib/recurrenceCore';
 
 /* -------------------------------------------------------------------------- */
 /* Events                                                                      */

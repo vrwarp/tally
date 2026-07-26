@@ -58,6 +58,16 @@ export class FakeFirestore implements FirestoreLike {
       id: path.slice(path.lastIndexOf('/') + 1),
       path,
       get: async () => this.snapshot(path),
+      create: async (value) => {
+        // Mirrors the admin SDK, which rejects rather than overwriting. The
+        // occurrence job depends on that being the failure mode.
+        if (this.data.has(path)) {
+          const error = new Error(`ALREADY_EXISTS: ${path}`) as Error & { code?: number };
+          error.code = 6;
+          throw error;
+        }
+        this.write(path, value, false);
+      },
       set: async (value, options) => this.write(path, value, options?.merge === true),
       update: async (value) => this.write(path, value, true),
     };

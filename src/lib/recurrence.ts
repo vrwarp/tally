@@ -1,25 +1,26 @@
 /**
- * Recurrence rules: describing them, matching them to presets, and expanding
- * them into dates.
+ * Recurrence, as a leader reads and edits it: the sentence a rule becomes, the
+ * shortlist it is chosen from, and the defaults the editor starts on.
  *
- * The model is an RFC 5545 subset — `FREQ`, `INTERVAL`, `BYDAY`, `UNTIL`,
- * `COUNT` — with everything the anchor date already implies left out. See the
- * `RecurrenceRule` doc comment for why. In RRULE terms:
- *
- *   Daily                        FREQ=WEEKLY;BYDAY=SU,MO,TU,WE,TH,FR,SA
- *   Every 2 weeks on Mon, Wed    FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE
- *   Monthly on day 21            FREQ=MONTHLY;BYMONTHDAY=21     (21 from the anchor)
- *   Monthly on the third Tuesday FREQ=MONTHLY;BYDAY=3TU         (3 and TU from the anchor)
- *   Monthly on the last Friday   FREQ=MONTHLY;BYDAY=-1FR
- *   Annually on 21 July          FREQ=YEARLY                    (month/day from the anchor)
- *
- * Like `time.ts`, every function takes the dates it reasons about explicitly.
- * Nothing here reads the clock, and every date is built with the local-time
- * `Date` constructor so a rule means the same wall-clock evening across a DST
- * boundary — a Friday night youth group starts at 19:00 in November too.
+ * The model and the expansion live in `recurrenceCore.ts`, which has no imports
+ * so it can be shared verbatim with the Cloud Functions. Everything here needs
+ * `date-fns` or exists only for the form, so it stays on this side of that
+ * line. Core is re-exported below, so app code has one import site — nothing
+ * outside this file and the sync script should reach for `recurrenceCore`.
  */
 import { format } from 'date-fns';
-import type { RecurrenceFrequency, RecurrenceRule } from '@/types';
+import {
+  EVERY_WEEKDAY,
+  monthlyWeekdayPosition,
+  normalizeRecurrence,
+  recurrenceOccurrences,
+  toDateOnlyValue,
+  untilInstant,
+  type RecurrenceFrequency,
+  type RecurrenceRule,
+} from '@/lib/recurrenceCore';
+
+export * from '@/lib/recurrenceCore';
 
 export const WEEKDAY_NAMES = [
   'Sunday',
@@ -37,166 +38,6 @@ export const WEEKDAY_INITIALS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] as const;
 export const WEEKDAY_SHORT_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 
 const ORDINAL_NAMES = ['first', 'second', 'third', 'fourth'] as const;
-
-/** A repeat every hundred years is not a schedule, it is a typo. */
-export const MAX_INTERVAL = 99;
-export const MAX_COUNT = 999;
-
-/**
- * How far the expander will walk looking for the next date that exists.
- *
- * Rules that skip are the reason there is a bound at all: "monthly on day 31"
- * produces nothing in seven months of the year, so a naive loop looking for one
- * more occurrence past `UNTIL` would run forever rather than simply stop.
- */
-const MAX_CANDIDATE_STEPS = 2_000;
-
-/* -------------------------------------------------------------------------- */
-/* Calendar arithmetic                                                         */
-/* -------------------------------------------------------------------------- */
-
-function daysInMonth(year: number, month: number): number {
-  // Day 0 of the next month is the last day of this one.
-  return new Date(year, month + 1, 0).getDate();
-}
-
-/**
- * Which occurrence of its own weekday within its month this date is: 1–5.
- * The 21st of a month is always the third of that weekday, whatever it is.
- */
-export function weekdayOrdinalInMonth(date: Date): number {
-  return Math.floor((date.getDate() - 1) / 7) + 1;
-}
-
-/**
- * The `BYDAY` position that phrases this date most naturally: 1–4, or -1 for
- * "last".
- *
- * A fifth Wednesday only exists in some months, so a rule pinned to "the fifth"
- * would silently skip most of the year. "Last" is what someone picking a date
- * in the final week of a month means, and it lands every month.
- */
-export function monthlyWeekdayPosition(date: Date): number {
-  const ordinal = weekdayOrdinalInMonth(date);
-  return ordinal >= 5 ? -1 : ordinal;
-}
-
-/**
- * The date of the `position`-th `weekday` in a month, or null when the month
- * has no such day (there is no fifth Friday in most Februaries).
- * `position` is 1-based, or -1 for the last one.
- */
-export function nthWeekdayOfMonth(
-  year: number,
-  month: number,
-  weekday: number,
-  position: number,
-): number | null {
-  const total = daysInMonth(year, month);
-
-  if (position === -1) {
-    const lastWeekday = new Date(year, month, total).getDay();
-    return total - ((lastWeekday - weekday + 7) % 7);
-  }
-
-  const firstWeekday = new Date(year, month, 1).getDay();
-  const first = 1 + ((weekday - firstWeekday + 7) % 7);
-  const day = first + (position - 1) * 7;
-  return day <= total ? day : null;
-}
-
-/* -------------------------------------------------------------------------- */
-/* Date-only values (`<input type="date">` and `UNTIL`)                        */
-/* -------------------------------------------------------------------------- */
-
-export function toDateOnlyValue(date: Date): string {
-  return format(date, 'yyyy-MM-dd');
-}
-
-/**
- * Local midnight on that calendar day, or null when the text is not a date.
- * Mirrors `fromDateTimeLocalValue`: the constructor rolls "2026-02-31" forward
- * to March rather than complaining, so the fields are read back to catch it.
- */
-export function fromDateOnlyValue(value: string): Date | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!match) return null;
-
-  const [, y, mo, d] = match;
-  const year = Number(y);
-  const month = Number(mo);
-  const day = Number(d);
-  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
-
-  const date = new Date(year, month - 1, day, 0, 0, 0, 0);
-  if (date.getMonth() !== month - 1 || date.getDate() !== day) return null;
-  return date;
-}
-
-/** The last instant of the `UNTIL` day — the bound is inclusive, per RFC 5545. */
-function untilInstant(rule: RecurrenceRule): Date | null {
-  if (!rule.until) return null;
-  const day = fromDateOnlyValue(rule.until);
-  if (!day) return null;
-  return new Date(day.getFullYear(), day.getMonth(), day.getDate(), 23, 59, 59, 999);
-}
-
-/* -------------------------------------------------------------------------- */
-/* Normalisation                                                               */
-/* -------------------------------------------------------------------------- */
-
-function clampInt(value: unknown, min: number, max: number, fallback: number): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
-  return Math.min(max, Math.max(min, Math.trunc(value)));
-}
-
-/**
- * The canonical form of a rule against a given anchor.
- *
- * Everything downstream — equality against a preset, expansion, the sentence
- * shown to a leader — runs on the output of this, so a rule assembled by the
- * form, one round-tripped through Firestore and one typed into the console all
- * behave identically.
- */
-export function normalizeRecurrence(rule: RecurrenceRule, anchor: Date): RecurrenceRule {
-  const frequency: RecurrenceFrequency = isRecurrenceFrequency(rule.frequency)
-    ? rule.frequency
-    : 'weekly';
-
-  const weekdays =
-    frequency === 'weekly'
-      ? [
-          ...new Set(
-            (Array.isArray(rule.weekdays) ? rule.weekdays : [])
-              .filter(
-                (day): day is number =>
-                  typeof day === 'number' && Number.isInteger(day) && day >= 0 && day <= 6,
-              ),
-          ),
-        ].sort((a, b) => a - b)
-      : [];
-
-  // A weekly rule with no days selected does not describe anything. The event's
-  // own weekday is the only defensible reading of "weekly" for this event.
-  if (frequency === 'weekly' && weekdays.length === 0) weekdays.push(anchor.getDay());
-
-  const count = rule.count === null ? null : clampInt(rule.count, 1, MAX_COUNT, 1);
-
-  return {
-    frequency,
-    interval: clampInt(rule.interval, 1, MAX_INTERVAL, 1),
-    weekdays,
-    monthlyMode: rule.monthlyMode === 'dayOfWeek' ? 'dayOfWeek' : 'dayOfMonth',
-    // RFC 5545: UNTIL and COUNT must not both appear. A count wins because it
-    // is the more specific of the two to have typed.
-    until: count !== null ? null : (rule.until ?? null),
-    count,
-  };
-}
-
-export function isRecurrenceFrequency(value: unknown): value is RecurrenceFrequency {
-  return value === 'weekly' || value === 'monthly' || value === 'yearly';
-}
 
 /**
  * Follows the rule along when the event's date moves.
@@ -317,9 +158,6 @@ function rule(
   };
 }
 
-/** Every day of the week, the `BYDAY` list that spells "daily". */
-export const EVERY_WEEKDAY = [0, 1, 2, 3, 4, 5, 6];
-
 /**
  * A weekly rule on just the day the event falls on. The default, and the shape
  * of nearly every gathering this app exists for.
@@ -391,125 +229,6 @@ export function matchRecurrencePreset(
   // entry, which keeps the dropdown stable rather than flipping between two
   // labels that name the same schedule.
   return found?.id ?? 'custom';
-}
-
-/* -------------------------------------------------------------------------- */
-/* Expansion                                                                   */
-/* -------------------------------------------------------------------------- */
-
-/**
- * Every date the pattern lands on, in order, starting with the anchor itself.
- * Ignores `UNTIL`/`COUNT` — those bound the caller's loop, not this one.
- */
-function* patternDates(rule: RecurrenceRule, anchor: Date): Generator<Date> {
-  const hours = anchor.getHours();
-  const minutes = anchor.getMinutes();
-  const year = anchor.getFullYear();
-  const month = anchor.getMonth();
-  const day = anchor.getDate();
-  const at = (y: number, mo: number, d: number) => new Date(y, mo, d, hours, minutes, 0, 0);
-
-  // The anchor is occurrence one by construction: it is a real gathering with a
-  // document of its own. The pattern only has to say what comes after it.
-  yield anchor;
-  const anchorTime = anchor.getTime();
-
-  switch (rule.frequency) {
-    case 'weekly': {
-      // Weeks are measured from the Sunday of the anchor's own week, so
-      // "every 2 weeks" alternates around the event rather than around an
-      // arbitrary epoch.
-      const sunday = day - anchor.getDay();
-      for (let block = 0; block <= MAX_CANDIDATE_STEPS; block += 1) {
-        for (const weekday of rule.weekdays) {
-          const date = at(year, month, sunday + block * 7 * rule.interval + weekday);
-          // Days earlier in the anchor's own week are in the past for this
-          // event; the anchor itself was already yielded.
-          if (date.getTime() > anchorTime) yield date;
-        }
-      }
-      return;
-    }
-
-    case 'monthly': {
-      const position = monthlyWeekdayPosition(anchor);
-      const weekday = anchor.getDay();
-
-      for (let step = 1; step <= MAX_CANDIDATE_STEPS; step += 1) {
-        const absolute = month + step * rule.interval;
-        const y = year + Math.floor(absolute / 12);
-        const mo = ((absolute % 12) + 12) % 12;
-
-        if (rule.monthlyMode === 'dayOfWeek') {
-          const found = nthWeekdayOfMonth(y, mo, weekday, position);
-          if (found !== null) yield at(y, mo, found);
-          continue;
-        }
-
-        // RFC 5545 skips a month that is too short rather than clamping: a rule
-        // set on the 31st means the 31st, and February simply has none.
-        if (day <= daysInMonth(y, mo)) yield at(y, mo, day);
-      }
-      return;
-    }
-
-    case 'yearly': {
-      for (let step = 1; step <= MAX_CANDIDATE_STEPS; step += 1) {
-        const y = year + step * rule.interval;
-        // 29 February in a common year, skipped for the same reason.
-        if (day <= daysInMonth(y, month)) yield at(y, month, day);
-      }
-      return;
-    }
-  }
-}
-
-export interface OccurrenceOptions {
-  /** How many dates to return. */
-  limit: number;
-  /** Only return occurrences at or after this instant. Defaults to the anchor. */
-  from?: Date;
-}
-
-/**
- * Expands a rule into dates.
- *
- * `count` is tallied from the anchor regardless of `from`, so asking for "the
- * next three after today" out of a rule that runs five times total correctly
- * returns however few are left rather than three more.
- */
-export function recurrenceOccurrences(
-  candidate: RecurrenceRule,
-  anchor: Date,
-  options: OccurrenceOptions,
-): Date[] {
-  const rule = normalizeRecurrence(candidate, anchor);
-  const until = untilInstant(rule);
-  const from = options.from ?? anchor;
-  const found: Date[] = [];
-
-  let emitted = 0;
-  for (const date of patternDates(rule, anchor)) {
-    if (until && date > until) break;
-    emitted += 1;
-    if (rule.count !== null && emitted > rule.count) break;
-    if (date >= from) found.push(date);
-    if (found.length >= options.limit) break;
-  }
-
-  return found;
-}
-
-/** The first occurrence strictly after `after`, or null when the rule is spent. */
-export function nextRecurrenceOccurrence(
-  rule: RecurrenceRule,
-  anchor: Date,
-  after: Date,
-): Date | null {
-  return (
-    recurrenceOccurrences(rule, anchor, { limit: 1, from: new Date(after.getTime() + 1) })[0] ??
-    null
-  );
 }
 
 /* -------------------------------------------------------------------------- */
