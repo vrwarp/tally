@@ -487,13 +487,17 @@ rules it deploys on merge with no prompt.
   | --- | --- |
   | `roles/firebase.viewer` | Reads the project's `adminSdkConfig`. Without it every deploy stops at `403 The caller does not have permission` before it does anything. |
   | `roles/cloudfunctions.admin` | Creates and updates the functions. |
-  | `roles/firebaserules.admin` | Deploys `firestore.rules` and the indexes. |
+  | `roles/firebaserules.admin` | Deploys `firestore.rules`. Rules only — see the row below. |
+  | `roles/datastore.indexAdmin` | Deploys `firestore.indexes.json`. Indexes are a Firestore resource rather than a rules one, so `firebaserules.admin` does not reach them: without this a deploy uploads the rules and then 403s on the first index. **Do not** reach for `roles/datastore.owner` to fix that — it would hand the CI key read and write access to the roster itself. `indexAdmin` can manage indexes and cannot touch a document. |
   | `roles/iam.serviceAccountUser` | Lets the deploy act as the functions' own runtime service account. |
   | `roles/artifactregistry.writer` | Holds the container image each function is built into. |
   | `roles/secretmanager.viewer` | Reads `PCO_APP_ID` and `PCO_SECRET` to bind them to the deployed functions. `secretAccessor` is the obvious guess and the wrong one — it grants `versions.access`, the payload, but not `secrets.get`, so the deploy fails looking up the very secret it is about to bind. The deploy never needs the payload itself; the functions' runtime account reads that — see [the secret bindings](#the-secret-bindings) below. |
 
-  `roles/firebase.admin` covers all of these in one, but it also carries Hosting, which would
-  undo the point of keeping two keys. The list above is the narrower equivalent.
+  `roles/firebase.admin` covers all of these in one grant and is what most guides suggest. It also
+  carries Hosting, undoing the point of keeping two keys, and — the part worth caring about — read
+  and write access to Firestore itself, so a leaked CI credential would reach the roster rather than
+  merely the deploy machinery. The list above is the narrower equivalent: everything needed to
+  *deploy*, nothing that can read a student.
 - `VITE_FIREBASE_CONFIG` — the web config object as one line of JSON, the same value
   `.env.local` holds. Vite embeds it at build time, so the Hosting workflows need it even
   though it is not a secret.
