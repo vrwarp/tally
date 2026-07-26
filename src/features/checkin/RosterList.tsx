@@ -8,8 +8,10 @@
  * reorders under a thumb that is already on its way down. Now the filters
  * change what the list holds and a tap changes only the colour of one row.
  *
- * The heading sticks to the top of the scroll container so a counselor halfway
- * down a 200-name list still knows which filter they are looking through.
+ * The heading sticks below the search box — which is itself stuck below the app
+ * bar — so a counselor halfway down a 200-name list still knows which filter
+ * they are looking through. Both offsets are measured at runtime and published
+ * as custom properties; see `useHeightVar`.
  */
 import { StudentRow } from '@/features/checkin/StudentRow';
 import { cn } from '@/lib/utils';
@@ -43,7 +45,10 @@ export function RosterList({
 }: RosterListProps) {
   return (
     <section className="px-3 pb-3" aria-label={`${title}, ${entries.length}`}>
-      <h2 className="sticky top-0 z-10 -mx-3 flex items-baseline gap-2 bg-ink-950/95 px-3 py-2 text-xs font-bold uppercase tracking-wider backdrop-blur">
+      <h2
+        style={{ top: 'calc(var(--app-header-h, 0px) + var(--checkin-search-h, 0px))' }}
+        className="sticky z-10 -mx-3 flex items-baseline gap-2 bg-ink-950/95 px-3 py-2 text-xs font-bold uppercase tracking-wider backdrop-blur"
+      >
         <span className={tone === 'present' ? 'text-present-400' : 'text-ink-400'}>{title}</span>
         <span
           className={cn(

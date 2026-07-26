@@ -45,11 +45,11 @@ export function GradeFilter({ grades, onChange }: GradeFilterProps) {
   /**
    * How much room there actually is under the chip.
    *
-   * The check-in frame is `h-dvh overflow-hidden`, so a panel that runs past the
-   * bottom of the window is not merely awkward — it is cut off, and a clipped
-   * checklist hides grades with nothing on screen to say so. A CSS `dvh` cap
-   * cannot do this: what matters is the distance from *this chip* to the bottom
-   * edge, and the chip sits under a header whose height varies with the event.
+   * A panel that runs past the bottom of the window puts grades where nothing on
+   * screen says they are: it is absolutely positioned, so it does not lengthen
+   * the page, and the bottom tab bar sits over the last of it besides. A CSS
+   * `dvh` cap cannot do this: what matters is the distance from *this chip* to
+   * the bottom edge, and the chip's own position moves as the page scrolls.
    * Measured before paint, so the panel never renders at the wrong size.
    */
   const [maxHeight, setMaxHeight] = useState<number>();
@@ -65,7 +65,14 @@ export function GradeFilter({ grades, onChange }: GradeFilterProps) {
 
     measure();
     window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
+    // The chip rides the page now, so how much room is under it changes as the
+    // roster scrolls — remeasuring lets the panel grow into the space instead of
+    // holding whatever was true when it opened.
+    window.addEventListener('scroll', measure, { passive: true });
+    return () => {
+      window.removeEventListener('resize', measure);
+      window.removeEventListener('scroll', measure);
+    };
   }, [open]);
 
   // Closing on an outside press keeps the panel from covering the first student

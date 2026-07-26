@@ -132,7 +132,7 @@ export function NoActiveEvent({ events, now }: NoActiveEventProps) {
     .slice(0, 5);
 
   return (
-    <div className="scroll-touch min-h-0 flex-1 overflow-y-auto px-4 pb-24 pt-4">
+    <div className="mx-auto w-full max-w-3xl px-4 pt-4">
       <EmptyState
         icon="🗓"
         title="Nothing to check into right now"
