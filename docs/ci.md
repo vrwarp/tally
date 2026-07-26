@@ -92,7 +92,7 @@ without `--force`, so a function missing from the source is left alone),
 anything touching production *data*, which no workflow does, and **granting
 IAM** — enabling APIs and giving Google's service agents their roles are
 owner-only, one-time steps in
-[Deployment](../README.md#one-time-setup-per-project). The deploy key can use
+[Setting up deployment](deployment-setup.md). The deploy key can use
 the project but not re-permission it, which is the line worth keeping: a key
 able to rewrite project IAM could grant itself anything, including the Firestore
 access the split above exists to deny it.
