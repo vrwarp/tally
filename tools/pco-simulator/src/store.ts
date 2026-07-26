@@ -435,12 +435,11 @@ export class SimulatorStore {
 /**
  * An organisation with nobody in it — but with the two Lists still there.
  *
- * The Lists are deliberately not empty-as-in-absent. A configuration pointing
- * at `PCO_STUDENT_LIST_ID` has to resolve to *an empty list* rather than to a
- * 404, because those mean different things: one is "no students yet", the
- * other is "your List id is wrong", and Tally reports them differently on
- * purpose. Seeding into a fresh organisation must not silently produce the
- * second.
+ * The Lists are deliberately not empty-as-in-absent. A list a caller names has
+ * to resolve to *an empty list* rather than to a 404, because those mean
+ * different things: one is "nobody on it yet", the other is "your List id is
+ * wrong", and Tally reports them differently on purpose. Seeding into a fresh
+ * organisation must not silently produce the second.
  */
 function emptyOrg(): SimOrg {
   return {

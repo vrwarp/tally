@@ -66,9 +66,6 @@ const planningCenterEnv = {
   PCO_API_BASE_URL: `http://127.0.0.1:${PORTS.planningCenter}/people/v2`,
   PCO_APP_ID: 'sim-app-id',
   PCO_SECRET: 'sim-secret',
-  PCO_ROSTER_SOURCE: 'list',
-  PCO_STUDENT_LIST_ID: 'FOOTPRINTS_STUDENTS',
-  PCO_COUNSELOR_LIST_ID: 'FOOTPRINTS_TEAM',
   PCO_WRITE_BACK: 'create',
   /*
    * The bootstrap admin, exactly as a real deploy would set it.
