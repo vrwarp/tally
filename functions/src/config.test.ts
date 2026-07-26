@@ -7,7 +7,9 @@
  * empty sync card.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { loadConfig } from './config.js';
+import { loadConfig, resolveConfig } from './config.js';
+import { FakeFirestore } from './testing/fakeFirestore.js';
+import { PATHS } from './firestore.js';
 import { PCO_BASE_URL } from './pco/types.js';
 
 /** Params fall back to `process.env`, which is what the emulator populates. */
@@ -209,5 +211,133 @@ describe('loadConfig', () => {
     expect(error).toContain('PCO_SECRET');
     expect(error).toContain('PCO_STUDENT_LIST_ID');
     expect(error).toContain('PCO_API_BASE_URL');
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Runtime overrides                                                           */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * What the core team saves in Settings has to win over what was deployed —
+ * that is the entire point of the document — without ever becoming a way to
+ * put the server into a state the deploy-time path could not reach.
+ */
+describe('resolveConfig', () => {
+  function withDocument(fields: Record<string, unknown> | null): FakeFirestore {
+    const db = new FakeFirestore();
+    if (fields) db.seed(PATHS.pcoConfig, fields);
+    return db;
+  }
+
+  it('falls back to the deployed parameters when nothing has been saved', async () => {
+    env({ ...CREDENTIALS, PCO_ROSTER_SOURCE: 'list', PCO_STUDENT_LIST_ID: 'deployed' });
+    const config = await resolveConfig(withDocument(null));
+
+    expect(config.studentListId).toBe('deployed');
+    expect(config.managedInApp).toBe(false);
+  });
+
+  it('lets a saved list win over the deployed one', async () => {
+    env({ ...CREDENTIALS, PCO_ROSTER_SOURCE: 'list', PCO_STUDENT_LIST_ID: 'deployed' });
+    const config = await resolveConfig(withDocument({ studentListId: 'chosen-in-app' }));
+
+    expect(config.studentListId).toBe('chosen-in-app');
+    expect(config.managedInApp).toBe(true);
+  });
+
+  it('treats an absent key as no opinion and an empty one as cleared', async () => {
+    // The two have to be distinguishable, or there is no way to *remove* a
+    // counselor list from Settings — only to overwrite it with another one.
+    env({ ...CREDENTIALS, PCO_COUNSELOR_LIST_ID: 'deployed', PCO_SMALL_GROUP_FIELD: 'Small Group' });
+    const config = await resolveConfig(withDocument({ counselorListId: '' }));
+
+    expect(config.counselorListId).toBeNull();
+    expect(config.smallGroupField).toBe('Small Group');
+  });
+
+  it('accepts numbers, so a document written by hand behaves the same', async () => {
+    env(CREDENTIALS);
+    const config = await resolveConfig(withDocument({ minGrade: 7, maxGrade: 9, cacheTtlSeconds: 0 }));
+
+    expect(config.minGrade).toBe(7);
+    expect(config.maxGrade).toBe(9);
+    expect(config.cacheTtlSeconds).toBe(0);
+  });
+
+  it('clamps saved values exactly as it clamps deployed ones', async () => {
+    // The document is client-written, so this is not politeness — it is the
+    // guarantee that no browser can widen the grade band past what the app's
+    // own `Grade` type admits, whatever the rules let through.
+    env(CREDENTIALS);
+    const config = await resolveConfig(
+      withDocument({ minGrade: 1, maxGrade: 99, cacheTtlSeconds: 86_400, writeBack: 'everything' }),
+    );
+
+    expect(config.minGrade).toBe(6);
+    expect(config.maxGrade).toBe(12);
+    expect(config.cacheTtlSeconds).toBe(300);
+    // Never silently escalate: an unrecognised mode must not become `full`.
+    expect(config.writeBack).toBe('create');
+  });
+
+  it('ignores fields it does not know and values of the wrong type', async () => {
+    env({ ...CREDENTIALS, PCO_WRITE_BACK: 'off' });
+    const config = await resolveConfig(
+      withDocument({ writeBack: { mode: 'full' }, appId: 'stolen', secret: 'stolen', nonsense: true }),
+    );
+
+    expect(config.writeBack).toBe('off');
+    // Credentials come from Secret Manager and from nowhere else. A document
+    // that names them changes nothing.
+    expect(config.appId).toBe('app-id');
+    expect(config.secret).toBe('secret');
+  });
+
+  it('treats an empty API address as no override rather than as a reset', async () => {
+    /*
+     * The one field where "cleared" would be dangerous rather than useful.
+     *
+     * The app writes every field on save, including the ones a core-team member
+     * cannot see. If an empty `baseUrl` meant "use the real Planning Center",
+     * then the first time anybody saved an unrelated setting, an install
+     * deployed against a proxy — or the end-to-end suite's simulator — would
+     * silently start talking to production instead.
+     */
+    env({ ...CREDENTIALS, PCO_API_BASE_URL: 'http://127.0.0.1:4010/people/v2' });
+    const config = await resolveConfig(withDocument({ baseUrl: '', studentListId: 'L1' }));
+
+    expect(config.baseUrl).toBe('http://127.0.0.1:4010/people/v2');
+    expect(config.baseUrlOverridden).toBe(true);
+  });
+
+  it('lets a saved API address win over the deployed one', async () => {
+    env({ ...CREDENTIALS, PCO_API_BASE_URL: 'http://127.0.0.1:4010/people/v2' });
+    const config = await resolveConfig(withDocument({ baseUrl: 'https://proxy.example.org/people/v2' }));
+
+    expect(config.baseUrl).toBe('https://proxy.example.org/people/v2');
+  });
+
+  it('points at Settings, not at a deploy parameter, once the app owns the config', async () => {
+    env(CREDENTIALS);
+    const config = await resolveConfig(withDocument({ rosterSource: 'list', studentListId: '' }));
+
+    expect(config.configError).toMatch(/Settings/);
+    expect(config.configError).not.toMatch(/PCO_STUDENT_LIST_ID/);
+  });
+
+  it('degrades to the deployed configuration when Firestore cannot be read', async () => {
+    // A Firestore blip should cost Tally its *newest* configuration, not its
+    // ability to run check-in tonight.
+    env({ ...CREDENTIALS, PCO_ROSTER_SOURCE: 'list', PCO_STUDENT_LIST_ID: 'deployed' });
+    const broken = {
+      doc: () => ({
+        get: () => Promise.reject(new Error('Firestore is having a minute')),
+      }),
+    } as unknown as FakeFirestore;
+
+    const config = await resolveConfig(broken);
+    expect(config.studentListId).toBe('deployed');
+    expect(config.configError).toBeNull();
   });
 });

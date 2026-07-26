@@ -199,4 +199,83 @@ test.describe('Planning Center', () => {
     await gotoReady(page, '/settings');
     await expect(page.getByRole('button', { name: /^refresh/i })).toHaveCount(0);
   });
+
+  test('a leader moves the roster onto a different list, with no deploy', async ({
+    page,
+    signedInAs,
+    firestore,
+  }) => {
+    /*
+     * The whole feature, from the button to the roster.
+     *
+     * Which list is the roster used to be a deploy-time parameter, so changing
+     * it meant finding whoever runs `firebase deploy` — and the value was an id
+     * copied out of a browser address bar, which is unverifiable by eye. Here a
+     * leader picks a list by name, sees what it would select, and the very next
+     * read comes from it.
+     *
+     * The decoy is doing real work: "Footprints Camp 2019" is a plausible name
+     * with real members, and it is the wrong answer. That is exactly the
+     * mistake a bare id invites.
+     */
+    await signedInAs('core');
+    await gotoReady(page, '/settings');
+
+    const card = page
+      .locator('section')
+      .filter({ has: page.getByRole('heading', { name: /planning center/i }) })
+      .first();
+
+    await expect(card.getByText(/students visible/i)).toBeVisible({ timeout: 20_000 });
+    const before = await card.getByText(/students visible/i).innerText();
+
+    try {
+      await card.getByRole('button', { name: /^change$/i }).click();
+
+      const dialog = page.getByRole('dialog', { name: /planning center settings/i });
+      // Scoped to the student picker: the counselor list offers the same lists,
+      // which is correct — a church may keep its team on any of them.
+      const camp = dialog
+        .getByRole('group', { name: 'Student list' })
+        .getByRole('button', { name: /Footprints Camp 2019/ });
+
+      await expect(camp).toBeVisible({ timeout: 20_000 });
+      // The count and the health note are the point of the picker: nobody can
+      // tell these lists apart by id, and everybody can tell 12 from 43 — or
+      // read that Planning Center has given up on this one's rules.
+      await expect(camp).toContainText(/12 people/);
+      await expect(camp).toContainText(/rules no longer work/i);
+
+      await camp.click();
+      await dialog.getByRole('button', { name: /save settings/i }).click();
+
+      // Saved as an ordinary document under the security rules — no callable,
+      // no deploy, no restart.
+      const saved = await firestore.until(
+        'config',
+        (docs) => docs.some((document) => document.id === 'planningCenter'),
+        'the saved Planning Center settings',
+      );
+      expect(
+        saved.find((document) => document.id === 'planningCenter')?.data.studentListId,
+      ).toBe('FOOTPRINTS_CAMP_2019');
+
+      // And the server is already reading from it: a smaller roster, named on
+      // the card by the list it now comes from.
+      await expect(card.getByText(/students visible/i)).not.toHaveText(before, {
+        timeout: 30_000,
+      });
+      // Named, not numbered. The card used to be able to say only "list mode";
+      // the id it was configured with told nobody anything.
+      await expect(card.getByText(/Students come from the .Footprints Camp 2019. list/)).toBeVisible();
+      // And the reason that was the wrong choice is on the card, not buried in
+      // a picker somebody has already closed.
+      await expect(card.getByText(/rules behind .Footprints Camp 2019. no longer work/)).toBeVisible();
+    } finally {
+      // One dataset, one worker: a spec that walks away leaving the roster
+      // pointed at a camp list from 2019 does not fail here, it fails somewhere
+      // else entirely.
+      await firestore.remove('config/planningCenter');
+    }
+  });
 });

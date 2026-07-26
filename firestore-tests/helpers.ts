@@ -25,6 +25,7 @@ import { paths } from '@/lib/paths';
 import type {
   AppSettingsDoc,
   AttendanceRecordDoc,
+  PcoRuntimeConfigDoc,
   RsvpDoc,
   SmallGroupDoc,
   StudentDoc,
@@ -189,6 +190,30 @@ export function settingsDoc(overrides: Partial<AppSettingsDoc> = {}): AppSetting
     predictiveOfLastN: 3,
     miaConsecutiveMisses: 3,
     newVisitorWindowDays: 7,
+    updatedAt: T0,
+    updatedBy: UID.core,
+    ...overrides,
+  };
+}
+
+/**
+ * The Planning Center settings the core team owns.
+ *
+ * Written as a whole document by the app rather than field by field, so the
+ * factory produces every key — including the ones a leader cleared, which are
+ * empty strings rather than absent.
+ */
+export function pcoConfigDoc(overrides: Partial<PcoRuntimeConfigDoc> = {}): PcoRuntimeConfigDoc {
+  return {
+    rosterSource: 'list',
+    studentListId: 'FOOTPRINTS_STUDENTS',
+    counselorListId: 'FOOTPRINTS_TEAM',
+    minGrade: 6,
+    maxGrade: 12,
+    writeBack: 'create',
+    smallGroupField: '',
+    cacheTtlSeconds: 30,
+    baseUrl: '',
     updatedAt: T0,
     updatedBy: UID.core,
     ...overrides,

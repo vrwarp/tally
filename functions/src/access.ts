@@ -17,7 +17,7 @@
  */
 import { HttpsError, onCall, type CallableRequest } from 'firebase-functions/v2/https';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
-import { loadConfig, PCO_SECRETS, type PcoConfig } from './config.js';
+import { PCO_SECRETS, resolveConfig, type PcoConfig } from './config.js';
 import { createPcoClient } from './pco/client.js';
 import { type Role } from './pco/mapping.js';
 import { findTeamMemberByEmail } from './pco/roster.js';
@@ -189,11 +189,12 @@ export const provisionAccess = onCall<void, Promise<ProvisionAccessResult>>(
 
     const displayName = typeof token.name === 'string' && token.name.trim() ? token.name.trim() : null;
 
-    const config = loadConfig();
+    const db = asFirestoreLike(getFirestore());
+    const config = await resolveConfig(db);
 
     try {
       return await provisionAccessForCaller(
-        asFirestoreLike(getFirestore()),
+        db,
         { uid: request.auth.uid, email: token.email as string, displayName },
         new Date(),
         planningCenterLookup(config),

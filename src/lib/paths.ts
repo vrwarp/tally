@@ -11,6 +11,7 @@
  *   events/{eventId}/attendance/{studentId}  who showed up
  *   events/{eventId}/rsvps/{studentId}       who said they were coming (one-offs)
  *   config/settings                          tunable thresholds
+ *   config/planningCenter                    the non-secret Planning Center settings
  *
  * Attendance and RSVP documents are keyed by student id on purpose: it makes
  * concurrent check-in from multiple counselor devices idempotent (PRD 4.1).
@@ -41,6 +42,15 @@ export const COLLECTIONS = {
 
 export const SETTINGS_DOC_ID = 'settings';
 
+/**
+ * Where the core team's Planning Center settings live.
+ *
+ * Mirrored in `functions/src/firestore.ts`, which reads it on every callable,
+ * and in firestore.rules. The credentials are *not* here — they stay in Secret
+ * Manager, which is why this document can be written from a browser at all.
+ */
+export const PCO_CONFIG_DOC_ID = 'planningCenter';
+
 export const paths = {
   users: () => COLLECTIONS.users,
   user: (uid: string) => `${COLLECTIONS.users}/${uid}`,
@@ -67,6 +77,7 @@ export const paths = {
     `${COLLECTIONS.events}/${eventId}/${COLLECTIONS.rsvps}/${studentId}`,
 
   settings: () => `${COLLECTIONS.config}/${SETTINGS_DOC_ID}`,
+  planningCenter: () => `${COLLECTIONS.config}/${PCO_CONFIG_DOC_ID}`,
 } as const;
 
 /** Well-known recurring series ids, seeded by `scripts/seed.ts`. */

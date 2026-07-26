@@ -27,6 +27,7 @@ import {
   attendanceDoc,
   eventDoc,
   initTestEnv,
+  pcoConfigDoc,
   rsvpDoc,
   seedAll,
   settingsDoc,
@@ -535,6 +536,127 @@ describe('config/settings', () => {
         doc(db, paths.settings()),
         settingsDoc({ predictiveMinAttended: 0, predictiveOfLastN: 3 }),
       ),
+    );
+  });
+});
+
+/**
+ * The Planning Center settings, which are the closest thing Tally has to a
+ * control that reaches outside itself: they decide which children the app can
+ * see, and how much of the church's permanent database it may write to.
+ */
+describe('config/planningCenter', () => {
+  it('lets core read and write the settings', async () => {
+    const db = asUser(env, UID.core);
+    await assertSucceeds(setDoc(doc(db, paths.planningCenter()), pcoConfigDoc()));
+    await assertSucceeds(getDoc(doc(db, paths.planningCenter())));
+  });
+
+  it('keeps it away from counselors entirely', async () => {
+    // Nothing a door volunteer's screen does depends on this document — the
+    // server resolves the configuration before answering any callable — so
+    // there is no reason for their device to hold it.
+    const db = asUser(env, UID.counselor);
+    await assertFails(getDoc(doc(db, paths.planningCenter())));
+    await assertFails(setDoc(doc(db, paths.planningCenter()), pcoConfigDoc()));
+  });
+
+  it('rejects a roster source that is neither of the two things it can be', async () => {
+    await assertFails(
+      setDoc(
+        doc(asUser(env, UID.core), paths.planningCenter()),
+        pcoConfigDoc({ rosterSource: 'spreadsheet' as never }),
+      ),
+    );
+  });
+
+  it('rejects a write-back mode nobody wrote code for', async () => {
+    // The stakes are asymmetric: an unrecognised mode that fell through to
+    // `full` would start editing the church's real people database.
+    await assertFails(
+      setDoc(
+        doc(asUser(env, UID.core), paths.planningCenter()),
+        pcoConfigDoc({ writeBack: 'everything' as never }),
+      ),
+    );
+  });
+
+  it('rejects a grade band outside the grades the app understands', async () => {
+    const db = asUser(env, UID.core);
+    await assertFails(setDoc(doc(db, paths.planningCenter()), pcoConfigDoc({ minGrade: 1 })));
+    await assertFails(setDoc(doc(db, paths.planningCenter()), pcoConfigDoc({ maxGrade: 13 })));
+  });
+
+  it('rejects a band whose top is below its bottom', async () => {
+    await assertFails(
+      setDoc(
+        doc(asUser(env, UID.core), paths.planningCenter()),
+        pcoConfigDoc({ minGrade: 10, maxGrade: 8 }),
+      ),
+    );
+  });
+
+  it('refuses to let a cache become a mirror', async () => {
+    const db = asUser(env, UID.core);
+    await assertFails(setDoc(doc(db, paths.planningCenter()), pcoConfigDoc({ cacheTtlSeconds: 86_400 })));
+    await assertFails(setDoc(doc(db, paths.planningCenter()), pcoConfigDoc({ cacheTtlSeconds: -1 })));
+  });
+
+  it('stops the core team pointing Tally at another host', async () => {
+    /*
+     * The API root decides where the church's Personal Access Token gets sent
+     * on every request. Core team runs the ministry; choosing the address the
+     * credentials travel to is an admin decision.
+     */
+    await assertFails(
+      setDoc(
+        doc(asUser(env, UID.core), paths.planningCenter()),
+        pcoConfigDoc({ baseUrl: 'https://not-planning-center.example/people/v2' }),
+      ),
+    );
+  });
+
+  it('lets an admin set the API root, and only to an http(s) address', async () => {
+    const db = asUser(env, UID.admin);
+    await assertSucceeds(
+      setDoc(doc(db, paths.planningCenter()), pcoConfigDoc({ baseUrl: 'https://proxy.example.org/people/v2' })),
+    );
+    await assertFails(
+      setDoc(doc(db, paths.planningCenter()), pcoConfigDoc({ baseUrl: 'ftp://files.example.org' })),
+    );
+  });
+
+  it('lets core keep editing everything else once an admin has set the root', async () => {
+    // The guard is on *changing* the address, not on the document containing
+    // one: otherwise one admin decision would lock the core team out of the
+    // roster settings for good.
+    await env.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), paths.planningCenter()),
+        pcoConfigDoc({ baseUrl: 'https://proxy.example.org/people/v2' }),
+      );
+    });
+
+    await assertSucceeds(
+      setDoc(
+        doc(asUser(env, UID.core), paths.planningCenter()),
+        pcoConfigDoc({ baseUrl: 'https://proxy.example.org/people/v2', studentListId: 'OTHER_LIST' }),
+      ),
+    );
+  });
+
+  it('never lets credentials into the document, whoever is asking', async () => {
+    /*
+     * The token pair lives in Secret Manager. A document a browser can write is
+     * a document a browser can read, so an admin who could stash credentials
+     * here would be handing them to every core-team device that opens Settings.
+     */
+    await assertFails(
+      setDoc(doc(asUser(env, UID.admin), paths.planningCenter()), {
+        ...pcoConfigDoc(),
+        appId: 'app-id',
+        secret: 'secret',
+      }),
     );
   });
 });

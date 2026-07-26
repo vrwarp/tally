@@ -459,6 +459,82 @@ export interface PcoStatus {
   /** True when the API root is not the real Planning Center — a test rig. */
   baseUrlOverridden: boolean;
   peopleVisible: number | null;
+  /** The settings actually in force, whatever their source. */
+  settings: PcoEffectiveSettings;
+  /** The configured lists, named — null when the id resolves to nothing. */
+  studentList: PcoList | null;
+  counselorList: PcoList | null;
+}
+
+/**
+ * The non-secret settings the server is running on right now.
+ *
+ * "Effective" rather than "saved": these are the deploy-time parameters with
+ * whatever the core team has saved layered over them, which is the only version
+ * anybody should be shown. A form filled in from the *saved* document would
+ * silently misrepresent a fresh install, where nothing is saved and everything
+ * still has a value.
+ */
+export interface PcoEffectiveSettings {
+  rosterSource: PcoRosterSource;
+  studentListId: string | null;
+  counselorListId: string | null;
+  minGrade: number;
+  maxGrade: number;
+  writeBack: PcoWriteBackMode;
+  smallGroupField: string | null;
+  cacheTtlSeconds: number;
+  /** The API root. Non-secret: an address, not a credential. */
+  baseUrl: string;
+  /** True when `config/planningCenter` is what these came from. */
+  managedInApp: boolean;
+}
+
+/**
+ * `config/planningCenter` as stored.
+ *
+ * Every field is written, and cleared fields are written as `''` rather than
+ * removed — the server treats an absent key as "no opinion, use the deployed
+ * value" and an empty one as "the leader deliberately cleared this", and the
+ * difference is the only way to *remove* a counselor list from Settings.
+ *
+ * The Personal Access Token is not here. It cannot be: this document is written
+ * by a browser, and a credential a browser can write is a credential a browser
+ * can read.
+ */
+export interface PcoRuntimeConfigDoc {
+  rosterSource: PcoRosterSource;
+  studentListId: string;
+  counselorListId: string;
+  minGrade: number;
+  maxGrade: number;
+  writeBack: PcoWriteBackMode;
+  smallGroupField: string;
+  cacheTtlSeconds: number;
+  /** Admin-only, and flagged everywhere it is not the real Planning Center. */
+  baseUrl: string;
+  updatedAt: Timestamp | null;
+  updatedBy: string | null;
+}
+
+/**
+ * One Planning Center list, as the roster picker shows it.
+ *
+ * `totalPeople` is what turns "list 1234567" into a decision somebody can make.
+ * `invalid` and `refreshedAt` are here because they answer the question this
+ * feature otherwise generates: a student missing from Tally is usually a list
+ * whose rules broke, or one that has not been refreshed since the spring.
+ */
+export interface PcoList {
+  id: string;
+  name: string;
+  description: string | null;
+  /** Members as of the last refresh, or null when Planning Center did not say. */
+  totalPeople: number | null;
+  refreshedAt: Date | null;
+  autoRefresh: boolean;
+  invalid: boolean;
+  starred: boolean;
 }
 
 /** The id Tally uses for a Planning Center person, everywhere. */

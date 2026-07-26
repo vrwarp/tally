@@ -163,8 +163,15 @@ export async function fetchYouthRoster(options: RosterOptions): Promise<RosterRe
   const { client, config, cache } = options;
   const now = options.now ?? new Date();
 
+  // Every input that changes *which people come back* is part of the key, so a
+  // setting changed in Settings takes effect on the next read rather than
+  // whenever the previous answer happens to expire. `base` is in here for the
+  // same reason it is the most alarming thing to get wrong: an instance that
+  // has just been repointed at a different Planning Center must not serve the
+  // old one's roster for another half-minute.
   const key = cacheKey({
     kind: 'roster',
+    base: config.baseUrl,
     source: config.rosterSource,
     list: config.studentListId,
     min: config.minGrade,
@@ -258,7 +265,7 @@ export async function fetchPersonDetails(
   const { client, config, cache, personId } = options;
   const now = options.now ?? new Date();
 
-  return cache.get(cacheKey({ kind: 'person', id: personId }), async () => {
+  return cache.get(cacheKey({ kind: 'person', base: config.baseUrl, id: personId }), async () => {
     const body = await client.get<PcoPerson>(`/people/${encodeURIComponent(personId)}`, {
       include: [...ROSTER_INCLUDES, 'households.people'],
     });
@@ -343,8 +350,18 @@ export async function findTeamMemberByEmail(
   const email = options.email.trim().toLowerCase();
   if (!email) return null;
 
-  return cache.get(cacheKey({ kind: 'team-member', email, list: config.counselorListId }), () =>
-    lookupTeamMember(client, config, email),
+  return cache.get(
+    cacheKey({
+      kind: 'team-member',
+      base: config.baseUrl,
+      email,
+      list: config.counselorListId,
+      // The small-group field decides the `assignedGroupId` on the entry, so a
+      // leader who fixes a mistyped field name should not have to wait out a
+      // cached answer that was mapped with the old one.
+      group: config.smallGroupField,
+    }),
+    () => lookupTeamMember(client, config, email),
   );
 }
 

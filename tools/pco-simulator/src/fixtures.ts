@@ -34,6 +34,8 @@ export const FIXTURE_ANCHOR = new Date('2026-07-01T12:00:00.000Z');
 
 export const STUDENT_LIST_ID = 'FOOTPRINTS_STUDENTS';
 export const TEAM_LIST_ID = 'FOOTPRINTS_TEAM';
+/** A list that exists, has members, and is the wrong answer. See `createFixtureOrg`. */
+export const STALE_LIST_ID = 'FOOTPRINTS_CAMP_2019';
 export const SMALL_GROUP_FIELD_SLUG = 'footprints_small_group';
 
 /** Default Personal Access Token pair the simulator accepts. */
@@ -333,15 +335,36 @@ export function createFixtureOrg(): SimOrg {
     {
       id: STUDENT_LIST_ID,
       name: 'Footprints Students',
+      description: 'Everyone in the youth ministry, maintained by the youth pastor.',
       // The list is what a youth pastor maintains by hand, so it includes the
       // student with no grade and excludes the 5th grader — the two cases where
       // a human overrules the grade filter in either direction.
       member_ids: YOUTH.filter((y) => y.id !== '4200016').map((y) => y.id),
+      refreshed_at: '2026-02-13T12:00:00Z',
+      auto_refresh: true,
+      starred: true,
     },
     {
       id: TEAM_LIST_ID,
       name: 'Footprints Team',
+      description: 'Adult counselors and core team.',
       member_ids: TEAM.map((t) => t.id),
+      refreshed_at: '2026-02-13T12:00:00Z',
+      auto_refresh: true,
+    },
+    /*
+     * A third list nobody should pick, and the reason the picker shows counts
+     * and health at all: it is stale, it is broken upstream, and its name is
+     * close enough to the real one to be chosen by mistake from a bare id.
+     */
+    {
+      id: STALE_LIST_ID,
+      name: 'Footprints Camp 2019',
+      description: 'Summer camp signups. Long over.',
+      member_ids: YOUTH.slice(0, 3).map((y) => y.id),
+      refreshed_at: '2019-07-04T12:00:00Z',
+      auto_refresh: false,
+      invalid: true,
     },
   ];
 

@@ -9,6 +9,7 @@ import { TEAM, signIn, type TeamRole } from './auth';
 import {
   clearSimulatorFaults,
   createSimulatorStudent,
+  deleteDocument,
   failSimulator,
   readCollection,
   resetSimulator,
@@ -21,6 +22,8 @@ export interface TallyFixtures {
   signedInAs: (role: TeamRole) => Promise<Page>;
   firestore: {
     collection: (path: string) => Promise<FirestoreDoc[]>;
+    /** Removes a document, so a spec can undo a setting it changed. */
+    remove: (path: string) => Promise<void>;
     /** Polls until `predicate` holds, so a test never races an onSnapshot write. */
     until: (
       path: string,
@@ -58,6 +61,7 @@ export const test = base.extend<TallyFixtures>({
   firestore: async ({}, use) => {
     await use({
       collection: readCollection,
+      remove: deleteDocument,
       until: async (path, predicate, label) => {
         const deadline = Date.now() + 15_000;
         let docs: FirestoreDoc[] = [];

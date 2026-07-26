@@ -10,6 +10,24 @@ import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'firebase/
 import { USE_EMULATORS, firebaseApp } from '@/lib/firebase';
 import type { PcoRosterPerson, PcoStatus, PcoPersonDetails } from '@/types';
 
+/**
+ * A Planning Center list on the wire.
+ *
+ * Identical to `PcoList` in @/types except that `refreshedAt` is still an ISO
+ * string — a callable's payload is JSON, so the conversion to a `Date` happens
+ * once, in `src/services/planningCenter.ts`, rather than at every render.
+ */
+export interface PcoListPayload {
+  id: string;
+  name: string;
+  description: string | null;
+  totalPeople: number | null;
+  refreshedAt: string | null;
+  autoRefresh: boolean;
+  invalid: boolean;
+  starred: boolean;
+}
+
 const functions = getFunctions(firebaseApp);
 
 if (USE_EMULATORS) {
@@ -74,11 +92,35 @@ export const getPersonDetails = httpsCallable<{ pcoPersonId: string }, PcoPerson
   'getPersonDetails',
 );
 
-/** What Settings shows about the connection, asked for rather than watched. */
-export const getPlanningCenterStatus = httpsCallable<{ force?: boolean } | void, PcoStatus>(
+/** `PcoStatus` as it arrives: list timestamps are still ISO strings. */
+export type PcoStatusPayload = Omit<PcoStatus, 'studentList' | 'counselorList'> & {
+  studentList: PcoListPayload | null;
+  counselorList: PcoListPayload | null;
+};
+
+/**
+ * What Settings shows about the connection, asked for rather than watched.
+ *
+ * Also carries the settings actually in force, which is what the editor opens
+ * filled in with. The browser cannot work those out for itself: they are the
+ * deployed parameters with the saved document layered over them, and only the
+ * server can see both halves.
+ */
+export const getPlanningCenterStatus = httpsCallable<{ force?: boolean } | void, PcoStatusPayload>(
   functions,
   'getPlanningCenterStatus',
 );
+
+/**
+ * The Planning Center lists this church has, for the roster picker.
+ *
+ * Read-only by necessity: the API has no way to create a list or to change who
+ * is on one. Tally chooses among what Planning Center already has.
+ */
+export const listPlanningCenterLists = httpsCallable<
+  { search?: string; limit?: number } | void,
+  { lists: PcoListPayload[] }
+>(functions, 'listPlanningCenterLists');
 
 /** Drops the server's cached roster, for a leader who just changed something upstream. */
 export const refreshPlanningCenter = httpsCallable<void, { status: 'ok' }>(

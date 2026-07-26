@@ -48,6 +48,7 @@ function baseConfig(overrides: Partial<PcoConfig> = {}): PcoConfig {
     writeBack: 'create',
     cacheTtlSeconds: 30,
     smallGroupField: null,
+    managedInApp: false,
     configError: null,
     ...overrides,
   };

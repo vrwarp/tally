@@ -63,6 +63,13 @@ export const PATHS = {
   users: 'users',
   /** Connection health for the Settings screen. Written only by functions. */
   pcoStatus: 'config/pcoStatus',
+  /**
+   * The non-secret half of the Planning Center configuration, owned by the core
+   * team from Settings. Absent on a fresh install, where the deploy-time params
+   * are the whole story. Read here, never written — the app writes it directly
+   * under the security rules.
+   */
+  pcoConfig: 'config/planningCenter',
 } as const;
 
 /** Accepts an admin `Timestamp`, a `Date` or epoch millis — whatever a test double stored. */

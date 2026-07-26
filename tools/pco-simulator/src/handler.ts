@@ -7,7 +7,7 @@
  * emails, the 429 with `Retry-After` — because those are the parts the client
  * has code to handle, and a simulator that smooths them over would test nothing.
  */
-import type { SimPerson, SimRequest, SimResponse } from './types.js';
+import type { SimList, SimPerson, SimRequest, SimResponse } from './types.js';
 import type { SimulatorStore } from './store.js';
 
 /* -------------------------------------------------------------------------- */
@@ -206,6 +206,31 @@ function personResource(person: SimPerson, store: SimulatorStore): Resource {
   };
 }
 
+/**
+ * A List, as `GET /lists` returns it.
+ *
+ * `total_people` is computed from the membership rather than stored, because
+ * that is what makes the picker's count trustworthy: a fixture cannot claim
+ * eleven members and then serve nine.
+ */
+function listResource(list: SimList, store: SimulatorStore): Resource {
+  return {
+    type: 'List',
+    id: list.id,
+    attributes: {
+      name: list.name,
+      description: list.description ?? null,
+      total_people: list.member_ids.filter((id) => store.personById(id) !== undefined).length,
+      refreshed_at: list.refreshed_at ?? null,
+      auto_refresh: list.auto_refresh ?? false,
+      invalid: list.invalid ?? false,
+      starred: list.starred ?? false,
+      status: 'complete',
+      returns: 'people',
+    },
+  };
+}
+
 function emailResource(email: ReturnType<SimulatorStore['emailsFor']>[number]): Resource {
   return {
     type: 'Email',
@@ -346,6 +371,7 @@ function error(status: number, title: string, detail: string): SimResponse {
 
 const PERSON_PATH = /^\/people\/([^/]+)$/;
 const LIST_PEOPLE_PATH = /^\/lists\/([^/]+)\/people$/;
+const LIST_PATH = /^\/lists\/([^/]+)$/;
 const HOUSEHOLD_MEMBERSHIPS_PATH = /^\/households\/([^/]+)\/household_memberships$/;
 
 function checkAuth(request: SimRequest, store: SimulatorStore): SimResponse | null {
@@ -405,6 +431,10 @@ function route(request: SimRequest, store: SimulatorStore): SimResponse {
     return servePeople(collectionFor(query, store), query, store, request.path, request.query);
   }
 
+  if (method === 'GET' && request.path === '/lists') {
+    return serveLists(query, store, request.path, request.query);
+  }
+
   const listMatch = LIST_PEOPLE_PATH.exec(request.path);
   if (method === 'GET' && listMatch) {
     const list = store.listById(decodeURIComponent(listMatch[1]!));
@@ -413,6 +443,13 @@ function route(request: SimRequest, store: SimulatorStore): SimResponse {
       .map((id) => store.personById(id))
       .filter((person): person is SimPerson => person !== undefined);
     return servePeople(members, query, store, request.path, request.query);
+  }
+
+  const singleListMatch = LIST_PATH.exec(request.path);
+  if (method === 'GET' && singleListMatch) {
+    const list = store.listById(decodeURIComponent(singleListMatch[1]!));
+    if (!list) return error(404, 'Not Found', `No list with id "${singleListMatch[1]}".`);
+    return json(200, { data: listResource(list, store) });
   }
 
   const personMatch = PERSON_PATH.exec(request.path);
@@ -530,6 +567,66 @@ function servePeople(
   if (hasMore) {
     // `no-cursor` deliberately advertises nothing: the client has to keep
     // walking on its own while pages arrive full.
+    if (store.pagination === 'links') {
+      (body.links as Record<string, string>).next = pageUrl(store, selfPath, rawQuery, nextOffset);
+    } else if (store.pagination === 'meta') {
+      (body.meta as Record<string, unknown>).next = { offset: nextOffset };
+    }
+  }
+
+  return json(200, body);
+}
+
+/**
+ * `GET /lists` — the collection the roster picker reads.
+ *
+ * Only the two query parameters Tally sends are honoured: `where[name]`, which
+ * the real API matches server-side, and `order=name`. A church with hundreds of
+ * lists is the case this exists for, so pagination is the same offset walk as
+ * everywhere else rather than a single unbounded page.
+ */
+function serveLists(
+  query: Record<string, QueryNode>,
+  store: SimulatorStore,
+  selfPath: string,
+  rawQuery: string,
+): SimResponse {
+  const name = scalar(nested(query.where).name);
+  const needle = name?.trim().toLowerCase() ?? '';
+
+  const matched = store.lists.filter(
+    (list) => needle === '' || list.name.toLowerCase().includes(needle),
+  );
+
+  const descending = (scalar(query.order) ?? '').startsWith('-');
+  const key = (scalar(query.order) ?? 'name').replace(/^-/, '');
+  const ordered = [...matched].sort((a, b) => {
+    const compared =
+      key === 'total_people'
+        ? a.member_ids.length - b.member_ids.length
+        : a.name.localeCompare(b.name);
+    // Ties break on id, so a page boundary cannot drop or repeat a list.
+    return compared || a.id.localeCompare(b.id);
+  });
+  if (descending) ordered.reverse();
+
+  const requestedPerPage = Number(scalar(query.per_page) ?? store.pageSize);
+  const perPage = Math.max(
+    1,
+    Math.min(store.pageSize, Number.isFinite(requestedPerPage) ? requestedPerPage : store.pageSize),
+  );
+  const offset = Math.max(0, Number(scalar(query.offset) ?? 0) || 0);
+  const page = ordered.slice(offset, offset + perPage);
+  const nextOffset = offset + perPage;
+
+  const body: Record<string, unknown> = {
+    links: { self: pageUrl(store, selfPath, rawQuery, offset) },
+    data: page.map((list) => listResource(list, store)),
+    included: [],
+    meta: { total_count: ordered.length, count: page.length },
+  };
+
+  if (nextOffset < ordered.length) {
     if (store.pagination === 'links') {
       (body.links as Record<string, string>).next = pageUrl(store, selfPath, rawQuery, nextOffset);
     } else if (store.pagination === 'meta') {

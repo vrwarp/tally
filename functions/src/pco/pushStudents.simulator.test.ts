@@ -38,6 +38,7 @@ function config(writeBack: PcoWriteBackMode): PcoConfig {
     writeBack,
     cacheTtlSeconds: 30,
     smallGroupField: null,
+    managedInApp: false,
     configError: null,
   };
 }

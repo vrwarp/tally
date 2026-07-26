@@ -287,6 +287,70 @@ service cloud.firestore {
     }
 
     /*
+     * The non-secret half of the Planning Center configuration.
+     *
+     * This document is why a church can move its roster onto a different
+     * Planning Center list without a deploy. The Personal Access Token is
+     * deliberately not here and never will be: credentials live in Secret
+     * Manager, where a browser cannot reach them even with an admin signed in.
+     *
+     * Read is core-only. Nothing on a counselor's screen depends on it — the
+     * server resolves the configuration itself before answering any callable —
+     * so there is no reason for a door volunteer's device to hold the shape of
+     * the church's Planning Center account.
+     */
+    match /config/planningCenter {
+      function validPcoConfig() {
+        let d = request.resource.data;
+        /*
+         * A closed shape, unlike every other document in this file.
+         *
+         * The reason is specific: the one thing that must never appear here is
+         * a Personal Access Token. Listing what is allowed — rather than
+         * validating what is recognised and ignoring the rest — is what makes
+         * "somebody stashed credentials in the config document" a write the
+         * database refuses rather than a habit nobody notices.
+         */
+        return d.keys().hasOnly([
+              'rosterSource', 'studentListId', 'counselorListId',
+              'minGrade', 'maxGrade', 'writeBack', 'smallGroupField',
+              'cacheTtlSeconds', 'baseUrl', 'updatedAt', 'updatedBy',
+            ])
+          && (!('rosterSource' in d.keys()) || d.rosterSource in ['list', 'grade'])
+          && (!('studentListId' in d.keys()) || d.studentListId is string)
+          && (!('counselorListId' in d.keys()) || d.counselorListId is string)
+          && (!('smallGroupField' in d.keys()) || d.smallGroupField is string)
+          && (!('writeBack' in d.keys()) || d.writeBack in ['off', 'create', 'full'])
+          && (!('minGrade' in d.keys()) || (d.minGrade is int && d.minGrade >= 6 && d.minGrade <= 12))
+          && (!('maxGrade' in d.keys()) || (d.maxGrade is int && d.maxGrade >= 6 && d.maxGrade <= 12))
+          && (!('minGrade' in d.keys()) || !('maxGrade' in d.keys()) || d.maxGrade >= d.minGrade)
+          && (!('cacheTtlSeconds' in d.keys())
+              || (d.cacheTtlSeconds is int && d.cacheTtlSeconds >= 0 && d.cacheTtlSeconds <= 300))
+          && (!('baseUrl' in d.keys())
+              || (d.baseUrl is string
+                  && (d.baseUrl == '' || d.baseUrl.matches('https?://.*'))));
+      }
+
+      /**
+       * The API root is the one field here that is not merely a preference.
+       *
+       * Every Planning Center request carries the church's Personal Access
+       * Token, so whoever sets this address chooses where those credentials get
+       * sent. That is an admin decision, not a core-team one — and the server
+       * shows a standing "not the real Planning Center" warning whenever it is
+       * set, so it cannot be changed quietly either.
+       */
+      function baseUrlUnchanged() {
+        return resource == null
+          ? request.resource.data.get('baseUrl', '') == ''
+          : request.resource.data.get('baseUrl', '') == resource.data.get('baseUrl', '');
+      }
+
+      allow get: if isCore();
+      allow write: if isCore() && validPcoConfig() && (isAdmin() || baseUrlUnchanged());
+    }
+
+    /*
      * `config/pcoSync` and `accessRoster` used to be matched here.
      *
      * Both are gone. `pcoSync` tracked a scheduled sweep that no longer exists;

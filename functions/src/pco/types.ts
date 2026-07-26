@@ -161,6 +161,31 @@ export type PcoFieldDefinitionAttributes = {
 
 export type PcoFieldDefinition = JsonApiResource<PcoFieldDefinitionAttributes>;
 
+/**
+ * A Planning Center List, as `/lists` returns it.
+ *
+ * `total_people` arriving on the collection is what makes a usable picker
+ * possible: the number of people a list would put on the roster is visible
+ * before anybody selects it, without a second request per list.
+ *
+ * `invalid` and `refreshed_at` are the two fields that explain a missing
+ * student, so they are read even though nothing else uses them.
+ */
+export type PcoListAttributes = {
+  name?: string | null;
+  description?: string | null;
+  total_people?: number | null;
+  refreshed_at?: string | null;
+  auto_refresh?: boolean | null;
+  /** True when the list's own rules stopped working upstream. */
+  invalid?: boolean | null;
+  starred?: boolean | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type PcoList = JsonApiResource<PcoListAttributes>;
+
 /* -------------------------------------------------------------------------- */
 /* Resource type names, as they appear in `data.type` / `included[].type`      */
 /* -------------------------------------------------------------------------- */
@@ -173,6 +198,7 @@ export const PCO_TYPES = {
   householdMembership: 'HouseholdMembership',
   fieldDatum: 'FieldDatum',
   fieldDefinition: 'FieldDefinition',
+  list: 'List',
 } as const;
 
 /** Household roles, most-parental first — this order *is* the preference rule. */

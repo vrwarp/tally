@@ -17,9 +17,10 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { logger, setGlobalOptions } from 'firebase-functions/v2';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
-import { loadConfig, PCO_SECRETS, type PcoConfig } from './config.js';
+import { PCO_SECRETS, resolveConfig, type PcoConfig } from './config.js';
 import { asFirestoreLike, PATHS, type FirestoreLike } from './firestore.js';
 import { createPcoClient, PcoApiError, type PcoClient } from './pco/client.js';
+import { fetchList, fetchLists, type PcoListSummary } from './pco/lists.js';
 import {
   fetchPersonDetails,
   fetchYouthRoster,
@@ -135,7 +136,7 @@ export const getRoster = onCall<{ force?: boolean } | undefined, Promise<RosterR
   async (request): Promise<RosterResponse> => {
     await requireMember(request.auth?.uid);
 
-    const config = loadConfig();
+    const config = await resolveConfig(db());
     const client = clientFor(config);
     if (!client) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
 
@@ -171,7 +172,7 @@ export const getPersonDetails = onCall<{ pcoPersonId: string }, Promise<PersonDe
       throw new HttpsError('invalid-argument', 'pcoPersonId is required.');
     }
 
-    const config = loadConfig();
+    const config = await resolveConfig(db());
     const client = clientFor(config);
     if (!client) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
 
@@ -203,6 +204,63 @@ interface PcoStatusResult {
   cacheTtlSeconds: number;
   baseUrlOverridden: boolean;
   peopleVisible: number | null;
+  /**
+   * The effective settings, so Settings can both describe the connection and
+   * open an editor already filled in with what is actually in force — rather
+   * than with what the browser guesses is in force.
+   *
+   * Everything here is non-secret by construction: the token pair is never
+   * part of this shape, and `baseUrl` is an API root, not a credential.
+   */
+  settings: {
+    rosterSource: 'list' | 'grade';
+    studentListId: string | null;
+    counselorListId: string | null;
+    minGrade: number;
+    maxGrade: number;
+    writeBack: 'off' | 'create' | 'full';
+    smallGroupField: string | null;
+    cacheTtlSeconds: number;
+    baseUrl: string;
+    /** True when these came from `config/planningCenter` rather than a deploy. */
+    managedInApp: boolean;
+  };
+  /**
+   * The names behind the configured list ids, when they could be read.
+   *
+   * A bare id is exactly as opaque on a status screen as it was in a deploy
+   * parameter, and "Footprints Students (47 people)" is the difference between
+   * a leader recognising their own configuration and hoping it is right.
+   */
+  studentList: PcoListSummary | null;
+  counselorList: PcoListSummary | null;
+}
+
+/**
+ * Looks up the configured lists so the screen can name them.
+ *
+ * Never allowed to fail the status call: a deleted list, a token without
+ * permission to read Lists, or a slow response are all things the roster
+ * question itself answers better. The names are a nicety on top.
+ */
+async function describeConfiguredLists(
+  client: PcoClient,
+  config: PcoConfig,
+): Promise<{ studentList: PcoListSummary | null; counselorList: PcoListSummary | null }> {
+  const lookup = async (listId: string | null): Promise<PcoListSummary | null> => {
+    if (!listId) return null;
+    try {
+      return await fetchList(client, listId);
+    } catch {
+      return null;
+    }
+  };
+
+  const [studentList, counselorList] = await Promise.all([
+    lookup(config.rosterSource === 'list' ? config.studentListId : null),
+    lookup(config.counselorListId),
+  ]);
+  return { studentList, counselorList };
 }
 
 /**
@@ -221,13 +279,30 @@ export const getPlanningCenterStatus = onCall<
   async (request): Promise<PcoStatusResult> => {
     await requireCoreTeam(request.auth?.uid);
 
-    const config = loadConfig();
+    const config = await resolveConfig(db());
     const base = {
       rosterSource: config.rosterSource,
       writeBack: config.writeBack,
       cacheTtlSeconds: config.cacheTtlSeconds,
       baseUrlOverridden: config.baseUrlOverridden,
-    };
+      // Echoed even when the connection is broken: the editor this feeds is
+      // exactly where somebody goes to fix a broken connection, so it must open
+      // filled in rather than empty.
+      settings: {
+        rosterSource: config.rosterSource,
+        studentListId: config.studentListId,
+        counselorListId: config.counselorListId,
+        minGrade: config.minGrade,
+        maxGrade: config.maxGrade,
+        writeBack: config.writeBack,
+        smallGroupField: config.smallGroupField,
+        cacheTtlSeconds: config.cacheTtlSeconds,
+        baseUrl: config.baseUrl,
+        managedInApp: config.managedInApp,
+      },
+      studentList: null,
+      counselorList: null,
+    } satisfies Omit<PcoStatusResult, 'configured' | 'reachable' | 'problem' | 'peopleVisible'>;
 
     if (config.configError) {
       return {
@@ -248,14 +323,18 @@ export const getPlanningCenterStatus = onCall<
       // Deliberately the real roster query rather than a cheap ping: "we can
       // reach the API" and "we can see your students" are different claims, and
       // only the second is worth showing a leader.
-      const result = await fetchYouthRoster({
-        client,
-        config,
-        cache: sharedCache(config),
-        force: request.data?.force === true,
-      });
+      const [result, lists] = await Promise.all([
+        fetchYouthRoster({
+          client,
+          config,
+          cache: sharedCache(config),
+          force: request.data?.force === true,
+        }),
+        describeConfiguredLists(client, config),
+      ]);
       return {
         ...base,
+        ...lists,
         configured: true,
         reachable: true,
         problem:
@@ -272,6 +351,47 @@ export const getPlanningCenterStatus = onCall<
         problem: error instanceof Error ? error.message : String(error),
         peopleVisible: null,
       };
+    }
+  },
+);
+
+/**
+ * The Planning Center lists this token can see, for the roster picker.
+ *
+ * Core team only, and read-only by necessity as much as by choice: the API has
+ * no way to create a list or to change who is on one, so Tally chooses among
+ * what Planning Center already has and links out for the rest.
+ */
+export const listPlanningCenterLists = onCall<
+  { search?: string; limit?: number } | undefined,
+  Promise<{ lists: PcoListSummary[] }>
+>(
+  { secrets: PCO_SECRETS, timeoutSeconds: 60, memory: '256MiB' },
+  async (request): Promise<{ lists: PcoListSummary[] }> => {
+    await requireCoreTeam(request.auth?.uid);
+
+    const config = await resolveConfig(db());
+    if (!config.appId || !config.secret) {
+      throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
+    }
+
+    // Deliberately not `clientFor`, which refuses on *any* configuration
+    // problem. The most likely reason somebody has this picker open is the
+    // problem itself — "list mode, no list chosen" — and refusing to list the
+    // lists until the list is chosen is a closed loop with no way out of it.
+    // Credentials are the only thing this call actually needs.
+    const client = createPcoClient({
+      appId: config.appId,
+      secret: config.secret,
+      baseUrl: config.baseUrl,
+    });
+
+    try {
+      const search = typeof request.data?.search === 'string' ? request.data.search : undefined;
+      const limit = typeof request.data?.limit === 'number' ? request.data.limit : undefined;
+      return { lists: await fetchLists({ client, search, limit }) };
+    } catch (error) {
+      return reportPcoFailure(error, 'load your Planning Center lists');
     }
   },
 );
@@ -309,7 +429,7 @@ export const pushStudentToPlanningCenter = onCall<
     throw new HttpsError('invalid-argument', 'studentId is required.');
   }
 
-  const config = loadConfig();
+  const config = await resolveConfig(db());
   const client = clientFor(config);
   if (!client) {
     return {
@@ -339,7 +459,7 @@ export const pushPendingVisitors = onCall<void, Promise<PushPendingResult>>(
   async (request): Promise<PushPendingResult> => {
     await requireCoreTeam(request.auth?.uid);
 
-    const config = loadConfig();
+    const config = await resolveConfig(db());
     const client = clientFor(config);
     if (!client) return { pushed: 0, skipped: 0, errors: 0 };
 
@@ -366,7 +486,7 @@ export const onStudentCreated = onDocumentCreated(
     const data = event.data?.data();
     if (!data || data.pcoPushPending !== true || typeof data.pcoPersonId === 'string') return;
 
-    const config = loadConfig();
+    const config = await resolveConfig(db());
     const client = clientFor(config);
     if (!client || config.writeBack === 'off') return;
 

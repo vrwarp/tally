@@ -13,20 +13,23 @@
  *
  * It still states the roster source and write-back mode, because "why is this
  * student not in Tally?" is almost always answered by one of those two rather
- * than by a failure.
+ * than by a failure — and now it can also answer the follow-up, which is a
+ * button rather than a deploy.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { Badge, Button, Card, CardHeader, ErrorBanner, SkeletonRows } from '@/components/ui';
+import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
+import { PlanningCenterEditor } from '@/features/settings/PlanningCenterEditor';
 import { formatRelative } from '@/lib/time';
-import { getPlanningCenterStatus, refreshPlanningCenter } from '@/services/functions';
-import type { PcoRosterSource, PcoStatus, PcoWriteBackMode } from '@/types';
-
-const SOURCE_LABEL: Record<PcoRosterSource, string> = {
-  list: 'a Planning Center list',
-  grade: 'grade fields on each person',
-};
+import { refreshPlanningCenter } from '@/services/functions';
+import {
+  fetchPlanningCenterStatus,
+  readPlanningCenterConfig,
+  type PcoStoredConfig,
+} from '@/services/planningCenter';
+import type { PcoList, PcoStatus, PcoWriteBackMode } from '@/types';
 
 const WRITE_BACK_LABEL: Record<PcoWriteBackMode, string> = {
   off: 'Tally never writes to Planning Center. Visitors stay queued until this is turned on.',
@@ -43,25 +46,78 @@ function describeCache(seconds: number): string {
   } before Tally asks Planning Center again.`;
 }
 
+/**
+ * How the roster is selected, said the way a leader would say it.
+ *
+ * Naming the list rather than its id is the point: an id is what this setting
+ * used to be, and an id on a status screen is unverifiable — nobody can tell
+ * whether 1234567 is this year's roster or a camp list from 2019.
+ */
+function describeSource(status: PcoStatus): string {
+  if (status.settings.rosterSource === 'grade') {
+    return `Students are everyone marked as a child in grades ${status.settings.minGrade}–${status.settings.maxGrade}.`;
+  }
+  if (status.studentList) {
+    return `Students come from the “${status.studentList.name}” list.`;
+  }
+  return status.settings.studentListId
+    ? `Students come from list ${status.settings.studentListId}, which Tally could not read.`
+    : 'Students come from a Planning Center list, but none has been chosen yet.';
+}
+
+function describeTeam(status: PcoStatus): string {
+  if (status.counselorList) return `Sign-in is allowed for the “${status.counselorList.name}” list.`;
+  return status.settings.counselorListId
+    ? `Sign-in is allowed for list ${status.settings.counselorListId}, which Tally could not read.`
+    : 'No counselor list is set, so sign-in falls back to your Planning Center administrators.';
+}
+
+/** Worth saying out loud on the status card, not just inside the picker. */
+function listWarning(list: PcoList | null): string | null {
+  if (!list) return null;
+  if (list.invalid) {
+    return `Planning Center says the rules behind “${list.name}” no longer work, so its members may be wrong.`;
+  }
+  if (!list.autoRefresh && list.refreshedAt) {
+    const months = (Date.now() - list.refreshedAt.getTime()) / (1000 * 60 * 60 * 24 * 30);
+    if (months >= 6) {
+      return `“${list.name}” does not refresh itself and was last run ${formatRelative(
+        list.refreshedAt,
+      )}. Anybody added since is not on it.`;
+    }
+  }
+  return null;
+}
+
 export function PlanningCenterCard() {
   const { show } = useToast();
+  const { profile } = useAuth();
   const { refreshRoster, rosterFetchedAt, rosterOffline } = useData();
 
   const [status, setStatus] = useState<PcoStatus | null>(null);
+  const [stored, setStored] = useState<PcoStoredConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   const check = useCallback(async (force = false) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await getPlanningCenterStatus({ force });
-      setStatus(response.data);
+      setStatus(await fetchPlanningCenterStatus(force));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not ask Tally about the connection.');
     } finally {
       setLoading(false);
+    }
+    // What is *saved* is a Firestore fact, and a missing document is the
+    // ordinary state of an install still running on its deploy-time parameters
+    // — so a failure here must not colour the connection itself.
+    try {
+      setStored(await readPlanningCenterConfig());
+    } catch {
+      setStored(null);
     }
   }, []);
 
@@ -87,15 +143,36 @@ export function PlanningCenterCard() {
     }
   };
 
+  /**
+   * After a save, ask again with `force`.
+   *
+   * The saved list is a different cache key from the old one, so a stale
+   * roster is not the risk — the risk is a leader believing a change worked.
+   * Re-reading is how the card can answer "and how many students does that see"
+   * in the same breath.
+   */
+  const afterSave = async () => {
+    await Promise.all([check(true), refreshRoster(true)]);
+    show('Planning Center settings saved', { tone: 'success' });
+  };
+
+  const studentWarning = status ? listWarning(status.studentList) : null;
+  const teamWarning = status ? listWarning(status.counselorList) : null;
+
   return (
     <Card>
       <CardHeader
         title="Planning Center"
         description="Where Tally reads your people from. It keeps no copy of them."
         action={
-          <Button variant="secondary" size="sm" onClick={() => void refresh()} loading={busy}>
-            Refresh
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={() => void refresh()} loading={busy}>
+              Refresh
+            </Button>
+            <Button size="sm" onClick={() => setEditing(true)} disabled={!status}>
+              Change
+            </Button>
+          </div>
         }
       />
 
@@ -137,6 +214,12 @@ export function PlanningCenterCard() {
               </p>
             ) : null}
 
+            {studentWarning ?? teamWarning ? (
+              <p className="rounded-xl bg-warn-500/10 px-3 py-2 text-sm text-warn-400 ring-1 ring-warn-500/25">
+                {studentWarning ?? teamWarning}
+              </p>
+            ) : null}
+
             {rosterOffline ? (
               <p className="rounded-xl bg-warn-500/10 px-3 py-2 text-sm text-warn-400 ring-1 ring-warn-500/25">
                 This device is showing a roster it saved earlier. Check-in still works; anyone added
@@ -148,21 +231,22 @@ export function PlanningCenterCard() {
               <div>
                 <dt className="text-xs font-medium uppercase tracking-wide text-ink-500">Roster</dt>
                 <dd className="text-ink-300">
-                  Students come from {SOURCE_LABEL[status.rosterSource]}.
+                  {describeSource(status)}
+                  <span className="block text-ink-500">{describeTeam(status)}</span>
                 </dd>
               </div>
               <div>
                 <dt className="text-xs font-medium uppercase tracking-wide text-ink-500">
                   Write-back
                 </dt>
-                <dd className="text-ink-300">{WRITE_BACK_LABEL[status.writeBack]}</dd>
+                <dd className="text-ink-300">{WRITE_BACK_LABEL[status.settings.writeBack]}</dd>
               </div>
               <div>
                 <dt className="text-xs font-medium uppercase tracking-wide text-ink-500">
                   Freshness
                 </dt>
                 <dd className="text-ink-300">
-                  {describeCache(status.cacheTtlSeconds)}
+                  {describeCache(status.settings.cacheTtlSeconds)}
                   {rosterFetchedAt ? (
                     <span className="block text-ink-500">
                       This device last read it {formatRelative(rosterFetchedAt)}.
@@ -171,9 +255,28 @@ export function PlanningCenterCard() {
                 </dd>
               </div>
             </dl>
+
+            <p className="text-xs text-ink-500">
+              {status.settings.managedInApp && stored?.updatedAt
+                ? `Changed here ${formatRelative(stored.updatedAt)}.`
+                : 'These settings came with the deploy. Changing any of them here takes over from it.'}
+              {profile?.role === 'admin'
+                ? ' The credentials themselves live in Secret Manager and are not editable from the app.'
+                : ''}
+            </p>
           </>
         ) : null}
       </div>
+
+      {status ? (
+        <PlanningCenterEditor
+          open={editing}
+          settings={status.settings}
+          storedBaseUrl={stored?.baseUrl ?? ''}
+          onClose={() => setEditing(false)}
+          onSaved={afterSave}
+        />
+      ) : null}
     </Card>
   );
 }
