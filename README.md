@@ -389,6 +389,38 @@ The tempting shortcut is to give the deploy key `roles/resourcemanager.projectIa
 this itself; don't. A key that can rewrite project IAM can grant itself anything, which is the
 opposite of why the backend key is kept narrow and separate from Hosting's.
 
+#### The secret bindings
+
+Last of the owner-only steps. A function declaring `defineSecret` needs its *runtime* account to be
+able to read that secret, and the deploy tries to arrange that itself with `setIamPolicy` — which
+the deploy key cannot do, so it stops at:
+
+```
+Error: Request to .../secrets/PCO_SECRET:setIamPolicy had HTTP Error: 403,
+Permission 'secretmanager.secrets.setIamPolicy' denied
+```
+
+Grant it once, from an owner, and the deploy finds the binding already in place and moves on:
+
+```bash
+NUM=$(gcloud projects describe tally-76406 --format='value(projectNumber)')
+for secret in PCO_APP_ID PCO_SECRET; do
+  gcloud secrets add-iam-policy-binding "$secret" \
+    --member="serviceAccount:$NUM-compute@developer.gserviceaccount.com" \
+    --role=roles/secretmanager.secretAccessor --project tally-76406
+done
+```
+
+Note who gets what. `secretAccessor` goes to the **runtime** account — the one the functions execute
+as, which does need to read the payload. The deploy key keeps only `secretmanager.viewer`, and never
+gains the ability to re-permission a secret.
+
+The alternative is to give the deploy key `roles/secretmanager.admin` on the two secrets so it can
+grant that binding itself. That works and is one less manual step, at the cost of a CI credential
+that can hand any principal access to the Planning Center token. Rotating the secrets would then be
+slightly easier and the blast radius of a leaked key slightly worse; the grant above is the safer
+default.
+
 ### Deploying
 
 ```bash
@@ -458,7 +490,7 @@ rules it deploys on merge with no prompt.
   | `roles/firebaserules.admin` | Deploys `firestore.rules` and the indexes. |
   | `roles/iam.serviceAccountUser` | Lets the deploy act as the functions' own runtime service account. |
   | `roles/artifactregistry.writer` | Holds the container image each function is built into. |
-  | `roles/secretmanager.viewer` | Reads `PCO_APP_ID` and `PCO_SECRET` to bind them to the deployed functions. `secretAccessor` is the obvious guess and the wrong one — it grants `versions.access`, the payload, but not `secrets.get`, so the deploy fails looking up the very secret it is about to bind. The deploy never needs the payload itself; the functions' runtime account reads that. |
+  | `roles/secretmanager.viewer` | Reads `PCO_APP_ID` and `PCO_SECRET` to bind them to the deployed functions. `secretAccessor` is the obvious guess and the wrong one — it grants `versions.access`, the payload, but not `secrets.get`, so the deploy fails looking up the very secret it is about to bind. The deploy never needs the payload itself; the functions' runtime account reads that — see [the secret bindings](#the-secret-bindings) below. |
 
   `roles/firebase.admin` covers all of these in one, but it also carries Hosting, which would
   undo the point of keeping two keys. The list above is the narrower equivalent.
