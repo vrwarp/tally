@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest';
 import {
   buildIncludedIndex,
   compareIds,
+  displayFirstName,
   emailKey,
   extractParentContact,
   isYouth,
   mapPersonToStudent,
   nameGradeKey,
   normaliseGender,
+  pcoGrade,
+  splitDisplayFirstName,
 } from './mapping.js';
 import type {
   JsonApiResource,
@@ -92,14 +95,44 @@ function index(...resources: JsonApiResource[][]) {
 /* -------------------------------------------------------------------------- */
 
 describe('mapPersonToStudent', () => {
-  it('prefers the nickname over the first name', () => {
+  it('writes the name the way Planning Center writes it', () => {
     const mapped = mapPersonToStudent(
       person('1', { first_name: 'Jonathan', nickname: 'Jonny', last_name: 'Rivera', grade: 8 }),
       RANGE,
     );
 
+    expect(mapped.firstName).toBe('Jonathan “Jonny”');
+    // Both spellings are in the search key, so either one finds him.
+    expect(mapped.searchName).toBe('jonathan “jonny” rivera');
+  });
+
+  it('keeps a non-Latin nickname alongside the first name', () => {
+    // The case this format exists for: dropping "Benson" left a profile the
+    // church office reads as "Benson Tsai" showing up in Tally as "蔡秉洲 Tsai".
+    const mapped = mapPersonToStudent(
+      person('1', { first_name: 'Benson', nickname: '蔡秉洲', last_name: 'Tsai', grade: 6 }),
+      RANGE,
+    );
+
+    expect(mapped.firstName).toBe('Benson “蔡秉洲”');
+  });
+
+  it('uses the nickname alone when there is no first name to pair it with', () => {
+    const mapped = mapPersonToStudent(
+      person('1', { first_name: null, nickname: 'Jonny', last_name: 'Rivera', grade: 8 }),
+      RANGE,
+    );
+
     expect(mapped.firstName).toBe('Jonny');
-    expect(mapped.searchName).toBe('jonny rivera');
+  });
+
+  it('does not repeat a nickname that is already the first name', () => {
+    const mapped = mapPersonToStudent(
+      person('1', { first_name: 'Ben', nickname: 'ben', last_name: 'Okonkwo', grade: 8 }),
+      RANGE,
+    );
+
+    expect(mapped.firstName).toBe('Ben');
   });
 
   it('falls back to the legal given name when both are blank', () => {
@@ -182,6 +215,54 @@ describe('mapPersonToStudent', () => {
 });
 
 /* -------------------------------------------------------------------------- */
+/* Names, both directions                                                      */
+/* -------------------------------------------------------------------------- */
+
+describe('displayFirstName', () => {
+  it('composes the two halves the way Planning Center does', () => {
+    expect(displayFirstName({ first_name: 'Benson', nickname: '蔡秉洲' })).toBe('Benson “蔡秉洲”');
+  });
+
+  it('uses whichever half exists on its own', () => {
+    expect(displayFirstName({ first_name: 'Benson' })).toBe('Benson');
+    expect(displayFirstName({ nickname: '蔡秉洲' })).toBe('蔡秉洲');
+    expect(displayFirstName({ given_name: 'Jonathan', first_name: '  ' })).toBe('Jonathan');
+    expect(displayFirstName({})).toBe('');
+  });
+
+  it('ignores a nickname that only restates the first name', () => {
+    expect(displayFirstName({ first_name: 'Ben', nickname: ' BEN ' })).toBe('Ben');
+  });
+});
+
+describe('splitDisplayFirstName', () => {
+  it('undoes displayFirstName, so a name survives a round trip', () => {
+    const attributes = { first_name: 'Benson', nickname: '蔡秉洲' };
+    expect(splitDisplayFirstName(displayFirstName(attributes))).toEqual({
+      firstName: 'Benson',
+      nickname: '蔡秉洲',
+    });
+  });
+
+  it('leaves a plain name alone', () => {
+    expect(splitDisplayFirstName('Benson')).toEqual({ firstName: 'Benson', nickname: null });
+    expect(splitDisplayFirstName('  Mary Jane ')).toEqual({ firstName: 'Mary Jane', nickname: null });
+  });
+
+  it('reads straight quotes too, since a person may have typed them', () => {
+    expect(splitDisplayFirstName('Benson "蔡秉洲"')).toEqual({
+      firstName: 'Benson',
+      nickname: '蔡秉洲',
+    });
+  });
+
+  it('treats a bare quoted name as the name itself', () => {
+    expect(splitDisplayFirstName('“Benji”')).toEqual({ firstName: 'Benji', nickname: null });
+    expect(splitDisplayFirstName('Benson “”')).toEqual({ firstName: 'Benson', nickname: null });
+  });
+});
+
+/* -------------------------------------------------------------------------- */
 /* isYouth                                                                     */
 /* -------------------------------------------------------------------------- */
 
@@ -200,6 +281,22 @@ describe('isYouth', () => {
   it('uses the graduation year when an anchor is supplied', () => {
     expect(isYouth(person('1', { graduation_year: 2030 }), { ...RANGE, now: NOW })).toBe(true);
     expect(isYouth(person('1', { graduation_year: 2020 }), { ...RANGE, now: NOW })).toBe(false);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* pcoGrade                                                                    */
+/* -------------------------------------------------------------------------- */
+
+describe('pcoGrade', () => {
+  it('says nothing rather than guessing when Planning Center holds no grade', () => {
+    expect(pcoGrade(person('1', { first_name: 'Sam', child: false }))).toBeNull();
+    expect(pcoGrade(person('1', { graduation_year: 2030 }))).toBeNull();
+  });
+
+  it('reports what Planning Center holds, unclamped', () => {
+    expect(pcoGrade(person('1', { grade: 3 }))).toBe(3);
+    expect(pcoGrade(person('1', { graduation_year: 2030 }), NOW)).toBe(8);
   });
 });
 
@@ -324,6 +421,13 @@ describe('keys', () => {
   it('matches a quick-added visitor to the same person despite accents and case', () => {
     expect(nameGradeKey('José', 'Núñez', 8)).toBe(nameGradeKey('  jose ', 'nunez', 8));
     expect(nameGradeKey('Jose', 'Nunez', 8)).not.toBe(nameGradeKey('Jose', 'Nunez', 9));
+  });
+
+  it('keeps two different non-Latin names apart', () => {
+    // Stripping to [a-z0-9] leaves both of these empty, which would collapse
+    // every 6th-grade Tsai in the church onto whichever one synced first.
+    expect(nameGradeKey('蔡秉洲', 'Tsai', 6)).not.toBe(nameGradeKey('蔡小明', 'Tsai', 6));
+    expect(nameGradeKey('蔡秉洲', 'Tsai', 6)).toBe(nameGradeKey(' 蔡秉洲 ', 'tsai', 6));
   });
 
   it('sorts Planning Center ids numerically so 9 comes before 10', () => {

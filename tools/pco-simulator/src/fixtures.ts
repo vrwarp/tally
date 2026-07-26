@@ -5,6 +5,8 @@
  * real mapping code has to make, and the awkward ones are the point:
  *
  *   - a student whose `nickname` differs from `first_name`
+ *   - a student whose `nickname` is in another script, so neither half of the
+ *     name can stand in for the other
  *   - a student with no `grade`, carrying only a `graduation_year`
  *   - a 5th grader, who must be excluded from a 6-12 ministry
  *   - an inactive person, who must be deactivated rather than deleted
@@ -86,6 +88,11 @@ const YOUTH: readonly YouthSpec[] = [
   { id: '4200017', first: 'Ruth', last: 'Abebe', grade: 12, gender: 'Female', inactive: true, updatedDaysAgo: 11 },
   // Lives with a grandparent whose household role is "other_adult".
   { id: '4200018', first: 'Dexter', last: 'Cole', grade: 6, gender: 'Male', updatedDaysAgo: 12, household: 'H12' },
+  // A nickname in a script the roster cannot fold down to Latin letters.
+  // Planning Center shows him as `Benson “蔡秉洲” Tsai`, and so must Tally —
+  // keeping only one half means the profile and the roster row cannot be
+  // matched up by eye.
+  { id: '4200019', first: 'Benson', last: 'Tsai', nickname: '蔡秉洲', grade: 6, gender: 'Male', updatedDaysAgo: 4, household: 'H13' },
 ];
 
 interface AdultSpec {
@@ -114,6 +121,7 @@ const PARENTS: readonly AdultSpec[] = [
   { id: '5200010', first: 'Samir', last: 'Ahmed', household: 'H9', role: 'parent_guardian', email: 'samir.ahmed@example.org', phone: '(555) 010-1010' },
   { id: '5200011', first: 'Yolanda', last: 'Grant', household: 'H11', role: 'parent_guardian', email: 'yolanda.grant@example.org' },
   { id: '5200012', first: 'Wilma', last: 'Cole', household: 'H12', role: 'other_adult', phone: '(555) 010-1012' },
+  { id: '5200013', first: 'Mei', last: 'Tsai', household: 'H13', role: 'parent_guardian', email: 'mei.tsai@example.org', phone: '(555) 010-1013' },
 ];
 
 interface TeamSpec {
@@ -153,6 +161,7 @@ const HOUSEHOLD_NAMES: Record<string, string> = {
   H10: 'Johnson Household',
   H11: 'Grant Household',
   H12: 'Cole Household',
+  H13: 'Tsai Household',
 };
 
 /**
@@ -384,6 +393,7 @@ export function createFixtureOrg(): SimOrg {
 export const FIXTURE_IDS = {
   amara: '4200001',
   benjiWithNickname: '4200002',
+  bensonWithScriptNickname: '4200019',
   sofiaWithAllergy: '4200003',
   ivyNoGrade: '4200015',
   oliverFifthGrader: '4200016',

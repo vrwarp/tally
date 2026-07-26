@@ -24,6 +24,7 @@ import {
   buildIncludedIndex,
   extractParentContact,
   mapPersonToStudent,
+  pcoGrade,
   type IncludedIndex,
   type ParentContact,
 } from './mapping.js';
@@ -291,7 +292,14 @@ export interface PersonSearchResult {
   id: string;
   firstName: string;
   lastName: string;
-  grade: number;
+  /**
+   * Null when Planning Center holds neither a grade nor a graduation year.
+   *
+   * Not floored to `minGrade` the way a student document is: this list exists to
+   * show what Planning Center thinks, and every adult in the church has a blank
+   * grade — rendering all of them as "6th" is a number nobody typed.
+   */
+  grade: number | null;
   /** What Planning Center thinks: a child, or an adult. Shown, never enforced. */
   child: boolean;
   status: 'active' | 'inactive';
@@ -338,7 +346,7 @@ export async function searchPeople(options: {
         id: pcoStudentId(person.id),
         firstName: mapped.firstName,
         lastName: mapped.lastName,
-        grade: mapped.grade,
+        grade: pcoGrade(person, now),
         child: person.attributes?.child === true,
         status: mapped.status,
       });

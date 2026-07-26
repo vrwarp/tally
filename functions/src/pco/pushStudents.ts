@@ -16,7 +16,12 @@
 import { Timestamp } from 'firebase-admin/firestore';
 import type { PcoConfig } from '../config.js';
 import { PcoApiError, type PcoClient } from '../pco/client.js';
-import { compareIds, mapPersonToStudent, nameGradeKey } from '../pco/mapping.js';
+import {
+  compareIds,
+  mapPersonToStudent,
+  nameGradeKey,
+  splitDisplayFirstName,
+} from '../pco/mapping.js';
 import type { PcoPerson } from '../pco/types.js';
 import {
   PATHS,
@@ -68,8 +73,12 @@ async function findExistingPerson(
   lastName: string,
   grade: number,
 ): Promise<PcoPerson | null> {
+  // The server's fuzzy `search_name` has never seen `Benson “蔡秉洲” Tsai` — it
+  // indexes the halves — so it is asked for the plain name and the composite is
+  // matched locally below.
+  const plainFirstName = splitDisplayFirstName(firstName).firstName;
   const body = await client.get<PcoPerson[]>('/people', {
-    where: { search_name: `${firstName} ${lastName}`, grade },
+    where: { search_name: `${plainFirstName} ${lastName}`, grade },
     per_page: SEARCH_PAGE_SIZE,
   });
 
@@ -104,8 +113,13 @@ async function findExistingPerson(
 
 function createAttributes(data: Record<string, unknown>): Record<string, unknown> {
   const allergies = readString(data, 'allergies');
+  // Tally holds Planning Center's *display* name, `Benson “蔡秉洲”`. Planning
+  // Center holds the two halves separately and composes them itself, so they go
+  // back the way they came.
+  const name = splitDisplayFirstName(readString(data, 'firstName') ?? '');
   return {
-    first_name: readString(data, 'firstName') ?? '',
+    first_name: name.firstName,
+    ...(name.nickname ? { nickname: name.nickname } : {}),
     last_name: readString(data, 'lastName') ?? '',
     grade: Number(data.grade ?? 0),
     // Every Footprints student is a minor; the flag is what puts them in the
@@ -132,7 +146,15 @@ function driftedAttributes(
   const allergies = readString(data, 'allergies');
   const grade = Number(data.grade ?? 0);
 
-  if (firstName && firstName !== mapped.firstName) attributes.first_name = firstName;
+  // Both sides are compared as display names — `mapped.firstName` is composed
+  // the same way Planning Center composes it — and only then split apart again
+  // for the patch, so an unedited nickname is never rewritten.
+  if (firstName && firstName !== mapped.firstName) {
+    const wanted = splitDisplayFirstName(firstName);
+    attributes.first_name = wanted.firstName;
+    const held = readString(person.attributes ?? {}, 'nickname');
+    if ((wanted.nickname ?? null) !== held) attributes.nickname = wanted.nickname ?? '';
+  }
   if (lastName && lastName !== mapped.lastName) attributes.last_name = lastName;
   if (Number.isFinite(grade) && grade > 0 && grade !== mapped.grade) attributes.grade = grade;
   if ((allergies ?? null) !== mapped.allergies) attributes.medical_notes = allergies ?? '';

@@ -220,7 +220,9 @@ export function AddFromPlanningCenterModal({
                         {person.firstName} {person.lastName}
                       </span>
                       <span className="block text-xs text-ink-500">
-                        {ordinalGrade(person.grade)}
+                        {person.grade === null
+                          ? 'No grade in Planning Center'
+                          : ordinalGrade(person.grade)}
                         {person.child ? '' : ' · not marked as a child'}
                         {person.status === 'inactive' ? ' · inactive in Planning Center' : ''}
                       </span>

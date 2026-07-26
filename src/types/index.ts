@@ -486,7 +486,8 @@ export interface PcoPersonSearchResult {
   id: string;
   firstName: string;
   lastName: string;
-  grade: number;
+  /** Null when Planning Center holds no grade and no graduation year for them. */
+  grade: number | null;
   child: boolean;
   status: StudentStatus;
 }

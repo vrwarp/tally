@@ -164,6 +164,49 @@ describe('pushStudent against the simulator', () => {
       expect(h.store.people).toHaveLength(before + 1);
     });
 
+    /**
+     * Tally holds Planning Center's display name. Sending it back whole would
+     * make the church's copy read `Benson “蔡秉洲” “蔡秉洲” Tsai`, and the next
+     * match attempt would fail against a name Tally itself wrote.
+     */
+    it('splits a display name back into first_name and nickname', async () => {
+      h.db.seed(
+        'students/s1',
+        tallyOnlyStudent({
+          firstName: 'Benson “蔡秉洲”',
+          lastName: 'Wu',
+          grade: 7,
+          searchName: 'benson “蔡秉洲” wu',
+        }),
+      );
+
+      const result = await push('s1', 'create');
+
+      expect(h.store.personById(result.pcoPersonId!)).toMatchObject({
+        first_name: 'Benson',
+        nickname: '蔡秉洲',
+        last_name: 'Wu',
+      });
+    });
+
+    it('links a display name to the person Planning Center already holds', async () => {
+      const before = h.store.people.length;
+      h.db.seed(
+        'students/s1',
+        tallyOnlyStudent({
+          firstName: 'Benson “蔡秉洲”',
+          lastName: 'Tsai',
+          grade: 6,
+          searchName: 'benson “蔡秉洲” tsai',
+        }),
+      );
+
+      const result = await push('s1', 'create');
+
+      expect(result.pcoPersonId).toBe(FIXTURE_IDS.bensonWithScriptNickname);
+      expect(h.store.people).toHaveLength(before);
+    });
+
     it('leaves an already-linked student alone', async () => {
       h.db.seed(
         'students/s1',
@@ -212,6 +255,50 @@ describe('pushStudent against the simulator', () => {
 
       expect(result.status).toBe('updated');
       expect(h.store.personById(FIXTURE_IDS.amara)?.grade).toBe(9);
+    });
+
+    it('does not rewrite a name that only looks different because of the nickname', async () => {
+      // Tally holds `Benjamin “Benji”`, Planning Center holds the two halves.
+      // They agree; a patch here would be Tally fighting itself every sync.
+      h.db.seed(
+        'students/s1',
+        tallyOnlyStudent({
+          firstName: 'Benjamin “Benji”',
+          lastName: 'Okonkwo',
+          grade: 6,
+          pcoPersonId: FIXTURE_IDS.benjiWithNickname,
+          pcoPushPending: false,
+        }),
+      );
+
+      const result = await push('s1', 'full');
+
+      expect(result.status).toBe('skipped');
+      expect(h.store.personById(FIXTURE_IDS.benjiWithNickname)).toMatchObject({
+        first_name: 'Benjamin',
+        nickname: 'Benji',
+      });
+    });
+
+    it('patches both halves when the name really did change', async () => {
+      h.db.seed(
+        'students/s1',
+        tallyOnlyStudent({
+          firstName: 'Benjamin “Ben”',
+          lastName: 'Okonkwo',
+          grade: 6,
+          pcoPersonId: FIXTURE_IDS.benjiWithNickname,
+          pcoPushPending: false,
+        }),
+      );
+
+      const result = await push('s1', 'full');
+
+      expect(result.status).toBe('updated');
+      expect(h.store.personById(FIXTURE_IDS.benjiWithNickname)).toMatchObject({
+        first_name: 'Benjamin',
+        nickname: 'Ben',
+      });
     });
 
     it('does nothing when Planning Center already agrees', async () => {
