@@ -93,12 +93,21 @@ Three things guard that, and all three are load-bearing:
 What is still a human action: **deleting** a Cloud Function (the deploy runs
 without `--force`, so a function missing from the source is left alone),
 anything touching production *data*, which no workflow does, and **granting
-IAM** — enabling APIs and giving Google's service agents their roles are
+project IAM** — enabling APIs and giving Google's service agents their roles are
 owner-only, one-time steps in
 [Setting up deployment](deployment-setup.md). The deploy key can use
 the project but not re-permission it, which is the line worth keeping: a key
 able to rewrite project IAM could grant itself anything, including the Firestore
 access the split above exists to deny it.
+
+The one IAM write the deploy does make is on the *resources it already owns*:
+after deploying, it re-asserts that each callable's Cloud Run service answers
+unauthenticated requests, because otherwise the CORS preflight is rejected and
+the app can no longer call it — see
+[callable functions must allow unauthenticated invocations](deployment-setup.md#callable-functions-must-allow-unauthenticated-invocations).
+That is a binding on a service the same key creates, updates and deletes, so it
+grants the key nothing it did not already have, and it does not weaken
+authentication: the ID token is still verified inside the call.
 
 **It does not publish an image.** The e2e image is built to prove it still
 builds. There is no application image, because a Firebase Hosting app does not

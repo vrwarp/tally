@@ -38,11 +38,9 @@
  * that exits 0. That matters because every push to a pull request re-runs the
  * add, and a pull request can be closed twice.
  */
-import { createSign } from 'node:crypto';
+import { accessToken, fail, serviceAccountKey } from './google-auth';
 
 const IDENTITY_TOOLKIT = 'https://identitytoolkit.googleapis.com';
-const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
-const SCOPE = 'https://www.googleapis.com/auth/cloud-platform';
 
 /** How many times to re-read and re-write when another job races us. */
 const ATTEMPTS = 3;
@@ -59,70 +57,6 @@ const ATTEMPTS = 3;
  * beside it, which never leaves this process.
  */
 let caller = '(unknown)';
-
-interface ServiceAccountKey {
-  client_email: string;
-  private_key: string;
-}
-
-function fail(message: string): never {
-  // `::error::` renders as an annotation on the job rather than a line buried
-  // in the log, which is the whole point of doing this in the open.
-  console.error(`::error::${message.replace(/\n/g, '%0A')}`);
-  process.exit(1);
-}
-
-function base64url(value: Buffer | string): string {
-  return Buffer.from(value)
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-}
-
-/**
- * Exchanges the service account key for an access token, directly.
- *
- * Deliberately not `google-github-actions/auth`: asked for an access token it
- * goes through the IAM Credentials API, which requires the key to hold
- * `roles/iam.serviceAccountTokenCreator` *on itself*. That is one more IAM
- * grant to get wrong, for a token the key can mint on its own — signing a JWT
- * and trading it in is what a service account key is for.
- */
-async function accessToken(key: ServiceAccountKey): Promise<string> {
-  const issued = Math.floor(Date.now() / 1000);
-  const claims = {
-    iss: key.client_email,
-    scope: SCOPE,
-    aud: TOKEN_ENDPOINT,
-    iat: issued,
-    exp: issued + 3600,
-  };
-
-  const unsigned = `${base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))}.${base64url(
-    JSON.stringify(claims),
-  )}`;
-  const signature = createSign('RSA-SHA256').update(unsigned).sign(key.private_key);
-  const assertion = `${unsigned}.${base64url(signature)}`;
-
-  const response = await fetch(TOKEN_ENDPOINT, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion,
-    }),
-  });
-
-  const body = await response.text();
-  if (!response.ok) {
-    fail(`Could not get an access token for ${key.client_email}: ${response.status} ${body}`);
-  }
-
-  const token = (JSON.parse(body) as { access_token?: string }).access_token;
-  if (!token) fail(`The token endpoint returned no access_token: ${body}`);
-  return token;
-}
 
 function configUrl(projectId: string): string {
   return `${IDENTITY_TOOLKIT}/admin/v2/projects/${projectId}/config`;
@@ -264,18 +198,7 @@ async function main(): Promise<void> {
   const projectId = process.env.FIREBASE_PROJECT_ID?.trim();
   if (!projectId) fail('FIREBASE_PROJECT_ID is not set.');
 
-  const raw = process.env.FIREBASE_SERVICE_ACCOUNT?.trim();
-  if (!raw) fail('FIREBASE_SERVICE_ACCOUNT is not set.');
-
-  let key: ServiceAccountKey;
-  try {
-    key = JSON.parse(raw) as ServiceAccountKey;
-  } catch {
-    fail('FIREBASE_SERVICE_ACCOUNT is not valid JSON. It should be the whole key file.');
-  }
-  if (!key.client_email || !key.private_key) {
-    fail('FIREBASE_SERVICE_ACCOUNT has no client_email/private_key — is it a service account key?');
-  }
+  const key = serviceAccountKey('FIREBASE_SERVICE_ACCOUNT');
 
   caller = key.client_email;
   console.log(`Acting as ${caller} on ${projectId}.`);

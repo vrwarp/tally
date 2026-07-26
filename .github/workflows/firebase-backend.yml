@@ -159,3 +159,18 @@ jobs:
           --only functions,firestore:rules,firestore:indexes
           --non-interactive
           --project "$FIREBASE_PROJECT"
+
+      # A callable whose Cloud Run service does not allow unauthenticated
+      # invocations rejects the CORS preflight — which carries no Authorization
+      # header — before the container sees it, and the browser reports a missing
+      # Access-Control-Allow-Origin header on a function whose code is fine. The
+      # CLI sets that binding when it *creates* a function and never re-checks
+      # it, so a binding removed afterwards survives every later deploy. This
+      # asserts it, and does not weaken authentication: the ID token is still
+      # verified inside the call. See
+      # docs/deployment-setup.md#callable-functions-must-allow-unauthenticated-invocations.
+      - name: Callable functions must answer unauthenticated preflights
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TALLY_BACKEND }}
+          FIREBASE_PROJECT_ID: ${{ env.FIREBASE_PROJECT }}
+        run: npm run functions:invokers
