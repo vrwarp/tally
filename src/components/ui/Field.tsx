@@ -1,4 +1,4 @@
-import { useId, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
+import { useId, useRef, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 import { cn, haptic } from '@/lib/utils';
 
 /*
@@ -34,15 +34,20 @@ const ICON_GUTTER_RIGHT = 'pr-9 pointer-fine:pr-8';
 const ICON_INSET_LEFT = 'left-3 pointer-fine:left-2.5';
 const ICON_INSET_RIGHT = 'right-3 pointer-fine:right-2.5';
 
+/* The clear button is a tap target rather than a glyph, so it needs more room
+   than the chevron does. */
+const CLEAR_GUTTER_RIGHT = 'pr-12 pointer-fine:pr-10';
+
 interface FieldShellProps {
   label: string;
+  labelHidden?: boolean;
   hint?: string;
   error?: string | null;
   required?: boolean;
   children: (props: { id: string; describedBy: string | undefined }) => ReactNode;
 }
 
-function FieldShell({ label, hint, error, required, children }: FieldShellProps) {
+function FieldShell({ label, labelHidden, hint, error, required, children }: FieldShellProps) {
   const id = useId();
   const hintId = hint ? `${id}-hint` : undefined;
   const errorId = error ? `${id}-error` : undefined;
@@ -50,7 +55,15 @@ function FieldShell({ label, hint, error, required, children }: FieldShellProps)
 
   return (
     <div className="flex min-w-0 flex-col gap-1.5 pointer-fine:gap-1">
-      <label htmlFor={id} className="text-sm font-medium text-ink-300 pointer-fine:text-xs">
+      {/* `sr-only` is absolutely positioned, so a hidden label is not a flex
+          item and leaves no gap of its own above the control. */}
+      <label
+        htmlFor={id}
+        className={cn(
+          'text-sm font-medium text-ink-300 pointer-fine:text-xs',
+          labelHidden && 'sr-only',
+        )}
+      >
         {label}
         {required ? <span className="ml-1 text-danger-400">*</span> : null}
       </label>
@@ -71,18 +84,57 @@ function FieldShell({ label, hint, error, required, children }: FieldShellProps)
 
 export interface TextFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'id'> {
   label: string;
+  /**
+   * Keep the label for screen readers but not on screen. For a field whose
+   * purpose is already obvious from its position — the search box pinned above
+   * the check-in roster — a printed "Search" is a line of chrome between the
+   * volunteer and the list. The `<label>` stays in the DOM either way, so the
+   * control keeps a real accessible name and a bigger hit area than an
+   * `aria-label` alone would give it.
+   */
+  labelHidden?: boolean;
   hint?: string;
   error?: string | null;
+  /**
+   * Show a clear button, and clear on Escape, while the field has a value.
+   * Reads `value`, so it only does anything on a controlled field.
+   */
+  onClear?: () => void;
 }
 
-export function TextField({ label, hint, error, className, required, ...rest }: TextFieldProps) {
+export function TextField({
+  label,
+  labelHidden,
+  hint,
+  error,
+  className,
+  required,
+  onClear,
+  onKeyDown,
+  ...rest
+}: TextFieldProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
   // A search box and a dropdown rendered as identical rounded rectangles are
   // genuinely ambiguous: people tap the filter expecting a keyboard. The icon
   // is what tells them which one they are about to touch.
   const isSearch = rest.type === 'search';
+  const clearable = onClear !== undefined && String(rest.value ?? '').length > 0;
+
+  const clear = () => {
+    onClear?.();
+    // Keep the keyboard up: clearing is usually a prelude to retyping.
+    inputRef.current?.focus();
+  };
 
   return (
-    <FieldShell label={label} hint={hint} error={error} required={required}>
+    <FieldShell
+      label={label}
+      labelHidden={labelHidden}
+      hint={hint}
+      error={error}
+      required={required}
+    >
       {({ id, describedBy }) => (
         <span className="relative block">
           {isSearch ? (
@@ -100,13 +152,47 @@ export function TextField({ label, hint, error, className, required, ...rest }: 
             </span>
           ) : null}
           <input
+            ref={inputRef}
             id={id}
             aria-describedby={describedBy}
             aria-invalid={error ? true : undefined}
             required={required}
-            className={cn(CONTROL, isSearch && ICON_GUTTER_LEFT, error && 'ring-danger-500', className)}
+            onKeyDown={(event) => {
+              onKeyDown?.(event);
+              if (clearable && !event.defaultPrevented && event.key === 'Escape') {
+                event.preventDefault();
+                clear();
+              }
+            }}
+            className={cn(
+              CONTROL,
+              isSearch && ICON_GUTTER_LEFT,
+              // Reserved whether or not the button is showing, so the text does
+              // not reflow out from under the cursor on the first keystroke.
+              onClear && CLEAR_GUTTER_RIGHT,
+              // WebKit draws its own ✕ for `type="search"`. Ours is the one
+              // sized for a thumb; two of them side by side is just confusing.
+              onClear && '[&::-webkit-search-cancel-button]:appearance-none',
+              error && 'ring-danger-500',
+              className,
+            )}
             {...rest}
           />
+          {clearable ? (
+            <button
+              type="button"
+              aria-label={isSearch ? 'Clear search' : `Clear ${label.toLowerCase()}`}
+              onClick={clear}
+              className={
+                'absolute top-1/2 right-0.5 flex size-11 -translate-y-1/2 items-center ' +
+                'justify-center rounded-full text-xl leading-none text-ink-400 ' +
+                'active:bg-ink-800 pointer-fine:size-8 pointer-fine:text-base ' +
+                'pointer-fine:hover:bg-ink-800'
+              }
+            >
+              <span aria-hidden="true">×</span>
+            </button>
+          ) : null}
         </span>
       )}
     </FieldShell>
