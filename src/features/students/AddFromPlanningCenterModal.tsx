@@ -166,13 +166,10 @@ export function AddFromPlanningCenterModal({
       onClose={onClose}
       title="Add from Planning Center"
       description="Search your church directory. Tally records that they are on the roster and nothing else about them."
-      variant="centered"
       footer={
-        <div className="flex justify-end">
-          <Button variant="secondary" onClick={onClose}>
-            Done
-          </Button>
-        </div>
+        <Button variant="secondary" onClick={onClose}>
+          Done
+        </Button>
       }
     >
       <div className="flex flex-col gap-4">

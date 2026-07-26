@@ -141,13 +141,12 @@ function AddStudentsModal({
       title="Add students"
       description="Tick everyone going, then add them in one go."
       footer={
-        <div className="flex gap-2">
-          <Button variant="secondary" size="lg" className="flex-1" onClick={close}>
+        <>
+          <Button variant="secondary" size="lg" onClick={close}>
             Cancel
           </Button>
           <Button
             size="lg"
-            className="flex-[2]"
             loading={saving}
             disabled={selected.size === 0}
             onClick={() => void submit()}
@@ -155,7 +154,7 @@ function AddStudentsModal({
             Add {selected.size > 0 ? selected.size : ''}{' '}
             {selected.size === 1 ? 'student' : 'students'}
           </Button>
-        </div>
+        </>
       }
     >
       <div className="flex flex-col gap-3">

@@ -1,10 +1,24 @@
 import { useId, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 import { cn, haptic } from '@/lib/utils';
 
+/*
+ * Two sizes, chosen by pointer rather than by viewport.
+ *
+ * `py-3` on a 16px line box is a 48px control — a thumb target, and correct on
+ * the phone this app is mostly used on. The same 48px on a desktop form of a
+ * dozen fields is ~1200px of column in a 900px window, which is how the event
+ * editor ended up scrolling a form that would otherwise fit on one screen.
+ *
+ * `pointer: fine` is the honest signal for "this is being driven by a mouse",
+ * and it is not the same question as "is this window wide". A tablet in a
+ * keyboard case reports coarse and keeps the big targets; a small laptop window
+ * reports fine and gets the tight ones. See also the font-size rule in
+ * `index.css`, which is what actually shrinks the line box underneath this.
+ */
 const CONTROL =
   'w-full rounded-xl bg-ink-900 px-3 py-3 text-ink-100 ring-1 ring-ink-700 ' +
   'placeholder:text-ink-500 focus:ring-2 focus:ring-brand-400 focus:outline-none ' +
-  'disabled:opacity-50';
+  'disabled:opacity-50 pointer-fine:rounded-lg pointer-fine:px-2.5 pointer-fine:py-2';
 
 interface FieldShellProps {
   label: string;
@@ -21,19 +35,19 @@ function FieldShell({ label, hint, error, required, children }: FieldShellProps)
   const describedBy = [hintId, errorId].filter(Boolean).join(' ') || undefined;
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-sm font-medium text-ink-300">
+    <div className="flex min-w-0 flex-col gap-1.5 pointer-fine:gap-1">
+      <label htmlFor={id} className="text-sm font-medium text-ink-300 pointer-fine:text-xs">
         {label}
         {required ? <span className="ml-1 text-danger-400">*</span> : null}
       </label>
       {children({ id, describedBy })}
       {hint && !error ? (
-        <p id={hintId} className="text-xs text-ink-500">
+        <p id={hintId} className="text-xs leading-snug text-ink-500">
           {hint}
         </p>
       ) : null}
       {error ? (
-        <p id={errorId} className="text-xs text-danger-400">
+        <p id={errorId} className="text-xs leading-snug text-danger-400">
           {error}
         </p>
       ) : null}
@@ -162,7 +176,7 @@ export function NumberStepperField({
             }}
             className={
               'w-full min-w-0 border-x border-ink-800 bg-transparent py-3 text-center text-lg ' +
-              'font-semibold tabular-nums text-ink-100 focus:outline-none ' +
+              'font-semibold tabular-nums text-ink-100 focus:outline-none pointer-fine:py-1.5 ' +
               // The native spinners are a third way to change the value, at a
               // size no thumb can hit. The buttons replace them.
               '[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none ' +
@@ -201,7 +215,8 @@ function StepButton({
       className={
         'flex min-h-12 w-12 shrink-0 items-center justify-center text-xl leading-none ' +
         'text-ink-300 select-none hover:bg-ink-800 active:bg-ink-700 ' +
-        'disabled:pointer-events-none disabled:text-ink-600'
+        'disabled:pointer-events-none disabled:text-ink-600 ' +
+        'pointer-fine:min-h-9 pointer-fine:w-9 pointer-fine:text-base'
       }
     >
       <span aria-hidden="true">{glyph}</span>

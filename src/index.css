@@ -67,6 +67,12 @@
   /* Safe-area aware sizing for the persistent check-in chrome. */
   --spacing-safe-bottom: env(safe-area-inset-bottom, 0px);
   --spacing-safe-top: env(safe-area-inset-top, 0px);
+
+  /* A sheet rises from the edge it is attached to; a window fades in where it
+     already is. Both are short enough to be felt rather than watched, and both
+     are flattened by the reduced-motion block at the foot of this file. */
+  --animate-sheet-in: tally-sheet-in 180ms ease-out;
+  --animate-dialog-in: tally-dialog-in 120ms ease-out;
 }
 
 /*
@@ -156,6 +162,23 @@
     font-size: 16px;
   }
 
+  /*
+   * That 16px is a workaround for a phone, not a type choice, and it is the
+   * single biggest reason a form looks blown up on a desktop: it sets the line
+   * box every control's height is built on. A mouse cannot trigger the zoom, so
+   * where there is one, controls go back to the app's own body size.
+   *
+   * Keyed on the pointer rather than the width on purpose — a tablet in a
+   * keyboard case is a wide screen that is still being touched.
+   */
+  @media (pointer: fine) {
+    input,
+    select,
+    textarea {
+      font-size: 14px;
+    }
+  }
+
   :focus-visible {
     @apply outline-2 outline-offset-2 outline-brand-400;
   }
@@ -173,6 +196,40 @@
   /* Momentum scrolling for the roster list on iOS. */
   .scroll-touch {
     -webkit-overflow-scrolling: touch;
+  }
+
+  /*
+   * "There is more below this."
+   *
+   * A phone scrollbar appears the moment you touch the list. A desktop one is
+   * an overlay that is invisible until the mouse is already moving, so a form
+   * clipped mid-field simply looks like a form that ends mid-field — which is
+   * exactly how the event editor read.
+   *
+   * The two `local` layers are the panel's own background painting over the
+   * shadow when the box is scrolled to that end; the two `scroll` layers are
+   * the shadows themselves, pinned to the frame. No JavaScript, no scroll
+   * listener, and it costs nothing when the content fits.
+   */
+  .scroll-shadow {
+    background-color: var(--color-ink-900);
+    background-image:
+      linear-gradient(var(--color-ink-900) 30%, transparent),
+      linear-gradient(transparent, var(--color-ink-900) 70%),
+      radial-gradient(farthest-side at 50% 0, rgb(0 0 0 / 0.45), transparent),
+      radial-gradient(farthest-side at 50% 100%, rgb(0 0 0 / 0.45), transparent);
+    background-position:
+      0 0,
+      0 100%,
+      0 0,
+      0 100%;
+    background-size:
+      100% 1.5rem,
+      100% 1.5rem,
+      100% 0.5rem,
+      100% 0.5rem;
+    background-repeat: no-repeat;
+    background-attachment: local, local, scroll, scroll;
   }
 }
 
@@ -208,6 +265,24 @@
 
 .animate-flash {
   animation: tally-flash 600ms ease-out;
+}
+
+/*
+ * Dialog entrances. `<dialog>` is `display: none` while closed, so both of
+ * these run on open without any mount/unmount bookkeeping in React.
+ */
+@keyframes tally-sheet-in {
+  from {
+    transform: translateY(1.5rem);
+    opacity: 0;
+  }
+}
+
+@keyframes tally-dialog-in {
+  from {
+    transform: scale(0.98);
+    opacity: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

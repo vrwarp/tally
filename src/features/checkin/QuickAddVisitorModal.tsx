@@ -89,16 +89,16 @@ export function QuickAddVisitorModal({
       onClose={onClose}
       title="Add a visitor"
       description="The core team fills in parent contact details later."
-      variant="sheet"
+      size="sm"
       footer={
-        <div className="flex gap-2">
-          <Button variant="secondary" size="lg" className="flex-1" onClick={onClose}>
+        <>
+          <Button variant="secondary" size="lg" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" form={formId} size="lg" className="flex-[2]">
+          <Button type="submit" form={formId} size="lg">
             Save &amp; check in
           </Button>
-        </div>
+        </>
       }
     >
       <form id={formId} onSubmit={handleSubmit} className="flex flex-col gap-4">

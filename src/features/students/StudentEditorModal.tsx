@@ -190,16 +190,15 @@ export function StudentEditorModal({ open, onClose, student }: StudentEditorModa
           ? undefined
           : 'Created in Tally and pushed to Planning Center on the next sync.'
       }
-      variant="sheet"
       footer={
-        <div className="flex gap-2">
-          <Button variant="secondary" size="lg" className="flex-1" onClick={onClose}>
+        <>
+          <Button variant="secondary" size="lg" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" form={formId} size="lg" className="flex-[2]" loading={saving}>
+          <Button type="submit" form={formId} size="lg" loading={saving}>
             {student ? 'Save changes' : 'Add student'}
           </Button>
-        </div>
+        </>
       }
     >
       <form

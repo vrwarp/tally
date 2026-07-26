@@ -129,16 +129,15 @@ export function PlanningCenterEditor({
       onClose={onClose}
       title="Planning Center settings"
       description="Everything except the credentials. Changes apply to every counselor's next read."
-      variant="centered"
       footer={
-        <div className="flex flex-wrap items-center justify-end gap-3">
-          <Button variant="ghost" onClick={onClose} disabled={saving}>
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
           <Button onClick={() => void handleSave()} loading={saving}>
             Save settings
           </Button>
-        </div>
+        </>
       }
     >
       <div className="flex flex-col gap-5">
