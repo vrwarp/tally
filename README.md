@@ -191,7 +191,7 @@ the same process.
 | File | Committed? | Read when | Holds |
 | --- | --- | --- | --- |
 | `.env.example` | yes | never — it is a template | The shape of `.env.local`. |
-| `.env.local` | no | `npm run dev`, `npm run build` | `VITE_FIREBASE_CONFIG`, the web config object — the console's `const firebaseConfig = { … };` snippet or JSON, either works. |
+| `.env.local` | no | `npm run dev`, `npm run build` | `VITE_FIREBASE_CONFIG`, the web config object — the console's `const firebaseConfig = { … };` snippet or JSON, either works. Optionally `VITE_AUTH_DOMAINS`, the domains serving Tally's own `/__/auth` handler — see [the sign-in domain](docs/deployment-setup.md#the-sign-in-domain). |
 | `.env.emulated` | yes | `vite --mode emulated` (`npm run dev:emulated`) | Emulator hosts and ports. No project config needed at all. |
 
 The Firebase **web config is not a secret** — `apiKey`, `projectId` and friends are shipped to every

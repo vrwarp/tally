@@ -2,13 +2,14 @@
  * Two browser contexts that break Google sign-in, and how to tell you are in
  * one. Client-safe and dependency-free.
  *
- * Both matter more for Tally than for a typical web app. Counselors open their
- * magic link from inside a mail client's in-app browser, and the ones who use
- * Tally weekly install it to their home screen — which is exactly the case
- * `signInWithPopup` cannot survive.
+ * Both matter more for Tally than for a typical web app. Counselors follow a
+ * link to the roster out of a group chat, which opens in that app's built-in
+ * browser; the ones who use Tally weekly install it to their home screen,
+ * which is exactly the case `signInWithPopup` cannot survive.
  *
- * The email link path works in every one of these contexts, which is why it is
- * the primary way in and Google is the secondary one.
+ * There is no second door to fall back to — the email magic link was removed,
+ * so Google is the only way in. That shapes everything below: the point is to
+ * find the flow most likely to work, and to refuse only when nothing can.
  */
 
 /**
@@ -65,7 +66,7 @@ export function isStandaloneDisplay(): boolean {
  * round-trip fails with "unable to process request due to missing initial
  * state". Serving auth from the app's own origin — set `authDomain` to the
  * hosting domain, which Firebase Hosting already serves `/__/auth/*` from —
- * makes partitioning irrelevant.
+ * makes partitioning irrelevant. `lib/authDomain.ts` is what arranges that.
  */
 export function isFirstPartyAuthDomain(authDomain: string | undefined): boolean {
   if (typeof window === 'undefined' || !authDomain) return false;
@@ -76,13 +77,31 @@ export function isFirstPartyAuthDomain(authDomain: string | undefined): boolean 
 export type GoogleSignInStrategy = 'popup' | 'redirect' | 'unavailable';
 
 export function googleSignInStrategy(authDomain: string | undefined): GoogleSignInStrategy {
-  if (isEmbeddedBrowser()) return 'unavailable';
+  const firstParty = isFirstPartyAuthDomain(authDomain);
 
-  if (isStandaloneDisplay()) {
-    // A hang is worse than an honest refusal: if redirect cannot be trusted
-    // either, say so and let the counselor use the email link.
-    return isFirstPartyAuthDomain(authDomain) ? 'redirect' : 'unavailable';
-  }
+  /*
+   * Installed app first, because it is the case that hangs. The popup is not
+   * merely worse here, it is unusable — and a hang cannot be caught and
+   * retried, so guessing wrong strands the counselor on a spinner. When the
+   * handler is not first-party the redirect would fail too, and an honest
+   * refusal beats a flow that half-works.
+   */
+  if (isStandaloneDisplay()) return firstParty ? 'redirect' : 'unavailable';
+
+  /*
+   * An in-app webview: opened from a mail client, Messenger, the Google app.
+   * `window.open` is blocked, so the popup has little chance — but a redirect
+   * is an ordinary same-window navigation and stands a real one.
+   *
+   * Deliberately never 'unavailable'. Google may still refuse the user agent
+   * with `disallowed_useragent`, and the login screen says so up front. But
+   * this detection is user-agent sniffing and it *will* be wrong sometimes,
+   * and Google is now the only door into Tally — the magic link is gone. A
+   * false positive that disables the button locks a counselor out of the app
+   * entirely, which is a far worse failure than a button that turns out not to
+   * work. So: warn loudly, and let them try.
+   */
+  if (isEmbeddedBrowser()) return firstParty ? 'redirect' : 'popup';
 
   return 'popup';
 }

@@ -82,6 +82,49 @@ The tempting shortcut is to give the deploy key `roles/resourcemanager.projectIa
 this itself; don't. A key that can rewrite project IAM can grant itself anything, which is the
 opposite of why the backend key is kept narrow and separate from Hosting's.
 
+### The sign-in domain
+
+Skippable while Tally lives on `tally-76406.web.app`. As soon as it has its own domain, this is
+what makes Google sign-in work in the installed app — which is how the counselors who use Tally
+weekly end up opening it.
+
+The Firebase console's web config points `authDomain` at `tally-76406.firebaseapp.com`, and for a
+sign-in **popup** that is fine. An installed home-screen app cannot use the popup at all: on
+Android it opens a Custom Tab whose handshake never comes back, so the call *hangs* rather than
+failing, and on iOS it is blocked outright. That leaves `signInWithRedirect`, which parks its state
+in `sessionStorage` belonging to the `authDomain` origin — and every browser that matters now
+partitions storage by top-level site. State written on the way to Google is not readable on the way
+back, and the round-trip dies with *"unable to process request due to missing initial state"*.
+
+The fix is to serve the handler from the app's own domain, and Firebase Hosting already does:
+`/__/*` is a reserved namespace answered on every domain attached to the site, ahead of the SPA
+rewrite in `firebase.json`. Nothing needs proxying. Three steps, all of them one-time:
+
+1. **Firebase console → Authentication → Settings → Authorized domains.** Add the domain. Sign-in
+   is refused from anywhere not on this list.
+2. **Google Cloud console → APIs & Services → Credentials → the "Web client (auto created by Google
+   Service)" OAuth client → Authorized redirect URIs.** Add `https://<domain>/__/auth/handler`.
+   Only `tally-76406.firebaseapp.com` is there by default. Miss this one and the redirect fails
+   with `redirect_uri_mismatch` — a hard failure, not a fallback, which is why Tally will not
+   assume a domain is ready until you say so in step 3.
+3. **Set `VITE_AUTH_DOMAINS`** — as a repository secret for the deployed build, and in `.env.local`
+   if you want it locally. Comma-separated, so list every domain you completed steps 1 and 2 for:
+
+   ```
+   VITE_AUTH_DOMAINS=tally.example.org,tally-76406.web.app
+   ```
+
+Tally matches the list against the host actually being browsed and points `authDomain` at that,
+leaving the console default in place anywhere else — `localhost`, and the PR preview channels,
+whose URLs are generated per-deploy and could never be registered in step 2. So one build stays
+correct at every address it is reachable from. The logic is in
+[`src/lib/authDomain.ts`](../src/lib/authDomain.ts); what it unlocks is in
+[`src/lib/embeddedBrowser.ts`](../src/lib/embeddedBrowser.ts), which stops refusing Google sign-in
+in an installed app once the handler is first-party.
+
+Verify it from an iPhone rather than a desktop: add Tally to the home screen, open it from there,
+and sign in. That is the path this exists for, and it is the one a desktop browser cannot rehearse.
+
 ### The secret bindings
 
 Last of the owner-only steps. A function declaring `defineSecret` needs its *runtime* account to be
@@ -178,6 +221,11 @@ once per project.
 - `VITE_FIREBASE_CONFIG` — the web config object, the same value `.env.local` holds, in either the
   console's `const firebaseConfig = { … };` form or JSON. Vite embeds it at build time, so the
   Hosting workflows need it even though it is not a secret.
+- `VITE_AUTH_DOMAINS` — optional, and not a secret either; a repository secret only because that is
+  where the Hosting workflows read build settings from. The comma-separated domains that serve
+  Tally's own `/__/auth` handler, which is what lets the installed home-screen app sign in at all.
+  Leave it unset until the console steps in [the sign-in domain](#the-sign-in-domain) are done —
+  naming a domain that is not registered breaks sign-in there rather than degrading it.
 - `FUNCTIONS_ENV` — the deploy-time settings for `tally-76406`, as the literal contents of a `.env`
   file: `TALLY_ADMIN_EMAILS`, `PCO_API_BASE_URL`, the grade range (`PCO_MIN_GRADE` /
   `PCO_MAX_GRADE`), `PCO_WRITE_BACK` and `PCO_CACHE_TTL_SECONDS` — **not** `PCO_APP_ID` or

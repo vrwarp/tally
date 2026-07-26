@@ -28,7 +28,11 @@ import {
   popupRedirectResolver,
   recoverFromWedgedPersistence,
 } from '@/lib/firebase';
-import { googleSignInStrategy, isEmbeddedBrowser } from '@/lib/embeddedBrowser';
+import {
+  googleSignInStrategy,
+  isEmbeddedBrowser,
+  isFirstPartyAuthDomain,
+} from '@/lib/embeddedBrowser';
 import { getUserProfileFromServer, subscribeUserProfile, touchLastSeen } from '@/services/users';
 import { roleAtLeast, type Role, type UserProfile } from '@/types';
 import {
@@ -75,21 +79,70 @@ function setRedirectPending(pending: boolean): void {
   }
 }
 
+/**
+ * What to tell someone whose browser is the problem. Both end in the same
+ * instruction because there is only one thing that fixes it.
+ */
+const IN_APP_BROWSER_DEAD_END =
+  'This in-app browser cannot do Google sign-in. Open Tally in Safari or Chrome — ' +
+  'tap the menu (⋯ or the share icon) and choose “Open in browser”.';
+const INSTALLED_APP_DEAD_END =
+  'Google sign-in is not available in the installed app. Open Tally in Safari or Chrome.';
+
+/**
+ * Failures that mean "the popup never opened", as opposed to "the person
+ * changed their mind". Firebase reports the same situation under different
+ * codes depending on the browser, and all of them are worth retrying as a
+ * redirect — provided the redirect can complete. See `signInWithGoogle`.
+ */
+const POPUP_NEVER_OPENED = new Set([
+  'auth/popup-blocked',
+  'auth/operation-not-supported-in-this-environment',
+]);
+
 function describeAuthError(error: unknown): string {
   const code = (error as { code?: string })?.code ?? '';
+  const message = (error as { message?: string })?.message ?? '';
+  const embedded = isEmbeddedBrowser();
+
   switch (code) {
     case 'auth/popup-closed-by-user':
     case 'auth/cancelled-popup-request':
       return 'Sign-in was cancelled.';
-    case 'auth/popup-blocked':
-      return 'The sign-in window was blocked. Allow popups for this site, or try again.';
-    case 'auth/operation-not-supported-in-this-environment':
-      return 'This browser cannot do Google sign-in. Open Tally in Safari or Chrome.';
     case 'auth/network-request-failed':
       return 'No connection. Check the wifi and try again.';
+    case 'auth/popup-blocked':
+      return embedded
+        ? IN_APP_BROWSER_DEAD_END
+        : 'The sign-in window was blocked. Allow popups for this site, or try again.';
+    case 'auth/operation-not-supported-in-this-environment':
+      return embedded
+        ? IN_APP_BROWSER_DEAD_END
+        : 'This browser cannot do Google sign-in. Open Tally in Safari or Chrome.';
     default:
-      return (error as { message?: string })?.message ?? 'Sign-in failed. Try again.';
+      break;
   }
+
+  /*
+   * The signature of a redirect whose handshake was partitioned away: the
+   * state written before leaving for Google was not readable on the way back.
+   * There is nothing the counselor can do about the cause — it is the
+   * deployment's `authDomain` — so the message offers the one workaround they
+   * have, and the console names the real fix for whoever is looking.
+   */
+  if (/missing initial state/i.test(message)) {
+    console.warn(
+      '[tally] Google redirect lost its initial state. The auth handler is not first-party: ' +
+        'add this host to VITE_AUTH_DOMAINS and register it with Google (docs/deployment-setup.md).',
+    );
+    return 'Sign-in could not be completed in this browser. Try again in Safari or Chrome.';
+  }
+
+  // In a webview an unrecognised failure is nearly always the webview, and the
+  // raw Firebase text helps nobody standing at a door.
+  if (embedded) return IN_APP_BROWSER_DEAD_END;
+
+  return message || 'Sign-in failed. Try again.';
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -261,8 +314,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * block ever runs — and on iOS it is blocked outright. Those contexts are
    * detected before the attempt, not after it.
    *
-   * "Unavailable" is now a genuine dead end rather than a nudge toward the
-   * other door — there is no other door — so it says what to do about it.
+   * An in-app browser is *not* treated as a dead end. The popup will probably
+   * fail there and the login screen says so, but where the auth handler is
+   * first-party the redirect is an ordinary navigation and often works — and
+   * user-agent sniffing that is wrong once locks somebody out of the only door
+   * Tally has.
+   *
+   * "Unavailable" is a genuine dead end rather than a nudge toward the other
+   * door — there is no other door — so it says what to do about it.
    */
   const signInWithGoogle = useCallback(async () => {
     setError(null);
@@ -270,14 +329,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
 
-    const strategy = googleSignInStrategy(firebaseApp.options.authDomain);
+    const authDomain = firebaseApp.options.authDomain;
+    const strategy = googleSignInStrategy(authDomain);
 
     if (strategy === 'unavailable') {
-      setError(
-        isEmbeddedBrowser()
-          ? 'This in-app browser cannot do Google sign-in. Open Tally in Safari or Chrome.'
-          : 'Google sign-in is not available in the installed app. Open Tally in Safari or Chrome.',
-      );
+      setError(isEmbeddedBrowser() ? IN_APP_BROWSER_DEAD_END : INSTALLED_APP_DEAD_END);
       return;
     }
 
@@ -304,8 +360,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       await signInWithPopup(auth, provider, resolver);
     } catch (cause) {
-      // A blocked popup in a normal tab is recoverable: hand it to the redirect.
-      if ((cause as { code?: string })?.code === 'auth/popup-blocked') {
+      /*
+       * A popup that never opened is recoverable — but only into a redirect
+       * that can actually finish. Against a third-party handler the fallback
+       * trades "the sign-in window was blocked" for "missing initial state":
+       * the same dead end, reached more slowly and explained worse. So the
+       * first-party check gates the retry rather than decorating it.
+       */
+      const code = (cause as { code?: string })?.code ?? '';
+      if (POPUP_NEVER_OPENED.has(code) && isFirstPartyAuthDomain(authDomain)) {
         try {
           await startRedirect();
           return;
