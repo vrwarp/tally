@@ -16,12 +16,14 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { paths } from '@/lib/paths';
+import { normalizeRecurrence } from '@/lib/recurrence';
 import { toEvent, toEventSeries, toSettings, toSmallGroup } from '@/services/converters';
 import type {
   AppSettings,
   EventMode,
   EventSeries,
   EventStatus,
+  RecurrenceRule,
   RosterGroupingMode,
   SmallGroup,
   TallyEvent,
@@ -31,6 +33,8 @@ export interface EventDraft {
   title: string;
   mode: EventMode;
   seriesId?: string | null;
+  /** How it repeats. `startAt`/`endAt` are the next occurrence, not the first. */
+  recurrence?: RecurrenceRule | null;
   startAt: Date;
   endAt: Date;
   checkInOpensAt: Date;
@@ -125,6 +129,13 @@ function buildEventPayload(draft: EventDraft, uid: string, isNew: boolean) {
     title: draft.title.trim(),
     mode: draft.mode,
     seriesId: draft.mode === 'recurring' ? (draft.seriesId ?? null) : null,
+    // A retreat happens once. Nulling it here rather than trusting the caller
+    // keeps a mode switch in the editor from leaving a weekly rule behind on
+    // something that will never run again.
+    recurrence:
+      draft.mode === 'recurring' && draft.recurrence
+        ? normalizeRecurrence(draft.recurrence, draft.startAt)
+        : null,
     startAt: draft.startAt,
     endAt: draft.endAt,
     checkInOpensAt: draft.checkInOpensAt,
