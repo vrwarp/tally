@@ -175,14 +175,27 @@ describe('fetchRoster', () => {
     expect(people[0]?.hasAllergies).toBe(true);
   });
 
-  it('prefers the nickname a counselor would actually say', async () => {
+  it('shows the name the way the Planning Center profile shows it', async () => {
     const { people } = await fetchRoster({
       ...world,
       config: baseConfig(),
       personIds: [FIXTURE_IDS.benjiWithNickname],
     });
 
-    expect(people[0]?.firstName).toBe('Benji');
+    expect(people[0]?.firstName).toBe('Benjamin “Benji”');
+  });
+
+  it('keeps both halves of a name whose nickname is in another script', async () => {
+    const { people } = await fetchRoster({
+      ...world,
+      config: baseConfig(),
+      personIds: [FIXTURE_IDS.bensonWithScriptNickname],
+    });
+
+    expect(people[0]?.firstName).toBe('Benson “蔡秉洲”');
+    // The search key carries both, so a counselor typing either one finds him.
+    expect(people[0]?.searchName).toContain('benson');
+    expect(people[0]?.searchName).toContain('蔡秉洲');
   });
 
   it('returns ids the rest of Tally can use as student ids', async () => {
@@ -332,6 +345,35 @@ describe('searchPeople', () => {
     const results = await searchPeople({ ...world, config: baseConfig(), query: 'Amara' });
 
     expect(results.find((person) => person.pcoPersonId === FIXTURE_IDS.amara)?.child).toBe(true);
+  });
+
+  it('reports the grade Planning Center holds, not the bottom of the band', async () => {
+    // Every adult in the church has a blank grade. Flooring that to `minGrade`
+    // put "6th" under a parent's name and read as something Planning Center had
+    // said.
+    const world = harness();
+    const results = await searchPeople({ ...world, config: baseConfig(), query: 'Chidi' });
+
+    expect(results.find((person) => person.pcoPersonId === '5200001')?.grade).toBeNull();
+  });
+
+  it('reports a grade below the band as the grade it is', async () => {
+    const world = harness();
+    const results = await searchPeople({ ...world, config: baseConfig(), query: 'Oliver' });
+
+    expect(results.find((person) => person.pcoPersonId === FIXTURE_IDS.oliverFifthGrader)?.grade).toBe(5);
+  });
+
+  it('finds a student by the first name Planning Center hides behind a nickname', async () => {
+    const world = harness();
+    const results = await searchPeople({ ...world, config: baseConfig(), query: 'Benson Tsai' });
+
+    const found = results.find(
+      (person) => person.pcoPersonId === FIXTURE_IDS.bensonWithScriptNickname,
+    );
+    // The row has to name him the way the profile does, or the search that found
+    // him and the result that came back look like two different people.
+    expect(found?.firstName).toBe('Benson “蔡秉洲”');
   });
 
   it('answers an empty query without asking', async () => {

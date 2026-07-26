@@ -74,10 +74,12 @@ Only on the HTTP server, for end-to-end tests:
 
 ## The seeded organisation
 
-35 people: 18 youth, 12 parents and 5 team members. Every record earns its place
+37 people: 19 youth, 13 parents and 5 team members. Every record earns its place
 by exercising a decision the mapping code has to make:
 
 - a student whose `nickname` differs from `first_name` (Benjamin → "Benji")
+- a student whose `nickname` is in another script (Benson → "蔡秉洲"), so the
+  roster has to carry both halves the way Planning Center does
 - a student with no `grade`, carrying only a `graduation_year`
 - a 5th grader, who must never reach a 6-12 ministry roster
 - an inactive student, who must be deactivated rather than deleted

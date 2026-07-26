@@ -248,6 +248,58 @@ export function buildSearchName(firstName: string, lastName: string): string {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Names                                                                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Planning Center writes a person with both a first name and a nickname as
+ * `Benson “蔡秉洲” Tsai` — the nickname adds to the first name rather than
+ * replacing it. `Student.firstName` holds that composite, so a roster row reads
+ * the same as the Planning Center profile and `searchName` carries both
+ * spellings.
+ *
+ * The student editor is the one place that needs the halves back: it offers the
+ * same two boxes Planning Center's own edit form does.
+ */
+const NICKNAME_OPEN = '“';
+const NICKNAME_CLOSE = '”';
+
+/**
+ * The two halves, joined. A nickname equal to the first name is dropped rather
+ * than repeated — `Ben “Ben”` is noise.
+ *
+ * Must stay identical to `composeFirstName` in functions/src/pco/mapping.ts.
+ */
+export function composeFirstName(firstName: string, nickname: string | null): string {
+  const legal = firstName.trim();
+  const nick = nickname?.trim() ?? '';
+
+  if (nick.length === 0) return legal;
+  if (legal.length === 0) return nick;
+  // The first name is the canonical spelling of the two.
+  if (legal.toLowerCase() === nick.toLowerCase()) return legal;
+  return `${legal} ${NICKNAME_OPEN}${nick}${NICKNAME_CLOSE}`;
+}
+
+/**
+ * The composite pulled apart again. Anything without the quoted section comes
+ * back unchanged, which covers every hand-typed visitor name.
+ *
+ * Must stay identical to `splitFirstName` in functions/src/pco/mapping.ts.
+ */
+export function splitFirstName(value: string): { firstName: string; nickname: string | null } {
+  const match = /^(.*?)\s*[“"]([^”"]*)[”"]\s*$/.exec(value.trim());
+  if (!match) return { firstName: value.trim(), nickname: null };
+
+  const legal = match[1]?.trim() ?? '';
+  const nickname = match[2]?.trim() ?? '';
+  if (nickname.length === 0) return { firstName: legal, nickname: null };
+  // `“Benji”` with nothing in front of it is just a name in quotes.
+  if (legal.length === 0) return { firstName: nickname, nickname: null };
+  return { firstName: legal, nickname };
+}
+
+/* -------------------------------------------------------------------------- */
 /* Event series (the recurring templates)                                      */
 /* -------------------------------------------------------------------------- */
 
@@ -486,7 +538,8 @@ export interface PcoPersonSearchResult {
   id: string;
   firstName: string;
   lastName: string;
-  grade: number;
+  /** Null when Planning Center holds no grade and no graduation year for them. */
+  grade: number | null;
   child: boolean;
   status: StudentStatus;
 }

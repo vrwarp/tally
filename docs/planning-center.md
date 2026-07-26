@@ -138,7 +138,17 @@ no name, grade or contact detail of its own.
 
 The search is deliberately unfiltered — no grade band, no "is a child" — because those filters are
 wrong at exactly the edges a hand-picked roster exists for. Both facts are *shown* on each result so
-the leader can see what they are choosing.
+the leader can see what they are choosing, and shown as Planning Center holds them: a person with no
+grade on file reads "No grade in Planning Center" rather than being floored to `PCO_MIN_GRADE`, which
+would put "6th" under every adult in the church.
+
+### How a name is written
+
+Planning Center composes a display name as `first_name “nickname” last_name` — `Benson “蔡秉洲” Tsai`
+— treating the nickname as an addition rather than a replacement. Tally follows that exactly, so the
+name on a roster row is the name on the profile page. Because `searchName` is built from the same
+string, either spelling finds the student; and because write-back splits the halves apart again
+before sending them, the two fields Planning Center actually stores are never conflated.
 
 Adding goes through a callable rather than a direct write. The document id is a claim about which
 real child a row refers to, so the security rules forbid a browser asserting it; the server checks
@@ -162,7 +172,9 @@ membership moves on its own, which is what made it a poor roster in the first pl
 
 `PCO_MIN_GRADE`/`PCO_MAX_GRADE` no longer select anybody. They are the range the app understands
 (`Grade` is 6–12) and the landing spot for a student Planning Center has no grade for. A student
-outside the band can be on the roster; their grade is clamped for display.
+outside the band can be on the roster; their grade is clamped for display. The clamp applies to
+roster rows and student documents, which must carry *some* grade — not to the Add-from-Planning-Center
+search, which reports a missing grade as missing.
 
 ---
 
@@ -183,6 +195,11 @@ In every mode, before creating a person Tally searches `where[search_name]` plus
 the results again locally through the same accent- and punctuation-insensitive normalisation used to
 collapse duplicate visitors. If several people match exactly, the church database already has
 duplicates and Tally links to the lowest id rather than adding a third.
+
+A name Tally holds as `Benson “蔡秉洲”` is split back into `first_name` and `nickname` before any of
+this: the server's fuzzy search indexes the halves separately, and writing the composite into
+`first_name` would render as `Benson “蔡秉洲” “蔡秉洲” Tsai` on the next read and stop the matcher
+recognising the person at all — which is how a duplicate child gets created.
 
 The fields Planning Center owns once a student is linked are listed in `PCO_MANAGED_STUDENT_FIELDS`:
 first name, last name, grade, gender, allergies, status. The student editor shows them read-only with
@@ -325,8 +342,8 @@ surname typed one way at the door, or a grade that was off by one. To fix it by 
    and the head count for those past events would silently drop.
 4. If the student's attendance is on the wrong record, re-check them in on the correct one from the
    event's detail screen before deactivating.
-5. To stop it recurring, make Planning Center's `first_name` (or nickname) match what counselors
-   actually call the student, and correct the grade.
+5. To stop it recurring, put what counselors actually call the student in Planning Center's
+   `first_name` or `nickname` — Tally carries both, so either one matches — and correct the grade.
 
 **It says it is not configured** — the config refused to build a client, and the message names the
 value: a missing `PCO_APP_ID` or `PCO_SECRET`. Both are a Secret Manager job.

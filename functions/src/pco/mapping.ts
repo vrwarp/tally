@@ -91,6 +91,77 @@ export function buildSearchName(firstName: string, lastName: string): string {
   return `${firstName} ${lastName}`.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
+/* -------------------------------------------------------------------------- */
+/* Names                                                                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Planning Center writes a person with both a first name and a nickname as
+ * `Benson “蔡秉洲” Tsai` — the nickname is an *addition* to the first name, not a
+ * replacement for it. Tally used to keep only the nickname, which meant a
+ * profile the church office reads as "Benson" showed up here as "蔡秉洲" and the
+ * two were impossible to line up by eye.
+ *
+ * Matching Planning Center's own format costs nothing and buys a lot: the name
+ * on screen is the name on the profile page, and because `searchName` is built
+ * from it, either spelling finds the student.
+ */
+const NICKNAME_OPEN = '“';
+const NICKNAME_CLOSE = '”';
+
+/**
+ * The two halves, joined. A nickname equal to the first name is dropped rather
+ * than repeated — `Ben “Ben”` is noise.
+ *
+ * Must stay identical to `composeFirstName` in src/types/index.ts.
+ */
+export function composeFirstName(firstName: unknown, nickname: unknown): string {
+  const legal = trimmed(firstName);
+  const nick = trimmed(nickname);
+
+  if (nick === null) return legal ?? '';
+  if (legal === null) return nick;
+  // The first name is the canonical spelling of the two.
+  if (legal.toLowerCase() === nick.toLowerCase()) return legal;
+  return `${legal} ${NICKNAME_OPEN}${nick}${NICKNAME_CLOSE}`;
+}
+
+/**
+ * The composite pulled apart again.
+ *
+ * Planning Center stores the halves in separate fields, so pushing the whole
+ * string into `first_name` would render as `Benson “蔡秉洲” “蔡秉洲” Tsai` on the
+ * next read — and a moment later as a duplicate person, because the matcher
+ * would stop recognising them. Anything without the quoted section comes back
+ * unchanged, which covers every hand-typed visitor name.
+ *
+ * Must stay identical to `splitFirstName` in src/types/index.ts.
+ */
+export function splitFirstName(value: string): { firstName: string; nickname: string | null } {
+  const match = /^(.*?)\s*[“"]([^”"]*)[”"]\s*$/.exec(value.trim());
+  if (!match) return { firstName: value.trim(), nickname: null };
+
+  const legal = match[1]?.trim() ?? '';
+  const nickname = match[2]?.trim() ?? '';
+  if (nickname.length === 0) return { firstName: legal, nickname: null };
+  // `“Benji”` with nothing in front of it is just a name in quotes.
+  if (legal.length === 0) return { firstName: nickname, nickname: null };
+  return { firstName: legal, nickname };
+}
+
+/**
+ * The first-name half of a Planning Center person's display name.
+ *
+ * `given_name` is the legal-name fallback, present when `first_name` has been
+ * overridden.
+ */
+export function displayFirstName(attributes: PcoPersonAttributes): string {
+  return composeFirstName(
+    firstNonEmpty(attributes.first_name, attributes.given_name),
+    attributes.nickname,
+  );
+}
+
 /** Must stay identical to `emailKey` in src/types/index.ts. */
 export function emailKey(email: string): string {
   return email.trim().toLowerCase().replace(/\./g, ',');
@@ -111,13 +182,17 @@ export function computeProfileComplete(input: {
  * "José" are the same child.
  */
 export function nameGradeKey(firstName: string, lastName: string, grade: number): string {
-  const normalise = (value: string): string =>
-    value
+  const normalise = (value: string): string => {
+    const folded = value
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, ' ')
-      .trim();
+      .toLowerCase();
+    const latin = folded.replace(/[^a-z0-9]+/g, ' ').trim();
+    // A name with no Latin letters at all \u2014 \u8521\u79c9\u6d32 \u2014 would otherwise normalise to
+    // the empty string, and every such child in a grade would share one key and
+    // be merged into whichever came first. Keep the characters instead.
+    return latin.length > 0 ? latin : folded.replace(/\s+/g, ' ').trim();
+  };
   return `${normalise(firstName)}|${normalise(lastName)}|${grade}`;
 }
 
@@ -234,6 +309,25 @@ export function gradeFromGraduationYear(graduationYear: number, now: Date): numb
   return 12 - (graduationYear - schoolYearEnding(now));
 }
 
+/**
+ * The grade Planning Center actually holds, or null when it says nothing.
+ *
+ * Kept separate from `mapPersonToStudent` because the two callers want opposite
+ * things from a blank: a student document must carry *some* grade, while a
+ * screen showing "what Planning Center thinks" must be able to say that
+ * Planning Center thinks nothing.
+ */
+export function pcoGrade(person: PcoPerson, now?: Date): number | null {
+  const attributes: PcoPersonAttributes = person.attributes ?? {};
+  if (typeof attributes.grade === 'number' && Number.isFinite(attributes.grade)) {
+    return attributes.grade;
+  }
+  if (now && typeof attributes.graduation_year === 'number') {
+    return gradeFromGraduationYear(attributes.graduation_year, now);
+  }
+  return null;
+}
+
 export function normaliseStatus(person: PcoPerson): StudentStatus {
   const attributes: PcoPersonAttributes = person.attributes ?? {};
   if (trimmed(attributes.inactivated_at) !== null) return 'inactive';
@@ -243,17 +337,11 @@ export function normaliseStatus(person: PcoPerson): StudentStatus {
 export function mapPersonToStudent(person: PcoPerson, ctx: StudentMappingContext): MappedStudent {
   const attributes: PcoPersonAttributes = person.attributes ?? {};
 
-  // What the kid is actually called wins over what the church database calls
-  // them; `given_name` is the legal-name fallback when `first_name` is blank.
-  const firstName = firstNonEmpty(attributes.nickname, attributes.first_name, attributes.given_name) ?? '';
+  // Planning Center's own format, quoted nickname and all. See displayFirstName.
+  const firstName = displayFirstName(attributes);
   const lastName = trimmed(attributes.last_name) ?? '';
 
-  let grade = typeof attributes.grade === 'number' && Number.isFinite(attributes.grade)
-    ? attributes.grade
-    : null;
-  if (grade === null && ctx.now && typeof attributes.graduation_year === 'number') {
-    grade = gradeFromGraduationYear(attributes.graduation_year, ctx.now);
-  }
+  const grade = pcoGrade(person, ctx.now);
 
   return {
     firstName,
@@ -277,13 +365,7 @@ export function mapPersonToStudent(person: PcoPerson, ctx: StudentMappingContext
  * otherwise be swept into the student roster.
  */
 export function isYouth(person: PcoPerson, options: GradeRange & { now?: Date }): boolean {
-  const attributes: PcoPersonAttributes = person.attributes ?? {};
-
-  let grade: number | null =
-    typeof attributes.grade === 'number' && Number.isFinite(attributes.grade) ? attributes.grade : null;
-  if (grade === null && options.now && typeof attributes.graduation_year === 'number') {
-    grade = gradeFromGraduationYear(attributes.graduation_year, options.now);
-  }
+  const grade = pcoGrade(person, options.now);
   if (grade === null) return false;
 
   return grade >= options.minGrade && grade <= options.maxGrade;
@@ -399,9 +481,7 @@ export function extractParentContact(person: PcoPerson, householdIndex: Included
   const attributes: PcoPersonAttributes = chosen.member?.attributes ?? {};
   const parentName =
     firstNonEmpty(
-      [firstNonEmpty(attributes.nickname, attributes.first_name), trimmed(attributes.last_name)]
-        .filter(Boolean)
-        .join(' '),
+      [displayFirstName(attributes), trimmed(attributes.last_name)].filter(Boolean).join(' '),
       attributes.name,
     ) ?? null;
 
