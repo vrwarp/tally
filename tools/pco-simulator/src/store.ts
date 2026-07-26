@@ -30,27 +30,31 @@ export interface SimulatorOptions {
   appId?: string;
   secret?: string;
   /**
-   * API root echoed back in `links.self` / `links.next`.
-   *
-   * The real API returns pagination links as absolute URLs, so the simulator
-   * must too — a relative link would let a client that cannot handle absolute
-   * ones pass here and fail in production.
+   * API root echoed back in `links.self`, and in `links.next` when the
+   * pagination mode is `absolute-links`.
    */
   publicUrl?: string;
   /**
    * How the simulator advertises the next page.
    *
-   * The real API sends `links.next`; some responses only carry `meta.next`.
-   * Both are exercised because the client supports both, and a client that
-   * silently handled only one would look fine right up until Planning Center
-   * changed which it sent.
+   * `links` is what Planning Center actually sends, and it is *relative*:
+   * `/people/v2/people?offset=100&per_page=100`, a path with no origin on it.
+   * This simulator used to send an absolute URL in every mode, on the reasoning
+   * that a client which could follow those could follow anything — which had it
+   * exactly backwards. `fetch` rejects a relative URL, so the real API's own
+   * link shape was the one shape nothing here ever tested, and page two of the
+   * first roster larger than a single page failed with `Invalid URL`.
+   *
+   * `absolute-links` keeps the other shape, because a proxy in front of the API
+   * may rewrite links and because it costs nothing to stay compatible with it.
+   * `meta` covers the responses that carry only `meta.next`.
    *
    * `no-cursor` advertises nothing at all. A client that treats "no cursor" as
    * "no more data" truncates the roster silently — students just vanish — so
    * this mode exists to prove Tally's client keeps walking while pages come
    * back full.
    */
-  pagination?: 'links' | 'meta' | 'no-cursor';
+  pagination?: 'links' | 'absolute-links' | 'meta' | 'no-cursor';
   /** Records served per page. The real API caps at 100. */
   pageSize?: number;
   /** Start the org empty instead of seeded — used by write-back tests. */

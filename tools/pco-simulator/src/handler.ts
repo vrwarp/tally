@@ -558,6 +558,29 @@ function pageUrl(store: SimulatorStore, selfPath: string, rawQuery: string, offs
   return `${store.publicUrl}${selfPath}?${params.toString().replace(/%5B/g, '[').replace(/%5D/g, ']')}`;
 }
 
+/**
+ * The same page, addressed the way Planning Center addresses it.
+ *
+ * The real API's `links.next` is origin-relative — `/people/v2/people?offset=100`
+ * — so that is what the default mode sends. `absolute-links` sends the whole
+ * URL, which is what a proxy that rewrites links would produce, and what this
+ * simulator used to send in every mode.
+ */
+function nextPageLink(
+  store: SimulatorStore,
+  selfPath: string,
+  rawQuery: string,
+  offset: number,
+): string {
+  const absolute = pageUrl(store, selfPath, rawQuery, offset);
+  if (store.pagination === 'absolute-links') return absolute;
+
+  // Path and query only. Parsed rather than sliced so a `publicUrl` carrying a
+  // port or a base path still yields a link that resolves back to this server.
+  const parsed = new URL(absolute);
+  return `${parsed.pathname}${parsed.search}`;
+}
+
 function servePeople(
   candidates: readonly SimPerson[],
   query: Record<string, QueryNode>,
@@ -593,8 +616,8 @@ function servePeople(
   if (hasMore) {
     // `no-cursor` deliberately advertises nothing: the client has to keep
     // walking on its own while pages arrive full.
-    if (store.pagination === 'links') {
-      (body.links as Record<string, string>).next = pageUrl(store, selfPath, rawQuery, nextOffset);
+    if (store.pagination === 'links' || store.pagination === 'absolute-links') {
+      (body.links as Record<string, string>).next = nextPageLink(store, selfPath, rawQuery, nextOffset);
     } else if (store.pagination === 'meta') {
       (body.meta as Record<string, unknown>).next = { offset: nextOffset };
     }
@@ -653,8 +676,8 @@ function serveLists(
   };
 
   if (nextOffset < ordered.length) {
-    if (store.pagination === 'links') {
-      (body.links as Record<string, string>).next = pageUrl(store, selfPath, rawQuery, nextOffset);
+    if (store.pagination === 'links' || store.pagination === 'absolute-links') {
+      (body.links as Record<string, string>).next = nextPageLink(store, selfPath, rawQuery, nextOffset);
     } else if (store.pagination === 'meta') {
       (body.meta as Record<string, unknown>).next = { offset: nextOffset };
     }

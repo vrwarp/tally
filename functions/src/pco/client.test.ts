@@ -113,6 +113,89 @@ describe('paginate', () => {
     ]);
   });
 
+  /**
+   * The regression this guards, and it cost a whole roster: Planning Center
+   * sends `links.next` as a path, `fetch` will not take one, and page one is
+   * built here and is absolute — so the failure needed a roster of more than a
+   * hundred students to appear at all, and appeared as `Invalid URL`.
+   */
+  it('follows a links.next that Planning Center sent as a bare path', async () => {
+    const { client, urls } = makeClient([
+      json({
+        data: personPage(['1', '2']),
+        links: { next: '/people/v2/people?where[child]=true&offset=2&per_page=2' },
+      }),
+      json({ data: personPage(['3']) }),
+    ]);
+
+    const seen: string[] = [];
+    for await (const page of client.paginate<PcoPerson>('/people', { where: { child: true } }, { perPage: 2 })) {
+      seen.push(...page.data.map((p) => p.id));
+    }
+
+    expect(seen).toEqual(['1', '2', '3']);
+    expect(urls[1]).toBe(
+      'https://api.planningcenteronline.com/people/v2/people?where[child]=true&offset=2&per_page=2',
+    );
+  });
+
+  it('follows a links.next that carries nothing but a query string', async () => {
+    const { client, urls } = makeClient([
+      json({ data: personPage(['1']), links: { next: '?offset=1&per_page=1' } }),
+      json({ data: personPage([]) }),
+    ]);
+
+    const seen: string[] = [];
+    for await (const page of client.paginate<PcoPerson>('/people', {}, { perPage: 1 })) {
+      seen.push(...page.data.map((p) => p.id));
+    }
+
+    expect(seen).toEqual(['1']);
+    expect(urls[1]).toBe(`${PCO_BASE_URL}/people?offset=1&per_page=1`);
+  });
+
+  /**
+   * A link that cannot be parsed is not a reason to abandon the walk: the
+   * offset step below finds page two on its own, and losing students is a far
+   * worse outcome than one redundant request.
+   */
+  it('falls back to stepping the offset when links.next is unusable', async () => {
+    const { client, urls } = makeClient([
+      json({ data: personPage(['1', '2']), links: { next: 'http://' } }),
+      json({ data: personPage(['3']) }),
+    ]);
+
+    const seen: string[] = [];
+    for await (const page of client.paginate<PcoPerson>('/people', {}, { perPage: 2 })) {
+      seen.push(...page.data.map((p) => p.id));
+    }
+
+    expect(seen).toEqual(['1', '2', '3']);
+    expect(urls[1]).toBe(`${PCO_BASE_URL}/people?per_page=2&offset=2`);
+  });
+
+  /**
+   * After following cursors, a page that advertises nothing has to step from
+   * where the walk actually got to. Stepping from the stale local offset
+   * re-requested a page already served, which the already-seen check then read
+   * as "the server is looping" and ended the roster early.
+   */
+  it('keeps the offset in step with the cursors it followed', async () => {
+    const { client, urls } = makeClient([
+      json({ data: personPage(['1', '2']), links: { next: '/people/v2/people?offset=2&per_page=2' } }),
+      json({ data: personPage(['3', '4']) }),
+      json({ data: personPage(['5']) }),
+    ]);
+
+    const seen: string[] = [];
+    for await (const page of client.paginate<PcoPerson>('/people', {}, { perPage: 2 })) {
+      seen.push(...page.data.map((p) => p.id));
+    }
+
+    expect(seen).toEqual(['1', '2', '3', '4', '5']);
+    expect(urls[2]).toBe(`${PCO_BASE_URL}/people?per_page=2&offset=4`);
+  });
+
   it('falls back to meta.next.offset when no link is given', async () => {
     const { client, urls } = makeClient([
       json({ data: personPage(['1', '2']), meta: { next: { offset: 2 } } }),

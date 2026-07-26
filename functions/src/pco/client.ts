@@ -375,6 +375,30 @@ export function createPcoClient(options: PcoClientOptions): PcoClient {
     throw lastError ?? new Error(`Planning Center request to ${url} failed.`);
   }
 
+  /**
+   * Turns whatever `links.next` says into something `fetch` will accept.
+   *
+   * Planning Center sends that link as a *path* — `/people/v2/people?offset=100`
+   * — and Node's `fetch` rejects a relative URL outright, so handing it straight
+   * back was a `TypeError: Invalid URL` on page two of every sweep. It only ever
+   * bit a roster of more than one page, which is why it survived: page one is
+   * built here and is absolute.
+   *
+   * Resolved against the URL the page came from rather than against `baseUrl`,
+   * because that is the one form that handles all three shapes the spec allows
+   * — an absolute URL, a path, and a bare `?offset=100` — and because a link is
+   * relative to what served it. Returns null rather than throwing when the
+   * server sends something unparseable: the caller has other ways to find page
+   * two, and all of them beat failing the roster.
+   */
+  function resolveNextUrl(nextLink: string, currentUrl: string): URL | null {
+    try {
+      return new URL(nextLink, currentUrl);
+    } catch {
+      return null;
+    }
+  }
+
   async function* paginate<T>(
     path: string,
     query?: PcoQuery,
@@ -408,9 +432,16 @@ export function createPcoClient(options: PcoClientOptions): PcoClient {
 
       const nextLink = body.links?.next;
       const nextOffset = body.meta?.next?.offset;
+      const resolvedNext: URL | null =
+        typeof nextLink === 'string' && nextLink.length > 0 ? resolveNextUrl(nextLink, url) : null;
 
-      if (typeof nextLink === 'string' && nextLink.length > 0) {
-        url = nextLink;
+      if (resolvedNext) {
+        // Kept in step with the cursor we are actually following, so that a
+        // later page which advertises nothing falls back to stepping from where
+        // this walk got to rather than from where it started.
+        const linkOffset = Number(resolvedNext.searchParams.get('offset'));
+        if (Number.isFinite(linkOffset) && linkOffset > offset) offset = linkOffset;
+        url = resolvedNext.toString();
       } else if (typeof nextOffset === 'number' && nextOffset > offset) {
         offset = nextOffset;
         url = toUrl(path, { ...query, per_page: perPage, offset });
