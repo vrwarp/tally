@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildQueryString, createPcoClient, PcoApiError } from './client.js';
+import { buildQueryString, createPcoClient, PcoApiError, PcoNetworkError, REDACTED } from './client.js';
 import { PCO_BASE_URL, type PcoPerson } from './types.js';
 
 /* -------------------------------------------------------------------------- */
@@ -235,6 +235,68 @@ describe('retries', () => {
     expect(apiError.message).toContain('Grade must be a number');
     expect(urls).toHaveLength(1);
     expect(slept).toEqual([]);
+  });
+
+  it('records the exchange on the error, with the credential taken out', async () => {
+    const badGateway = () =>
+      new Response('<html>Bad gateway</html>', {
+        status: 502,
+        statusText: 'Bad Gateway',
+        headers: { 'Content-Type': 'text/html', 'Set-Cookie': 'session=secret' },
+      });
+    // Five, because the trace that matters is the attempt that gave up.
+    const { client } = makeClient([badGateway(), badGateway(), badGateway(), badGateway(), badGateway()]);
+
+    const error = (await client.get('/people').catch((caught: unknown) => caught)) as PcoApiError;
+
+    expect(error).toBeInstanceOf(PcoApiError);
+    expect(error.request?.method).toBe('GET');
+    expect(error.request?.url).toContain('/people');
+    // The whole reason a trace may be shown to somebody: no token in it.
+    expect(error.request?.headers.Authorization).toBe(REDACTED);
+    expect(JSON.stringify(error.request)).not.toContain('secret');
+    // Five sends: the first plus the four retries.
+    expect(error.request?.attempts).toBe(5);
+
+    expect(error.response?.status).toBe(502);
+    expect(error.response?.statusText).toBe('Bad Gateway');
+    expect(error.response?.headers['content-type']).toBe('text/html');
+    expect(error.response?.headers['set-cookie']).toBeUndefined();
+    // Not JSON, so there are no parsed errors — but the body still explains it.
+    expect(error.errors).toEqual([]);
+    expect(error.response?.body).toBe('<html>Bad gateway</html>');
+    expect(error.response?.bodyTruncated).toBe(false);
+  });
+
+  it('truncates a body too big to carry back to a browser', async () => {
+    const { client } = makeClient([
+      new Response('x'.repeat(9000), { status: 400, statusText: 'Bad Request' }),
+    ]);
+
+    const error = (await client.get('/people').catch((caught: unknown) => caught)) as PcoApiError;
+
+    expect(error.response?.body).toHaveLength(4000);
+    expect(error.response?.bodyTruncated).toBe(true);
+  });
+
+  it('wraps a request that never became a response, keeping the cause', async () => {
+    const client = createPcoClient({
+      appId: 'a',
+      secret: 'b',
+      maxRetries: 1,
+      sleep: async () => {},
+      fetchImpl: (async () => {
+        throw new Error('getaddrinfo ENOTFOUND api.planningcenteronline.com');
+      }) as unknown as typeof fetch,
+    });
+
+    const error = (await client.get('/people').catch((caught: unknown) => caught)) as PcoNetworkError;
+
+    expect(error).toBeInstanceOf(PcoNetworkError);
+    expect(error.request.attempts).toBe(2);
+    expect(error.request.headers.Authorization).toBe(REDACTED);
+    expect((error.cause as Error).message).toContain('ENOTFOUND');
+    expect(error.message).toContain('Could not reach Planning Center');
   });
 });
 

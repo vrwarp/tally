@@ -569,6 +569,74 @@ export interface PcoRuntimeConfigDoc {
   updatedBy: string | null;
 }
 
+/* -------------------------------------------------------------------------- */
+/* When Planning Center will not answer                                        */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The request that failed, as the server recorded it.
+ *
+ * Mirrors `PcoRequestTrace` in functions/src/pco/client.ts. `Authorization` is
+ * replaced with `[redacted]` before it leaves the function, so this is safe to
+ * put on a clipboard — which is the entire point of it existing.
+ */
+export interface PcoDebugRequest {
+  method: string;
+  url: string;
+  headers: Record<string, string>;
+  /** Sends made, including the first. More than one means retries happened. */
+  attempts: number;
+}
+
+/** The response that failed. Mirrors `PcoResponseTrace` in the functions. */
+export interface PcoDebugResponse {
+  status: number;
+  statusText: string;
+  headers: Record<string, string>;
+  body: string;
+  bodyTruncated: boolean;
+  durationMs: number;
+}
+
+export type PcoFailureKind = 'api' | 'network' | 'unknown';
+
+/**
+ * What the server attached to a failed Planning Center callable.
+ *
+ * Mirrors `PcoErrorDebug` in functions/src/pco/debug.ts, and arrives as the
+ * `details` of a `FunctionsError`. Absent whenever the failure never reached
+ * Planning Center at all — an expired session, a browser with no network — so
+ * every reader of this treats it as optional.
+ */
+export interface PcoErrorDebug {
+  kind: PcoFailureKind;
+  operation: string;
+  occurredAt: string;
+  message: string;
+  request: PcoDebugRequest | null;
+  response: PcoDebugResponse | null;
+  errors: string[];
+}
+
+/**
+ * A failed Planning Center call as a screen holds it: the sentence to show,
+ * and everything behind the sentence for the panel under it.
+ *
+ * Built by `pcoErrorReport` from whatever was thrown, so a screen has one shape
+ * to render whether Planning Center returned a 500, the session expired, or the
+ * phone is in a car park with no signal.
+ */
+export interface PcoErrorReport {
+  /** The one line the banner shows. */
+  message: string;
+  /** The callable's error code — `functions/unavailable` — when there was one. */
+  code: string | null;
+  /** Noted by the browser, because a local failure has no server timestamp. */
+  reportedAt: string;
+  /** Null when the failure never got as far as Planning Center. */
+  debug: PcoErrorDebug | null;
+}
+
 /**
  * One Planning Center list, as the roster picker shows it.
  *

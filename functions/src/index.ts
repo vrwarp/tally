@@ -20,6 +20,7 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { PCO_SECRETS, resolveConfig, type PcoConfig } from './config.js';
 import { asFirestoreLike, PATHS, type FirestoreLike } from './firestore.js';
 import { createPcoClient, PcoApiError, type PcoClient } from './pco/client.js';
+import { describePcoFailure } from './pco/debug.js';
 import { fetchListMemberIds, fetchLists, type PcoListSummary } from './pco/lists.js';
 import {
   fetchPersonDetails,
@@ -91,27 +92,36 @@ async function requireCoreTeam(uid: string | undefined): Promise<void> {
  * The distinction that matters is "Tally is broken" versus "Planning Center is
  * having a minute" — the second is a reason to try again, and saying so stops a
  * volunteer hunting for a problem on their end.
+ *
+ * The sentence is the whole answer for the person reading it at a door. The
+ * request and response behind it ride along as the error's `details`, for the
+ * screen's "Details" panel and the person they forward it to — see
+ * ./pco/debug.ts for what that payload may and may not contain.
  */
 function reportPcoFailure(error: unknown, what: string): never {
   if (error instanceof HttpsError) throw error;
+
+  const debug = describePcoFailure(error, what);
+  logger.error(`Failed to ${what}`, { error: String(error), pco: debug });
 
   if (error instanceof PcoApiError) {
     if (error.status === 429) {
       throw new HttpsError(
         'resource-exhausted',
         'Planning Center is rate-limiting us. Try again in a moment.',
+        debug,
       );
     }
     if (error.status === 401 || error.status === 403) {
       throw new HttpsError(
         'permission-denied',
         "Planning Center rejected Tally's credentials. A leader needs to check the connection in Settings.",
+        debug,
       );
     }
   }
 
-  logger.error(`Failed to ${what}`, { error: String(error) });
-  throw new HttpsError('unavailable', `Could not reach Planning Center to ${what}.`);
+  throw new HttpsError('unavailable', `Could not reach Planning Center to ${what}.`, debug);
 }
 
 /* -------------------------------------------------------------------------- */

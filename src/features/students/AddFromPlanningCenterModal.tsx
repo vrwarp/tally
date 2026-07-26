@@ -17,14 +17,16 @@
  * read live and thrown away.
  */
 import { useEffect, useRef, useState } from 'react';
+import { PlanningCenterErrorDetails } from '@/components/PlanningCenterErrorDetails';
 import { Badge, Button, ErrorBanner, Modal, SkeletonRows, TextField } from '@/components/ui';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { addRosterMember, importPlanningCenterList, searchPlanningCenterPeople } from '@/services/functions';
 import { fetchPlanningCenterLists } from '@/services/planningCenter';
+import { pcoErrorReport } from '@/lib/pcoErrors';
 import { ordinalGrade } from '@/lib/utils';
 import { cn } from '@/lib/utils';
-import type { PcoList, PcoPersonSearchResult } from '@/types';
+import type { PcoErrorReport, PcoList, PcoPersonSearchResult } from '@/types';
 
 /** Long enough that a typed name is one request, short enough to feel live. */
 const SEARCH_DEBOUNCE_MS = 300;
@@ -46,7 +48,13 @@ export function AddFromPlanningCenterModal({
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<PcoPersonSearchResult[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  /*
+   * The failure itself rather than a sentence about it. Every one of these
+   * four calls goes through a Cloud Function to Planning Center, so when one
+   * breaks the useful question is which request got what back — and that only
+   * survives if the whole report is kept. See src/lib/pcoErrors.ts.
+   */
+  const [error, setError] = useState<PcoErrorReport | null>(null);
   const [addingId, setAddingId] = useState<string | null>(null);
   /** Added in this session, so a row can say so before the roster catches up. */
   const [added, setAdded] = useState<ReadonlySet<string>>(new Set());
@@ -91,7 +99,7 @@ export function AddFromPlanningCenterModal({
         .catch((cause: unknown) => {
           if (cancelled) return;
           setResults([]);
-          setError(cause instanceof Error ? cause.message : 'Could not search Planning Center.');
+          setError(pcoErrorReport(cause, 'Could not search Planning Center.'));
         });
     }, SEARCH_DEBOUNCE_MS);
 
@@ -116,7 +124,7 @@ export function AddFromPlanningCenterModal({
       // The roster's cache key is the membership, so this comes back changed.
       await refreshRoster(true);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not add that student.');
+      setError(pcoErrorReport(cause, 'Could not add that student.'));
     } finally {
       setAddingId(null);
     }
@@ -129,7 +137,7 @@ export function AddFromPlanningCenterModal({
       setLists(await fetchPlanningCenterLists());
     } catch (cause) {
       setLists([]);
-      setError(cause instanceof Error ? cause.message : 'Could not read your Planning Center lists.');
+      setError(pcoErrorReport(cause, 'Could not read your Planning Center lists.'));
     }
   };
 
@@ -146,7 +154,7 @@ export function AddFromPlanningCenterModal({
       );
       await refreshRoster(true);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not import that list.');
+      setError(pcoErrorReport(cause, 'Could not import that list.'));
     } finally {
       setImportingId(null);
     }
@@ -168,7 +176,12 @@ export function AddFromPlanningCenterModal({
       }
     >
       <div className="flex flex-col gap-4">
-        {error ? <ErrorBanner message={error} /> : null}
+        {error ? (
+          <ErrorBanner
+            message={error.message}
+            details={<PlanningCenterErrorDetails report={error} />}
+          />
+        ) : null}
 
         <TextField
           label="Search Planning Center"
