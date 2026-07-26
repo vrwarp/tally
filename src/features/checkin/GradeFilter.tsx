@@ -11,9 +11,15 @@
  * two grades is a two-tap job, and a full-screen sheet for it would be heavier
  * than the roster underneath it.
  */
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { cn, ordinalGrade } from '@/lib/utils';
 import { GRADES, type Grade } from '@/types';
+
+/** Breathing room between the bottom of the panel and the bottom of the screen. */
+const PANEL_MARGIN = 12;
+
+/** Below this the panel scrolls rather than shrinking to a slot or two. */
+const PANEL_MIN = 160;
 
 export interface GradeFilterProps {
   /** Selected grades. Empty means every grade — the default. */
@@ -34,6 +40,33 @@ export function GradeFilter({ grades, onChange }: GradeFilterProps) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
   const container = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+
+  /**
+   * How much room there actually is under the chip.
+   *
+   * The check-in frame is `h-dvh overflow-hidden`, so a panel that runs past the
+   * bottom of the window is not merely awkward — it is cut off, and a clipped
+   * checklist hides grades with nothing on screen to say so. A CSS `dvh` cap
+   * cannot do this: what matters is the distance from *this chip* to the bottom
+   * edge, and the chip sits under a header whose height varies with the event.
+   * Measured before paint, so the panel never renders at the wrong size.
+   */
+  const [maxHeight, setMaxHeight] = useState<number>();
+
+  useLayoutEffect(() => {
+    if (!open) return;
+
+    const measure = () => {
+      const rect = trigger.current?.getBoundingClientRect();
+      if (!rect) return;
+      setMaxHeight(Math.max(PANEL_MIN, window.innerHeight - rect.bottom - PANEL_MARGIN));
+    };
+
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [open]);
 
   // Closing on an outside press keeps the panel from covering the first student
   // in the list once the counselor has moved on from filtering.
@@ -68,6 +101,7 @@ export function GradeFilter({ grades, onChange }: GradeFilterProps) {
   return (
     <div ref={container} className="relative shrink-0">
       <button
+        ref={trigger}
         type="button"
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
@@ -97,10 +131,13 @@ export function GradeFilter({ grades, onChange }: GradeFilterProps) {
           id={panelId}
           role="group"
           aria-label="Grades"
-          // Anchored right: the chip is pinned to the right-hand end of the
-          // filter row, and a left-anchored panel would hang off a phone and
-          // give the whole page a horizontal scrollbar.
-          className="absolute right-0 top-full z-40 mt-1.5 w-44 overflow-hidden rounded-xl bg-ink-900 py-1 shadow-lg shadow-black/50 ring-1 ring-ink-700"
+          style={{ maxHeight }}
+          /* Anchored right: the chip is pinned to the right-hand end of the
+             filter row, and a left-anchored panel would hang off a phone and
+             give the whole page a horizontal scrollbar. `overscroll-contain`
+             keeps a flick inside the checklist from scrolling the roster
+             underneath it. */
+          className="scroll-touch absolute right-0 top-full z-40 mt-1.5 w-44 overflow-y-auto overscroll-contain rounded-xl bg-ink-900 py-1 shadow-lg shadow-black/50 ring-1 ring-ink-700"
         >
           <Option
             checked={grades.length === 0}

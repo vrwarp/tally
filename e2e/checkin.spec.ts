@@ -278,6 +278,30 @@ test.describe('check-in', () => {
     expect(labels.every((label) => /, (8th|9th) grade/.test(label))).toBe(true);
   });
 
+  /**
+   * The check-in frame is `h-dvh overflow-hidden`, so anything that runs past
+   * the bottom of the window is cut off rather than pushing the page. A grade
+   * checklist that gets clipped hides grades with nothing on screen saying so,
+   * and a short laptop window is exactly where it would happen.
+   */
+  test('keeps the grade checklist inside a short window', async ({ page }) => {
+    await rosterSettled(page);
+    await page.setViewportSize({ width: 1024, height: 560 });
+    await page.getByRole('button', { name: /^filter by grade/i }).click();
+
+    const panel = page.getByRole('group', { name: 'Grades' });
+    await expect(panel).toBeVisible();
+
+    const fits = await panel.evaluate(
+      (node) => node.getBoundingClientRect().bottom <= window.innerHeight,
+    );
+    expect(fits, 'the grade checklist ran past the bottom of the window').toBe(true);
+
+    // Clipped or not, every grade has to be reachable.
+    await page.getByRole('checkbox', { name: '12th grade' }).check();
+    await expect(page.getByRole('checkbox', { name: '12th grade' })).toBeChecked();
+  });
+
   test('a tap checks a student in, and it survives a reload', async ({ page, firestore }) => {
     const name = await tapFirstRoster(page);
 
