@@ -132,10 +132,26 @@ export function DataProvider({ children }: { children: ReactNode }) {
   /* ---- The roster -------------------------------------------------------- */
 
   const inFlight = useRef(false);
+  /**
+   * A refresh asked for while another was running.
+   *
+   * Collapsing concurrent reads is right — two screens mounting at once must
+   * not become two Planning Center reads — but *dropping* the second one is
+   * not, and the difference only became visible once the roster gained an
+   * "add this student" button. The read already in flight was issued before
+   * the student existed, so answering with it means the person who just
+   * pressed Add watches nothing happen. One more read, after this one, is the
+   * whole fix.
+   */
+  const pending = useRef<{ force: boolean } | null>(null);
 
   const refreshRoster = useCallback(async (force = false) => {
-    // Two screens mounting at once must not become two Planning Center reads.
-    if (inFlight.current) return;
+    if (inFlight.current) {
+      // `force` is sticky: a deliberate refresh must not be downgraded by an
+      // incidental one that happened to arrive alongside it.
+      pending.current = { force: force || (pending.current?.force ?? false) };
+      return;
+    }
     inFlight.current = true;
     setRosterLoading(true);
 
@@ -155,6 +171,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
     } finally {
       inFlight.current = false;
       setRosterLoading(false);
+
+      const queued = pending.current;
+      pending.current = null;
+      if (queued) void refreshRoster(queued.force);
     }
   }, []);
 

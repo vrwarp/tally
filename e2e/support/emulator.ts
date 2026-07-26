@@ -116,6 +116,21 @@ export async function readCollection(path: string): Promise<FirestoreDoc[]> {
   return docs;
 }
 
+/**
+ * Deletes one document, through the same admin channel.
+ *
+ * This exists so a test that changes a *setting* can put it back. The suite
+ * runs one worker against one dataset, so a spec that leaves the Planning
+ * Center configuration pointing at a different list does not fail — it makes
+ * some later spec fail instead, which is the worst kind of flake to chase.
+ */
+export async function deleteDocument(path: string): Promise<void> {
+  const response = await fetch(`${FIRESTORE_ROOT}/${path}`, { method: 'DELETE', headers: ADMIN });
+  if (!response.ok && response.status !== 404) {
+    throw new Error(`Deleting ${path} failed: HTTP ${response.status}.`);
+  }
+}
+
 /* -------------------------------------------------------------------------- */
 /* Planning Center simulator control plane                                     */
 /* -------------------------------------------------------------------------- */

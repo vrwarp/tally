@@ -178,15 +178,20 @@ once per project.
 - `VITE_FIREBASE_CONFIG` — the web config object, the same value `.env.local` holds, in either the
   console's `const firebaseConfig = { … };` form or JSON. Vite embeds it at build time, so the
   Hosting workflows need it even though it is not a secret.
-- `FUNCTIONS_ENV` — the deploy-time Planning Center settings for `tally-76406`, as the literal
-  contents of a `.env` file: `PCO_ROSTER_SOURCE`, the list ids, the grade range,
-  `PCO_CACHE_TTL_SECONDS` and so on — **not** `PCO_APP_ID` or `PCO_SECRET`, which live in Secret
-  Manager. Use `functions/.secret.local.example` as the list of what can go in it, minus the two
-  credentials. The backend workflow writes it to `functions/.env.tally-76406` before deploying,
+- `FUNCTIONS_ENV` — the deploy-time settings for `tally-76406`, as the literal contents of a `.env`
+  file: `TALLY_ADMIN_EMAILS`, `PCO_API_BASE_URL`, the grade range (`PCO_MIN_GRADE` /
+  `PCO_MAX_GRADE`), `PCO_WRITE_BACK` and `PCO_CACHE_TTL_SECONDS` — **not** `PCO_APP_ID` or
+  `PCO_SECRET`, which live in Secret Manager. Use `functions/.secret.local.example` as the list of
+  what can go in it, minus the two credentials. Everything here except `TALLY_ADMIN_EMAILS` is only
+  a *default*: once the app is running, the core team edits the same settings in Settings →
+  Planning Center and those overrides live in `config/planningCenter`, so a redeploy is not the way
+  to change a grade band. `TALLY_ADMIN_EMAILS` is the exception on purpose — it is the standing
+  grant that bootstraps the first admin, so it has to come from outside the database the admins
+  administer. The backend workflow writes the file to `functions/.env.tally-76406` before deploying,
   because the CLI resolves the `defineString` params in `functions/src/config.ts` from that file and
   stops to ask when it is missing, whatever defaults the code declares — the same trap
   `functions/.env.demo-tally` documents for the emulator. Keeping it in a secret rather than the
-  repository keeps the ministry's list ids out of git history.
+  repository keeps the ministry's admin addresses out of git history.
 
 ---
 

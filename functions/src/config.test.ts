@@ -7,7 +7,9 @@
  * empty sync card.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { loadConfig } from './config.js';
+import { loadConfig, resolveConfig, seededAdminEmails } from './config.js';
+import { FakeFirestore } from './testing/fakeFirestore.js';
+import { PATHS } from './firestore.js';
 import { PCO_BASE_URL } from './pco/types.js';
 
 /** Params fall back to `process.env`, which is what the emulator populates. */
@@ -114,34 +116,6 @@ describe('loadConfig', () => {
     });
   });
 
-  describe('roster source', () => {
-    it('defaults to grade mode', () => {
-      env(CREDENTIALS);
-      expect(loadConfig().rosterSource).toBe('grade');
-    });
-
-    it('treats an unrecognised value as grade rather than guessing', () => {
-      env({ ...CREDENTIALS, PCO_ROSTER_SOURCE: 'spreadsheet' });
-      expect(loadConfig().rosterSource).toBe('grade');
-    });
-
-    it('reports list mode with no list id as a configuration error', () => {
-      env({ ...CREDENTIALS, PCO_ROSTER_SOURCE: 'list' });
-      const config = loadConfig();
-
-      expect(config.rosterSource).toBe('list');
-      expect(config.configError).toContain('PCO_STUDENT_LIST_ID');
-    });
-
-    it('is happy with list mode once the list is named', () => {
-      env({ ...CREDENTIALS, PCO_ROSTER_SOURCE: 'list', PCO_STUDENT_LIST_ID: 'L1' });
-      const config = loadConfig();
-
-      expect(config.studentListId).toBe('L1');
-      expect(config.configError).toBeNull();
-    });
-  });
-
   describe('cache TTL', () => {
     it('defaults to half a minute', () => {
       expect(loadConfig().cacheTtlSeconds).toBe(30);
@@ -202,12 +176,170 @@ describe('loadConfig', () => {
   });
 
   it('accumulates every problem rather than stopping at the first', () => {
-    env({ PCO_ROSTER_SOURCE: 'list', PCO_API_BASE_URL: 'nope' });
+    env({ PCO_API_BASE_URL: 'nope' });
     const error = loadConfig().configError ?? '';
 
     expect(error).toContain('PCO_APP_ID');
     expect(error).toContain('PCO_SECRET');
-    expect(error).toContain('PCO_STUDENT_LIST_ID');
     expect(error).toContain('PCO_API_BASE_URL');
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Runtime overrides                                                           */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * What the core team saves in Settings has to win over what was deployed —
+ * that is the entire point of the document — without ever becoming a way to
+ * put the server into a state the deploy-time path could not reach.
+ */
+describe('resolveConfig', () => {
+  function withDocument(fields: Record<string, unknown> | null): FakeFirestore {
+    const db = new FakeFirestore();
+    if (fields) db.seed(PATHS.pcoConfig, fields);
+    return db;
+  }
+
+  it('falls back to the deployed parameters when nothing has been saved', async () => {
+    env({ ...CREDENTIALS, PCO_WRITE_BACK: 'full' });
+    const config = await resolveConfig(withDocument(null));
+
+    expect(config.writeBack).toBe('full');
+    expect(config.managedInApp).toBe(false);
+  });
+
+  it('lets a saved value win over the deployed one', async () => {
+    env({ ...CREDENTIALS, PCO_WRITE_BACK: 'full' });
+    const config = await resolveConfig(withDocument({ writeBack: 'off' }));
+
+    expect(config.writeBack).toBe('off');
+    expect(config.managedInApp).toBe(true);
+  });
+
+  it('leaves a key the document does not carry to the deployed value', async () => {
+    env({ ...CREDENTIALS, PCO_MIN_GRADE: '7', PCO_WRITE_BACK: 'off' });
+    const config = await resolveConfig(withDocument({ writeBack: 'create' }));
+
+    expect(config.minGrade).toBe(7);
+    expect(config.writeBack).toBe('create');
+  });
+
+  it('accepts numbers, so a document written by hand behaves the same', async () => {
+    env(CREDENTIALS);
+    const config = await resolveConfig(withDocument({ minGrade: 7, maxGrade: 9, cacheTtlSeconds: 0 }));
+
+    expect(config.minGrade).toBe(7);
+    expect(config.maxGrade).toBe(9);
+    expect(config.cacheTtlSeconds).toBe(0);
+  });
+
+  it('clamps saved values exactly as it clamps deployed ones', async () => {
+    // The document is client-written, so this is not politeness — it is the
+    // guarantee that no browser can widen the grade band past what the app's
+    // own `Grade` type admits, whatever the rules let through.
+    env(CREDENTIALS);
+    const config = await resolveConfig(
+      withDocument({ minGrade: 1, maxGrade: 99, cacheTtlSeconds: 86_400, writeBack: 'everything' }),
+    );
+
+    expect(config.minGrade).toBe(6);
+    expect(config.maxGrade).toBe(12);
+    expect(config.cacheTtlSeconds).toBe(300);
+    // Never silently escalate: an unrecognised mode must not become `full`.
+    expect(config.writeBack).toBe('create');
+  });
+
+  it('ignores fields it does not know and values of the wrong type', async () => {
+    env({ ...CREDENTIALS, PCO_WRITE_BACK: 'off' });
+    const config = await resolveConfig(
+      withDocument({ writeBack: { mode: 'full' }, appId: 'stolen', secret: 'stolen', nonsense: true }),
+    );
+
+    expect(config.writeBack).toBe('off');
+    // Credentials come from Secret Manager and from nowhere else. A document
+    // that names them changes nothing.
+    expect(config.appId).toBe('app-id');
+    expect(config.secret).toBe('secret');
+  });
+
+  it('treats an empty API address as no override rather than as a reset', async () => {
+    /*
+     * The one field where "cleared" would be dangerous rather than useful.
+     *
+     * The app writes every field on save, including the ones a core-team member
+     * cannot see. If an empty `baseUrl` meant "use the real Planning Center",
+     * then the first time anybody saved an unrelated setting, an install
+     * deployed against a proxy — or the end-to-end suite's simulator — would
+     * silently start talking to production instead.
+     */
+    env({ ...CREDENTIALS, PCO_API_BASE_URL: 'http://127.0.0.1:4010/people/v2' });
+    const config = await resolveConfig(withDocument({ baseUrl: '', studentListId: 'L1' }));
+
+    expect(config.baseUrl).toBe('http://127.0.0.1:4010/people/v2');
+    expect(config.baseUrlOverridden).toBe(true);
+  });
+
+  it('lets a saved API address win over the deployed one', async () => {
+    env({ ...CREDENTIALS, PCO_API_BASE_URL: 'http://127.0.0.1:4010/people/v2' });
+    const config = await resolveConfig(withDocument({ baseUrl: 'https://proxy.example.org/people/v2' }));
+
+    expect(config.baseUrl).toBe('https://proxy.example.org/people/v2');
+  });
+
+  it('degrades to the deployed configuration when Firestore cannot be read', async () => {
+    // A Firestore blip should cost Tally its *newest* configuration, not its
+    // ability to run check-in tonight.
+    env({ ...CREDENTIALS, PCO_MIN_GRADE: '9' });
+    const broken = {
+      doc: () => ({
+        get: () => Promise.reject(new Error('Firestore is having a minute')),
+      }),
+    } as unknown as FakeFirestore;
+
+    const config = await resolveConfig(broken);
+    expect(config.minGrade).toBe(9);
+    expect(config.configError).toBeNull();
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* The admin seed                                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The one piece of configuration that is not about Planning Center at all: the
+ * addresses that are admins whatever the database says. Everything about
+ * parsing it is forgiving on purpose — it is typed into a deploy environment by
+ * hand, usually once, usually in a hurry.
+ */
+describe('seededAdminEmails', () => {
+  it('is empty when nobody has been named', () => {
+    env({ TALLY_ADMIN_EMAILS: '' });
+    expect(seededAdminEmails()).toEqual([]);
+  });
+
+  it('reads a single address', () => {
+    env({ TALLY_ADMIN_EMAILS: 'dana@church.org' });
+    expect(seededAdminEmails()).toEqual(['dana@church.org']);
+  });
+
+  it('accepts the separators somebody might reach for', () => {
+    env({ TALLY_ADMIN_EMAILS: 'dana@church.org, miriam@church.org;  sam@church.org' });
+    expect(seededAdminEmails()).toEqual([
+      'dana@church.org',
+      'miriam@church.org',
+      'sam@church.org',
+    ]);
+  });
+
+  it('lowercases, so a capitalised address still matches a token', () => {
+    env({ TALLY_ADMIN_EMAILS: 'Dana.Ruiz@Church.ORG' });
+    expect(seededAdminEmails()).toEqual(['dana.ruiz@church.org']);
+  });
+
+  it('drops the empties a trailing comma leaves behind', () => {
+    env({ TALLY_ADMIN_EMAILS: 'dana@church.org,,' });
+    expect(seededAdminEmails()).toEqual(['dana@church.org']);
   });
 });

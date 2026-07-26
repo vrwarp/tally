@@ -70,9 +70,11 @@ process request due to missing initial state". Refusing beats a flow that
 half-works. Setting `authDomain` to the hosting domain — Firebase Hosting
 already serves `/__/auth/*` there — makes redirect available again.
 
-Because the email link works in every one of these contexts, "unavailable" is an
-honest answer rather than a dead end. The login screen disables the button and
-explains, instead of offering something that silently does nothing.
+"Unavailable" used to be softened by the email magic link, which worked in every
+one of these contexts. That path is gone — Tally accepts Google and only Google —
+so this is now a genuine dead end, and the login screen says so plainly: it
+disables the button and tells the person to open Tally in Safari or Chrome,
+instead of offering something that silently does nothing.
 
 *Approach adapted from [`vrwarp/numbers`](https://github.com/vrwarp/numbers),
 which had already solved this.*

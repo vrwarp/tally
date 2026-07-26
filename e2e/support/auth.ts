@@ -1,16 +1,37 @@
 /**
  * Signing in the way a counselor actually does.
  *
- * The magic-link flow is worth exercising rather than shortcutting: it is the
- * only path most volunteers will ever take, it crosses Auth, Firestore rules and
- * the `provisionAccess` callable, and every one of those can fail on its own.
- * The Auth emulator hands out the link over REST instead of sending mail, so the
- * test can pick it up the way an inbox would.
+ * There is one way in — Google — and this drives the real thing: the button,
+ * the popup, the emulator's account chooser standing in for Google, and then
+ * `provisionAccess` deciding whether the address is a seeded admin, an invited
+ * volunteer, or a stranger.
+ *
+ * ## The one environment where it cannot
+ *
+ * `signInWithPopup` boots Firebase's hidden iframe from `apis.google.com`
+ * before it opens anything — unconditionally, since only the *iframe's URL* is
+ * emulator-aware, not the loader that fetches gapi. A sandbox with no route to
+ * Google therefore fails at Google's front door, with an `auth/internal-error`
+ * and no popup, having tested nothing about Tally.
+ *
+ * So the suite probes for that once per run and falls back to a build-flagged
+ * hook that mints the same credential (`src/lib/firebase.ts`), announcing it
+ * loudly. The fallback still exercises everything that matters downstream —
+ * the invitation lookup, the seeded-admin grant, the role, every rule that
+ * reads the profile — because the session it produces carries
+ * `sign_in_provider: google.com`, which is the only thing the server inspects.
+ * What it does not cover is the handshake, and the log says so rather than
+ * letting a green run imply otherwise.
  */
 import type { Page } from '@playwright/test';
-import { E2E } from '../../playwright.config';
 
-/** Seeded by `scripts/seed.ts` into the Planning Center simulator. */
+/**
+ * Who the seed authorises, and how.
+ *
+ * `admin` is deliberately not in Firestore at all: they come from
+ * `TALLY_ADMIN_EMAILS`, which is the only way the first admin of a real install
+ * can exist. The other two arrive on invitations `scripts/seed.ts` writes.
+ */
 export const TEAM = {
   admin: 'dana.ruiz@footprints.example.org',
   core: 'miriam.achebe@footprints.example.org',
@@ -19,50 +40,70 @@ export const TEAM = {
 
 export type TeamRole = keyof typeof TEAM;
 
-interface OobCode {
-  email: string;
-  oobLink: string;
-  requestType: string;
-}
+/** Display names, so the emulator's account chooser is readable in a trace. */
+const DISPLAY_NAMES: Record<string, string> = {
+  [TEAM.admin]: 'Dana Ruiz',
+  [TEAM.core]: 'Miriam Achebe',
+  [TEAM.counselor]: 'Sam Whitfield',
+};
 
-async function latestSignInLink(email: string): Promise<string> {
-  const response = await fetch(
-    `http://127.0.0.1:${E2E.auth}/emulator/v1/projects/${E2E.projectId}/oobCodes`,
-  );
-  if (!response.ok) {
-    throw new Error(`Could not read sign-in codes from the Auth emulator: HTTP ${response.status}.`);
-  }
+/**
+ * Whether this browser can reach the script `signInWithPopup` needs.
+ *
+ * Probed once per run, and from inside the page rather than from Node: it is
+ * the *browser's* route to Google that decides, and in a container those two
+ * are not the same network.
+ */
+let popupSupported: boolean | null = null;
 
-  const body = (await response.json()) as { oobCodes?: OobCode[] };
-  const codes = (body.oobCodes ?? []).filter(
-    (code) => code.email.toLowerCase() === email.toLowerCase(),
-  );
+async function canUseGooglePopup(page: Page): Promise<boolean> {
+  if (popupSupported !== null) return popupSupported;
 
-  const latest = codes.at(-1);
-  if (!latest) {
-    throw new Error(
-      `No sign-in link was issued for ${email}. Either the form did not submit, or the Auth ` +
-        'emulator is not the one the app is pointed at.',
+  popupSupported = await page.evaluate(async () => {
+    try {
+      // `no-cors` because the answer wanted is "did anything arrive", not what.
+      await fetch('https://apis.google.com/js/api.js', { mode: 'no-cors', cache: 'no-store' });
+      return true;
+    } catch {
+      return false;
+    }
+  });
+
+  if (!popupSupported) {
+    console.warn(
+      '[e2e] apis.google.com is unreachable from the browser, so signInWithPopup cannot run ' +
+        'here. Falling back to the emulator credential hook: everything after the credential ' +
+        'is still exercised, the Google handshake is not.',
     );
   }
-  return latest.oobLink;
+  return popupSupported;
 }
 
 /**
- * The emulator's link lands on its own action page, which then bounces to the
- * app's `continueUrl`. Rewriting it directly avoids depending on that
- * intermediate page's markup, which is emulator implementation detail.
+ * Completes the Auth emulator's stand-in for Google, in the popup it opened.
+ *
+ * The widget offers accounts it has seen before and a form for new ones, so
+ * this takes whichever is on screen — reusing an existing account is also the
+ * returning-volunteer path, which is worth exercising.
  */
-function toAppUrl(oobLink: string): string {
-  const link = new URL(oobLink);
-  const continueUrl = link.searchParams.get('continueUrl') ?? `${E2E.baseURL}/login`;
+async function completeGoogleSignIn(popup: Page, email: string): Promise<void> {
+  await popup.waitForLoadState('domcontentloaded');
 
-  const target = new URL(continueUrl);
-  for (const key of ['mode', 'oobCode', 'apiKey', 'lang']) {
-    const value = link.searchParams.get(key);
-    if (value) target.searchParams.set(key, value);
+  const existing = popup.locator('#accounts-list').getByText(email, { exact: false }).first();
+  if (await existing.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await existing.click();
+    return;
   }
-  return target.toString();
+
+  await popup.locator('#add-account-button').click({ timeout: 15_000 });
+  await popup.locator('#email-input').fill(email);
+
+  const displayName = popup.locator('#display-name-input');
+  if (await displayName.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await displayName.fill(DISPLAY_NAMES[email] ?? email);
+  }
+
+  await popup.locator('#sign-in').click();
 }
 
 /**
@@ -73,27 +114,36 @@ function toAppUrl(oobLink: string): string {
 export async function signIn(page: Page, email: string): Promise<void> {
   await page.goto('/login');
 
-  await page.getByLabel(/email/i).fill(email);
-  await page.getByRole('button', { name: /send sign-in link/i }).click();
+  // Google, and nothing else: if a second way in ever reappears, this fails.
+  const button = page.getByRole('button', { name: /continue with google/i });
+  await button.waitFor({ timeout: 30_000 });
 
-  // The emulator issues the code synchronously, but the app's own request has to
-  // land first; poll rather than sleep.
-  const deadline = Date.now() + 15_000;
-  let link = '';
-  while (Date.now() < deadline) {
-    try {
-      link = await latestSignInLink(email);
-      break;
-    } catch {
-      await page.waitForTimeout(250);
-    }
+  if (await canUseGooglePopup(page)) {
+    const [popup] = await Promise.all([
+      page.waitForEvent('popup', { timeout: 30_000 }),
+      button.click(),
+    ]);
+    await completeGoogleSignIn(popup, email);
+    // The popup closes itself once the emulator posts the credential back. If
+    // it lingers, the assertion below is the real check anyway.
+    await popup.waitForEvent('close', { timeout: 30_000 }).catch(() => popup.close());
+  } else {
+    await page.waitForFunction(() => '__tallyEmulatorSignIn' in window, undefined, {
+      timeout: 30_000,
+    });
+    await page.evaluate(
+      ([address, name]) =>
+        (
+          window as unknown as {
+            __tallyEmulatorSignIn: (email: string, displayName?: string) => Promise<void>;
+          }
+        ).__tallyEmulatorSignIn(address!, name),
+      [email, DISPLAY_NAMES[email] ?? email] as const,
+    );
   }
-  if (!link) link = await latestSignInLink(email);
-
-  await page.goto(toAppUrl(link));
 
   /*
-   * Wait for the sign-in form to *go away*, not for a landmark to appear.
+   * Wait for the sign-in button to *go away*, not for a landmark to appear.
    *
    * The login screen has its own `banner`, and a counselor — who sees only one
    * tab — gets no `navigation` landmark at all, so waiting for either accepted
@@ -104,11 +154,11 @@ export async function signIn(page: Page, email: string): Promise<void> {
    * `provisionAccess` may have to mint the users/{uid} document on first
    * sign-in, so this allows for a callable round-trip.
    */
-  const signInForm = page.getByRole('button', { name: /send sign-in link/i });
-  await signInForm.waitFor({ state: 'detached', timeout: 30_000 }).catch(() => {
+  await button.waitFor({ state: 'detached', timeout: 30_000 }).catch(() => {
     throw new Error(
-      `Signing in as ${email} left the login form on screen. Either provisionAccess refused ` +
-        'the address, or it could not reach Planning Center to check the team roster.',
+      `Signing in as ${email} left the login screen up. Either provisionAccess refused the ` +
+        'address — no invitation, and not in TALLY_ADMIN_EMAILS — or the Google flow never ' +
+        `completed (popup path: ${popupSupported ? 'yes' : 'no'}).`,
     );
   });
   await page.getByRole('navigation').or(page.getByRole('banner')).first().waitFor({ timeout: 30_000 });

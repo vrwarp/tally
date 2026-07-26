@@ -14,6 +14,13 @@
  * path is the default developer experience (`npm run dev:emulated`).
  */
 import { initializeApp, type FirebaseApp, type FirebaseOptions } from 'firebase/app';
+
+/**
+ * Injected by Vite (`define` in vite.config.ts). `true` only for the build the
+ * end-to-end suite makes; `false` everywhere else, which is what lets the test
+ * hook below be dead-code-eliminated rather than merely unreachable.
+ */
+declare const __E2E_HOOKS__: boolean;
 import {
   browserLocalPersistence,
   connectAuthEmulator,
@@ -287,4 +294,48 @@ if (USE_EMULATORS) {
   console.info(
     `[tally] Using Firebase emulators — auth :${authPort}, firestore :${firestorePort}`,
   );
+
+  /**
+   * The end-to-end fallback: mint the Google credential a popup would produce.
+   *
+   * The suite drives the *real* popup wherever it can — that is the flow a
+   * counselor uses, and it is worth testing. It cannot everywhere:
+   * `signInWithPopup` boots Firebase's hidden iframe from `apis.google.com`
+   * (unconditionally — only the iframe's URL is emulator-aware), so in a
+   * sandbox with no route to Google the run dies at Google's front door rather
+   * than at anything Tally owns. The suite detects that and comes here instead,
+   * saying so loudly.
+   *
+   * The Auth emulator accepts a JSON "ID token" in place of a real one for
+   * exactly this purpose, and the session it mints carries
+   * `sign_in_provider: google.com` — which is the only thing `provisionAccess`
+   * inspects. So everything downstream is still exercised for real: the
+   * invitation lookup, the seeded-admin grant, the role, and every rule that
+   * reads the profile. Only the Google round-trip is skipped.
+   *
+   * Two guards, both required. `__E2E_HOOKS__` is a compile-time constant that
+   * is `false` in every build except the suite's own, so this whole block is
+   * eliminated from anything a church deploys; `USE_EMULATORS` means even that
+   * build refuses to expose it against a real project. A test seam that ships
+   * is not a test seam, it is a way in.
+   */
+  if (__E2E_HOOKS__) {
+    (window as unknown as Record<string, unknown>).__tallyEmulatorSignIn = async (
+      email: string,
+      displayName?: string,
+    ): Promise<void> => {
+      const { GoogleAuthProvider, signInWithCredential } = await import('firebase/auth');
+      await signInWithCredential(
+        auth,
+        GoogleAuthProvider.credential(
+          JSON.stringify({
+            sub: `google-${email}`,
+            email,
+            email_verified: true,
+            name: displayName ?? email,
+          }),
+        ),
+      );
+    };
+  }
 }

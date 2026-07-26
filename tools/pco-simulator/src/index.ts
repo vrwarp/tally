@@ -17,6 +17,7 @@ export {
   FIXTURE_ANCHOR,
   FIXTURE_IDS,
   SMALL_GROUP_FIELD_SLUG,
+  STALE_LIST_ID,
   STUDENT_LIST_ID,
   TEAM_LIST_ID,
 } from './fixtures.js';

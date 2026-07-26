@@ -5,6 +5,17 @@ import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+  /*
+   * Compile-time flag gating the end-to-end sign-in hook (see src/lib/firebase.ts).
+   *
+   * Set only for E2E builds — `playwright.config.ts` exports it before building —
+   * so it folds to `false` everywhere else and the hook is dead-code-eliminated
+   * from anything a church would deploy. A test seam that ships is not a test
+   * seam, it is a way in.
+   */
+  define: {
+    __E2E_HOOKS__: JSON.stringify(process.env.VITE_E2E_HOOKS === 'true'),
+  },
   plugins: [
     react(),
     tailwindcss(),

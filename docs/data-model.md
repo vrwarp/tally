@@ -26,7 +26,7 @@ erDiagram
     events ||--o{ rsvps : "subcollection"
     students ||--o| attendance : "doc id = studentId"
     students ||--o| rsvps : "doc id = studentId"
-    accessRoster ||--o| users : "provisionAccess"
+    invitations ||--o| users : "provisionAccess"
 
     config_settings {
         int predictiveMinAttended
@@ -34,24 +34,19 @@ erDiagram
         int miaConsecutiveMisses
         int newVisitorWindowDays
     }
-    config_pcoSync {
-        string status
-        timestamp cursor
-        map counts
-    }
 ```
 
 ```
 users/{uid}                              counselor & core team profiles
+invitations/{emailKey}                   who an admin has said may sign in
 smallGroups/{groupId}                    Sunday School groupings
 eventSeries/{seriesId}                   recurring templates (friday-fellowship, sunday-school)
-students/{studentId}                     the youth roster
+students/{studentId}                     the roster itself — a document is a membership
 events/{eventId}                         a single dated gathering
 events/{eventId}/attendance/{studentId}  who showed up
 events/{eventId}/rsvps/{studentId}       who said they were coming (one-offs)
 config/settings                          tunable thresholds
-config/pcoSync                            Planning Center sync state
-accessRoster/{emailKey}                  Planning-Center-derived allowlist
+config/planningCenter                    the non-secret Planning Center settings
 ```
 
 All paths are built from `src/lib/paths.ts`. Nothing constructs a path by string concatenation.
@@ -179,6 +174,12 @@ because a student can exist in Tally before they exist in Planning Center.
 | `pcoPushPending` | boolean | A Tally-created student still waiting to be pushed. |
 | `createdAt`, `updatedAt`, `createdBy` | — | `createdBy` is a uid, or `'planning-center'` for synced records. |
 
+**A document here *is* the roster membership.** No document, not on the roster. For a student
+Planning Center knows, that document holds the membership and Tally's own annotations only — the
+name, grade and contact details are read live and stored nowhere. The id is `pco_{personId}`, which
+is a claim about which real child the row refers to, so a client may not assert it: adding somebody
+goes through the `addRosterMember` callable, which checks the person exists upstream first.
+
 **Who writes:** any counselor may create and update. That is deliberate — quick-add happens at the
 door, and check-in itself writes `firstAttendedAt` / `lastAttendedAt`.
 
@@ -270,34 +271,40 @@ A single document holding the four thresholds the core team can tune:
 least `predictiveMinAttended`, or the Recent block could never be satisfied and would silently render
 empty, which reads as a bug rather than a setting. The converter clamps on read as a second belt.
 
-### `config/pcoSync`
+### `config/planningCenter`
 
-The one document the core team watches while a sync runs: `status`, `startedAt`, `finishedAt`,
-`cursor`, `lastFullSyncAt`, a `counts` map, `lastError`, and an echo of the effective server config
-(`rosterSource`, `writeBack`, `triggeredBy`) so the UI can explain what the run actually did.
+The non-secret half of the Planning Center configuration, owned by the core team from Settings:
+`minGrade`, `maxGrade`, `writeBack`, `cacheTtlSeconds`, `baseUrl`, plus `updatedAt` / `updatedBy`.
 
-**Who writes:** the Cloud Functions only, on the Admin SDK. Clients are flatly denied — the rule is
-`allow write: if false`, not a condition a client could argue with. Readable by core and up.
+Absent on a fresh install, which is a normal state rather than a missing record — the deploy-time
+parameters are the defaults, and this document only overrides them where it has an opinion.
 
-Progress writes are throttled to one every five seconds, because the app holds a live listener on
-this document and a 400-student sweep would otherwise emit a hundred snapshots nobody can read. The
-run always lands on a terminal `ok` or `error`, even when it throws: a status stuck on `running`
-forever is indistinguishable from a hung integration.
+**Who writes:** core and up, with one carve-out: `baseUrl` is admin-only, because every Planning
+Center request carries the church's credentials and that field decides where they are sent. **Who
+reads:** core and up. The shape is closed (`hasOnly`), so a credential cannot be stashed here even by
+an admin — and it must not be, since a document a browser can write is one a browser can read.
 
-### `accessRoster/{emailKey}`
+### `invitations/{emailKey}`
 
-The Planning-Center-derived allowlist. `emailKey` is the lowercased address with `.` replaced by `,`
-(`sam.smith@example.org` → `sam,smith@example,org`) — Firestore ids may not contain `/`, and `.` is
-legal but awkward to read.
+The allowlist: an admin saying "this Google address may sign in, as this". `emailKey` is the
+lowercased address with `.` replaced by `,` (`sam.smith@example.org` → `sam,smith@example,org`) —
+Firestore ids may not contain `/`, and `.` is legal but awkward to read.
 
-Fields: `email`, `displayName`, `role`, `pcoPersonId`, `assignedGroupId`, `active`, `syncedAt`.
+Fields: `email`, `role`, `active`, `invitedAt`, `invitedBy`, and an optional `note`.
 
-**Who writes:** Cloud Functions only. A client that could write here could mint itself an admin entry
-and then claim it through `provisionAccess`, so the rule is `allow write: if false`. Readable by core
-and up, which is what makes the Settings team list possible.
+Keyed by address rather than by uid because it is written *before* the person has ever signed in, and
+a uid does not exist until they do. Once they have, `users/{uid}` is the live authorisation and this
+is only the record of how they arrived — which is why withdrawing an invitation stops somebody
+arriving but does not evict anybody who already has.
 
-This collection is why "who may use Tally" stays governed by Planning Center rather than by a
-separate list somebody has to remember to update.
+**Who writes:** admins, through the app. **Who reads:** admins only — this is a list of church staff
+email addresses, and a counselor's phone has no reason to hold one. The shape is closed (`hasOnly`),
+so nothing unvalidated can be smuggled into an access decision.
+
+This collection used to be a Planning Center List. A List is generated from filter rules, so "these
+particular twelve adults" was only expressible by inventing a custom field on every person in the
+church — and it put an access decision in a system whose editors are a different set of people from
+the ones who should be making it.
 
 ---
 

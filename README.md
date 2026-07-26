@@ -80,28 +80,21 @@ lands on each dashboard list.
 
 ### Signing in against the Auth emulator
 
-The Auth emulator never sends mail. It prints the magic link instead, so "check your inbox" means
-"check your terminal":
+Tally accepts Google sign-in and nothing else, and the Auth emulator stands in for Google — it shows
+a fake account chooser rather than talking to anyone.
 
-1. On the sign-in screen, enter one of the seeded team addresses —
+1. On the sign-in screen, press **Continue with Google**.
+2. In the emulator's chooser, pick **Add new account** and enter one of the seeded team addresses —
    `dana.ruiz@footprints.example.org` (admin), `miriam.achebe@footprints.example.org` (core), or
-   `sam.whitfield@footprints.example.org` (counselor) — and press **Send sign-in link**.
-2. Switch to the terminal running `npm run dev:emulated`. The emulator logs a line beginning
-   `i auth: To sign in as dana.ruiz@footprints.example.org, follow this link:` followed by a
-   `http://127.0.0.1:9099/emulator/action?mode=signIn&...` URL. Command-click or copy it.
-   If you would rather read it as data, `curl http://127.0.0.1:9099/emulator/v1/projects/demo-tally/oobCodes`
-   returns the same links as JSON.
-3. Open the link **in the same browser you requested it from**. Firebase stores the address in
-   `localStorage` to prevent session fixation; a different browser will prompt you to retype it.
-4. You land back on the app as a signed-in stranger with no `users/{uid}` document. Tally calls the
-   `provisionAccess` Cloud Function, which asks Planning Center — the simulator, locally — whether
-   that address belongs to the team, and creates the profile with the role it gets back. This is why
-   the functions emulator has to be running (`npm run dev:emulated` builds and starts it for you;
-   plain `npm run emulators` will not have compiled it) **and** why the simulator has to be running
-   and seeded. Without it the answer is an honest "not on the roster".
+   `sam.whitfield@footprints.example.org` (counselor). Any display name will do.
+3. You land back on the app as a signed-in stranger with no `users/{uid}` document. Tally calls the
+   `provisionAccess` Cloud Function, which decides from *Tally's own* records: the admin is in
+   `TALLY_ADMIN_EMAILS` (see `functions/.env.demo-tally`), the other two arrive on invitations the
+   seed wrote. This is why the functions emulator has to be running — `npm run dev:emulated` builds
+   and starts it for you, plain `npm run emulators` will not have compiled it.
 
-**Continue with Google** works too: the emulator shows a fake account chooser, and everything after
-that follows the same `provisionAccess` path.
+Signing in as an address nobody has invited is a supported thing to try: you get the "ask a leader"
+holding screen, which is what a real volunteer sees before an admin adds them.
 
 ---
 
@@ -290,23 +283,17 @@ still narrows on the first keystroke.
 
 ## Planning Center
 
-Planning Center People is the system of record for *people*: students and counselors originate there,
-and Tally reads them when it needs them rather than asking anyone to maintain a second roster.
+Planning Center People is the system of record for *people*: names, grades, parent contact and
+medical notes originate there, are read on demand, and are stored nowhere in Tally.
 
-**Tally keeps no copy.** There is no scheduled sync and no mirrored roster collection — every screen
-that shows a person is answered by a Cloud Function that asks Planning Center and holds the answer
-for at most `PCO_CACHE_TTL_SECONDS` (default 30). That replaced a sweep that copied every person in
-the church into Firestore, which was a lot of machinery, and a lot of stored personal data about
-minors, to answer questions as small as "what grade is Marcus in".
+*Membership* is Tally's own — both of them. Who is a Footprints student is a document in `students/`,
+put there from **Students → Add from Planning Center**; who may sign in is an invitation an admin
+writes in **Settings → Team**, plus the addresses in `TALLY_ADMIN_EMAILS`. Both used to be Planning
+Center Lists, which cannot express either: a List is generated from filter rules, so "these
+forty-three teenagers" is only sayable by inventing a custom field on every person in the church.
 
-Counselor authorisation comes from the same place, and just as live: `provisionAccess` asks Planning
-Center whether the address that just signed in belongs to the team, and exchanges the answer for a
-`users/{uid}` profile. Tally stores no list of church staff email addresses at all. Write-back is
-only what the church asked for: by default it creates a Person for a quick-added visitor and changes
-nothing else.
-
-The one thing Tally still owns about a person is what Planning Center has no opinion about — which
-small group they are in, and when they first turned up.
+Tally writes back only what the church asked for: by default it creates a Person for a quick-added
+visitor and changes nothing else.
 
 Setup, configuration parameters, role mapping and troubleshooting live in
 **[docs/planning-center.md](docs/planning-center.md)**.

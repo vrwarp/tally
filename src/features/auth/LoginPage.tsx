@@ -2,22 +2,24 @@
  * The sign-in screen.
  *
  * The only screen a signed-out volunteer ever sees, so it carries the brand and
- * explains where access comes from. Email magic link is the primary path — most
- * counselors are handed a phone at the door and never set a password — with
- * Google as the secondary path for the core team.
+ * explains where access comes from. One button, because there is one way in:
+ * Tally decides what somebody may do from their email address, so it needs a
+ * provider that has confirmed the address is theirs.
  *
- * Completing a magic link is handled by AuthProvider on page load; this screen
- * only requests one.
+ * There used to be an email magic link here as well, and it was the primary
+ * path. Removing it costs the volunteer who has no Google account and buys one
+ * door to watch, one set of failure modes to explain at 6:55pm, and no mailbox
+ * left signed in on a shared phone.
  */
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/context/authContext';
-import { Button, ErrorBanner, LoadingScreen, TextField } from '@/components/ui';
+import { Button, ErrorBanner, LoadingScreen } from '@/components/ui';
 import { googleSignInStrategy, isEmbeddedBrowser } from '@/lib/embeddedBrowser';
 import { firebaseApp } from '@/lib/firebase';
 
 export function LoginPage() {
-  const { status, error, magicLinkSentTo, sendMagicLink, signInWithGoogle, clearError } = useAuth();
+  const { status, error, signInWithGoogle } = useAuth();
 
   /*
    * Decided once on mount, not on click: telling someone up front that a button
@@ -29,36 +31,12 @@ export function LoginPage() {
   const [googleUnavailable] = useState(
     () => googleSignInStrategy(firebaseApp.options.authDomain) === 'unavailable',
   );
-  const [email, setEmail] = useState('');
-  const [sending, setSending] = useState(false);
   const [googlePending, setGooglePending] = useState(false);
-  /** Which sent-link confirmation the user has dismissed via "different email". */
-  const [dismissed, setDismissed] = useState<string | null>(null);
 
   if (status === 'loading') return <LoadingScreen message="Checking your session…" />;
-  // `pending` redirects too: AuthProvider finishes a magic link by rewriting the
-  // URL with history.replaceState, which the router never hears about, so a user
-  // who just signed in would otherwise sit here staring at the form.
+  // `pending` redirects too: somebody who has just signed in but has no profile
+  // yet gets the holding screen inside the app, not this form again.
   if (status === 'ready' || status === 'pending') return <Navigate to="/" replace />;
-
-  const sentTo = magicLinkSentTo && magicLinkSentTo !== dismissed ? magicLinkSentTo : null;
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const address = email.trim();
-    if (!address || sending) return;
-
-    setSending(true);
-    // Re-arm the confirmation panel in case they are resending to the same address.
-    setDismissed(null);
-    try {
-      await sendMagicLink(address);
-    } catch {
-      /* Already surfaced through `error`. */
-    } finally {
-      setSending(false);
-    }
-  }
 
   async function handleGoogle() {
     setGooglePending(true);
@@ -90,74 +68,7 @@ export function LoginPage() {
         <div className="flex flex-col gap-5">
           {error ? <ErrorBanner message={error} /> : null}
 
-          {sentTo ? (
-            <div
-              role="status"
-              className="rounded-2xl bg-ink-900 px-5 py-6 text-center ring-1 ring-ink-800"
-            >
-              <span aria-hidden="true" className="text-3xl">
-                ✉️
-              </span>
-              <p className="mt-2 text-lg font-semibold text-ink-50">Check your inbox</p>
-              <p className="mt-2 text-sm text-ink-300">
-                We sent a sign-in link to{' '}
-                <span className="break-all font-medium text-brand-300">{sentTo}</span>.
-              </p>
-              <p className="mt-2 text-sm text-ink-500">
-                Open it on this phone to finish signing in. Links expire, so ask for a fresh one if
-                it stops working.
-              </p>
-              <Button
-                variant="ghost"
-                fullWidth
-                className="mt-4"
-                onClick={() => {
-                  setDismissed(sentTo);
-                  setEmail('');
-                }}
-              >
-                Use a different email
-              </Button>
-            </div>
-          ) : (
-            <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
-              <TextField
-                label="Email"
-                type="email"
-                name="email"
-                value={email}
-                placeholder="you@example.org"
-                autoComplete="email"
-                inputMode="email"
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                required
-                onChange={(event) => {
-                  setEmail(event.target.value);
-                  if (error) clearError();
-                }}
-              />
-              <Button
-                type="submit"
-                size="lg"
-                fullWidth
-                loading={sending}
-                disabled={!email.trim()}
-              >
-                Send sign-in link
-              </Button>
-            </form>
-          )}
-
-          <div className="flex items-center gap-3" aria-hidden="true">
-            <span className="h-px flex-1 bg-ink-800" />
-            <span className="text-xs uppercase tracking-widest text-ink-600">or</span>
-            <span className="h-px flex-1 bg-ink-800" />
-          </div>
-
           <Button
-            variant="secondary"
             size="lg"
             fullWidth
             disabled={googleUnavailable}
@@ -171,15 +82,15 @@ export function LoginPage() {
           {googleUnavailable ? (
             <p className="text-center text-xs leading-relaxed text-warn-400">
               {inAppBrowser
-                ? 'Google sign-in does not work inside an app’s built-in browser. The email link above does — or open Tally in Safari or Chrome.'
-                : 'Google sign-in is not available in the installed app. Use the email link above.'}
+                ? 'Google sign-in does not work inside an app’s built-in browser. Open Tally in Safari or Chrome.'
+                : 'Google sign-in is not available in the installed app. Open Tally in Safari or Chrome.'}
             </p>
           ) : null}
         </div>
 
         <p className="text-center text-xs leading-relaxed text-ink-500">
-          Access is granted from the Footprints team list in Planning Center — sign in with the
-          email your leader has on file there.
+          A leader adds you to Tally by your Google address. Sign in with the one they used, and
+          you are in — no password to remember at a door.
         </p>
       </div>
     </div>

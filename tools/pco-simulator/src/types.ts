@@ -84,6 +84,19 @@ export interface SimList {
   id: string;
   name: string;
   member_ids: string[];
+  description?: string | null;
+  /**
+   * The health attributes `GET /lists` carries.
+   *
+   * They exist here because they are the ones that explain a missing student:
+   * a list whose rules broke upstream (`invalid`), or one that has not been
+   * refreshed since the spring. The roster picker shows them, so the simulator
+   * has to be able to produce them.
+   */
+  refreshed_at?: string | null;
+  auto_refresh?: boolean;
+  invalid?: boolean;
+  starred?: boolean;
 }
 
 export interface SimOrg {

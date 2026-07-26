@@ -27,6 +27,8 @@ import {
   attendanceDoc,
   eventDoc,
   initTestEnv,
+  invitationDoc,
+  pcoConfigDoc,
   rsvpDoc,
   seedAll,
   settingsDoc,
@@ -186,6 +188,73 @@ describe('users', () => {
     const db = asUser(env, UID.admin);
     await assertFails(updateDoc(doc(db, paths.user(UID.admin)), { role: 'counselor' }));
     await assertFails(updateDoc(doc(db, paths.user(UID.admin)), { active: false }));
+  });
+});
+
+/**
+ * The allowlist that decides who may sign in at all.
+ *
+ * It moved out of Planning Center because a List is generated from filter
+ * rules, so "these particular twelve adults may see a roster of minors" was
+ * only expressible by inventing a custom field on every person in the church —
+ * an access decision stored in a system edited by a different set of people
+ * from the ones who should be making it.
+ */
+describe('invitations', () => {
+  const key = 'newcomer@footprints,example,org';
+
+  it('lets an admin invite somebody', async () => {
+    const db = asUser(env, UID.admin);
+    await assertSucceeds(setDoc(doc(db, paths.invitation(key)), invitationDoc()));
+    await assertSucceeds(getDoc(doc(db, paths.invitation(key))));
+    await assertSucceeds(deleteDoc(doc(db, paths.invitation(key))));
+  });
+
+  it('keeps the list away from the core team, let alone counselors', async () => {
+    /*
+     * Not a hierarchy oversight. This is a list of church staff email
+     * addresses and who may do what with a roster of minors; the core team runs
+     * the ministry, and granting access is a different job from running it.
+     */
+    for (const uid of [UID.core, UID.counselor]) {
+      const db = asUser(env, uid);
+      await assertFails(getDocs(collection(db, paths.invitations())));
+      await assertFails(setDoc(doc(db, paths.invitation(key)), invitationDoc()));
+    }
+  });
+
+  it('rejects a role nobody wrote code for', async () => {
+    // The invitation decides the role somebody arrives with, so a made-up value
+    // here is an attempt to arrive as something the app does not model.
+    await assertFails(
+      setDoc(
+        doc(asUser(env, UID.admin), paths.invitation(key)),
+        invitationDoc({ role: 'superuser' as never }),
+      ),
+    );
+  });
+
+  it('rejects an invitation with no address on it', async () => {
+    await assertFails(
+      setDoc(doc(asUser(env, UID.admin), paths.invitation(key)), invitationDoc({ email: '' })),
+    );
+  });
+
+  it('refuses fields the shape does not admit', async () => {
+    // Closed on purpose: an invitation is an access decision, and a field
+    // nobody validates is a field somebody will later trust.
+    await assertFails(
+      setDoc(doc(asUser(env, UID.admin), paths.invitation(key)), {
+        ...invitationDoc(),
+        grantsEverything: true,
+      }),
+    );
+  });
+
+  it('lets an admin pause an invitation without retyping it in September', async () => {
+    const db = asUser(env, UID.admin);
+    await assertSucceeds(setDoc(doc(db, paths.invitation(key)), invitationDoc()));
+    await assertSucceeds(setDoc(doc(db, paths.invitation(key)), invitationDoc({ active: false })));
   });
 });
 
@@ -535,6 +604,118 @@ describe('config/settings', () => {
         doc(db, paths.settings()),
         settingsDoc({ predictiveMinAttended: 0, predictiveOfLastN: 3 }),
       ),
+    );
+  });
+});
+
+/**
+ * The Planning Center settings, which are the closest thing Tally has to a
+ * control that reaches outside itself: they decide which children the app can
+ * see, and how much of the church's permanent database it may write to.
+ */
+describe('config/planningCenter', () => {
+  it('lets core read and write the settings', async () => {
+    const db = asUser(env, UID.core);
+    await assertSucceeds(setDoc(doc(db, paths.planningCenter()), pcoConfigDoc()));
+    await assertSucceeds(getDoc(doc(db, paths.planningCenter())));
+  });
+
+  it('keeps it away from counselors entirely', async () => {
+    // Nothing a door volunteer's screen does depends on this document — the
+    // server resolves the configuration before answering any callable — so
+    // there is no reason for their device to hold it.
+    const db = asUser(env, UID.counselor);
+    await assertFails(getDoc(doc(db, paths.planningCenter())));
+    await assertFails(setDoc(doc(db, paths.planningCenter()), pcoConfigDoc()));
+  });
+
+  it('rejects a write-back mode nobody wrote code for', async () => {
+    // The stakes are asymmetric: an unrecognised mode that fell through to
+    // `full` would start editing the church's real people database.
+    await assertFails(
+      setDoc(
+        doc(asUser(env, UID.core), paths.planningCenter()),
+        pcoConfigDoc({ writeBack: 'everything' as never }),
+      ),
+    );
+  });
+
+  it('rejects a grade band outside the grades the app understands', async () => {
+    const db = asUser(env, UID.core);
+    await assertFails(setDoc(doc(db, paths.planningCenter()), pcoConfigDoc({ minGrade: 1 })));
+    await assertFails(setDoc(doc(db, paths.planningCenter()), pcoConfigDoc({ maxGrade: 13 })));
+  });
+
+  it('rejects a band whose top is below its bottom', async () => {
+    await assertFails(
+      setDoc(
+        doc(asUser(env, UID.core), paths.planningCenter()),
+        pcoConfigDoc({ minGrade: 10, maxGrade: 8 }),
+      ),
+    );
+  });
+
+  it('refuses to let a cache become a mirror', async () => {
+    const db = asUser(env, UID.core);
+    await assertFails(setDoc(doc(db, paths.planningCenter()), pcoConfigDoc({ cacheTtlSeconds: 86_400 })));
+    await assertFails(setDoc(doc(db, paths.planningCenter()), pcoConfigDoc({ cacheTtlSeconds: -1 })));
+  });
+
+  it('stops the core team pointing Tally at another host', async () => {
+    /*
+     * The API root decides where the church's Personal Access Token gets sent
+     * on every request. Core team runs the ministry; choosing the address the
+     * credentials travel to is an admin decision.
+     */
+    await assertFails(
+      setDoc(
+        doc(asUser(env, UID.core), paths.planningCenter()),
+        pcoConfigDoc({ baseUrl: 'https://not-planning-center.example/people/v2' }),
+      ),
+    );
+  });
+
+  it('lets an admin set the API root, and only to an http(s) address', async () => {
+    const db = asUser(env, UID.admin);
+    await assertSucceeds(
+      setDoc(doc(db, paths.planningCenter()), pcoConfigDoc({ baseUrl: 'https://proxy.example.org/people/v2' })),
+    );
+    await assertFails(
+      setDoc(doc(db, paths.planningCenter()), pcoConfigDoc({ baseUrl: 'ftp://files.example.org' })),
+    );
+  });
+
+  it('lets core keep editing everything else once an admin has set the root', async () => {
+    // The guard is on *changing* the address, not on the document containing
+    // one: otherwise one admin decision would lock the core team out of the
+    // roster settings for good.
+    await env.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), paths.planningCenter()),
+        pcoConfigDoc({ baseUrl: 'https://proxy.example.org/people/v2' }),
+      );
+    });
+
+    await assertSucceeds(
+      setDoc(
+        doc(asUser(env, UID.core), paths.planningCenter()),
+        pcoConfigDoc({ baseUrl: 'https://proxy.example.org/people/v2', minGrade: 7 }),
+      ),
+    );
+  });
+
+  it('never lets credentials into the document, whoever is asking', async () => {
+    /*
+     * The token pair lives in Secret Manager. A document a browser can write is
+     * a document a browser can read, so an admin who could stash credentials
+     * here would be handing them to every core-team device that opens Settings.
+     */
+    await assertFails(
+      setDoc(doc(asUser(env, UID.admin), paths.planningCenter()), {
+        ...pcoConfigDoc(),
+        appId: 'app-id',
+        secret: 'secret',
+      }),
     );
   });
 });

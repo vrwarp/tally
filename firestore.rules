@@ -115,22 +115,63 @@ service cloud.firestore {
     }
 
     /* ---------------------------------------------------------------- */
+    /* invitations — who may sign in at all                              */
+    /* ---------------------------------------------------------------- */
+
+    /*
+     * Keyed by address, because it is written before the person has ever
+     * signed in and a uid does not exist until they do.
+     *
+     * This is the allowlist that used to be a Planning Center List. A List is
+     * generated from filter rules, so "these particular twelve adults may see a
+     * roster of minors" was only expressible by inventing a custom field on
+     * every person in the church — an access decision stored in a system whose
+     * editors are a different set of people from the ones who should be making
+     * it. It belongs here, where an admin makes it deliberately.
+     *
+     * Admin-only in both directions. The read matters as much as the write:
+     * this is a list of church staff email addresses, and a counselor's phone
+     * has no reason to hold one.
+     */
+    match /invitations/{emailKey} {
+      function validInvitation() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['email', 'role', 'active', 'invitedAt', 'invitedBy', 'note'])
+          && d.email is string
+          && d.email.size() > 0
+          && d.role in ['counselor', 'core', 'admin']
+          && d.active is bool
+          && (!('note' in d.keys()) || d.note is string);
+      }
+
+      allow get, list: if isAdmin();
+      allow create, update: if isAdmin() && validInvitation();
+      allow delete: if isAdmin();
+    }
+
+    /* ---------------------------------------------------------------- */
     /* students                                                          */
     /* ---------------------------------------------------------------- */
 
     /*
-     * This collection is *not* the roster.
+     * This collection *is* the roster — the membership, not the people.
      *
-     * The roster comes from Planning Center through a callable, and none of it
-     * is stored. What lives here is only what Planning Center has no opinion
-     * about — a small group, a note, when somebody first turned up — plus the
-     * whole record for a quick-added visitor until the push lands.
+     * A document here says somebody put this student on Tally's roster. What it
+     * does not say is who they are: for a student linked to Planning Center the
+     * name, grade and everything else are read live through a callable and
+     * stored nowhere. What lives here is the membership itself plus what
+     * Planning Center has no opinion about — a small group, a note, when
+     * somebody first turned up — plus the whole record for a quick-added
+     * visitor until the push lands.
      *
-     * Two consequences for these rules. A document is sparse, so field
-     * validation only applies to fields that are present. And parent contact
-     * and allergies are not writable at all: Tally does not hold them, and a
-     * client that could write them here would be recreating the mirror one
-     * document at a time.
+     * Three consequences for these rules. A document is sparse, so field
+     * validation only applies to fields that are present. Parent contact and
+     * allergies are not writable at all: Tally does not hold them, and a client
+     * that could write them here would be recreating the mirror one document at
+     * a time. And the Planning Center linkage is still not a client's to
+     * assert — putting a person on the roster goes through a callable that
+     * checks the id upstream first, because `students/pco_123` is a claim about
+     * a real child, not a preference.
      */
     match /students/{studentId} {
       function validStudent() {
@@ -284,6 +325,70 @@ service cloud.firestore {
 
       allow get: if isActive();
       allow write: if isCore() && validSettings();
+    }
+
+    /*
+     * The non-secret half of the Planning Center configuration.
+     *
+     * This document is why a church can move its roster onto a different
+     * Planning Center list without a deploy. The Personal Access Token is
+     * deliberately not here and never will be: credentials live in Secret
+     * Manager, where a browser cannot reach them even with an admin signed in.
+     *
+     * Read is core-only. Nothing on a counselor's screen depends on it — the
+     * server resolves the configuration itself before answering any callable —
+     * so there is no reason for a door volunteer's device to hold the shape of
+     * the church's Planning Center account.
+     */
+    match /config/planningCenter {
+      function validPcoConfig() {
+        let d = request.resource.data;
+        /*
+         * A closed shape, unlike every other document in this file.
+         *
+         * The reason is specific: the one thing that must never appear here is
+         * a Personal Access Token. Listing what is allowed — rather than
+         * validating what is recognised and ignoring the rest — is what makes
+         * "somebody stashed credentials in the config document" a write the
+         * database refuses rather than a habit nobody notices.
+         */
+        return d.keys().hasOnly([
+              'rosterSource', 'studentListId', 'counselorListId',
+              'minGrade', 'maxGrade', 'writeBack', 'smallGroupField',
+              'cacheTtlSeconds', 'baseUrl', 'updatedAt', 'updatedBy',
+            ])
+          && (!('rosterSource' in d.keys()) || d.rosterSource in ['list', 'grade'])
+          && (!('studentListId' in d.keys()) || d.studentListId is string)
+          && (!('counselorListId' in d.keys()) || d.counselorListId is string)
+          && (!('smallGroupField' in d.keys()) || d.smallGroupField is string)
+          && (!('writeBack' in d.keys()) || d.writeBack in ['off', 'create', 'full'])
+          && (!('minGrade' in d.keys()) || (d.minGrade is int && d.minGrade >= 6 && d.minGrade <= 12))
+          && (!('maxGrade' in d.keys()) || (d.maxGrade is int && d.maxGrade >= 6 && d.maxGrade <= 12))
+          && (!('minGrade' in d.keys()) || !('maxGrade' in d.keys()) || d.maxGrade >= d.minGrade)
+          && (!('cacheTtlSeconds' in d.keys())
+              || (d.cacheTtlSeconds is int && d.cacheTtlSeconds >= 0 && d.cacheTtlSeconds <= 300))
+          && (!('baseUrl' in d.keys())
+              || (d.baseUrl is string
+                  && (d.baseUrl == '' || d.baseUrl.matches('https?://.*'))));
+      }
+
+      /**
+       * The API root is the one field here that is not merely a preference.
+       *
+       * Every Planning Center request carries the church's Personal Access
+       * Token, so whoever sets this address chooses where those credentials get
+       * sent. That is an admin decision, not a core-team one — and the server
+       * shows a standing "not the real Planning Center" warning whenever it is
+       * set, so it cannot be changed quietly either.
+       */
+      function baseUrlUnchanged() {
+        return resource == null
+          ? request.resource.data.get('baseUrl', '') == ''
+          : request.resource.data.get('baseUrl', '') == resource.data.get('baseUrl', '');
+      }
+
+      allow get: if isCore();
+      allow write: if isCore() && validPcoConfig() && (isAdmin() || baseUrlUnchanged());
     }
 
     /*

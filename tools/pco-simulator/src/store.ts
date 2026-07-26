@@ -7,6 +7,7 @@ import {
   createFixtureOrg,
   DEFAULT_APP_ID,
   DEFAULT_SECRET,
+  STALE_LIST_ID,
   STUDENT_LIST_ID,
   TEAM_LIST_ID,
 } from './fixtures.js';
@@ -14,6 +15,7 @@ import type {
   SimEmail,
   SimHousehold,
   SimHouseholdMembership,
+  SimList,
   SimOrg,
   SimPerson,
   SimPhoneNumber,
@@ -196,6 +198,10 @@ export class SimulatorStore {
     return this.membershipsForHousehold(householdId).length;
   }
 
+  get lists(): readonly SimList[] {
+    return this.org.lists;
+  }
+
   listById(id: string) {
     return this.org.lists.find((list) => list.id === id);
   }
@@ -312,6 +318,13 @@ export class SimulatorStore {
     const studentList = this.org.lists.find((entry) => entry.id === STUDENT_LIST_ID);
     if (studentList) studentList.member_ids.push(student.id);
 
+    // The first few also land on the stale camp list, so a seeded organisation
+    // has more than one plausible answer to "which list is the roster". A
+    // picker that only ever shows the right choice proves nothing about the
+    // wrong one.
+    const campList = this.org.lists.find((entry) => entry.id === STALE_LIST_ID);
+    if (campList && campList.member_ids.length < 12) campList.member_ids.push(student.id);
+
     // No parent named means a student the church has on file but cannot reach —
     // exactly the case the "incomplete profile" list exists for, so it has to
     // be expressible here.
@@ -422,12 +435,11 @@ export class SimulatorStore {
 /**
  * An organisation with nobody in it — but with the two Lists still there.
  *
- * The Lists are deliberately not empty-as-in-absent. A configuration pointing
- * at `PCO_STUDENT_LIST_ID` has to resolve to *an empty list* rather than to a
- * 404, because those mean different things: one is "no students yet", the
- * other is "your List id is wrong", and Tally reports them differently on
- * purpose. Seeding into a fresh organisation must not silently produce the
- * second.
+ * The Lists are deliberately not empty-as-in-absent. A list a caller names has
+ * to resolve to *an empty list* rather than to a 404, because those mean
+ * different things: one is "nobody on it yet", the other is "your List id is
+ * wrong", and Tally reports them differently on purpose. Seeding into a fresh
+ * organisation must not silently produce the second.
  */
 function emptyOrg(): SimOrg {
   return {
@@ -439,8 +451,33 @@ function emptyOrg(): SimOrg {
     fieldDefinitions: [],
     fieldData: [],
     lists: [
-      { id: STUDENT_LIST_ID, name: 'Footprints Students', member_ids: [] },
-      { id: TEAM_LIST_ID, name: 'Footprints Team', member_ids: [] },
+      {
+        id: STUDENT_LIST_ID,
+        name: 'Footprints Students',
+        member_ids: [],
+        auto_refresh: true,
+        refreshed_at: '2026-02-13T12:00:00Z',
+        starred: true,
+      },
+      {
+        id: TEAM_LIST_ID,
+        name: 'Footprints Team',
+        member_ids: [],
+        auto_refresh: true,
+        refreshed_at: '2026-02-13T12:00:00Z',
+      },
+      // The decoy, and the reason the roster picker shows counts and health at
+      // all: a name this similar is indistinguishable from the real list when
+      // the setting is a bare id copied out of a URL.
+      {
+        id: STALE_LIST_ID,
+        name: 'Footprints Camp 2019',
+        member_ids: [],
+        description: 'Summer camp signups. Long over.',
+        auto_refresh: false,
+        refreshed_at: '2019-07-04T12:00:00Z',
+        invalid: true,
+      },
     ],
   };
 }

@@ -35,6 +35,19 @@ export function mergeRoster(
     const target = byId.get(document.id) ?? (linkedId ? byId.get(linkedId) : undefined);
 
     if (!target) {
+      /*
+       * A document that names a Planning Center person the roster did not
+       * return is not a row.
+       *
+       * Two ways to get here, and both mean "not on the roster": somebody was
+       * removed (the membership is kept so their attendance history still
+       * resolves), or their upstream person was deleted or merged. Either way
+       * the document holds no name — names are Planning Center's and are never
+       * stored — so rendering it would put a blank line on the roster. The
+       * second case is reported on the Settings screen instead, with a count.
+       */
+      if (document.pcoPersonId && !document.firstName) continue;
+
       byId.set(document.id, document);
       continue;
     }

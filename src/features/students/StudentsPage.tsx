@@ -23,6 +23,7 @@ import {
 } from '@/components/ui';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
+import { AddFromPlanningCenterModal } from '@/features/students/AddFromPlanningCenterModal';
 import { StudentEditorModal } from '@/features/students/StudentEditorModal';
 import { cn, createSearchMatcher, initials, ordinalGrade } from '@/lib/utils';
 import { GRADES, studentFullName, type Grade, type Student } from '@/types';
@@ -31,7 +32,7 @@ type StatusFilter = 'active' | 'inactive' | 'all';
 type QuickFilter = 'none' | 'incomplete' | 'visitors';
 
 export function StudentsPage() {
-  const { students, groups, loading } = useData();
+  const { students, groups, loading, refreshRoster } = useData();
   const { user } = useAuth();
 
   const [query, setQuery] = useState('');
@@ -41,11 +42,15 @@ export function StudentsPage() {
   const [status, setStatus] = useState<StatusFilter>('active');
   const [quick, setQuick] = useState<QuickFilter>('none');
   const [editorOpen, setEditorOpen] = useState(false);
+  const [addFromPcoOpen, setAddFromPcoOpen] = useState(false);
 
   const groupNames = useMemo(
     () => new Map(groups.map((group) => [group.id, group.name])),
     [groups],
   );
+
+  /** Whoever is already here, so the Planning Center search can say so. */
+  const rosterIds = useMemo(() => new Set(students.map((student) => student.id)), [students]);
 
   const visible = useMemo(() => {
     const matcher = createSearchMatcher(query);
@@ -95,7 +100,17 @@ export function StudentsPage() {
             {visible.length === students.length ? ' students' : ` of ${students.length}`}
           </p>
         </div>
-        <Button onClick={() => setEditorOpen(true)}>Add student</Button>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {/*
+            Two ways onto the roster, and the order is the common case first.
+            Somebody the church already knows is looked up; a face at the door
+            nobody has met is typed in and pushed upstream later.
+          */}
+          <Button onClick={() => setAddFromPcoOpen(true)}>Add from Planning Center</Button>
+          <Button variant="secondary" onClick={() => setEditorOpen(true)}>
+            New visitor
+          </Button>
+        </div>
       </header>
 
       <div className="flex flex-col gap-3">
@@ -195,7 +210,7 @@ export function StudentsPage() {
                   Clear filters
                 </Button>
               ) : (
-                <Button onClick={() => setEditorOpen(true)}>Add student</Button>
+                <Button onClick={() => setAddFromPcoOpen(true)}>Add from Planning Center</Button>
               )
             }
           />
@@ -215,6 +230,18 @@ export function StudentsPage() {
       {user ? (
         <StudentEditorModal open={editorOpen} onClose={() => setEditorOpen(false)} />
       ) : null}
+
+      <AddFromPlanningCenterModal
+        open={addFromPcoOpen}
+        onClose={() => {
+          setAddFromPcoOpen(false);
+          // The modal refreshes after each add, but a read that failed on the
+          // way out would otherwise leave the list a student short with no way
+          // to notice short of a reload.
+          void refreshRoster(true);
+        }}
+        onRoster={rosterIds}
+      />
     </div>
   );
 }

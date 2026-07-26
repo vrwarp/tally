@@ -73,6 +73,41 @@ export interface UserProfile extends Omit<UserProfileDoc, 'createdAt' | 'lastSee
 }
 
 /* -------------------------------------------------------------------------- */
+/* Invitations — who may sign in at all                                        */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * An admin saying "this Google address may sign in, as this".
+ *
+ * Keyed by `emailKey` rather than by uid, because it is written before the
+ * person has ever signed in and there is no uid until they do. Once they have,
+ * `users/{uid}` is the live authorisation and this is only the record of how
+ * they got in — which is why deleting an invitation does not evict anybody.
+ *
+ * This replaced a Planning Center List. A List is generated from filter rules,
+ * so "these particular twelve adults" was only expressible by inventing a
+ * custom field on every person in the church — an access decision living in a
+ * system edited by a different set of people from the ones who should be
+ * making it.
+ */
+export interface InvitationDoc {
+  /** The address as typed, for display. The document id is its `emailKey`. */
+  email: string;
+  role: Role;
+  active: boolean;
+  invitedAt: Timestamp;
+  invitedBy: string | null;
+  /** Free text, for "Wednesday night volunteer" and the like. */
+  note?: string;
+}
+
+export interface Invitation extends Omit<InvitationDoc, 'invitedAt'> {
+  /** The `emailKey` document id. */
+  id: string;
+  invitedAt: Date | null;
+}
+
+/* -------------------------------------------------------------------------- */
 /* Small groups                                                                */
 /* -------------------------------------------------------------------------- */
 
@@ -394,8 +429,16 @@ export const DEFAULT_SETTINGS: AppSettings = {
 /* Planning Center                                                             */
 /* -------------------------------------------------------------------------- */
 
-/** How the youth roster is selected out of Planning Center. */
-export type PcoRosterSource = 'list' | 'grade';
+/**
+ * The `invitations/{emailKey}` document id.
+ *
+ * Dots become commas because the address is the key and the key is a path
+ * segment. Must stay identical to `emailKey` in functions/src/pco/mapping.ts,
+ * or an invitation an admin wrote would not be the one a sign-in looks up.
+ */
+export function emailKey(email: string): string {
+  return email.trim().toLowerCase().replace(/\./g, ',');
+}
 
 /** How much Tally is allowed to write back to Planning Center. */
 export type PcoWriteBackMode = 'off' | 'create' | 'full';
@@ -430,6 +473,24 @@ export interface PcoRosterPerson {
   hasAllergies: boolean;
 }
 
+/**
+ * Somebody Planning Center knows, offered as a candidate for the roster.
+ *
+ * Deliberately not filtered by grade or by "is a child": those filters are
+ * wrong at exactly the edges a hand-picked roster exists for. Both facts are
+ * shown so the person choosing can see what they are picking.
+ */
+export interface PcoPersonSearchResult {
+  pcoPersonId: string;
+  /** Tally student id, so a caller can tell who is already on the roster. */
+  id: string;
+  firstName: string;
+  lastName: string;
+  grade: number;
+  child: boolean;
+  status: StudentStatus;
+}
+
 /** The fields the roster deliberately withholds, fetched one person at a time. */
 export interface PcoPersonDetails {
   pcoPersonId: string;
@@ -452,13 +513,80 @@ export interface PcoStatus {
   reachable: boolean;
   /** Null when everything is fine; otherwise the reason, in plain language. */
   problem: string | null;
-  rosterSource: PcoRosterSource;
   writeBack: PcoWriteBackMode;
   /** Seconds a read may be reused server-side. `0` means the cache is off. */
   cacheTtlSeconds: number;
   /** True when the API root is not the real Planning Center — a test rig. */
   baseUrlOverridden: boolean;
+  /** How many of Tally's roster entries Planning Center could actually name. */
   peopleVisible: number | null;
+  /** How many it could not: deleted upstream, merged, or no longer readable. */
+  unresolved: number;
+  /** The settings actually in force, whatever their source. */
+  settings: PcoEffectiveSettings;
+}
+
+/**
+ * The non-secret settings the server is running on right now.
+ *
+ * "Effective" rather than "saved": these are the deploy-time parameters with
+ * whatever the core team has saved layered over them, which is the only version
+ * anybody should be shown. A form filled in from the *saved* document would
+ * silently misrepresent a fresh install, where nothing is saved and everything
+ * still has a value.
+ */
+export interface PcoEffectiveSettings {
+  minGrade: number;
+  maxGrade: number;
+  writeBack: PcoWriteBackMode;
+  cacheTtlSeconds: number;
+  /** The API root. Non-secret: an address, not a credential. */
+  baseUrl: string;
+  /** True when `config/planningCenter` is what these came from. */
+  managedInApp: boolean;
+}
+
+/**
+ * `config/planningCenter` as stored.
+ *
+ * Every field is written, and cleared fields are written as `''` rather than
+ * removed — the server treats an absent key as "no opinion, use the deployed
+ * value" and an empty one as "the leader deliberately cleared this", and the
+ * difference is the only way to *remove* a counselor list from Settings.
+ *
+ * The Personal Access Token is not here. It cannot be: this document is written
+ * by a browser, and a credential a browser can write is a credential a browser
+ * can read.
+ */
+export interface PcoRuntimeConfigDoc {
+  minGrade: number;
+  maxGrade: number;
+  writeBack: PcoWriteBackMode;
+  cacheTtlSeconds: number;
+  /** Admin-only, and flagged everywhere it is not the real Planning Center. */
+  baseUrl: string;
+  updatedAt: Timestamp | null;
+  updatedBy: string | null;
+}
+
+/**
+ * One Planning Center list, as the roster picker shows it.
+ *
+ * `totalPeople` is what turns "list 1234567" into a decision somebody can make.
+ * `invalid` and `refreshedAt` are here because they answer the question this
+ * feature otherwise generates: a student missing from Tally is usually a list
+ * whose rules broke, or one that has not been refreshed since the spring.
+ */
+export interface PcoList {
+  id: string;
+  name: string;
+  description: string | null;
+  /** Members as of the last refresh, or null when Planning Center did not say. */
+  totalPeople: number | null;
+  refreshedAt: Date | null;
+  autoRefresh: boolean;
+  invalid: boolean;
+  starred: boolean;
 }
 
 /** The id Tally uses for a Planning Center person, everywhere. */

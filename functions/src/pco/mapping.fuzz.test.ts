@@ -8,7 +8,7 @@
  * into a child's profile.
  */
 import { describe, expect, it } from 'vitest';
-import { buildIncludedIndex, extractParentContact, isYouth, mapPersonToAccessEntry, mapPersonToStudent } from './mapping.js';
+import { buildIncludedIndex, extractParentContact, isYouth, mapPersonToStudent } from './mapping.js';
 import type { PcoPerson } from './types.js';
 
 /**
@@ -122,16 +122,6 @@ describe('Planning Center mapping properties', () => {
 
     // A contact that changed between syncs would rewrite the record every run.
     expect(second).toEqual(first);
-  });
-
-  forEachPerson('an access entry is never granted without a usable email', (person) => {
-    const entry = mapPersonToAccessEntry(person, { index: buildIncludedIndex([]) });
-    if (entry === null) return;
-
-    expect(entry.email.length).toBeGreaterThan(0);
-    expect(entry.email).toBe(entry.email.toLowerCase());
-    // Role must come from Planning Center's own fields, never from free text.
-    expect(['counselor', 'core', 'admin']).toContain(entry.role);
   });
 
   it('never pollutes Object.prototype from a person payload', () => {

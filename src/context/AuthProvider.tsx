@@ -1,20 +1,22 @@
 /**
- * Passwordless authentication (PRD 4.5).
+ * Authentication (PRD 4.5).
  *
- * Counselors sign in with an email magic link; the core team can also use
- * Google OAuth. Neither path grants access on its own — authorisation comes
- * from the `users/{uid}` document, mirrored live so an admin revoking someone
- * mid-event takes effect without a reload.
+ * Google, and only Google. Tally used to accept an email magic link as well,
+ * and for a while that was the primary path — most counselors are handed a
+ * phone at the door. Two things ended it: authorisation is keyed on an email
+ * address, so what matters is that a provider Tally trusts has confirmed the
+ * address belongs to the person; and a mailbox left signed in on a shared phone
+ * is a way into the ministry's data that nobody is watching.
+ *
+ * Signing in grants nothing on its own — authorisation comes from the
+ * `users/{uid}` document, mirrored live so an admin revoking someone mid-event
+ * takes effect without a reload.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   GoogleAuthProvider,
   getRedirectResult,
-  isSignInWithEmailLink,
   onAuthStateChanged,
-  sendSignInLinkToEmail,
-  signInWithEmailLink,
   signInWithPopup,
   signInWithRedirect,
   signOut as firebaseSignOut,
@@ -35,9 +37,6 @@ import {
   type AuthStage,
   type AuthStatus,
 } from '@/context/authContext';
-
-/** Where the magic link lands. Kept in one place so it matches the auth domain allowlist. */
-const EMAIL_STORAGE_KEY = 'tally:magic-link-email';
 
 /**
  * Set immediately before `signInWithRedirect`, so the return leg knows there is
@@ -76,30 +75,16 @@ function setRedirectPending(pending: boolean): void {
   }
 }
 
-function magicLinkSettings() {
-  return {
-    url: `${window.location.origin}/login`,
-    handleCodeInApp: true,
-  };
-}
-
 function describeAuthError(error: unknown): string {
   const code = (error as { code?: string })?.code ?? '';
   switch (code) {
-    case 'auth/invalid-email':
-      return 'That email address does not look right.';
-    case 'auth/invalid-action-code':
-    case 'auth/expired-action-code':
-      return 'That sign-in link has expired. Request a new one.';
     case 'auth/popup-closed-by-user':
     case 'auth/cancelled-popup-request':
       return 'Sign-in was cancelled.';
     case 'auth/popup-blocked':
-      return 'The sign-in window was blocked. Use the email link instead.';
+      return 'The sign-in window was blocked. Allow popups for this site, or try again.';
     case 'auth/operation-not-supported-in-this-environment':
-      return 'This browser cannot do Google sign-in. Use the email link instead.';
-    case 'auth/unauthorized-continue-uri':
-      return 'This domain is not authorised for sign-in links. Add it in the Firebase console.';
+      return 'This browser cannot do Google sign-in. Open Tally in Safari or Chrome.';
     case 'auth/network-request-failed':
       return 'No connection. Check the wifi and try again.';
     default:
@@ -108,14 +93,11 @@ function describeAuthError(error: unknown): string {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [authResolved, setAuthResolved] = useState(false);
   const [profileResolved, setProfileResolved] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [magicLinkSentTo, setMagicLinkSentTo] = useState<string | null>(null);
-  const completingLink = useRef(false);
   /** Bumped to re-establish the profile listener. See `refreshProfile`. */
   const [profileEpoch, setProfileEpoch] = useState(0);
   const uid = useRef<string | null>(null);
@@ -270,51 +252,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
   }, []);
 
-  /* Finish a magic-link sign-in when the browser lands back on the app. */
-  useEffect(() => {
-    if (completingLink.current) return;
-    if (!isSignInWithEmailLink(auth, window.location.href)) return;
-    completingLink.current = true;
-
-    const stored = window.localStorage.getItem(EMAIL_STORAGE_KEY);
-    // Opening the link on a different device loses the stored address; asking
-    // for it again is required by Firebase to prevent session-fixation.
-    const email =
-      stored ?? window.prompt('Confirm the email address this link was sent to:') ?? '';
-
-    if (!email) {
-      setError('An email address is required to finish signing in.');
-      return;
-    }
-
-    signInWithEmailLink(auth, email, window.location.href)
-      .then(() => {
-        window.localStorage.removeItem(EMAIL_STORAGE_KEY);
-        setMagicLinkSentTo(null);
-        setError(null);
-        // Strip the one-time credential out of the address bar. This must go
-        // through the router rather than history.replaceState: React Router
-        // does not observe direct history mutations, so the app would stay
-        // mounted on /login and the user would sit staring at the sign-in form
-        // they had just completed.
-        navigate('/', { replace: true });
-      })
-      .catch((cause) => setError(describeAuthError(cause)));
-  }, [navigate]);
-
-  const sendMagicLink = useCallback(async (email: string) => {
-    const address = email.trim().toLowerCase();
-    setError(null);
-    try {
-      await sendSignInLinkToEmail(auth, address, magicLinkSettings());
-      window.localStorage.setItem(EMAIL_STORAGE_KEY, address);
-      setMagicLinkSentTo(address);
-    } catch (cause) {
-      setError(describeAuthError(cause));
-      throw cause;
-    }
-  }, []);
-
   /**
    * Google sign-in, routed by what the current browser can actually do.
    *
@@ -324,8 +261,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * block ever runs — and on iOS it is blocked outright. Those contexts are
    * detected before the attempt, not after it.
    *
-   * The email link works everywhere, so "unavailable" is a real answer here
-   * rather than a dead end.
+   * "Unavailable" is now a genuine dead end rather than a nudge toward the
+   * other door — there is no other door — so it says what to do about it.
    */
   const signInWithGoogle = useCallback(async () => {
     setError(null);
@@ -338,8 +275,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (strategy === 'unavailable') {
       setError(
         isEmbeddedBrowser()
-          ? 'This in-app browser cannot do Google sign-in. Use the email link, or open Tally in Safari or Chrome.'
-          : 'Google sign-in is not available in the installed app. Use the email link instead.',
+          ? 'This in-app browser cannot do Google sign-in. Open Tally in Safari or Chrome.'
+          : 'Google sign-in is not available in the installed app. Open Tally in Safari or Chrome.',
       );
       return;
     }
@@ -384,9 +321,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     await firebaseSignOut(auth);
-    window.localStorage.removeItem(EMAIL_STORAGE_KEY);
     setRedirectPending(false);
-    setMagicLinkSentTo(null);
   }, []);
 
   const status: AuthStatus = !authResolved
@@ -413,8 +348,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       profile,
       error,
-      magicLinkSentTo,
-      sendMagicLink,
       signInWithGoogle,
       signOut,
       refreshProfile,
@@ -427,8 +360,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       profile,
       error,
-      magicLinkSentTo,
-      sendMagicLink,
       signInWithGoogle,
       signOut,
       refreshProfile,

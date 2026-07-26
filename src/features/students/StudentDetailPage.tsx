@@ -10,7 +10,7 @@
  * `useEventSnapshots` — past attendance does not change while this page is open.
  */
 import { useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   Badge,
   Button,
@@ -33,7 +33,11 @@ import { usePersonDetails } from '@/hooks/usePersonDetails';
 import { sessionOutcome } from '@/lib/sessionHistory';
 import { formatRelative, formatShortDate } from '@/lib/time';
 import { formatPhone, initials, ordinalGrade } from '@/lib/utils';
-import { pushStudentToPlanningCenter } from '@/services/functions';
+import {
+  addRosterMember,
+  pushStudentToPlanningCenter,
+  removeRosterMember,
+} from '@/services/functions';
 import { setStudentStatus } from '@/services/students';
 import { studentFullName } from '@/types';
 
@@ -52,7 +56,8 @@ function dialable(phone: string): string {
 
 export function StudentDetailPage() {
   const { studentId } = useParams();
-  const { students, events, groups, settings, loading } = useData();
+  const navigate = useNavigate();
+  const { students, events, groups, settings, loading, refreshRoster } = useData();
   const { user } = useAuth();
   const { show } = useToast();
   const now = useNow(60_000);
@@ -153,15 +158,44 @@ export function StudentDetailPage() {
    */
   const unreachable = details ? !phone && !email : student.profileComplete === false;
 
+  /**
+   * On or off the roster.
+   *
+   * Two paths, because membership and identity live in different places. A
+   * student Planning Center knows is added and removed through a callable: the
+   * document id is a claim about which upstream person this row is, so a
+   * browser may not write it. A visitor Tally created is entirely Tally's, and
+   * an ordinary write is right.
+   *
+   * Neither path deletes anything. Every attendance record points at a student
+   * id, so erasing the row would drop past head counts and leave history
+   * pointing at nobody.
+   */
   const toggleStatus = async () => {
     if (!user || statusBusy) return;
     const next = student.status === 'active' ? 'inactive' : 'active';
     setStatusBusy(true);
     try {
-      await setStudentStatus(student.id, next, user.uid);
-      show(next === 'active' ? `${name} is back on the roster` : `${name} marked inactive`, {
+      if (student.pcoPersonId) {
+        if (next === 'inactive') await removeRosterMember({ studentId: student.id });
+        else await addRosterMember({ pcoPersonId: student.pcoPersonId });
+        await refreshRoster(true);
+      } else {
+        await setStudentStatus(student.id, next, user.uid);
+      }
+      show(next === 'active' ? `${name} is back on the roster` : `${name} taken off the roster`, {
         tone: 'success',
       });
+
+      /*
+       * Somebody taken off the roster has no screen left to be on.
+       *
+       * Their name lives in Planning Center and is only read for people the
+       * roster asked about, so once they are off it there is nothing to render
+       * here — the alternative is a detail page with a blank name on it. The
+       * list is where they were, so that is where this goes.
+       */
+      if (next === 'inactive' && student.pcoPersonId) navigate('/students');
     } catch {
       show(`Could not change ${name}'s status.`, { tone: 'error' });
     } finally {
@@ -221,20 +255,14 @@ export function StudentDetailPage() {
           variant={student.status === 'active' ? 'secondary' : 'success'}
           onClick={() => void toggleStatus()}
           loading={statusBusy}
-          /* `status` is one of the Planning-Center-managed fields, so flipping
-             it here would last only until the next pull. */
-          disabled={Boolean(student.pcoPersonId)}
-          title={
-            student.pcoPersonId ? 'Active or inactive is managed in Planning Center.' : undefined
-          }
         >
-          {student.status === 'active' ? 'Mark inactive' : 'Reactivate'}
+          {student.status === 'active' ? 'Remove from roster' : 'Add back to roster'}
         </Button>
-        {student.pcoPersonId ? (
-          <span className="text-xs text-ink-500">
-            Archive them in Planning Center to take them off the roster.
-          </span>
-        ) : null}
+        <span className="text-xs text-ink-500">
+          {student.pcoPersonId
+            ? 'Removing them here leaves their Planning Center record alone, and keeps every night they attended.'
+            : 'Keeps every night they attended; they just stop appearing at the door.'}
+        </span>
       </div>
 
       <Card>

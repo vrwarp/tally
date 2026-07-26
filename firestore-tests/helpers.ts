@@ -25,6 +25,8 @@ import { paths } from '@/lib/paths';
 import type {
   AppSettingsDoc,
   AttendanceRecordDoc,
+  InvitationDoc,
+  PcoRuntimeConfigDoc,
   RsvpDoc,
   SmallGroupDoc,
   StudentDoc,
@@ -191,6 +193,44 @@ export function settingsDoc(overrides: Partial<AppSettingsDoc> = {}): AppSetting
     newVisitorWindowDays: 7,
     updatedAt: T0,
     updatedBy: UID.core,
+    ...overrides,
+  };
+}
+
+/**
+ * The Planning Center settings the core team owns.
+ *
+ * Written as a whole document by the app rather than field by field, so the
+ * factory produces every key — including the ones a leader cleared, which are
+ * empty strings rather than absent.
+ */
+export function pcoConfigDoc(overrides: Partial<PcoRuntimeConfigDoc> = {}): PcoRuntimeConfigDoc {
+  return {
+    minGrade: 6,
+    maxGrade: 12,
+    writeBack: 'create',
+    cacheTtlSeconds: 30,
+    baseUrl: '',
+    updatedAt: T0,
+    updatedBy: UID.core,
+    ...overrides,
+  };
+}
+
+/**
+ * An invitation, as an admin leaves it.
+ *
+ * This is the allowlist that used to be a Planning Center List — the one thing
+ * a List genuinely could not express, since "these particular twelve adults"
+ * is not a filter rule.
+ */
+export function invitationDoc(overrides: Partial<InvitationDoc> = {}): InvitationDoc {
+  return {
+    email: 'newcomer@footprints.example.org',
+    role: 'counselor',
+    active: true,
+    invitedAt: T0,
+    invitedBy: UID.admin,
     ...overrides,
   };
 }

@@ -13,20 +13,23 @@
  *
  * It still states the roster source and write-back mode, because "why is this
  * student not in Tally?" is almost always answered by one of those two rather
- * than by a failure.
+ * than by a failure — and now it can also answer the follow-up, which is a
+ * button rather than a deploy.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { Badge, Button, Card, CardHeader, ErrorBanner, SkeletonRows } from '@/components/ui';
+import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
+import { PlanningCenterEditor } from '@/features/settings/PlanningCenterEditor';
 import { formatRelative } from '@/lib/time';
-import { getPlanningCenterStatus, refreshPlanningCenter } from '@/services/functions';
-import type { PcoRosterSource, PcoStatus, PcoWriteBackMode } from '@/types';
-
-const SOURCE_LABEL: Record<PcoRosterSource, string> = {
-  list: 'a Planning Center list',
-  grade: 'grade fields on each person',
-};
+import { refreshPlanningCenter } from '@/services/functions';
+import {
+  fetchPlanningCenterStatus,
+  readPlanningCenterConfig,
+  type PcoStoredConfig,
+} from '@/services/planningCenter';
+import type { PcoStatus, PcoWriteBackMode } from '@/types';
 
 const WRITE_BACK_LABEL: Record<PcoWriteBackMode, string> = {
   off: 'Tally never writes to Planning Center. Visitors stay queued until this is turned on.',
@@ -45,23 +48,33 @@ function describeCache(seconds: number): string {
 
 export function PlanningCenterCard() {
   const { show } = useToast();
+  const { profile } = useAuth();
   const { refreshRoster, rosterFetchedAt, rosterOffline } = useData();
 
   const [status, setStatus] = useState<PcoStatus | null>(null);
+  const [stored, setStored] = useState<PcoStoredConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   const check = useCallback(async (force = false) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await getPlanningCenterStatus({ force });
-      setStatus(response.data);
+      setStatus(await fetchPlanningCenterStatus(force));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not ask Tally about the connection.');
     } finally {
       setLoading(false);
+    }
+    // What is *saved* is a Firestore fact, and a missing document is the
+    // ordinary state of an install still running on its deploy-time parameters
+    // — so a failure here must not colour the connection itself.
+    try {
+      setStored(await readPlanningCenterConfig());
+    } catch {
+      setStored(null);
     }
   }, []);
 
@@ -87,15 +100,33 @@ export function PlanningCenterCard() {
     }
   };
 
+  /**
+   * After a save, ask again with `force`.
+   *
+   * The saved list is a different cache key from the old one, so a stale
+   * roster is not the risk — the risk is a leader believing a change worked.
+   * Re-reading is how the card can answer "and how many students does that see"
+   * in the same breath.
+   */
+  const afterSave = async () => {
+    await Promise.all([check(true), refreshRoster(true)]);
+    show('Planning Center settings saved', { tone: 'success' });
+  };
+
   return (
     <Card>
       <CardHeader
         title="Planning Center"
         description="Where Tally reads your people from. It keeps no copy of them."
         action={
-          <Button variant="secondary" size="sm" onClick={() => void refresh()} loading={busy}>
-            Refresh
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={() => void refresh()} loading={busy}>
+              Refresh
+            </Button>
+            <Button size="sm" onClick={() => setEditing(true)} disabled={!status}>
+              Change
+            </Button>
+          </div>
         }
       />
 
@@ -148,21 +179,30 @@ export function PlanningCenterCard() {
               <div>
                 <dt className="text-xs font-medium uppercase tracking-wide text-ink-500">Roster</dt>
                 <dd className="text-ink-300">
-                  Students come from {SOURCE_LABEL[status.rosterSource]}.
+                  Who is on the roster is Tally's own list — add and remove students on the Students
+                  screen. Planning Center supplies their names, grades and parent contact, and Tally
+                  stores none of it.
+                  {status.unresolved > 0 ? (
+                    <span className="block text-warn-400">
+                      {status.unresolved}{' '}
+                      {status.unresolved === 1 ? 'student is' : 'students are'} on the roster but can
+                      no longer be read from Planning Center — deleted or merged upstream.
+                    </span>
+                  ) : null}
                 </dd>
               </div>
               <div>
                 <dt className="text-xs font-medium uppercase tracking-wide text-ink-500">
                   Write-back
                 </dt>
-                <dd className="text-ink-300">{WRITE_BACK_LABEL[status.writeBack]}</dd>
+                <dd className="text-ink-300">{WRITE_BACK_LABEL[status.settings.writeBack]}</dd>
               </div>
               <div>
                 <dt className="text-xs font-medium uppercase tracking-wide text-ink-500">
                   Freshness
                 </dt>
                 <dd className="text-ink-300">
-                  {describeCache(status.cacheTtlSeconds)}
+                  {describeCache(status.settings.cacheTtlSeconds)}
                   {rosterFetchedAt ? (
                     <span className="block text-ink-500">
                       This device last read it {formatRelative(rosterFetchedAt)}.
@@ -171,9 +211,28 @@ export function PlanningCenterCard() {
                 </dd>
               </div>
             </dl>
+
+            <p className="text-xs text-ink-500">
+              {status.settings.managedInApp && stored?.updatedAt
+                ? `Changed here ${formatRelative(stored.updatedAt)}.`
+                : 'These settings came with the deploy. Changing any of them here takes over from it.'}
+              {profile?.role === 'admin'
+                ? ' The credentials themselves live in Secret Manager and are not editable from the app.'
+                : ''}
+            </p>
           </>
         ) : null}
       </div>
+
+      {status ? (
+        <PlanningCenterEditor
+          open={editing}
+          settings={status.settings}
+          storedBaseUrl={stored?.baseUrl ?? ''}
+          onClose={() => setEditing(false)}
+          onSaved={afterSave}
+        />
+      ) : null}
     </Card>
   );
 }

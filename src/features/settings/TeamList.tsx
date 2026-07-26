@@ -1,33 +1,45 @@
 /**
  * Who can use Tally, and what they can do with it.
  *
- * One list now, not two. There used to be a second panel showing the mirrored
- * `accessRoster` — everybody Planning Center would let in, whether or not they
- * had ever signed in — which was useful precisely because that mirror could be
- * stale and somebody had to be able to see it.
+ * Two lists, because there are genuinely two states. *Invited* is an address an
+ * admin has said may sign in; it has to exist before the person ever appears,
+ * since there is no uid to grant a role on until they do. *Signed in* is a real
+ * profile, and from that point it — not the invitation — decides what they may
+ * do. So withdrawing an invitation stops somebody arriving; deactivating a
+ * profile is what removes access from somebody already here.
  *
- * The allowlist is no longer stored. `provisionAccess` asks Planning Center at
- * the moment somebody signs in, so "am I allowed in?" is answered by trying,
- * and there is nothing to display in advance that would not be a guess. What is
- * left is the list that was always the real one: people who have a Tally
- * profile, and what they may do with it.
+ * Access used to come from a Planning Center List, and this screen used to say
+ * so. It could not keep saying so: a List is generated from filter rules, so
+ * "these twelve adults may see a roster of minors" was only expressible by
+ * inventing a custom field on every person in the church. It was also the wrong
+ * place for the decision — the people who edit Planning Center are not
+ * necessarily the people who should be granting access to this.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import {
   Badge,
+  Button,
   Card,
   CardHeader,
   CheckboxField,
   EmptyState,
   ErrorBanner,
+  SelectField,
   SkeletonRows,
+  TextField,
 } from '@/components/ui';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { formatRelative } from '@/lib/time';
+import {
+  inviteToTally,
+  setInvitationActive,
+  subscribeInvitations,
+  withdrawInvitation,
+} from '@/services/access';
 import { subscribeUsers, upsertUser } from '@/services/users';
-import type { Role, UserProfile } from '@/types';
+import type { Invitation, Role, UserProfile } from '@/types';
 
 const ROLE_LABEL: Record<Role, string> = {
   counselor: 'Counselor',
@@ -46,9 +58,21 @@ export function TeamList() {
   const [usersError, setUsersError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
+  const [invitations, setInvitations] = useState<Invitation[] | null>(null);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<Role>('counselor');
+  const [inviting, setInviting] = useState(false);
+
   useEffect(() => subscribeUsers(setUsers, (cause) => setUsersError(cause.message)), []);
 
   const isAdmin = can('admin');
+
+  // Admin-only by rule as well as by screen: this is a list of staff addresses,
+  // so a core-team subscription would just be a denial in the console.
+  useEffect(() => {
+    if (!isAdmin) return;
+    return subscribeInvitations(setInvitations, () => setInvitations([]));
+  }, [isAdmin]);
   const groupNames = useMemo(
     () => new Map(groups.map((group) => [group.id, group.name])),
     [groups],
@@ -74,12 +98,53 @@ export function TeamList() {
     }
   };
 
+  const handleInvite = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const address = inviteEmail.trim();
+    if (!address || !profile || inviting) return;
+
+    setInviting(true);
+    try {
+      await inviteToTally(address, inviteRole, profile.id);
+      setInviteEmail('');
+      show(`${address} can now sign in`, { tone: 'success' });
+    } catch {
+      show('Could not save that invitation.', { tone: 'error' });
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const patchInvitation = async (invitation: Invitation, active: boolean) => {
+    setBusyId(invitation.id);
+    try {
+      await setInvitationActive(invitation.id, active);
+    } catch {
+      show('Could not save that change.', { tone: 'error' });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const dropInvitation = async (invitation: Invitation) => {
+    setBusyId(invitation.id);
+    try {
+      await withdrawInvitation(invitation.id);
+      show(`${invitation.email} withdrawn`, { tone: 'success' });
+    } catch {
+      show('Could not withdraw that invitation.', { tone: 'error' });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-3">
       <p className="rounded-xl bg-ink-900 px-4 py-3 text-sm text-ink-400 ring-1 ring-ink-800">
-        Access comes from Planning Center. Anyone on your team there can sign in, and they appear
-        here the first time they do — Tally keeps no list of who is allowed in, so there is nothing
-        to invite anyone to. Roles can be raised here without changing anything upstream.
+        Tally decides access by Google address. An admin invites somebody here, they sign in with
+        that Google account, and their profile appears below — from then on the profile decides what
+        they may do. Some admins are pinned by the deployment itself and cannot be changed here;
+        that is the way back in if access is ever lost.
       </p>
 
       <div className="grid gap-3">
@@ -99,7 +164,7 @@ export function TeamList() {
           ) : users.length === 0 ? (
             <EmptyState
               title="Nobody has signed in yet."
-              description="The first counselor to sign in with an email Planning Center knows gets provisioned automatically."
+              description="Invite a Google address above, or sign in with one of the addresses named in TALLY_ADMIN_EMAILS."
             />
           ) : (
             <ul className="divide-y divide-ink-800">
@@ -176,6 +241,87 @@ export function TeamList() {
           )}
         </Card>
 
+        {isAdmin ? (
+          <Card>
+            <CardHeader
+              title="Invited"
+              count={invitations?.length}
+              description="Addresses that may sign in but have not yet."
+            />
+
+            <form className="flex flex-col gap-3 px-4 py-3" onSubmit={(event) => void handleInvite(event)}>
+              <TextField
+                label="Google address"
+                type="email"
+                value={inviteEmail}
+                onChange={(event) => setInviteEmail(event.target.value)}
+                placeholder="volunteer@example.org"
+                autoComplete="off"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                hint="It has to be the Google account they will actually sign in with — Tally matches on the address."
+              />
+              <SelectField
+                label="Role"
+                value={inviteRole}
+                onChange={(event) => setInviteRole(event.target.value as Role)}
+              >
+                {ROLE_OPTIONS.map((role) => (
+                  <option key={role} value={role}>
+                    {ROLE_LABEL[role]}
+                  </option>
+                ))}
+              </SelectField>
+              <Button type="submit" loading={inviting} disabled={!inviteEmail.trim()}>
+                Invite
+              </Button>
+            </form>
+
+            {!invitations ? (
+              <SkeletonRows count={2} />
+            ) : invitations.length === 0 ? (
+              <EmptyState
+                title="No pending invitations."
+                description="Everybody who has been invited has signed in."
+              />
+            ) : (
+              <ul className="divide-y divide-ink-800">
+                {invitations.map((invitation) => (
+                  <li key={invitation.id} className="flex flex-col gap-2 px-4 py-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-ink-50">
+                        {invitation.email}
+                      </p>
+                      <p className="text-xs text-ink-500">
+                        {ROLE_LABEL[invitation.role]}
+                        {invitation.invitedAt ? ` · invited ${formatRelative(invitation.invitedAt)}` : ''}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <CheckboxField
+                        label="Active"
+                        checked={invitation.active}
+                        disabled={busyId === invitation.id}
+                        onChange={(changed) =>
+                          void patchInvitation(invitation, changed.target.checked)
+                        }
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={busyId === invitation.id}
+                        onClick={() => void dropInvitation(invitation)}
+                      >
+                        Withdraw
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        ) : null}
       </div>
     </div>
   );
