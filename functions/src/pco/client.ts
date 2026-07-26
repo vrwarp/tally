@@ -83,18 +83,78 @@ export function buildQueryString(query: PcoQuery | undefined): string {
 /* Errors                                                                      */
 /* -------------------------------------------------------------------------- */
 
+/** What went out on the wire, with the credential taken back out of it. */
+export interface PcoRequestTrace {
+  method: string;
+  url: string;
+  /** As sent, except `Authorization`, which is replaced with `REDACTED`. */
+  headers: Record<string, string>;
+  /** Sends made for this request, including the first. */
+  attempts: number;
+}
+
+/** What came back, far enough to explain a failure without keeping the body. */
+export interface PcoResponseTrace {
+  status: number;
+  statusText: string;
+  headers: Record<string, string>;
+  /** The raw body, truncated to `MAX_TRACE_BODY_CHARS`. */
+  body: string;
+  bodyTruncated: boolean;
+  /** Wall-clock for the final attempt only, which is the one that failed. */
+  durationMs: number;
+}
+
+/**
+ * Stands in for the Personal Access Token wherever a trace would otherwise
+ * carry it. Every path out of this module is a path towards somebody's screen.
+ */
+export const REDACTED = '[redacted]';
+
+/** Enough of a 500 page to recognise it; short enough to travel in an error. */
+const MAX_TRACE_BODY_CHARS = 4000;
+
+function redactHeaders(headers: Record<string, string>): Record<string, string> {
+  const safe: Record<string, string> = {};
+  for (const [key, value] of Object.entries(headers)) {
+    safe[key] = key.toLowerCase() === 'authorization' ? REDACTED : value;
+  }
+  return safe;
+}
+
+function readResponseHeaders(response: Response): Record<string, string> {
+  const headers: Record<string, string> = {};
+  response.headers.forEach((value, key) => {
+    // Nothing here is a Tally credential, but a cookie is a credential of
+    // somebody's and has no business explaining an outage.
+    if (key.toLowerCase() === 'set-cookie') return;
+    headers[key] = value;
+  });
+  return headers;
+}
+
 export class PcoApiError extends Error {
   readonly status: number;
   readonly path: string;
   readonly errors: PcoErrorDetail[];
   /** Populated from `Retry-After` on a 429, so a caller can report the wait. */
   readonly retryAfterMs: number | null;
+  /**
+   * The exchange that failed, for a screen that offers to show it.
+   *
+   * Optional because the class is also constructed in tests and by callers that
+   * have a status and nothing else; a missing trace reads as "not recorded"
+   * rather than as an empty request.
+   */
+  readonly request: PcoRequestTrace | null;
+  readonly response: PcoResponseTrace | null;
 
   constructor(
     status: number,
     path: string,
     errors: PcoErrorDetail[],
     retryAfterMs: number | null = null,
+    trace?: { request?: PcoRequestTrace; response?: PcoResponseTrace },
   ) {
     const detail = errors.map((error) => error.detail ?? error.title).filter(Boolean).join('; ');
     super(`Planning Center ${status} for ${path}${detail ? `: ${detail}` : ''}`);
@@ -103,6 +163,29 @@ export class PcoApiError extends Error {
     this.path = path;
     this.errors = errors;
     this.retryAfterMs = retryAfterMs;
+    this.request = trace?.request ?? null;
+    this.response = trace?.response ?? null;
+  }
+}
+
+/**
+ * A request that never became a response: DNS, TLS, a socket reset, a timeout.
+ *
+ * Worth its own class because the two failures need different words in front of
+ * a volunteer — "Planning Center said no" and "we could not get there" — and
+ * because there is no status line to hang the second one on. The underlying
+ * error is kept as `cause` so the reason still reaches a debug panel.
+ */
+export class PcoNetworkError extends Error {
+  readonly request: PcoRequestTrace;
+  override readonly cause: unknown;
+
+  constructor(request: PcoRequestTrace, cause: unknown) {
+    const reason = cause instanceof Error ? cause.message : String(cause);
+    super(`Could not reach Planning Center at ${request.url}: ${reason}`);
+    this.name = 'PcoNetworkError';
+    this.request = request;
+    this.cause = cause;
   }
 }
 
@@ -165,14 +248,41 @@ function parseRetryAfter(header: string | null, now: Date): number | null {
   return Number.isFinite(date) ? Math.max(0, date - now.getTime()) : null;
 }
 
-async function readErrors(response: Response): Promise<PcoErrorDetail[]> {
+interface FailureBody {
+  errors: PcoErrorDetail[];
+  text: string;
+  truncated: boolean;
+}
+
+/**
+ * Reads a failed response once, as text, and parses what it can from it.
+ *
+ * Text rather than `json()` because the bodies that most need explaining are
+ * exactly the ones that are not JSON — a gateway timeout, a WAF block, an HTML
+ * error page from something in front of the API. An empty `errors` list beside
+ * a body somebody can read is more honest than either alone.
+ */
+async function readFailureBody(response: Response): Promise<FailureBody> {
+  let text: string;
   try {
-    const body = (await response.json()) as PcoErrorBody;
-    return Array.isArray(body?.errors) ? body.errors : [];
+    text = await response.text();
   } catch {
-    // A gateway timeout or a WAF block is not JSON. An empty list is honest.
-    return [];
+    return { errors: [], text: '', truncated: false };
   }
+
+  let errors: PcoErrorDetail[] = [];
+  try {
+    const body = JSON.parse(text) as PcoErrorBody;
+    if (Array.isArray(body?.errors)) errors = body.errors;
+  } catch {
+    // Not JSON. The text is still the most useful thing we have.
+  }
+
+  return {
+    errors,
+    text: text.slice(0, MAX_TRACE_BODY_CHARS),
+    truncated: text.length > MAX_TRACE_BODY_CHARS,
+  };
 }
 
 export function createPcoClient(options: PcoClientOptions): PcoClient {
@@ -199,24 +309,33 @@ export function createPcoClient(options: PcoClientOptions): PcoClient {
   ): Promise<JsonApiBody<TData>> {
     let lastError: unknown;
 
+    const headers: Record<string, string> = {
+      Authorization: authorization,
+      Accept: 'application/json',
+      'User-Agent': options.userAgent ?? 'Tally/1.0 (Footprints attendance)',
+      ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+    };
+    const traceRequest = (attempt: number): PcoRequestTrace => ({
+      method,
+      url,
+      headers: redactHeaders(headers),
+      attempts: attempt + 1,
+    });
+
     for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
       let response: Response;
+      const startedAt = now().getTime();
       try {
         response = await doFetch(url, {
           method,
-          headers: {
-            Authorization: authorization,
-            Accept: 'application/json',
-            'User-Agent': options.userAgent ?? 'Tally/1.0 (Footprints attendance)',
-            ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
-          },
+          headers,
           ...(body === undefined ? {} : { body: JSON.stringify(body) }),
         });
       } catch (error) {
         // DNS blips and socket resets look nothing like an HTTP status but are
         // exactly as transient, so they share the backoff.
         lastError = error;
-        if (attempt === maxRetries) throw error;
+        if (attempt === maxRetries) throw new PcoNetworkError(traceRequest(attempt), error);
         await sleep(Math.min(MAX_BACKOFF_MS, BASE_BACKOFF_MS * 2 ** attempt));
         continue;
       }
@@ -228,13 +347,24 @@ export function createPcoClient(options: PcoClientOptions): PcoClient {
 
       const retryAfterMs = parseRetryAfter(response.headers.get('Retry-After'), now());
 
-      if (!isRetryableStatus(response.status)) {
-        throw new PcoApiError(response.status, url, await readErrors(response), retryAfterMs);
-      }
+      const apiError = async (): Promise<PcoApiError> => {
+        const failure = await readFailureBody(response);
+        return new PcoApiError(response.status, url, failure.errors, retryAfterMs, {
+          request: traceRequest(attempt),
+          response: {
+            status: response.status,
+            statusText: response.statusText,
+            headers: readResponseHeaders(response),
+            body: failure.text,
+            bodyTruncated: failure.truncated,
+            durationMs: Math.max(0, now().getTime() - startedAt),
+          },
+        });
+      };
 
-      if (attempt === maxRetries) {
-        throw new PcoApiError(response.status, url, await readErrors(response), retryAfterMs);
-      }
+      if (!isRetryableStatus(response.status)) throw await apiError();
+
+      if (attempt === maxRetries) throw await apiError();
 
       // Planning Center's own advice wins over our guess; the exponential curve
       // is only the floor for a 5xx that arrives without a header.

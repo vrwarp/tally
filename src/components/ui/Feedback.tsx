@@ -46,7 +46,22 @@ export function EmptyState({
   );
 }
 
-export function ErrorBanner({ message, className }: { message: string; className?: string }) {
+/**
+ * `details` is the slot for whatever the sentence cannot say.
+ *
+ * Deliberately a node rather than a string: what belongs under "Could not reach
+ * Planning Center" is a request and a response somebody can copy, and that is
+ * the caller's shape to build, not this component's to know about.
+ */
+export function ErrorBanner({
+  message,
+  details,
+  className,
+}: {
+  message: string;
+  details?: ReactNode;
+  className?: string;
+}) {
   return (
     <div
       role="alert"
@@ -56,6 +71,7 @@ export function ErrorBanner({ message, className }: { message: string; className
       )}
     >
       {message}
+      {details}
     </div>
   );
 }

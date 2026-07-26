@@ -283,6 +283,21 @@ changes the key, so they appear on the next read rather than whenever the previo
 Start at **Settings → Planning Center** in the app. It shows the last run's status, counts, and the
 verbatim error message. `firebase functions:log` has the rest.
 
+### Getting the details out of the app
+
+Anywhere Tally says it could not reach Planning Center — **Students → Add from Planning Center** is
+the usual one — the red banner has a **Show details** link under it. That panel is the request Tally
+sent, the status and body Planning Center sent back, how many times it retried, and Planning Center's
+own `errors[]`. **Copy debug details** puts the lot on the clipboard as markdown, which is the useful
+thing to paste into a message to whoever set the connection up, or into an issue.
+
+The panel is safe to share. The Personal Access Token never leaves the Cloud Function:
+`Authorization` is replaced with `[redacted]` where the request is recorded
+(`functions/src/pco/client.ts`), and the payload carries transport facts about a request rather than
+anything about a person (`functions/src/pco/debug.ts`). The same information is in
+`firebase functions:log` under `Failed to …`, for whoever has console access — the panel exists
+because the person looking at the failure usually does not.
+
 **`401 Unauthorized`** — the token is wrong. Either the app id and secret were swapped, one of them
 picked up a trailing space on the way into Secret Manager, or the token was revoked in Planning
 Center. Mint a fresh Personal Access Token and re-set both values; they are a pair and must be
