@@ -272,8 +272,15 @@ export function CheckInPage() {
           the student's name and the control that checks them in a foot apart, so
           the eye and the mouse both have to travel the whole way. The bottom
           padding clears the floating add button, which otherwise sits on top of
-          the last student in the list. */}
-      <div className="scroll-touch mx-auto min-h-0 w-full max-w-3xl flex-1 overflow-y-auto pb-36 lg:pb-8">
+          the last student in the list.
+
+          `relative` is doing real work: `overflow` only clips an absolutely
+          positioned descendant when the scroller is also its containing block.
+          Every roster row that carries a warning badge holds an `sr-only` span,
+          which is `position: absolute` — left static, those escaped the box and
+          added their offsets to the *page*, so the whole app frame could be
+          scrolled off into empty space below the roster. */}
+      <div className="scroll-touch relative mx-auto min-h-0 w-full max-w-3xl flex-1 overflow-y-auto pb-36 lg:pb-8">
         {attendanceError ? (
           <div className="px-3 pt-3">
             <ErrorBanner message={attendanceError} />

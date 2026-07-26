@@ -107,7 +107,28 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 
   return (
-    <div className="flex min-h-dvh flex-col bg-ink-950 lg:flex-row">
+    <div
+      className={cn(
+        'flex flex-col bg-ink-950 lg:flex-row',
+        /*
+         * Check-in owns the viewport; every other screen owns the document.
+         *
+         * The roster is meant to scroll *inside* the frame, so the event
+         * header, the search box and the scope chips stay under the thumb no
+         * matter how far down the list you are. That only works if something
+         * actually caps the frame's height: `min-h-dvh` sets a floor, not a
+         * ceiling, so the roster grew the page instead and the inner
+         * `overflow-y-auto` never had anything to scroll.
+         *
+         * The visible cost was on the way out. With check-in scrolling the
+         * document, it shared a scroller with the rest of the app and nothing
+         * resets that on a route change — so a counselor who scrolled to the
+         * bottom of the roster and tapped "Students" arrived halfway down the
+         * student list.
+         */
+        isCheckIn ? 'h-dvh overflow-hidden' : 'min-h-dvh',
+      )}
+    >
       {/* Desktop: a persistent sidebar. */}
       {showNav ? (
         <aside className="hidden lg:flex lg:w-56 lg:shrink-0 lg:flex-col lg:gap-1 lg:border-r lg:border-ink-800 lg:px-3 lg:py-4">
