@@ -28,10 +28,16 @@ export function LoginPage() {
    * page is open.
    */
   const [inAppBrowser] = useState(() => isEmbeddedBrowser());
-  const [googleUnavailable] = useState(
-    () => googleSignInStrategy(firebaseApp.options.authDomain) === 'unavailable',
-  );
+  const [strategy] = useState(() => googleSignInStrategy(firebaseApp.options.authDomain));
   const [googlePending, setGooglePending] = useState(false);
+
+  /*
+   * Only a genuine dead end disables the button. An in-app browser gets a
+   * warning and a working button instead: the redirect flow sometimes gets
+   * through, and this detection is user-agent sniffing — being wrong about it
+   * would lock a counselor out of the only way into Tally.
+   */
+  const googleUnavailable = strategy === 'unavailable';
 
   if (status === 'loading') return <LoadingScreen message="Checking your session…" />;
   // `pending` redirects too: somebody who has just signed in but has no profile
@@ -75,15 +81,17 @@ export function LoginPage() {
             loading={googlePending}
             leading={<GoogleMark />}
             onClick={() => void handleGoogle()}
+            className={inAppBrowser && !googleUnavailable ? 'opacity-70 saturate-50' : undefined}
           >
-            Continue with Google
+            {inAppBrowser && !googleUnavailable ? 'Try Google sign-in anyway' : 'Continue with Google'}
           </Button>
 
-          {googleUnavailable ? (
+          {googleUnavailable || inAppBrowser ? (
             <p className="text-center text-xs leading-relaxed text-warn-400">
-              {inAppBrowser
-                ? 'Google sign-in does not work inside an app’s built-in browser. Open Tally in Safari or Chrome.'
-                : 'Google sign-in is not available in the installed app. Open Tally in Safari or Chrome.'}
+              {googleUnavailable
+                ? 'Google sign-in is not available in the installed app. Open Tally in Safari or Chrome.'
+                : 'Google often refuses to sign people in inside an app’s built-in browser. If it ' +
+                  'does, tap the menu (⋯ or the share icon) and choose “Open in browser”, then try again.'}
             </p>
           ) : null}
         </div>

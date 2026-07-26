@@ -23,6 +23,10 @@ jobs:
         run: npm run build
         env:
           VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
+          # Domains serving Tally's own /__/auth handler, so the installed app
+          # can sign in — see docs/deployment-setup.md#the-sign-in-domain.
+          # Unset is fine: sign-in falls back to the console's authDomain.
+          VITE_AUTH_DOMAINS: ${{ secrets.VITE_AUTH_DOMAINS }}
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'

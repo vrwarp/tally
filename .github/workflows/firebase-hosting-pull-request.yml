@@ -26,6 +26,10 @@ jobs:
         run: npm run build
         env:
           VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
+          # Passed so the preview build matches the live one. It has no effect
+          # here: a preview channel's URL is generated per-deploy and so is
+          # never on the list, which is exactly the fallback being previewed.
+          VITE_AUTH_DOMAINS: ${{ secrets.VITE_AUTH_DOMAINS }}
       # As in firebase-backend.yml: a pull request should not go red merely
       # because the deploy key has not been created yet, which says nothing
       # about the change being reviewed. The build above still runs either way,

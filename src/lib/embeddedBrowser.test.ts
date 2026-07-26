@@ -114,14 +114,12 @@ describe('isFirstPartyAuthDomain', () => {
 });
 
 describe('googleSignInStrategy', () => {
+  const THIRD_PARTY = 'tally-76406.firebaseapp.com';
+  const FACEBOOK_UA = 'Mozilla/5.0 (iPhone) [FBAN/FBIOS;FBAV/440.0]';
+
   it('uses a popup in an ordinary tab', () => {
     setDisplayMode('browser');
     expect(googleSignInStrategy(window.location.host)).toBe('popup');
-  });
-
-  it('refuses outright inside an in-app browser', () => {
-    setUserAgent('Mozilla/5.0 (iPhone) [FBAN/FBIOS;FBAV/440.0]');
-    expect(googleSignInStrategy(window.location.host)).toBe('unavailable');
   });
 
   it('redirects in an installed app when the auth handler is first-party', () => {
@@ -130,12 +128,57 @@ describe('googleSignInStrategy', () => {
   });
 
   /**
-   * The important negative case. A third-party redirect handler loses its
-   * sessionStorage to Safari's storage partitioning and fails with "missing
-   * initial state" — so refusing is better than a flow that half-works.
+   * The case this whole mechanism exists for. A third-party redirect handler
+   * loses its sessionStorage to storage partitioning and fails with "missing
+   * initial state", and the popup an installed app would otherwise fall back
+   * to hangs on Android and is blocked on iOS. Refusing is better than a flow
+   * that half-works — but it is also why `VITE_AUTH_DOMAINS` matters: with it
+   * set, the case above applies instead and iOS can sign in at all.
    */
   it('refuses in an installed app when the auth handler is third-party', () => {
     setDisplayMode('standalone');
-    expect(googleSignInStrategy('tally-76406.firebaseapp.com')).toBe('unavailable');
+    expect(googleSignInStrategy(THIRD_PARTY)).toBe('unavailable');
+  });
+
+  /**
+   * In-app browsers block `window.open`, so the popup has little chance and
+   * the redirect — an ordinary same-window navigation — has a real one.
+   */
+  it('prefers the redirect inside an in-app browser when it can complete', () => {
+    setUserAgent(FACEBOOK_UA);
+    expect(googleSignInStrategy(window.location.host)).toBe('redirect');
+  });
+
+  /**
+   * The regression this guards is a lockout, not a bad flow. Google is the
+   * only door into Tally, so a user-agent match — which is a heuristic, and
+   * will be wrong sometimes — must never be what stops somebody trying.
+   */
+  it('still attempts a popup inside an in-app browser rather than refusing', () => {
+    setUserAgent(FACEBOOK_UA);
+    expect(googleSignInStrategy(THIRD_PARTY)).toBe('popup');
+  });
+
+  it('never reports an in-app browser as unavailable, on any known webview', () => {
+    for (const ua of [
+      'Mozilla/5.0 (iPhone) Messenger/440.0.0.0',
+      'Mozilla/5.0 (Linux; Android 14) Instagram 300.0.0.0 Android',
+      'Mozilla/5.0 (iPhone) MicroMessenger/8.0.40',
+      'Mozilla/5.0 (Linux; Android 14; wv) Chrome/120.0.0.0',
+    ]) {
+      setUserAgent(ua);
+      expect(googleSignInStrategy(THIRD_PARTY)).not.toBe('unavailable');
+      expect(googleSignInStrategy(window.location.host)).not.toBe('unavailable');
+    }
+  });
+
+  /**
+   * An installed app is checked first: the popup there does not fail, it
+   * hangs, and no catch block can rescue a call that never returns.
+   */
+  it('treats an installed app as installed even if the webview sniff also fires', () => {
+    setUserAgent(FACEBOOK_UA);
+    setDisplayMode('standalone');
+    expect(googleSignInStrategy(THIRD_PARTY)).toBe('unavailable');
   });
 });

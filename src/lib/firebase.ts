@@ -39,6 +39,7 @@ import {
   type FirestoreLocalCache,
 } from 'firebase/firestore';
 
+import { parseAuthDomains, resolveAuthDomain } from './authDomain';
 import { missingKeys, parseFirebaseConfig } from './firebaseConfig';
 
 const env = import.meta.env;
@@ -90,7 +91,24 @@ function readConfig(): FirebaseOptions {
     );
   }
 
-  return config;
+  /*
+   * Serve the sign-in handler from this very origin where we can.
+   *
+   * The console's `authDomain` is `<project>.firebaseapp.com`, which makes the
+   * redirect flow third-party and therefore dead on iOS — and the redirect is
+   * the only flow an installed home-screen app has. Firebase Hosting answers
+   * `/__/auth/*` on every domain attached to the site, so naming the domain is
+   * the entire fix. `VITE_AUTH_DOMAINS` is the operator's statement that the
+   * handler there is registered with Google; see `authDomain.ts` for why that
+   * cannot be inferred.
+   */
+  const authDomain = resolveAuthDomain({
+    configured: typeof config.authDomain === 'string' ? config.authDomain : undefined,
+    publicDomains: parseAuthDomains(env.VITE_AUTH_DOMAINS),
+    host: typeof window === 'undefined' ? undefined : window.location.host,
+  });
+
+  return authDomain ? { ...config, authDomain } : config;
 }
 
 export const firebaseApp: FirebaseApp = initializeApp(readConfig());
