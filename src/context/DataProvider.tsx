@@ -7,10 +7,12 @@ import {
 } from '@/services/events';
 import { subscribeStudents } from '@/services/students';
 import { cachedRoster, fetchRoster, mergeRoster } from '@/services/roster';
+import { pcoErrorReport } from '@/lib/pcoErrors';
 import {
   DEFAULT_SETTINGS,
   type AppSettings,
   type EventSeries,
+  type PcoErrorReport,
   type SmallGroup,
   type Student,
   type TallyEvent,
@@ -60,6 +62,22 @@ function describeRosterError(cause: unknown): string {
   return 'Could not reach Planning Center for the roster.';
 }
 
+/**
+ * The failure, in a form a screen can both state and forward.
+ *
+ * `message` is this module's sentence rather than the callable's, because the
+ * sentence a counselor needs depends on which failure it was and the server
+ * cannot know that it is answering a roster read. The developer-facing message
+ * is not lost — `pcoErrorReport` keeps it, and the details panel shows it under
+ * "Underlying error".
+ */
+function rosterErrorReport(cause: unknown): PcoErrorReport {
+  return {
+    ...pcoErrorReport(cause, 'Could not reach Planning Center for the roster.'),
+    message: describeRosterError(cause),
+  };
+}
+
 export function DataProvider({ children }: { children: ReactNode }) {
   const [documents, setDocuments] = useState<Student[]>([]);
   const [events, setEvents] = useState<TallyEvent[]>([]);
@@ -71,7 +89,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // immediately rather than an empty roster with a spinner over it.
   const [roster, setRoster] = useState<Student[]>(() => cachedRoster()?.students ?? []);
   const [rosterLoading, setRosterLoading] = useState(true);
-  const [rosterError, setRosterError] = useState<string | null>(null);
+  const [rosterError, setRosterError] = useState<PcoErrorReport | null>(null);
   const [rosterOffline, setRosterOffline] = useState(() => cachedRoster() !== null);
   const [rosterFetchedAt, setRosterFetchedAt] = useState<Date | null>(null);
 
@@ -166,7 +184,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     } catch (cause) {
       // Deliberately not clearing `roster`: whatever is already on screen is
       // more useful than nothing, and `rosterOffline` says where it came from.
-      setRosterError(describeRosterError(cause));
+      setRosterError(rosterErrorReport(cause));
       setRosterOffline(true);
     } finally {
       inFlight.current = false;

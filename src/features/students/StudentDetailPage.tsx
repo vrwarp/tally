@@ -22,6 +22,7 @@ import {
   SkeletonRows,
   StatTile,
 } from '@/components/ui';
+import { RosterErrorBanner } from '@/components/RosterErrorBanner';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
@@ -57,7 +58,7 @@ function dialable(phone: string): string {
 export function StudentDetailPage() {
   const { studentId } = useParams();
   const navigate = useNavigate();
-  const { students, events, groups, settings, loading, refreshRoster } = useData();
+  const { students, events, groups, settings, loading, rosterError, refreshRoster } = useData();
   const { user } = useAuth();
   const { show } = useToast();
   const now = useNow(60_000);
@@ -121,12 +122,19 @@ export function StudentDetailPage() {
   if (!student) {
     if (loading) return <LoadingScreen message="Loading student…" />;
     return (
-      <div className="mx-auto w-full max-w-2xl px-4 py-4">
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-3 px-4 py-4">
+        {/* Without this the screen blames the link, which is the one thing that
+            is not wrong: the student is on the roster, their name is not. */}
+        <RosterErrorBanner />
         <Card>
           <EmptyState
-            icon="🤷"
-            title="No student with that link."
-            description="They may have been removed, or the link is stale."
+            icon={rosterError ? '⚠️' : '🤷'}
+            title={rosterError ? 'This student cannot be read right now.' : 'No student with that link.'}
+            description={
+              rosterError
+                ? 'Their name and grade come from Planning Center, which Tally cannot reach.'
+                : 'They may have been removed, or the link is stale.'
+            }
             action={
               <Link
                 to="/students"

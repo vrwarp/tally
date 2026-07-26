@@ -14,6 +14,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { RosterErrorBanner } from '@/components/RosterErrorBanner';
 import { EmptyState, ErrorBanner, SkeletonRows } from '@/components/ui';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
@@ -40,7 +41,7 @@ export function CheckInPage() {
   const { event, autoEvent, isOverridden, now, selectableEvents } =
     useActiveEvent(eventId ?? null);
 
-  const { students, groups, settings, loading: dataLoading } = useData();
+  const { students, groups, settings, loading: dataLoading, rosterError } = useData();
   const { profile, user } = useAuth();
   const { show } = useToast();
 
@@ -279,19 +280,28 @@ export function CheckInPage() {
           </div>
         ) : null}
 
+        {/* Above the roster rather than below it: a counselor who cannot find a
+            student needs to know the list is short before they conclude the
+            student is not on it and quick-add a duplicate. */}
+        <RosterErrorBanner className="mx-3 mt-3" />
+
         {counts.eligible === 0 ? (
           <EmptyState
             className="pt-10"
-            icon="👋"
+            icon={rosterError ? "⚠️" : "👋"}
             title={
-              event.requiresRsvp
-                ? "Nobody has RSVP’d yet"
-                : "Nobody on this roster yet"
+              rosterError
+                ? "The roster could not be read"
+                : event.requiresRsvp
+                  ? "Nobody has RSVP’d yet"
+                  : "Nobody on this roster yet"
             }
             description={
-              event.requiresRsvp
-                ? "This trip is limited to students who RSVP’d. Add them from the event page, or quick-add someone who turned up anyway."
-                : "Students appear here as soon as the roster syncs. You can still quick-add anyone who walks in."
+              rosterError
+                ? "Check-in still works: quick-add anyone who walks in, and they will be counted."
+                : event.requiresRsvp
+                  ? "This trip is limited to students who RSVP’d. Add them from the event page, or quick-add someone who turned up anyway."
+                  : "Students appear here as soon as the roster syncs. You can still quick-add anyone who walks in."
             }
           />
         ) : roster.isFiltered && visible === 0 ? (

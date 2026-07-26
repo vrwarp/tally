@@ -21,6 +21,7 @@ import {
   SkeletonRows,
   TextField,
 } from '@/components/ui';
+import { RosterErrorBanner } from '@/components/RosterErrorBanner';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { AddFromPlanningCenterModal } from '@/features/students/AddFromPlanningCenterModal';
@@ -32,7 +33,7 @@ type StatusFilter = 'active' | 'inactive' | 'all';
 type QuickFilter = 'none' | 'incomplete' | 'visitors';
 
 export function StudentsPage() {
-  const { students, groups, loading, refreshRoster } = useData();
+  const { students, groups, loading, rosterError, refreshRoster } = useData();
   const { user } = useAuth();
 
   const [query, setQuery] = useState('');
@@ -112,6 +113,8 @@ export function StudentsPage() {
           </Button>
         </div>
       </header>
+
+      <RosterErrorBanner />
 
       <div className="flex flex-col gap-3">
         <TextField
@@ -196,24 +199,43 @@ export function StudentsPage() {
         {loading && students.length === 0 ? (
           <SkeletonRows count={8} />
         ) : visible.length === 0 ? (
-          <EmptyState
-            icon="🔍"
-            title={isFiltered ? 'Nobody matches those filters.' : 'No students on the roster yet.'}
-            description={
-              isFiltered
-                ? 'Widen the search, or add the student if this is their first time.'
-                : 'Students arrive from the Planning Center sync, or you can add one by hand.'
-            }
-            action={
-              isFiltered ? (
-                <Button variant="secondary" onClick={clearFilters}>
-                  Clear filters
+          /*
+            Three different nothings, and only one of them is "add a student".
+            An empty list because Planning Center could not be read used to
+            offer the button that had just failed, under a sentence saying the
+            roster was empty — which it was not.
+          */
+          rosterError ? (
+            <EmptyState
+              icon="⚠️"
+              title="The roster could not be read."
+              description="Whoever is on it is still on it — Tally needs Planning Center to put names to them. The banner above has the details."
+              action={
+                <Button variant="secondary" onClick={() => void refreshRoster(true)}>
+                  Try again
                 </Button>
-              ) : (
-                <Button onClick={() => setAddFromPcoOpen(true)}>Add from Planning Center</Button>
-              )
-            }
-          />
+              }
+            />
+          ) : (
+            <EmptyState
+              icon="🔍"
+              title={isFiltered ? 'Nobody matches those filters.' : 'No students on the roster yet.'}
+              description={
+                isFiltered
+                  ? 'Widen the search, or add the student if this is their first time.'
+                  : 'Students arrive from the Planning Center sync, or you can add one by hand.'
+              }
+              action={
+                isFiltered ? (
+                  <Button variant="secondary" onClick={clearFilters}>
+                    Clear filters
+                  </Button>
+                ) : (
+                  <Button onClick={() => setAddFromPcoOpen(true)}>Add from Planning Center</Button>
+                )
+              }
+            />
+          )
         ) : (
           <ul className="divide-y divide-ink-800">
             {visible.map((student) => (
