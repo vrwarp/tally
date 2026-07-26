@@ -365,6 +365,30 @@ Or click through the console, starting with
 Deploying by hand from an owner account enables them along the way, which is why this only bites
 the first time CI deploys.
 
+Then grant Google's own **service agents** the roles a 2nd-gen deploy needs. `onDocumentCreated` is
+delivered through Eventarc, which means Pub/Sub has to mint tokens and Cloud Run has to accept the
+call, and wiring that up modifies the *project's* IAM policy — something the deploy key
+deliberately cannot do. Also owner-only, also once:
+
+```bash
+NUM=$(gcloud projects describe tally-76406 --format='value(projectNumber)')
+gcloud projects add-iam-policy-binding tally-76406 \
+  --member="serviceAccount:service-$NUM@gcp-sa-pubsub.iam.gserviceaccount.com" \
+  --role=roles/iam.serviceAccountTokenCreator
+gcloud projects add-iam-policy-binding tally-76406 \
+  --member="serviceAccount:$NUM-compute@developer.gserviceaccount.com" \
+  --role=roles/run.invoker
+gcloud projects add-iam-policy-binding tally-76406 \
+  --member="serviceAccount:$NUM-compute@developer.gserviceaccount.com" \
+  --role=roles/eventarc.eventReceiver
+```
+
+Skip it and the deploy stops at "We failed to modify the IAM policy for the project", having
+already built and packaged the functions — it prints these same commands with the number filled in.
+The tempting shortcut is to give the deploy key `roles/resourcemanager.projectIamAdmin` so it can do
+this itself; don't. A key that can rewrite project IAM can grant itself anything, which is the
+opposite of why the backend key is kept narrow and separate from Hosting's.
+
 ### Deploying
 
 ```bash

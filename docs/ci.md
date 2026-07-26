@@ -88,8 +88,14 @@ Three things guard that, and all three are load-bearing:
    the preview deploy that runs on every pull request.
 
 What is still a human action: **deleting** a Cloud Function (the deploy runs
-without `--force`, so a function missing from the source is left alone) and
-anything touching production *data*, which no workflow does.
+without `--force`, so a function missing from the source is left alone),
+anything touching production *data*, which no workflow does, and **granting
+IAM** — enabling APIs and giving Google's service agents their roles are
+owner-only, one-time steps in
+[Deployment](../README.md#one-time-setup-per-project). The deploy key can use
+the project but not re-permission it, which is the line worth keeping: a key
+able to rewrite project IAM could grant itself anything, including the Firestore
+access the split above exists to deny it.
 
 **It does not publish an image.** The e2e image is built to prove it still
 builds. There is no application image, because a Firebase Hosting app does not
