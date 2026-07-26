@@ -20,6 +20,20 @@ const CONTROL =
   'placeholder:text-ink-500 focus:ring-2 focus:ring-brand-400 focus:outline-none ' +
   'disabled:opacity-50 pointer-fine:rounded-lg pointer-fine:px-2.5 pointer-fine:py-2';
 
+/*
+ * Room for an adornment, stated at both sizes.
+ *
+ * `CONTROL` narrows its padding under `pointer: fine`, and that variant is
+ * emitted after the plain `pl-9`/`pr-9` below it in the stylesheet — so a bare
+ * `pl-9` was silently reset to 10px on a mouse, and the search icon printed
+ * itself over the placeholder. Anything that reserves a gutter has to reserve
+ * it in the same two sizes the control is drawn in.
+ */
+const ICON_GUTTER_LEFT = 'pl-9 pointer-fine:pl-8';
+const ICON_GUTTER_RIGHT = 'pr-9 pointer-fine:pr-8';
+const ICON_INSET_LEFT = 'left-3 pointer-fine:left-2.5';
+const ICON_INSET_RIGHT = 'right-3 pointer-fine:right-2.5';
+
 interface FieldShellProps {
   label: string;
   hint?: string;
@@ -74,7 +88,10 @@ export function TextField({ label, hint, error, className, required, ...rest }: 
           {isSearch ? (
             <span
               aria-hidden="true"
-              className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-ink-500"
+              className={cn(
+                'pointer-events-none absolute inset-y-0 flex items-center text-ink-500',
+                ICON_INSET_LEFT,
+              )}
             >
               <svg viewBox="0 0 20 20" fill="none" className="size-4">
                 <circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="2" />
@@ -87,7 +104,7 @@ export function TextField({ label, hint, error, className, required, ...rest }: 
             aria-describedby={describedBy}
             aria-invalid={error ? true : undefined}
             required={required}
-            className={cn(CONTROL, isSearch && 'pl-9', error && 'ring-danger-500', className)}
+            className={cn(CONTROL, isSearch && ICON_GUTTER_LEFT, error && 'ring-danger-500', className)}
             {...rest}
           />
         </span>
@@ -240,7 +257,7 @@ export function SelectField({ label, hint, error, className, required, children,
             aria-describedby={describedBy}
             aria-invalid={error ? true : undefined}
             required={required}
-            className={cn(CONTROL, 'appearance-none pr-9', error && 'ring-danger-500', className)}
+            className={cn(CONTROL, 'appearance-none', ICON_GUTTER_RIGHT, error && 'ring-danger-500', className)}
             {...rest}
           >
             {children}
@@ -249,7 +266,10 @@ export function SelectField({ label, hint, error, className, required, children,
               otherwise be indistinguishable from a text box. */}
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-ink-400"
+            className={cn(
+              'pointer-events-none absolute inset-y-0 flex items-center text-ink-400',
+              ICON_INSET_RIGHT,
+            )}
           >
             <svg viewBox="0 0 20 20" fill="none" className="size-4">
               <path d="m5 8 5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
