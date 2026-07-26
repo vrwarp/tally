@@ -75,6 +75,7 @@ export function makeEvent(overrides: Partial<TallyEvent> = {}): TallyEvent {
     mode: pick(overrides, 'mode', 'recurring'),
     seriesId: pick(overrides, 'seriesId', 'friday-fellowship'),
     recurrence: pick(overrides, 'recurrence', null),
+    recurrenceRootId: pick(overrides, 'recurrenceRootId', null),
     startAt,
     endAt,
     checkInOpensAt: pick(overrides, 'checkInOpensAt', new Date(startAt.getTime() - 60 * 60_000)),

@@ -146,6 +146,7 @@ export function eventDoc(overrides: Partial<TallyEventDoc> = {}): TallyEventDoc 
       until: null,
       count: null,
     },
+    recurrenceRootId: null,
     startAt: T0,
     endAt: T1,
     checkInOpensAt: T0,

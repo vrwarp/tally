@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
+import { useOccurrenceHorizon } from '@/hooks/useOccurrenceHorizon';
 import { cn } from '@/lib/utils';
 import { ErrorBanner } from '@/components/ui';
 
@@ -36,6 +37,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { error } = useData();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // Mounted at the frame rather than on the Events page: the horizon has to
+  // advance for a leader who only ever opens the check-in screen.
+  useOccurrenceHorizon();
 
   const items = NAV.filter((item) => !item.core || can('core'));
   const showNav = items.length > 1;

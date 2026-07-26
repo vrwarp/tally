@@ -364,6 +364,16 @@ export interface TallyEventDoc {
    * moves what is still ahead.
    */
   recurrence: RecurrenceRule | null;
+  /**
+   * The id of the hand-made event this chain of repeats grew from, or null when
+   * this event *is* that root.
+   *
+   * Gives a recurrence chain an identity that survives being copied forward,
+   * which is what lets an occurrence's document id be derived rather than
+   * generated — see `lib/materialize.ts`. Redundant when `seriesId` is set,
+   * which is the more readable key and wins; this covers everything else.
+   */
+  recurrenceRootId: string | null;
   startAt: Timestamp;
   endAt: Timestamp;
   /** Window during which this event is auto-selected as "active". */

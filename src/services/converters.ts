@@ -196,6 +196,7 @@ export function toEvent(snapshot: DocumentSnapshot<DocumentData>): TallyEvent {
     // A one-off does not repeat by definition, so a stray rule on one is
     // dropped rather than rendered.
     recurrence: mode === 'recurring' ? toRecurrence(data.recurrence, startAt) : null,
+    recurrenceRootId: strOrNull(data.recurrenceRootId),
     startAt,
     endAt,
     checkInOpensAt: toDate(data.checkInOpensAt, startAt),
