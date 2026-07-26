@@ -516,7 +516,7 @@ export interface PcoStatus {
   writeBack: PcoWriteBackMode;
   /** Seconds a read may be reused server-side. `0` means the cache is off. */
   cacheTtlSeconds: number;
-  /** True when the API root is not the real Planning Center — a test rig. */
+  /** True when the API root is not Planning Center's own — a proxy, cache or test rig. */
   baseUrlOverridden: boolean;
   /** How many of Tally's roster entries Planning Center could actually name. */
   peopleVisible: number | null;
