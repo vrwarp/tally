@@ -76,6 +76,32 @@ Nothing here ever reaches the browser. Planning Center does not serve CORS heade
 anyway, so every call runs inside a Cloud Function and the app talks to it through the callables in
 `src/services/functions.ts`.
 
+### Why Secret Manager, when the env file would work
+
+It genuinely would work. `readValue` in `src/config.ts` tries the bound parameter first and falls
+back to `process.env`, so `PCO_APP_ID` and `PCO_SECRET` written into `functions/.env.<projectId>`
+would be picked up. That fallback is there for the emulator — it is how `.env.demo-tally` supplies
+`sim-app-id` / `sim-secret` to the simulator — and using it for the real credentials costs four
+things:
+
+- **Anyone who can read the project can read the token.** Values from a dotenv file become part of
+  the function's deployed configuration, which `gcloud functions describe` and the console's
+  environment-variables panel print in plaintext. Project Viewer is enough. A `defineSecret` value
+  appears in neither; it is injected at run time.
+- **It would be stored in the build artefacts.** The functions `ignore` list in `firebase.json`
+  excludes `node_modules`, `.git`, tests and `*.local` — not `.env.<projectId>`. The file is uploaded
+  with the source, so the credential ends up in the Cloud Build archive and in the container image
+  in Artifact Registry, which are retained.
+- **It would exist in more places.** Deploying from CI means a copy in the `FUNCTIONS_ENV` repository
+  secret as well, readable by every workflow run and one mistaken `git add` from the history.
+- **Rotation and audit get worse.** A new secret version is picked up by the next cold start with no
+  redeploy, and every access is logged against a version. Editing a dotenv value means a redeploy and
+  leaves no trail of who read what.
+
+The stakes are not theoretical: with `PCO_WRITE_BACK` at `create` this token can add people to the
+church's real database (see [§4](#4-write-back-what-actually-changes-in-the-church-database)). It is
+a write credential for a system of record about minors, not a read-only API key.
+
 ---
 
 ## 2. Configuration parameters

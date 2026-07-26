@@ -162,7 +162,7 @@ is therefore 7.x and `tsc6` is 6.x.
 | `firestore-tests/` | Security-rules tests, run against the emulator. |
 | `scripts/` | `seed.ts`, the emulator data set. |
 | `e2e/` | Playwright suite. |
-| `docs/` | [Planning Center operations](docs/planning-center.md) and the [data model](docs/data-model.md). |
+| `docs/` | [Deployment setup](docs/deployment-setup.md), [CI](docs/ci.md), [Planning Center operations](docs/planning-center.md) and the [data model](docs/data-model.md). |
 
 ### `functions/` is a separate npm package
 
@@ -198,7 +198,7 @@ the same process.
 | File | Committed? | Read when | Holds |
 | --- | --- | --- | --- |
 | `.env.example` | yes | never — it is a template | The shape of `.env.local`. |
-| `.env.local` | no | `npm run dev`, `npm run build` | `VITE_FIREBASE_CONFIG`, the web config object as one line of JSON. |
+| `.env.local` | no | `npm run dev`, `npm run build` | `VITE_FIREBASE_CONFIG`, the web config object — the console's `const firebaseConfig = { … };` snippet or JSON, either works. |
 | `.env.emulated` | yes | `vite --mode emulated` (`npm run dev:emulated`) | Emulator hosts and ports. No project config needed at all. |
 
 The Firebase **web config is not a secret** — `apiKey`, `projectId` and friends are shipped to every
@@ -321,49 +321,12 @@ indexes — to the `tally-76406` Firebase project configured in `.firebaserc`. S
 the backend half is gated more tightly than Hosting. `npm run deploy` does the same thing by hand,
 which is still the way to deploy from a branch or when CI is unavailable.
 
-### One-time setup, per machine
+### First-time setup
 
-1. **Log in to the Firebase CLI:** `npx firebase login`. This opens a browser and stores a token
-   under your OS user account; you only need to do it once per machine. (`firebase-tools` is a dev
-   dependency of this repo, not something you install globally — always run it through `npx` or an
-   npm script so the pinned version is used.)
-2. **Get access to the Firebase project.** Your Google account needs at least Editor on
-   `tally-76406` in the [Firebase console](https://console.firebase.google.com/) — ask whoever
-   administers it to add you. `npx firebase projects:list` should show `tally-76406` once you do.
-3. **Fill in `.env.local`.** Copy `.env.example` to `.env.local` and paste the config object from
-   the console (Project settings → General → Your apps → Web app config) into
-   `VITE_FIREBASE_CONFIG`, as one line of JSON. The console prints it as JavaScript, so the keys
-   need double quotes. This is what the production build embeds, so it has to exist even though
-   these values are not secret — see below.
-4. **Set the Planning Center secrets**, once, in Secret Manager:
-   ```bash
-   npx firebase functions:secrets:set PCO_APP_ID
-   npx firebase functions:secrets:set PCO_SECRET
-   ```
-5. **Generate the PWA icons** — see [public/icons/README.md](public/icons/README.md).
-
-### One-time setup, per project
-
-Deploying Cloud Functions needs a handful of Google Cloud APIs turned on. A project **owner** has
-to do this once — a deploy service account deliberately cannot enable APIs itself, and a first
-deploy otherwise fails with "Cloud Functions deployment requires the Cloud Build API to be
-enabled":
-
-```bash
-gcloud services enable \
-  cloudbuild.googleapis.com cloudfunctions.googleapis.com artifactregistry.googleapis.com \
-  run.googleapis.com eventarc.googleapis.com pubsub.googleapis.com \
-  secretmanager.googleapis.com firebaseextensions.googleapis.com --project tally-76406
-```
-
-`run`, `eventarc` and `pubsub` are there because the functions are 2nd gen: `onCall` runs on Cloud
-Run, and `onDocumentCreated` is delivered through Eventarc. `firebaseextensions` is needed even
-though Tally uses no extensions — the CLI checks for them on every deploy.
-
-Or click through the console, starting with
-[Cloud Build](https://console.cloud.google.com/apis/library/cloudbuild.googleapis.com?project=tally-76406).
-Deploying by hand from an owner account enables them along the way, which is why this only bites
-the first time CI deploys.
+Enabling the APIs, granting the service accounts, creating the repository secrets — all of it lives
+in **[docs/deployment-setup.md](docs/deployment-setup.md)**. It is mostly one-time, and mostly only
+needed when CI does the deploying: a human deploying from an owner account gets those things
+silently, a deploy key cannot.
 
 ### Deploying
 
@@ -373,8 +336,9 @@ npm run deploy
 
 This checks that you're logged in to the Firebase CLI and that `.env.local` exists, then runs
 `npm run build` and `firebase deploy` (hosting, rules, indexes and functions — the functions build
-runs automatically as `firebase.json`'s `predeploy` hook). If either check fails it tells you which
-one-time setup step above you skipped, rather than failing deep inside `firebase deploy`. The same
+runs automatically as `firebase.json`'s `predeploy` hook). If either check fails it names the
+[setup step](docs/deployment-setup.md) you skipped, rather than failing deep inside
+`firebase deploy`. The same
 thing, without the checks: `npm run build && firebase deploy`.
 
 To deploy only one piece — e.g. after a rules-only change — use the Firebase CLI's `--only` flag
@@ -389,6 +353,11 @@ and, only if you have chosen to run the emulator against real Planning Center da
 Planning Center goes through a Cloud Function. See [Configuration](#configuration) for the full set
 of files and which one applies when.
 
+Putting it in `FUNCTIONS_ENV` alongside the other settings would also work, and is worth not doing:
+a dotenv value is printed by `gcloud functions describe`, uploaded with the source into the retained
+container image, and copied into a third place. See
+[why Secret Manager](docs/planning-center.md#why-secret-manager-when-the-env-file-would-work).
+
 ### Deploying from CI
 
 Three workflows, split by what they can reach:
@@ -400,7 +369,8 @@ Three workflows, split by what they can reach:
 | `firebase-backend.yml` | Builds the functions, then `firebase deploy --dry-run` validates rules and indexes without deploying | Deploys Cloud Functions, Firestore rules and Firestore indexes |
 
 Both pull-request jobs are skipped for forked PRs (`head.repo.full_name == github.repository`),
-because a fork cannot read repository secrets. Until the secrets below exist the backend dry run
+because a fork cannot read repository secrets. Until the
+[repository secrets](docs/deployment-setup.md#repository-secrets) exist the backend dry run
 skips itself with a notice rather than failing the PR — the functions build and the emulator-based
 rules suite in `ci.yml` need no credentials, so they still gate every pull request. The merge-time
 deploy has no such escape hatch: without its key it fails loudly rather than silently doing nothing.
@@ -415,41 +385,6 @@ running rather than torn down by a robot; remove one with `npx firebase function
 `environment: production`, so adding required reviewers to that environment under
 Settings → Environments turns every backend deploy into an approval prompt. Without protection
 rules it deploys on merge with no prompt.
-
-#### Repository secrets
-
-- `FIREBASE_SERVICE_ACCOUNT_TALLY` — service account JSON key holding **only** Firebase Hosting
-  Admin. `npx firebase init hosting:github` creates one and stores it for you; otherwise generate
-  it in the [Google Cloud console](https://console.cloud.google.com/iam-admin/serviceaccounts).
-- `FIREBASE_SERVICE_ACCOUNT_TALLY_BACKEND` — a **second, separate** key for the backend workflow.
-  Keeping it apart from the Hosting key is the point: the privileged credential is only ever
-  exposed to the gated merge job, never to the preview deploy that runs on every pull request.
-  Prefer [Workload Identity Federation](https://github.com/google-github-actions/auth#workload-identity-federation)
-  over a long-lived JSON key if you are willing to do the extra GCP setup. It needs:
-
-  | Role | Why |
-  | --- | --- |
-  | `roles/firebase.viewer` | Reads the project's `adminSdkConfig`. Without it every deploy stops at `403 The caller does not have permission` before it does anything. |
-  | `roles/cloudfunctions.admin` | Creates and updates the functions. |
-  | `roles/firebaserules.admin` | Deploys `firestore.rules` and the indexes. |
-  | `roles/iam.serviceAccountUser` | Lets the deploy act as the functions' own runtime service account. |
-  | `roles/artifactregistry.writer` | Holds the container image each function is built into. |
-  | `roles/secretmanager.viewer` | Reads `PCO_APP_ID` and `PCO_SECRET` to bind them to the deployed functions. `secretAccessor` is the obvious guess and the wrong one — it grants `versions.access`, the payload, but not `secrets.get`, so the deploy fails looking up the very secret it is about to bind. The deploy never needs the payload itself; the functions' runtime account reads that. |
-
-  `roles/firebase.admin` covers all of these in one, but it also carries Hosting, which would
-  undo the point of keeping two keys. The list above is the narrower equivalent.
-- `VITE_FIREBASE_CONFIG` — the web config object as one line of JSON, the same value
-  `.env.local` holds. Vite embeds it at build time, so the Hosting workflows need it even
-  though it is not a secret.
-- `FUNCTIONS_ENV` — the deploy-time Planning Center settings for `tally-76406`, as the literal
-  contents of a `.env` file: `PCO_ROSTER_SOURCE`, the list ids, the grade range,
-  `PCO_CACHE_TTL_SECONDS` and so on — **not** `PCO_APP_ID` or `PCO_SECRET`, which live in Secret
-  Manager. Use `functions/.secret.local.example` as the list of what can go in it, minus the two
-  credentials. The backend workflow writes it to `functions/.env.tally-76406` before deploying,
-  because the CLI resolves the `defineString` params in `functions/src/config.ts` from that file and
-  stops to ask when it is missing, whatever defaults the code declares — the same trap
-  `functions/.env.demo-tally` documents for the emulator. Keeping it in a secret rather than the
-  repository keeps the ministry's list ids out of git history.
 
 ---
 
