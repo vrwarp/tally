@@ -125,6 +125,57 @@ in an installed app once the handler is first-party.
 Verify it from an iPhone rather than a desktop: add Tally to the home screen, open it from there,
 and sign in. That is the path this exists for, and it is the one a desktop browser cannot rehearse.
 
+### Preview channels and sign-in
+
+Every pull request gets a Hosting preview channel at a URL nobody can predict —
+`tally-76406--pr29-some-branch-47da0eby.web.app`, with the trailing hash generated per channel.
+Firebase Auth checks the host it is running on against the project's **authorized domains** list
+*before* it opens the sign-in popup, so a preview is refused outright:
+
+```
+Firebase: Error (auth/unauthorized-domain).
+```
+
+A preview of the login screen is not a preview. `firebase hosting:channel:deploy` is meant to fix
+this by itself — it appends the channel's host to the authorized domains after every deploy — and on
+this project it does not, for two reasons that hide each other:
+
+1. **The header.** The CLI sends `x-goog-user-project: tally-76406` on both the read and the write.
+   That nominates the caller's *quota* project, which Google only permits if the caller holds
+   `serviceusage.services.use`. Neither `roles/firebase.hostingAdmin` nor `roles/firebaseauth.admin`
+   carries it, so the call 403s no matter how much Auth access the deploy key is given — which is
+   why granting Firebase Authentication Admin alone changes nothing.
+2. **The silence.** A failed sync is a warning, not an error, and `action-hosting-deploy` runs the
+   CLI with `--json`, which suppresses warnings. The job is green, the channel is up, and the first
+   sign that sign-in is broken is somebody opening the preview.
+
+So Tally registers the domain itself, in
+[`scripts/authorized-domains.ts`](../scripts/authorized-domains.ts), against the same API without
+that header — so `roles/firebaseauth.admin` is genuinely sufficient — and fails the job when it
+cannot. `firebase-hosting-pull-request.yml` adds the domain after each deploy;
+`firebase-hosting-pull-request-cleanup.yml` removes every domain for that pull request when it
+closes, because the channel expires after a week and the authorized domain would otherwise outlive
+it forever.
+
+Two things this does **not** need, both of which the [sign-in domain](#the-sign-in-domain) above
+does. A preview keeps the console's `authDomain` (`tally-76406.firebaseapp.com`), whose
+`/__/auth/handler` is already a registered OAuth redirect URI — so there is no Google Cloud console
+step, and nothing to add to `VITE_AUTH_DOMAINS`. The authorized domains entry is the whole fix.
+
+One grant makes it work, on the Hosting deploy key:
+
+```bash
+gcloud projects add-iam-policy-binding tally-76406 \
+  --member=serviceAccount:<the key in FIREBASE_SERVICE_ACCOUNT_TALLY> \
+  --role=roles/firebaseauth.admin
+```
+
+That is broader than the rest of that key, which is Hosting-only by design: it can read and write
+Auth *configuration* — providers, templates, the domain list — though not the roster, which lives in
+Firestore behind rules the Hosting key cannot reach either way. Skipping the grant is a supported
+outcome, not a broken one: the preview still deploys and CI still passes, the authorize step goes
+red with the reason, and reviewers use `npm run dev:emulated` instead.
+
 ### The secret bindings
 
 Last of the owner-only steps. A function declaring `defineSecret` needs its *runtime* account to be
@@ -194,9 +245,12 @@ once per project.
 
 ## Repository secrets
 
-- `FIREBASE_SERVICE_ACCOUNT_TALLY` — service account JSON key holding **only** Firebase Hosting
-  Admin. `npx firebase init hosting:github` creates one and stores it for you; otherwise generate
-  it in the [Google Cloud console](https://console.cloud.google.com/iam-admin/serviceaccounts).
+- `FIREBASE_SERVICE_ACCOUNT_TALLY` — service account JSON key holding Firebase Hosting Admin, plus
+  `roles/firebaseauth.admin` so a pull request's preview channel can be authorized for sign-in (see
+  [preview channels and sign-in](#preview-channels-and-sign-in) — without it previews deploy fine
+  and refuse every login). `npx firebase init hosting:github` creates the key and stores it for you,
+  with the Hosting role only; otherwise generate it in the
+  [Google Cloud console](https://console.cloud.google.com/iam-admin/serviceaccounts).
 - `FIREBASE_SERVICE_ACCOUNT_TALLY_BACKEND` — a **second, separate** key for the backend workflow.
   Keeping it apart from the Hosting key is the point: the privileged credential is only ever
   exposed to the gated merge job, never to the preview deploy that runs on every pull request.

@@ -49,8 +49,27 @@ jobs:
           fi
 
       - uses: FirebaseExtended/action-hosting-deploy@v0
+        id: deploy
         if: steps.creds.outputs.present == 'true'
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_TALLY }}'
           projectId: tally-76406
+
+      # Firebase Auth refuses to start a sign-in from a host that is not on the
+      # project's authorized domains list, and a preview channel's host is
+      # generated per-channel, so it never is. Without this the preview comes up
+      # showing `auth/unauthorized-domain` and nobody can get past the login
+      # screen — which is most of what there is to review.
+      #
+      # The CLI is supposed to do this itself and quietly does not; the script
+      # explains why, and does it in a way that fails visibly instead. It is
+      # deliberately allowed to fail the job: a green deploy of a preview that
+      # cannot be signed into is the exact silence this replaces.
+      - name: Authorize the preview URL for sign-in
+        if: steps.deploy.outputs.details_url != ''
+        run: npx tsx scripts/authorized-domains.ts add "$PREVIEW_URL"
+        env:
+          PREVIEW_URL: ${{ steps.deploy.outputs.details_url }}
+          FIREBASE_PROJECT_ID: tally-76406
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TALLY }}

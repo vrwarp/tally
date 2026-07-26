@@ -72,7 +72,10 @@ from `firebase-backend.yml`. A pull request gets a Hosting preview channel and a
 
 The two halves are deliberately separate, because they carry different risk.
 Hosting is a static bundle; a bad one is fixed by redeploying, and its key is
-scoped to Firebase Hosting Admin so it cannot reach Firestore. Rules are the
+scoped to Hosting and Firebase Auth *configuration* — enough to authorize a
+preview channel's URL for sign-in, see
+[preview channels and sign-in](deployment-setup.md#preview-channels-and-sign-in)
+— so it cannot reach Firestore. Rules are the
 opposite: they are the only thing standing between a roster of minors' data and
 the internet, and a bad ruleset is not visibly broken — it silently permits.
 Three things guard that, and all three are load-bearing:
