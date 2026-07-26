@@ -1,0 +1,58 @@
+name: Clean up preview sign-in domains
+
+# A preview channel expires on its own after a week, but the authorized domain
+# the preview deploy registered for it does not — Firebase Auth keeps whatever
+# it is told until something takes it away. Left alone the list grows by one
+# entry per pull request forever, and every stale entry is a host that is still
+# permitted to start a sign-in for this project long after the channel serving
+# it is gone. Nothing else prunes it, so closing the pull request does.
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+
+jobs:
+  revoke:
+    name: Revoke the preview domain
+    # Same reason as the preview deploy: a forked pull request never got a
+    # preview channel, because it cannot see the secrets needed to make one.
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      # For `tsx`, which is what runs the script. Nothing here is built.
+      - run: npm ci
+
+      # As in the preview deploy: a missing key is a project that never had
+      # previews, not a failure worth a red mark on a merged pull request.
+      - name: Is the Hosting key configured?
+        id: creds
+        env:
+          KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TALLY }}
+        run: |
+          if [ -n "$KEY" ]; then
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      # Matched by prefix rather than by remembering the URL, because by now
+      # there is nothing left to ask: the deploy that knew the URL ran on a
+      # different workflow run, and the channel it names may already have
+      # expired. The channel id is `pr<number>-<branch>` and the host Firebase
+      # derives from it keeps that prefix, so `tally-76406--pr29-` matches every
+      # preview this pull request ever had and nothing from pull request 2.
+      - name: Remove this pull request's preview domains
+        if: steps.creds.outputs.present == 'true'
+        run: npx tsx scripts/authorized-domains.ts remove-prefix "tally-76406--pr${PR_NUMBER}-"
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          FIREBASE_PROJECT_ID: tally-76406
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TALLY }}
