@@ -22,10 +22,10 @@ import { useToast } from '@/context/toastContext';
 import { EventHeader } from '@/features/checkin/EventHeader';
 import { NoActiveEvent } from '@/features/checkin/NoActiveEvent';
 import { QuickAddVisitorModal } from '@/features/checkin/QuickAddVisitorModal';
-import { RosterSection } from '@/features/checkin/RosterSection';
+import { RosterList } from '@/features/checkin/RosterList';
 import { ScopeBar } from '@/features/checkin/ScopeBar';
 import { SearchBar } from '@/features/checkin/SearchBar';
-import { buildRoster } from '@/features/roster/predictiveRoster';
+import { buildRoster, type RosterFocus } from '@/features/roster/predictiveRoster';
 import { useActiveEvent, useSeriesHistoryEvents } from '@/hooks/useActiveEvent';
 import { useAttendance, useRsvps } from '@/hooks/useAttendance';
 import { invalidateSnapshotCache, useEventSnapshots } from '@/hooks/useEventSnapshots';
@@ -35,6 +35,19 @@ import { studentFullName, type Grade, type RosterEntry } from '@/types';
 
 /** Long enough to register as confirmation, short enough not to lag the queue. */
 const FLASH_MS = 700;
+
+/** What the one list is called, given the filter currently applied to it. */
+const FOCUS_TITLE: Record<RosterFocus, string> = {
+  all: "Roster",
+  recent: "Recent",
+  checkedIn: "Checked in",
+};
+
+const FOCUS_EMPTY: Record<RosterFocus, string> = {
+  all: "Nobody matches these filters.",
+  recent: "No regulars on this roster yet.",
+  checkedIn: "Nobody is checked in yet.",
+};
 
 export function CheckInPage() {
   const { eventId } = useParams();
@@ -53,7 +66,12 @@ export function CheckInPage() {
   const { snapshots } = useEventSnapshots(historyEvents);
 
   const [query, setQuery] = useState("");
-  const [grade, setGrade] = useState<Grade | null>(null);
+  const [grades, setGrades] = useState<readonly Grade[]>(() => []);
+  // The screen opens on the regulars, because on a recurring gathering they are
+  // most of the taps. `buildRoster` quietly downgrades this to the whole roster
+  // whenever the prediction has nothing to say, so a one-off trip or a brand-new
+  // series never opens on an empty list.
+  const [focus, setFocus] = useState<RosterFocus>("recent");
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [announcement, setAnnouncement] = useState("");
 
@@ -113,7 +131,7 @@ export function CheckInPage() {
       rsvps,
       history: snapshots,
       settings,
-      filters: { query, grade },
+      filters: { query, grades, focus },
       group,
     });
   }, [
@@ -124,7 +142,8 @@ export function CheckInPage() {
     snapshots,
     settings,
     query,
-    grade,
+    grades,
+    focus,
     group,
   ]);
 
@@ -234,9 +253,12 @@ export function CheckInPage() {
     return <NoActiveEvent events={selectableEvents} now={now} />;
   }
 
-  const { counts } = roster;
-  const notHereYet = [...roster.recent, ...roster.roster];
-  const visible = notHereYet.length + roster.checkedIn.length;
+  const { counts, focus: appliedFocus } = roster;
+
+  // Offering the prediction as a filter it cannot honour would be a chip that
+  // does nothing: a search has to reach the whole roster, a small group is
+  // already short, and a series with no regulars has none to show.
+  const canFocusRecent = !roster.isFiltered && !group && counts.recent > 0;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -257,8 +279,12 @@ export function CheckInPage() {
               groups={groups}
               scopeGroupId={scopeGroupId}
               onScopeChange={handleScopeChange}
-              grade={grade}
-              onGradeChange={setGrade}
+              grades={grades}
+              onGradesChange={setGrades}
+              focus={appliedFocus}
+              onFocusChange={setFocus}
+              showRecent={canFocusRecent}
+              recentCount={counts.recent}
               assignedGroupId={profile?.assignedGroupId ?? null}
               present={counts.present}
               eligible={counts.eligible}
@@ -311,7 +337,7 @@ export function CheckInPage() {
                   : "Students appear here as soon as the roster syncs. You can still quick-add anyone who walks in."
             }
           />
-        ) : roster.isFiltered && visible === 0 ? (
+        ) : roster.isFiltered && roster.entries.length === 0 ? (
           <EmptyState
             className="pt-10"
             icon="🔍"
@@ -327,62 +353,44 @@ export function CheckInPage() {
               </button>
             }
           />
-        ) : roster.isFiltered ? (
-          <RosterSection
-            title="Results"
-            entries={notHereYet}
-            onPress={onPress}
-            flashing={flashing}
-            busy={pending}
-          />
-        ) : group ? (
-          /* Scoped to a small group, the question is who is *missing*, so the
-             prediction split is dropped for one undivided absence list. */
-          <RosterSection
-            title="Not here yet"
-            entries={notHereYet}
-            emptyLabel="Everyone in this group is checked in."
-            onPress={onPress}
-            flashing={flashing}
-            busy={pending}
-          />
         ) : (
           <>
-            <RosterSection
-              title="Recent"
-              entries={roster.recent}
+            {/* One list, always. A tap recolours a row; it never relocates it. */}
+            <RosterList
+              title={roster.isFiltered ? "Results" : FOCUS_TITLE[appliedFocus]}
+              entries={roster.entries}
               description={
-                counts.historyWindow > 0
+                appliedFocus === "recent" && counts.historyWindow > 0
                   ? `from the last ${counts.historyWindow} ${counts.historyWindow === 1 ? "gathering" : "gatherings"}`
-                  : undefined
+                  : appliedFocus === "checkedIn"
+                    ? "tap to undo"
+                    : undefined
               }
+              emptyLabel={FOCUS_EMPTY[appliedFocus]}
+              tone={appliedFocus === "checkedIn" ? "present" : "default"}
               showRecentHint={event.mode === "recurring"}
               onPress={onPress}
               flashing={flashing}
               busy={pending}
             />
-            <RosterSection
-              title={roster.recent.length > 0 ? "Everyone else" : "Roster"}
-              entries={roster.roster}
-              emptyLabel={
-                roster.recent.length > 0 ? undefined : "Everyone is checked in."
-              }
-              onPress={onPress}
-              flashing={flashing}
-              busy={pending}
-            />
+
+            {/* The way back out. A filtered list looks exactly like a short
+                roster, and a counselor who cannot find a student needs to be
+                told the rest of the ministry is one tap away before they
+                conclude the student is missing and quick-add a duplicate. */}
+            {appliedFocus !== "all" ? (
+              <div className="px-3 pb-3">
+                <button
+                  type="button"
+                  onClick={() => setFocus("all")}
+                  className="min-h-11 w-full rounded-xl bg-ink-900 px-4 text-sm font-semibold text-ink-300 ring-1 ring-ink-800 active:bg-ink-800"
+                >
+                  Show all {counts.eligible} students
+                </button>
+              </div>
+            ) : null}
           </>
         )}
-
-        <RosterSection
-          title="Checked in"
-          entries={roster.checkedIn}
-          description="tap to undo"
-          tone="present"
-          onPress={onPress}
-          flashing={flashing}
-          busy={pending}
-        />
       </div>
 
       <button
@@ -402,8 +410,9 @@ export function CheckInPage() {
           uid={user.uid}
           initialName={query}
           onAdded={(name) => {
-            // Clearing the search guarantees the new visitor is visible in the
-            // "Checked in" block instead of hiding behind a stale query.
+            // Clearing the search is what makes the new visitor visible — they
+            // arrive checked in, and every focus keeps checked-in students on
+            // screen, so the filters need no nudging.
             setQuery("");
             setAnnouncement(`${name} added and checked in`);
             forgetCachedHistory();

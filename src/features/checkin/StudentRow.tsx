@@ -18,7 +18,11 @@ export interface StudentRowProps {
   flashing?: boolean;
   /** True while this row's own write is in flight, so a double-tap cannot fire twice. */
   busy?: boolean;
-  /** "3 of 3" prediction hint — only meaningful inside the Recent block. */
+  /**
+   * Allow the "3 of 3" prediction hint. It still only renders on the rows the
+   * prediction actually picked out, which is what makes a regular legible in
+   * the unfiltered list now that they no longer sit in a block of their own.
+   */
   showRecentHint?: boolean;
 }
 
@@ -29,11 +33,11 @@ export function StudentRow({
   busy = false,
   showRecentHint = false,
 }: StudentRowProps) {
-  const { student, attendance, warnings, recentHits, recentWindow } = entry;
+  const { student, attendance, warnings, isRecent, recentHits, recentWindow } = entry;
   const name = studentFullName(student);
   const grade = ordinalGrade(student.grade);
   const blocking = warnings.filter(isBlocking);
-  const showHint = showRecentHint && recentWindow > 0;
+  const showHint = showRecentHint && isRecent && recentWindow > 0;
 
   const label = attendance
     ? `Undo check-in for ${name}, ${grade} grade, checked in at ${formatClock(attendance.checkedInAt)}`

@@ -4,7 +4,7 @@
  * The headline behaviour — "attended 2 of the last 3 Fridays" — is easy to get
  * approximately right and hard to keep exactly right, so this suite pins the
  * boundaries: the threshold either side, the window edge, and above all *series
- * isolation*, because a bug there is invisible (the Recent block still looks
+ * isolation*, because a bug there is invisible (the Recent list still looks
  * plausible) and it silently destroys the feature's value.
  */
 import { describe, expect, it } from 'vitest';
@@ -50,6 +50,23 @@ const pastSundays = (count: number) =>
   makeWeeklyEvents({ count, seriesId: SUNDAY, title: 'Sunday School' });
 
 const ids = (entries: readonly RosterEntry[]) => entries.map((entry) => entry.student.id);
+
+/*
+ * The roster is one list now, so these read the three interesting slices back
+ * out of it. They are only meaningful on an unfocused view — with a focus
+ * applied, `entries` is already the answer.
+ */
+
+/** Students the prediction expects tonight and who are not here yet. */
+const predicted = (view: RosterView) =>
+  view.entries.filter((entry) => entry.isRecent && !entry.attendance);
+
+/** Everyone else still to arrive. */
+const waiting = (view: RosterView) =>
+  view.entries.filter((entry) => !entry.isRecent && !entry.attendance);
+
+/** Everyone already through the door. */
+const arrived = (view: RosterView) => view.entries.filter((entry) => entry.attendance);
 
 /**
  * A student who comes to everything, and who no test ever asks about.
@@ -381,16 +398,16 @@ describe('buildRoster: the 2-of-3 rule', () => {
   it('surfaces a student who attended 2 of the last 3, and not one who attended 1', () => {
     const view = roster({ students: [regular, occasional], history });
 
-    expect(ids(view.recent)).toEqual([regular.id]);
-    expect(ids(view.roster)).toEqual([occasional.id]);
+    expect(ids(predicted(view))).toEqual([regular.id]);
+    expect(ids(waiting(view))).toEqual([occasional.id]);
     expect(view.counts.historyWindow).toBe(3);
   });
 
-  it('reports hits and window on every entry, in both blocks', () => {
+  it('reports hits, window and the verdict on every entry', () => {
     const view = roster({ students: [regular, occasional], history });
 
-    expect(view.recent[0]).toMatchObject({ recentHits: 2, recentWindow: 3, section: 'recent' });
-    expect(view.roster[0]).toMatchObject({ recentHits: 1, recentWindow: 3, section: 'roster' });
+    expect(predicted(view)[0]).toMatchObject({ recentHits: 2, recentWindow: 3, isRecent: true });
+    expect(waiting(view)[0]).toMatchObject({ recentHits: 1, recentWindow: 3, isRecent: false });
   });
 });
 
@@ -419,17 +436,17 @@ describe('buildRoster: series isolation', () => {
   it('does not surface a perfect Sunday attender on the Friday roster', () => {
     const view = roster({ students, history: snapshots });
 
-    expect(ids(view.recent)).toEqual([fridayRegular.id]);
-    expect(ids(view.roster)).toEqual([sundayRegular.id]);
-    expect(view.roster[0]!.recentHits).toBe(0);
+    expect(ids(predicted(view))).toEqual([fridayRegular.id]);
+    expect(ids(waiting(view))).toEqual([sundayRegular.id]);
+    expect(waiting(view)[0]!.recentHits).toBe(0);
   });
 
   it('does not surface a perfect Friday attender on the Sunday roster', () => {
     const view = roster({ event: sundayEvent, students, history: snapshots });
 
-    expect(ids(view.recent)).toEqual([sundayRegular.id]);
-    expect(ids(view.roster)).toEqual([fridayRegular.id]);
-    expect(view.roster[0]!.recentHits).toBe(0);
+    expect(ids(predicted(view))).toEqual([sundayRegular.id]);
+    expect(ids(waiting(view))).toEqual([fridayRegular.id]);
+    expect(waiting(view)[0]!.recentHits).toBe(0);
   });
 
   it('counts only same-series instances toward the history window', () => {
@@ -445,8 +462,8 @@ describe('buildRoster: the history window', () => {
     const view = roster({ students: [student], history: [makeSnapshot(tonight, [student.id])] });
 
     expect(view.counts.historyWindow).toBe(0);
-    expect(view.recent).toEqual([]);
-    expect(ids(view.roster)).toEqual([student.id]);
+    expect(predicted(view)).toEqual([]);
+    expect(ids(waiting(view))).toEqual([student.id]);
   });
 
   it('excludes cancelled past instances from the window', () => {
@@ -466,8 +483,8 @@ describe('buildRoster: the history window', () => {
 
     // One usable instance left, so the threshold clamps to 1.
     expect(view.counts.historyWindow).toBe(1);
-    expect(ids(view.recent)).toEqual([cameToTheRealOne.id]);
-    expect(ids(view.roster)).toEqual([onlyCameToTheCancelledOne.id]);
+    expect(ids(predicted(view))).toEqual([cameToTheRealOne.id]);
+    expect(ids(waiting(view))).toEqual([onlyCameToTheCancelledOne.id]);
   });
 
   it('does not let a week nobody attended demote a regular out of Recent', () => {
@@ -488,9 +505,9 @@ describe('buildRoster: the history window', () => {
 
     // Perfect attendance at the three Fridays that happened. Counting the storm
     // night as an instance would make this "3 of 3" unreachable for everybody in
-    // the ministry at once — the Recent block would simply empty out.
+    // the ministry at once — the Recent list would simply empty out.
     expect(view.counts.historyWindow).toBe(3);
-    expect(view.recent[0]).toMatchObject({ student: regular, recentHits: 3 });
+    expect(predicted(view)[0]).toMatchObject({ student: regular, recentHits: 3 });
   });
 
   it('looks only at the most recent predictiveOfLastN instances', () => {
@@ -507,8 +524,8 @@ describe('buildRoster: the history window', () => {
     });
 
     expect(view.counts.historyWindow).toBe(3);
-    expect(ids(view.recent)).toEqual([current.id]);
-    expect(view.roster[0]).toMatchObject({ student: lapsed, recentHits: 0 });
+    expect(ids(predicted(view))).toEqual([current.id]);
+    expect(waiting(view)[0]).toMatchObject({ student: lapsed, recentHits: 0 });
   });
 });
 
@@ -524,7 +541,7 @@ describe('buildRoster: threshold clamping on a young series', () => {
     });
 
     expect(view.counts.historyWindow).toBe(1);
-    expect(ids(view.recent)).toEqual([student.id]);
+    expect(ids(predicted(view))).toEqual([student.id]);
   });
 
   it('still excludes a student who missed that single instance', () => {
@@ -533,17 +550,17 @@ describe('buildRoster: threshold clamping on a young series', () => {
 
     const view = roster({ students: [student], history: [held(onlyFriday!)] });
 
-    expect(view.recent).toEqual([]);
-    expect(ids(view.roster)).toEqual([student.id]);
+    expect(predicted(view)).toEqual([]);
+    expect(ids(waiting(view))).toEqual([student.id]);
   });
 
-  it('leaves the Recent block empty when the series has no history at all', () => {
+  it('predicts nobody when the series has no history at all', () => {
     const student = makeStudent({ id: 'brand-new' });
     const view = roster({ students: [student], history: [] });
 
     expect(view.counts.historyWindow).toBe(0);
-    expect(view.recent).toEqual([]);
-    expect(ids(view.roster)).toEqual([student.id]);
+    expect(predicted(view)).toEqual([]);
+    expect(ids(waiting(view))).toEqual([student.id]);
   });
 });
 
@@ -565,8 +582,8 @@ describe('buildRoster: custom thresholds', () => {
     });
 
     expect(view.counts.historyWindow).toBe(5);
-    expect(ids(view.recent)).toEqual([three.id]);
-    expect(ids(view.roster)).toEqual([two.id]);
+    expect(ids(predicted(view))).toEqual([three.id]);
+    expect(ids(waiting(view))).toEqual([two.id]);
   });
 
   it('honours a 1-of-2 configuration, window and all', () => {
@@ -585,8 +602,8 @@ describe('buildRoster: custom thresholds', () => {
     });
 
     expect(view.counts.historyWindow).toBe(2);
-    expect(ids(view.recent)).toEqual([showedUpLastWeek.id]);
-    expect(ids(view.roster)).toEqual([showedUpLongAgo.id]);
+    expect(ids(predicted(view))).toEqual([showedUpLastWeek.id]);
+    expect(ids(waiting(view))).toEqual([showedUpLongAgo.id]);
   });
 });
 
@@ -601,7 +618,7 @@ describe('buildRoster: recurring eligibility', () => {
 
     const view = roster({ students: [active, inactive] });
 
-    expect(ids(view.roster)).toEqual([active.id]);
+    expect(ids(waiting(view))).toEqual([active.id]);
     expect(view.counts.eligible).toBe(1);
   });
 
@@ -612,7 +629,7 @@ describe('buildRoster: recurring eligibility', () => {
       attendance: [makeAttendance({ studentId: inactive.id, eventId: tonight.id })],
     });
 
-    expect(ids(view.checkedIn)).toEqual([inactive.id]);
+    expect(ids(arrived(view))).toEqual([inactive.id]);
     expect(view.counts).toMatchObject({ present: 1, eligible: 1, absent: 0 });
   });
 });
@@ -641,7 +658,7 @@ describe('buildRoster: one-off events', () => {
   it('restricts the roster to students who did not decline', () => {
     const view = roster({ event: retreat, students: [yes, maybe, no, silent], rsvps });
 
-    expect(ids(view.roster)).toEqual([yes.id, maybe.id]);
+    expect(ids(waiting(view))).toEqual([yes.id, maybe.id]);
     expect(view.counts.eligible).toBe(2);
   });
 
@@ -653,8 +670,8 @@ describe('buildRoster: one-off events', () => {
       attendance: [makeAttendance({ studentId: silent.id, eventId: retreat.id })],
     });
 
-    expect(ids(view.checkedIn)).toEqual([silent.id]);
-    expect(ids(view.roster)).toEqual([yes.id]);
+    expect(ids(arrived(view))).toEqual([silent.id]);
+    expect(ids(waiting(view))).toEqual([yes.id]);
     expect(view.counts).toMatchObject({ present: 1, eligible: 2 });
   });
 
@@ -666,16 +683,16 @@ describe('buildRoster: one-off events', () => {
       attendance: [makeAttendance({ studentId: no.id, eventId: retreat.id })],
     });
 
-    expect(ids(view.checkedIn)).toEqual([no.id]);
-    expect(view.checkedIn[0]!.rsvp?.status).toBe('no');
+    expect(ids(arrived(view))).toEqual([no.id]);
+    expect(arrived(view)[0]!.rsvp?.status).toBe('no');
   });
 
   it('flashes the blocking paperwork warnings and attaches the RSVP', () => {
     const view = roster({ event: retreat, students: [yes], rsvps });
 
-    expect(view.roster[0]!.warnings).toEqual(['missing-waiver', 'missing-payment']);
-    expect(view.roster[0]!.warnings.every(isBlocking)).toBe(true);
-    expect(view.roster[0]!.rsvp?.studentId).toBe(yes.id);
+    expect(waiting(view)[0]!.warnings).toEqual(['missing-waiver', 'missing-payment']);
+    expect(waiting(view)[0]!.warnings.every(isBlocking)).toBe(true);
+    expect(waiting(view)[0]!.rsvp?.studentId).toBe(yes.id);
   });
 
   it('predicts nothing — a one-off has no series history', () => {
@@ -687,7 +704,7 @@ describe('buildRoster: one-off events', () => {
     });
 
     expect(view.counts.historyWindow).toBe(0);
-    expect(view.recent).toEqual([]);
+    expect(predicted(view)).toEqual([]);
   });
 });
 
@@ -701,7 +718,7 @@ describe('buildRoster: search', () => {
   const jose = makeStudent({ id: 'jose', firstName: 'José', lastName: 'García' });
   const students = [marcus, ana, jose];
 
-  // Marcus is a regular; without a query he sits in the Recent block.
+  // Marcus is a regular; without a query the Recent filter is all he needs.
   const [weekC, weekB, weekA] = pastFridays(3);
   const history = [
     held(weekA!, [marcus.id]),
@@ -718,26 +735,35 @@ describe('buildRoster: search', () => {
   it('matches on first name', () => {
     const view = roster({ students, filters: { query: 'marcus' } });
     expect(view.isFiltered).toBe(true);
-    expect(ids(view.roster)).toEqual([marcus.id]);
+    expect(ids(view.entries)).toEqual([marcus.id]);
   });
 
   it('matches on last name', () => {
-    expect(ids(roster({ students, filters: { query: 'martinez' } }).roster)).toEqual([ana.id]);
+    expect(ids(roster({ students, filters: { query: 'martinez' } }).entries)).toEqual([ana.id]);
   });
 
   it('matches a two-letter prefix against either name part', () => {
-    expect(ids(roster({ students, filters: { query: 'ma' } }).roster)).toEqual([marcus.id, ana.id]);
-    expect(ids(roster({ students, filters: { query: 'le' } }).roster)).toEqual([marcus.id]);
-    expect(ids(roster({ students, filters: { query: 'jo' } }).roster)).toEqual([jose.id]);
+    expect(ids(roster({ students, filters: { query: 'ma' } }).entries)).toEqual([
+      marcus.id,
+      ana.id,
+    ]);
+    expect(ids(roster({ students, filters: { query: 'le' } }).entries)).toEqual([marcus.id]);
+    expect(ids(roster({ students, filters: { query: 'jo' } }).entries)).toEqual([jose.id]);
   });
 
-  it('collapses the Recent block into the roster while a query is active', () => {
-    const unfiltered = roster({ students, history });
-    expect(ids(unfiltered.recent)).toEqual([marcus.id]);
+  /**
+   * A search is a lookup, not a browse. Leaving the Recent filter switched on
+   * would mean typing a visitor's name and being told nobody by that name is on
+   * the roster — the one moment the screen must not lie about who exists.
+   */
+  it('stands the Recent filter down while a query is active', () => {
+    const unfiltered = roster({ students, history, filters: { focus: 'recent' } });
+    expect(unfiltered.focus).toBe('recent');
+    expect(ids(unfiltered.entries)).toEqual([marcus.id]);
 
-    const filtered = roster({ students, history, filters: { query: 'marcus' } });
-    expect(filtered.recent).toEqual([]);
-    expect(ids(filtered.roster)).toEqual([marcus.id]);
+    const filtered = roster({ students, history, filters: { focus: 'recent', query: 'ana' } });
+    expect(filtered.focus).toBe('all');
+    expect(ids(filtered.entries)).toEqual([ana.id]);
   });
 
   it('keeps the header counts describing the whole roster, not the search result', () => {
@@ -748,15 +774,13 @@ describe('buildRoster: search', () => {
     expect(unfiltered.counts).toMatchObject({ present: 1, eligible: 3, absent: 2 });
     // Ana is checked in but does not match "marcus" — the tally must not move.
     expect(filtered.counts).toMatchObject({ present: 1, eligible: 3, absent: 2 });
-    expect(filtered.checkedIn).toEqual([]);
+    expect(arrived(filtered)).toEqual([]);
   });
 
-  it('returns empty blocks but intact counts when nothing matches', () => {
+  it('returns an empty list but intact counts when nothing matches', () => {
     const view = roster({ students, history, filters: { query: 'zzz' } });
 
-    expect(view.recent).toEqual([]);
-    expect(view.roster).toEqual([]);
-    expect(view.checkedIn).toEqual([]);
+    expect(view.entries).toEqual([]);
     expect(view.counts.eligible).toBe(3);
   });
 });
@@ -778,7 +802,7 @@ describe('buildRoster: group scoping', () => {
   it('scopes to the counselor group, explicit assignment winning over the fallback', () => {
     const view = roster({ students, group: eighthGradeBoys });
 
-    expect(ids(view.roster)).toEqual([assigned.id, byGradeAndGender.id]);
+    expect(ids(waiting(view))).toEqual([assigned.id, byGradeAndGender.id]);
     expect(view.counts.eligible).toBe(2);
   });
 
@@ -789,19 +813,32 @@ describe('buildRoster: group scoping', () => {
 
   it('filters by explicit small group id without the grade/gender fallback', () => {
     const view = roster({ students, filters: { smallGroupId: 'g-8b' } });
-    expect(ids(view.roster)).toEqual([assigned.id]);
+    expect(ids(waiting(view))).toEqual([assigned.id]);
   });
 
   it('filters by grade', () => {
-    const view = roster({ students, filters: { grade: 8 } });
-    expect(ids(view.roster)).toEqual([byGradeAndGender.id, assignedElsewhere.id]);
+    const view = roster({ students, filters: { grades: [8] } });
+    expect(ids(waiting(view))).toEqual([byGradeAndGender.id, assignedElsewhere.id]);
+  });
+
+  it('takes the union of several grades, and every grade for an empty list', () => {
+    const ninth = makeStudent({ id: 'ninth', lastName: 'Eaves', grade: 9 });
+    const roll = [...students, ninth];
+
+    expect(ids(waiting(roster({ students: roll, filters: { grades: [8, 9] } })))).toEqual([
+      byGradeAndGender.id,
+      wrongGrade.id,
+      assignedElsewhere.id,
+      ninth.id,
+    ]);
+    expect(roster({ students: roll, filters: { grades: [] } }).counts.eligible).toBe(5);
   });
 
   it('filters to incomplete profiles only', () => {
     const missing = makeStudent({ id: 'missing', lastName: 'Nolan', profileComplete: false });
     const view = roster({ students: [...students, missing], filters: { incompleteOnly: true } });
 
-    expect(ids(view.roster)).toEqual([missing.id]);
+    expect(ids(waiting(view))).toEqual([missing.id]);
     expect(view.counts.eligible).toBe(1);
   });
 });
@@ -826,39 +863,49 @@ describe('buildRoster: ordering', () => {
       ],
     });
 
-    expect(ids(view.recent)).toEqual([perfect.id, twoEarly.id, twoLate.id]);
-    expect(view.recent.map((entry) => entry.recentHits)).toEqual([3, 2, 2]);
+    expect(ids(predicted(view))).toEqual([perfect.id, twoEarly.id, twoLate.id]);
+    expect(predicted(view).map((entry) => entry.recentHits)).toEqual([3, 2, 2]);
   });
 
-  it('sorts the main roster by name', () => {
+  it('sorts the list by name, whatever the focus', () => {
     const students = [
       makeStudent({ id: 'c', firstName: 'Zoe', lastName: 'Crane' }),
       makeStudent({ id: 'a', firstName: 'Zoe', lastName: 'Ames' }),
       makeStudent({ id: 'b', firstName: 'Abe', lastName: 'Brook' }),
     ];
-    expect(ids(roster({ students }).roster)).toEqual(['a', 'b', 'c']);
+    const attendance = [makeAttendance({ studentId: 'c', eventId: tonight.id })];
+
+    expect(ids(roster({ students }).entries)).toEqual(['a', 'b', 'c']);
+    expect(ids(roster({ students, attendance }).entries)).toEqual(['a', 'b', 'c']);
+    expect(
+      ids(roster({ students, attendance, filters: { focus: 'checkedIn' } }).entries),
+    ).toEqual(['c']);
   });
 
-  it('sorts Checked-in by most recent tap first', () => {
+  /**
+   * The whole point of the rewrite. Two counselors working the same queue used
+   * to watch rows jump between blocks under their thumbs; a student's place in
+   * the list now depends on their name and on nothing else.
+   */
+  it('does not move a student when they are checked in', () => {
     const first = makeStudent({ id: 'first', lastName: 'Ames' });
     const second = makeStudent({ id: 'second', lastName: 'Brook' });
     const third = makeStudent({ id: 'third', lastName: 'Crane' });
+    const students = [first, second, third];
 
-    const view = roster({
-      students: [first, second, third],
+    const before = roster({ students });
+    const after = roster({
+      students,
       attendance: [
-        makeAttendance({ studentId: first.id, checkedInAt: new Date(NOW.getTime() + 60_000) }),
-        makeAttendance({ studentId: second.id, checkedInAt: new Date(NOW.getTime() + 180_000) }),
-        makeAttendance({ studentId: third.id, checkedInAt: new Date(NOW.getTime() + 120_000) }),
+        makeAttendance({ studentId: second.id, checkedInAt: new Date(NOW.getTime() + 60_000) }),
       ],
     });
 
-    expect(ids(view.checkedIn)).toEqual([second.id, third.id, first.id]);
-    expect(view.roster).toEqual([]);
-    expect(view.counts).toMatchObject({ present: 3, eligible: 3, absent: 0 });
+    expect(ids(after.entries)).toEqual(ids(before.entries));
+    expect(after.counts).toMatchObject({ present: 1, eligible: 3, absent: 2 });
   });
 
-  it('never lets a checked-in student linger in Recent', () => {
+  it('keeps a checked-in regular exactly where they were, prediction intact', () => {
     const fridays = pastFridays(3);
     const regular = makeStudent({ id: 'regular' });
 
@@ -866,13 +913,81 @@ describe('buildRoster: ordering', () => {
       students: [regular],
       history: fridays.map((event) => makeSnapshot(event, [regular.id])),
       attendance: [makeAttendance({ studentId: regular.id, eventId: tonight.id })],
+      filters: { focus: 'recent' },
     });
 
-    expect(view.recent).toEqual([]);
-    expect(ids(view.checkedIn)).toEqual([regular.id]);
-    expect(view.checkedIn[0]!.section).toBe('checkedIn');
+    // Still on the Recent list, now with a tick against their name.
+    expect(ids(view.entries)).toEqual([regular.id]);
+    expect(view.entries[0]!.isRecent).toBe(true);
+    expect(view.entries[0]!.attendance).not.toBeNull();
     // The prediction is still reported, for the row's "3 of 3" hint.
-    expect(view.checkedIn[0]!.recentHits).toBe(3);
+    expect(view.entries[0]!.recentHits).toBe(3);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* buildRoster — focus                                                         */
+/* -------------------------------------------------------------------------- */
+
+describe('buildRoster: focus', () => {
+  const fridays = pastFridays(3);
+  const regular = makeStudent({ id: 'regular', lastName: 'Ames' });
+  const stranger = makeStudent({ id: 'stranger', lastName: 'Brook' });
+  const visitor = makeStudent({ id: 'visitor', lastName: 'Crane' });
+  const students = [regular, stranger, visitor];
+  const history = fridays.map((event) => held(event, [regular.id]));
+
+  /** The visitor walked in and was quick-added; nobody predicted them. */
+  const attendance = [makeAttendance({ studentId: visitor.id, eventId: tonight.id })];
+
+  it('shows everyone by default', () => {
+    const view = roster({ students, history, attendance });
+
+    expect(view.focus).toBe('all');
+    expect(ids(view.entries)).toEqual([regular.id, stranger.id, visitor.id]);
+  });
+
+  /**
+   * A student who is on screen has to stay on screen. Hiding the visitor the
+   * moment they were checked in would leave a mistaken tap with no way back,
+   * and would make a quick-add look like it had failed.
+   */
+  it('keeps checked-in students on the Recent list even when unpredicted', () => {
+    const view = roster({ students, history, attendance, filters: { focus: 'recent' } });
+
+    expect(view.focus).toBe('recent');
+    expect(ids(view.entries)).toEqual([regular.id, visitor.id]);
+  });
+
+  it('narrows to the students who are actually here', () => {
+    const view = roster({ students, history, attendance, filters: { focus: 'checkedIn' } });
+
+    expect(view.focus).toBe('checkedIn');
+    expect(ids(view.entries)).toEqual([visitor.id]);
+  });
+
+  it('counts the regulars regardless of the focus applied, or the query', () => {
+    expect(roster({ students, history }).counts.recent).toBe(1);
+    expect(roster({ students, history, filters: { focus: 'checkedIn' } }).counts.recent).toBe(1);
+    expect(roster({ students, history, filters: { query: 'zzz' } }).counts.recent).toBe(1);
+  });
+
+  it('falls back to the whole roster when the prediction has nobody to offer', () => {
+    const view = roster({ students, filters: { focus: 'recent' } });
+
+    expect(view.counts.recent).toBe(0);
+    expect(view.focus).toBe('all');
+    expect(ids(view.entries)).toEqual([regular.id, stranger.id, visitor.id]);
+  });
+
+  /* Nine names already fit on a phone; what the leader came for is the list of
+     who is missing, and narrowing that to regulars only hides absences. */
+  it('stands down inside a small group', () => {
+    const group = makeSmallGroup({ id: 'g', grades: [], gender: 'mixed' });
+    const view = roster({ students, history, group, filters: { focus: 'recent' } });
+
+    expect(view.focus).toBe('all');
+    expect(ids(view.entries)).toEqual([regular.id, stranger.id, visitor.id]);
   });
 });
 
@@ -885,11 +1000,10 @@ describe('buildRoster: empty inputs', () => {
     const view = roster({ students: [] });
 
     expect(view).toMatchObject({
-      recent: [],
-      roster: [],
-      checkedIn: [],
+      entries: [],
+      focus: 'all',
       isFiltered: false,
-      counts: { present: 0, eligible: 0, absent: 0, historyWindow: 0 },
+      counts: { present: 0, eligible: 0, absent: 0, historyWindow: 0, recent: 0 },
     });
   });
 

@@ -13,31 +13,59 @@ import { expect, test } from './support/fixtures';
 /** The screen-reader line in the event header: "7 of 43 students checked in". */
 const countsLine = (page: Page) => page.getByText(/^\d+ of \d+ students checked in$/);
 
+/** The one roster list, whichever filter it is currently showing. */
+const rosterList = (page: Page) =>
+  page.getByRole('region', { name: /^(Recent|Roster|Checked in|Results),/ });
+
 /**
- * Waits for the live attendance stream to catch up with the roster.
+ * Waits for the roster to stop changing under the test.
  *
  * The check-in screen paints names the moment it has them — that is the whole
- * point of it — and fills in who is *already* present a beat later, when the
- * `onSnapshot` stream delivers. A test that reads a row during that beat can
- * pick a student who is about to move to the checked-in list, and then spend
- * fifteen seconds waiting for a button that will never come back.
+ * point of it — and two slower sources then land on top. Who is *already*
+ * present arrives with the `onSnapshot` stream; the prediction arrives with a
+ * one-shot read of the past instances' attendance, and until it does there are
+ * no regulars, so the screen shows the whole roster before narrowing to Recent.
+ *
+ * A test that reads a row during either beat picks a student the next render is
+ * about to move, and then spends fifteen seconds waiting for a button that will
+ * never come back. The region's own accessible name ("Recent, 12") is what
+ * catches the second one — the header counts describe the event and do not
+ * move when the prediction lands.
  */
 async function rosterSettled(page: Page): Promise<void> {
   const counts = countsLine(page);
   await expect(counts).toBeVisible();
+  const list = rosterList(page);
 
   let last: string | null = null;
   await expect
     .poll(
       async () => {
-        const now = await counts.innerText();
+        const now = `${await counts.innerText()}|${await list.getAttribute('aria-label')}`;
         const unchanged = now === last;
         last = now;
         return unchanged;
       },
-      { intervals: [250, 250, 250, 250], message: 'the check-in counts never settled' },
+      { intervals: [250, 250, 250, 250], message: 'the check-in roster never settled' },
     )
     .toBe(true);
+}
+
+/**
+ * Every student on the list, in the order they are painted.
+ *
+ * The suite shares one emulator, so by the time a test runs some of these rows
+ * are already checked in from an earlier one — hence both label shapes.
+ */
+async function rosterRows(page: Page): Promise<{ name: string; here: boolean }[]> {
+  const labels = await rosterList(page)
+    .getByRole('button')
+    .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('aria-label') ?? ''));
+
+  return labels.map((label) => ({
+    name: /^(?:Check in|Undo check-in for) ([^,]+),/.exec(label)?.[1] ?? '',
+    here: label.startsWith('Undo'),
+  }));
 }
 
 /**
@@ -71,23 +99,90 @@ test.describe('check-in', () => {
     await expect(page.getByLabel(/search students by name/i)).toBeVisible();
   });
 
-  test('surfaces a Recent block that is shorter than the whole roster', async ({ page }) => {
+  test('opens on the regulars, with the whole roster one tap away', async ({ page }) => {
+    await rosterSettled(page);
+
     const recent = page.getByRole('region', { name: /^Recent,/ });
     await expect(recent).toBeVisible();
-
     const recentCount = await recent.getByRole('button').count();
-    const everyoneElse = page.getByRole('region', { name: /^(Everyone else|Roster),/ });
-    const otherCount = await everyoneElse.getByRole('button').count();
+    expect(recentCount).toBeGreaterThan(0);
+
+    // A pre-selected filter that cannot be undone is a roster with students
+    // missing from it, so the way out is a button and not a guess.
+    await page.getByRole('button', { name: /^Show all \d+ students$/ }).click();
+
+    const everyone = page.getByRole('region', { name: /^Roster,/ });
+    await expect(everyone).toBeVisible();
 
     // The whole point of prediction is that it saves scrolling.
-    expect(recentCount).toBeGreaterThan(0);
-    expect(recentCount).toBeLessThan(recentCount + otherCount);
+    expect(recentCount).toBeLessThan(await everyone.getByRole('button').count());
+  });
+
+  /**
+   * The reason the three blocks became one list.
+   *
+   * Two counselors work the same queue on two phones, and every write echoes to
+   * both. A roster that re-sorts on check-in moves the next row out from under
+   * a thumb that is already on its way down to it.
+   */
+  test('a tap recolours a row without moving it', async ({ page }) => {
+    await rosterSettled(page);
+    const before = await rosterRows(page);
+    test.skip(before.length < 3, 'needs a few students for movement to be visible');
+
+    // Somebody in the middle of the list, and somebody not already here: the
+    // point is that a row with names above *and* below it does not jump.
+    const target = before.slice(1).find((row) => !row.here)?.name;
+    test.skip(!target, 'everybody on this roster is already checked in');
+
+    await page
+      .getByRole('button', { name: new RegExp(`^Check in ${target},`) })
+      .first()
+      .click();
+    await expect(
+      page.getByRole('button', { name: new RegExp(`^Undo check-in for ${target}`) }),
+    ).toBeVisible();
+
+    const after = await rosterRows(page);
+    expect(after.map((row) => row.name)).toEqual(before.map((row) => row.name));
+    expect(after.find((row) => row.name === target)?.here).toBe(true);
+  });
+
+  test('the checked-in chip narrows the list to who is actually here', async ({ page }) => {
+    const name = await tapFirstRoster(page);
+
+    await page.getByRole('button', { name: /show checked-in students only/i }).click();
+
+    const list = page.getByRole('region', { name: /^Checked in,/ });
+    await expect(
+      list.getByRole('button', { name: new RegExp(`^Undo check-in for ${name}`) }),
+    ).toBeVisible();
+    await expect(list.getByRole('button', { name: /^Check in / })).toHaveCount(0);
+  });
+
+  test('the grade filter takes several grades at once', async ({ page }) => {
+    await rosterSettled(page);
+    await page.getByRole('button', { name: /^filter by grade/i }).click();
+
+    await page.getByRole('checkbox', { name: '8th grade' }).check();
+    await page.getByRole('checkbox', { name: '9th grade' }).check();
+    await page.keyboard.press('Escape');
+
+    await expect(page.getByRole('button', { name: /^filter by grade, 8th, 9th$/i })).toBeVisible();
+
+    const labels = await page
+      .getByRole('region', { name: /^(Recent|Roster),/ })
+      .getByRole('button')
+      .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('aria-label') ?? ''));
+
+    expect(labels.length).toBeGreaterThan(0);
+    expect(labels.every((label) => /, (8th|9th) grade/.test(label))).toBe(true);
   });
 
   test('a tap checks a student in, and it survives a reload', async ({ page, firestore }) => {
     const name = await tapFirstRoster(page);
 
-    // It moved to the checked-in section...
+    // The row turned green where it stood...
     await expect(
       page.getByRole('button', { name: new RegExp(`^Undo check-in for ${name}`) }),
     ).toBeVisible();

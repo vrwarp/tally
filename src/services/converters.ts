@@ -336,7 +336,7 @@ export function toSettings(snapshot: DocumentSnapshot<DocumentData>): AppSetting
   const data = (snapshot.data() ?? {}) as Partial<AppSettingsDoc>;
 
   // Clamp to sane ranges: a misconfigured `predictiveOfLastN` of 0 would make
-  // the Recent block silently vanish, which reads as a bug to a counselor.
+  // the Recent filter silently vanish, which reads as a bug to a counselor.
   const ofLastN = Math.max(1, Math.min(12, num(data.predictiveOfLastN, DEFAULT_SETTINGS.predictiveOfLastN)));
   const minAttended = Math.max(
     1,

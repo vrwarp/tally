@@ -13,13 +13,16 @@ also get the dashboard, the roster, event and RSVP management, and settings.
 ## What it does
 
 **Journey 1 — Friday night at the door.** Open the app and it has already picked tonight's event
-from the clock. A "Recent" block sits on top of the roster with the students who attended at least
-two of the last three Friday Fellowships; tapping a row flashes green, buzzes, and moves the student
-to "Checked in" before the write reaches the server. Search filters the whole roster as you type.
+from the clock. There is one roster list, sorted A–Z, and it opens filtered to "Recent" — the
+students who attended at least two of the last three Friday Fellowships — with "Show all" underneath
+and a "Checked in" chip beside it. Tapping a row flashes green and buzzes before the write reaches
+the server, and the row stays exactly where it was: with two counselors working one queue, a list
+that re-sorted on every check-in slid the next name out from under a thumb already moving toward it.
+Search reaches the whole roster as you type and stands the Recent filter down while it runs.
 
 **Journey 2 — Sunday School by small group.** Sunday School opens pre-scoped to a counselor's
 assigned group ("8th Grade Boys"), so the list is twelve names rather than two hundred. Prediction
-is per-series: Friday history never leaks into Sunday's Recent block, because they are different
+is per-series: Friday history never leaks into Sunday's regulars, because they are different
 crowds.
 
 **Journey 3 — a visitor nobody has met.** Quick-add takes a first name, a last name and a grade,
@@ -254,7 +257,7 @@ listeners: the current event's attendance and RSVPs, the student roster, and the
 reference data (events, series, groups, settings). Everything else is a one-shot read.
 
 **Firestore stores facts; the client derives meaning.** What is persisted is deliberately dumb —
-students, events, attendance rows, RSVPs. The Recent block, MIA students, new visitors, incomplete
+students, events, attendance rows, RSVPs. The Recent filter, MIA students, new visitors, incomplete
 profiles, roster warnings and the attendance trend are all computed in the browser by pure functions
 (`src/features/roster/predictiveRoster.ts`, `src/features/dashboard/insights.ts`) from data that is
 already loaded. That keeps the interesting logic unit-testable without Firebase and means changing a

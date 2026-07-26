@@ -77,7 +77,7 @@ test('capture the walkthrough', async ({ page, signedInAs }) => {
 
   /* ---- Journey 1: the bouncer flow ------------------------------------- */
 
-  // The Recent block needs the past instances' attendance, which is fetched
+  // The Recent filter needs the past instances' attendance, which is fetched
   // once rather than streamed. Waiting for it is the difference between
   // photographing the predictive roster and photographing a plain list.
   await page
@@ -85,7 +85,7 @@ test('capture the walkthrough', async ({ page, signedInAs }) => {
     .waitFor({ timeout: 30_000 })
     .catch(() => {
       throw new Error(
-        'The Recent block never appeared. Either the seeded history is missing or ' +
+        'The Recent list never appeared. Either the seeded history is missing or ' +
           'the predictive roster is broken — do not publish a walkthrough claiming it works.',
       );
     });
@@ -94,7 +94,7 @@ test('capture the walkthrough', async ({ page, signedInAs }) => {
     journey: 'Journey 1 — high-volume check-in',
     title: 'The predictive roster',
     caption:
-      'Tally picked tonight’s event from the clock; nobody chose it. The “Recent” block is the predictive roster: students who came to at least 2 of the last 3 Fridays, most consistent first. Friday history predicts Friday — Sunday’s regulars are not in this list.',
+      'Tally picked tonight’s event from the clock; nobody chose it. The screen opens on “Recent”, the predictive filter: students who came to at least 2 of the last 3 Fridays. Friday history predicts Friday — Sunday’s regulars are not in this list — and “Show all” is right underneath it.',
   });
 
   const firstRow = page.getByRole('button', { name: /^Check in / }).first();
@@ -106,15 +106,15 @@ test('capture the walkthrough', async ({ page, signedInAs }) => {
     journey: 'Journey 1 — high-volume check-in',
     title: 'One tap checks a student in',
     caption:
-      `${name} moved to “Checked in” at the bottom, and the header count went up. The row flashed green and buzzed before the write left the device — the authoritative state then arrives back through Firestore, so a second counselor at the same door sees it too.`,
+      `${name} turned green exactly where they stood, and the header count went up. Nothing moves on a tap: with two counselors working one queue, a list that re-sorts on every write slides the next name out from under a thumb. The row flashed and buzzed before the write left the device — the authoritative state then arrives back through Firestore, so the second phone sees it too.`,
   });
 
   await page.getByLabel(/search students by name/i).fill('ma');
   await capture(page, {
     journey: 'Journey 1 — high-volume check-in',
-    title: 'Search for anyone not in the Recent block',
+    title: 'Search for anyone the prediction missed',
     caption:
-      'Two letters, filtered instantly against the in-memory roster. The header counts deliberately do not move: they describe the event, not the query, so nobody watches the number drop as they type and thinks they broke something.',
+      'Two letters, filtered instantly against the in-memory roster. A search reaches the whole ministry — the Recent filter stands itself down while a query is running, so typing a visitor’s name can never report that nobody by that name exists. The header counts deliberately do not move: they describe the event, not the query.',
   });
   await page.getByRole('button', { name: /clear search/i }).click();
 
