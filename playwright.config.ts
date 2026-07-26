@@ -149,7 +149,10 @@ export default defineConfig({
       // A production build, not the dev server: the service worker, the code
       // splitting and the minified bundle are all things that can break only
       // once built.
-      command: `npm run build -- --mode emulated && npx vite preview --mode emulated --port ${PORTS.app} --strictPort`,
+      // `VITE_E2E_HOOKS` bakes in the sign-in hook the suite falls back to when
+      // the browser cannot reach Google (see e2e/support/auth.ts). It is a build
+      // flag rather than a runtime one so it cannot reach a real deployment.
+      command: `VITE_E2E_HOOKS=true npm run build -- --mode emulated && npx vite preview --mode emulated --port ${PORTS.app} --strictPort`,
       url: E2E.baseURL,
       reuseExistingServer: !process.env.CI,
       timeout: 180_000,

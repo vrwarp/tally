@@ -30,18 +30,32 @@ splitting and the minified bundle are all things that can only break once built.
 
 ## Sign-in
 
-`signIn()` uses the real magic-link flow rather than injecting a token. The Auth
-emulator publishes pending links over REST instead of sending mail, so the test
-collects one the way an inbox would. That path crosses Auth, Firestore rules and
-the `provisionAccess` callable — three things worth exercising.
+`signIn()` drives the real Google flow: it clicks the button, waits for the
+popup, and completes the Auth emulator's stand-in for Google's account chooser.
+That path crosses Auth, Firestore rules and the `provisionAccess` callable —
+three things worth exercising.
 
-The three seeded addresses come from `scripts/seed.ts`:
+**One environment cannot run it.** `signInWithPopup` loads
+`apis.google.com/js/api.js` before it opens anything — unconditionally, since
+only the *iframe's* URL is emulator-aware, not the loader that fetches gapi. On a
+machine whose browser has no route to Google (a sandboxed CI container), the run
+would die at Google's front door having tested nothing. So `signIn()` probes for
+that once per run and falls back to a build-flagged hook that mints the same
+credential, printing a warning that says the handshake was skipped. Everything
+after the credential is still exercised for real; the log tells you which path a
+run took rather than letting green imply full coverage.
 
-| Role | Address |
-| --- | --- |
-| admin | `dana.ruiz@footprints.example.org` |
-| core | `miriam.achebe@footprints.example.org` |
-| counselor | `sam.whitfield@footprints.example.org` |
+The hook is gated on `__E2E_HOOKS__`, a compile-time constant set only by this
+suite's own build (`VITE_E2E_HOOKS=true`), so it is eliminated from anything a
+church deploys.
+
+Access comes from two places, and the suite covers both:
+
+| Role | Address | Authorised by |
+| --- | --- | --- |
+| admin | `dana.ruiz@footprints.example.org` | `TALLY_ADMIN_EMAILS`, the deploy-time standing grant |
+| core | `miriam.achebe@footprints.example.org` | an invitation `scripts/seed.ts` writes |
+| counselor | `sam.whitfield@footprints.example.org` | an invitation `scripts/seed.ts` writes |
 
 Use `gotoReady(page, path)` rather than `page.goto` after signing in. A bare
 `goto` resolves as soon as the document loads, but Tally still has to
@@ -91,7 +105,10 @@ stops and asks at the terminal; an emulator sitting on a prompt loads no
 functions at all, so `provisionAccess` answers 404 and every `signIn()` dies on
 "Could not reach the access service" after 30 seconds. It holds simulator
 settings only. Add a param to `config.ts` and you must add it here too, or the
-CLI will ask about it.
+CLI will ask about it — and the reverse bites just as hard: a key left here for a
+param that no longer exists produces the same stalled emulator and the same
+"Could not reach the access service", pointing at the app rather than at the
+file.
 
 **WebKit needs long-polling *and* auto-detection off.** Firestore auto-detects
 its transport by default, and on WebKit against the emulator that probe breaks
