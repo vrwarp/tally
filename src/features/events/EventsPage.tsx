@@ -28,6 +28,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Badge, Button, Card, CardHeader, EmptyState, EventIcon, SkeletonRows } from '@/components/ui';
+import { PageFrame } from '@/components/PageFrame';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
@@ -146,7 +147,7 @@ function RowSection({
     <section aria-labelledby={`events-${title.replace(/\s+/g, '-').toLowerCase()}`}>
       <h2
         id={`events-${title.replace(/\s+/g, '-').toLowerCase()}`}
-        className="px-1 pb-2 text-xs font-bold uppercase tracking-wider text-ink-400"
+        className="pb-2 text-xs font-bold uppercase tracking-wider text-ink-400"
       >
         {title}
       </h2>
@@ -188,7 +189,7 @@ function Today({ events, now }: { events: readonly TallyEvent[]; now: Date }) {
     <section aria-labelledby="events-today">
       <h2
         id="events-today"
-        className="px-1 pb-2 text-xs font-bold uppercase tracking-wider text-ink-400"
+        className="pb-2 text-xs font-bold uppercase tracking-wider text-ink-400"
       >
         Today
       </h2>
@@ -373,55 +374,78 @@ export function EventsPage() {
   const nothingAhead = today.length === 0 && thisWeek.length === 0 && later.length === 0;
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-4 pb-8">
+    <PageFrame gap="lg" className="pb-8">
       <header className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-bold text-ink-50">Events</h1>
         <Button onClick={() => setEditor({ event: null })}>New event</Button>
       </header>
 
-      {quickActions.length > 0 ? (
-        <Card>
-          <CardHeader title="Quick add" description="Next occurrence of each series." />
-          <ul className="flex flex-col gap-2 p-3">
-            {quickActions.map(({ series: candidate, existing }) => (
-              <QuickAction
-                key={candidate.id}
-                series={candidate}
-                now={now}
-                existing={existing}
-                onSchedule={handleSchedule}
+      {/*
+        Ahead on the left, behind on the right — side by side where there is a
+        pointer, stacked where there is a thumb.
+
+        The half of this page that gets hunted through was the half that was
+        furthest away: "find the Friday from three weeks ago" meant scrolling
+        past a hero card for the gathering happening right now and then past
+        sixteen future occurrences, about 2,500px, before the first past night
+        appeared. Ten of them are on the fold now, beside the whole of what is
+        coming. The phone keeps the original order, because there is only one
+        column there and the calendar reads forwards.
+      */}
+      <div className="flex flex-col gap-8 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8">
+        <div className="flex min-w-0 flex-col gap-8">
+          {quickActions.length > 0 ? (
+            <Card>
+              {/* Named for what it holds rather than for what it offers. The
+                  rows are a schedule button *or* a link to the occurrence that
+                  already exists, and "Quick add" made the second kind read as a
+                  receipt filed under the wrong heading. */}
+              <CardHeader
+                title="Next in each series"
+                description="Schedule the next one, or open the one already on the calendar."
               />
-            ))}
-          </ul>
-        </Card>
-      ) : null}
+              <ul className="flex flex-col gap-2 p-3">
+                {quickActions.map(({ series: candidate, existing }) => (
+                  <QuickAction
+                    key={candidate.id}
+                    series={candidate}
+                    now={now}
+                    existing={existing}
+                    onSchedule={handleSchedule}
+                  />
+                ))}
+              </ul>
+            </Card>
+          ) : null}
 
-      <Today events={today} now={now} />
+          <Today events={today} now={now} />
 
-      {nothingAhead ? (
-        <EmptyState
-          icon="🗓"
-          title="Nothing scheduled yet"
-          description="Use a quick action above, or create a one-off for a retreat or outing."
-        />
-      ) : null}
+          {nothingAhead ? (
+            <EmptyState
+              icon="🗓"
+              title="Nothing scheduled yet"
+              description="Use a quick action above, or create a one-off for a retreat or outing."
+            />
+          ) : null}
 
-      <RowSection
-        title="Next seven days"
-        events={thisWeek}
-        now={now}
-        onUncancel={onUncancel}
-        uncancelling={uncancelling}
-      />
-      <RowSection
-        title="Later"
-        events={later}
-        now={now}
-        onUncancel={onUncancel}
-        uncancelling={uncancelling}
-      />
+          <RowSection
+            title="Next seven days"
+            events={thisWeek}
+            now={now}
+            onUncancel={onUncancel}
+            uncancelling={uncancelling}
+          />
+          <RowSection
+            title="Later"
+            events={later}
+            now={now}
+            onUncancel={onUncancel}
+            uncancelling={uncancelling}
+          />
+        </div>
 
-      <PastGatherings before={dayStart} />
+        <PastGatherings before={dayStart} />
+      </div>
 
       <EventEditorModal
         open={editor !== null}
@@ -429,6 +453,6 @@ export function EventsPage() {
         event={editor?.event ?? null}
         defaults={editor?.defaults}
       />
-    </div>
+    </PageFrame>
   );
 }

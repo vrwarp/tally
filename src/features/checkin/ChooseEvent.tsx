@@ -61,11 +61,11 @@ function CatchUp({ before }: { before: Date }) {
     <section aria-labelledby="catch-up">
       <h2
         id="catch-up"
-        className="px-1 pb-1 text-xs font-bold uppercase tracking-wider text-ink-400"
+        className="pb-1 text-xs font-bold uppercase tracking-wider text-ink-400"
       >
         Catch up
       </h2>
-      <p className="px-1 pb-2 text-xs text-ink-500">
+      <p className="pb-2 text-xs text-ink-500">
         Nobody took the register? Open one of these and add them now.
       </p>
       <ul className="flex flex-col gap-2">
@@ -112,10 +112,10 @@ export function ChooseEvent({ events, now }: ChooseEventProps) {
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 pt-4 pb-8">
       {today.length > 0 ? (
         <section aria-labelledby="choose-heading">
-          <h1 id="choose-heading" className="px-1 pb-1 text-xl font-bold text-ink-50">
+          <h1 id="choose-heading" className="pb-1 text-xl font-bold text-ink-50">
             {today.length === 1 ? 'On today' : 'Which gathering?'}
           </h1>
-          <p className="px-1 pb-3 text-sm text-ink-500">
+          <p className="pb-3 text-sm text-ink-500">
             {today.length === 1
               ? 'Open it to start checking students in.'
               : 'Pick the one you are standing at — attendance is filed against it.'}

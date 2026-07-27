@@ -38,29 +38,56 @@ export function CardHeader({
   );
 }
 
+/**
+ * One number in the row of four at the top of Insights.
+ *
+ * `tone` colours the *numeral*, not the tile. It used to wash the whole field,
+ * and three of the four tiles carry a tone — so three quarters of the row was
+ * accented and the accent had stopped being a signal: the good news (two new
+ * faces, green) shouted exactly as loudly as the thing that put the leader on
+ * this screen (ten missing, red), and the eye landed by default on the one
+ * neutral tile, which is the one fact that requires no action.
+ *
+ * `emphasis` is the tinted field, and exactly one tile in the row should carry
+ * it: the one that is a call to action. Nothing is lost by moving the rest onto
+ * the numeral — green still means new, amber still means unreachable.
+ */
 export function StatTile({
   label,
   value,
   hint,
   tone = 'neutral',
+  emphasis = false,
 }: {
   label: string;
   value: string | number;
   hint?: string;
   tone?: 'neutral' | 'warn' | 'danger' | 'success';
+  /** Wash the whole tile in `tone`. At most one tile in a row. */
+  emphasis?: boolean;
 }) {
   return (
     <div
       className={cn(
         'rounded-2xl px-4 py-3 ring-1',
-        tone === 'neutral' && 'bg-ink-900 ring-ink-800',
-        tone === 'success' && 'bg-present-500/10 ring-present-500/25',
-        tone === 'warn' && 'bg-warn-500/10 ring-warn-500/25',
-        tone === 'danger' && 'bg-danger-500/10 ring-danger-500/25',
+        (!emphasis || tone === 'neutral') && 'bg-ink-900 ring-ink-800',
+        emphasis && tone === 'success' && 'bg-present-500/10 ring-present-500/25',
+        emphasis && tone === 'warn' && 'bg-warn-500/10 ring-warn-500/25',
+        emphasis && tone === 'danger' && 'bg-danger-500/10 ring-danger-500/25',
       )}
     >
       <p className="text-xs font-medium uppercase tracking-wide text-ink-400">{label}</p>
-      <p className="mt-1 text-2xl font-bold tabular-nums text-ink-50">{value}</p>
+      <p
+        className={cn(
+          'mt-1 text-2xl font-bold tabular-nums',
+          tone === 'neutral' && 'text-ink-50',
+          tone === 'success' && 'text-present-400',
+          tone === 'warn' && 'text-warn-400',
+          tone === 'danger' && 'text-danger-400',
+        )}
+      >
+        {value}
+      </p>
       {hint ? <p className="mt-0.5 text-xs text-ink-500">{hint}</p> : null}
     </div>
   );

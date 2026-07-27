@@ -21,6 +21,7 @@ import {
   SkeletonRows,
   TextField,
 } from '@/components/ui';
+import { PageFrame } from '@/components/PageFrame';
 import { RosterErrorBanner } from '@/components/RosterErrorBanner';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
@@ -93,7 +94,7 @@ export function StudentsPage() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-4 py-4">
+    <PageFrame width="2xl">
       <header className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-ink-50">Students</h1>
@@ -104,34 +105,47 @@ export function StudentsPage() {
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
           {/*
-            Two ways onto the roster, and the order is the common case first.
-            Somebody the church already knows is looked up; a face at the door
-            nobody has met is typed in and pushed upstream later.
+            Two ways onto the roster, weekly first.
+
+            Both are quiet now. The import used to be the only brand-filled
+            thing on the screen — the loudest, widest object on a page whose job
+            is finding one student among forty-five, for an administrative act
+            somebody does twice a year. What this page is actually for is
+            search, and search is an input rather than a button; at `lg` it
+            takes the top line of the toolbar to itself.
           */}
-          <Button onClick={() => setAddFromPcoOpen(true)}>Add from Planning Center</Button>
           <Button variant="secondary" onClick={() => setEditorOpen(true)}>
             New visitor
+          </Button>
+          <Button variant="secondary" onClick={() => setAddFromPcoOpen(true)}>
+            Add from Planning Center
           </Button>
         </div>
       </header>
 
       <RosterErrorBanner />
 
-      <div className="flex flex-col gap-3">
-        <TextField
-          label="Search"
-          type="search"
-          inputMode="search"
-          enterKeyHint="search"
-          autoCapitalize="off"
-          autoCorrect="off"
-          spellCheck={false}
-          placeholder="Name…"
-          value={query}
-          onChange={(changed) => setQuery(changed.target.value)}
-        />
+      {/* One toolbar row where there is a pointer. Stacked, the search field,
+          the two selects and the two chips terminated at three different right
+          edges — three controls dropped in at their natural widths rather than
+          a set — and cost a row and a half of students. */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:gap-4">
+        <div className="lg:flex-1">
+          <TextField
+            label="Search"
+            type="search"
+            inputMode="search"
+            enterKeyHint="search"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+            placeholder="Name…"
+            value={query}
+            onChange={(changed) => setQuery(changed.target.value)}
+          />
+        </div>
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:w-[28rem] lg:shrink-0 lg:grid-cols-2">
           <SelectField
             label="Grade"
             value={grade ?? ''}
@@ -158,7 +172,7 @@ export function StudentsPage() {
           </SelectField>
         </div>
 
-        <div role="group" aria-label="Quick filters" className="flex flex-wrap gap-2">
+        <div role="group" aria-label="Quick filters" className="flex flex-wrap gap-2 lg:shrink-0">
           <FilterChip
             active={quick === 'incomplete'}
             onPress={() => setQuick((current) => (current === 'incomplete' ? 'none' : 'incomplete'))}
@@ -252,7 +266,7 @@ export function StudentsPage() {
         }}
         onRoster={rosterIds}
       />
-    </div>
+    </PageFrame>
   );
 }
 
@@ -293,19 +307,29 @@ const StudentListRow = memo(function StudentListRow({
 }) {
   return (
     <li>
+      {/*
+        Two rows, not one row at two heights.
+
+        On a phone this is a 64px card with the grade on a second line, because
+        a thumb needs the target. On a laptop the same facts become columns on a
+        44px line — sixteen names above the fold instead of nine — which is the
+        responsive difference the two audiences actually need rather than a
+        compromise height that serves neither. No new fact is added: grade was
+        already on the row and simply moves from a line to a column.
+      */}
       <Link
         to={`/students/${student.id}`}
-        className="flex min-h-16 items-center gap-3 px-3 py-2 hover:bg-ink-800/40"
+        className="flex min-h-16 items-center gap-3 px-3 py-2 hover:bg-ink-800/40 lg:min-h-11 lg:py-1"
       >
         <span
           aria-hidden="true"
-          className="flex size-11 shrink-0 items-center justify-center rounded-full bg-ink-800 text-sm font-bold text-ink-300"
+          className="flex size-11 shrink-0 items-center justify-center rounded-full bg-ink-800 text-sm font-bold text-ink-300 lg:size-8 lg:text-xs"
         >
           {initials(student.firstName, student.lastName)}
         </span>
 
-        <span className="min-w-0 flex-1">
-          <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <span className="min-w-0 flex-1 lg:flex lg:items-center lg:gap-4">
+          <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1 lg:min-w-0 lg:flex-1 lg:flex-nowrap">
             <span className="truncate text-base font-semibold text-ink-50">
               {studentFullName(student)}
             </span>
@@ -313,7 +337,7 @@ const StudentListRow = memo(function StudentListRow({
             {unreachable ? <Badge tone="warn">Missing info</Badge> : null}
             {student.status === 'inactive' ? <Badge tone="neutral">Inactive</Badge> : null}
           </span>
-          <span className="mt-0.5 flex items-center gap-2 text-xs text-ink-500">
+          <span className="mt-0.5 flex items-center gap-2 text-xs text-ink-500 lg:mt-0 lg:w-28 lg:shrink-0 lg:justify-end">
             <span className="truncate">{ordinalGrade(student.grade)} grade</span>
             <QueuedBadge pcoPersonId={student.pcoPersonId} />
           </span>

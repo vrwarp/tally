@@ -185,7 +185,7 @@ export function PastGatherings({ before }: PastGatheringsProps) {
     <section aria-labelledby="past-gatherings">
       <h2
         id="past-gatherings"
-        className="px-1 pb-2 text-xs font-bold uppercase tracking-wider text-ink-400"
+        className="pb-2 text-xs font-bold uppercase tracking-wider text-ink-400"
       >
         Past gatherings
       </h2>
@@ -193,7 +193,7 @@ export function PastGatherings({ before }: PastGatheringsProps) {
       <div className="flex flex-col gap-5">
         {groups.map((group) => (
           <div key={group.key}>
-            <h3 className="px-1 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-500">
+            <h3 className="pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-500">
               {group.label}
             </h3>
             <ul className="flex flex-col gap-2">

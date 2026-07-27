@@ -35,6 +35,7 @@ import {
   StatTile,
   TabBar,
 } from '@/components/ui';
+import { PageFrame } from '@/components/PageFrame';
 import { useData } from '@/context/dataContext';
 import { useEventSnapshots } from '@/hooks/useEventSnapshots';
 import { useNow } from '@/hooks/useNow';
@@ -286,7 +287,7 @@ export function DashboardPage() {
     : 'across every gathering';
 
   return (
-    <div className="mx-auto flex w-full max-w-lg flex-col gap-4 px-4 py-4">
+    <PageFrame width="lg">
       <header>
         <h1 className="text-xl font-bold text-ink-50">Insights</h1>
         <p className="mt-0.5 text-sm text-ink-500">
@@ -334,6 +335,9 @@ export function DashboardPage() {
           value={pending(summary.miaCount)}
           hint={`${settings.miaConsecutiveMisses}+ missed in a row`}
           tone={!awaitingRoster && summary.miaCount > 0 ? 'danger' : 'neutral'}
+          // The one tile in the row that is a call to action, and so the one
+          // that gets the tinted field.
+          emphasis
         />
         <StatTile
           label="New faces"
@@ -351,65 +355,87 @@ export function DashboardPage() {
         />
       </div>
 
-      {awaiting ? (
-        <Card>
-          <span role="status" className="sr-only">
-            {awaitingRoster ? 'Loading the roster' : 'Loading attendance history'}
-          </span>
-          <SkeletonRows count={4} />
-        </Card>
-      ) : recentEvents.length === 0 ? (
-        <Card>
-          <EmptyState
-            title="No gatherings on record yet."
-            description="Check a few students in and this screen fills itself: who has drifted, who is new, and who nobody can reach."
-          />
-        </Card>
-      ) : (
-        <>
-          <MiaList
-            items={mia}
-            threshold={settings.miaConsecutiveMisses}
-            gatheringTitle={activeGathering?.title ?? null}
-          />
-          <NewVisitorList
-            items={newVisitors}
-            windowDays={settings.newVisitorWindowDays}
-            gatheringTitle={activeGathering?.title ?? null}
-            reachable={parentContact.reachable}
-          />
-          <AttendanceTrend
-            snapshots={snapshots}
-            gatheringKey={activeGathering?.key ?? null}
-            gatheringTitle={activeGathering?.title ?? null}
-          />
-        </>
-      )}
+      {/*
+        Two columns where there is a pointer, one where there is a thumb.
 
-      {/* Scoped by the tabs like everything above it, but rendered outside that
-          block on purpose: a ministry that has not run a gathering yet still has
-          quick-added visitors nobody can reach, and this is the only list that
-          can say so without any attendance history behind it. There are no tabs
-          in that state, so it shows the whole roster — which is what "All"
-          means. It still waits for the roster it is a statement about. */}
-      {awaitingRoster ? null : (
-        <IncompleteProfileList
-          students={incomplete}
-          now={now}
-          checking={awaitingContacts}
-          error={parentContact.error}
-          gatheringTitle={activeGathering?.title ?? null}
-        />
-      )}
+        The three questions this screen answers — who drifted, who is new, who
+        nobody can reach — used to be stacked in single file behind each other,
+        so a leader on a laptop saw three and a half MIA names and had to scroll
+        past a two-month chart to reach a two-name list. Side by side, all three
+        are on one screen. The long list gets the fluid column because it is the
+        one that grows; the short lists get a fixed 28rem, which is the width at
+        which a name like "Bree Sandoval" stops truncating.
+      */}
+      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_28rem] lg:items-start lg:gap-6">
+        <div className="flex min-w-0 flex-col gap-4">
+          {awaiting ? (
+            <Card>
+              <span role="status" className="sr-only">
+                {awaitingRoster ? 'Loading the roster' : 'Loading attendance history'}
+              </span>
+              <SkeletonRows count={4} />
+            </Card>
+          ) : recentEvents.length === 0 ? (
+            <Card>
+              <EmptyState
+                title="No gatherings on record yet."
+                description="Check a few students in and this screen fills itself: who has drifted, who is new, and who nobody can reach."
+              />
+            </Card>
+          ) : (
+            <>
+              <MiaList
+                items={mia}
+                threshold={settings.miaConsecutiveMisses}
+                gatheringTitle={activeGathering?.title ?? null}
+              />
+              <AttendanceTrend
+                snapshots={snapshots}
+                gatheringKey={activeGathering?.key ?? null}
+                gatheringTitle={activeGathering?.title ?? null}
+              />
+            </>
+          )}
+        </div>
 
-      {/* Outside the tabs on purpose: a one-off belongs to no chain of repeats,
-          so it neither filters by one nor answers the questions they do. */}
-      {!awaiting && (oneOffRecaps.length > 0 || oneOffOnly.length > 0) ? (
-        <>
-          <OneOffRecapList items={oneOffRecaps} />
-          <OneOffOnlyList items={oneOffOnly} />
-        </>
-      ) : null}
-    </div>
+        <div className="flex min-w-0 flex-col gap-4">
+          {!awaiting && recentEvents.length > 0 ? (
+            <NewVisitorList
+              items={newVisitors}
+              windowDays={settings.newVisitorWindowDays}
+              gatheringTitle={activeGathering?.title ?? null}
+              reachable={parentContact.reachable}
+            />
+          ) : null}
+
+          {/* Scoped by the tabs like everything above it, but rendered outside
+              that block on purpose: a ministry that has not run a gathering yet
+              still has quick-added visitors nobody can reach, and this is the
+              only list that can say so without any attendance history behind
+              it. There are no tabs in that state, so it shows the whole roster
+              — which is what "All" means. It still waits for the roster it is a
+              statement about. */}
+          {awaitingRoster ? null : (
+            <IncompleteProfileList
+              students={incomplete}
+              now={now}
+              checking={awaitingContacts}
+              error={parentContact.error}
+              gatheringTitle={activeGathering?.title ?? null}
+            />
+          )}
+
+          {/* Outside the tabs on purpose: a one-off belongs to no chain of
+              repeats, so it neither filters by one nor answers the questions
+              they do. */}
+          {!awaiting && (oneOffRecaps.length > 0 || oneOffOnly.length > 0) ? (
+            <>
+              <OneOffRecapList items={oneOffRecaps} />
+              <OneOffOnlyList items={oneOffOnly} />
+            </>
+          ) : null}
+        </div>
+      </div>
+    </PageFrame>
   );
 }

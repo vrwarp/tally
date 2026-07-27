@@ -15,6 +15,16 @@ export default tseslint.config(
       'functions/src/generated',
       '.emulator-data',
       'coverage',
+      // `npm run typecheck` is `tsc -b --noEmit false`, so it leaves a .js
+      // beside every .ts it checks. Linting the output as well as the source
+      // reports every finding twice — and reports it against rules the
+      // generated file cannot satisfy. Gitignored for the same reason.
+      'src/**/*.js',
+      'tests/**/*.js',
+      'scripts/**/*.js',
+      'firestore-tests/**/*.js',
+      'e2e/**/*.js',
+      'uxr/**/*.js',
     ],
   },
   {

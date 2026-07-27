@@ -1,0 +1,83 @@
+[
+  {
+    "scene": "dashboard",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "the Incomplete profiles rows — the student name against the 'Visitor' and 'Waiting …' badges",
+    "finding": "In every row of this section the student's name is the only element allowed to shrink, so the name is the one thing that gets cut while its two decorations render in full. 'Selah Mbeki' becomes 'Selah M…', 'Jayden Rivers' becomes 'Jayden …', 'Bree Sandoval' becomes 'Bree S…' — five of five names truncated — while the blue 'Visitor' chip and the amber 'Waiting 16 days' chip beside them are complete and, being filled and coloured, are also the loudest marks in the row. The composition therefore says the badges are the subject and the person is context, which is backwards on a list whose whole purpose is to hand a leader a name to chase.",
+    "evidence": "dashboard--phone-full.png, the Incomplete profiles list: every one of the five names ends in an ellipsis, four of them inside the first word of the surname; the trailing 'Waiting 1 day' / 'Waiting 16 days' / 'Waiting 22 days' chips and the 'Visitor' chips never truncate. The markup confirms the priority — the name span carries `truncate` while both badges carry `shrink-0`.",
+    "direction": "The name should be the last thing in the row to give up width, not the first. Let the badges yield — wrap them below the name, park them in the row's trailing column, or drop 'Visitor' here entirely, since this section is about a missing parent contact and visitor status is already stated on the Students page. Whatever else goes, a person's name in a list of people to contact should read whole at 390px."
+  },
+  {
+    "scene": "dashboard",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the two meta lines inside each Missing in action row (and the same pattern in New faces and Met once, never since)",
+    "finding": "Round 1's change removed the duplicated gathering name from the first meta line, which fixed the desktop but left the phone exactly where it was: all ten MIA rows still cut line one mid-value ('Last seen Jun 21, 1…', 'Jun 28, 2…', 'Jul 5, 22…'), each at a different character, so the block ends in a ragged column of ellipses — while line two directly beneath it ('Missing from Sunday School') stops well short of the same column and leaves roughly 105 CSS px of that width unused. A fact is being cut off on the line above a line that had room for it. The same shape recurs in New faces ('Sunday School · Jul 26, 1 …') and Met once, never since ('met at Fall Lock-In · Ju…').",
+    "evidence": "dashboard--phone-full.png: ten consecutive MIA rows each ending line one in an ellipsis at a different x; 'Missing from Sunday School' beneath each of them ends around x 253 of a 358 CSS px text column. Compare r01 changes.json change 4, which reports the truncation resolved 'in the wider desktop frame'.",
+    "direction": "The row is packing three facts into a line that only fits two at this width. Either let this line wrap to two lines on the narrow viewport instead of truncating, or move one fact — grade is the least load-bearing of the three and is already on the student's own record — so that the last-seen date, which is the reason the row exists, survives at 390px."
+  },
+  {
+    "scene": "roster",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the row beneath the event header — the 'Today' badge, the 'Change' link and the date select",
+    "finding": "One 44px row carries three different control vocabularies and three type sizes: an 11px ringed chip, a 12px bare blue word with no boundary of any kind, and a 16px ringed pill with a native chevron. The two objects that do the same job — get me to a different gathering — are the two that look least alike, and the one with no visible boundary is the one that navigates. The sizing also inverts the page: the select's label is set at 16px, two steps above the badge and only 2px below the H1 that names the gathering, so the switcher is nearly as loud as the thing it switches. This is the residue the r01 disposition explicitly held over — the fix is a shared vocabulary, not a merge.",
+    "evidence": "roster--phone-fold.png and roster-search--phone-fold.png, the strip between the event header and the search field. Markup: badge `text-[11px] rounded-md ring-1`, 'Change' `text-xs rounded-full` with no ring or fill, select at inherited 16px `rounded-full ring-1`, against an H1 at `text-lg` (18px).",
+    "direction": "Give the two event-changing controls one shape, one size and one weight so they read as a pair, and let the 'Today' badge stay the odd one out because it is a status and not a control. Whatever they settle on should sit below the H1 in the type hierarchy — the header's job is to say which gathering you are on, and the machinery for changing it is a footnote to that."
+  },
+  {
+    "scene": "roster",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the second line of each roster row — the allergy badge and the 'x of 3' attendance ratio",
+    "finding": "Unchanged from round 1 and held over by the disposition. The ratio is set in tabular numerals — someone wanted it to line up — and then its column moves, because the allergy badge is laid out ahead of it in a wrapping flex row. On plain rows '2 of 3' starts at x 80; on the Layla Farouk, Noah Fitzgerald, Sofia Ramirez and Naomi Tanaka rows it starts at x 153. The one number a counselor compares down the list never appears twice in the same place, so the tabular setting buys nothing. And the amber chip is the heaviest, most saturated mark in the row while sitting in its third-rank line, so it out-shouts the student's own name.",
+    "evidence": "roster--phone-full.png: the '2 of 3' / '3 of 3' run holds a clean left edge for eighteen rows and jumps right on the four rows that carry the Allergy chip.",
+    "direction": "Give the ratio a fixed position — first on the meta line with badges trailing, or its own column — so it forms a readable vertical run. And let the allergy flag be legible without being the loudest ink in the row: a warning in the quietest line should not outweigh the name in the loudest one."
+  },
+  {
+    "scene": "events",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the Next seven days and Later rows — the 'Recurring' badge and the truncated detail line",
+    "finding": "Seventeen consecutive rows each spend a whole extra line on an identical grey 'Recurring' chip, and on the line above it each row truncates the only fact that varies ('· Fellowshi…', '· Educa…'). A badge that every row carries is not information, it is a repeated word, and here it is a repeated word that costs a line of height per row and roughly doubles the length of the Later list — while the one row that is genuinely different, Winter Retreat with its One-off and RSVP-only chips, has to compete with sixteen decoys wearing the same badge shape. The row is spending its width on a constant and cutting a variable.",
+    "evidence": "events--phone-full.png: from Aug 7 to Sep 20 every row shows the same 'Recurring' pill on its own line beneath a detail line that ends in an ellipsis; Winter Retreat's distinguishing chips sit in the middle of that run and read as one more badge.",
+    "direction": "Mark the exception, not the rule. Drop the badge from recurring rows and let One-off / RSVP only be the only chips in the list, which is both truer and lets the reclaimed line either close up the rows or hold the location that is currently being cut."
+  },
+  {
+    "scene": "events",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the 'Next in each series' card heading against the TODAY / NEXT SEVEN DAYS / LATER labels",
+    "finding": "The page has two heading systems and the wrong one is louder. Four sections are introduced by a 12px bold uppercase label in ink-400; the fifth — a scheduling-maintenance card — is introduced by a 16px semibold card title in ink-100 inside a bordered header, and it sits first on the page. So the biggest, brightest, closest-to-the-reader section heading on Events belongs to the card you touch when you notice something is missing, and tonight's gathering is announced by a grey whisper below it. Squinting at the fold, the composition reads: page title, big card, faint label, hero. That ranks the card above the hero.",
+    "evidence": "events--phone-fold.png: 'Next in each series' at 16px ink-100 with a rule beneath it, versus 'TODAY' at 12px uppercase ink-400 directly above the hero card; the hero's own title does not appear until y 457 CSS.",
+    "direction": "Pick one heading system for the page's sections and let every section wear it, so the card stops out-ranking the hero by virtue of being a card. If the series card is genuinely secondary — and its position suggests otherwise — it should also sit below the gathering that is on tonight, not above it."
+  },
+  {
+    "scene": "students",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the page header — 'Students / 45 students' against the two stacked action buttons",
+    "finding": "The header is now a staircase of two same-weight grey buttons hanging off the right edge on two lines, with left edges at x 252 and x 136 and a shared right edge at x 374, beside a title block anchored at x 16. Nothing in the header shares an edge with anything else, and the second button's line runs into the 'Search' label's space below it. Round 1 correctly demoted the import, but demoting both actions to the same treatment has also removed any statement of which one a leader does weekly — and it puts this page out of step with its sibling, where Events gives 'New event' the brand fill. Two core-team pages, the same kind of create action, opposite treatments.",
+    "evidence": "students--phone-fold.png: 'New visitor' and 'Add from Planning Center' render in identical `bg-ink-800 ring-ink-700` at 14px, right-aligned on two lines; events--phone-fold.png shows 'New event' brand-filled in the same header position.",
+    "direction": "Let the header resolve to one line — a single visible action with the rare import moved into an overflow, or both actions given a common left edge below the title rather than a right-aligned staircase. And settle one rule across the core-team pages for what a create action looks like, so 'New visitor' and 'New event' are recognisably the same kind of thing."
+  },
+  {
+    "scene": "students",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the directory rows that carry Visitor / Missing info badges",
+    "finding": "Five rows in forty-five wrap their badges onto a second line, which pushes the grade down to a third and makes those rows visibly taller than their neighbours. The grade is the one fact every row shares, and it is the fact whose vertical position moves — so the column that should form a clean run down the list breaks five times. Meanwhile the right two-thirds of every row is empty: the name block ends around x 125 and the chevron sits alone at x 358, so the badges are being stacked into the crowded left column while 230 CSS px of the same row sits unused.",
+    "evidence": "students--phone-full.png: the Bree Sandoval, Jayden Rivers, Kylie Novak, Selah Mbeki and Tomas Vielle rows are three lines tall with 'Missing info' on its own line and the grade beneath it, against two-line rows everywhere else; the empty middle of every row is the same width in both cases.",
+    "direction": "Keep the grade on the same line in every row so the list has one rhythm and one column of grades, and let the badges occupy the empty span before the chevron instead of wrapping under the name. Badges should annotate the row, not restructure it."
+  },
+  {
+    "scene": "students",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the 'Incomplete profiles (5)' and 'Visitors (5)' quick-filter chips",
+    "finding": "These two chips print their counts in parentheses inside the label, while every other count in the app is a pill set beside the label — 'Recent 24' and 'Checked in 3' on the roster, 'RESULTS 9' on search, 'Missing in action 10', 'New faces 2' and 'Incomplete profiles 5' on the dashboard. One of those dashboard headings is even the same phrase as the chip here, printed the other way. It is a small thing, but it is the kind of small thing that makes a design system read as a set of pages rather than one app, and the parenthetical form also buries the number in a run of 12px text where the pill form keeps it findable.",
+    "evidence": "students--phone-fold.png ('Incomplete profiles (5)', 'Visitors (5)') against roster--phone-fold.png ('Recent' + a 24 bubble, 'Checked in' + a 3 bubble) and dashboard--phone-full.png ('Incomplete profiles' + a 5 pill).",
+    "direction": "Use one form for a count everywhere it appears. The pill is the established one and it is the one that survives a glance; the parentheses should go."
+  }
+]

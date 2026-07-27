@@ -81,9 +81,23 @@ function MiaRow({ item, showGathering }: { item: MiaStudent; showGathering: bool
   const { student, consecutiveMisses, lastAttendedAt, lastAttendedEventTitle } = item;
   const name = studentFullName(student);
 
+  /*
+   * The gathering is named once per row, not twice.
+   *
+   * The row is four lines tall and used to print it in both of them — and the
+   * first printing was the one that ran out of room, so the reader lost the
+   * words the next line then repeated in full ("…1 month ago at Sund…" over
+   * "Missing from Sunday School"). Line one is identity and history now; line
+   * two is the reason this person is on the list.
+   *
+   * The exception is the row nothing else can place: somebody who has been to
+   * nothing at all gets "Not seen at any gathering" below, which names no
+   * gathering, so where they were last seen is worth saying here.
+   */
+  const placedBelow = showGathering ? item.gatheringTitle !== null : true;
   const lastSeen = lastAttendedAt
     ? `Last seen ${formatShortDate(lastAttendedAt)}, ${formatRelative(lastAttendedAt)}${
-        lastAttendedEventTitle ? ` at ${lastAttendedEventTitle}` : ''
+        !placedBelow && lastAttendedEventTitle ? ` at ${lastAttendedEventTitle}` : ''
       }`
     : 'Never checked in';
 
