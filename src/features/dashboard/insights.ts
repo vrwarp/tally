@@ -306,6 +306,7 @@ export function computeUnseen(
   const history = recurringSnapshots(snapshots);
   if (history.length === 0) return [];
   const oneOffs = oneOffSnapshots(snapshots);
+  const gatherings = groupByGathering(snapshots);
 
   const results: MiaStudent[] = [];
 
@@ -314,11 +315,27 @@ export function computeUnseen(
     if (history.some((snapshot) => snapshot.presentStudentIds.has(student.id))) continue;
     if (oneOffs.some((snapshot) => snapshot.presentStudentIds.has(student.id))) continue;
 
-    // Nights they could plausibly have been at, across every gathering.
+    /*
+     * The threshold is measured against one gathering, exactly as it is
+     * everywhere else on this screen.
+     *
+     * Pooled — which is what this used to do — the trigger depends on how many
+     * gatherings a ministry runs rather than on how long anybody has been away:
+     * three weekly gatherings that have each met once clears "three in a row"
+     * inside a single week, and scheduling a fourth would make it fire sooner
+     * still. Somebody has to have gone missing from *something* for three of
+     * its nights before this list says so.
+     */
+    const missedOf = gatherings.map(
+      (gathering) => standingIn(gathering, student, settings).eligible,
+    );
+    if (!missedOf.some((nights) => nights >= settings.miaConsecutiveMisses)) continue;
+
+    // Every night they could have been at, anywhere — which is the number the
+    // row shows, because "not seen at any of the last N" is what it says.
     const eligible = history.filter(
       (snapshot) => snapshot.event.startAt.getTime() >= student.createdAt.getTime(),
     );
-    if (eligible.length < settings.miaConsecutiveMisses) continue;
 
     results.push({
       student,

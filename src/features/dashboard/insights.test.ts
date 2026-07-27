@@ -647,7 +647,9 @@ describe('computeMia and the expectation behind a miss', () => {
 
 describe('computeUnseen', () => {
   const settings = makeSettings({ miaConsecutiveMisses: 3 });
-  const fridayNights = fridays(2);
+  // Three Fridays, so one gathering on its own reaches the threshold — see the
+  // "three gatherings' first nights" case below for why that matters.
+  const fridayNights = fridays(3);
   const sundayNights = makeWeeklyEvents({ count: 2, seriesId: SUNDAY, title: 'Sunday School' });
   const everything = [
     ...fridayNights.map((event) => held(event)),
@@ -666,7 +668,8 @@ describe('computeUnseen', () => {
 
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
-      consecutiveMisses: 4,
+      // Every night, everywhere, since they joined — which is what the row says.
+      consecutiveMisses: 5,
       gatheringKey: null,
       gatheringTitle: null,
       lastAttendedEventTitle: null,
@@ -689,6 +692,42 @@ describe('computeUnseen', () => {
     expect(
       computeUnseen([guest], [...everything, makeSnapshot(retreat, [guest.id])], settings),
     ).toEqual([]);
+  });
+
+  /*
+   * Reported from a real setup: three recurring gatherings, each one meeting
+   * once, and every student who had not been to any of them appeared as "3
+   * unseen" after a single week. Pooled, the trigger measured how many
+   * gatherings the ministry runs rather than how long anybody had been away.
+   */
+  it('does not add three gatherings\u2019 first nights into one streak', () => {
+    const student = makeStudent({ id: 'ghost', createdAt: LONG_AGO });
+    const openingNight = [FRIDAY, SUNDAY, 'wednesday-prayer'].map((seriesId, index) =>
+      held(
+        makeEvent({
+          id: `${seriesId}-opening`,
+          seriesId,
+          startAt: new Date(2026, 1, 9 + index, 19, 0),
+          endAt: new Date(2026, 1, 9 + index, 21, 0),
+        }),
+      ),
+    );
+
+    expect(computeUnseen([student], openingNight, settings)).toEqual([]);
+
+    // A third night of one of them, and now something really has been missed.
+    const twoMore = [1, 2].map((week) =>
+      held(
+        makeEvent({
+          id: `${FRIDAY}-week-${week}`,
+          seriesId: FRIDAY,
+          startAt: new Date(2026, 1, 9 + week * 7, 19, 0),
+          endAt: new Date(2026, 1, 9 + week * 7, 21, 0),
+        }),
+      ),
+    );
+
+    expect(computeUnseen([student], [...openingNight, ...twoMore], settings)).toHaveLength(1);
   });
 
   it('waits until enough nights have passed since they joined the roster', () => {
