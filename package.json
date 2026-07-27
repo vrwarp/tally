@@ -42,7 +42,9 @@
     "walkthrough": "npm run walkthrough:capture && npm run walkthrough:optimize && npm run walkthrough:build",
     "walkthrough:optimize": "tsx scripts/optimize-screenshots.ts",
     "uxr:capture": "playwright test -c uxr/playwright.config.ts",
-    "uxr:shoot": "tsx uxr/shoot.ts"
+    "uxr:shoot": "tsx uxr/shoot.ts",
+    "uxr:shots": "tsx scripts/optimize-uxr-shots.ts",
+    "uxr:walkthrough": "tsx scripts/build-uxr-walkthrough.ts"
   },
   "dependencies": {
     "clsx": "^2.1.1",

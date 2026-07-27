@@ -183,10 +183,9 @@ export function PastGatherings({ before }: PastGatheringsProps) {
 
   return (
     <section aria-labelledby="past-gatherings">
-      <h2
-        id="past-gatherings"
-        className="-mb-2 text-base font-semibold text-ink-100"
-      >
+      {/* A half of the calendar, at the same rank as "Upcoming" opposite it —
+          not a group inside one. */}
+      <h2 id="past-gatherings" className="pb-3 text-base font-semibold text-ink-100">
         Past gatherings
       </h2>
 

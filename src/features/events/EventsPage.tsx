@@ -413,7 +413,7 @@ export function EventsPage() {
               the loudest, the groups inside them a step down, the month
               captions inside those a step down again. "Past gatherings" owned
               half the page and was set like a group inside the other half. */}
-          <h2 id="events-upcoming" className="-mb-4 text-base font-semibold text-ink-100">
+          <h2 id="events-upcoming" className="-mb-5 text-base font-semibold text-ink-100">
             Upcoming
           </h2>
 

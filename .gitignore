@@ -76,5 +76,12 @@ uxr/renders/
 /e2e/**/*.js
 /uxr/**/*.js
 uxr/after/
+# `npm run typecheck` also emits beside the root-level configs it checks, and
+# those are not covered by the per-directory patterns above.
 /*.config.js
 !eslint.config.js
+
+# The assembled walkthrough page — a megabyte and a half of the same JPEGs
+# inlined as base64. `docs/uxr/before` and `docs/uxr/after` ARE committed; this
+# rebuilds from them with `npm run uxr:walkthrough`.
+docs/uxr/walkthrough.html
