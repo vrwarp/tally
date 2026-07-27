@@ -208,6 +208,25 @@ test.describe('dashboard', () => {
     await expect(page.getByText(/friday fellowship — head count per night/i)).toBeVisible();
     // Nobody else's gathering leaks into a scoped list.
     await expect(page.getByText(/missing from sunday school/i)).toHaveCount(0);
+
+    /*
+     * Including the card that is not about attendance at all. An unfinished
+     * profile is a fact about the roster, so this one used to ignore the tabs
+     * and keep listing the whole ministry underneath two lists that had
+     * narrowed — which reads as the tab having done nothing.
+     */
+    const incomplete = page.getByRole('heading', { name: /incomplete profiles/i }).first();
+    const count = async () => Number(/(\d+)/.exec(await incomplete.innerText())?.[1] ?? 0);
+
+    await expect(page.getByText(/seen at friday fellowship, with no parent phone or email/i))
+      .toBeVisible();
+    const scoped = await count();
+
+    await tabs.getByRole('button', { name: 'All' }).click();
+    await expect(page.getByText(/active students with no parent phone or email/i)).toBeVisible();
+    // The seed keeps students with no parent contact at both gatherings and at
+    // neither, so narrowing has to drop somebody.
+    await expect.poll(count).toBeGreaterThan(scoped);
   });
 
   /*
