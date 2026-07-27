@@ -8,50 +8,51 @@
  */
 
 /**
- * Turning a recurrence rule into real event documents.
+ * Turning a recurrence rule into the gatherings it describes.
  *
- * Tally does not expand rules at read time. A gathering a counselor checks into
- * has to be a document — attendance hangs off it, the predictive roster reads
- * its series history, the dashboard counts it — so somebody has to write next
- * Friday down before next Friday.
+ * A rule is the truth about when a ministry meets; a document is a record that
+ * somebody did something about one of those nights. Tally keeps the two apart.
+ * The calendar a leader scrolls is *computed* from the rules on every read, and
+ * a gathering only becomes a document when it is acted on — checked into,
+ * cancelled, moved, edited.
  *
  * SHARED WITH THE CLOUD FUNCTIONS, like `recurrenceCore.ts` — its only import
- * is that module, and `scripts/sync-functions-shared.mjs` copies both.
+ * is that module, and `scripts/sync-functions-shared.mjs` copies both. The
+ * callable that materialises an occurrence has to agree with the app about
+ * which occurrences exist, so it runs this same projection server-side.
  *
- * This module is the *planning* half, and it is deliberately pure: given the
- * events already known and a clock, it says which occurrences are missing. The
- * writing half lives in `services/events.ts`, and who triggers it lives in
- * `hooks/useOccurrenceHorizon.ts`. Splitting it this way is what makes the
- * awkward part — "did we already create this one?" — testable without a
- * database.
+ * This module is deliberately pure: given the documents already known and a
+ * clock, it says which occurrences the rules put on the calendar that nothing
+ * has been written down for. Turning those into events the app can render lives
+ * in `lib/eventProjection.ts`, and materialising one lives in
+ * `services/events.ts`. Splitting it this way is what makes the awkward part —
+ * "is this night already spoken for?" — testable without a database.
  *
  * Two rules govern the whole design.
  *
- * **Ahead of time, not at the door.** Materialising when check-in starts would
- * mean next Friday does not exist all week: it would be missing from Upcoming,
- * nobody could move it or call it off in advance, and the whole point of having
- * a calendar would arrive about an hour before the calendar stopped mattering.
+ * **Computed, not written.** Tally used to write the next two months of Fridays
+ * down in advance, and the calendar was then a set of documents that a change
+ * to the rule could not reach: turning a weekly gathering monthly left eight
+ * Fridays standing that nobody had chosen. A projection cannot drift from the
+ * rule it comes from, because it *is* the rule.
  *
- * **Deterministic ids.** An occurrence's document id is derived from its chain
- * and its date, never generated. Two leaders opening the app at once, or one
- * device syncing a queued write from the car park, converge on the same
- * document instead of producing two Friday Fellowships for the same Friday and
- * splitting the night's attendance between them. It is the same reason an
+ * **Deterministic ids.** A projected occurrence's id is derived from its chain
+ * and its date, never generated, and it is the id the document will have if the
+ * occurrence is ever materialised. That is what lets a real document shadow its
+ * own projection — a cancelled Friday stays cancelled, a Friday moved to
+ * Saturday keeps its original id and does not appear twice — and it is why two
+ * leaders acting on the same night converge on one document instead of
+ * splitting the night's attendance between two. It is the same reason an
  * attendance document's id *is* the student id.
  */
-import {
-  recurrenceEquals,
-  recurrenceOccurrences,
-  toDateOnlyValue,
-  type RecurrenceRule,
-} from './recurrenceCore.js';
+import { recurrenceOccurrences, toDateOnlyValue, type RecurrenceRule } from './recurrenceCore.js';
 
 /**
  * The slice of an event this module reasons about.
  *
- * Structural rather than `TallyEvent`, because the nightly job builds these
- * from admin-SDK documents and `@/types` speaks the client SDK's `Timestamp`.
- * A `TallyEvent` satisfies it, so app call sites are unchanged.
+ * Structural rather than `TallyEvent`, because the callable builds these from
+ * admin-SDK documents and `@/types` speaks the client SDK's `Timestamp`. A
+ * `TallyEvent` satisfies it, so app call sites are unchanged.
  */
 export interface OccurrenceSource {
   id: string;
@@ -71,22 +72,17 @@ export interface OccurrenceSource {
 }
 
 /**
- * How far ahead occurrences are written down.
+ * How far ahead the calendar is shown.
  *
- * Two months of Fridays is eight documents — small enough to be free, long
- * enough that the calendar still reaches past the end of a term when nobody has
- * opened Tally over the holidays.
+ * A rule runs forever, so something has to say where Upcoming stops. Two months
+ * of Fridays is eight gatherings — long enough to plan a term around and to
+ * reach past a holiday, short enough that the list is still a list.
+ *
+ * This used to be how far ahead occurrences were *written*, which made it a
+ * quota as well as a window: the calendar ended where the writing had got to.
+ * Now it only decides what is shown.
  */
 export const HORIZON_DAYS = 60;
-
-/**
- * The most occurrences one chain may gain in a single top-up.
- *
- * A daily rule would otherwise write sixty documents the first time anybody
- * opened the app. The cap is not a limit on the schedule — the next top-up
- * simply adds the next few — it is a limit on how much one page load may do.
- */
-export const MAX_PER_CHAIN = 10;
 
 /**
  * The identity of a chain of repeats, stable across every instance in it.
@@ -94,14 +90,14 @@ export const MAX_PER_CHAIN = 10;
  * `seriesId` first, because a series *is* the chain and the id reads like one
  * (`friday-fellowship-2026-08-07`). Failing that, the root — the id of the
  * hand-made event the chain grew from. Failing that the event is itself a root
- * that has never been materialised, so it is its own key.
+ * that nothing has been materialised from, so it is its own key.
  *
  * This is also what the predictive roster groups history by, and the two uses
- * have to agree: whatever the horizon copies forward as one chain is exactly
- * the set of gatherings that predict each other. Keying prediction on
- * `seriesId` alone was the older, narrower rule, and it meant a weekly event
- * created in the app — which has a root but no series document — accumulated
- * months of attendance that its own roster then refused to read.
+ * have to agree: whatever the projection treats as one chain is exactly the set
+ * of gatherings that predict each other. Keying prediction on `seriesId` alone
+ * was the older, narrower rule, and it meant a weekly event created in the app
+ * — which has a root but no series document — accumulated months of attendance
+ * that its own roster then refused to read.
  *
  * Narrowed to the three fields it reads so a caller holding less than a whole
  * event — the roster asks this of a `Pick`, and its tests of a fixture — can
@@ -114,7 +110,7 @@ export function chainKey(
 }
 
 /**
- * The document id for one occurrence.
+ * The id one occurrence has, projected or materialised.
  *
  * A calendar day, not an instant: two gatherings of the same series on one day
  * is not a thing that happens, and a date reads in the Firebase console.
@@ -123,10 +119,11 @@ export function occurrenceId(key: string, startAt: Date): string {
   return `${key}-${toDateOnlyValue(startAt)}`;
 }
 
-/** One occurrence that ought to exist and does not. */
-export interface OccurrenceDraft {
+/** One occurrence the rules put on the calendar that has no document. */
+export interface ProjectedOccurrence {
+  /** The id it would be materialised under. Derived, never generated. */
   id: string;
-  /** The instance it was copied forward from. */
+  /** The instance it takes its shape from. */
   source: OccurrenceSource;
   startAt: Date;
   endAt: Date;
@@ -135,15 +132,15 @@ export interface OccurrenceDraft {
 }
 
 /**
- * The template each chain is copied forward from: its latest live instance.
+ * The template each chain is projected from: its latest live instance.
  *
  * The latest rather than the first, because an edit is meant to carry: a leader
  * who moves Friday night to 19:30 has moved the Fridays still ahead, and the
- * next one written down should be the 19:30 one. Past instances keep what they
- * were held at, which is exactly what makes them history.
+ * ones the calendar shows after it should be the 19:30 ones. Instances already
+ * held keep what they were held at, which is exactly what makes them history.
  *
  * Cancelled instances are skipped as templates but still count as existing, so
- * calling one Friday off does not make it reappear on the next top-up.
+ * calling one Friday off does not make it reappear in the projection.
  */
 function templatesByChain(
   events: readonly OccurrenceSource[],
@@ -164,37 +161,37 @@ function templatesByChain(
 
 export interface HorizonOptions {
   horizonDays?: number;
-  maxPerChain?: number;
 }
 
 /**
- * Which occurrences are missing between `now` and the horizon.
+ * Which occurrences the rules put between `now` and the horizon that no
+ * document already stands for.
  *
- * Returns drafts in chronological order. An empty result is the normal case —
- * the horizon is usually already full, which is what makes it safe to call this
- * on every app open.
+ * Returns them in chronological order. Everything a real document covers is
+ * left out here rather than merged out later, which is what makes the two sets
+ * disjoint by construction — see `lib/eventProjection.ts` for how they are put
+ * back together.
  */
-export function pendingOccurrences(
+export function projectOccurrences(
   events: readonly OccurrenceSource[],
   now: Date,
   options: HorizonOptions = {},
-): OccurrenceDraft[] {
+): ProjectedOccurrence[] {
   const horizonDays = options.horizonDays ?? HORIZON_DAYS;
-  const maxPerChain = options.maxPerChain ?? MAX_PER_CHAIN;
 
   const horizon = new Date(now.getTime() + horizonDays * 86_400_000);
-  const drafts: OccurrenceDraft[] = [];
+  const projected: ProjectedOccurrence[] = [];
 
   /*
-   * Every occurrence already accounted for, cancelled ones included.
+   * Every occurrence a document already speaks for, cancelled ones included.
    *
    * Two keys per event, because an event can be spoken for in two different
-   * ways. Its id catches the ones written by this module — including one a
-   * leader has since dragged to a different evening, which must not come back
-   * on its original date. Its chain-and-day catches everything else: a Friday
-   * scheduled by hand, or seeded, carries an id from before this scheme existed
-   * and would otherwise be materialised a second time, putting two Friday
-   * Fellowships on one Friday and splitting the night's attendance.
+   * ways. Its id catches the ones materialised from this projection —
+   * including one a leader has since dragged to a different evening, which must
+   * not reappear on its original date. Its chain-and-day catches everything
+   * else: a Friday scheduled by hand, or seeded, carries an id from before this
+   * scheme existed and would otherwise be projected alongside itself, putting
+   * two Friday Fellowships on one Friday.
    */
   const taken = new Set<string>();
   for (const event of events) {
@@ -207,8 +204,8 @@ export function pendingOccurrences(
     if (!rule) continue;
 
     // Offsets rather than absolute times, so an occurrence keeps the shape of
-    // the gathering it was copied from: a lock-in that runs past midnight stays
-    // that long, and a window somebody widened stays wide.
+    // the gathering it was projected from: a lock-in that runs past midnight
+    // stays that long, and a window somebody widened stays wide.
     const duration = template.endAt.getTime() - template.startAt.getTime();
     const opensOffset = template.checkInOpensAt.getTime() - template.startAt.getTime();
     const closesOffset = template.checkInClosesAt.getTime() - template.endAt.getTime();
@@ -230,14 +227,13 @@ export function pendingOccurrences(
       from: new Date(now.getTime() - tail),
     });
 
-    let written = 0;
     for (const startAt of dates) {
-      if (startAt > horizon || written >= maxPerChain) break;
+      if (startAt > horizon) break;
 
       const endAt = new Date(startAt.getTime() + duration);
       const checkInClosesAt = new Date(endAt.getTime() + closesOffset);
       // Over and done with. Tally does not invent history — a gathering nobody
-      // recorded did not happen, and writing it now would put an empty one on
+      // recorded did not happen, and showing it now would put an empty one on
       // the calendar and in the dashboard's denominator.
       if (checkInClosesAt < now) continue;
 
@@ -245,7 +241,7 @@ export function pendingOccurrences(
       if (taken.has(id)) continue;
       taken.add(id);
 
-      drafts.push({
+      projected.push({
         id,
         source: template,
         startAt,
@@ -253,150 +249,33 @@ export function pendingOccurrences(
         checkInOpensAt: new Date(startAt.getTime() + opensOffset),
         checkInClosesAt,
       });
-      written += 1;
     }
   }
 
-  return drafts.sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
-}
-
-/* -------------------------------------------------------------------------- */
-/* Reconciling a chain after its schedule changes                              */
-/* -------------------------------------------------------------------------- */
-
-/**
- * What a schedule change means for the gatherings already written down after
- * the one that was edited.
- *
- * Materialising ahead of time is what makes next Friday a document a leader can
- * cancel or move — and it is also what makes an edit incomplete on its own.
- * Turning a weekly gathering monthly writes one document; the eight Fridays the
- * old rule had already put on the calendar are still sitting there, and Upcoming
- * shows a schedule nobody chose.
- *
- * So an edit has a second half: work out which of the ones ahead the new rule
- * no longer lands on, and say so. `pendingOccurrences` then fills the gap on the
- * next top-up, from the edited gathering as the template.
- */
-export interface ChainReconciliation {
-  /**
-   * Later instances the new schedule no longer produces. To be deleted — they
-   * are gatherings that were never chosen, and cancelling them instead would
-   * leave a column of struck-through Fridays standing in for the mistake.
-   */
-  superseded: OccurrenceSource[];
-  /**
-   * Later instances that survive but still carry the rule they were written
-   * under. Only `recurrence` is stale, and it has to be brought up to date or
-   * the chain's own template would put the old schedule back: the horizon copies
-   * forward from the *latest* live instance, not from the one that was edited.
-   */
-  restated: OccurrenceSource[];
+  return projected.sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
 }
 
 /**
- * How far ahead a reconciliation will expand the new rule looking for matches.
+ * The occurrence at exactly this instant in this chain, or null.
  *
- * Bounded by the horizon rather than by the chain, so a single stray document
- * dated years out cannot turn one edit into an unbounded expansion.
+ * What the materialising callable checks before it writes anything: a client
+ * asks for a chain and a start time, and this is the question "is that a
+ * gathering the rules actually describe?" asked of the same projection the
+ * client was reading. Nothing else about the request is trusted — the payload
+ * comes from `source`, and the id from `occurrenceId`.
  */
-const MAX_RECONCILE_DAYS = 400;
-
-/**
- * Which gatherings after `edited` its new schedule contradicts.
- *
- * `chain` is the key the chain had *before* the edit, because a gathering
- * switched to one-off loses its series and its root and would otherwise stop
- * matching the very instances it needs to clean up. Callers holding the event as
- * it was stored pass `chainKey(previous)`; the default is right everywhere else.
- *
- * Two kinds of instance are deliberately left alone.
- *
- * **Cancelled ones**, because calling a Friday off is a decision, and deleting
- * the record of it would let the next top-up write that Friday back.
- *
- * **Ones somebody moved**, spotted by their id no longer being the one their
- * date derives from — a Friday dragged to Saturday keeps `…-07-24` while
- * sitting on the 25th. A leader who moved a gathering by hand meant it, and an
- * edit to the series is not an instruction to undo that. They still get their
- * rule restated, so a moved instance cannot quietly become the template that
- * revives the old schedule.
- */
-export function reconcileChain(
+export function findProjectedOccurrence(
   events: readonly OccurrenceSource[],
-  edited: OccurrenceSource,
-  chain: string = chainKey(edited),
-): ChainReconciliation {
-  const rule = edited.mode === 'recurring' ? edited.recurrence : null;
-
-  const later = events
-    .filter(
-      (event) =>
-        event.id !== edited.id &&
-        event.mode === 'recurring' &&
-        chainKey(event) === chain &&
-        event.startAt > edited.startAt,
-    )
-    .sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
-
-  if (later.length === 0) return { superseded: [], restated: [] };
-
-  /*
-   * Every instant the new rule lands on between the edited gathering and the
-   * last one already written down.
-   *
-   * Matched by instant rather than by day on purpose: moving a Friday night from
-   * 23:00 to 20:00 leaves the days alone but changes every gathering after it,
-   * and those documents are wrong until they are rewritten. Dropping them here
-   * is what lets the horizon put them back at the hour a leader actually chose.
-   */
-  const produced = new Set<number>();
-  if (rule) {
-    const span = Math.ceil(
-      (later[later.length - 1].startAt.getTime() - edited.startAt.getTime()) / 86_400_000,
-    );
-    for (const date of recurrenceOccurrences(rule, edited.startAt, {
-      // At most one occurrence a day, so the span bounds how many there can be.
-      limit: Math.min(span, MAX_RECONCILE_DAYS) + 2,
-      from: new Date(edited.startAt.getTime() + 1),
-    })) {
-      produced.add(date.getTime());
-    }
-  }
-
-  const superseded: OccurrenceSource[] = [];
-  const restated: OccurrenceSource[] = [];
-
-  for (const event of later) {
-    const moved = event.id !== occurrenceId(chain, event.startAt);
-    const orphaned = !produced.has(event.startAt.getTime());
-
-    if (orphaned && !moved && event.status !== 'cancelled') {
-      superseded.push(event);
-      continue;
-    }
-
-    if (!recurrenceEquals(event.recurrence, rule)) restated.push(event);
-  }
-
-  return { superseded, restated };
-}
-
-/**
- * The occurrence a counselor is standing in front of, if it was never written
- * down: one whose check-in window is open right now.
- *
- * This is the backstop, not the mechanism. If the horizon is doing its job this
- * returns null forever — it exists for the case where nobody from the core team
- * opened Tally for two months and the calendar ran dry.
- */
-export function missingOccurrenceNow(
-  events: readonly OccurrenceSource[],
+  chain: string,
+  startAt: Date,
   now: Date,
-): OccurrenceDraft | null {
+  options: HorizonOptions = {},
+): ProjectedOccurrence | null {
   return (
-    pendingOccurrences(events, now, { horizonDays: 1, maxPerChain: 1 }).find(
-      (draft) => now >= draft.checkInOpensAt && now <= draft.checkInClosesAt,
+    projectOccurrences(events, now, options).find(
+      (occurrence) =>
+        occurrence.startAt.getTime() === startAt.getTime() &&
+        occurrence.id === occurrenceId(chain, startAt),
     ) ?? null
   );
 }

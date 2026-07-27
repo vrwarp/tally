@@ -1,18 +1,30 @@
 /**
- * The nightly occurrence sweep, driven against the in-memory Firestore.
+ * Materialising one occurrence, driven against the in-memory Firestore.
  *
- * The expansion itself is tested exhaustively on the app side — this file's job
- * is the parts that only exist on a server: decoding stored documents, the
- * create-only write, and the properties that make a job safe to run every
- * night forever. Chiefly: running it twice must write nothing the second time.
+ * The projection itself is tested exhaustively on the app side — this file's
+ * job is the parts that only exist on a server: decoding stored documents, the
+ * create-only write, and the property the whole design rests on. Any active
+ * member may call this, so what it *refuses* is load-bearing: a request names a
+ * chain and an instant and nothing else, and anything the projection does not
+ * independently recognise has to come back as a refusal rather than a document.
  */
 import { describe, expect, it } from 'vitest';
-import { materializeDueOccurrences, EVENTS, MINISTRY_TIME_ZONE } from './occurrences.js';
+import {
+  materializeOccurrence,
+  pruneMaterializedOccurrences,
+  EVENTS,
+  MINISTRY_TIME_ZONE,
+} from './occurrences.js';
 import { SILENT_LOGGER } from './firestore.js';
 import { FakeFirestore } from './testing/fakeFirestore.js';
 
 /** Fri 24 Jul 2026, 19:00 local. */
 const FRIDAY = new Date(2026, 6, 24, 19, 0);
+/** The Friday after it — the one a counselor is standing in front of. */
+const NEXT_FRIDAY = new Date(2026, 6, 31, 19, 0);
+
+const CHAIN = 'friday-fellowship';
+const UID = 'counselor-1';
 
 const WEEKLY_FRIDAY = {
   frequency: 'weekly',
@@ -58,41 +70,32 @@ function eventIds(db: FakeFirestore): string[] {
     .sort();
 }
 
-describe('materializeDueOccurrences', () => {
-  it('writes the horizon down from a single instance', async () => {
-    const db = seeded();
-    const result = await materializeDueOccurrences(db, FRIDAY, SILENT_LOGGER);
+/** The common case: a counselor opens check-in on a projected Friday. */
+function materialize(
+  db: FakeFirestore,
+  startAt: Date = NEXT_FRIDAY,
+  chain: string = CHAIN,
+  now: Date = FRIDAY,
+) {
+  return materializeOccurrence(db, { chain, startAt, uid: UID }, now, SILENT_LOGGER);
+}
 
-    expect(result.created).toBe(8);
-    expect(result.raced).toBe(0);
+describe('materializeOccurrence', () => {
+  it('writes down the one gathering it was asked for, and no others', async () => {
+    const db = seeded();
+    const result = await materialize(db);
+
+    expect(result).toEqual({ id: 'friday-fellowship-2026-07-31', created: true });
+    // The point of the whole migration: the rest of the horizon stays computed.
     expect(eventIds(db)).toEqual([
       'friday-fellowship-2026-07-24',
       'friday-fellowship-2026-07-31',
-      'friday-fellowship-2026-08-07',
-      'friday-fellowship-2026-08-14',
-      'friday-fellowship-2026-08-21',
-      'friday-fellowship-2026-08-28',
-      'friday-fellowship-2026-09-04',
-      'friday-fellowship-2026-09-11',
-      'friday-fellowship-2026-09-18',
     ]);
   });
 
-  it('writes nothing on a second run — the property that makes it nightly', async () => {
+  it('derives the gathering from the chain, not from the request', async () => {
     const db = seeded();
-    await materializeDueOccurrences(db, FRIDAY, SILENT_LOGGER);
-    const after = db.writes.length;
-
-    const again = await materializeDueOccurrences(db, FRIDAY, SILENT_LOGGER);
-
-    expect(again.created).toBe(0);
-    expect(again.raced).toBe(0);
-    expect(db.writes.length).toBe(after);
-  });
-
-  it('carries the gathering forward, not just its date', async () => {
-    const db = seeded();
-    await materializeDueOccurrences(db, FRIDAY, SILENT_LOGGER);
+    await materialize(db);
 
     const next = db.get(`${EVENTS}/friday-fellowship-2026-07-31`);
     expect(next?.title).toBe('Friday Fellowship');
@@ -101,36 +104,70 @@ describe('materializeDueOccurrences', () => {
     expect(next?.recurrence).toEqual(WEEKLY_FRIDAY);
     // The chain's root, so the ids stay derivable from here on.
     expect(next?.recurrenceRootId).toBe('friday-fellowship-2026-07-24');
-    expect(next?.startAt).toEqual(new Date(2026, 6, 31, 19, 0));
+    expect(next?.startAt).toEqual(NEXT_FRIDAY);
     expect(next?.endAt).toEqual(new Date(2026, 6, 31, 21, 0));
     expect(next?.checkInOpensAt).toEqual(new Date(2026, 6, 31, 18, 0));
     expect(next?.status).toBe('scheduled');
     // A recurring gathering is never an RSVP list.
     expect(next?.requiresRsvp).toBe(false);
+    // Somebody did press something, and it was them.
+    expect(next?.createdBy).toBe(UID);
   });
 
-  it('skips an occurrence already on the calendar when the read happened', async () => {
+  it('refuses a date the rule does not land on', async () => {
     const db = seeded();
-    // The app's own top-up landed this one before the sweep read the collection.
-    db.seed(
-      `${EVENTS}/friday-fellowship-2026-07-31`,
-      eventDoc({ startAt: new Date(2026, 6, 31, 19, 0) }),
-    );
 
-    const result = await materializeDueOccurrences(db, FRIDAY, SILENT_LOGGER);
-
-    // Planned around, so it never reaches a write at all.
-    expect(result.raced).toBe(0);
-    expect(result.created).toBe(7);
+    // A Thursday, and a Friday from before the chain began. This is the check
+    // that stops a counselor's client inventing a gathering — or backdating one
+    // and filing attendance under it.
+    expect(await materialize(db, new Date(2026, 6, 30, 19, 0))).toBeNull();
+    expect(await materialize(db, new Date(2026, 6, 17, 19, 0))).toBeNull();
+    expect(eventIds(db)).toEqual(['friday-fellowship-2026-07-24']);
   });
 
-  it('counts a document written *during* the sweep rather than failing', async () => {
+  it('refuses a chain that does not exist', async () => {
+    const db = seeded();
+    expect(await materialize(db, NEXT_FRIDAY, 'sunday-school')).toBeNull();
+    expect(eventIds(db)).toEqual(['friday-fellowship-2026-07-24']);
+  });
+
+  it('refuses one past the horizon', async () => {
+    const db = seeded();
+    expect(await materialize(db, new Date(2027, 6, 30, 19, 0))).toBeNull();
+  });
+
+  it('refuses a gathering the rule stopped describing', async () => {
+    // A leader turned the weekly gathering monthly while a counselor's screen
+    // still showed the old Fridays. Their tap must not restore one.
+    const db = seeded({
+      recurrence: { ...WEEKLY_FRIDAY, frequency: 'monthly', weekdays: [] },
+    });
+
+    expect(await materialize(db)).toBeNull();
+    expect(await materialize(db, new Date(2026, 7, 24, 19, 0))).not.toBeNull();
+  });
+
+  it('is idempotent — a second tap addresses the same document', async () => {
+    const db = seeded();
+    await materialize(db);
+    const after = db.writes.length;
+
+    // "Make sure it exists" succeeds when it already does. A screen holding a
+    // copy from before another device materialised the night would otherwise
+    // have its check-in refused.
+    const again = await materialize(db);
+
+    expect(again).toEqual({ id: 'friday-fellowship-2026-07-31', created: false });
+    expect(db.writes.length).toBe(after);
+  });
+
+  it('reports a document written *during* the call rather than failing', async () => {
     const db = seeded();
 
-    // The genuine race: the app commits between this run's read and its write,
-    // so `create` is what discovers the collision. Losing it must be a tally,
-    // not a thrown job that leaves the rest of the horizon unwritten.
-    const contended = `${EVENTS}/friday-fellowship-2026-08-07`;
+    // The genuine race: two counselors tap at the same instant, so `create` is
+    // what discovers the collision. The id is derived, so they addressed the
+    // same document and it already says what this would have said.
+    const contended = `${EVENTS}/friday-fellowship-2026-07-31`;
     const racing = {
       ...db,
       collection: (path: string) => db.collection(path),
@@ -149,82 +186,82 @@ describe('materializeDueOccurrences', () => {
       batch: () => db.batch(),
     };
 
-    const result = await materializeDueOccurrences(racing, FRIDAY, SILENT_LOGGER);
-
-    expect(result.raced).toBe(1);
-    expect(result.created).toBe(7);
-    // Everything after the collision still got written.
-    expect(eventIds(db)).toContain('friday-fellowship-2026-09-18');
+    expect(await materialize(racing as unknown as FakeFirestore)).toEqual({
+      id: 'friday-fellowship-2026-07-31',
+      created: false,
+    });
   });
 
   it('never overwrites a gathering somebody moved on purpose', async () => {
     const db = seeded();
-    await materializeDueOccurrences(db, FRIDAY, SILENT_LOGGER);
-
-    // A leader pushes the 7 August one back half an hour.
-    const moved = { ...db.get(`${EVENTS}/friday-fellowship-2026-08-07`)! };
-    moved.startAt = new Date(2026, 7, 7, 19, 30);
-    moved.location = 'Youth room';
-    db.seed(`${EVENTS}/friday-fellowship-2026-08-07`, moved);
-
-    await materializeDueOccurrences(db, FRIDAY, SILENT_LOGGER);
-
-    expect(db.get(`${EVENTS}/friday-fellowship-2026-08-07`)?.startAt).toEqual(
-      new Date(2026, 7, 7, 19, 30),
+    // Materialised for the 31st, then pushed back half an hour.
+    db.seed(
+      `${EVENTS}/friday-fellowship-2026-07-31`,
+      eventDoc({ startAt: new Date(2026, 6, 31, 19, 30), location: 'Youth room' }),
     );
-    expect(db.get(`${EVENTS}/friday-fellowship-2026-08-07`)?.location).toBe('Youth room');
-  });
 
-  it('leaves one-offs and rule-less events alone', async () => {
-    const db = new FakeFirestore();
-    db.seed(`${EVENTS}/retreat`, eventDoc({ mode: 'oneoff', seriesId: null, recurrence: null }));
-    db.seed(`${EVENTS}/plain`, eventDoc({ seriesId: null, recurrence: null }));
-
-    const result = await materializeDueOccurrences(db, FRIDAY, SILENT_LOGGER);
-
-    expect(result.created).toBe(0);
-    expect(eventIds(db)).toEqual(['plain', 'retreat']);
+    // The document is handed back as it stands. Nothing is written, so the
+    // half hour and the room a leader chose survive.
+    expect(await materialize(db)).toEqual({
+      id: 'friday-fellowship-2026-07-31',
+      created: false,
+    });
+    expect(db.get(`${EVENTS}/friday-fellowship-2026-07-31`)?.startAt).toEqual(
+      new Date(2026, 6, 31, 19, 30),
+    );
+    expect(db.get(`${EVENTS}/friday-fellowship-2026-07-31`)?.location).toBe('Youth room');
   });
 
   it('does not resurrect a cancelled gathering', async () => {
     const db = seeded();
     db.seed(
       `${EVENTS}/friday-fellowship-2026-07-31`,
-      eventDoc({ startAt: new Date(2026, 6, 31, 19, 0), status: 'cancelled' }),
+      eventDoc({ startAt: NEXT_FRIDAY, status: 'cancelled' }),
     );
 
-    await materializeDueOccurrences(db, FRIDAY, SILENT_LOGGER);
-
+    expect(await materialize(db)).toEqual({
+      id: 'friday-fellowship-2026-07-31',
+      created: false,
+    });
     expect(db.get(`${EVENTS}/friday-fellowship-2026-07-31`)?.status).toBe('cancelled');
   });
 
-  it('skips a document with no usable schedule instead of scheduling the epoch', async () => {
+  it('leaves one-offs and rule-less events out of the projection', async () => {
+    const db = new FakeFirestore();
+    db.seed(`${EVENTS}/retreat`, eventDoc({ mode: 'oneoff', seriesId: null, recurrence: null }));
+
+    expect(await materialize(db, NEXT_FRIDAY, 'retreat')).toBeNull();
+    expect(eventIds(db)).toEqual(['retreat']);
+  });
+
+  it('skips a document with no usable schedule instead of projecting the epoch', async () => {
     const db = seeded();
     db.seed(`${EVENTS}/corrupt`, { title: 'No dates', mode: 'recurring' });
 
     const warnings: string[] = [];
-    const result = await materializeDueOccurrences(db, FRIDAY, {
-      ...SILENT_LOGGER,
-      warn: (message) => warnings.push(message),
-    });
+    const result = await materializeOccurrence(
+      db,
+      { chain: CHAIN, startAt: NEXT_FRIDAY, uid: UID },
+      FRIDAY,
+      { ...SILENT_LOGGER, warn: (message) => warnings.push(message) },
+    );
 
     expect(warnings).toHaveLength(1);
-    // The healthy chain still ran.
-    expect(result.created).toBe(8);
-    expect(eventIds(db)).not.toContain('1970-01-01');
+    // The healthy chain still resolved.
+    expect(result?.created).toBe(true);
   });
 
   it('reads a legacy "daily" rule as every weekday', async () => {
     const db = seeded({ recurrence: { frequency: 'daily', interval: 1 } });
-    const result = await materializeDueOccurrences(db, FRIDAY, SILENT_LOGGER);
 
-    // Ten a run, the per-chain cap.
-    expect(result.created).toBe(10);
-    expect(eventIds(db)).toContain('friday-fellowship-2026-07-25');
-    expect(eventIds(db)).toContain('friday-fellowship-2026-07-26');
+    // The Saturday after: only a rule meaning every weekday puts one there.
+    expect(await materialize(db, new Date(2026, 6, 25, 19, 0))).toEqual({
+      id: 'friday-fellowship-2026-07-25',
+      created: true,
+    });
   });
 
-  it('writes wall-clock times in the ministry\'s timezone, not the container\'s', async () => {
+  it("writes wall-clock times in the ministry's timezone, not the container's", async () => {
     // The failure this guards: a Cloud Functions container is UTC, and the
     // expander builds dates with the local-time constructor. Without the TZ the
     // entry point sets from MINISTRY_TIME_ZONE, a 19:00 Friday would be written
@@ -237,7 +274,7 @@ describe('materializeDueOccurrences', () => {
       const db = new FakeFirestore();
       db.seed(`${EVENTS}/friday-fellowship-2026-07-24`, eventDoc({ startAt: friday }));
 
-      await materializeDueOccurrences(db, friday, SILENT_LOGGER);
+      await materialize(db, new Date(2026, 6, 31, 19, 0), CHAIN, friday);
 
       // 19:00 Pacific on the Friday, which is 02:00Z the next morning.
       const next = db.get(`${EVENTS}/friday-fellowship-2026-07-31`)?.startAt as Date;
@@ -259,7 +296,7 @@ describe('materializeDueOccurrences', () => {
       const db = new FakeFirestore();
       db.seed(`${EVENTS}/friday-fellowship-2026-10-30`, eventDoc({ startAt: beforeChange }));
 
-      await materializeDueOccurrences(db, beforeChange, SILENT_LOGGER);
+      await materialize(db, new Date(2026, 10, 6, 19, 0), CHAIN, beforeChange);
 
       const after = db.get(`${EVENTS}/friday-fellowship-2026-11-06`)?.startAt as Date;
       expect(after.getHours()).toBe(19);
@@ -275,9 +312,111 @@ describe('materializeDueOccurrences', () => {
     const ancient = new Date(2024, 0, 5, 19, 0);
     db.seed(`${EVENTS}/friday-fellowship-2024-01-05`, eventDoc({ startAt: ancient }));
 
-    const result = await materializeDueOccurrences(db, FRIDAY, SILENT_LOGGER);
+    // The chain is real, but nothing recent enough to project from was read.
+    expect(await materialize(db)).toBeNull();
+  });
+});
 
-    expect(result.events).toBe(0);
-    expect(result.created).toBe(0);
+describe('pruneMaterializedOccurrences', () => {
+  /** A chain with history behind it and the old horizon written out ahead. */
+  function writtenAhead(): FakeFirestore {
+    const db = new FakeFirestore();
+    // Two Fridays already held, then the eight the sweep used to write.
+    for (const day of [10, 17, 24]) {
+      const startAt = new Date(2026, 6, day, 19, 0);
+      db.seed(`${EVENTS}/friday-fellowship-2026-07-${day}`, eventDoc({ startAt }));
+    }
+    for (const [month, day] of [
+      [6, 31],
+      [7, 7],
+      [7, 14],
+      [7, 21],
+      [7, 28],
+      [8, 4],
+      [8, 11],
+      [8, 18],
+    ] as const) {
+      const startAt = new Date(2026, month, day, 19, 0);
+      const id = `friday-fellowship-2026-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      db.seed(`${EVENTS}/${id}`, eventDoc({ startAt }));
+    }
+    return db;
+  }
+
+  it('reports without writing unless told to apply', async () => {
+    const db = writtenAhead();
+    const result = await pruneMaterializedOccurrences(db, FRIDAY, SILENT_LOGGER);
+
+    expect(result.pruned).toHaveLength(8);
+    expect(db.writes).toHaveLength(0);
+    expect(eventIds(db)).toHaveLength(11);
+  });
+
+  it('hands the calendar ahead back to the projection', async () => {
+    const db = writtenAhead();
+    await pruneMaterializedOccurrences(db, FRIDAY, SILENT_LOGGER, { apply: true });
+
+    // Only what actually happened is left standing.
+    expect(eventIds(db)).toEqual([
+      'friday-fellowship-2026-07-10',
+      'friday-fellowship-2026-07-17',
+      'friday-fellowship-2026-07-24',
+    ]);
+  });
+
+  it('keeps a gathering somebody was checked in to', async () => {
+    const db = writtenAhead();
+    db.seed(`${EVENTS}/friday-fellowship-2026-08-07/attendance/student-1`, {
+      studentId: 'student-1',
+    });
+
+    const result = await pruneMaterializedOccurrences(db, FRIDAY, SILENT_LOGGER, { apply: true });
+
+    expect(result.attended).toEqual(['friday-fellowship-2026-08-07']);
+    expect(eventIds(db)).toContain('friday-fellowship-2026-08-07');
+  });
+
+  it('keeps one somebody moved, and one somebody called off', async () => {
+    const db = writtenAhead();
+    // Dragged to the Saturday: its id no longer derives from its own date.
+    db.seed(
+      `${EVENTS}/friday-fellowship-2026-08-07`,
+      eventDoc({ startAt: new Date(2026, 7, 8, 19, 0) }),
+    );
+    db.seed(
+      `${EVENTS}/friday-fellowship-2026-08-14`,
+      eventDoc({ startAt: new Date(2026, 7, 14, 19, 0), status: 'cancelled' }),
+    );
+
+    await pruneMaterializedOccurrences(db, FRIDAY, SILENT_LOGGER, { apply: true });
+
+    expect(eventIds(db)).toContain('friday-fellowship-2026-08-07');
+    expect(eventIds(db)).toContain('friday-fellowship-2026-08-14');
+  });
+
+  it('never strands a chain with nothing to project from', async () => {
+    // A weekly gathering created last week for next Friday: every instance of
+    // it is still ahead, so pruning them all would erase the series.
+    const db = new FakeFirestore();
+    db.seed(`${EVENTS}/friday-fellowship-2026-07-31`, eventDoc({ startAt: NEXT_FRIDAY }));
+
+    const result = await pruneMaterializedOccurrences(db, FRIDAY, SILENT_LOGGER, { apply: true });
+
+    expect(result.pruned).toEqual([]);
+    expect(result.retained).toEqual(['friday-fellowship-2026-07-31']);
+    expect(eventIds(db)).toEqual(['friday-fellowship-2026-07-31']);
+  });
+
+  it('leaves history and one-offs alone', async () => {
+    const db = writtenAhead();
+    db.seed(
+      `${EVENTS}/retreat`,
+      eventDoc({ mode: 'oneoff', seriesId: null, recurrence: null, startAt: NEXT_FRIDAY }),
+    );
+
+    await pruneMaterializedOccurrences(db, FRIDAY, SILENT_LOGGER, { apply: true });
+
+    expect(eventIds(db)).toContain('retreat');
+    expect(eventIds(db)).toContain('friday-fellowship-2026-07-10');
   });
 });

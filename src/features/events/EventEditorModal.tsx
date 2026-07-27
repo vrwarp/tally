@@ -46,12 +46,7 @@ import {
   nextSeriesOccurrence,
   toDateTimeLocalValue,
 } from '@/lib/time';
-import {
-  createEvent,
-  reconcileChainSchedule,
-  updateEvent,
-  type EventDraft,
-} from '@/services/events';
+import { createEvent, ensureMaterialized, updateEvent, type EventDraft } from '@/services/events';
 import type { EventMode, RecurrenceRule, RosterGroupingMode, TallyEvent } from '@/types';
 
 /** House defaults for the check-in window, in minutes around the event. */
@@ -236,7 +231,7 @@ export function EventEditorModal({
   defaults,
   onSaved,
 }: EventEditorModalProps) {
-  const { events, series } = useData();
+  const { series } = useData();
   const { user } = useAuth();
   const { show } = useToast();
 
@@ -370,30 +365,18 @@ export function EventEditorModal({
     setSaving(true);
     try {
       let eventId = event?.id ?? '';
-      let dropped = 0;
 
       if (event) {
-        await updateEvent(event.id, draft, user.uid);
-        // The gatherings after this one were written down under the old
-        // schedule. Saving the rule is only half of changing it.
-        dropped = await reconcileChainSchedule({
-          events,
-          previous: event,
-          draft,
-          uid: user.uid,
-        });
+        // Editing a gathering the rules describe but nothing has been done
+        // about yet: there is no document to update until this returns. The id
+        // does not change, so nothing below has to know which it was.
+        eventId = await ensureMaterialized(event);
+        await updateEvent(eventId, draft, user.uid);
       } else {
         eventId = await createEvent(draft, user.uid);
       }
 
-      show(
-        event
-          ? dropped > 0
-            ? `Event updated · ${dropped} later ${dropped === 1 ? 'gathering' : 'gatherings'} rescheduled`
-            : 'Event updated'
-          : `${draft.title} scheduled`,
-        { tone: 'success' },
-      );
+      show(event ? 'Event updated' : `${draft.title} scheduled`, { tone: 'success' });
       onSaved?.(eventId);
       onClose();
     } catch {
@@ -427,7 +410,7 @@ export function EventEditorModal({
       description={
         isEditing
           ? form.mode === 'recurring'
-            ? 'Changing the schedule rewrites the gatherings after this one.'
+            ? 'The dates ahead follow the schedule; this changes them from here on.'
             : 'Changes apply to this gathering only.'
           : 'Recurring gatherings predict their roster from past instances.'
       }

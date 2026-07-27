@@ -4,16 +4,17 @@
  * Not an error: most of the week there is genuinely nothing to check into. The
  * job here is to say so plainly and put the two useful escapes within one tap —
  * start an upcoming event early, or catch up on one that already happened.
+ *
+ * Both lists come from the projected calendar, so "nothing on" is a statement
+ * about the recurrence rules rather than about what somebody remembered to
+ * write down. There used to be a third block here offering to create a
+ * gathering whose rule said it was happening right now but which nobody had
+ * materialised; a computed calendar cannot be missing one.
  */
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Button, EmptyState } from '@/components/ui';
+import { Link } from 'react-router-dom';
+import { EmptyState } from '@/components/ui';
 import { useAuth } from '@/context/authContext';
-import { useData } from '@/context/dataContext';
-import { useToast } from '@/context/toastContext';
-import { missingOccurrenceNow } from '@/lib/materialize';
 import { formatEventDay, formatEventWindow } from '@/lib/time';
-import { materializeOccurrences } from '@/services/events';
 import type { TallyEvent } from '@/types';
 
 export interface NoActiveEventProps {
@@ -60,65 +61,6 @@ function EventList({
   );
 }
 
-/**
- * The backstop: a gathering whose rule says it is happening right now, that
- * nobody ever wrote down.
- *
- * If the horizon is doing its job this never renders. It exists for the case it
- * cannot cover — the core team stayed out of Tally for two months and the
- * calendar ran dry — and it is an offer rather than a silent write, because
- * *looking* at the check-in screen must not create a gathering. A counselor who
- * opened the app on the wrong evening would otherwise put a Friday on the
- * calendar that never happened.
- */
-function MissingOccurrence({ now }: { now: Date }) {
-  const { events } = useData();
-  const { user, can } = useAuth();
-  const { show } = useToast();
-  const navigate = useNavigate();
-  const [starting, setStarting] = useState(false);
-
-  const draft = missingOccurrenceNow(events, now);
-  if (!draft) return null;
-
-  // Only core may write events, so only core is offered the button. A counselor
-  // is told what is missing and who can fix it, which beats an empty screen
-  // that says nothing is on when something plainly is.
-  const start = async () => {
-    if (!user) return;
-    setStarting(true);
-    try {
-      const created = await materializeOccurrences([draft], user.uid);
-      if (created === 0) throw new Error('not created');
-      show(`${draft.source.title} is on`, { tone: 'success' });
-      navigate(`/event/${draft.id}`);
-    } catch {
-      show('Could not start this gathering. Try again.', { tone: 'error' });
-    } finally {
-      setStarting(false);
-    }
-  };
-
-  return (
-    <section className="mt-6 rounded-xl bg-brand-500/10 p-4 ring-1 ring-brand-500/30">
-      <h2 className="font-semibold text-brand-200">{draft.source.title} is due now</h2>
-      <p className="mt-1 text-xs text-ink-400">
-        {formatEventDay(draft.startAt, now)} · {formatEventWindow(draft)} — it repeats, but this
-        one was never scheduled.
-      </p>
-      {can('core') ? (
-        <Button className="mt-3 w-full" loading={starting} onClick={() => void start()}>
-          Start it now
-        </Button>
-      ) : (
-        <p className="mt-2 text-xs text-ink-500">
-          Ask the core team to schedule it, then pull to refresh.
-        </p>
-      )}
-    </section>
-  );
-}
-
 export function NoActiveEvent({ events, now }: NoActiveEventProps) {
   const { can } = useAuth();
 
@@ -142,8 +84,6 @@ export function NoActiveEvent({ events, now }: NoActiveEventProps) {
             : 'No gatherings are scheduled yet.'
         }
       />
-
-      <MissingOccurrence now={now} />
 
       <EventList title="Coming up" events={upcoming} now={now} />
       <EventList title="Recently" events={recent} now={now} />

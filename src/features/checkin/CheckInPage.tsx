@@ -32,6 +32,8 @@ import { useHeightVar } from '@/hooks/useHeightVar';
 import { invalidateSnapshotCache, useEventSnapshots } from '@/hooks/useEventSnapshots';
 import { haptic } from '@/lib/utils';
 import { checkIn, undoCheckIn } from '@/services/attendance';
+import { isCheckInOpen } from '@/lib/time';
+import { ensureMaterialized } from '@/services/events';
 import { studentFullName, type Grade, type RosterEntry } from '@/types';
 
 /** Long enough to register as confirmation, short enough not to lag the queue. */
@@ -84,6 +86,36 @@ export function CheckInPage() {
   const [focus, setFocus] = useState<RosterFocus>("recent");
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [announcement, setAnnouncement] = useState("");
+
+  /*
+   * The gathering in front of the counselor becomes a document, if it was not
+   * one already.
+   *
+   * The calendar is projected from the recurrence rules, so tonight's Friday
+   * exists as a computed occurrence until somebody does something about it —
+   * and taking attendance is that something. Done when check-in opens rather
+   * than on the first tap, so the round trip happens while a counselor is still
+   * finding the first student instead of underneath them.
+   *
+   * Gated on the window being open, not merely on an event being selected.
+   * Browsing next month's Friday from the picker is not doing anything to it,
+   * and it must not leave a document behind for a night nobody turned up to.
+   * The tap itself is covered separately, in `handlePress`.
+   *
+   * Failure is deliberately silent here. It is retried on the tap, and saying
+   * "could not create the event" to somebody with a queue at the door would be
+   * noise about a thing they did not ask for.
+   */
+  const materializing = useRef<string | null>(null);
+  useEffect(() => {
+    if (!event || event.materialized || !isCheckInOpen(event, now)) return;
+    if (materializing.current === event.id) return;
+
+    materializing.current = event.id;
+    void ensureMaterialized(event).catch(() => {
+      materializing.current = null;
+    });
+  }, [event, now]);
 
   // Published for the roster heading below it, which sticks to the underside of
   // the search box rather than to the top of the window.
@@ -250,6 +282,11 @@ export function CheckInPage() {
           haptic();
           flash(studentId);
           setAnnouncement(`${name} checked in`);
+          // Attendance hangs off the event document, so the gathering has to be
+          // one. Almost always already done by the effect above; this is what
+          // makes it true for a counselor getting a head start on a gathering
+          // whose check-in has not opened yet.
+          await ensureMaterialized(event);
           await checkIn({
             event,
             student: entry.student,

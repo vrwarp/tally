@@ -8,7 +8,6 @@ import {
   onSnapshot,
   orderBy,
   query,
-  runTransaction,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -17,10 +16,10 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { paths } from '@/lib/paths';
-import { chainKey, reconcileChain, type OccurrenceDraft } from '@/lib/materialize';
+import { chainKey } from '@/lib/materialize';
 import { normalizeRecurrence } from '@/lib/recurrence';
-import { fetchAttendanceByEvent } from '@/services/attendance';
 import { toEvent, toEventSeries, toSettings, toSmallGroup } from '@/services/converters';
+import { materializeOccurrence } from '@/services/functions';
 import type {
   AppSettings,
   EventMode,
@@ -176,161 +175,33 @@ export async function updateEvent(
 }
 
 /**
- * The second half of editing a repeating gathering: bringing the ones already
- * written down after it into line with the schedule that was just saved.
+ * Makes sure a gathering has a document behind it, and hands back its id.
  *
- * Without this, changing a weekly gathering to monthly saves one document and
- * leaves the eight Fridays the horizon had already materialised sitting in
- * Upcoming — the calendar showing a schedule nobody chose, and the next top-up
- * happy with it because those Fridays are exactly the documents it checks for.
+ * A no-op for anything that came out of Firestore, which is the overwhelmingly
+ * common case and must not cost a round trip. For a projected gathering — one
+ * the recurrence rules describe that nothing has been done about yet — this is
+ * the moment it becomes real.
  *
- * What is planned here is decided by `reconcileChain`, which is pure and tested.
- * This adds the two things only a service can do: confirming against the server
- * that nobody has been checked in, and writing.
+ * The write is a callable rather than a Firestore write for a reason the
+ * security rules cannot express: check-in belongs to counselors and `events` is
+ * core-team-writable, and rules have no loops, so they cannot check that a date
+ * is genuinely an occurrence of a rule. The server derives the id and every
+ * field from the chain's own template and refuses anything its projection does
+ * not recognise, which is what makes it safe for any active member to ask.
  *
- * Attendance is the one veto. A gathering somebody attended is history, and
- * deleting it would orphan those records — so it is left standing, wrong date
- * and all, exactly as `EventDetailPage` refuses to delete an event with
- * attendance. That mirrors the reason the whole chain is not simply rewritten:
- * an occurrence that already happened is not a prediction to be corrected.
- *
- * Returns how many gatherings were dropped, for the toast. Failures are
- * swallowed per document — an edit that saved should not report itself as
- * failed because one stale Friday could not be removed, and the next edit or
- * top-up will find it again.
+ * The id never changes: it was derived from the chain and the date before the
+ * document existed, so whatever the caller was already showing keeps working
+ * and nothing has to be re-resolved afterwards.
  */
-export async function reconcileChainSchedule(args: {
-  /** Everything loaded, chain-mates included. Filtered by `reconcileChain`. */
-  events: readonly TallyEvent[];
-  /** The edited event as it was stored, for the chain key it had then. */
-  previous: TallyEvent;
-  /** What was just saved for it. */
-  draft: EventDraft;
-  uid: string;
-}): Promise<number> {
-  const { events, previous, draft, uid } = args;
+export async function ensureMaterialized(event: TallyEvent): Promise<string> {
+  if (event.materialized) return event.id;
 
-  const edited = {
-    ...previous,
-    title: draft.title,
-    mode: draft.mode,
-    seriesId: draft.mode === 'recurring' ? (draft.seriesId ?? null) : null,
-    recurrence:
-      draft.mode === 'recurring' && draft.recurrence
-        ? normalizeRecurrence(draft.recurrence, draft.startAt)
-        : null,
-    recurrenceRootId: draft.mode === 'recurring' ? (draft.recurrenceRootId ?? null) : null,
-    startAt: draft.startAt,
-    endAt: draft.endAt,
-    checkInOpensAt: draft.checkInOpensAt,
-    checkInClosesAt: draft.checkInClosesAt,
-    location: draft.location ?? null,
-    notes: draft.notes ?? null,
-    defaultGroupingMode: draft.defaultGroupingMode ?? previous.defaultGroupingMode,
-    status: draft.status ?? previous.status,
-  };
+  const { data } = await materializeOccurrence({
+    chain: chainKey(event),
+    startAt: event.startAt.getTime(),
+  });
 
-  const { superseded, restated } = reconcileChain(events, edited, chainKey(previous));
-  if (superseded.length === 0 && restated.length === 0) return 0;
-
-  const attendance = await fetchAttendanceByEvent(superseded.map((event) => event.id));
-
-  let removed = 0;
-  await Promise.all([
-    ...superseded.map(async (event) => {
-      if ((attendance.get(event.id)?.size ?? 0) > 0) return;
-      try {
-        await deleteDoc(doc(db, paths.event(event.id)));
-        removed += 1;
-      } catch {
-        // Not authorised, or the network dropped the write. Both are states the
-        // next edit fixes.
-      }
-    }),
-    ...restated.map(async (event) => {
-      try {
-        await updateDoc(doc(db, paths.event(event.id)), {
-          recurrence: edited.recurrence,
-          updatedAt: serverTimestamp(),
-          updatedBy: uid,
-        });
-      } catch {
-        // As above.
-      }
-    }),
-  ]);
-
-  return removed;
-}
-
-/**
- * Writes down occurrences the recurrence rules say ought to exist.
- *
- * Two things make this safe to run on any app open.
- *
- * The id is derived from the chain and the date, so two leaders topping the
- * horizon up at the same moment address the same document rather than creating
- * two gatherings for one Friday.
- *
- * And each write is a transaction that gives up if the document already exists.
- * Deterministic ids alone would converge, but a plain `setDoc` would also
- * happily overwrite next Friday's 19:30 start — the one somebody moved on
- * purpose — with the 19:00 the template still says. Existing means finished,
- * whatever state it is in.
- *
- * Returns how many were actually created. A permission error is swallowed per
- * occurrence: a counselor's app calling this is not a failure worth surfacing,
- * it is simply not their job.
- */
-export async function materializeOccurrences(
-  drafts: readonly OccurrenceDraft[],
-  uid: string,
-): Promise<number> {
-  let created = 0;
-
-  for (const draft of drafts) {
-    const { source } = draft;
-    const ref = doc(db, paths.event(draft.id));
-
-    try {
-      const wrote = await runTransaction(db, async (transaction) => {
-        if ((await transaction.get(ref)).exists()) return false;
-
-        transaction.set(
-          ref,
-          buildEventPayload(
-            {
-              title: source.title,
-              mode: 'recurring',
-              seriesId: source.seriesId,
-              recurrence: source.recurrence,
-              // The chain's root, resolved once here so every instance after
-              // the first carries the same one.
-              recurrenceRootId: source.recurrenceRootId ?? source.id,
-              startAt: draft.startAt,
-              endAt: draft.endAt,
-              checkInOpensAt: draft.checkInOpensAt,
-              checkInClosesAt: draft.checkInClosesAt,
-              location: source.location,
-              notes: source.notes,
-              defaultGroupingMode: source.defaultGroupingMode,
-              status: 'scheduled',
-            },
-            uid,
-            true,
-          ),
-        );
-        return true;
-      });
-
-      if (wrote) created += 1;
-    } catch {
-      // Not authorised, or the network dropped the write. Both are states the
-      // next top-up fixes.
-    }
-  }
-
-  return created;
+  return data.id;
 }
 
 export async function setEventStatus(

@@ -17,10 +17,9 @@ import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { logger, setGlobalOptions } from 'firebase-functions/v2';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
-import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { PCO_SECRETS, resolveConfig, type PcoConfig } from './config.js';
 import { asFirestoreLike, PATHS, type FirestoreLike } from './firestore.js';
-import { materializeDueOccurrences, MINISTRY_TIME_ZONE } from './occurrences.js';
+import { materializeOccurrence as materializeOne, MINISTRY_TIME_ZONE } from './occurrences.js';
 import { createPcoClient, PcoApiError, type PcoClient } from './pco/client.js';
 import { describePcoFailure } from './pco/debug.js';
 import { fetchListMemberIds, fetchLists, type PcoListSummary } from './pco/lists.js';
@@ -722,42 +721,61 @@ export const onStudentCreated = onDocumentCreated(
 );
 
 /* -------------------------------------------------------------------------- */
-/* Scheduled                                                                   */
+/* Occurrences                                                                 */
 /* -------------------------------------------------------------------------- */
 
 /**
- * Writes down the gatherings the recurrence rules say are coming.
+ * Brings one projected gathering into existence.
  *
- * Nightly rather than hourly: the horizon is sixty days, so a run that fails or
- * is skipped costs nothing — the next one catches up, and the app tops itself
- * up whenever a leader has it open. This is the floor, not the mechanism.
+ * Tally's calendar is computed from the recurrence rules rather than written
+ * down ahead of time, so next Friday is a projection until somebody does
+ * something about it. This is what they press against: check-in opening the
+ * screen, a leader cancelling or editing it. After this returns, the id the app
+ * was already showing names a real document.
+ *
+ * Any active member may call it, which is the point — check-in is a counselor's
+ * job and `events` is core-team-writable. Safety comes from the request being
+ * unable to say anything that matters: `chain` and `startAt` are a *question*,
+ * and `materializeOne` refuses unless the projection independently agrees that
+ * the occurrence exists. The document's id and every field of it are derived
+ * from events that already passed the security rules.
  *
  * `MINISTRY_TIME_ZONE` is what makes a "19:00 Friday" gathering land at 19:00.
  * The expander builds every date with the local-time `Date` constructor, and a
  * Cloud Functions container is UTC, which either side of a DST change would put
- * a Friday evening on the wrong day. It governs both when this fires and — via
- * `process.env.TZ` below — what the handler's own date arithmetic means.
- *
- * Writing here bypasses the security rules, which are otherwise the only gate
- * on creating an event. That is deliberate and narrow: the payload is derived
- * entirely from documents that already passed those rules, and the ids are
- * derived rather than supplied, so this cannot create a gathering no rule
- * already described.
+ * a Friday evening on the wrong calendar day.
  */
-export const materializeOccurrences = onSchedule(
-  {
-    schedule: 'every day 03:15',
-    timeZone: MINISTRY_TIME_ZONE,
-    retryCount: 1,
-    maxInstances: 1,
-  },
-  async () => {
-    // `timeZone` above schedules the run; this is what makes the dates it
-    // *writes* come out in the same zone. Safe to set globally because a v2
-    // function is its own service — nothing else shares this container.
-    process.env.TZ = MINISTRY_TIME_ZONE;
+export const materializeOccurrence = onCall<
+  { chain: string; startAt: number },
+  Promise<{ id: string; created: boolean }>
+>({ timeoutSeconds: 30, memory: '256MiB' }, async (request) => {
+  await requireMember(request.auth?.uid);
 
-    const result = await materializeDueOccurrences(db(), new Date(), logger);
-    logger.info('Occurrence sweep finished', result);
-  },
-);
+  // Safe to set globally because a v2 function is its own service — nothing
+  // else shares this container.
+  process.env.TZ = MINISTRY_TIME_ZONE;
+
+  const chain = request.data?.chain;
+  const startAt = request.data?.startAt;
+  if (typeof chain !== 'string' || chain.trim().length === 0) {
+    throw new HttpsError('invalid-argument', 'chain is required.');
+  }
+  if (typeof startAt !== 'number' || !Number.isFinite(startAt)) {
+    throw new HttpsError('invalid-argument', 'startAt must be a timestamp in milliseconds.');
+  }
+
+  const result = await materializeOne(
+    db(),
+    { chain, startAt: new Date(startAt), uid: request.auth!.uid },
+    new Date(),
+    logger,
+  );
+
+  // Not an error the caller can fix by retrying: either the rule does not put a
+  // gathering there, or it has since been changed so that it no longer does.
+  if (!result) {
+    throw new HttpsError('not-found', 'That is not a gathering the schedule describes.');
+  }
+
+  return result;
+});

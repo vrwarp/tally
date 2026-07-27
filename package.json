@@ -24,6 +24,7 @@
     "test:all": "npm run test && npm run test:functions && npm run test:rules",
     "functions:build": "npm --prefix functions run build",
     "functions:invokers": "tsx scripts/callable-invokers.ts",
+    "prune:occurrences": "npm --prefix functions run build && node functions/lib/prune.js",
     "functions:install": "npm --prefix functions install",
     "emulators": "firebase emulators:start --project demo-tally --export-on-exit=./.emulator-data",
     "emulators:resume": "firebase emulators:start --project demo-tally --import=./.emulator-data --export-on-exit=./.emulator-data",

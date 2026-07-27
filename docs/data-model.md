@@ -231,7 +231,7 @@ One dated gathering.
 | `title` | string | |
 | `mode` | `'recurring' \| 'oneoff'` | Recurring is speed-first with a predictive roster. One-off does not repeat and never informs prediction, and its roster can be closed to the students who RSVP'd. |
 | `seriesId` | string \| null | Optional link to an `eventSeries` template, on recurring events only. Nothing in the app creates one — a series document comes from the seed — so most recurring events leave this null. |
-| `recurrence` | object \| null | How the event repeats (RFC 5545 subset, anchored on `startAt`). Occurrences are written down ahead of time rather than expanded at read time — see `lib/materialize.ts`. |
+| `recurrence` | object \| null | How the event repeats (RFC 5545 subset, anchored on `startAt`). Occurrences are projected at read time, not written ahead: a document exists only for a gathering somebody acted on — see `lib/materialize.ts` and `lib/eventProjection.ts`. |
 | `recurrenceRootId` | string \| null | The hand-made event a chain of repeats grew from, or null when this event *is* that root. Copied onto every occurrence, so the chain has an identity that outlives any one instance. |
 | `startAt`, `endAt` | Timestamp | For a recurring event these are the *next* occurrence, not the first ever. Instances already held are their own documents and keep the times they ran at. |
 | `checkInOpensAt`, `checkInClosesAt` | Timestamp | The window during which this event is auto-selected as "active". Materialised per event rather than recomputed from the series, so moving one Friday does not need the template edited. |

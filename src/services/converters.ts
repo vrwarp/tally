@@ -224,6 +224,9 @@ export function toEvent(snapshot: DocumentSnapshot<DocumentData>): TallyEvent {
     createdAt: toDate(data.createdAt, fallback),
     updatedAt: toDate(data.updatedAt, fallback),
     createdBy: str(data.createdBy),
+    // It came out of Firestore, so a document is exactly what it is. The other
+    // half of the calendar is built in `lib/eventProjection.ts`.
+    materialized: true,
   };
 }
 

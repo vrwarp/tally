@@ -46,28 +46,16 @@ enabled":
 gcloud services enable \
   cloudbuild.googleapis.com cloudfunctions.googleapis.com artifactregistry.googleapis.com \
   run.googleapis.com eventarc.googleapis.com pubsub.googleapis.com \
-  cloudscheduler.googleapis.com \
   secretmanager.googleapis.com firebaseextensions.googleapis.com --project tally-76406
 ```
 
 `run`, `eventarc` and `pubsub` are there because the functions are 2nd gen: `onCall` runs on Cloud
-Run, and `onDocumentCreated` is delivered through Eventarc. `cloudscheduler` is what runs
-`materializeOccurrences`, the nightly sweep that writes down the gatherings a recurrence rule says
-are coming. `firebaseextensions` is needed even though Tally uses no extensions — the CLI checks
-for them on every deploy.
+Run, and `onDocumentCreated` is delivered through Eventarc. `firebaseextensions` is needed even
+though Tally uses no extensions — the CLI checks for them on every deploy.
 
-Miss `cloudscheduler` and the failure is legible but easy to misread as a code problem, because it
-lands *after* the functions have built and packaged:
-
-```
-⚠  functions: missing required API cloudscheduler.googleapis.com. Enabling now...
-Error: Permissions denied enabling cloudscheduler.googleapis.com.
-```
-
-The CLI tries to enable it and cannot, because a deploy service account is deliberately not allowed
-to turn APIs on. The **dry run on a pull request hits this too** — it is one of the few side effects
-a `--dry-run` has — so a red `Validate (dry run)` with that message means the project is missing an
-API, not that the branch is broken.
+`cloudscheduler` used to be on that list, for a nightly sweep that wrote the coming gatherings down.
+The calendar is projected from the recurrence rules now and nothing is scheduled, so it is no longer
+required. Leaving it enabled on a project that already has it costs nothing.
 
 Or click through the console, starting with
 [Cloud Build](https://console.cloud.google.com/apis/library/cloudbuild.googleapis.com?project=tally-76406).

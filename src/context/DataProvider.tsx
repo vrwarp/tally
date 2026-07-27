@@ -7,6 +7,8 @@ import {
 } from '@/services/events';
 import { subscribeStudents } from '@/services/students';
 import { cachedRoster, fetchRoster, mergeRoster } from '@/services/roster';
+import { useNow } from '@/hooks/useNow';
+import { calendarSignature, projectEvents } from '@/lib/eventProjection';
 import { pcoErrorReport } from '@/lib/pcoErrors';
 import {
   DEFAULT_SETTINGS,
@@ -80,7 +82,7 @@ function rosterErrorReport(cause: unknown): PcoErrorReport {
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const [documents, setDocuments] = useState<Student[]>([]);
-  const [events, setEvents] = useState<TallyEvent[]>([]);
+  const [storedEvents, setStoredEvents] = useState<TallyEvent[]>([]);
   const [series, setSeries] = useState<EventSeries[]>([]);
   const [groups, setGroups] = useState<SmallGroup[]>([]);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
@@ -121,7 +123,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
       subscribeEvents(
         (next) => {
-          setEvents(next);
+          setStoredEvents(next);
           markReady('events');
         },
         { sinceDaysAgo: EVENT_WINDOW_DAYS },
@@ -215,6 +217,34 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [refreshRoster]);
 
   const students = useMemo(() => mergeRoster(roster, documents), [roster, documents]);
+
+  /* ---- The calendar ------------------------------------------------------ */
+
+  /*
+   * Documents plus the gatherings the recurrence rules describe.
+   *
+   * Done once here rather than in each screen so that everything downstream —
+   * Upcoming, the dashboard, temporal awareness, check-in — keeps reading one
+   * list of events and never has to know which half a gathering came from.
+   *
+   * The clock is what makes a projection possible at all: a rule has no end, so
+   * "what is on" is only a question relative to a moment. A minute is finer
+   * than any boundary this decides.
+   */
+  const now = useNow(60_000);
+  const lastCalendar = useRef<{ signature: string; events: TallyEvent[] } | null>(null);
+
+  const events = useMemo(() => {
+    const projected = projectEvents(storedEvents, now);
+
+    // Almost every tick projects exactly the same gatherings, and handing back
+    // a new array anyway re-renders every screen in the app once a minute.
+    const signature = calendarSignature(projected);
+    if (lastCalendar.current?.signature === signature) return lastCalendar.current.events;
+
+    lastCalendar.current = { signature, events: projected };
+    return projected;
+  }, [storedEvents, now]);
 
   const loading = !Object.values(ready).every(Boolean);
 

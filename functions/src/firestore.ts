@@ -29,6 +29,12 @@ export interface DocumentRefLike {
   create(data: Record<string, unknown>): Promise<unknown>;
   set(data: Record<string, unknown>, options?: { merge?: boolean }): Promise<unknown>;
   update(data: Record<string, unknown>): Promise<unknown>;
+  /**
+   * Removes the document. Subcollections are *not* removed with it, which is
+   * why anything deleting an event has to satisfy itself first that no
+   * attendance hangs off it — see `pruneMaterializedOccurrences`.
+   */
+  delete(): Promise<unknown>;
 }
 
 export interface QuerySnapshotLike {
