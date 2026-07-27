@@ -40,7 +40,9 @@
     "walkthrough:capture": "WALKTHROUGH=1 playwright test --project=chromium-desktop e2e/walkthrough.spec.ts && WALKTHROUGH=1 playwright test --project=chromium-mobile e2e/walkthrough.spec.ts",
     "walkthrough:build": "tsx scripts/build-walkthrough.ts",
     "walkthrough": "npm run walkthrough:capture && npm run walkthrough:optimize && npm run walkthrough:build",
-    "walkthrough:optimize": "tsx scripts/optimize-screenshots.ts"
+    "walkthrough:optimize": "tsx scripts/optimize-screenshots.ts",
+    "uxr:capture": "playwright test -c uxr/playwright.config.ts",
+    "uxr:shoot": "tsx uxr/shoot.ts"
   },
   "dependencies": {
     "clsx": "^2.1.1",

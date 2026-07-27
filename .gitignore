@@ -57,3 +57,11 @@ playwright-report/
 test-results/
 blob-report/
 tsconfig.tsbuildinfo
+
+# UXR refinement working files.
+#
+# `uxr/baseline/` and `uxr/prototype/` ARE committed: they are the frozen
+# derivations of the live app the refinement was argued over, and the record of
+# what was decided is worth nothing without them. The renders are not — every
+# round re-shoots every frame from the HTML in a couple of seconds.
+uxr/renders/

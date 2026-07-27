@@ -56,8 +56,11 @@ export default tseslint.config(
      * which trips both the empty-pattern rule and the hooks rule — `use` is a
      * fixture callback, not a React hook.
      */
-    files: ['e2e/**/*.ts', 'playwright.config.ts'],
-    languageOptions: { globals: globals.node },
+    files: ['e2e/**/*.ts', 'playwright.config.ts', 'uxr/**/*.ts'],
+    // `uxr/` is the same shape: Node code that drives a browser, sharing the
+    // e2e fixtures. `snapshot.ts` also runs a block inside the page, so it
+    // needs the browser globals alongside Node's.
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
     rules: {
       'react-hooks/rules-of-hooks': 'off',
       'no-empty-pattern': 'off',
