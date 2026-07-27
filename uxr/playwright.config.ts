@@ -120,7 +120,13 @@ export default defineConfig({
   projects: [
     {
       name: 'phone',
-      use: { ...devices['Desktop Chrome'], ...launchOptions, viewport: VIEWPORTS.phone, isMobile: false, hasTouch: true, deviceScaleFactor: 2 },
+      /*
+       * Touch, not merely narrow. Tally chooses between its two control sizes
+       * on `@media (pointer: fine)` rather than on width, so a phone-sized
+       * window driven by a mouse freezes the *pointer* design into the phone
+       * prototype. `uxr/shoot.ts` renders these files under the same flags.
+       */
+      use: { ...devices['Desktop Chrome'], ...launchOptions, viewport: VIEWPORTS.phone, isMobile: true, hasTouch: true, deviceScaleFactor: 2 },
     },
     {
       name: 'desktop',

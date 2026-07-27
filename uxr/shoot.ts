@@ -29,15 +29,26 @@ const executablePath =
     ? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'
     : undefined);
 
-const VIEWPORTS: Record<string, { width: number; height: number; scale: number }> = {
-  phone: { width: 390, height: 844, scale: 2 },
-  desktop: { width: 1440, height: 900, scale: 1 },
+/*
+ * `touch` is not decoration — it is what decides which design is on screen.
+ *
+ * Tally splits touch from pointer on `@media (pointer: fine)` rather than on
+ * width, deliberately: a tablet in a keyboard case is a wide screen that is
+ * still being touched. A phone-sized window driven by Chromium's default
+ * (mouse) input therefore reports `pointer: fine` and renders every control at
+ * its *desktop* size — so the phone frames would be pictures of the pointer
+ * design, and a loop whose whole purpose is to widen the gap between the two
+ * would converge on a phone nobody had looked at.
+ */
+const VIEWPORTS: Record<string, { width: number; height: number; scale: number; touch: boolean }> = {
+  phone: { width: 390, height: 844, scale: 2, touch: true },
+  desktop: { width: 1440, height: 900, scale: 1, touch: false },
 };
 
 /** Beyond this the "full page" frame is a strip nobody can read; it is capped. */
 const MAX_FULL_HEIGHT = 4200;
 
-function viewportFor(file: string): { width: number; height: number; scale: number } {
+function viewportFor(file: string) {
   const match = /--([a-z]+)\.html$/.exec(basename(file));
   const viewport = match ? VIEWPORTS[match[1]!] : undefined;
   if (!viewport) throw new Error(`Cannot tell the viewport from "${basename(file)}".`);
@@ -45,11 +56,13 @@ function viewportFor(file: string): { width: number; height: number; scale: numb
 }
 
 async function shoot(browser: Browser, file: string, outDir: string): Promise<string[]> {
-  const { width, height, scale } = viewportFor(file);
+  const { width, height, scale, touch } = viewportFor(file);
   const context = await browser.newContext({
     viewport: { width, height },
     deviceScaleFactor: scale,
     colorScheme: 'dark',
+    hasTouch: touch,
+    isMobile: touch,
   });
   const page = await context.newPage();
   await page.goto(pathToFileURL(file).href, { waitUntil: 'load' });
@@ -62,13 +75,22 @@ async function shoot(browser: Browser, file: string, outDir: string): Promise<st
   await page.screenshot({ path: fold });
   written.push(fold);
 
+  /*
+   * The whole page, by growing the window rather than by `fullPage`.
+   *
+   * `fullPage` with a `clip` is refused, and a `clip` on its own is clamped to
+   * the viewport — so the first version of this wrote a "full page" frame that
+   * was a byte-for-byte copy of the fold, and every critique of scroll depth
+   * was made against a picture of the top of the screen. Resizing the window is
+   * also the more honest capture: the sticky bars lay themselves out for the
+   * height they are given, exactly as they would on a taller display.
+   */
   const scrollHeight = await page.evaluate(() => document.documentElement.scrollHeight);
   if (scrollHeight > height * 1.25) {
+    await page.setViewportSize({ width, height: Math.min(scrollHeight, MAX_FULL_HEIGHT) });
+    await page.waitForTimeout(150);
     const full = join(outDir, `${stem}-full.png`);
-    await page.screenshot({
-      path: full,
-      clip: { x: 0, y: 0, width, height: Math.min(scrollHeight, MAX_FULL_HEIGHT) },
-    });
+    await page.screenshot({ path: full });
     written.push(full);
   }
 

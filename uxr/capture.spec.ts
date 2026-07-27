@@ -118,7 +118,18 @@ test('capture the UXR scene suite', async ({ page, signedInAs }) => {
   await signedInAs('core');
 
   await gotoReady(page, '/dashboard');
-  await page.waitForTimeout(1500);
+  /*
+   * Who has a parent on file is a separate question put to Planning Center, and
+   * it lands a beat after the page does. Freezing before it answers photographs
+   * a screen whose "Incomplete" tile reads "—" and whose call lists all say
+   * "Looking up contact details…" — a loading state, critiqued as a design.
+   */
+  await page
+    .getByText(/Looking up contact details/i)
+    .first()
+    .waitFor({ state: 'detached', timeout: 30_000 })
+    .catch(() => {});
+  await page.waitForTimeout(1200);
   await capture(page, 'dashboard');
 
   await gotoReady(page, '/events');

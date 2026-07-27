@@ -24,6 +24,8 @@ import {
 import { RosterErrorBanner } from '@/components/RosterErrorBanner';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
+import { useParentContact } from '@/hooks/useParentContact';
+import { isUnreachable } from '@/features/dashboard/insights';
 import { AddFromPlanningCenterModal } from '@/features/students/AddFromPlanningCenterModal';
 import { StudentEditorModal } from '@/features/students/StudentEditorModal';
 import { cn, createSearchMatcher, initials, ordinalGrade } from '@/lib/utils';
@@ -47,26 +49,33 @@ export function StudentsPage() {
   /** Whoever is already here, so the Planning Center search can say so. */
   const rosterIds = useMemo(() => new Set(students.map((student) => student.id)), [students]);
 
+  /*
+   * Who has nobody to ring is Planning Center's answer, not the roster's, and
+   * this screen asks the same question the insights screen does — through the
+   * same session-held read, so opening one after the other costs nothing.
+   *
+   * It used to filter on `profileComplete === false` alone. That flag is `null`
+   * on every student a roster read did not hydrate, so the chip counted only
+   * Tally's own quick-adds and disagreed with the dashboard tile beside it in
+   * the sidebar: seven there, five here, same three words.
+   */
+  const { reachable } = useParentContact();
+
   const visible = useMemo(() => {
     const matcher = createSearchMatcher(query);
     return students.filter((student) => {
       if (status !== 'all' && student.status !== status) return false;
       if (grade !== null && student.grade !== grade) return false;
-      // `profileComplete` has three states and only `false` is a problem:
-      // `null` means a roster read did not hydrate households, so nobody has
-      // checked. Filtering on truthiness listed the entire ministry.
-      if (quick === 'incomplete' && student.profileComplete !== false) return false;
+      if (quick === 'incomplete' && !isUnreachable(student, reachable)) return false;
       if (quick === 'visitors' && !student.isVisitor) return false;
       if (!matcher.matches(student.searchName)) return false;
       return true;
     });
-  }, [students, status, grade, quick, query]);
+  }, [students, status, grade, quick, query, reachable]);
 
   const incompleteCount = useMemo(
-    () =>
-      students.filter((student) => student.status === 'active' && student.profileComplete === false)
-        .length,
-    [students],
+    () => students.filter((student) => isUnreachable(student, reachable)).length,
+    [students, reachable],
   );
   const visitorCount = useMemo(
     () => students.filter((student) => student.status === 'active' && student.isVisitor).length,
@@ -218,7 +227,11 @@ export function StudentsPage() {
         ) : (
           <ul className="divide-y divide-ink-800">
             {visible.map((student) => (
-              <StudentListRow key={student.id} student={student} />
+              <StudentListRow
+                key={student.id}
+                student={student}
+                unreachable={isUnreachable(student, reachable)}
+              />
             ))}
           </ul>
         )}
@@ -270,7 +283,14 @@ function FilterChip({
 }
 
 /** Memoised so retyping in the search box only re-renders the rows that change. */
-const StudentListRow = memo(function StudentListRow({ student }: { student: Student }) {
+const StudentListRow = memo(function StudentListRow({
+  student,
+  unreachable,
+}: {
+  student: Student;
+  /** Passed in rather than read here, so the row and the chip count agree. */
+  unreachable: boolean;
+}) {
   return (
     <li>
       <Link
@@ -290,7 +310,7 @@ const StudentListRow = memo(function StudentListRow({ student }: { student: Stud
               {studentFullName(student)}
             </span>
             {student.isVisitor ? <Badge tone="brand">Visitor</Badge> : null}
-            {student.profileComplete === false ? <Badge tone="warn">Missing info</Badge> : null}
+            {unreachable ? <Badge tone="warn">Missing info</Badge> : null}
             {student.status === 'inactive' ? <Badge tone="neutral">Inactive</Badge> : null}
           </span>
           <span className="mt-0.5 flex items-center gap-2 text-xs text-ink-500">

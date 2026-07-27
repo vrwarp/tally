@@ -1,0 +1,92 @@
+[
+  {
+    "scene": "choose-event",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "the Catch up rows — the green attendance count against the gathering name",
+    "finding": "In every catch-up row the loudest element is the historical head-count, not the gathering it belongs to. The count is text-xl font-bold in present-400; the event name beside it is a plain base-size semibold in ink-100 — a step smaller and a step further from the reader. Squint at the lower half of the frame and you read '16 24 18 26 21' as a column, and the names only afterwards. Worse, the accent is borrowed: present is the app's word for 'this student is checked in', and here it is spent on a total from a night that is over. The reader picks a row by its name and its date, and both of those are the quiet part.",
+    "evidence": "choose-event--phone-fold.png, the five rows below CATCH UP: green numerals sit a full type step above the titles they annotate, and use the same green as the checked-in rows in roster--phone-fold.png.",
+    "direction": "Invert the emphasis inside the row: the gathering name and its date are the thing being chosen and should be the heaviest ink in the row; the past count is context and belongs at the weight of the date line, in neutral ink rather than present. Reserve present for live check-in state so the token keeps one meaning across the app."
+  },
+  {
+    "scene": "roster",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "the event header block — H1, subtitle, 'Today' badge, 'Change' link and the date select",
+    "finding": "Which gathering you are on is stated four times in the top 200px, in four different visual idioms, and the two controls that change it are dressed as unrelated things. The H1 says Friday Fellowship; the line under it says 'Today · 3:12 PM…'; a chip repeats 'Today'; and a pill select repeats 'Jul 27 · Friday Fellow…' truncated. Next to it 'Change' is a bare blue word with a 44px hit area and no boundary — it reads as body text, while the select next to it reads as the control. Two affordances for one question, plus a badge that restates a word already on screen: the block reads as assembled from three separate ideas rather than composed as one header.",
+    "evidence": "roster--phone-fold.png and roster-search--phone-fold.png, the two rows between the app bar and the search field. 'Today' appears twice, 'Friday Fellow…' twice, and the select is truncated while the H1 above it has room.",
+    "direction": "Decide that the header states the gathering once and offers exactly one way to change it. Let the title line carry identity and time; drop the badge that repeats a word from the line above; and collapse 'Change' and the select into a single control with one visual weight, so the row has a subject and a verb rather than three competing chips."
+  },
+  {
+    "scene": "dashboard",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "the INCOMPLETE stat tile in the four-up grid",
+    "finding": "Three tiles carry tabular numerals and the fourth carries an em dash, so the row of answers has a hole in it. A dash where its neighbours have digits reads as 'not measured', which is the one thing it is not: the Incomplete profiles section further down the same page carries a count pill of 5. The tile that exists to answer 'who has nobody we can reach' is the tile that appears to have failed to load, and it contradicts the page under it.",
+    "evidence": "dashboard--phone-full.png: tile reads INCOMPLETE / — / no parent contact, while the 'Incomplete profiles' section header on the same page reads 'Incomplete profiles 5'.",
+    "direction": "The tile should show the same figure as the section it summarises, set in the same tabular numeral as its three neighbours, and take the same semantic tint the other alarming tile takes when the number is non-zero. Keep the dash only for a genuinely unavailable measure — and if a real zero can occur, a zero is a number and should be printed as one."
+  },
+  {
+    "scene": "students",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "the page header — 'Students / 45 students' against the two action buttons",
+    "finding": "The loudest object on a page whose job is finding one student among forty-five is a brand-filled 'Add from Planning Center' button — a bulk import someone does twice a year. It is wide enough to claim the entire first line, which wraps 'New visitor' onto a second line, so the header is a two-row staircase of buttons beside a two-line title, and the search field — the actual instrument of the page — starts 300 device px down. Hierarchy is exactly inverted: the rare administrative action wears the accent, the constant action wears a form label.",
+    "evidence": "students--phone-fold.png: the brand fill occupies the top-right quadrant, 'New visitor' is orphaned on its own line below it, and 'Search' does not appear until roughly a third of the way down the fold.",
+    "direction": "Only one thing in this header should carry the brand fill and it should be the one a leader does weekly. Demote the import to the quiet weight the secondary button has now, or move it out of the header entirely; and let the header be one line so the search field rises into the first screen."
+  },
+  {
+    "scene": "events",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "the 'Quick add' card and its two rows",
+    "finding": "The card is titled 'Quick add' and subtitled 'Next occurrence of each series', but its rows are dressed as completed items: a green tick on the left, and a label that says 'Friday Fellowship is scheduled' set in ink-300 rather than the ink-50/ink-100 every other list row in the app uses for its primary label. A tick plus a past-tense statement plus dimmed ink is the universal costume for 'done, nothing to do here'. So the one card on the page that is offering an action reads as a receipt for an action already taken, and the reader's eye skips it on the way to the real content.",
+    "evidence": "events--phone-fold.png: both rows inside Quick add show '✓ … is scheduled' in dimmed text, visually identical to a completed checklist, sitting under a header that promises an add.",
+    "direction": "Pick one story for this card and dress it consistently. If these are still actions, the label should be the thing you would create and the row should carry the ink and the affordance of a live control; if they are confirmations of something already scheduled, the card should not be called Quick add. Either way the dimmed ink is doing damage — a row you are meant to tap should not sit two steps back from the reader."
+  },
+  {
+    "scene": "roster",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "the floating '+' button where it lands over the Noah Fitzgerald row",
+    "finding": "The add-a-visitor button floats with no relationship to anything on the page and comes to rest directly on top of a row's check circle, with no gutter, no scrim and no shadow to separate the planes. Because the circle it covers is exactly the affordance the whole screen is built around, the row underneath reads as a partially drawn or unavailable one, and the composition acquires a collision at its busiest point — the right-hand column where every row's state lives.",
+    "evidence": "roster--phone-fold.png: the blue disc spans roughly x 318–373, y 708–763 CSS px, covering the ring on the Noah Fitzgerald row; the same collision recurs on the Aisha Rahman row in roster-search--phone-fold.png.",
+    "direction": "The floating control needs to belong to the page's structure rather than hover in the middle of it — give the list enough trailing space that the button never sits over a row's state column, and give the button a visible separation from the plane below so the two never read as one broken row."
+  },
+  {
+    "scene": "events",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the uppercase section headings (TODAY, NEXT SEVEN DAYS, CATCH UP, RECENT) against the cards beneath them",
+    "finding": "Every section heading carries a small horizontal inset that its cards do not, so no heading shares a left edge with the block it labels — the text starts about 4–5 CSS px inboard of the card edge below it. It is too small to read as a deliberate offset and too consistent to read as an accident; the effect is a page where nothing quite lines up and the eye finds no spine. On choose-event the heading sits at x 20 while the card edge sits at x 15.",
+    "evidence": "choose-event--phone-fold.png ('On today' and 'CATCH UP' both inset from the card edges) and events--phone-fold.png ('TODAY' and 'NEXT SEVEN DAYS' likewise); the markup gives the headings a px-1 the cards do not have.",
+    "direction": "Put the headings on the same left edge as the cards they introduce so a single vertical line runs the length of every page. If a heading is meant to sit outside the card gutter, make the offset large enough to read as a choice rather than a rounding error."
+  },
+  {
+    "scene": "roster",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the secondary line in each roster row — the allergy badge and the 'x of 3' ratio",
+    "finding": "The attendance ratio is set in tabular numerals, which says someone wanted it to line up, and then its column moves: on rows with an allergy badge the badge is laid out first and pushes '3 of 3' about 75 CSS px to the right. Scanning the list, the one number you compare between students never appears twice in the same place, so the tabular setting buys nothing. The badge also drops the loudest colour in the row into the quietest line, so an amber chip is heavier than the student's own name.",
+    "evidence": "roster--phone-fold.png: '3 of 3' begins at the same x on Maya, Chloe, Ruby and Marcus, then jumps right on the Layla Farouk and Noah Fitzgerald rows where the Allergy chip precedes it.",
+    "direction": "Give the ratio a fixed position in the row — either always first on the meta line with badges trailing it, or in its own column — so it forms a readable vertical run. And let the allergy flag be legible without out-shouting the name; a warning in the third-rank line should not be the heaviest mark in the row."
+  },
+  {
+    "scene": "choose-event",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the 'Check-in open' badge and the 'Check-in is open' caption beside it",
+    "finding": "The same sentence is printed twice, side by side, once loud and once quiet. A ringed green chip saying 'Check-in open' sits immediately left of grey text saying 'Check-in is open'. Neither adds anything to the other, and the pair makes the reader stop and check whether they are two different facts. It also puts a third piece of present-green into a card that already carries a brand-filled primary button, so the status line competes with the action beneath it for no return.",
+    "evidence": "choose-event--phone-fold.png and events--phone-fold.png, the row directly above 'Start check-in' / 'Open this gathering'.",
+    "direction": "Say it once. Either the chip carries the status and the caption goes, or the caption carries it and the chip goes — and whichever survives should sit at a weight that lets the primary button remain the loudest thing in the card."
+  },
+  {
+    "scene": "dashboard",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the Missing in action rows and the filter chip row above the stat tiles",
+    "finding": "Two things keep the top of this page from settling. The filter chips wrap to two lines and orphan 'Friday Fellowship' alone on the second, so the fold opens on a ragged block of controls that is taller than any of the numbers it filters. And each MIA row has three different left edges: the name and its meta line align, then 'Looking up contact details…' starts further right again, a third indent inside a row only four lines tall. In the same rows 'Last seen Jun 21, 1…' truncates mid-value while the line directly beneath it uses barely half its width — the fact is cut off in a place where there was room.",
+    "evidence": "dashboard--phone-fold.png: the chip group runs two rows before the tiles begin; on the Leila Haddad and Trevor Boyd rows the third line is indented past the two above it and both 'Last seen' dates end in an ellipsis mid-time.",
+    "direction": "Let the chip row stay on one line so the fold opens on the numbers rather than the filters. Inside a row, hold every line to one left edge unless the indent means something. And rebalance what the meta lines carry so a date is never truncated while the line under it is half empty — grade, last-seen and which gathering are three facts competing for one line's worth of width."
+  }
+]

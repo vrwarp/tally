@@ -65,3 +65,13 @@ tsconfig.tsbuildinfo
 # what was decided is worth nothing without them. The renders are not — every
 # round re-shoots every frame from the HTML in a couple of seconds.
 uxr/renders/
+
+# `npm run typecheck` is `tsc -b --noEmit false`, so it writes a .js beside
+# every .ts it checks. They are build output, not source — and there is no
+# hand-written JavaScript under any of these trees, so the pattern is safe.
+/src/**/*.js
+/tests/**/*.js
+/scripts/**/*.js
+/firestore-tests/**/*.js
+/e2e/**/*.js
+/uxr/**/*.js

@@ -17,6 +17,7 @@ import {
   computeSummary,
   computeUnseen,
   groupByGathering,
+  isUnreachable,
   orderSnapshotsNewestFirst,
   recurringSnapshots,
   seenAt,
@@ -1073,6 +1074,33 @@ describe('computeIncompleteProfiles', () => {
     );
 
     expect(incomplete.map((s) => s.id)).toEqual(['tally-1', 'pco_1']);
+  });
+
+  /*
+   * The students directory offers this same count as a filter chip, and used to
+   * compute it itself from `profileComplete === false` — which is `null` for
+   * every roster student — so the two screens showed different numbers under
+   * the same three words, one click apart in the same sidebar. They share the
+   * predicate now; this is the test that keeps them sharing it.
+   */
+  it('is the predicate the students directory filters on', () => {
+    const rosterUnreachable = makeStudent({ id: 'pco_1', profileComplete: null });
+    const rosterReachable = makeStudent({ id: 'pco_2', profileComplete: null });
+    const visitor = makeStudent({ id: 'tally-1', profileComplete: false, isVisitor: true });
+    const inactive = makeStudent({ id: 'pco_3', profileComplete: false, status: 'inactive' });
+    const roster = [rosterUnreachable, rosterReachable, visitor, inactive];
+    const reachable = new Map([
+      ['pco_1', false],
+      ['pco_2', true],
+    ]);
+
+    // Sorted on both sides: the list orders visitors first for the screen that
+    // works it, and the chip only ever asks who is in the set.
+    const filtered = roster.filter((student) => isUnreachable(student, reachable)).map((s) => s.id);
+    const listed = computeIncompleteProfiles(roster, reachable).map((s) => s.id);
+
+    expect(filtered.toSorted()).toEqual(listed.toSorted());
+    expect(filtered).toHaveLength(2);
   });
 });
 
