@@ -200,7 +200,29 @@ export function PlanningCenterCard() {
                 <dt className="text-xs font-medium uppercase tracking-wide text-ink-500">
                   Write-back
                 </dt>
-                <dd className="text-ink-300">{WRITE_BACK_LABEL[status.settings.writeBack]}</dd>
+                <dd className="text-ink-300">
+                  {WRITE_BACK_LABEL[status.settings.writeBack]}
+                  {/*
+                   * Sits under the mode rather than under Roster so the two are
+                   * read together: a queue and an "off" beside each other say
+                   * plainly that nothing is draining it.
+                   */}
+                  {status.queued > 0 ? (
+                    <span
+                      className={
+                        status.settings.writeBack === 'off'
+                          ? 'block text-warn-400'
+                          : 'block text-ink-500'
+                      }
+                    >
+                      {status.queued} {status.queued === 1 ? 'student has' : 'students have'} no
+                      Planning Center person yet
+                      {status.settings.writeBack === 'off'
+                        ? ' — and none will be created while write-back is off.'
+                        : '. The scheduled sync creates them.'}
+                    </span>
+                  ) : null}
+                </dd>
               </div>
               <div>
                 <dt className="text-xs font-medium uppercase tracking-wide text-ink-500">
