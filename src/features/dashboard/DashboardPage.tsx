@@ -34,6 +34,7 @@ import {
 import { useData } from '@/context/dataContext';
 import { useEventSnapshots } from '@/hooks/useEventSnapshots';
 import { useNow } from '@/hooks/useNow';
+import { useParentContact } from '@/hooks/useParentContact';
 import { AttendanceTrend } from '@/features/dashboard/AttendanceTrend';
 import { IncompleteProfileList } from '@/features/dashboard/IncompleteProfileList';
 import { MiaList } from '@/features/dashboard/MiaList';
@@ -181,7 +182,17 @@ export function DashboardPage() {
     [visitorRows, activeGathering],
   );
 
-  const incomplete = useMemo(() => computeIncompleteProfiles(students), [students]);
+  /*
+   * Who has a parent on file is Planning Center's answer, not the roster's: a
+   * roster read reports `profileComplete: null` for everybody, because
+   * hydrating households is not work a counselor should wait through at a door.
+   * Asked here, by the one screen that lists the students nobody can reach.
+   */
+  const parentContact = useParentContact();
+  const incomplete = useMemo(
+    () => computeIncompleteProfiles(students, parentContact.reachable),
+    [students, parentContact.reachable],
+  );
 
   /*
    * Head counts always come from one gathering, even under "All".
@@ -223,6 +234,14 @@ export function DashboardPage() {
    * enough to call it loaded and publish a call list missing everybody else.
    */
   const awaitingRoster = rosterLoading;
+  /*
+   * The same rule, for the same reason, about the other read this screen makes:
+   * who has a parent contact is a separate question put to Planning Center, and
+   * until it answers the only unreachable students Tally can name are its own
+   * quick-adds. A tile that says "5" and becomes "12" a second later has already
+   * been read and believed.
+   */
+  const awaitingContacts = parentContact.loading && !parentContact.loaded;
   const awaiting = awaitingHistory || awaitingRoster;
   /** The dash a tile shows rather than a zero it would have to take back. */
   const pending = (value: number) => (awaitingRoster ? '—' : value);
@@ -305,9 +324,11 @@ export function DashboardPage() {
         />
         <StatTile
           label="Incomplete"
-          value={pending(summary.incompleteCount)}
+          value={awaitingContacts ? '—' : pending(summary.incompleteCount)}
           hint="no parent contact"
-          tone={!awaitingRoster && summary.incompleteCount > 0 ? 'warn' : 'neutral'}
+          tone={
+            !awaitingRoster && !awaitingContacts && summary.incompleteCount > 0 ? 'warn' : 'neutral'
+          }
         />
       </div>
 
@@ -348,7 +369,14 @@ export function DashboardPage() {
       {/* Independent of attendance history, so it renders even while snapshots
           are in flight or the ministry has not run an event yet — but not
           before the roster it is a statement about has arrived. */}
-      {awaitingRoster ? null : <IncompleteProfileList students={incomplete} now={now} />}
+      {awaitingRoster ? null : (
+        <IncompleteProfileList
+          students={incomplete}
+          now={now}
+          checking={awaitingContacts}
+          error={parentContact.error}
+        />
+      )}
 
       {/* Outside the tabs on purpose: a one-off belongs to no chain of repeats,
           so it neither filters by one nor answers the questions they do. */}

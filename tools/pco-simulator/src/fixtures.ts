@@ -367,6 +367,12 @@ export const FIXTURE_IDS = {
   oliverFifthGrader: '4200016',
   ruthInactive: '4200017',
   dexterGrandparent: '4200018',
+  /** In a household of his own, with no adult in it — nobody to ring. */
+  marcusNoAdultAtHome: '4200014',
+  /** His household's only adult has an email and no phone. */
+  tobiasEmailOnlyParent: '4200010',
+  /** Hers has a phone and no email. */
+  leilaPhoneOnlyParent: '4200011',
   twoAdultHousehold: 'H1',
   adminDana: '9100001',
   managerMiriam: '9100002',

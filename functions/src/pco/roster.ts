@@ -23,6 +23,7 @@ import {
   addToIncludedIndex,
   buildIncludedIndex,
   extractParentContact,
+  hasContactDetails,
   mapPersonToStudent,
   pcoGrade,
   type IncludedIndex,
@@ -148,6 +149,15 @@ export interface RosterHydration {
    * to say so — these are students somebody added on purpose.
    */
   unresolved: string[];
+  /**
+   * Which households each of them belongs to, keyed by Planning Center person
+   * id. Free — a roster read already side-loads `households` — and deliberately
+   * kept out of `RosterPerson`, because a counselor at a door has no use for it
+   * and this is the module that decides what leaves the server.
+   *
+   * `fetchParentContactStatus` is the one thing that reads it.
+   */
+  households: Record<string, string[]>;
 }
 
 /**
@@ -171,7 +181,7 @@ async function hydratePeople(
   now: Date,
 ): Promise<RosterHydration> {
   const wanted = new Set(personIds);
-  if (wanted.size === 0) return { people: [], unresolved: [] };
+  if (wanted.size === 0) return { people: [], unresolved: [], households: {} };
 
   const found = new Map<string, PcoPerson>();
 
@@ -208,7 +218,9 @@ async function hydratePeople(
   unresolved.push(...stragglers.slice(MAX_INDIVIDUAL_LOOKUPS));
 
   const people: RosterPerson[] = [];
+  const households: Record<string, string[]> = {};
   for (const person of found.values()) {
+    households[person.id] = householdIdsOf(person);
     const mapped = mapPersonToStudent(person, {
       minGrade: config.minGrade,
       maxGrade: config.maxGrade,
@@ -232,7 +244,7 @@ async function hydratePeople(
   }
 
   people.sort((a, b) => (a.searchName < b.searchName ? -1 : a.searchName > b.searchName ? 1 : 0));
-  return { people, unresolved };
+  return { people, unresolved, households };
 }
 
 export interface RosterOptions {
@@ -256,8 +268,29 @@ export interface RosterOptions {
 export async function fetchRoster(
   options: RosterOptions & { personIds: readonly string[] },
 ): Promise<RosterResult> {
-  const { client, config, cache } = options;
+  const { cache } = options;
   const now = options.now ?? new Date();
+
+  const before = cache.stats.misses;
+  const hydrated = await hydratedRoster(options, now);
+
+  return {
+    people: hydrated.people,
+    unresolved: hydrated.unresolved,
+    cached: cache.stats.misses === before,
+    fetchedAt: now.toISOString(),
+  };
+}
+
+/**
+ * The cached hydration behind both the roster and the parent-contact status, so
+ * asking the second question a moment after the first costs nothing.
+ */
+function hydratedRoster(
+  options: RosterOptions & { personIds: readonly string[] },
+  now: Date,
+): Promise<RosterHydration> {
+  const { client, config, cache } = options;
 
   const ids = [...new Set(options.personIds)].sort();
   const key = cacheKey({
@@ -268,11 +301,109 @@ export async function fetchRoster(
     ids,
   });
 
+  return cache.get(key, () => hydratePeople(client, config, ids, now), options.force);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Who can be reached                                                          */
+/* -------------------------------------------------------------------------- */
+
+export interface ParentContactStatus {
+  /**
+   * Tally student id -> whether Planning Center holds a way to reach an adult
+   * in that student's household. A student the roster could not resolve is
+   * absent rather than `false`: "we could not look" is not "nobody is there".
+   */
+  reachable: Record<string, boolean>;
+  /** Roster entries whose Planning Center person could not be read. */
+  unresolved: string[];
+  cached: boolean;
+  fetchedAt: string;
+}
+
+/**
+ * Which households hold an adult somebody could actually ring, keyed household
+ * id -> the ids of the adults in it who have a phone number or an email.
+ *
+ * One sweep of `where[child]=false`, which is the same shape — and the same
+ * cost — as the roster's own sweep of the church's children. The alternative is
+ * a request per household, which is what `fetchPersonDetails` does for one
+ * student and what nothing may do for four hundred.
+ *
+ * The ids are kept rather than a bare boolean because a household is shared:
+ * a 12th grader flagged as an adult upstream, with their own mobile on file,
+ * must not count as their own parent contact.
+ *
+ * One known gap, and it is the forgiving direction: an adult Planning Center
+ * has flagged as a child — a household whose `parent_guardian` is recorded that
+ * way — is missed here, though the per-student detail read still finds them
+ * through their household role. A rare upstream oddity costs a name on this
+ * list, not a name missing from it.
+ */
+async function sweepReachableAdults(client: PcoClient): Promise<Map<string, string[]>> {
+  const byHousehold = new Map<string, string[]>();
+
+  for await (const page of client.paginate<PcoPerson>('/people', {
+    include: [...ROSTER_INCLUDES],
+    order: 'last_name',
+    where: { child: false },
+  })) {
+    // Per page: the emails and phone numbers side-loaded with it belong to the
+    // people on it, and holding the whole church's contact records in one index
+    // would be the mirror this module exists to avoid.
+    const index = buildIncludedIndex(page.included);
+
+    for (const person of page.data) {
+      if (!hasContactDetails(person, index)) continue;
+      for (const householdId of householdIdsOf(person)) {
+        const existing = byHousehold.get(householdId);
+        if (existing) existing.push(person.id);
+        else byHousehold.set(householdId, [person.id]);
+      }
+    }
+  }
+
+  return byHousehold;
+}
+
+/**
+ * Whether each student on the roster has anybody Tally could ring — a boolean
+ * each, and nothing else.
+ *
+ * This is the dashboard's "incomplete profiles" list, and it exists as its own
+ * read for two reasons. It must not be on the path a counselor waits for at a
+ * door: `fetchRoster` deliberately reports `profileComplete: null`, because
+ * hydrating households there would put a second sweep in front of the first
+ * name appearing. And it must not hand back contact details to answer a
+ * question about their *absence* — the whole list is students nobody can reach,
+ * so there is nothing to send.
+ */
+export async function fetchParentContactStatus(
+  options: RosterOptions & { personIds: readonly string[] },
+): Promise<ParentContactStatus> {
+  const { client, config, cache } = options;
+  const now = options.now ?? new Date();
+
   const before = cache.stats.misses;
-  const hydrated = await cache.get(key, () => hydratePeople(client, config, ids, now), options.force);
+
+  const hydrated = await hydratedRoster(options, now);
+  // Keyed by base URL alone: the answer is about the church's adults, not about
+  // whoever happens to be on Tally's roster this minute.
+  const adults = await cache.get(
+    cacheKey({ kind: 'reachable-adults', base: config.baseUrl }),
+    () => sweepReachableAdults(client),
+    options.force,
+  );
+
+  const reachable: Record<string, boolean> = {};
+  for (const [personId, householdIds] of Object.entries(hydrated.households)) {
+    reachable[pcoStudentId(personId)] = householdIds.some((householdId) =>
+      (adults.get(householdId) ?? []).some((adultId) => adultId !== personId),
+    );
+  }
 
   return {
-    people: hydrated.people,
+    reachable,
     unresolved: hydrated.unresolved,
     cached: cache.stats.misses === before,
     fetchedAt: now.toISOString(),

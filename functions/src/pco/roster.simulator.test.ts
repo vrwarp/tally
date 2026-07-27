@@ -25,6 +25,7 @@ import type { PcoConfig } from '../config.js';
 import { createTtlCache, type TtlCache } from './cache.js';
 import { createPcoClient, type PcoClient } from './client.js';
 import {
+  fetchParentContactStatus,
   fetchPersonDetails,
   fetchRoster,
   pcoStudentId,
@@ -382,6 +383,122 @@ describe('searchPeople', () => {
 
     expect(results).toEqual([]);
     expect(world.requests).toHaveLength(0);
+  });
+});
+
+/*
+ * The dashboard's "incomplete profiles" list, which for a ministry whose roster
+ * comes from Planning Center was empty for as long as it took anybody to notice
+ * — the roster reports `profileComplete: null` for everyone, and a list that
+ * only accepts `false` finds nothing in a page full of nulls. Meanwhile the
+ * follow-up rows above it, which read one student at a time, were saying
+ * "Planning Center has no parent contact for this student" out loud.
+ */
+describe('fetchParentContactStatus', () => {
+  const ROSTER = [
+    FIXTURE_IDS.amara,
+    FIXTURE_IDS.marcusNoAdultAtHome,
+    FIXTURE_IDS.ivyNoGrade,
+    FIXTURE_IDS.tobiasEmailOnlyParent,
+    FIXTURE_IDS.leilaPhoneOnlyParent,
+    FIXTURE_IDS.dexterGrandparent,
+  ];
+
+  it('names the students nobody can be reached about', async () => {
+    const world = harness();
+    const { reachable } = await fetchParentContactStatus({
+      ...world,
+      config: baseConfig(),
+      personIds: ROSTER,
+    });
+
+    // A household with no adult in it, and a student in no household at all.
+    expect(reachable[pcoStudentId(FIXTURE_IDS.marcusNoAdultAtHome)]).toBe(false);
+    expect(reachable[pcoStudentId(FIXTURE_IDS.ivyNoGrade)]).toBe(false);
+  });
+
+  it('counts a parent with only an email, and one with only a phone', async () => {
+    // Either is enough to follow up on, which is what `computeProfileComplete`
+    // has always said and what this must not quietly disagree with.
+    const world = harness();
+    const { reachable } = await fetchParentContactStatus({
+      ...world,
+      config: baseConfig(),
+      personIds: ROSTER,
+    });
+
+    expect(reachable[pcoStudentId(FIXTURE_IDS.tobiasEmailOnlyParent)]).toBe(true);
+    expect(reachable[pcoStudentId(FIXTURE_IDS.leilaPhoneOnlyParent)]).toBe(true);
+    // The grandparent Dexter lives with counts too: an adult in the household
+    // with a phone number is somebody to call.
+    expect(reachable[pcoStudentId(FIXTURE_IDS.dexterGrandparent)]).toBe(true);
+  });
+
+  it('agrees with the detail read, one student at a time', async () => {
+    /*
+     * The two answers are produced completely differently — a sweep of the
+     * church's adults here, a household-by-household read there — and a leader
+     * sees them side by side on the same screen. If they can disagree, one of
+     * them is lying to somebody working a call list.
+     */
+    const world = harness();
+    const { reachable } = await fetchParentContactStatus({
+      ...world,
+      config: baseConfig(),
+      personIds: ROSTER,
+    });
+
+    for (const personId of ROSTER) {
+      const details = await fetchPersonDetails({ ...world, config: baseConfig(), personId });
+      const hasContact = Boolean(details?.parentPhone ?? details?.parentEmail);
+      expect(reachable[pcoStudentId(personId)], `disagreed about ${personId}`).toBe(hasContact);
+    }
+  });
+
+  it('says nothing at all about a student Planning Center could not resolve', async () => {
+    // Absent from the map, not `false`. "We could not look" is not "nobody is
+    // there", and putting a deleted-upstream student on a call list as
+    // unreachable sends somebody to fix the wrong thing.
+    const world = harness();
+    const { reachable, unresolved } = await fetchParentContactStatus({
+      ...world,
+      config: baseConfig(),
+      personIds: [FIXTURE_IDS.amara, '4209999'],
+    });
+
+    expect(unresolved).toEqual(['4209999']);
+    expect(reachable).not.toHaveProperty(pcoStudentId('4209999'));
+  });
+
+  it('carries no contact details, only the fact that there are some', async () => {
+    const world = harness();
+    const status = await fetchParentContactStatus({
+      ...world,
+      config: baseConfig(),
+      personIds: ROSTER,
+    });
+
+    // The whole list is students with nobody to ring, so there is nothing to
+    // send — and the students who *do* have a parent must not have that
+    // parent's phone number shipped to a browser to prove it.
+    expect(JSON.stringify(status)).not.toMatch(/555|@example\.org/);
+  });
+
+  it('reuses the roster read it shares with the check-in screen', async () => {
+    const world = harness();
+    const config = baseConfig();
+
+    await fetchRoster({ ...world, config, personIds: ROSTER });
+    const afterRoster = world.requests.length;
+    await fetchParentContactStatus({ ...world, config, personIds: ROSTER });
+    const afterStatus = world.requests.length;
+
+    // The adult sweep is new work; asking who is on the roster again is not.
+    expect(afterStatus).toBeGreaterThan(afterRoster);
+
+    const second = await fetchParentContactStatus({ ...world, config, personIds: ROSTER });
+    expect(second.cached).toBe(true);
+    expect(world.requests.length).toBe(afterStatus);
   });
 });
 

@@ -481,11 +481,40 @@ export function computeNewVisitors(
 
 /**
  * Profiles still missing a parent contact (Journey 3's handoff).
- * Quick-added visitors surface first, since they are the reason the list exists.
+ *
+ * Two sources, because there are two kinds of unreachable student and only one
+ * of them is a Tally record:
+ *
+ *  - A quick-added visitor is a name and a grade in Firestore, and carries
+ *    `profileComplete: false` by construction. They are the reason this list
+ *    exists.
+ *  - A student the church has on file with nobody to ring is a fact about
+ *    Planning Center, and the roster does not know it: `profileComplete` is
+ *    `null` on every roster row because a roster read does not hydrate
+ *    households. `reachable` is the answer to that, asked separately by the
+ *    screen that shows this list (`useParentContact`).
+ *
+ * Without the second source this list was empty in every ministry that runs its
+ * roster off Planning Center — while the follow-up rows above it said, in so
+ * many words, "Planning Center has no parent contact for this student".
+ *
+ * A student in neither source is one nobody has an answer for — a roster entry
+ * that could not be read, or a read that has not landed yet — and is left off.
+ * "We did not look" must not be rendered as "nobody can reach them".
+ *
+ * Quick-added visitors surface first, since they are the freshest to-do.
  */
-export function computeIncompleteProfiles(students: readonly Student[]): Student[] {
+export function computeIncompleteProfiles(
+  students: readonly Student[],
+  reachable: ReadonlyMap<string, boolean> = new Map(),
+): Student[] {
   return students
-    .filter((student) => student.status === 'active' && student.profileComplete === false)
+    .filter((student) => {
+      if (student.status !== 'active') return false;
+      // Tally's own answer wins where it has one: a visitor who exists nowhere
+      // else cannot be looked up, and `null` on a roster row means unasked.
+      return (student.profileComplete ?? reachable.get(student.id) ?? null) === false;
+    })
     .sort(
       (a, b) =>
         Number(b.isVisitor) - Number(a.isVisitor) ||

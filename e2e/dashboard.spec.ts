@@ -34,6 +34,22 @@ test.describe('dashboard', () => {
     const mia = await page.getByRole('heading', { name: /missing in action/i }).first().innerText();
     expect(Number(/(\d+)/.exec(mia)?.[1] ?? 0)).toBeGreaterThan(0);
     await expect(page.locator('a[href^="/students/"]').first()).toBeVisible();
+
+    /*
+     * The same demand of the incomplete-profiles list, and it is not a formality:
+     * this section was empty for every ministry whose roster comes from Planning
+     * Center. A roster read reports `profileComplete: null` for everybody — it
+     * does not hydrate households — so a list that only accepted `false` found
+     * nothing, while the follow-up rows above it said "Planning Center has no
+     * parent contact for this student" in as many words. The seed puts students
+     * with no reachable parent upstream for exactly this assertion.
+     */
+    const incomplete = page.getByRole('heading', { name: /incomplete profiles/i }).first();
+    await expect
+      .poll(async () => Number(/(\d+)/.exec(await incomplete.innerText())?.[1] ?? 0), {
+        timeout: 20_000,
+      })
+      .toBeGreaterThan(0);
   });
 
   test('every follow-up row leads somewhere actionable', async ({ page, signedInAs }) => {

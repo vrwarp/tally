@@ -24,11 +24,13 @@ import { createPcoClient, PcoApiError, type PcoClient } from './pco/client.js';
 import { describePcoFailure } from './pco/debug.js';
 import { fetchListMemberIds, fetchLists, type PcoListSummary } from './pco/lists.js';
 import {
+  fetchParentContactStatus,
   fetchPersonDetails,
   fetchRoster,
   pcoStudentId,
   personIdFromStudentId,
   searchPeople,
+  type ParentContactStatus,
   type PersonDetails,
   type PersonSearchResult,
   type RosterPerson,
@@ -344,6 +346,43 @@ export const getPersonDetails = onCall<{ pcoPersonId: string }, Promise<PersonDe
       });
     } catch (error) {
       return reportPcoFailure(error, 'load this student');
+    }
+  },
+);
+
+/**
+ * Which students on the roster nobody can be reached about.
+ *
+ * A boolean each, and deliberately nothing else: this answers a question about
+ * the *absence* of contact details, so sending any would be paying the whole
+ * privacy cost of `getPersonDetails` for a screen that only counts.
+ *
+ * Core team only, and separate from `getRoster` on purpose — see
+ * `fetchParentContactStatus`. The roster is what a door volunteer waits for;
+ * this is a Tuesday-morning question asked from the insights screen.
+ */
+export const getParentContactStatus = onCall<
+  { force?: boolean } | undefined,
+  Promise<ParentContactStatus>
+>(
+  { secrets: PCO_SECRETS, timeoutSeconds: 120, memory: '512MiB' },
+  async (request): Promise<ParentContactStatus> => {
+    await requireCoreTeam(request.auth?.uid);
+
+    const config = await resolveConfig(db());
+    const client = clientFor(config);
+    if (!client) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
+
+    try {
+      return await fetchParentContactStatus({
+        client,
+        config,
+        cache: sharedCache(config),
+        personIds: (await scanRoster(db())).personIds,
+        force: request.data?.force === true,
+      });
+    } catch (error) {
+      return reportPcoFailure(error, 'check which students have a parent contact');
     }
   },
 );
