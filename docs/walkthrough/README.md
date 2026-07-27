@@ -17,7 +17,7 @@ npm run walkthrough                   # capture, then build the page
 
 ### Sign in
 
-The only screen a signed-out volunteer sees. An email link is the primary path — counselors are handed a phone at the door and never set a password. Google is secondary, and hides itself in browsers that cannot do OAuth.
+The only screen a signed-out volunteer sees, and the only way in. A leader adds somebody by their Google address; signing in with that address is the whole of it, because authorisation is keyed on an address and one door is easier to watch than two. Nobody sets a password they would have to remember at a door.
 
 ![Sign in](web/desktop-01-sign-in.jpg)
 
@@ -27,7 +27,7 @@ The only screen a signed-out volunteer sees. An email link is the primary path �
 
 ### The predictive roster
 
-Tally picked tonight’s event from the clock; nobody chose it. The “Recent” block is the predictive roster: students who came to at least 2 of the last 3 Fridays, most consistent first. Friday history predicts Friday — Sunday’s regulars are not in this list.
+Tally picked tonight’s event from the clock; nobody chose it. The screen opens on “Recent”, the predictive filter: students who came to at least 2 of the last 3 Fridays. Friday history predicts Friday — Sunday’s regulars are not in this list — and “Show all” is right underneath it.
 
 ![The predictive roster](web/desktop-02-the-predictive-roster.jpg)
 
@@ -35,19 +35,19 @@ Tally picked tonight’s event from the clock; nobody chose it. The “Recent”
 
 ### One tap checks a student in
 
-Maya Adebayo moved to “Checked in” at the bottom, and the header count went up. The row flashed green and buzzed before the write left the device — the authoritative state then arrives back through Firestore, so a second counselor at the same door sees it too.
+Maya Adebayo turned green exactly where they stood, and the header count went up. Nothing moves on a tap: with two counselors working one queue, a list that re-sorts on every write slides the next name out from under a thumb. The row flashed and buzzed before the write left the device — the authoritative state then arrives back through Firestore, so the second phone sees it too.
 
 ![One tap checks a student in](web/desktop-03-one-tap-checks-a-student-in.jpg)
 
 <img src="web/phone-03-one-tap-checks-a-student-in.jpg" width="260" alt="One tap checks a student in on a phone">
 
-### Search for anyone not in the Recent block
+### Search for anyone the prediction missed
 
-Two letters, filtered instantly against the in-memory roster. The header counts deliberately do not move: they describe the event, not the query, so nobody watches the number drop as they type and thinks they broke something.
+Two letters, filtered instantly against the in-memory roster. A search reaches the whole ministry — the Recent filter stands itself down while a query is running, so typing a visitor’s name can never report that nobody by that name exists. The header counts deliberately do not move: they describe the event, not the query.
 
-![Search for anyone not in the Recent block](web/desktop-04-search-for-anyone-not-in-the-recent-block.jpg)
+![Search for anyone the prediction missed](web/desktop-04-search-for-anyone-the-prediction-missed.jpg)
 
-<img src="web/phone-04-search-for-anyone-not-in-the-recent-block.jpg" width="260" alt="Search for anyone not in the Recent block on a phone">
+<img src="web/phone-04-search-for-anyone-the-prediction-missed.jpg" width="260" alt="Search for anyone the prediction missed on a phone">
 
 ## Journey 3 — bring a friend
 
@@ -103,13 +103,21 @@ Recurring gatherings and one-offs together. “Schedule next Friday Fellowship�
 
 <img src="web/phone-10-the-event-calendar.jpg" width="260" alt="The event calendar on a phone">
 
-### RSVPs, waivers and payments
+### A gathering with a face
 
-A one-off event is about accountability rather than speed. The numbers a leader is actually chasing the week before a retreat — waivers outstanding, payments outstanding — are the prominent ones.
+An event carries a description and an icon. The icon is searchable by what the thing is rather than by what Google called it — “campfire” finds it — and the glyphs are bundled with the app rather than fetched from a font CDN, because Tally’s home is a hallway with one bar of signal and a missing icon is a missing icon on exactly the night it mattered. The description is the sentence the check-in screen leads with; the “Notes” field on the right stays what one leader leaves for another.
 
-![RSVPs, waivers and payments](web/desktop-11-rsvps-waivers-and-payments.jpg)
+![A gathering with a face](web/desktop-11-a-gathering-with-a-face.jpg)
 
-<img src="web/phone-11-rsvps-waivers-and-payments.jpg" width="260" alt="RSVPs, waivers and payments on a phone">
+<img src="web/phone-11-a-gathering-with-a-face.jpg" width="260" alt="A gathering with a face on a phone">
+
+### The RSVP list
+
+A one-off event carries its own guest list, and with “RSVP only” set that list is the check-in roster: going, maybe and declined, with declined students kept on the page but off the roster.
+
+![The RSVP list](web/desktop-12-the-rsvp-list.jpg)
+
+<img src="web/phone-12-the-rsvp-list.jpg" width="260" alt="The RSVP list on a phone">
 
 ## The roster
 
@@ -117,9 +125,9 @@ A one-off event is about accountability rather than speed. The numbers a leader 
 
 The whole ministry, filterable by grade and status. Each row says whether the record came from Planning Center or was created in Tally, so it is obvious which fields are safe to edit here.
 
-![Students](web/desktop-12-students.jpg)
+![Students](web/desktop-13-students.jpg)
 
-<img src="web/phone-12-students.jpg" width="260" alt="Students on a phone">
+<img src="web/phone-13-students.jpg" width="260" alt="Students on a phone">
 
 ## Settings
 
@@ -127,9 +135,9 @@ The whole ministry, filterable by grade and status. Each row says whether the re
 
 The prediction window is the one genuinely dangerous control here — it silently reshapes what every counselor sees at the door — so each number is restated as the behaviour it causes, and the panel beside it counts the students the change would actually move. Nobody should have to reason about “2 of 3” at 6:55pm.
 
-![Thresholds, in plain language](web/desktop-13-thresholds-in-plain-language.jpg)
+![Thresholds, in plain language](web/desktop-14-thresholds-in-plain-language.jpg)
 
-<img src="web/phone-13-thresholds-in-plain-language.jpg" width="260" alt="Thresholds, in plain language on a phone">
+<img src="web/phone-14-thresholds-in-plain-language.jpg" width="260" alt="Thresholds, in plain language on a phone">
 
 ## Planning Center
 
@@ -137,9 +145,9 @@ The prediction window is the one genuinely dangerous control here — it silentl
 
 Tally reads its people from Planning Center and keeps no copy of them. “Refresh” is a live read: browser → callable → Cloud Function → the Planning Center API → back. Between reads a short cache (30 seconds by default, 0 to turn it off) keeps a busy door from becoming a rate limit.
 
-![Connected, and holding nothing](web/desktop-14-connected-and-holding-nothing.jpg)
+![Connected, and holding nothing](web/desktop-15-connected-and-holding-nothing.jpg)
 
-<img src="web/phone-14-connected-and-holding-nothing.jpg" width="260" alt="Connected, and holding nothing on a phone">
+<img src="web/phone-15-connected-and-holding-nothing.jpg" width="260" alt="Connected, and holding nothing on a phone">
 
 ## Settings
 
@@ -147,9 +155,9 @@ Tally reads its people from Planning Center and keeps no copy of them. “Refres
 
 Dark is the default because Tally’s home is a dim room on a Friday night, but a Sunday morning classroom is not that room. Light, dark, or follow the device — the choice is per-person and local, unlike the thresholds above it, which are ministry-wide the instant they save.
 
-![The same screen, in daylight](web/desktop-15-the-same-screen-in-daylight.jpg)
+![The same screen, in daylight](web/desktop-16-the-same-screen-in-daylight.jpg)
 
-<img src="web/phone-15-the-same-screen-in-daylight.jpg" width="260" alt="The same screen, in daylight on a phone">
+<img src="web/phone-16-the-same-screen-in-daylight.jpg" width="260" alt="The same screen, in daylight on a phone">
 
 ## The roster
 
@@ -157,14 +165,40 @@ Dark is the default because Tally’s home is a dim room on a Friday night, but 
 
 These names are not in Tally’s database. They arrived from Planning Center on this page load, merged with the handful of things Planning Center has no opinion about — a note, when somebody first turned up.
 
-![A roster nobody stores](web/desktop-16-a-roster-nobody-stores.jpg)
+![A roster nobody stores](web/desktop-17-a-roster-nobody-stores.jpg)
 
-<img src="web/phone-16-a-roster-nobody-stores.jpg" width="260" alt="A roster nobody stores on a phone">
+<img src="web/phone-17-a-roster-nobody-stores.jpg" width="260" alt="A roster nobody stores on a phone">
 
 ### Who do I call, and only when asked
 
 A parent’s number, fetched for one student at the moment somebody needs it — resolved through her household, since Planning Center keeps contact on the parent’s record rather than the child’s. Firestore holds none of it: no parent name, no phone, no email, no allergies. For a database full of minors, the safest copy is the one that was never made.
 
-![Who do I call, and only when asked](web/desktop-17-who-do-i-call-and-only-when-asked.jpg)
+![Who do I call, and only when asked](web/desktop-18-who-do-i-call-and-only-when-asked.jpg)
 
-<img src="web/phone-17-who-do-i-call-and-only-when-asked.jpg" width="260" alt="Who do I call, and only when asked on a phone">
+<img src="web/phone-18-who-do-i-call-and-only-when-asked.jpg" width="260" alt="Who do I call, and only when asked on a phone">
+
+## Journey 6 — the other six days
+
+### Today, in full
+
+Most of the week there is nothing to check into, and saying only that wastes the screen. Today is the hero: whatever is on, with its icon and its description, and a line that answers the actual question — check-in opens at seven, or it is open now, or it finished and twenty-two people came. A gathering that ended this afternoon stays up here rather than dropping into the history, because the boundary is midnight and a counselor catching up at teatime is still thinking about “today”.
+
+![Today, in full](web/desktop-19-today-in-full.jpg)
+
+<img src="web/phone-19-today-in-full.jpg" width="260" alt="Today, in full on a phone">
+
+### The week ahead, then everything held
+
+The next seven days as rows — a glance, not a decision. Under it the whole history, newest first, cut into months and paging further back as you scroll. Each row carries the one fact that makes a past gathering recognisable: how many students were checked in. Somebody down here is looking for the Friday they missed, and “22” is how they find it.
+
+![The week ahead, then everything held](web/desktop-20-the-week-ahead-then-everything-held.jpg)
+
+<img src="web/phone-20-the-week-ahead-then-everything-held.jpg" width="260" alt="The week ahead, then everything held on a phone">
+
+### Scrolling into the ministry’s past
+
+The pages come straight out of Firestore, a dozen gatherings at a time, cursored rather than counted — the calendar the rest of the app holds in memory is a bounded window, and its far edge is exactly the boundary somebody looking for last March is trying to cross. The head counts come from the same cache the predictive roster fills, so scrolling back over a fortnight the roster already read costs nothing.
+
+![Scrolling into the ministry’s past](web/desktop-21-scrolling-into-the-ministry-s-past.jpg)
+
+<img src="web/phone-21-scrolling-into-the-ministry-s-past.jpg" width="260" alt="Scrolling into the ministry’s past on a phone">

@@ -70,7 +70,7 @@ test('capture the walkthrough', async ({ page, signedInAs }) => {
     journey: 'Getting in',
     title: 'Sign in',
     caption:
-      'The only screen a signed-out volunteer sees. An email link is the primary path — counselors are handed a phone at the door and never set a password. Google is secondary, and hides itself in browsers that cannot do OAuth.',
+      'The only screen a signed-out volunteer sees, and the only way in. A leader adds somebody by their Google address; signing in with that address is the whole of it, because authorisation is keyed on an address and one door is easier to watch than two. Nobody sets a password they would have to remember at a door.',
   });
 
   await signedInAs('counselor');
@@ -181,6 +181,20 @@ test('capture the walkthrough', async ({ page, signedInAs }) => {
       'Recurring gatherings and one-offs together. “Schedule next Friday Fellowship” is two taps, because somebody has to do it every single week.',
   });
 
+  await page.getByRole('button', { name: 'New event' }).click();
+  await page.waitForTimeout(500);
+  await page.getByRole('dialog').getByRole('button', { name: /^Icon/ }).click();
+  await page.getByPlaceholder(/search icons/i).fill('camp');
+  await page.waitForTimeout(400);
+  await capture(page, {
+    journey: 'Journey 4 — the field trip',
+    title: 'A gathering with a face',
+    caption:
+      'An event carries a description and an icon. The icon is searchable by what the thing is rather than by what Google called it — “campfire” finds it — and the glyphs are bundled with the app rather than fetched from a font CDN, because Tally’s home is a hallway with one bar of signal and a missing icon is a missing icon on exactly the night it mattered. The description is the sentence the check-in screen leads with; the “Notes” field on the right stays what one leader leaves for another.',
+  });
+  await page.getByRole('button', { name: /^Cancel$/ }).click();
+  await page.waitForTimeout(400);
+
   const retreat = page.getByRole('link', { name: /winter retreat/i }).first();
   if (await retreat.count()) {
     await retreat.click();
@@ -253,6 +267,58 @@ test('capture the walkthrough', async ({ page, signedInAs }) => {
     title: 'Who do I call, and only when asked',
     caption:
       'A parent’s number, fetched for one student at the moment somebody needs it — resolved through her household, since Planning Center keeps contact on the parent’s record rather than the child’s. Firestore holds none of it: no parent name, no phone, no email, no allergies. For a database full of minors, the safest copy is the one that was never made.',
+  });
+
+  /* ---- Journey 6: the other six days ------------------------------------ */
+
+  /*
+   * Last, and deliberately so: this is the one section that has to lie to the
+   * browser about the time.
+   *
+   * The seed guarantees something is live, because the first screen anybody
+   * opens should be the one Tally exists for. That is the opposite of the
+   * screen below, which is what a counselor meets on the other six days — so
+   * the clock is pushed past tonight's window rather than the data being bent.
+   * Everything on screen is still the real seeded ministry.
+   */
+  const afterTonight = new Date(Date.now() + 5 * 60 * 60 * 1000);
+  await page.clock.install({ time: afterTonight });
+  await gotoReady(page, '/');
+  await page.clock.setSystemTime(afterTonight);
+
+  await page
+    .getByRole('region', { name: /past gatherings/i })
+    .waitFor({ timeout: 30_000 })
+    .catch(() => {
+      throw new Error(
+        'The history never loaded. Do not publish a walkthrough claiming a screen that did not paint.',
+      );
+    });
+  await page.waitForTimeout(1500);
+
+  await capture(page, {
+    journey: 'Journey 6 — the other six days',
+    title: 'Today, in full',
+    caption:
+      'Most of the week there is nothing to check into, and saying only that wastes the screen. Today is the hero: whatever is on, with its icon and its description, and a line that answers the actual question — check-in opens at seven, or it is open now, or it finished and twenty-two people came. A gathering that ended this afternoon stays up here rather than dropping into the history, because the boundary is midnight and a counselor catching up at teatime is still thinking about “today”.',
+  });
+
+  await page.mouse.wheel(0, 500);
+  await page.waitForTimeout(600);
+  await capture(page, {
+    journey: 'Journey 6 — the other six days',
+    title: 'The week ahead, then everything held',
+    caption:
+      'The next seven days as rows — a glance, not a decision. Under it the whole history, newest first, cut into months and paging further back as you scroll. Each row carries the one fact that makes a past gathering recognisable: how many students were checked in. Somebody down here is looking for the Friday they missed, and “22” is how they find it.',
+  });
+
+  await page.mouse.wheel(0, 1400);
+  await page.waitForTimeout(1500);
+  await capture(page, {
+    journey: 'Journey 6 — the other six days',
+    title: 'Scrolling into the ministry’s past',
+    caption:
+      'The pages come straight out of Firestore, a dozen gatherings at a time, cursored rather than counted — the calendar the rest of the app holds in memory is a bounded window, and its far edge is exactly the boundary somebody looking for last March is trying to cross. The head counts come from the same cache the predictive roster fills, so scrolling back over a fortnight the roster already read costs nothing.',
   });
 
   await writeFile(
