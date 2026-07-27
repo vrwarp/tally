@@ -131,6 +131,8 @@ export function studentDoc(overrides: Partial<StudentDoc> = {}): StudentDoc {
 export function eventDoc(overrides: Partial<TallyEventDoc> = {}): TallyEventDoc {
   return {
     title: 'Friday Fellowship',
+    description: null,
+    icon: null,
     mode: 'recurring',
     seriesId: ID.series,
     recurrence: {

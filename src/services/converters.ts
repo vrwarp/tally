@@ -8,6 +8,7 @@
  * of crashing or showing "Invalid Date".
  */
 import { Timestamp, type DocumentData, type DocumentSnapshot } from 'firebase/firestore';
+import { findEventIcon } from '@/lib/eventIcons';
 import {
   EVERY_WEEKDAY,
   fromDateOnlyValue,
@@ -199,6 +200,11 @@ export function toEvent(snapshot: DocumentSnapshot<DocumentData>): TallyEvent {
   return {
     id: snapshot.id,
     title: str(data.title, 'Untitled event'),
+    description: strOrNull(data.description),
+    // Checked against the bundled catalogue rather than trusted: a name that is
+    // no longer shipped, or one that was never a Material symbol, would leave
+    // an empty tile in a list of full ones.
+    icon: findEventIcon(strOrNull(data.icon))?.name ?? null,
     mode,
     seriesId: strOrNull(data.seriesId),
     // A one-off does not repeat by definition, so a stray rule on one is

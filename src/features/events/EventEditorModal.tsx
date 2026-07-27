@@ -37,6 +37,7 @@ import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { CheckInWindowField } from '@/features/events/CheckInWindowField';
+import { IconPickerField } from '@/features/events/IconPickerField';
 import { RecurrenceField } from '@/features/events/RecurrenceField';
 import { defaultRecurrence, retimeRecurrence, validateRecurrence } from '@/lib/recurrence';
 import { cn } from '@/lib/utils';
@@ -55,6 +56,10 @@ const CLOSES_AFTER_MIN = 60;
 
 interface EditorForm {
   title: string;
+  /** The invitation — what this gathering is. Shown on the check-in hero. */
+  description: string;
+  /** A Material Symbols name from `lib/eventIcons`, or `''` for none. */
+  icon: string;
   mode: EventMode;
   seriesId: string;
   /**
@@ -125,6 +130,8 @@ function buildForm(
 
   return {
     title: event?.title ?? defaults?.title ?? '',
+    description: event?.description ?? defaults?.description ?? '',
+    icon: event?.icon ?? defaults?.icon ?? '',
     mode,
     seriesId: event?.seriesId ?? defaults?.seriesId ?? '',
     recurrence,
@@ -343,6 +350,8 @@ export function EventEditorModal({
 
     const draft: EventDraft = {
       title: form.title.trim(),
+      description: form.description.trim() || null,
+      icon: form.icon || null,
       mode: form.mode,
       seriesId: form.mode === 'recurring' ? form.seriesId || null : null,
       recurrence: form.mode === 'recurring' ? form.recurrence : null,
@@ -446,6 +455,29 @@ export function EventEditorModal({
             autoCapitalize="words"
             autoComplete="off"
             required
+          />
+
+          {/*
+            * The two fields that decide how this gathering reads on the screen
+            * a counselor opens first, kept next to the title they belong with.
+            *
+            * Both optional, and deliberately not defaulted to something clever:
+            * an icon guessed from the word "retreat" is right often enough to
+            * be trusted and wrong often enough to be embarrassing.
+            */}
+          <IconPickerField
+            value={form.icon || null}
+            onChange={(icon) => patch({ icon: icon ?? '' })}
+            hint="Shown wherever this gathering is listed."
+          />
+
+          <TextAreaField
+            label="Description"
+            value={form.description}
+            onChange={(changed) => patch({ description: changed.target.value })}
+            placeholder="Games, a talk and pizza. Bring a friend."
+            rows={2}
+            hint="A sentence for the people turning up. Shown on the check-in screen when this is today’s gathering."
           />
 
           <SelectField
@@ -553,11 +585,15 @@ export function EventEditorModal({
             autoComplete="off"
           />
 
+          {/* Notes are for the other leaders; the description above is for the
+              people turning up. Saying so is cheaper than watching the two
+              fields slowly become copies of each other. */}
           <TextAreaField
             label="Notes"
             value={form.notes}
             onChange={(changed) => patch({ notes: changed.target.value })}
-            placeholder="Bring a jacket, meet at the church car park…"
+            placeholder="Meet at the church car park at 5:45…"
+            hint="For the core team. Only shown on the event page."
           />
         </Section>
       </form>

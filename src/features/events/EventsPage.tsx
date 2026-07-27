@@ -1,28 +1,48 @@
 /**
- * The event calendar.
+ * The event calendar, read from where the leader is standing.
  *
- * Someone has to create next Friday every single week, so that path is the one
- * this screen optimises: a quick action per active series materialises the next
- * occurrence and hands it straight to the editor, which makes scheduling two
- * taps instead of a form. Everything else — browsing, un-cancelling, opening an
- * event — is a list.
+ * Four bands, and they are shaped differently because they answer different
+ * questions rather than because variety is nice.
+ *
+ *  - **Today** is the hero. If something is on, it is almost certainly what the
+ *    screen was opened for, so it gets its icon, its description and a card the
+ *    size of a decision.
+ *  - **Next seven days** is a glance: rows, one line of detail each. This is
+ *    the horizon a Friday is planned to.
+ *  - **Later** is everything else the recurrence rules put on the calendar
+ *    before the horizon. It is not one of the three bands the redesign asked
+ *    for, and it is here anyway, because without it a retreat four weeks out
+ *    would simply be missing from the events screen.
+ *  - **Past gatherings** is a search. It pages into the ministry's whole
+ *    history and carries a head count per row — see `PastGatherings`.
+ *
+ * Someone has to create next Friday every single week, so that path keeps its
+ * shortcut: a quick action per active series materialises the next occurrence
+ * and hands it straight to the editor, which makes scheduling two taps instead
+ * of a form.
  *
  * RSVP counts deliberately do not appear on a row. They live in a subcollection
- * that this screen does not subscribe to, and a plausible-looking wrong number
- * is worse than no number when it is what a leader is chasing.
+ * this screen does not subscribe to, and a plausible-looking wrong number is
+ * worse than no number when it is what a leader is chasing.
  */
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Badge, Button, Card, CardHeader, EmptyState, SkeletonRows } from '@/components/ui';
+import { Badge, Button, Card, CardHeader, EmptyState, EventIcon, SkeletonRows } from '@/components/ui';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { EventEditorModal } from '@/features/events/EventEditorModal';
+import { EventHeroCard } from '@/features/events/EventHeroCard';
+import { PastGatherings } from '@/features/events/PastGatherings';
+import { useEventSnapshots } from '@/hooks/useEventSnapshots';
 import { useNow } from '@/hooks/useNow';
 import { formatEventDay, formatEventWindow, nextSeriesOccurrence, startOfDay } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import { setEventStatus, type EventDraft } from '@/services/events';
 import type { EventSeries, TallyEvent } from '@/types';
+
+/** How far "this week" reaches. Seven days is the horizon a Friday plans to. */
+const WEEK_DAYS = 7;
 
 interface EditorTarget {
   event: TallyEvent | null;
@@ -32,6 +52,10 @@ interface EditorTarget {
 function sameDay(a: Date, b: Date): boolean {
   return startOfDay(a).getTime() === startOfDay(b).getTime();
 }
+
+/* -------------------------------------------------------------------------- */
+/* Rows                                                                        */
+/* -------------------------------------------------------------------------- */
 
 function EventRow({
   event,
@@ -53,8 +77,10 @@ function EventRow({
     <li className="flex min-w-0 items-stretch gap-2">
       <Link
         to={`/events/${event.id}`}
-        className="flex min-h-16 min-w-0 flex-1 items-center gap-3 rounded-xl bg-ink-900 px-4 py-3 ring-1 ring-ink-800 active:bg-ink-800"
+        className="flex min-h-16 min-w-0 flex-1 items-center gap-3 rounded-xl bg-ink-900 px-3 py-3 ring-1 ring-ink-800 active:bg-ink-800"
       >
+        <EventIcon name={event.icon} size="md" />
+
         <span className="min-w-0 flex-1">
           <span
             className={cn(
@@ -100,6 +126,91 @@ function EventRow({
     </li>
   );
 }
+
+function RowSection({
+  title,
+  events,
+  now,
+  onUncancel,
+  uncancelling,
+}: {
+  title: string;
+  events: readonly TallyEvent[];
+  now: Date;
+  onUncancel: (event: TallyEvent) => void;
+  uncancelling: string | null;
+}) {
+  if (events.length === 0) return null;
+
+  return (
+    <section aria-labelledby={`events-${title.replace(/\s+/g, '-').toLowerCase()}`}>
+      <h2
+        id={`events-${title.replace(/\s+/g, '-').toLowerCase()}`}
+        className="px-1 pb-2 text-xs font-bold uppercase tracking-wider text-ink-400"
+      >
+        {title}
+      </h2>
+      <ul className="flex flex-col gap-2">
+        {events.map((event) => (
+          <EventRow
+            key={event.id}
+            event={event}
+            now={now}
+            onUncancel={onUncancel}
+            uncancelling={uncancelling === event.id}
+          />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Today                                                                       */
+/* -------------------------------------------------------------------------- */
+
+function Today({ events, now }: { events: readonly TallyEvent[]; now: Date }) {
+  // Head counts, but only for the gatherings that have finished. See the note
+  // on `present` in `EventHeroCard`.
+  const finished = useMemo(
+    () => events.filter((event) => event.checkInClosesAt < now),
+    [events, now],
+  );
+  const { snapshots } = useEventSnapshots(finished);
+  const present = useMemo(
+    () => new Map(snapshots.map((s) => [s.event.id, s.presentStudentIds.size])),
+    [snapshots],
+  );
+
+  if (events.length === 0) return null;
+
+  return (
+    <section aria-labelledby="events-today">
+      <h2
+        id="events-today"
+        className="px-1 pb-2 text-xs font-bold uppercase tracking-wider text-ink-400"
+      >
+        Today
+      </h2>
+      <div className="flex flex-col gap-3">
+        {events.map((event) => (
+          <EventHeroCard
+            key={event.id}
+            event={event}
+            now={now}
+            present={present.get(event.id)}
+            to={`/events/${event.id}`}
+            cta="Open this gathering"
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Quick actions                                                               */
+/* -------------------------------------------------------------------------- */
 
 function QuickAction({
   series,
@@ -157,6 +268,8 @@ function QuickAction({
   );
 }
 
+/* -------------------------------------------------------------------------- */
+
 export function EventsPage() {
   const { events, series, loading } = useData();
   const { user } = useAuth();
@@ -166,14 +279,30 @@ export function EventsPage() {
   const [editor, setEditor] = useState<EditorTarget | null>(null);
   const [uncancelling, setUncancelling] = useState<string | null>(null);
 
-  const { upcoming, past } = useMemo(() => {
-    // "Past" starts when the gathering is over, not when it starts — an event
-    // in progress belongs at the top of Upcoming where someone can still open it.
-    const ahead = events.filter((event) => event.endAt >= now);
-    const behind = events.filter((event) => event.endAt < now);
+  const { dayStart, today, thisWeek, later } = useMemo(() => {
+    /*
+     * The day boundary, not the current instant.
+     *
+     * A gathering that finished at four this afternoon is still today's, and a
+     * leader looking at it at six should find it at the top of the screen
+     * rather than in the history. `PastGatherings` reads back from the same
+     * boundary, so nothing appears twice and nothing falls between them.
+     */
+    const dayStart = startOfDay(now);
+    const dayEnd = new Date(dayStart.getTime() + 86_400_000);
+    const weekEnd = new Date(dayStart.getTime() + WEEK_DAYS * 86_400_000);
+
+    const byStart = (a: TallyEvent, b: TallyEvent) => a.startAt.getTime() - b.startAt.getTime();
+    const between = (from: Date, to: Date | null) =>
+      events
+        .filter((event) => event.startAt >= from && (to === null || event.startAt < to))
+        .sort(byStart);
+
     return {
-      upcoming: [...ahead].sort((a, b) => a.startAt.getTime() - b.startAt.getTime()),
-      past: [...behind].sort((a, b) => b.startAt.getTime() - a.startAt.getTime()),
+      dayStart,
+      today: between(dayStart, dayEnd),
+      thisWeek: between(dayEnd, weekEnd),
+      later: between(weekEnd, null),
     };
   }, [events, now]);
 
@@ -234,14 +363,17 @@ export function EventsPage() {
 
   if (loading && events.length === 0) {
     return (
-      <div className="mx-auto max-w-lg px-4 py-4">
+      <div className="mx-auto max-w-3xl px-4 py-4">
         <SkeletonRows count={4} />
       </div>
     );
   }
 
+  const onUncancel = (target: TallyEvent) => void handleUncancel(target);
+  const nothingAhead = today.length === 0 && thisWeek.length === 0 && later.length === 0;
+
   return (
-    <div className="mx-auto flex max-w-lg flex-col gap-4 px-4 py-4">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-4 pb-8">
       <header className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-bold text-ink-50">Events</h1>
         <Button onClick={() => setEditor({ event: null })}>New event</Button>
@@ -264,51 +396,32 @@ export function EventsPage() {
         </Card>
       ) : null}
 
-      <Card>
-        <CardHeader title="Upcoming" count={upcoming.length} />
-        {upcoming.length === 0 ? (
-          <EmptyState
-            icon="🗓"
-            title="Nothing scheduled yet"
-            description="Use a quick action above, or create a one-off for a retreat or outing."
-          />
-        ) : (
-          <ul className="flex flex-col gap-2 p-3">
-            {upcoming.map((event) => (
-              <EventRow
-                key={event.id}
-                event={event}
-                now={now}
-                onUncancel={(target) => void handleUncancel(target)}
-                uncancelling={uncancelling === event.id}
-              />
-            ))}
-          </ul>
-        )}
-      </Card>
+      <Today events={today} now={now} />
 
-      <Card>
-        <CardHeader
-          title="Past"
-          count={past.length}
-          description="The last few months, newest first."
+      {nothingAhead ? (
+        <EmptyState
+          icon="🗓"
+          title="Nothing scheduled yet"
+          description="Use a quick action above, or create a one-off for a retreat or outing."
         />
-        {past.length === 0 ? (
-          <EmptyState title="No past gatherings yet" />
-        ) : (
-          <ul className="flex flex-col gap-2 p-3">
-            {past.map((event) => (
-              <EventRow
-                key={event.id}
-                event={event}
-                now={now}
-                onUncancel={(target) => void handleUncancel(target)}
-                uncancelling={uncancelling === event.id}
-              />
-            ))}
-          </ul>
-        )}
-      </Card>
+      ) : null}
+
+      <RowSection
+        title="Next seven days"
+        events={thisWeek}
+        now={now}
+        onUncancel={onUncancel}
+        uncancelling={uncancelling}
+      />
+      <RowSection
+        title="Later"
+        events={later}
+        now={now}
+        onUncancel={onUncancel}
+        uncancelling={uncancelling}
+      />
+
+      <PastGatherings before={dayStart} />
 
       <EventEditorModal
         open={editor !== null}

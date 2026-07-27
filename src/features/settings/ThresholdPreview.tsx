@@ -66,6 +66,8 @@ export function ThresholdPreview({ draft, saved, valid }: ThresholdPreviewProps)
         const next: TallyEvent = {
           id: `preview-${entry.id}`,
           title: entry.title,
+          description: null,
+          icon: null,
           mode: 'recurring',
           seriesId: entry.id,
           // Irrelevant to the preview: prediction reads the series' history,

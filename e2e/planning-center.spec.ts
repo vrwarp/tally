@@ -12,7 +12,7 @@
  * upstream show up without anybody running anything, and — the one that matters
  * most — does the sensitive half of a minor's record stay out of Firestore.
  */
-import { gotoReady } from './support/auth';
+import { gotoReady, openCheckIn } from './support/auth';
 import { expect, test } from './support/fixtures';
 
 /**
@@ -31,6 +31,7 @@ test.describe('Planning Center', () => {
     firestore,
   }) => {
     await signedInAs('counselor');
+    await openCheckIn(page);
 
     await expect(page.getByText(new RegExp(ROSTER_STUDENT)).first()).toBeVisible({
       timeout: 20_000,

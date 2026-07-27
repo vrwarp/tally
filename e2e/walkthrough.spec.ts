@@ -17,7 +17,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Page } from '@playwright/test';
-import { gotoReady, signOut } from './support/auth';
+import { gotoReady, openCheckIn, signOut } from './support/auth';
 import { test } from './support/fixtures';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -70,12 +70,25 @@ test('capture the walkthrough', async ({ page, signedInAs }) => {
     journey: 'Getting in',
     title: 'Sign in',
     caption:
-      'The only screen a signed-out volunteer sees. An email link is the primary path — counselors are handed a phone at the door and never set a password. Google is secondary, and hides itself in browsers that cannot do OAuth.',
+      'The only screen a signed-out volunteer sees, and the only way in. A leader adds somebody by their Google address; signing in with that address is the whole of it, because authorisation is keyed on an address and one door is easier to watch than two. Nobody sets a password they would have to remember at a door.',
   });
 
   await signedInAs('counselor');
 
   /* ---- Journey 1: the bouncer flow ------------------------------------- */
+
+  await page
+    .getByRole('link', { name: /start check-in|take attendance/i })
+    .first()
+    .waitFor({ timeout: 30_000 });
+  await capture(page, {
+    journey: 'Journey 1 — high-volume check-in',
+    title: 'Which gathering are you at?',
+    caption:
+      'The first question, and the only one. Tally used to answer it from the clock and open straight into a roster — one fewer tap, and one way to be confidently, silently wrong: on a night with two things on, or one running late, forty students could be filed against the wrong gathering before anybody noticed. The card is the size of the answer because the person giving it is holding the phone one-handed with a queue in front of them, and the gathering whose window is actually open is ringed and sorted first.',
+  });
+
+  await openCheckIn(page);
 
   // The Recent filter needs the past instances' attendance, which is fetched
   // once rather than streamed. Waiting for it is the difference between
@@ -94,7 +107,7 @@ test('capture the walkthrough', async ({ page, signedInAs }) => {
     journey: 'Journey 1 — high-volume check-in',
     title: 'The predictive roster',
     caption:
-      'Tally picked tonight’s event from the clock; nobody chose it. The screen opens on “Recent”, the predictive filter: students who came to at least 2 of the last 3 Fridays. Friday history predicts Friday — Sunday’s regulars are not in this list — and “Show all” is right underneath it.',
+      'One tap later. The screen opens on “Recent”, the predictive filter: students who came to at least 2 of the last 3 Fridays. Friday history predicts Friday — Sunday’s regulars are not in this list — and “Show all” is right underneath it. The event is named in the bar above, with the date beside it, and it keeps saying so for as long as somebody is tapping.',
   });
 
   const firstRow = page.getByRole('button', { name: /^Check in / }).first();
@@ -181,6 +194,20 @@ test('capture the walkthrough', async ({ page, signedInAs }) => {
       'Recurring gatherings and one-offs together. “Schedule next Friday Fellowship” is two taps, because somebody has to do it every single week.',
   });
 
+  await page.getByRole('button', { name: 'New event' }).click();
+  await page.waitForTimeout(500);
+  await page.getByRole('dialog').getByRole('button', { name: /^Icon/ }).click();
+  await page.getByPlaceholder(/search icons/i).fill('camp');
+  await page.waitForTimeout(400);
+  await capture(page, {
+    journey: 'Journey 4 — the field trip',
+    title: 'A gathering with a face',
+    caption:
+      'An event carries a description and an icon. The icon is searchable by what the thing is rather than by what Google called it — “campfire” finds it — and the glyphs are bundled with the app rather than fetched from a font CDN, because Tally’s home is a hallway with one bar of signal and a missing icon is a missing icon on exactly the night it mattered. The description is the sentence the check-in screen leads with; the “Notes” field on the right stays what one leader leaves for another.',
+  });
+  await page.getByRole('button', { name: /^Cancel$/ }).click();
+  await page.waitForTimeout(400);
+
   const retreat = page.getByRole('link', { name: /winter retreat/i }).first();
   if (await retreat.count()) {
     await retreat.click();
@@ -253,6 +280,44 @@ test('capture the walkthrough', async ({ page, signedInAs }) => {
     title: 'Who do I call, and only when asked',
     caption:
       'A parent’s number, fetched for one student at the moment somebody needs it — resolved through her household, since Planning Center keeps contact on the parent’s record rather than the child’s. Firestore holds none of it: no parent name, no phone, no email, no allergies. For a database full of minors, the safest copy is the one that was never made.',
+  });
+
+  /* ---- Journey 6: the calendar ------------------------------------------ */
+
+  await gotoReady(page, '/events');
+  await page
+    .getByRole('region', { name: /past gatherings/i })
+    .waitFor({ timeout: 30_000 })
+    .catch(() => {
+      throw new Error(
+        'The history never loaded. Do not publish a walkthrough claiming a screen that did not paint.',
+      );
+    });
+  await page.waitForTimeout(1500);
+
+  await capture(page, {
+    journey: 'Journey 6 — the calendar',
+    title: 'Today, in full',
+    caption:
+      'The Events tab, read from where the leader is standing. Today is the hero: whatever is on, with its icon and the sentence describing it, and a line that answers the actual question — check-in opens at seven, or it is open now, or it finished and twenty-two people came. A gathering that ended this afternoon stays up here rather than dropping into the history, because the boundary is midnight and somebody looking at it at teatime is still thinking about “today”.',
+  });
+
+  await page.mouse.wheel(0, 700);
+  await page.waitForTimeout(600);
+  await capture(page, {
+    journey: 'Journey 6 — the calendar',
+    title: 'The week ahead, then everything held',
+    caption:
+      'The next seven days as rows — a glance, not a decision — and then whatever the recurrence rules put further out, so a retreat four weeks away is still somewhere. Under all of it the history, newest first, cut into months and paging further back as you scroll. Each row carries the one fact that makes a past gathering recognisable: how many students were checked in.',
+  });
+
+  await page.mouse.wheel(0, 1600);
+  await page.waitForTimeout(1500);
+  await capture(page, {
+    journey: 'Journey 6 — the calendar',
+    title: 'Scrolling into the ministry’s past',
+    caption:
+      'The pages come straight out of Firestore, a dozen gatherings at a time, cursored rather than counted — the calendar the rest of the app holds in memory is a bounded window, and its far edge is exactly the boundary somebody looking for last March is trying to cross. The head counts come from the same cache the predictive roster fills, so scrolling back over a fortnight the roster already read costs nothing.',
   });
 
   await writeFile(

@@ -16,7 +16,7 @@
  */
 import type { Page } from '@playwright/test';
 import { expect, test } from './support/fixtures';
-import { gotoReady } from './support/auth';
+import { openCheckIn } from './support/auth';
 
 /**
  * Waits until the roster is longer than the screen.
@@ -66,7 +66,7 @@ test.describe('scrolling', () => {
   });
 
   test('the roster scrolls the page, and the search box comes along', async ({ page }) => {
-    await gotoReady(page, '/');
+    await openCheckIn(page);
     await longRoster(page);
 
     expect(
@@ -119,7 +119,7 @@ test.describe('scrolling', () => {
       'mobile WebKit cannot dispatch a wheel event',
     );
 
-    await gotoReady(page, '/');
+    await openCheckIn(page);
     await longRoster(page);
 
     /*

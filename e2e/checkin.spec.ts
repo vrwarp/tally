@@ -6,7 +6,7 @@
  * reads the document back.
  */
 import type { Page } from '@playwright/test';
-import { reloadReady } from './support/auth';
+import { openCheckIn, reloadReady } from './support/auth';
 import { expect, test } from './support/fixtures';
 
 
@@ -142,6 +142,7 @@ test.describe('the first paint', () => {
     });
 
     await signedInAs('counselor');
+    await openCheckIn(page);
     await settledOnRecent(page);
 
     /*
@@ -187,13 +188,22 @@ test.describe('the first paint', () => {
 });
 
 test.describe('check-in', () => {
-  test.beforeEach(async ({ signedInAs }) => {
+  test.beforeEach(async ({ page, signedInAs }) => {
     await signedInAs('counselor');
+    await openCheckIn(page);
   });
 
-  test('lands on the active event without anyone choosing it', async ({ page }) => {
-    // PRD 4.3: a counselor at the door should never have to pick a date.
+  test('opens the gathering the counselor chose, and keeps saying which it is', async ({
+    page,
+  }) => {
+    // Tally used to pick the event from the clock. It now asks — see
+    // `ChooseEvent` — and the header's job is to keep the answer visible,
+    // because filing forty check-ins against the wrong night is this app's
+    // worst failure and the counselor is no longer being told what was chosen
+    // for them.
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(page.getByText('Today', { exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Change' })).toBeVisible();
     await expect(page.getByLabel(/switch event/i)).toBeVisible();
     await expect(page.getByLabel(/search students by name/i)).toBeVisible();
   });
@@ -388,6 +398,7 @@ test.describe('on a phone', () => {
   }) => {
     mobileOnly();
     await signedInAs('counselor');
+    await openCheckIn(page);
 
     await expect(page.getByLabel(/search students by name/i)).toBeVisible();
     await expect(page.getByRole('button', { name: /quick add a visitor/i })).toBeVisible();
@@ -402,6 +413,7 @@ test.describe('on a phone', () => {
   test('tap targets are big enough to hit without looking', async ({ page, signedInAs }) => {
     mobileOnly();
     await signedInAs('counselor');
+    await openCheckIn(page);
 
     const row = page.getByRole('button', { name: /^Check in / }).first();
     const box = await row.boundingBox();

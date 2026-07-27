@@ -40,6 +40,8 @@ function asEvent(
   return {
     id: occurrence.id,
     title: source.title,
+    description: source.description,
+    icon: source.icon,
     mode: 'recurring',
     seriesId: source.seriesId,
     recurrence: source.recurrence,

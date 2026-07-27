@@ -11,6 +11,12 @@
  * onSnapshot stream is the only source of truth for who is present — which is
  * also what keeps two counselors' phones agreeing with each other. The one piece
  * of local state, `flashing`, exists purely to drive an animation.
+ *
+ * The event is never chosen here. `/` is a question — see `ChooseEvent` — and
+ * this screen only renders once `/event/:eventId` names an answer. That is a
+ * deliberate reversal: Tally used to pick from the clock and open straight into
+ * a roster, which saved a tap and made the app capable of being confidently,
+ * silently wrong about which night forty check-ins belonged to.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
@@ -21,7 +27,7 @@ import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { EventHeader } from '@/features/checkin/EventHeader';
 import { FilterBar } from '@/features/checkin/FilterBar';
-import { NoActiveEvent } from '@/features/checkin/NoActiveEvent';
+import { ChooseEvent } from '@/features/checkin/ChooseEvent';
 import { QuickAddVisitorModal } from '@/features/checkin/QuickAddVisitorModal';
 import { RosterList } from '@/features/checkin/RosterList';
 import { SearchBar } from '@/features/checkin/SearchBar';
@@ -63,8 +69,7 @@ const FOCUS_EMPTY: Record<RosterFocus, string> = {
 
 export function CheckInPage() {
   const { eventId } = useParams();
-  const { event, autoEvent, isOverridden, now, selectableEvents } =
-    useActiveEvent(eventId ?? null);
+  const { event, now, selectableEvents } = useActiveEvent(eventId ?? null);
 
   const { students, settings, loading: dataLoading, rosterError } = useData();
   const { user } = useAuth();
@@ -286,7 +291,7 @@ export function CheckInPage() {
         </div>
       );
     }
-    return <NoActiveEvent events={selectableEvents} now={now} />;
+    return <ChooseEvent events={selectableEvents} now={now} />;
   }
 
   const { counts, focus: appliedFocus } = roster;
@@ -305,8 +310,6 @@ export function CheckInPage() {
       <div className="mx-auto w-full max-w-3xl">
         <EventHeader
           event={event}
-          autoEvent={autoEvent}
-          isOverridden={isOverridden}
           selectableEvents={selectableEvents}
           now={now}
           present={counts.present}

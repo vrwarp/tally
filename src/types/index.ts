@@ -329,6 +329,25 @@ export type EventStatus = 'scheduled' | 'cancelled';
 
 export interface TallyEventDoc {
   title: string;
+  /**
+   * A sentence or two about what this gathering is, for the students and
+   * counselors reading the check-in screen — "Games, a talk and pizza".
+   *
+   * Distinct from `notes`, which is the logistics a leader leaves for the other
+   * leaders ("bring a jacket, meet at the car park"). The description is the
+   * one the hero card shows, because it is the one that reads as an invitation
+   * rather than as a memo.
+   */
+  description: string | null;
+  /**
+   * A Material Symbols name from `lib/eventIcons`, or null.
+   *
+   * Stored as the name rather than as a glyph so the drawing can be improved
+   * without rewriting anybody's events, and validated on read against the
+   * bundled catalogue — an event carrying a name Tally no longer ships renders
+   * as one with no icon rather than as an empty box.
+   */
+  icon: string | null;
   mode: EventMode;
   /**
    * Optional link to an `eventSeries` template, on `recurring` events only.
@@ -362,7 +381,14 @@ export interface TallyEventDoc {
   recurrenceRootId: string | null;
   startAt: Timestamp;
   endAt: Timestamp;
-  /** Window during which this event is auto-selected as "active". */
+  /**
+   * Window during which this event counts as live.
+   *
+   * Advisory rather than decisive since the check-in screen started asking
+   * which gathering somebody is at: it rings the card in the chooser and sorts
+   * it first, and it decides whether the roster header warns that the window
+   * has closed. It no longer picks anything on a counselor's behalf.
+   */
   checkInOpensAt: Timestamp;
   checkInClosesAt: Timestamp;
   location: string | null;

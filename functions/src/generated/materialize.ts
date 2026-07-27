@@ -57,6 +57,10 @@ import { recurrenceOccurrences, toDateOnlyValue, type RecurrenceRule } from './r
 export interface OccurrenceSource {
   id: string;
   title: string;
+  /** Carried onto every projected instance — see `lib/eventProjection.ts`. */
+  description: string | null;
+  /** A Material Symbols name. Carried the same way, and for the same reason. */
+  icon: string | null;
   mode: 'recurring' | 'oneoff';
   seriesId: string | null;
   recurrence: RecurrenceRule | null;

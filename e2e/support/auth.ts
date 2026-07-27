@@ -185,6 +185,35 @@ export async function reloadReady(page: Page): Promise<void> {
 }
 
 /**
+ * Gets to a roster, the way a counselor does: by choosing tonight's gathering.
+ *
+ * `/` is a question now, not a roster. Tally used to answer it from the clock
+ * and open straight into the list, and every spec below simply landed there
+ * after signing in. This is the tap that replaced that, factored out because
+ * three specs need it and because the day it changes again there should be one
+ * place to change.
+ *
+ * The card whose check-in window is open sorts to the top of the chooser, so
+ * the first one is the one a counselor at a door would reach for. The seed
+ * guarantees something is live — see `buildEvents` in `scripts/seed.ts`.
+ */
+export async function openCheckIn(page: Page): Promise<void> {
+  if (!new URL(page.url()).pathname.startsWith('/event/')) {
+    await gotoReady(page, '/');
+  }
+
+  const card = page.getByRole('link', { name: /start check-in|take attendance/i }).first();
+  await card.waitFor({ timeout: 30_000 }).catch(() => {
+    throw new Error(
+      'No gathering was offered on the check-in screen. The seed guarantees one is live, ' +
+        'so either seeding did not run or the chooser is broken.',
+    );
+  });
+  await card.click();
+  await page.getByLabel(/search students by name/i).waitFor({ timeout: 30_000 });
+}
+
+/**
  * Signs out through the app's own menu, then clears the Firebase session from
  * the browser.
  *

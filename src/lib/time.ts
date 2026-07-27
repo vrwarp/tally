@@ -49,7 +49,7 @@ export function isCheckInOpen(event: TallyEvent, now: Date): boolean {
 }
 
 /**
- * Picks the event a counselor should land on when they open the app.
+ * The gathering whose check-in window covers this instant.
  *
  * Priority:
  *  1. An event whose check-in window is open right now. Ties break toward the
@@ -59,7 +59,7 @@ export function isCheckInOpen(event: TallyEvent, now: Date): boolean {
  *     should still see tonight's fellowship).
  *  3. Otherwise nothing; the caller offers a manual picker.
  *
- * Cancelled events are never auto-selected.
+ * Cancelled events are never offered.
  */
 export function pickActiveEvent(
   events: readonly TallyEvent[],

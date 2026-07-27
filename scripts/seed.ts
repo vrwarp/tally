@@ -831,6 +831,18 @@ function collectWrites(now: Date): {
       path: paths.event(event.id),
       data: {
         title: event.title,
+        // The sentence the check-in screen leads with when this is today's
+        // gathering, and the glyph it wears everywhere else.
+        description: isRetreat
+          ? 'Two nights at Camp Silverpine — hiking, campfires, and four sessions together.'
+          : event.seriesId === SERIES_IDS.sundaySchool
+            ? 'Small groups by grade, working through the Gospel of Mark this term.'
+            : 'Games, worship and a short talk, then pizza in the hall. Bring a friend.',
+        icon: isRetreat
+          ? 'cabin'
+          : event.seriesId === SERIES_IDS.sundaySchool
+            ? 'menu_book'
+            : 'groups',
         mode: isRetreat ? 'oneoff' : 'recurring',
         seriesId: event.seriesId,
         // A retreat happens once; everything else is the weekly slot its series
