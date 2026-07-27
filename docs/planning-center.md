@@ -278,12 +278,13 @@ roster of minors.
 
 ## 6. What Tally reads, and when
 
-There is no scheduled anything. Three reads, and each one is somebody looking at a screen:
+There is no scheduled anything. Four reads, and each one is somebody looking at a screen:
 
 | Read | Triggered by | Cost |
 | --- | --- | --- |
 | The roster | Opening check-in, the students list, or a refresh | One sweep of `where[child]=true`, plus one request per roster member the sweep did not cover |
 | One person's details | Opening a student's page | One request, plus one per household |
+| Who has a parent contact | Opening Insights | One sweep of `where[child]=false`, on top of the roster read it reuses |
 | A directory search | Typing in "Add from Planning Center" | One request per keystroke burst |
 
 The roster read is the interesting one, because it has to turn Tally's membership into people. It
@@ -294,6 +295,14 @@ the failure nobody notices. Settings shows the count.
 
 Every answer is held for `PCO_CACHE_TTL_SECONDS`, keyed by the roster itself. Adding a student
 changes the key, so they appear on the next read rather than whenever the previous answer expires.
+
+The parent-contact read (`getParentContactStatus`) is the one that is deliberately *not* part of the
+roster. A roster row reports `profileComplete: null` — "we did not look" — because a parent's phone
+number lives on the parent, and hydrating households would put a second sweep in front of the first
+name a counselor sees at a door. Insights asks the question separately, gets a boolean per student
+and no contact details at all, and that is what fills the "incomplete profiles" list. Answering it
+with `false` on the roster instead would badge every student in the ministry as unreachable; leaving
+it at `null` everywhere left the list permanently empty, which is the bug this read exists to fix.
 
 ## 7. Troubleshooting
 

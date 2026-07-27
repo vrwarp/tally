@@ -5,6 +5,7 @@ import {
   displayFirstName,
   emailKey,
   extractParentContact,
+  hasContactDetails,
   isYouth,
   mapPersonToStudent,
   nameGradeKey,
@@ -393,6 +394,40 @@ describe('extractParentContact', () => {
 
     expect(contact.parentName).toBe('Chris Rivera');
     expect(contact.parentPhone).toBe('555-0123');
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* hasContactDetails                                                           */
+/* -------------------------------------------------------------------------- */
+
+describe('hasContactDetails', () => {
+  const adult = person('301', { first_name: 'Chris', last_name: 'Rivera', child: false });
+
+  it('accepts a phone number or an email address on its own', () => {
+    expect(hasContactDetails(adult, index([phone('p1', '301', '555-0123')]))).toBe(true);
+    expect(hasContactDetails(adult, index([email('e1', '301', 'chris@example.org')]))).toBe(true);
+  });
+
+  it('says no when Planning Center holds neither', () => {
+    expect(hasContactDetails(adult, index())).toBe(false);
+  });
+
+  it('does not count somebody else in the household as a way to reach them', () => {
+    // The index carries a whole page of people; an Email belongs to the person
+    // its relationship names, not to whoever is being asked about.
+    const other = index([phone('p1', '999', '555-0123'), email('e1', '999', 'other@example.org')]);
+    expect(hasContactDetails(adult, other)).toBe(false);
+  });
+
+  it('ignores a blank number or address', () => {
+    expect(hasContactDetails(adult, index([phone('p1', '301', '   ')]))).toBe(false);
+    expect(hasContactDetails(adult, index([email('e1', '301', '')]))).toBe(false);
+  });
+
+  it('falls back to the address on the person when no Email was side-loaded', () => {
+    const withPrimary = person('301', { first_name: 'Chris', primary_email_address: 'chris@example.org' });
+    expect(hasContactDetails(withPrimary, index())).toBe(true);
   });
 });
 

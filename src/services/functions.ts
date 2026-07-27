@@ -105,6 +105,35 @@ export const getPersonDetails = httpsCallable<{ pcoPersonId: string }, PcoPerson
   'getPersonDetails',
 );
 
+export interface ParentContactStatusResponse {
+  /**
+   * Student id -> whether Planning Center holds a way to reach an adult in that
+   * student's household. A student the roster could not resolve is absent
+   * rather than `false`: "we could not look" is not "nobody is there".
+   */
+  reachable: Record<string, boolean>;
+  /** Roster entries whose Planning Center person could not be read. */
+  unresolved: string[];
+  /** True when Planning Center was not asked, because a recent answer was reused. */
+  cached: boolean;
+  fetchedAt: string;
+}
+
+/**
+ * Which students nobody can be reached about — the insights screen's
+ * "incomplete profiles" list.
+ *
+ * A boolean each and nothing more: the whole list is students with no contact
+ * details, so there are none to send. The roster cannot answer this itself
+ * (`PcoRosterPerson.profileComplete` is `null` for exactly this reason) because
+ * finding a parent means reading households, and that is not work a counselor
+ * should wait through at a door.
+ */
+export const getParentContactStatus = httpsCallable<
+  { force?: boolean } | void,
+  ParentContactStatusResponse
+>(functions, 'getParentContactStatus');
+
 /**
  * What Settings shows about the connection, asked for rather than watched.
  *

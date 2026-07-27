@@ -1012,6 +1012,67 @@ describe('computeIncompleteProfiles', () => {
 
     expect(computeIncompleteProfiles([zane, ames]).map((s) => s.id)).toEqual([ames.id, zane.id]);
   });
+
+  /*
+   * The bug this list had for as long as a roster came from Planning Center: a
+   * roster row carries `profileComplete: null`, so a filter that only accepted
+   * `false` found nothing — on a screen whose follow-up rows above were saying
+   * "Planning Center has no parent contact for this student" out loud.
+   */
+  it('lists a roster student Planning Center holds no parent contact for', () => {
+    const unreachable = makeStudent({ id: 'pco_1', profileComplete: null });
+    const reachable = makeStudent({ id: 'pco_2', profileComplete: null });
+
+    const incomplete = computeIncompleteProfiles(
+      [unreachable, reachable],
+      new Map([
+        ['pco_1', false],
+        ['pco_2', true],
+      ]),
+    );
+
+    expect(incomplete.map((s) => s.id)).toEqual(['pco_1']);
+  });
+
+  it('says nothing about a student nobody has checked', () => {
+    // An unanswered roster row is not an unreachable one. Reading the two the
+    // same way would put the whole ministry on a follow-up list the moment
+    // Planning Center went quiet.
+    const unchecked = makeStudent({ id: 'pco_1', profileComplete: null });
+
+    expect(computeIncompleteProfiles([unchecked])).toEqual([]);
+    expect(computeIncompleteProfiles([unchecked], new Map())).toEqual([]);
+  });
+
+  it('keeps a quick-added visitor Planning Center has never heard of', () => {
+    // They exist only in Tally, so the check has no answer for them — and their
+    // document already knows there is no parent contact on it.
+    const visitor = makeStudent({ id: 'tally-1', profileComplete: false, isVisitor: true });
+
+    expect(computeIncompleteProfiles([visitor], new Map()).map((s) => s.id)).toEqual(['tally-1']);
+  });
+
+  it('sorts a roster student behind the visitors, oldest last', () => {
+    const visitor = makeStudent({
+      id: 'tally-1',
+      profileComplete: false,
+      isVisitor: true,
+      createdAt: new Date(2026, 1, 6, 19, 0),
+    });
+    // Roster students carry the epoch as `createdAt` — see `fromRosterPerson`.
+    const rosterStudent = makeStudent({
+      id: 'pco_1',
+      profileComplete: null,
+      createdAt: new Date(0),
+    });
+
+    const incomplete = computeIncompleteProfiles(
+      [rosterStudent, visitor],
+      new Map([['pco_1', false]]),
+    );
+
+    expect(incomplete.map((s) => s.id)).toEqual(['tally-1', 'pco_1']);
+  });
 });
 
 /* -------------------------------------------------------------------------- */

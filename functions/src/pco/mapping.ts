@@ -416,6 +416,36 @@ function pickContactValue<T extends JsonApiResource<{ primary?: boolean | null }
 }
 
 /**
+ * Whether Planning Center holds any way to reach this person.
+ *
+ * Exactly the two fields `extractParentContact` would hand back — a phone
+ * number or an email address — asked as a yes/no. That is what lets the answer
+ * be carried for a whole roster without carrying a single parent's contact
+ * details along with it.
+ */
+export function hasContactDetails(person: PcoPerson, index: IncludedIndex): boolean {
+  const reachableByEmail = listIncluded<PcoEmail>(index, PCO_TYPES.email).some(
+    (email) => ownedBy(email, person.id) && trimmed(email.attributes?.address) !== null,
+  );
+  if (reachableByEmail) return true;
+
+  const reachableByPhone = listIncluded<PcoPhoneNumber>(index, PCO_TYPES.phoneNumber).some(
+    (phone) =>
+      ownedBy(phone, person.id) &&
+      firstNonEmpty(
+        phone.attributes?.number,
+        phone.attributes?.national,
+        phone.attributes?.e164,
+      ) !== null,
+  );
+  if (reachableByPhone) return true;
+
+  // The same last resort `extractParentContact` falls back to, for a person
+  // whose Email records were not side-loaded.
+  return trimmed(person.attributes?.primary_email_address) !== null;
+}
+
+/**
  * Finds the adult Tally should call about this student.
  *
  * Preference order is `parent_guardian`, then `adult`, then `other_adult`, then

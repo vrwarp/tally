@@ -36,10 +36,20 @@ interface DashboardInput {
   students: Student[];
   snapshots: EventAttendanceSnapshot[];
   settings: ReturnType<typeof arbitrarySettings>;
+  /**
+   * What the separate parent-contact read came back with, which for any given
+   * student may not have come back at all. See `computeIncompleteProfiles`.
+   */
+  reachable: Map<string, boolean>;
 }
 
 function arbitraryDashboard(rng: Rng): DashboardInput {
   const students = Array.from({ length: rng.int(0, 20) }, () => arbitraryStudent(rng));
+  const reachable = new Map<string, boolean>();
+  for (const student of students) {
+    if (rng.bool(0.3)) continue;
+    reachable.set(student.id, rng.bool(0.5));
+  }
   const snapshots = Array.from({ length: rng.int(0, 12) }, (_, index) => {
     const startAt = new Date(NOW.getTime() - (index + 1) * 7 * 86_400_000);
     const event = arbitraryEvent(rng, {
@@ -54,7 +64,7 @@ function arbitraryDashboard(rng: Rng): DashboardInput {
     };
   });
 
-  return { students, snapshots, settings: arbitrarySettings(rng) };
+  return { students, snapshots, settings: arbitrarySettings(rng), reachable };
 }
 
 describe('dashboard insight properties', () => {
@@ -196,22 +206,36 @@ describe('dashboard insight properties', () => {
 
   /*
    * `profileComplete` has three states, and only one of them is a problem.
-   * `null` means a roster read did not hydrate households and so nobody has
-   * checked — listing those as "no way to reach a parent" would hand the core
-   * team a follow-up list containing the entire ministry.
+   * `null` means a roster read did not hydrate households and so the document
+   * has not checked — the separate parent-contact read answers for those, and
+   * where *it* is silent too nobody has checked at all. Listing an unchecked
+   * student as "no way to reach a parent" would hand the core team a follow-up
+   * list containing the entire ministry.
    */
   forAll('incomplete profiles are exactly the active, known-unreachable ones', arbitraryDashboard, (input) => {
-    const incomplete = computeIncompleteProfiles(input.students);
+    const incomplete = computeIncompleteProfiles(input.students, input.reachable);
+    const unreachable = (student: Student) =>
+      (student.profileComplete ?? input.reachable.get(student.id) ?? null) === false;
 
     for (const student of incomplete) {
       expect(student.status).toBe('active');
-      expect(student.profileComplete).toBe(false);
+      expect(unreachable(student)).toBe(true);
     }
 
     const expected = input.students.filter(
-      (student) => student.status === 'active' && student.profileComplete === false,
+      (student) => student.status === 'active' && unreachable(student),
     ).length;
     expect(incomplete).toHaveLength(expected);
+  });
+
+  forAll('an unanswered contact check never puts anybody on the list', arbitraryDashboard, (input) => {
+    // The failure mode that matters here is a Planning Center outage reading as
+    // "nobody in the ministry has a parent on file".
+    const unchecked = computeIncompleteProfiles(input.students, new Map());
+
+    for (const student of unchecked) {
+      expect(student.profileComplete).toBe(false);
+    }
   });
 
   forAll('the trend is oldest-first and never longer than asked for', arbitraryDashboard, (input, rng) => {
