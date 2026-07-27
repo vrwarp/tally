@@ -105,9 +105,9 @@ for (const [index, scene] of changes.scenes.entries()) {
 
           <div class="media">
             <figure class="compare" style="--ratio:${phone ? '460 / 995' : '1240 / 775'}">
-              <img class="base" src="${before}" alt="${escapeHtml(scene.title)}, before, on ${note.viewport}" loading="lazy" decoding="async">
+              <img class="base" src="${after}" alt="${escapeHtml(scene.title)}, after, on ${note.viewport}" loading="lazy" decoding="async">
               <div class="reveal">
-                <img src="${after}" alt="${escapeHtml(scene.title)}, after, on ${note.viewport}" loading="lazy" decoding="async">
+                <img src="${before}" alt="${escapeHtml(scene.title)}, before, on ${note.viewport}" loading="lazy" decoding="async">
               </div>
               <div class="handle" aria-hidden="true"><span class="grip"></span></div>
               <input type="range" min="0" max="100" value="52" step="0.1"
@@ -415,6 +415,15 @@ const html = `<title>Tally — what the refinement changed</title>
    * change. Both images are now the same absolutely-positioned box and only the
    * clip moves, so they cannot disagree.
    */
+  /*
+   * The overlay holds the *before* frame, because the overlay is what shows on
+   * the left and the label under the left edge says "Before".
+   *
+   * It held the after frame at first, so the left half of every comparison
+   * showed the redesign under a label reading Before and the right half showed
+   * the old screen under After — the handle worked and the page argued the
+   * opposite of what it meant.
+   */
   .reveal {
     position: absolute; inset: 0;
     clip-path: inset(0 calc(100% - var(--pos, 52%)) 0 0);
@@ -464,13 +473,22 @@ const html = `<title>Tally — what the refinement changed</title>
     opacity: 0; cursor: ew-resize;
     -webkit-appearance: none; appearance: none; background: transparent;
   }
+  /* A wide thumb insets the value-to-position mapping by half its width at each
+     end, so the handle trails the pointer near the edges. A hairline thumb maps
+     the track 1:1; the input is invisible and full-bleed, so there is nothing to
+     grab hold of anyway — pressing anywhere seizes it. */
   .compare input[type='range']::-webkit-slider-thumb {
-    -webkit-appearance: none; width: 44px; height: 100%;
+    -webkit-appearance: none; width: 1px; height: 100%;
   }
   .compare input[type='range']::-moz-range-thumb {
-    width: 44px; height: 100%; border: 0; background: transparent;
+    width: 1px; height: 100%; border: 0; background: transparent;
   }
-  .compare:focus-within .handle { background: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+  /* Keyboard focus, not every mouse drag — dragging focuses the input, and a
+     2px accent flare on the seam during a drag hides the thing being compared. */
+  .compare:has(input:focus-visible) .handle {
+    background: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent);
+  }
 
   .why { padding: 1.25rem 1.4rem 1.45rem; max-width: 58rem; }
   .why-lead { margin: 0 0 0.85rem; font-size: 0.95rem; color: var(--ink); }
@@ -541,18 +559,31 @@ const html = `<title>Tally — what the refinement changed</title>
 </div>
 
 <script>
-  for (const figure of document.querySelectorAll('.compare')) {
-    const slider = figure.querySelector('input');
-    const before = figure.querySelector('.tag--before');
-    const after = figure.querySelector('.tag--after');
+  for (const media of document.querySelectorAll('.media')) {
+    const figure = media.querySelector('.compare');
+    const slider = media.querySelector('input');
+    if (!figure || !slider) continue;
+
+    /*
+     * Scoped to the whole media block, not to the figure.
+     *
+     * The labels used to sit inside the figure and were moved out to the legend
+     * beneath it; the lookup was not moved with them, so it returned null and
+     * the first line of paint() that touched one threw — which killed the
+     * function before it ever set --pos. The slider's value changed on every
+     * drag and nothing moved. Setting the position first, and treating the
+     * labels as optional, means a missing label can only cost a label.
+     */
+    const before = media.querySelector('.tag--before');
+    const after = media.querySelector('.tag--after');
 
     const paint = () => {
       const pos = Number(slider.value);
       figure.style.setProperty('--pos', pos + '%');
-      // The labels fade toward whichever half is being hidden, so the control
-      // reads as one image replacing another rather than two images abutting.
-      before.style.color = pos > 12 ? 'var(--ink)' : 'var(--faint)';
-      after.style.color = pos < 88 ? 'var(--ink)' : 'var(--faint)';
+      // The labels lean toward whichever half is showing, so the control reads
+      // as one image replacing another rather than two images abutting.
+      if (before) before.style.color = pos > 12 ? 'var(--ink)' : 'var(--faint)';
+      if (after) after.style.color = pos < 88 ? 'var(--ink)' : 'var(--faint)';
     };
 
     paint();
