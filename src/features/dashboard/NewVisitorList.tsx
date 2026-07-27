@@ -20,6 +20,7 @@
 import { Link } from 'react-router-dom';
 import { Badge, Card, CardHeader, EmptyState } from '@/components/ui';
 import { FollowUpActions } from '@/features/dashboard/FollowUpActions';
+import { hasNoParentContact } from '@/features/dashboard/insights';
 import { pcoPersonUrl } from '@/lib/planningCenter';
 import { formatRelative, formatShortDate } from '@/lib/time';
 import { initials, ordinalGrade } from '@/lib/utils';
@@ -102,7 +103,7 @@ function NewVisitorRow({
    * neither. Tally's own flag wins where it has one — a visitor who exists
    * nowhere else cannot be looked up — and `null` on either side means unasked.
    */
-  const unreachable = (student.profileComplete ?? reachable ?? null) === false;
+  const unreachable = hasNoParentContact(student.profileComplete, reachable);
 
   return (
     <li className="px-3 py-2">

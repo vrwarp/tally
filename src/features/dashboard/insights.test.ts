@@ -17,6 +17,7 @@ import {
   computeSummary,
   computeUnseen,
   groupByGathering,
+  hasNoParentContact,
   isUnreachable,
   orderSnapshotsNewestFirst,
   recurringSnapshots,
@@ -1083,6 +1084,23 @@ describe('computeIncompleteProfiles', () => {
    * the same three words, one click apart in the same sidebar. They share the
    * predicate now; this is the test that keeps them sharing it.
    */
+  /*
+   * The row-level form and the map-level form are the same rule. They were
+   * written out by hand in three places at one point and one copy had already
+   * dropped the `status` check, which is what a shared predicate is for.
+   */
+  it('resolves a single student the same way as the whole map', () => {
+    const rosterUnreachable = makeStudent({ id: 'pco_1', profileComplete: null });
+    const visitor = makeStudent({ id: 'tally-1', profileComplete: false });
+    const reachable = new Map([['pco_1', false]]);
+
+    for (const student of [rosterUnreachable, visitor]) {
+      expect(hasNoParentContact(student.profileComplete, reachable.get(student.id))).toBe(
+        isUnreachable(student, reachable),
+      );
+    }
+  });
+
   it('is the predicate the students directory filters on', () => {
     const rosterUnreachable = makeStudent({ id: 'pco_1', profileComplete: null });
     const rosterReachable = makeStudent({ id: 'pco_2', profileComplete: null });
