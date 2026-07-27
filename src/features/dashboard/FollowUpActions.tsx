@@ -155,7 +155,18 @@ export function FollowUpActions({ student, className }: FollowUpActionsProps) {
         >
           Text
         </ActionLink>
-        <span className="text-xs tabular-nums text-ink-500">{formatPhone(phone)}</span>
+        {/*
+          Printed where there is room for it.
+
+          Below `lg` the row is 358px wide and the number is what forced a
+          fourth line onto it. On a laptop it is the opposite: `tel:` and
+          `sms:` are protocols a desktop services unreliably, so a leader
+          working this list on a Tuesday morning needs the digits themselves —
+          otherwise the only route to ten numbers is opening ten records.
+        */}
+        <span className="hidden text-xs tabular-nums text-ink-500 lg:inline">
+          {formatPhone(phone)}
+        </span>
       </div>
     );
   } else {
@@ -168,7 +179,9 @@ export function FollowUpActions({ student, className }: FollowUpActionsProps) {
         >
           Email
         </ActionLink>
-        <span className="min-w-0 truncate text-xs text-ink-500">{email}</span>
+        {/* Same rule as the phone number above: printed where there is room
+            for it, and the mailto carries it either way. */}
+        <span className="hidden min-w-0 truncate text-xs text-ink-500 lg:inline">{email}</span>
       </div>
     );
   }
@@ -222,6 +235,7 @@ export function CopyContactsButton({ students, title }: CopyContactsButtonProps)
       size="md"
       onClick={() => void copy()}
       disabled={students.length === 0}
+      className="shrink-0 whitespace-nowrap"
     >
       Copy list
     </Button>

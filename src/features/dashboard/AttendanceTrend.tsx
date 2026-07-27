@@ -28,6 +28,8 @@ export interface AttendanceTrendProps {
   /** Named in the description, so the card says which nights it is drawing. */
   gatheringTitle?: string | null;
   limit?: number;
+  /** Lets the dashboard order this card differently on a phone. */
+  className?: string;
 }
 
 export function AttendanceTrend({
@@ -35,6 +37,7 @@ export function AttendanceTrend({
   gatheringKey = null,
   gatheringTitle = null,
   limit = 8,
+  className,
 }: AttendanceTrendProps) {
   const points = useMemo(
     () => computeAttendanceTrend(snapshots, { gatheringKey, limit }),
@@ -48,7 +51,7 @@ export function AttendanceTrend({
       : 0;
 
   return (
-    <Card>
+    <Card className={className}>
       <CardHeader
         title="Attendance trend"
         description={

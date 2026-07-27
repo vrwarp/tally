@@ -35,12 +35,15 @@ export function Badge({ tone = 'neutral', children, className, title }: BadgePro
   );
 }
 
-/** Renders a roster warning as its badge. All warnings are advisory. */
+/**
+ * Renders a roster warning as its badge. All warnings are advisory, and the ⚠
+ * belongs only to the one with a consequence at the door — see `warnings.ts`.
+ */
 export function WarningBadge({ warning }: { warning: RosterWarning }) {
   const meta = WARNING_META[warning];
   return (
-    <Badge tone="warn" title={meta.label}>
-      <span aria-hidden="true">⚠</span>
+    <Badge tone={meta.tone} title={meta.label}>
+      {meta.tone === 'warn' ? <span aria-hidden="true">⚠</span> : null}
       <span className="sr-only">{meta.label}</span>
       <span aria-hidden="true">{meta.short}</span>
     </Badge>

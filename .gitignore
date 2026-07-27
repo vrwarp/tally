@@ -76,3 +76,5 @@ uxr/renders/
 /e2e/**/*.js
 /uxr/**/*.js
 uxr/after/
+/*.config.js
+!eslint.config.js

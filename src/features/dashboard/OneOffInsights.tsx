@@ -21,9 +21,9 @@ export interface OneOffRecapListProps {
   items: readonly OneOffRecap[];
 }
 
-export function OneOffRecapList({ items }: OneOffRecapListProps) {
+export function OneOffRecapList({ items, className }: OneOffRecapListProps & { className?: string }) {
   return (
-    <Card>
+    <Card className={className}>
       <CardHeader
         title="One-off events"
         count={items.length}
@@ -89,13 +89,13 @@ export interface OneOffOnlyListProps {
  * out of the window. Rendered only when it has somebody in it — a permanent
  * empty card here would just be a reminder that retreats exist.
  */
-export function OneOffOnlyList({ items }: OneOffOnlyListProps) {
+export function OneOffOnlyList({ items, className }: OneOffOnlyListProps & { className?: string }) {
   if (items.length === 0) return null;
 
   const students = items.map((item) => item.student);
 
   return (
-    <Card>
+    <Card className={className}>
       <CardHeader
         title="Met once, never since"
         count={items.length}

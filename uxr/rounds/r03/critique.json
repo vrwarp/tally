@@ -1,0 +1,182 @@
+[
+  {
+    "source": "usability/phone",
+    "scene": "roster-search, roster",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "the amber ⚠ chip on the second line of a student row — 'Allergy' on four rows of the Recent list, 'Info' on the Tomas Vielle row in the search results",
+    "finding": "The counselor's one screen now has two different amber warning chips that are pixel-identical apart from a single 11px word, and one of them is not a counselor's problem at all. 'Allergy' is the one flag in this app with a physical consequence at a door; 'Info' means an office somewhere has not typed in a parent's phone number. Standing in a dim hallway with three seconds and a queue, the counselor sees the same amber triangle in the same slot and has two options, both bad: stop and read an 11px word on every amber row to work out which kind it is, or learn that amber chips are usually clerical and stop reading them — and the one they stop reading is the allergy. The visible word makes it worse rather than better: 'Info' names nothing on its own, and its actual meaning ('Missing parent contact') exists only in a `title` attribute and an `sr-only` span, neither of which a thumb on a touch screen can produce. This is not the r02 'the amber is too loud' decline, which was about weight; this is two consequences wearing one mark inside the scene where a wrong read is most expensive.",
+    "evidence": "roster-search--phone-full, Tomas Vielle (last of nine results): `<span title=\"Missing parent contact\" class=\"… bg-warn-500/15 text-warn-400 ring-warn-500/30\">⚠ <sr-only>Missing parent contact</sr-only> Info</span>`. roster--phone-full, Layla Farouk / Naomi Tanaka / Noah Fitzgerald / Sofia Ramirez: the same span, byte-for-byte the same class list, reading '⚠ Allergy'. Both render ~19 CSS px tall on the meta line at 11px, in the same wrapping flex slot immediately after the 'x of 3' ratio, and both are the only saturated colour in a row that is otherwise ink. The same fact is called three things across the phone frames — 'Info' here, 'Missing info' on students--phone-full (5 rows), '⚠ Incomplete' on dashboard--phone-full — so there is not even a consistent word to learn.",
+    "direction": "The counselor's row should carry only flags a counselor acts on at the door. Missing parent contact is an admin queue item — it already has a card of its own on Insights and a filter chip on Students — and it has no business wearing the allergy's costume in the check-in list. If it must stay on this row, it needs a different carrier (neutral ink chip, no ⚠) and a word that means something without a hover, so amber-triangle can go back to meaning exactly one thing."
+  },
+  {
+    "source": "usability/phone",
+    "scene": "roster-search",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "the RESULTS 9 list under the sticky search band, for the query 'ma'",
+    "finding": "Search results are sorted, not ranked. Typing the two letters the brief describes returns nine people, and the five at the top of the list match only somewhere inside a surname — Aisha Rahman, Amara Osei, Chloe Bergman, Fatima Nasser, Hana Yamamoto — while the three students whose name actually begins 'Ma' sit in positions six, seven and eight, and the eighth is cut in half by the bottom of the screen. So the counselor who typed 'ma' because Maya Adebayo is at the front of the queue reads five names that are not hers, then scrolls, on the screen that exists precisely because the prediction did not offer the person. Nothing in a row says why it matched — there is no highlight on the matched letters — so the top of the list looks like a bug for the second or two the counselor can spare. Round 2 made this measurably worse: it re-keyed both lists to given name, which was right for the roster, and the search results inherited the new key, so Maya moved from result 1 to result 8 and Marcus from result 3 to result 7.",
+    "evidence": "roster-search--phone-full, query 'ma', header 'RESULTS 9'. Order in the markup: Aisha Rahman, Amara Osei, Chloe Bergman, Fatima Nasser, Hana Yamamoto, Malik Johnson, Marcus Delgado, Maya Adebayo, Tomas Vielle. Rows measure 66 CSS px on a 72px pitch with the first at y 308 (the sticky band above it is 308px of chrome), so row tops fall at 308, 379, 451, 523, 595, 667 (Malik), 739 (Marcus), 811 (Maya — 33 of her 66px above the 844px fold) and 883 (Tomas, entirely below). Under r02's previous surname key the same nine would have run Adebayo, Bergman, Delgado, Johnson, Nasser, Osei, Rahman, Vielle, Yamamoto — Maya first, Marcus third.",
+    "direction": "Rank instead of sort: prefix match on the given name first, then prefix on the surname, then contained-anywhere, holding A–Z inside each band — and mark the matched letters in the row so a result explains its own presence. This does not touch 'a tap never moves a row': the order here changes only between keystrokes, never as a consequence of checking someone in, and the roster proper keeps its single A–Z list untouched."
+  },
+  {
+    "source": "usability/phone",
+    "scene": "events",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the second line of the Next seven days and Later rows, versus the same line in Past gatherings further down the page",
+    "finding": "Eleven upcoming rows carry one of two titles — five 'Friday Fellowship', five 'Sunday School' — so the date line is the only thing that tells them apart, and it is set two steps back from the reader while the equivalent line in the past list, three screens below on the same page, is set one step back. Round 1 raised the past rows' dates for exactly this reason ('when two rows share a title, the date is the only discriminator, and it was the quietest thing in the row'); the upcoming list, which repeats its titles more than the past list does, never got the same treatment. A leader thumbing this list reads a column of five identical bold names and hunts a dim 12px line under each one. The cost is a Back tap, not a wrong record, which is why this is minor — but it is the same defect, already diagnosed, left on the larger half of the page.",
+    "evidence": "events--phone-full. Upcoming rows: `<span class=\"mt-0.5 block truncate text-xs text-ink-500\">Fri, Aug 7 · 7:00 PM – 9:00 PM · Fellowship Hall</span>` — 12px, sampled at rgb(100,116,139) on the ink-900 card, a contrast ratio of 3.75:1. Past rows: the same 12px line in `text-ink-400`, sampled at rgb(191,199,209), roughly 7:1. Eleven upcoming rows, ten of them sharing two titles. The same line also truncates ('· Fellowshi…', '· Educa…'), but that tail is a constant per series and costs nothing — the tone is the part that costs.",
+    "direction": "Give the upcoming date line the tone the past date line already has, so the one varying fact in eleven near-identical rows is the second thing read rather than the last. Nothing structural: it is the same one-token change round 1 made on the other half of this page."
+  },
+  {
+    "source": "usability/desktop",
+    "scene": "dashboard",
+    "viewport": "desktop",
+    "severity": "major",
+    "where": "the Missing in action rows in the left column, y=370 to y=1100 — specifically the space between the meta text and the MISSED badge, and Elena Petrova's row at y=990",
+    "finding": "Round 2 folded the MIA row to one line by deleting the printed phone number 'at every width'. That was a 390px decision applied to a 1440px screen, and the screen it cost is the one whose entire job is phoning people. The Tuesday-morning leader sits at a laptop; the only contact affordances left on eight of the ten rows are a 'Call' and a 'Text' link that resolve to tel: and sms:, protocols a laptop services unreliably at best and usually not at all. There is now no phone number visible anywhere on this page for any of the ten students the page exists to make them ring. The leader either opens ten student records to read ten numbers, or trusts 'Copy list' — a button whose payload the screen never states — to contain them. The row that proves the width was there is Elena Petrova's: because her contact is an email, her address still prints in full, 161px of it, on the same 73px row. Nine rows suppress their contact string and one prints it, on the same card, at the same width.",
+    "evidence": "Leila Haddad's row, y 370–443: avatar 268–311, name and both meta lines end at x=584, MISSED badge 682–743, Call 758–836, Text 843–924, column edge 936. That is a 98px gap of empty row between the text and the badge, against roughly 85px for '(555) 555-0112' at 12px tabular — it fits without moving anything. Elena's row at y 965–1015 renders the badge at 591–651, 'Email' at 666–752 and 'irina.petrova@example.org' at 761–922. The markup confirms the deletion is unconditional: the baseline row carried `<span class=\"text-xs tabular-nums text-ink-500\">(555) 555-0112</span>` after the Text link and the prototype row has no such span at any breakpoint, while the number survives only inside `aria-label=\"Call Rania Haddad about Leila Haddad at (555) 555-0112\"`.",
+    "direction": "Put the number back at lg only — the phone's 358px row is what could not hold it, not the laptop's 680px one, and this is precisely the responsive difference the brief asks for instead of a compromise. It drops into the 98px gap the fold-up created, or trails Call/Text the way the email address already trails Email, which also ends the one-row-in-ten inconsistency. If the number genuinely must stay off the row, then 'Copy list' has to say what it copies, because it becomes the only route to ten numbers."
+  },
+  {
+    "source": "usability/desktop",
+    "scene": "events",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the 'Show later gatherings' button at the foot of the Upcoming column, y≈1556–1605, against the empty right half of the page from y=1098 down",
+    "finding": "The same shape as the dashboard finding, smaller. Round 2 capped 'Later' at the end of next month to shorten the phone page, and applied the cap at every width. On the laptop that means September is now behind a click — and the click sits directly beside 507px of blank right column, which is almost exactly the height the hidden rows would have occupied. A leader asking 'is anything on in September yet' scrolls to the bottom of a 1,661px page, finds a button, clicks, and gets rows drawn into a column that had no room while the half of the frame next to it was empty. The cap was the right answer to the phone's 3,700px page and the wrong one to a screen with a spare 561×507px hole in it.",
+    "evidence": "Columns are equal halves — left x=255–816, right x=847–1408, 561px each. The right column's last ink is y=1098 ('Load older gatherings'); the left runs to y=1605. Later rows are on a 76px pitch (gaps at 917, 993, 1069, 1145, 1221, 1297, 1398, 1474, 1550); the six or seven September occurrences the cap hides measure ~500px, against 507px of blank right column. Round 2's changes.json took the second of the critic's two exits ('stop Later being an unbounded scroll') and left the first ('let the Later group flow into two sub-columns once the past column has ended') untaken — that first exit is what the empty region is asking for.",
+    "direction": "Let the cap be the phone's and not the laptop's: render more of Later at lg, or let Later spill into the right column once Past gatherings has run out, so the page ends with two columns of roughly equal length instead of one column and a hole. Either way the page stays well under the 2,447px it was before."
+  },
+  {
+    "source": "usability/desktop",
+    "scene": "students",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the directory rows, x=313 (name) to x=1120 (grade), all forty-five of them",
+    "finding": "The badge column landed and it works — 'Missing info' now sits at one x on all five rows that carry it, so the flag is a vertical run rather than a ragged mid-row position. What is left is the void it left behind: the row's facts are now a tight cluster at x=1120–1400 and a name at x=313–460, with roughly 660px of nothing between them, forty-five times over. Sixteen of forty-five students are above the fold and the page is 2,259px, so a leader who wants to eyeball the whole roll — the grade spread, or the five flags they came to find — reads it in two and a half screens on a screen that has room for it in one and a half. Round 2's disposition deferred the two-column list 'to a round of its own' rather than declining it; the row has had its structural change, so the deferral is now due.",
+    "evidence": "45 rows on a 45px pitch from y=178 to y=2203. Name text measures 100–190px starting at x=313; grade sits at x≈1120–1190, badges at x≈1210–1360, chevron at x=1392. Only 5 of 45 rows put anything between x=460 and x=1120. Two columns of 23 rows at the current pitch measure ~1,035px, which puts about 32 of the 45 names above the 900px fold and drops the page from 2,259px to roughly 1,220px.",
+    "direction": "Two columns of the A–Z list at lg. This is not the roster — a mis-click here opens a neighbour's record and costs one Back, so 'a tap never moves a row' does not apply. The keyboard and screen-reader traversal order is the real cost and it is worth naming in the implementation note, not worth avoiding the change for."
+  },
+  {
+    "source": "design/phone",
+    "scene": "roster",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the event-switch row under the header — the 'Today' chip, the 'Change' pill and the date select (same row in roster-search)",
+    "finding": "Round 2 gave 'Change' and the select one vocabulary — same radius, same fill, same ring, same 44px height, same 12px label — and then the layout put them at opposite ends of the row with 34px of nothing between, while the one object that is not a control, the static 'Today' chip, sits 8px from 'Change'. Proximity now says the opposite of what the styling says: the reader groups the grey status chip with the blue link, and reads the select as unrelated machinery parked in the corner. A dim ringed chip touching a ringed pill of the same family also invites the read that this is one two-part control with a dead left half.",
+    "evidence": "'Today' occupies x12–59.7, 'Change' x67.7–142.5, the select x177–378: an 8px gap inside the pair that does different things and a 34.5px gap inside the pair that was deliberately made to look alike. 'Change' also lands at x67.7 against the search field's x72 directly below it — 4px short of the only edge it could have shared.",
+    "direction": "Let the two ways of getting to another gathering sit together and the status stand apart, rather than the other way round — either move the chip to the far end of the row or close the gap between 'Change' and the select — and while the row is being re-set, give 'Change' the left edge of the field beneath it instead of landing 4px shy of it."
+  },
+  {
+    "source": "design/phone",
+    "scene": "roster-search",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the RESULTS list — rows that carry a 'x of 3' ratio against the rows that do not",
+    "finding": "Every row is the same 64px tall, but the text block inside it is vertically centred, so a two-line row puts the name 10px higher than a one-line row. Down nine results the given name — the token round 2 made the anchor of the whole scan — sits at two different heights in no pattern, and the avatar beside it stays put, so the name also drifts off the avatar's centre and back again. The list stops reading as ruled rows and starts reading as loose cards.",
+    "evidence": "roster-search--phone-full: Aisha, Amara, Chloe, Malik, Marcus all set their name line 9.7px below the row top; Fatima, Hana and Maya — the three results with no attendance ratio — set theirs at 20px. The check circles stay centred throughout, so the misalignment is only in the column being read.",
+    "direction": "Hold the name at one offset in every row whatever is under it — top-align the text block rather than centring it, or give every row the same number of lines so the ratio column is complete and the name column is straight."
+  },
+  {
+    "source": "design/phone",
+    "scene": "dashboard",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the New faces rows — the '⚠ Incomplete' badge against the name and date lines",
+    "finding": "This is the one list on the page where a badge still sets the width of the text. The badge is pinned in the row's trailing slot and does not shrink, so the text column is capped at 171px and both rows cut their date mid-value — 'Sunday School · Jul 26, 1 …' — on a card whose whole claim is 'first time in the last 7 days'. The line above it has 33px spare. Two blocks down, Incomplete profiles shows the same two students with a full-width name and its qualifier folded into the meta line, and the directory does the same with Visitor / Missing info; New faces is now the odd row out, and the fact it cuts is the one it exists to state.",
+    "evidence": "dashboard--phone-full: 'Selah Mbeki 6th' ends at x222 inside a 171px block that runs to x255, while the meta line beneath is clipped at x255 because the 95px badge holds x267–362. Both rows truncate at the same broken point, '1 …'.",
+    "direction": "Use the pattern the rest of the page already settled on: the badge yields, or moves down beside the meta the way the 'Waiting N days' chip did, so the row's date reads whole at 390px. The flag can stay — it just should not be what decides how much of the row the text gets."
+  },
+  {
+    "source": "design/phone",
+    "scene": "dashboard",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the 'Met once, never since' card header — the title, its count pill and 'Copy list'",
+    "finding": "The count pill is attached to the title in three of the four list cards and orphaned in the fourth. Squeezed to 213px by the Copy list button, this title wraps to two lines, and because the pill is centred against the wrapped block it ends up alone in the whitespace to the right of 'since', straddling the line break, about 150px from the words it counts. The header reads as three unrelated objects instead of a titled section with a count.",
+    "evidence": "dashboard--phone-full: the h2 box is 48px tall (two lines) and the '2' pill sits at x221–245, vertically centred on the wrap; on Missing in action, New faces and Incomplete profiles the identical pill sits 8px after the last word of a single-line title.",
+    "direction": "Bind the count to the title's last line rather than to the block — align it to the text baseline, or let the title have the width it needs at 390px by dropping Copy list below the description — so the count reads as part of the heading in every card."
+  },
+  {
+    "source": "design/phone",
+    "scene": "events",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the 'NEXT IN EACH SERIES' card against the TODAY / NEXT SEVEN DAYS / LATER groups",
+    "finding": "Round 2 gave this card the group-label vocabulary but left it at a different left edge and inside a different box, so the four labels that are now supposed to be one rank do not line up: three sit on the page at x16 and the fourth is indented to x32 inside a container lid with a rule under it. Inside that container the two rows carry their own rings 12px in from the card's ring, which is three nested boxes drawn around two rows — and their content starts at x69 where every other row on the page starts its text at x84. One rank, two indents, and the only place on the page where a ring sits inside a ring.",
+    "evidence": "events--phone-fold: 'TODAY' at x16, 'NEXT IN EACH SERIES' at x32; the calendar rows run x16–374 with text at x84, the series rows run x28–362 with text at x69. Card ring at x16–374, row rings at x28–362.",
+    "direction": "Finish the move round 2 started: if this is a group like the others, let its label sit on the page at the page's left edge and let its rows be rows at the same inset as the calendar's, so one of the two ring levels disappears. If it must stay a card, then it is not the same rank as TODAY and should not be wearing that label's clothes."
+  },
+  {
+    "source": "design/phone",
+    "scene": "events",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the detail line of every NEXT SEVEN DAYS and LATER row",
+    "finding": "Eleven consecutive upcoming rows end in an ellipsis, each at a different character, and what is being cut is the location — which is a constant per series, identical on every Friday row and every Sunday row. The line spends about 110px printing a time range that is also identical on every row of that series, and then runs out of width for the token it cut. So the reader gets a ragged column of ellipses down the whole upcoming half in exchange for repetition, and never once reads the room. Removing the Recurring badge freed the height but the line was never re-cut to fit.",
+    "evidence": "events--phone-full: '· Fellowshi…', '· Educa…', '· Fellows…', '· Educ…', '· Camp S…' down eleven rows, cutting at four different points because the date ahead of it varies in length. The past half, using the same 12px meta, prints 'Sun 26 · 9:30 AM – 10:45 AM' complete and drops the location entirely.",
+    "direction": "Decide what varies and print that. At 390px the row can carry the date and one more fact; the constants belong to the series or the group, not to eleven rows each. Whatever is chosen, the line should end because it finished, not with an ellipsis on every row."
+  },
+  {
+    "source": "design/phone",
+    "scene": "events",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the meta line of the past gathering rows against the meta line of the upcoming rows",
+    "finding": "The two halves of the calendar set the same line at two distances from the reader, and the archive is the nearer one: past rows print their date and time one full step brighter than upcoming rows. Scrolling the page, the list appears to get more legible as it goes backwards in time, which is the opposite of what the ramp is for. The two halves are visibly two different row components — the past row also swaps the chevron for a headcount and drops the location — but the only difference the reader can feel is that the finished half is louder than the coming one.",
+    "evidence": "Sampled from events--phone-full: upcoming detail lines render rgb(100,116,139) (ink-500), past detail lines rgb(148,163,184) (ink-400), while both halves set their row titles at the identical ink-100. The past treatment is shared with choose-event's CATCH UP rows, where being the brighter list is correct because it is the only list.",
+    "direction": "Pick one distance for a gathering's detail line and let the halves differ by their headings and their right-hand slot, not by how close the type is. If anything is to sit a step back it is the half the reader has already lived through."
+  },
+  {
+    "source": "design/desktop",
+    "scene": "dashboard",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the trailing end of the Missing in action rows — the MISSED count against Call/Text, the ⚠ No parent contact badge, and Elena Petrova's Email row",
+    "finding": "Folding the row to one line worked, but the whole trailing end is laid out as one right-aligned group of variable width, so the MISSED count rides on whatever contact treatment the row happens to have. That count is the only thing ranking this list — 5, 4, 4, 4 … 3 — and it never appears twice in the same place, so the eye cannot read it as a column and has to re-find it on every row. Elena's row is the worst of the three because it still prints her parent's raw email address beside the Email button: that is the same printed contact string round 2 deleted everywhere else in this card, and it is the string that drags her count 31px out of line while putting a lowercase grey address where nine other rows have a button.",
+    "evidence": "In dashboard--desktop-full the MISSED chip's left edge is x=683 on the eight Call/Text rows, x=710 on Trevor Boyd's badge row, and x=651 on Elena Petrova's Email row — 59px of spread down ten rows. In the markup the chip sits inside the `min-w-0 flex-1` identity block and the contact group is `lg:shrink-0`, so the chip is positioned by the contact group's width; Elena's group carries `<span class=\"truncate text-xs text-ink-500\">irina.petrova@example.org</span>` after the Email link, the counterpart of the phone number that was removed in r02.",
+    "direction": "Give the count its own fixed column between the identity block and the contact actions, so ten rows read as one vertical run of numbers with the actions closing the row behind them. And finish the r02 rule while you are there: the printed address should go the way the printed phone number went — the mailto already carries it, and it is what makes one row of ten a different shape from its neighbours."
+  },
+  {
+    "source": "design/desktop",
+    "scene": "dashboard",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the four stat tiles, specifically the 28rem INCOMPLETE tile against the LAST GATHERING tile",
+    "finding": "Aligning the tile row's seam to the body seam was right, but it left the row's widths inversely proportional to what the tiles have to say. The fourth cell is more than twice the width of the other three and holds the shortest caption in the row, while the first cell — the only tile carrying a comparison, and the one the round-2 critique singled out as the row's one non-redundant fact — is 30px too narrow for its own caption and wraps it onto a second line, which is what sets the height of all four. So the row reads as three cramped tiles plus a banner, and the tile with the most to say is the one that got squeezed.",
+    "evidence": "dashboard--desktop-fold: cells at 255–467, 490–701, 724–936, 959–1408 (212/211/212/449px). In the fourth, 'no parent contact' runs 977–1082, leaving 344px of the cell empty; in the first, 'Sunday School · -2 vs 18 before' breaks after 'vs 18' and occupies two lines, 273–418 of 195px available. The grid is `lg:grid-cols-[repeat(3,minmax(0,1fr))_28rem]`.",
+    "direction": "The seam is worth keeping; the cell assignment is not. Let the tile with the sentence take the wide cell and the bare count take a narrow one, or give the row four equal cells over the left column and leave the right column's width to the cards that actually need 28rem. A cell should be sized by what goes in it, not by which body column it happens to sit above."
+  },
+  {
+    "source": "design/desktop",
+    "scene": "events",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the 'Next in each series' block in the Upcoming column, against TODAY / NEXT SEVEN DAYS / LATER",
+    "finding": "Round 2 brought this block's heading down into the group vocabulary, which was right, and that has left the container behind as the only thing making it different from its three siblings. The result is a group that claims the same rank as the others but sits inside a frame nobody else has — and the frame is the same ink-900 as the rows it wraps, so it contributes an extra hairline and no ground. Its cost is alignment: its label and its rows both sit 16px inboard, so the Upcoming column has two left edges and the reader's eye finds a step in a stack that is otherwise flush. The rows inside it are also a different height and lead with a small ✓ where every other row in the column leads with a 44px icon tile, so the block breaks the column's rhythm twice over.",
+    "evidence": "events--desktop-full: TODAY, NEXT SEVEN DAYS and LATER all start at x=257; NEXT IN EACH SERIES starts at x=273. Row titles are at x=325 in every other group and x=310 inside this one. The section is `rounded-2xl bg-ink-900 ring-1 ring-ink-800` and its `<li>` anchors are `bg-ink-900 … ring-1 ring-ink-800` — identical fill, ring inside ring. Its rows are `min-h-14`, the calendar rows are `min-h-16`.",
+    "direction": "Now that the heading is a peer, let the block be one: drop the container and let its two rows sit as cards flush with the column like every other group's, so one left edge runs from 'Upcoming' to 'Show later gatherings'. If the box is genuinely wanted to say 'this is maintenance, not calendar', then it needs a ground of its own rather than the same fill with an extra ring — but the cheaper and quieter answer is to let the label do that work."
+  },
+  {
+    "source": "design/desktop",
+    "scene": "choose-event",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the 'On today' heading block against the 'CATCH UP' heading block",
+    "finding": "The two sections of this page are labelled three steps apart, and the smaller of the two owns five of the page's six cards. 'Catch up' is set so quietly that it is smaller than the explanatory sentence sitting above it under 'On today' — a section title losing to another section's body copy — and the two sub-lines that do the same job are themselves set at two sizes. Events has just settled this exact pair of ranks (halves at 16px sentence case, groups at 12px uppercase); the sibling screen still runs both idioms for two peers, so the page reads as one titled section followed by an afterthought rather than as two answers to 'which register am I opening'.",
+    "evidence": "choose-event--desktop-fold: 'On today' renders at ~20px bold ink-50 (bbox 353–453, y 79–97) with a 14px ink-500 sub-line; 'Catch up' at 12px uppercase ink-400 (bbox 353–421, y 395–403) with a 12px sub-line, over five cards. Markup: `h1 text-xl font-bold text-ink-50` + `p text-sm`, versus `h2 text-xs font-bold uppercase tracking-wider text-ink-400` + `p text-xs`. events--desktop-full sets both of its halves at 16px semibold ink-100.",
+    "direction": "Carry the Events resolution across: one treatment for the page's sections and one size for their sub-lines, with tonight's emphasis carried by the card — which is already brand-ringed and holds the only filled button on the screen — rather than by an eight-point heading gap. If 'On today' is meant to be the page title rather than a section heading, then the first group needs its own label at the same rank as 'Catch up' so the two lists are announced the same way."
+  },
+  {
+    "source": "design/desktop",
+    "scene": "roster, roster-search",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the sticky control band — quick-add '+', the search field, the Recent / Checked in chips and the All grades chip",
+    "finding": "Round 2 gave the Students toolbar one control height at pointer sizes and it now sets perfectly; the roster's band, which is the same kind of band, still runs three. The search field is the only control in it that takes the compact pointer step, so it sits 5px shorter than the chips directly beneath it and 9px shorter than the square it is paired with — and because the pair is bottom-aligned, the quick-add square stands 11px proud of the field at the top, which is exactly where the eye reads a mis-set pair. The knock-on is the vertical rhythm: the three control rows are laid out on a consistent 8px gap, but because their contents are different heights the gaps a reader actually sees between adjacent objects run 8, 19, 7, so the header stack looks accidental rather than measured.",
+    "evidence": "roster--desktop-fold, measured top-to-bottom: '+' 171–220 (50), search field 182–220 (39), Recent/Checked in chips 228–271 (44), All grades 227–272 (46), Change 119–163, event select 120–163. students--desktop-fold, same measurement: header buttons 23–60, search field 117–155, both selects 117–155, both filter chips 118–155 — one height throughout. The roster chips are `min-h-11` with no `pointer-fine` step; the field carries `pointer-fine:py-2`.",
+    "direction": "One height per band at pointer sizes, the way Students now does it — the chips and the grade control want the same compact step the field already takes, and whatever the quick-add square resolves to should match the field it sits against so the two share a top edge as well as a bottom one. Once the controls agree, the 8px gap between rows will read as the system it already is."
+  }
+]

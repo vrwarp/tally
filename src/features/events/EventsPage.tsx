@@ -27,7 +27,7 @@
  */
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Badge, Button, Card, CardHeader, EmptyState, EventIcon, SkeletonRows } from '@/components/ui';
+import { Badge, Button, EmptyState, EventIcon, SkeletonRows } from '@/components/ui';
 import { PageFrame } from '@/components/PageFrame';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
@@ -71,6 +71,12 @@ function EventRow({
 }) {
   const cancelled = event.status === 'cancelled';
 
+  const badges = [
+    event.mode === 'oneoff' ? <Badge key="oneoff" tone="brand">One-off</Badge> : null,
+    cancelled ? <Badge key="cancelled" tone="danger">Cancelled</Badge> : null,
+    event.requiresRsvp ? <Badge key="rsvp" tone="warn">RSVP only</Badge> : null,
+  ].filter(Boolean);
+
   return (
     // `min-w-0` at every level of the flex chain: a flex item defaults to
     // `min-width: auto`, which refuses to shrink below its content and pushes
@@ -92,18 +98,27 @@ function EventRow({
             {event.title}
           </span>
 
-          <span className="mt-0.5 block truncate text-xs text-ink-500">
+          {/* One step closer than it was. Five of these rows say "Friday
+              Fellowship" and five say "Sunday School", so the date is the only
+              thing that tells them apart — and it was the quietest mark in the
+              row, a step further back than the same line in the past list. */}
+          <span className="mt-0.5 block truncate text-xs text-ink-400">
             {formatEventDay(event.startAt, now)} · {formatEventWindow(event)}
             {event.location ? ` · ${event.location}` : ''}
           </span>
 
-          <span className="mt-1.5 flex flex-wrap items-center gap-1">
-            <Badge tone={event.mode === 'recurring' ? 'neutral' : 'brand'}>
-              {event.mode === 'recurring' ? 'Recurring' : 'One-off'}
-            </Badge>
-            {cancelled ? <Badge tone="danger">Cancelled</Badge> : null}
-            {event.requiresRsvp ? <Badge tone="warn">RSVP only</Badge> : null}
-          </span>
+          {/*
+            Only what makes this row different from the sixteen around it.
+
+            Every recurring row carried a grey "Recurring" chip on a line of its
+            own — a badge on every row is not information, it is a repeated
+            word, and it cost a line of height each while the one genuinely
+            different gathering, a retreat with an RSVP list, had to compete
+            with sixteen decoys wearing the same chip shape.
+          */}
+          {badges.length > 0 ? (
+            <span className="mt-1.5 flex flex-wrap items-center gap-1">{badges}</span>
+          ) : null}
         </span>
 
         <span aria-hidden="true" className="shrink-0 text-lg text-ink-600">
@@ -393,18 +408,36 @@ export function EventsPage() {
         column there and the calendar reads forwards.
       */}
       <div className="flex flex-col gap-8 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8">
-        <div className="flex min-w-0 flex-col gap-8">
+        <section aria-labelledby="events-upcoming" className="flex min-w-0 flex-col gap-8">
+          {/* Three ranks, three treatments. The two halves of the calendar are
+              the loudest, the groups inside them a step down, the month
+              captions inside those a step down again. "Past gatherings" owned
+              half the page and was set like a group inside the other half. */}
+          <h2 id="events-upcoming" className="-mb-4 text-base font-semibold text-ink-100">
+            Upcoming
+          </h2>
+
+          <Today events={today} now={now} />
+
+          {/*
+            Below tonight, not above it.
+
+            This is the maintenance shortcut — schedule next Friday — and it sat
+            first on the page wearing the loudest heading on it, so the card you
+            touch when you notice something is missing outranked the gathering
+            that is on tonight. Its rows already read "✓ … is scheduled" or
+            "+ Schedule next …", so the explainer under the title was forty
+            pixels restating them.
+          */}
           {quickActions.length > 0 ? (
-            <Card>
-              {/* Named for what it holds rather than for what it offers. The
-                  rows are a schedule button *or* a link to the occurrence that
-                  already exists, and "Quick add" made the second kind read as a
-                  receipt filed under the wrong heading. */}
-              <CardHeader
-                title="Next in each series"
-                description="Schedule the next one, or open the one already on the calendar."
-              />
-              <ul className="flex flex-col gap-2 p-3">
+            <section aria-labelledby="events-series">
+              <h3
+                id="events-series"
+                className="pb-2 text-xs font-bold uppercase tracking-wider text-ink-400"
+              >
+                Next in each series
+              </h3>
+              <ul className="flex flex-col gap-2">
                 {quickActions.map(({ series: candidate, existing }) => (
                   <QuickAction
                     key={candidate.id}
@@ -415,10 +448,8 @@ export function EventsPage() {
                   />
                 ))}
               </ul>
-            </Card>
+            </section>
           ) : null}
-
-          <Today events={today} now={now} />
 
           {nothingAhead ? (
             <EmptyState
@@ -442,7 +473,7 @@ export function EventsPage() {
             onUncancel={onUncancel}
             uncancelling={uncancelling}
           />
-        </div>
+        </section>
 
         <PastGatherings before={dayStart} />
       </div>

@@ -185,7 +185,7 @@ export function PastGatherings({ before }: PastGatheringsProps) {
     <section aria-labelledby="past-gatherings">
       <h2
         id="past-gatherings"
-        className="pb-2 text-xs font-bold uppercase tracking-wider text-ink-400"
+        className="-mb-2 text-base font-semibold text-ink-100"
       >
         Past gatherings
       </h2>

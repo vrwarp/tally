@@ -69,6 +69,16 @@ export function EventHeader({
         </p>
       </div>
 
+      {/*
+        A status, then the two ways to a different gathering, grouped as such.
+
+        The row used to run three vocabularies — a small grey capsule, a bare
+        blue word with no boundary, and a large ringed select — with the two
+        controls that do the same job looking least alike, and the one with no
+        visible boundary being the one that navigates. The status now sits apart
+        at the leading edge and the pair sits together, so proximity says what
+        the styling says.
+      */}
       <div className="mt-2 flex items-center gap-2 px-3">
         {isToday ? (
           <Badge tone="neutral" title="This gathering is on today">
@@ -86,7 +96,7 @@ export function EventHeader({
             second guess at the answer. */}
         <Link
           to="/"
-          className="min-h-11 shrink-0 rounded-full px-2 text-xs font-semibold leading-[2.75rem] text-brand-300 active:bg-ink-800"
+          className="ml-auto flex min-h-11 shrink-0 items-center rounded-full bg-ink-900 px-3 text-xs font-semibold text-brand-300 ring-1 ring-ink-700 active:bg-ink-800 pointer-fine:min-h-9"
         >
           Change
         </Link>
@@ -95,7 +105,7 @@ export function EventHeader({
           aria-label="Switch event"
           value={event.id}
           onChange={(changed) => navigate(`/event/${changed.target.value}`)}
-          className="ml-auto min-h-11 max-w-[55%] shrink truncate rounded-full bg-ink-900 px-3 text-ink-200 ring-1 ring-ink-700 focus:outline-none focus:ring-2 focus:ring-brand-400"
+          className="min-h-11 max-w-[55%] shrink truncate rounded-full bg-ink-900 px-3 text-xs text-ink-200 ring-1 ring-ink-700 focus:outline-none focus:ring-2 focus:ring-brand-400 pointer-fine:min-h-9"
         >
           {options.map((candidate) => (
             <option key={candidate.id} value={candidate.id}>

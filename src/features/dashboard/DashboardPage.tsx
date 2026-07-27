@@ -324,7 +324,9 @@ export function DashboardPage() {
 
       {error ? <ErrorBanner message={`Could not load attendance history. ${error}`} /> : null}
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      {/* Three tiles over the left column, one over the right, so the row
+          shares the body's seam and its gutter instead of running its own. */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-[repeat(3,minmax(0,1fr))_28rem] lg:gap-6">
         <StatTile
           label={activeGathering ? 'Last night' : 'Last gathering'}
           value={summary.lastEventCount}
@@ -366,8 +368,8 @@ export function DashboardPage() {
         one that grows; the short lists get a fixed 28rem, which is the width at
         which a name like "Bree Sandoval" stops truncating.
       */}
-      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_28rem] lg:items-start lg:gap-6">
-        <div className="flex min-w-0 flex-col gap-4">
+      <div className="contents lg:grid lg:grid-cols-[minmax(0,1fr)_28rem] lg:items-start lg:gap-6">
+        <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
           {awaiting ? (
             <Card>
               <span role="status" className="sr-only">
@@ -389,16 +391,29 @@ export function DashboardPage() {
                 threshold={settings.miaConsecutiveMisses}
                 gatheringTitle={activeGathering?.title ?? null}
               />
+              {/*
+                Ordered by question on a phone, by column on a laptop.
+
+                The two column wrappers above are `display: contents` below
+                `lg`, so all six sections are flex children of the page again —
+                which means the desktop split cannot decide the phone's reading
+                order as a side effect. It did once: the chart ended up gating
+                "who is new", so a leader passed a block with no names in it to
+                reach a two-name list they could act on. The chart is the one
+                section here nobody phones anybody about, so it sorts after the
+                three that are call lists.
+              */}
               <AttendanceTrend
                 snapshots={snapshots}
                 gatheringKey={activeGathering?.key ?? null}
                 gatheringTitle={activeGathering?.title ?? null}
+                className="order-5 lg:order-none"
               />
             </>
           )}
         </div>
 
-        <div className="flex min-w-0 flex-col gap-4">
+        <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
           {!awaiting && recentEvents.length > 0 ? (
             <NewVisitorList
               items={newVisitors}
@@ -430,8 +445,8 @@ export function DashboardPage() {
               they do. */}
           {!awaiting && (oneOffRecaps.length > 0 || oneOffOnly.length > 0) ? (
             <>
-              <OneOffRecapList items={oneOffRecaps} />
-              <OneOffOnlyList items={oneOffOnly} />
+              <OneOffRecapList items={oneOffRecaps} className="order-6 lg:order-none" />
+              <OneOffOnlyList items={oneOffOnly} className="order-4 lg:order-none" />
             </>
           ) : null}
         </div>

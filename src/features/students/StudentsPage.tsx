@@ -30,7 +30,7 @@ import { isUnreachable } from '@/features/dashboard/insights';
 import { AddFromPlanningCenterModal } from '@/features/students/AddFromPlanningCenterModal';
 import { StudentEditorModal } from '@/features/students/StudentEditorModal';
 import { cn, createSearchMatcher, initials, ordinalGrade } from '@/lib/utils';
-import { GRADES, studentFullName, type Grade, type Student } from '@/types';
+import { GRADES, type Grade, type Student } from '@/types';
 
 type StatusFilter = 'active' | 'inactive' | 'all';
 type QuickFilter = 'none' | 'incomplete' | 'visitors';
@@ -177,13 +177,15 @@ export function StudentsPage() {
             active={quick === 'incomplete'}
             onPress={() => setQuick((current) => (current === 'incomplete' ? 'none' : 'incomplete'))}
           >
-            Incomplete profiles ({incompleteCount})
+            Incomplete profiles
+            <ChipCount active={quick === 'incomplete'}>{incompleteCount}</ChipCount>
           </FilterChip>
           <FilterChip
             active={quick === 'visitors'}
             onPress={() => setQuick((current) => (current === 'visitors' ? 'none' : 'visitors'))}
           >
-            Visitors ({visitorCount})
+            Visitors
+            <ChipCount active={quick === 'visitors'}>{visitorCount}</ChipCount>
           </FilterChip>
           {isFiltered ? (
             <button
@@ -285,7 +287,8 @@ function FilterChip({
       onClick={onPress}
       aria-pressed={active}
       className={cn(
-        'min-h-11 shrink-0 whitespace-nowrap rounded-full px-3.5 text-xs font-semibold ring-1 transition-colors',
+        'inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5',
+        'text-xs font-semibold ring-1 transition-colors pointer-fine:min-h-9',
         active
           ? 'bg-brand-500/20 text-brand-200 ring-brand-500/40'
           : 'bg-ink-900 text-ink-400 ring-ink-800 hover:bg-ink-800',
@@ -293,6 +296,25 @@ function FilterChip({
     >
       {children}
     </button>
+  );
+}
+
+/**
+ * A count beside a chip's label, in the form the rest of the app uses — the
+ * roster's "Recent 24", the dashboard's "Missing in action 10". These two chips
+ * printed theirs in parentheses inside the label, which buried the number in a
+ * run of 12px text and made two screens describe the same quantity two ways.
+ */
+function ChipCount({ active, children }: { active: boolean; children: ReactNode }) {
+  return (
+    <span
+      className={cn(
+        'rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums',
+        active ? 'bg-brand-500/25 text-brand-100' : 'bg-ink-800 text-ink-400',
+      )}
+    >
+      {children}
+    </span>
   );
 }
 
@@ -329,16 +351,27 @@ const StudentListRow = memo(function StudentListRow({
         </span>
 
         <span className="min-w-0 flex-1 lg:flex lg:items-center lg:gap-4">
-          <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1 lg:min-w-0 lg:flex-1 lg:flex-nowrap">
-            <span className="truncate text-base font-semibold text-ink-50">
-              {studentFullName(student)}
+          <span className="min-w-0 truncate text-base text-ink-50 lg:flex-1">
+            <span className="font-semibold">{student.firstName}</span>{' '}
+            <span className="font-normal text-ink-300">{student.lastName}</span>
+          </span>
+          {/*
+            Badges annotate the row; they do not restructure it.
+
+            Laid out as part of the name they inherited its variable width, so
+            on a phone five rows in forty-five wrapped their badges to a second
+            line and pushed the grade to a third — the one fact every row shares
+            was the one whose position moved. On a laptop the same mistake put
+            "Missing info" at five different x positions, so the flag a leader
+            came to find was a ragged mid-row scan rather than a column.
+          */}
+          <span className="mt-0.5 flex items-center gap-2 text-xs text-ink-500 lg:mt-0 lg:w-64 lg:shrink-0 lg:justify-end">
+            <span className="truncate lg:w-20 lg:shrink-0 lg:text-right">
+              {ordinalGrade(student.grade)} grade
             </span>
             {student.isVisitor ? <Badge tone="brand">Visitor</Badge> : null}
             {unreachable ? <Badge tone="warn">Missing info</Badge> : null}
             {student.status === 'inactive' ? <Badge tone="neutral">Inactive</Badge> : null}
-          </span>
-          <span className="mt-0.5 flex items-center gap-2 text-xs text-ink-500 lg:mt-0 lg:w-28 lg:shrink-0 lg:justify-end">
-            <span className="truncate">{ordinalGrade(student.grade)} grade</span>
             <QueuedBadge pcoPersonId={student.pcoPersonId} />
           </span>
         </span>

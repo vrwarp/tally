@@ -69,16 +69,31 @@ export function StudentRow({
         </span>
 
         <span className="min-w-0 flex-1">
+          {/*
+            The given name leads and carries the weight, because it is the key
+            the list is sorted on and therefore the word a thumb-scrolling eye
+            is travelling down. Printed at one weight, "Maya Adebayo" gave the
+            scan nothing to land on: the leading word ran Maya, Andre, Chloe,
+            Ruby with no order in it, and a counselor either read all
+            twenty-four rows or gave up and typed.
+          */}
           <span className="flex items-baseline gap-2">
-            <span className="truncate text-base font-semibold text-ink-50">{name}</span>
+            <span className="min-w-0 truncate text-base text-ink-50">
+              <span className="font-semibold">{student.firstName}</span>{' '}
+              <span className="font-normal text-ink-300">{student.lastName}</span>
+            </span>
             <span className="shrink-0 text-xs font-medium text-ink-500">{grade}</span>
           </span>
 
           {warnings.length > 0 || showHint ? (
             <span className="mt-1 flex flex-wrap items-center gap-1">
-              {warnings.map((warning) => (
-                <WarningBadge key={warning} warning={warning} />
-              ))}
+              {/*
+                The ratio leads, badges trail. It is set in tabular numerals —
+                somebody wanted it to line up — and a badge laid out ahead of it
+                moved its column 75px to the right on the four rows that carry
+                one, so the number a counselor compares down the list never
+                appeared twice in the same place.
+              */}
               {showHint ? (
                 <span
                   className="text-[11px] font-medium tabular-nums text-ink-500"
@@ -87,6 +102,9 @@ export function StudentRow({
                   {recentHits} of {recentWindow}
                 </span>
               ) : null}
+              {warnings.map((warning) => (
+                <WarningBadge key={warning} warning={warning} />
+              ))}
             </span>
           ) : null}
         </span>
