@@ -203,34 +203,51 @@ interface RosterResponse {
   cacheTtlSeconds: number;
 }
 
-/**
- * Every Planning Center person Tally has on its roster.
- *
- * The membership is Tally's own: a `students/{id}` document whose id is
- * `pco_{personId}`. Read here rather than trusted from the caller, because the
- * whole point of the id prefix is that it says which upstream person a row
- * refers to — a browser that could name the ids would be choosing whose
- * personal details the server fetches.
- */
-async function rosterPersonIds(database: FirestoreLike): Promise<string[]> {
+interface RosterScan {
+  /**
+   * Every Planning Center person Tally has on its roster.
+   *
+   * The membership is Tally's own: a `students/{id}` document whose id is
+   * `pco_{personId}`. Read here rather than trusted from the caller, because the
+   * whole point of the id prefix is that it says which upstream person a row
+   * refers to — a browser that could name the ids would be choosing whose
+   * personal details the server fetches.
+   */
+  personIds: string[];
+  /**
+   * Active students with no Planning Center person yet — the same rows the
+   * Students screen marks "Queued". Counted on this pass rather than its own
+   * because the collection has already been read.
+   */
+  queued: number;
+}
+
+/** One scan of the students collection, for the two things anybody asks it. */
+async function scanRoster(database: FirestoreLike): Promise<RosterScan> {
   const snapshot = await database.collection(PATHS.students).get();
-  const ids: string[] = [];
+  const personIds: string[] = [];
+  let queued = 0;
+
   for (const document of snapshot.docs) {
-    const personId = personIdFromStudentId(document.id);
-    if (!personId) continue;
+    const data = document.data() ?? {};
 
     /*
      * A student taken off the roster keeps their document — every attendance
      * record points at it, so deleting the row would drop past head counts —
      * but stops being somebody Tally asks Planning Center about. Skipping them
      * here is what makes "remove" mean anything, and it also means Tally reads
-     * no personal data at all about a child who has left the ministry.
+     * no personal data at all about a child who has left the ministry. Somebody
+     * who has left is not waiting to be created upstream either, so the same
+     * skip is what keeps them out of the queued count.
      */
-    if ((document.data() ?? {}).status === 'inactive') continue;
+    if (data.status === 'inactive') continue;
 
-    ids.push(personId);
+    const personId = personIdFromStudentId(document.id);
+    if (personId) personIds.push(personId);
+    else if (typeof data.pcoPersonId !== 'string' || !data.pcoPersonId) queued += 1;
   }
-  return ids;
+
+  return { personIds, queued };
 }
 
 /**
@@ -260,7 +277,7 @@ export const getRoster = onCall<{ force?: boolean } | undefined, Promise<RosterR
         client,
         config,
         cache: sharedCache(config),
-        personIds: await rosterPersonIds(db()),
+        personIds: (await scanRoster(db())).personIds,
         force: request.data?.force === true,
       });
       return { ...result, cacheTtlSeconds: config.cacheTtlSeconds };
@@ -348,6 +365,8 @@ interface PcoStatusResult {
   peopleVisible: number | null;
   /** Roster entries whose upstream person could not be read. */
   unresolved: number;
+  /** Active students with no Planning Center person yet. */
+  queued: number;
   /**
    * The effective settings, so Settings can both describe the connection and
    * open an editor already filled in with what is actually in force — rather
@@ -384,6 +403,15 @@ export const getPlanningCenterStatus = onCall<
     await requireCoreTeam(request.auth?.uid);
 
     const config = await resolveConfig(db());
+
+    /*
+     * Read before the configuration is judged, because "how many students have
+     * not reached Planning Center" is most worth knowing in exactly the states
+     * that return early below — write-back off, or the connection broken. The
+     * roster ids from the same scan are only usable once there is a client.
+     */
+    const scan = await scanRoster(db());
+
     const base = {
       writeBack: config.writeBack,
       cacheTtlSeconds: config.cacheTtlSeconds,
@@ -400,6 +428,7 @@ export const getPlanningCenterStatus = onCall<
         managedInApp: config.managedInApp,
       },
       unresolved: 0,
+      queued: scan.queued,
     } satisfies Omit<PcoStatusResult, 'configured' | 'reachable' | 'problem' | 'peopleVisible'>;
 
     if (config.configError) {
@@ -421,7 +450,7 @@ export const getPlanningCenterStatus = onCall<
       // Deliberately the real roster query rather than a cheap ping: "we can
       // reach the API" and "we can see your students" are different claims, and
       // only the second is worth showing a leader.
-      const personIds = await rosterPersonIds(db());
+      const personIds = scan.personIds;
       const result = await fetchRoster({
         client,
         config,

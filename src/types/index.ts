@@ -593,6 +593,12 @@ export interface PcoStatus {
   peopleVisible: number | null;
   /** How many it could not: deleted upstream, merged, or no longer readable. */
   unresolved: number;
+  /**
+   * Active students with no Planning Center person yet — the rows the Students
+   * screen marks "Queued". Reported even when the connection is broken, because
+   * a queue that is not moving is the thing worth seeing.
+   */
+  queued: number;
   /** The settings actually in force, whatever their source. */
   settings: PcoEffectiveSettings;
 }

@@ -295,7 +295,7 @@ const StudentListRow = memo(function StudentListRow({ student }: { student: Stud
           </span>
           <span className="mt-0.5 flex items-center gap-2 text-xs text-ink-500">
             <span className="truncate">{ordinalGrade(student.grade)} grade</span>
-            <SourceBadge pcoPersonId={student.pcoPersonId} />
+            <QueuedBadge pcoPersonId={student.pcoPersonId} />
           </span>
         </span>
 
@@ -307,20 +307,24 @@ const StudentListRow = memo(function StudentListRow({ student }: { student: Stud
   );
 });
 
-/** Where this record came from — it decides which fields anyone can edit. */
-function SourceBadge({ pcoPersonId }: { pcoPersonId: string | null }) {
-  return pcoPersonId ? (
-    <Badge tone="neutral" title="Synced from Planning Center" className="shrink-0">
-      <span className="sr-only">Synced from Planning Center</span>
-      <span aria-hidden="true">PC</span>
-    </Badge>
-  ) : (
-    <Badge
-      tone="neutral"
-      title="Created in Tally — not linked to a Planning Center person"
-      className="shrink-0"
-    >
-      Tally only
+/**
+ * Marks the rare student who has no Planning Center person yet.
+ *
+ * There used to be a badge on every row saying which side a student came from,
+ * which meant the common case — read from Planning Center, like almost everyone
+ * — carried a mark of its own and the list said nothing. Only the exception is
+ * worth a badge, and "Queued" names the state somebody can act on rather than
+ * the collection the row happens to live in.
+ *
+ * Neutral, not warn: the row already spends its warn tone on "Missing info", and
+ * a visitor added ninety seconds ago is not a problem.
+ */
+function QueuedBadge({ pcoPersonId }: { pcoPersonId: string | null }) {
+  if (pcoPersonId) return null;
+
+  return (
+    <Badge tone="neutral" title="Waiting to be created in Planning Center" className="shrink-0">
+      Queued
     </Badge>
   );
 }
