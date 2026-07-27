@@ -47,6 +47,8 @@ export interface EventDraft {
   recurrence?: RecurrenceRule | null;
   /** Identity of the chain of repeats. Null on the event that started it. */
   recurrenceRootId?: string | null;
+  /** A `chainKey` whose regulars seed a one-off's prediction. */
+  predictFromChain?: string | null;
   startAt: Date;
   endAt: Date;
   checkInOpensAt: Date;
@@ -203,6 +205,9 @@ function buildEventPayload(draft: EventDraft, uid: string, isNew: boolean) {
         ? normalizeRecurrence(draft.recurrence, draft.startAt)
         : null,
     recurrenceRootId: draft.mode === 'recurring' ? (draft.recurrenceRootId ?? null) : null,
+    // The mirror image: a borrowed prediction belongs to a gathering that has
+    // no history of its own, so switching a trip back to recurring drops it.
+    predictFromChain: draft.mode === 'oneoff' ? (draft.predictFromChain ?? null) : null,
     startAt: draft.startAt,
     endAt: draft.endAt,
     checkInOpensAt: draft.checkInOpensAt,

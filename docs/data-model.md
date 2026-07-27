@@ -225,8 +225,9 @@ One dated gathering.
 | `title` | string | |
 | `description` | string \| null | A sentence for the people turning up — "Games, a talk and pizza". Distinct from `notes`, which is logistics for the other leaders; the description is what the check-in screen leads with when this is today's gathering. |
 | `icon` | string \| null | A Material Symbols name from the bundled catalogue in `src/lib/eventIcons.ts`. Stored as the name, not as a glyph, and validated against the catalogue on read: an event carrying a name Tally no longer ships renders as one with no icon rather than as an empty tile. |
-| `mode` | `'recurring' \| 'oneoff'` | Recurring is speed-first with a predictive roster. One-off does not repeat and never informs prediction, and its roster can be closed to the students who RSVP'd. |
-| `seriesId` | string \| null | Optional link to an `eventSeries` template, on recurring events only. Nothing in the app creates one — a series document comes from the seed — so most recurring events leave this null. |
+| `mode` | `'recurring' \| 'oneoff'` | Recurring is speed-first with a predictive roster. One-off does not repeat and never informs prediction — though it may borrow one, see `predictFromChain` — and its roster can be closed to the students who RSVP'd. |
+| `seriesId` | string \| null | Optional link to an `eventSeries` template, on recurring events only. What it does is join this gathering to that template's chain; it is not what turns prediction on, which groups by `chainKey`. Nothing in the app creates a series document — they come from the seed — so most recurring events leave this null. |
+| `predictFromChain` | string \| null | On one-off events only: the `chainKey` of the gathering whose regulars this trip borrows. A retreat has no history of its own, but the students on the coach are the ones who come on Friday nights, so a leader names that gathering and the trip's Recent filter reads its last few instances. A chain rather than a `seriesId`, so a weekly gathering created in the app can be borrowed too. Null means no prediction — the whole roster. |
 | `recurrence` | object \| null | How the event repeats (RFC 5545 subset, anchored on `startAt`). Occurrences are projected at read time, not written ahead: a document exists only for a gathering somebody acted on — see `lib/materialize.ts` and `lib/eventProjection.ts`. |
 | `recurrenceRootId` | string \| null | The hand-made event a chain of repeats grew from, or null when this event *is* that root. Copied onto every occurrence, so the chain has an identity that outlives any one instance. |
 | `startAt`, `endAt` | Timestamp | For a recurring event these are the *next* occurrence, not the first ever. Instances already held are their own documents and keep the times they ran at. |
@@ -349,6 +350,11 @@ there is one, the recurrence root otherwise. That is what makes "the same gather
 across the app, so the check-in roster, the dashboard's tabs and a student's attendance card cannot
 disagree about which nights predict, or accuse, each other. One-off events are outside it by
 definition and get their own derivations, which never produce a streak.
+
+A trip is the one thing that reaches across that line, and only in one direction: `predictFromChain`
+lets it *read* a gathering's history for its own Recent filter. Nothing ever predicts from a one-off —
+a retreat is not evidence about who turns up to a retreat — so the chains themselves stay untouched.
+`predictionChain` in `src/lib/gatherings.ts` is where the two cases meet.
 
 ---
 

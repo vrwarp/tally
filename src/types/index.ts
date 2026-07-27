@@ -321,7 +321,8 @@ import type { RecurrenceRule } from '@/lib/recurrenceCore';
  * `recurring` — Fridays/Sundays. Speed-first, roster = all active youth with a
  *               predictive "Recent" block on top.
  * `oneoff`    — retreats/outings. Does not repeat and never informs prediction,
- *               and its roster can be closed to the students who RSVP'd.
+ *               though it may borrow one (see `predictFromChain`), and its
+ *               roster can be closed to the students who RSVP'd.
  */
 export type EventMode = 'recurring' | 'oneoff';
 
@@ -352,12 +353,32 @@ export interface TallyEventDoc {
   /**
    * Optional link to an `eventSeries` template, on `recurring` events only.
    *
-   * Not required for prediction: history is grouped by the repeat chain
+   * What it does is join this gathering to that template's chain — the Fridays
+   * under `friday-fellowship` are one gathering because they share this. It is
+   * not what turns prediction on: history is grouped by the repeat chain
    * (`chainKey` — this when set, the recurrence root otherwise), so a weekly
    * gathering created in the app predicts from its own past instances with no
    * series document anywhere.
    */
   seriesId: string | null;
+  /**
+   * The gathering a one-off borrows its regulars from — a `chainKey`, or null.
+   *
+   * A trip has no history of its own and never will: it happens once. But the
+   * students on the coach are the students who come on Friday nights, and at
+   * the door of a coach that is a prediction worth having. Point this at a
+   * weekly gathering and the trip's "Recent" filter reads that gathering's last
+   * few instances instead of reading nothing.
+   *
+   * A chain rather than a `seriesId`, for the same reason `chainKey` exists: a
+   * weekly gathering created in the app has a recurrence root and no series
+   * document, and it is exactly as good a thing to predict from.
+   *
+   * One-off events only, and it only ever points *at* a recurring chain. A
+   * recurring gathering has its own past and reads that; a trip is never
+   * evidence about who turns up to anything, so nothing predicts from one.
+   */
+  predictFromChain: string | null;
   /**
    * How this gathering repeats, or null when it does not.
    *
