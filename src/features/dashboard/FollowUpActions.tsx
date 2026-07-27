@@ -11,6 +11,7 @@ import type { ReactNode } from 'react';
 import { Button, Spinner } from '@/components/ui';
 import { useToast } from '@/context/toastContext';
 import { usePersonDetails } from '@/hooks/usePersonDetails';
+import { pcoPersonUrl } from '@/lib/planningCenter';
 import { cn, formatPhone } from '@/lib/utils';
 import { buildContactList } from '@/features/dashboard/contactList';
 import { studentFullName, type Student } from '@/types';
@@ -112,10 +113,29 @@ export function FollowUpActions({ student, className }: FollowUpActionsProps) {
       </p>
     );
   } else if (!phone && !email) {
+    /*
+     * The one state that is a job rather than a dead end. Tally holds no parent
+     * contact and cannot be given one, so the fix is upstream — but "the fix is
+     * upstream" was for a while the entire row, a sentence on a list where the
+     * row above it had a button. Saying where to go is the same information; a
+     * link is that information somebody can act on with a thumb.
+     */
     body = (
       <p className="text-xs text-warn-400">
-        Planning Center has no parent contact for {name}. Nobody can follow up until somebody adds
-        one there.
+        Planning Center has no parent contact for {name}.{' '}
+        {student.pcoPersonId ? (
+          <a
+            href={pcoPersonUrl(student.pcoPersonId)}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={`Add a parent contact for ${name} in Planning Center`}
+            className="font-semibold underline"
+          >
+            Add one there
+          </a>
+        ) : (
+          'Nobody can follow up until somebody adds one there.'
+        )}
       </p>
     );
   } else if (phone) {

@@ -19,6 +19,7 @@ import {
 } from '@/components/ui';
 import { useAuth } from '@/context/authContext';
 import { useToast } from '@/context/toastContext';
+import { pcoPersonUrl } from '@/lib/planningCenter';
 import { ordinalGrade } from '@/lib/utils';
 import { createStudent, updateStudent, type StudentDraft } from '@/services/students';
 import {
@@ -31,11 +32,6 @@ import {
   type Student,
   type StudentStatus,
 } from '@/types';
-
-/** Deep link to a person in Planning Center People. Mirrored in StudentDetailPage. */
-function pcoPersonUrl(pcoPersonId: string): string {
-  return `https://people.planningcenteronline.com/people/AC${pcoPersonId}`;
-}
 
 function isPcoManaged(field: keyof Student): boolean {
   return (PCO_MANAGED_STUDENT_FIELDS as readonly string[]).includes(field);

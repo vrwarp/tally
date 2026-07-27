@@ -24,11 +24,17 @@ import { createPcoClient, PcoApiError, type PcoClient } from './pco/client.js';
 import { describePcoFailure } from './pco/debug.js';
 import { fetchListMemberIds, fetchLists, type PcoListSummary } from './pco/lists.js';
 import {
+  setParentContact as setParentContactUpstream,
+  type SetParentContactResult,
+} from './pco/parentContact.js';
+import {
   fetchParentContactStatus,
   fetchPersonDetails,
   fetchRoster,
   pcoStudentId,
+  personDetailsCacheKey,
   personIdFromStudentId,
+  reachableAdultsCacheKey,
   searchPeople,
   type ParentContactStatus,
   type PersonDetails,
@@ -315,6 +321,16 @@ export const searchPlanningCenterPeople = onCall<
   }
 });
 
+/** Mirrors `PcoPersonDetails` in src/types. */
+interface PersonDetailsResponse extends PersonDetails {
+  /**
+   * Whether Tally can add a parent contact for this student right now — an
+   * adult in the household to hang it off, *and* write-back turned up to
+   * `full`. Answered by the server because the browser can see neither half.
+   */
+  contactWritable: boolean;
+}
+
 /**
  * Parent contact and allergies for one student.
  *
@@ -323,9 +339,12 @@ export const searchPlanningCenterPeople = onCall<
  * receives a minor's parent's phone number, because the screen they are on
  * never asks for it.
  */
-export const getPersonDetails = onCall<{ pcoPersonId: string }, Promise<PersonDetails | null>>(
+export const getPersonDetails = onCall<
+  { pcoPersonId: string },
+  Promise<PersonDetailsResponse | null>
+>(
   { secrets: PCO_SECRETS, timeoutSeconds: 60, memory: '256MiB' },
-  async (request): Promise<PersonDetails | null> => {
+  async (request): Promise<PersonDetailsResponse | null> => {
     await requireCoreTeam(request.auth?.uid);
 
     const personId = request.data?.pcoPersonId;
@@ -338,12 +357,23 @@ export const getPersonDetails = onCall<{ pcoPersonId: string }, Promise<PersonDe
     if (!client) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
 
     try {
-      return await fetchPersonDetails({
+      const details = await fetchPersonDetails({
         client,
         config,
         cache: sharedCache(config),
         personId,
       });
+      if (!details) return null;
+
+      /*
+       * Added here rather than inside the cached read, because the two halves
+       * of this answer expire on completely different schedules. Whether the
+       * household has an adult is a fact about Planning Center and is worth
+       * holding for the TTL; whether Tally is allowed to write is a setting a
+       * leader may have changed a second ago, and serving that from a cache
+       * would leave a form on screen that the write path then refuses.
+       */
+      return { ...details, contactWritable: details.householdAdult && config.writeBack === 'full' };
     } catch (error) {
       return reportPcoFailure(error, 'load this student');
     }
@@ -780,6 +810,70 @@ export const pushStudentToPlanningCenter = onCall<
   // A student who is now in Planning Center must not be missing from the next
   // roster read because a cached copy predates them.
   if (result.status !== 'skipped') resetSharedCache();
+  return result;
+});
+
+/**
+ * Adds a parent's phone number or email to a student's household upstream.
+ *
+ * Gated twice over, and deliberately narrow in what it can do at all. It refuses
+ * unless write-back is `full`, and even then it only ever creates a PhoneNumber
+ * or an Email on an adult Planning Center *already* has in the household — it
+ * cannot create a person, a household, or a membership. A student with no family
+ * on file has no write path here at all; the app links out to Planning Center
+ * for that, which is where the family has to be built anyway.
+ *
+ * Core team only. This writes to the church's permanent people database, which
+ * is a wider blast radius than anything a door volunteer does.
+ */
+export const setParentContact = onCall<
+  { studentId: string; phone?: string | null; email?: string | null },
+  Promise<SetParentContactResult>
+>({ secrets: PCO_SECRETS, timeoutSeconds: 120, memory: '256MiB' }, async (request) => {
+  await requireCoreTeam(request.auth?.uid);
+
+  const studentId = request.data?.studentId;
+  if (typeof studentId !== 'string' || studentId.trim().length === 0) {
+    throw new HttpsError('invalid-argument', 'studentId is required.');
+  }
+
+  const config = await resolveConfig(db());
+  const client = clientFor(config);
+  if (!client) {
+    throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
+  }
+
+  let result: SetParentContactResult;
+  try {
+    result = await setParentContactUpstream({
+      db: db(),
+      client,
+      config,
+      studentId,
+      phone: request.data?.phone ?? null,
+      email: request.data?.email ?? null,
+      logger,
+    });
+  } catch (error) {
+    return reportPcoFailure(error, 'add a parent contact in Planning Center');
+  }
+
+  /*
+   * Drop just this student's cached details rather than the whole cache. The
+   * screen that called this re-reads immediately, and a held answer from
+   * moments ago would show the number as still missing — but nothing else about
+   * the roster changed, and a full reset would make every other counselor's
+   * next read pay for one edit.
+   */
+  if (result.status === 'updated') {
+    const cache = sharedCache(config);
+    const personId = personIdFromStudentId(studentId);
+    if (personId) cache.invalidate(personDetailsCacheKey(config.baseUrl, personId));
+    // And the sweep behind "incomplete profiles", which has just stopped being
+    // true about this household.
+    cache.invalidate(reachableAdultsCacheKey(config.baseUrl));
+  }
+
   return result;
 });
 

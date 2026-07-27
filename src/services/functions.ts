@@ -231,6 +231,42 @@ export const pushStudentToPlanningCenter = httpsCallable<
   PushStudentResult
 >(functions, 'pushStudentToPlanningCenter');
 
+export interface SetParentContactResult {
+  status:
+    | 'updated'
+    | 'already-set'
+    | 'disabled'
+    | 'no-student'
+    | 'not-in-planning-center'
+    | 'no-household-adult'
+    | 'nothing-to-write';
+  /** The adult it landed on, when there was one. */
+  parentName: string | null;
+  wrote: ('phone' | 'email')[];
+  /** Left alone because Planning Center already had one. */
+  skipped: ('phone' | 'email')[];
+  message: string;
+}
+
+/**
+ * Adds a parent's phone number or email to a student's household upstream.
+ *
+ * Far narrower than its name suggests, and deliberately so: it writes onto an
+ * adult Planning Center *already* has in the household, and it cannot create a
+ * person, a household or a membership. A student whose family is not on file
+ * has no write path at all — `PcoPersonDetails.householdAdult` is how a screen
+ * knows to link out to Planning Center instead of offering a form.
+ *
+ * Off unless `PCO_WRITE_BACK=full`, which is not the default. Check
+ * `contactWritable` before showing anything that calls this; the server refuses
+ * either way, but offering a form and then refusing it is a worse answer than
+ * not offering it.
+ */
+export const setParentContact = httpsCallable<
+  { studentId: string; phone?: string | null; email?: string | null },
+  SetParentContactResult
+>(functions, 'setParentContact');
+
 export interface PushPendingResult {
   pushed: number;
   skipped: number;

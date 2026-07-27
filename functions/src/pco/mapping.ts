@@ -51,6 +51,16 @@ export interface ParentContact {
   parentEmail: string | null;
 }
 
+/** The household adult `extractParentContact` reports on, identified. */
+export interface ParentCandidate {
+  /** Planning Center person id of the adult. */
+  id: string;
+  /** Their person resource, when it was side-loaded. */
+  member: PcoPerson | null;
+  /** Their display name, composed the same way `parentName` is. */
+  name: string | null;
+}
+
 export interface GradeRange {
   minGrade: number;
   maxGrade: number;
@@ -415,34 +425,50 @@ function pickContactValue<T extends JsonApiResource<{ primary?: boolean | null }
   return read(primary ?? usable[0]!);
 }
 
+/** Which of the two contact fields Planning Center already holds for a person. */
+export interface ContactFieldsOnFile {
+  phone: boolean;
+  email: boolean;
+}
+
+/**
+ * Exactly the two fields `extractParentContact` would hand back, as yes/no.
+ *
+ * Answered per field rather than as one boolean because the write path needs to
+ * know *which* half is missing: it may add the one that is absent and must not
+ * add a second copy of the one that is not.
+ */
+export function contactFieldsOnFile(person: PcoPerson, index: IncludedIndex): ContactFieldsOnFile {
+  const email =
+    listIncluded<PcoEmail>(index, PCO_TYPES.email).some(
+      (candidate) => ownedBy(candidate, person.id) && trimmed(candidate.attributes?.address) !== null,
+    ) ||
+    // The same last resort `extractParentContact` falls back to, for a person
+    // whose Email records were not side-loaded.
+    trimmed(person.attributes?.primary_email_address) !== null;
+
+  const phone = listIncluded<PcoPhoneNumber>(index, PCO_TYPES.phoneNumber).some(
+    (candidate) =>
+      ownedBy(candidate, person.id) &&
+      firstNonEmpty(
+        candidate.attributes?.number,
+        candidate.attributes?.national,
+        candidate.attributes?.e164,
+      ) !== null,
+  );
+
+  return { phone, email };
+}
+
 /**
  * Whether Planning Center holds any way to reach this person.
  *
- * Exactly the two fields `extractParentContact` would hand back — a phone
- * number or an email address — asked as a yes/no. That is what lets the answer
- * be carried for a whole roster without carrying a single parent's contact
- * details along with it.
+ * That is what lets the answer be carried for a whole roster without carrying a
+ * single parent's contact details along with it.
  */
 export function hasContactDetails(person: PcoPerson, index: IncludedIndex): boolean {
-  const reachableByEmail = listIncluded<PcoEmail>(index, PCO_TYPES.email).some(
-    (email) => ownedBy(email, person.id) && trimmed(email.attributes?.address) !== null,
-  );
-  if (reachableByEmail) return true;
-
-  const reachableByPhone = listIncluded<PcoPhoneNumber>(index, PCO_TYPES.phoneNumber).some(
-    (phone) =>
-      ownedBy(phone, person.id) &&
-      firstNonEmpty(
-        phone.attributes?.number,
-        phone.attributes?.national,
-        phone.attributes?.e164,
-      ) !== null,
-  );
-  if (reachableByPhone) return true;
-
-  // The same last resort `extractParentContact` falls back to, for a person
-  // whose Email records were not side-loaded.
-  return trimmed(person.attributes?.primary_email_address) !== null;
+  const onFile = contactFieldsOnFile(person, index);
+  return onFile.phone || onFile.email;
 }
 
 /**
@@ -452,10 +478,19 @@ export function hasContactDetails(person: PcoPerson, index: IncludedIndex): bool
  * any household member flagged as not-a-child; ties break on Planning Center id
  * so two syncs over an unchanged household never flap between mum and dad and
  * churn every counselor's listener.
+ *
+ * Split out from `extractParentContact` because the write path needs the same
+ * answer with the id still attached. "Who does Tally say to ring" and "whose
+ * record does Tally add a number to" must be the same person — a row that says
+ * nobody can be reached, and a write that lands on a different adult in the
+ * household, would leave the row saying it still.
  */
-export function extractParentContact(person: PcoPerson, householdIndex: IncludedIndex): ParentContact {
+export function findParentCandidate(
+  person: PcoPerson,
+  householdIndex: IncludedIndex,
+): ParentCandidate | null {
   const householdIds = new Set(householdIdsFor(person, householdIndex));
-  if (householdIds.size === 0) return { parentName: null, parentPhone: null, parentEmail: null };
+  if (householdIds.size === 0) return null;
 
   const memberships = listIncluded<PcoHouseholdMembership>(
     householdIndex,
@@ -490,15 +525,26 @@ export function extractParentContact(person: PcoPerson, householdIndex: Included
     .sort((a, b) => a.rank - b.rank || compareIds(a.id, b.id));
 
   const chosen = ranked[0];
+  if (!chosen) return null;
+
+  const attributes: PcoPersonAttributes = chosen.member?.attributes ?? {};
+  return {
+    id: chosen.id,
+    member: chosen.member ?? null,
+    name:
+      firstNonEmpty(
+        [displayFirstName(attributes), trimmed(attributes.last_name)].filter(Boolean).join(' '),
+        attributes.name,
+      ) ?? null,
+  };
+}
+
+/** Parent name, phone and email for a student, or nulls when there is nobody. */
+export function extractParentContact(person: PcoPerson, householdIndex: IncludedIndex): ParentContact {
+  const chosen = findParentCandidate(person, householdIndex);
   if (!chosen) return { parentName: null, parentPhone: null, parentEmail: null };
 
   const attributes: PcoPersonAttributes = chosen.member?.attributes ?? {};
-  const parentName =
-    firstNonEmpty(
-      [displayFirstName(attributes), trimmed(attributes.last_name)].filter(Boolean).join(' '),
-      attributes.name,
-    ) ?? null;
-
   const emails = listIncluded<PcoEmail>(householdIndex, PCO_TYPES.email).filter((email) =>
     ownedBy(email, chosen.id),
   );
@@ -507,7 +553,7 @@ export function extractParentContact(person: PcoPerson, householdIndex: Included
   );
 
   return {
-    parentName,
+    parentName: chosen.name,
     parentPhone: pickContactValue(phones, (phone) =>
       firstNonEmpty(phone.attributes?.number, phone.attributes?.national, phone.attributes?.e164),
     ),

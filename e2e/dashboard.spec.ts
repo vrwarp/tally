@@ -113,6 +113,58 @@ test.describe('dashboard', () => {
     expect(reachable, 'not one follow-up row yielded any contact details').toBeGreaterThan(0);
   });
 
+  test('a student nobody can reach still has somewhere to press', async ({ page, signedInAs }) => {
+    await signedInAs('core');
+    await gotoReady(page, '/dashboard');
+
+    /*
+     * "Actionable" used to stop at *stating* the problem. A student off the
+     * Planning Center roster with no parent on file got a sentence saying
+     * nobody could follow up, on a list where a quick-added visitor in exactly
+     * the same position got a button — the same fact, rendered once as a
+     * to-do and once as a shrug, because only the second kind carries
+     * `profileComplete: false`.
+     *
+     * Both now lead somewhere. Which link a row gets depends on where the
+     * record lives, so this asserts the promise rather than the wording: every
+     * row that says nobody can be reached also offers the way to fix it.
+     */
+    /*
+     * Each of these rows is one Planning Center read, so counting before they
+     * land counts nothing — which is a pass-shaped failure. Wait for the first,
+     * then hold the rest to the same promise.
+     */
+    const stuck = page.getByText(/has no parent contact for/);
+    await expect(stuck.first()).toBeVisible({ timeout: 20_000 });
+
+    for (const row of await stuck.all()) {
+      await expect(row.getByRole('link', { name: /in Planning Center$/ })).toHaveAttribute(
+        'href',
+        /people\.planningcenteronline\.com\/people\/AC\d+/,
+      );
+    }
+
+    /*
+     * And the list this whole change is about. "Add in Planning Center" is the
+     * New faces prompt specifically — the follow-up rows above word theirs
+     * differently — so its presence is the assertion: a first-timer off the
+     * roster with nobody on file now gets a prompt of their own rather than the
+     * paragraph that used to sit where a button was on the row above.
+     *
+     * The seed puts unreachable students in the visitor window on purpose. If
+     * that ever stops being true this fails, which is the right signal: the
+     * regression it guards would otherwise go unwatched.
+     */
+    const prompt = page.getByRole('link', { name: /in Planning Center$/ }).filter({
+      hasText: 'Add in Planning Center',
+    });
+    await expect(prompt.first()).toBeVisible({ timeout: 20_000 });
+    await expect(prompt.first()).toHaveAttribute(
+      'href',
+      /people\.planningcenteronline\.com\/people\/AC\d+/,
+    );
+  });
+
   test('a counselor cannot reach it', async ({ page, signedInAs }) => {
     await signedInAs('counselor');
 

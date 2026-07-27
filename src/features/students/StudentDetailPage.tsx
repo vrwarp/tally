@@ -39,11 +39,13 @@ import {
   standingIn,
   type GatheringStanding,
 } from '@/features/dashboard/insights';
+import { AddParentContact } from '@/features/students/AddParentContact';
 import { StudentEditorModal } from '@/features/students/StudentEditorModal';
 import { useEventSnapshots } from '@/hooks/useEventSnapshots';
 import { useNow } from '@/hooks/useNow';
 import { usePersonDetails } from '@/hooks/usePersonDetails';
 import { chainKey } from '@/lib/materialize';
+import { pcoPersonUrl } from '@/lib/planningCenter';
 import { sessionOutcome, type SessionOutcome } from '@/lib/sessionHistory';
 import { formatRelative, formatShortDate } from '@/lib/time';
 import { cn, formatPhone, initials, ordinalGrade } from '@/lib/utils';
@@ -88,11 +90,6 @@ interface HistoryGroup {
   entries: HistoryEntry[];
 }
 
-/** Deep link to a person in Planning Center People. Mirrored in StudentEditorModal. */
-function pcoPersonUrl(pcoPersonId: string): string {
-  return `https://people.planningcenteronline.com/people/AC${pcoPersonId}`;
-}
-
 /** `tel:`/`sms:` want a dialable string, not "(555) 010-0100". */
 function dialable(phone: string): string {
   return phone.replace(/[^\d+]/g, '');
@@ -114,7 +111,12 @@ export function StudentDetailPage() {
   });
 
   const student = students.find((candidate) => candidate.id === studentId) ?? null;
-  const { details, loading: detailsLoading, error: detailsError } = usePersonDetails(student);
+  const {
+    details,
+    loading: detailsLoading,
+    error: detailsError,
+    refresh: refreshDetails,
+  } = usePersonDetails(student);
 
   // Only finished gatherings: a night still in progress is not an absence.
   // Taken per gathering, so a fortnight of Fridays cannot crowd out Sunday.
@@ -448,9 +450,7 @@ export function StudentDetailPage() {
                 </p>
               </>
             ) : (
-              <p className="mt-1 text-sm text-warn-400">
-                Nothing in Planning Center — nobody can reach this family in an emergency.
-              </p>
+              <AddParentContact student={student} details={details} onAdded={refreshDetails} />
             )}
           </div>
 

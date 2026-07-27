@@ -189,7 +189,7 @@ later.
 | --- | --- | --- |
 | `off` | Nothing at all. | Everything. Quick-added visitors stay queued (`pcoPushPending: true`) so switching the mode on later picks them up with nobody re-editing anything. |
 | `create` *(default)* | Creates a **Person** for a quick-added visitor — first name, last name, grade, `child: true`, and allergies as `medical_notes` — but only after searching for an exact first + last + grade match and linking to that instead. | Any existing person. No edits, ever. Planning Center still owns every field on everyone it already knows. |
-| `full` | Everything `create` does, plus patches drifted managed fields on **linked** people: `first_name`, `last_name`, `grade`, `medical_notes`. | Parent contacts, households, emails, phone numbers, membership, notes, anything not in that list. Nothing is ever deleted or deactivated in Planning Center; a student who leaves is deactivated in Tally only. |
+| `full` | Everything `create` does, plus patches drifted managed fields on **linked** people: `first_name`, `last_name`, `grade`, `medical_notes`. Also adds a **PhoneNumber** or **Email** to an adult already in a student's household — see below. | Households, membership, notes, anything not in that list. No person is ever created to hold a parent contact, nothing on file is ever overwritten, and nothing is ever deleted or deactivated in Planning Center; a student who leaves is deactivated in Tally only. |
 
 In every mode, before creating a person Tally searches `where[search_name]` plus grade and filters
 the results again locally through the same accent- and punctuation-insensitive normalisation used to
@@ -200,6 +200,28 @@ A name Tally holds as `Benson “蔡秉洲”` is split back into `first_name` a
 this: the server's fuzzy search indexes the halves separately, and writing the composite into
 `first_name` would render as `Benson “蔡秉洲” “蔡秉洲” Tsai` on the next read and stop the matcher
 recognising the person at all — which is how a duplicate child gets created.
+
+### Parent contacts (`full` only)
+
+Every screen that finds a student nobody can reach says so and points at Planning Center, because
+that is where the answer lives — Tally has held no parent contact of its own since the mirror was
+removed. Under `full`, one screen can also fix it in place: the student's page offers a phone/email
+form, and `setParentContact` writes it upstream.
+
+What it may do is deliberately much narrower than "edit a household":
+
+- It writes onto the adult **already** in the student's household, chosen by `findParentCandidate` —
+  the same ranking the read path uses to decide whose number to *show*. If the two disagreed, a
+  leader could add a number and watch the row go on saying nobody can be reached.
+- It creates no Person, no Household and no HouseholdMembership. A student whose family is not on
+  file has no write path at all; `PcoPersonDetails.householdAdult` is how the screen knows to link
+  out instead of offering a form that would be refused.
+- It never overwrites. A field already on file is left alone and reported as skipped — the form is
+  only ever opened on the premise that there was nothing there, and that premise expires while
+  somebody is typing.
+
+`PcoPersonDetails.contactWritable` carries both halves of the gate (an adult to write onto, *and*
+`full`) so the browser never guesses at either. The token needs Editor or Manager access to People.
 
 The fields Planning Center owns once a student is linked are listed in `PCO_MANAGED_STUDENT_FIELDS`:
 first name, last name, grade, allergies, status. The student editor shows them read-only with
@@ -303,6 +325,13 @@ name a counselor sees at a door. Insights asks the question separately, gets a b
 and no contact details at all, and that is what fills the "incomplete profiles" list. Answering it
 with `false` on the roster instead would badge every student in the ministry as unreachable; leaving
 it at `null` everywhere left the list permanently empty, which is the bug this read exists to fix.
+
+Every list on Insights that says a student is unreachable must resolve the same three states the
+same way — `student.profileComplete ?? reachable.get(id) ?? null`, and only `false` is a problem.
+"New faces" consulted the flag alone for a release, so a roster student it already knew nobody could
+reach got a sentence explaining that while the row above them had a button. Tally's own flag wins
+where it has one (a quick-added visitor exists nowhere else and cannot be looked up); `null` on both
+sides means unasked, and must never render as "nobody can reach them".
 
 ## 7. Troubleshooting
 
