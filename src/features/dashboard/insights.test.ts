@@ -383,12 +383,13 @@ describe('groupByGathering', () => {
 
 describe('standingIn', () => {
   const events = fridays(3);
+  const settings = makeSettings();
 
   it('reports no misses for a student who was at the most recent night', () => {
     const student = makeStudent({ id: 'regular', createdAt: LONG_AGO });
     const [gathering] = groupByGathering(events.map((event) => held(event, [student.id])));
 
-    expect(standingIn(gathering!, student)).toMatchObject({ consecutiveMisses: 0, eligible: 3 });
+    expect(standingIn(gathering!, student, settings)).toMatchObject({ consecutiveMisses: 0, eligible: 3 });
   });
 
   it('counts back to the last night they were at', () => {
@@ -399,10 +400,40 @@ describe('standingIn', () => {
       held(events[2]!),
     ]);
 
-    const standing = standingIn(gathering!, student);
+    const standing = standingIn(gathering!, student, settings);
 
     expect(standing.consecutiveMisses).toBe(2);
     expect(standing.lastAttended!.event.id).toBe(events[0]!.id);
+  });
+
+  it('reads a regular from the Recent rule, as of their last visit', () => {
+    const student = makeStudent({ id: 'regular', createdAt: LONG_AGO });
+    const [gathering] = groupByGathering([
+      held(events[0]!, [student.id]),
+      held(events[1]!, [student.id]),
+      held(events[2]!),
+    ]);
+
+    expect(standingIn(gathering!, student, settings)).toMatchObject({
+      attended: 2,
+      wasRegular: true,
+    });
+  });
+
+  it('does not call a single drop-in a regular', () => {
+    const student = makeStudent({ id: 'drop-in', createdAt: LONG_AGO });
+    const nights = fridays(4);
+    const [gathering] = groupByGathering([
+      held(nights[0]!),
+      held(nights[1]!, [student.id]),
+      held(nights[2]!),
+      held(nights[3]!),
+    ]);
+
+    expect(standingIn(gathering!, student, settings)).toMatchObject({
+      attended: 1,
+      wasRegular: false,
+    });
   });
 
   it('does not count nights held before the student joined the roster', () => {
@@ -412,7 +443,7 @@ describe('standingIn', () => {
     });
     const [gathering] = groupByGathering(events.map((event) => held(event)));
 
-    expect(standingIn(gathering!, student)).toMatchObject({ consecutiveMisses: 1, eligible: 1 });
+    expect(standingIn(gathering!, student, settings)).toMatchObject({ consecutiveMisses: 1, eligible: 1 });
   });
 });
 
@@ -521,6 +552,92 @@ describe('computeMia across several gatherings', () => {
       gatheringKey: FRIDAY,
       alsoMissingCount: 0,
     });
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Who a gathering may expect                                                  */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * The roster is every student in the ministry, not a promise that each of them
+ * attends everything. So a miss needs an expectation behind it, and the
+ * expectation is the one check-in already computes: the Recent rule, asked as
+ * of the student's last visit. Without it the MIA list fills up with people who
+ * dropped in once in the spring and were never coming weekly.
+ */
+describe('computeMia and the expectation behind a miss', () => {
+  const settings = makeSettings({
+    miaConsecutiveMisses: 3,
+    predictiveMinAttended: 2,
+    predictiveOfLastN: 3,
+  });
+  // Oldest first: nights[0] is eight weeks back, nights[7] is the most recent.
+  const nights = fridays(8);
+  const snapshotsWith = (present: readonly number[]) =>
+    nights.map((event, index) => held(event, present.includes(index) ? ['drop-in'] : []));
+
+  it('says nothing about somebody who only ever dropped in once', () => {
+    const student = makeStudent({ id: 'drop-in', createdAt: LONG_AGO });
+
+    // One visit, with three nights behind it they were not at: 1 of 3 has never
+    // been the Recent bar, so nobody was expecting them the following week.
+    expect(computeMia([student], snapshotsWith([3]), settings)).toEqual([]);
+  });
+
+  it('lists a regular who stopped, counting only the nights since', () => {
+    const student = makeStudent({ id: 'drop-in', createdAt: LONG_AGO });
+
+    // Three in a row, then three missed: the shape of somebody drifting away.
+    const mia = computeMia([student], snapshotsWith([2, 3, 4]), settings);
+
+    expect(mia).toHaveLength(1);
+    expect(mia[0]!.consecutiveMisses).toBe(3);
+  });
+
+  it('takes its idea of a regular from the predictive settings', () => {
+    const student = makeStudent({ id: 'drop-in', createdAt: LONG_AGO });
+    const snapshots = snapshotsWith([3]);
+    const looser = makeSettings({
+      miaConsecutiveMisses: 3,
+      predictiveMinAttended: 1,
+      predictiveOfLastN: 3,
+    });
+
+    // A ministry that counts one visit in three as "we expect them" gets the
+    // longer list it asked for, from the same field the door screen reads.
+    expect(computeMia([student], snapshots, settings)).toEqual([]);
+    expect(computeMia([student], snapshots, looser)).toHaveLength(1);
+  });
+
+  /*
+   * The quick-added visitor, and the reason `wasRegular` is measured over the
+   * gathering's history rather than over the nights since the student joined:
+   * measured the second way, their first night is the oldest one they are
+   * eligible for, nothing sits behind it, and the clamp waves every one-visit
+   * visitor through as a regular.
+   */
+  it('does not turn a visitor who came once into a regular', () => {
+    const visitor = makeStudent({
+      id: 'drop-in',
+      isVisitor: true,
+      // Quick-added at the door on the night they first came, as `checkIn` does.
+      createdAt: new Date(nights[3]!.startAt.getTime() - 12 * 60_000),
+      firstAttendedAt: nights[3]!.startAt,
+    });
+
+    expect(computeMia([visitor], snapshotsWith([3]), settings)).toEqual([]);
+  });
+
+  /*
+   * The clamp, and the reason for it: there is nothing behind the oldest night
+   * in the window to judge a visit by. Excluding them would drop a genuine
+   * drifter whose last night is exactly where the window ends.
+   */
+  it('trusts a visit at the very edge of the window, having nothing behind it', () => {
+    const student = makeStudent({ id: 'drop-in', createdAt: LONG_AGO });
+
+    expect(computeMia([student], snapshotsWith([0]), settings)).toHaveLength(1);
   });
 });
 

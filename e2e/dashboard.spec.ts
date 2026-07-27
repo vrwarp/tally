@@ -134,7 +134,9 @@ test.describe('dashboard', () => {
 
     await tabs.getByRole('button', { name: 'Friday Fellowship' }).click();
 
-    await expect(page.getByText(/missed \d+ or more friday fellowship nights in a row/i)).toBeVisible();
+    await expect(
+      page.getByText(/came to friday fellowship regularly, then missed \d+ or more in a row/i),
+    ).toBeVisible();
     await expect(page.getByText(/friday fellowship — head count per night/i)).toBeVisible();
     // Nobody else's gathering leaks into a scoped list.
     await expect(page.getByText(/missing from sunday school/i)).toHaveCount(0);

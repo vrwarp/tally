@@ -22,8 +22,10 @@ import {
   computeNewVisitors,
   computeOneOffOnly,
   computeSummary,
+  groupByGathering,
   mergeMia,
   recurringSnapshots,
+  standingIn,
 } from './insights';
 import { chainKey } from '@/lib/materialize';
 import type { EventAttendanceSnapshot, Student } from '@/types';
@@ -127,8 +129,12 @@ describe('dashboard insight properties', () => {
       expect(row.consecutiveMisses).toBeLessThanOrEqual(nights.length);
       // Whatever else is true, they were not at the most recent one.
       expect(nights[0]!.presentStudentIds.has(row.student.id)).toBe(false);
-      // And this gathering has seen them, or it has no business naming them.
-      expect(nights.some((snapshot) => snapshot.presentStudentIds.has(row.student.id))).toBe(true);
+      // And this gathering could expect them, or it has no business naming
+      // them: a roster is not a promise that everybody attends everything.
+      const gathering = groupByGathering(input.snapshots).find(
+        (candidate) => candidate.key === row.gatheringKey,
+      );
+      expect(standingIn(gathering!, row.student, input.settings).wasRegular).toBe(true);
     }
   });
 

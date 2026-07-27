@@ -164,7 +164,7 @@ export function StudentDetailPage() {
     const standings = new Map(
       groupByGathering(snapshots, series).map((gathering) => [
         gathering.key,
-        { title: gathering.title, standing: standingIn(gathering, student) },
+        { title: gathering.title, standing: standingIn(gathering, student, settings) },
       ]),
     );
 
@@ -210,7 +210,7 @@ export function StudentDetailPage() {
       groups.push({ key: ONE_OFF_GROUP, title: 'One-off events', standing: null, entries: oneOff });
     }
     return groups;
-  }, [snapshots, series, student]);
+  }, [snapshots, series, student, settings]);
 
   /**
    * The streak the tile reports: the gathering they have drifted furthest from,
@@ -223,7 +223,7 @@ export function StudentDetailPage() {
    * what the dashboard shows them as too.
    */
   const worst = useMemo(() => {
-    const theirs = groups.filter((group) => group.standing?.lastAttended != null);
+    const theirs = groups.filter((group) => group.standing?.wasRegular);
 
     if (theirs.length > 0) {
       const leader = theirs.reduce((best, group) =>
@@ -596,12 +596,15 @@ export function StudentDetailPage() {
                       'Trips and retreats — no streak applies'
                     : group.standing === null
                       ? 'None of these nights happened'
-                      : group.standing.lastAttended === null
-                        ? // Not their gathering. The MIA list will not name them
-                          // here either — see the fourth exclusion in `insights`
-                          // — and a bare "8 missed in a row" beside a student who
-                          // simply goes on Fridays reads as an accusation.
-                          'Not one they come to'
+                      : !group.standing.wasRegular
+                        ? // Nobody was expecting them here, so nothing was
+                          // missed. A bare "8 missed in a row" beside a student
+                          // who goes on Fridays, or who dropped in once in the
+                          // spring, is an accusation rather than a count — and
+                          // the MIA list will not name them here either.
+                          group.standing.attended === 0
+                          ? 'Not one they come to'
+                          : `Drops in — ${group.standing.attended} of ${group.standing.eligible}`
                         : group.standing.consecutiveMisses === 0
                           ? 'At the most recent one'
                           : `${group.standing.consecutiveMisses} missed in a row${
@@ -621,7 +624,7 @@ export function StudentDetailPage() {
                     entry={entry}
                     // A trip is nobody's regular gathering, but "not on it" is
                     // still worth saying out loud, so one-offs always count.
-                    theirs={group.key === ONE_OFF_GROUP || group.standing?.lastAttended != null}
+                    theirs={group.key === ONE_OFF_GROUP || Boolean(group.standing?.wasRegular)}
                   />
                 ))}
               </ul>

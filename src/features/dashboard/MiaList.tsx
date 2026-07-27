@@ -37,8 +37,8 @@ export function MiaList({ items, threshold, gatheringTitle = null }: MiaListProp
         count={items.length}
         description={
           gatheringTitle
-            ? `Missed ${threshold} or more ${gatheringTitle} nights in a row.`
-            : `Missed ${threshold} or more nights of the same gathering in a row.`
+            ? `Came to ${gatheringTitle} regularly, then missed ${threshold} or more in a row.`
+            : `Was a regular at one gathering, then missed ${threshold} or more of it in a row.`
         }
         action={
           items.length > 0 ? (
@@ -55,8 +55,8 @@ export function MiaList({ items, threshold, gatheringTitle = null }: MiaListProp
           title={`Nobody has missed ${threshold} in a row — nice.`}
           description={
             gatheringTitle
-              ? `Everyone on the active roster has been to one of the recent ${gatheringTitle} nights.`
-              : 'Everyone on the active roster has turned up at one of the recent gatherings.'
+              ? `Every ${gatheringTitle} regular has been to one of the recent ones.`
+              : 'Every regular has turned up at one of the recent gatherings.'
           }
         />
       ) : (
@@ -135,7 +135,9 @@ function MiaRow({ item, showGathering }: { item: MiaStudent; showGathering: bool
             {consecutiveMisses}
           </span>
           <span aria-hidden="true" className="block text-[10px] uppercase tracking-wide text-ink-400">
-            missed
+            {/* Nobody expected them anywhere, so "missed" is the wrong word for
+                the number: it counts the nights that have gone by without them. */}
+            {item.gatheringTitle ? 'missed' : 'unseen'}
           </span>
         </span>
       </div>

@@ -48,9 +48,14 @@ someone's clipboard and someone's cash box, and a half-kept copy in an app is wo
 missed three gatherings in a row, first-timers from the last week, profiles with no parent contact,
 and a head-count trend. It is split by gathering, for the same reason prediction is — a student who
 comes every Sunday and has never been to a Friday has missed nothing, and the pooled version phoned
-their family about it. Each tab answers for one repeat chain, and a gathering only speaks about the
-students who come to it; somebody nothing has seen keeps their place on the list under no gathering at
-all.
+their family about it. Each tab answers for one repeat chain.
+
+A miss needs somebody to have been expecting them. The roster is every student in the ministry, not a
+promise that each of them attends everything, so "missing" means *was a regular here and stopped*:
+they cleared the check-in screen's own Recent bar as of their last visit — `predictiveMinAttended` of
+the last `predictiveOfLastN` nights of this gathering — and have since missed `miaConsecutiveMisses`
+in a row. The MIA list is exactly the people who fell off a gathering's Recent list. Somebody nothing
+has seen at all keeps their place under no gathering, with the pooled count.
 
 One-off events sit in a section below, outside the tabs, because a retreat is an instance of nothing:
 nobody can have missed it and it has no trend to be part of. What it can say is who turned up, and who

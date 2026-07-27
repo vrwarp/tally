@@ -18,6 +18,7 @@
  * file, which ask the question a one-off can actually answer — who did we meet
  * there, and have we seen them since?
  */
+import { countRecentHits, effectiveThreshold } from '@/features/roster/predictiveRoster';
 import { chainKey } from '@/lib/materialize';
 import { wasHeld } from '@/lib/sessionHistory';
 import { sortByName } from '@/lib/utils';
@@ -116,6 +117,95 @@ export function groupByGathering(
   return [...gatherings.values()].sort((a, b) => b.lastHeldAt.getTime() - a.lastHeldAt.getTime());
 }
 
+export interface GatheringStanding {
+  /** Nights of this gathering missed in a row, newest first. */
+  consecutiveMisses: number;
+  /** The most recent night of it they were at, within the loaded window. */
+  lastAttended: EventAttendanceSnapshot | null;
+  /** Nights of it held since they joined the roster — the streak's denominator. */
+  eligible: number;
+  /** Nights of it they were actually at, within the same window. */
+  attended: number;
+  /**
+   * Whether this gathering could expect them: they cleared the Recent bar as of
+   * their last visit to it. False for somebody who has only ever dropped in.
+   */
+  wasRegular: boolean;
+}
+
+/**
+ * Where one student stands with one gathering.
+ *
+ * The single implementation of the streak rule, so the MIA list and the student
+ * page cannot drift apart: a page that said "2 missed" beside a dashboard that
+ * had already phoned the family about 3 is worse than either number alone.
+ *
+ * `wasRegular` is the answer to "was anybody expecting them?", and it is
+ * deliberately the *same* question the check-in screen asks about tonight —
+ * `predictiveMinAttended` of the last `predictiveOfLastN` nights of this chain,
+ * the rule behind the Recent filter — only asked as of their last visit rather
+ * than as of now. The roster is every student in the ministry, not a promise
+ * that each of them attends everything, so a streak against somebody who drops
+ * in twice a term is arithmetic about an expectation nobody ever had. Read this
+ * way the MIA list has one meaning: the people who *fell off* this gathering's
+ * Recent list.
+ *
+ * The threshold is clamped to the history actually behind that visit, exactly
+ * as `effectiveThreshold` clamps it for a young series. The cost is that a
+ * student whose only visit is the oldest night in the window counts as a
+ * regular — there is nothing behind it to judge them by. That is the forgiving
+ * direction, and it is the one that keeps a genuine drifter on the list when
+ * the window is only just long enough to reach their last night.
+ */
+export function standingIn(
+  gathering: Gathering,
+  student: Student,
+  settings: AppSettings,
+): GatheringStanding {
+  // Only nights the student could plausibly have attended.
+  const eligible = gathering.snapshots.filter(
+    (snapshot) => snapshot.event.startAt.getTime() >= student.createdAt.getTime(),
+  );
+
+  let consecutiveMisses = 0;
+  let lastAttended: EventAttendanceSnapshot | null = null;
+
+  for (const snapshot of eligible) {
+    if (snapshot.presentStudentIds.has(student.id)) {
+      lastAttended = snapshot;
+      break;
+    }
+    consecutiveMisses += 1;
+  }
+
+  const attended = eligible.filter((snapshot) =>
+    snapshot.presentStudentIds.has(student.id),
+  ).length;
+
+  /*
+   * The Recent window as it stood on the night they last came: that night and
+   * the ones before it, newest first.
+   *
+   * Measured over the gathering's whole history rather than over `eligible`,
+   * because "was there enough history to judge this visit?" is a question about
+   * the calendar, not about when the student was added. Counting from their
+   * join date instead made every quick-added visitor a regular by definition:
+   * their first night is the oldest one they are eligible for, nothing sits
+   * behind it, and the clamp then waved them through. A visitor who came once
+   * and never came back is a real follow-up, but they are not somebody a
+   * gathering was expecting — and this list is only about expectations broken.
+   */
+  const inHistory = lastAttended === null ? -1 : gathering.snapshots.indexOf(lastAttended);
+  const asOfLastVisit =
+    inHistory < 0 ? [] : gathering.snapshots.slice(inHistory, inHistory + settings.predictiveOfLastN);
+  const wasRegular =
+    lastAttended !== null &&
+    countRecentHits(student.id, asOfLastVisit) >=
+      effectiveThreshold(settings, asOfLastVisit.length);
+
+  return { consecutiveMisses, lastAttended, eligible: eligible.length, attended, wasRegular };
+}
+
 /**
  * Students who have missed `miaConsecutiveMisses` or more recurring gatherings
  * in a row.
@@ -137,53 +227,18 @@ export function groupByGathering(
  * not confined to this one gathering, which is a different conversation.
  *
  * Which forces a fourth exclusion, and it is the one that makes the split
- * usable: a gathering may only speak about the students who *come to it*. Every
- * Friday regular has "missed" every Sunday School since the beginning of time,
- * and listing them would put most of the ministry on the Sunday call list —
- * including students seen two days ago. So a row needs evidence the student was
- * ever part of this gathering, which is one attendance at it inside the loaded
- * window.
+ * usable: a gathering may only speak about the students it could *expect*.
+ * Every Friday regular has "missed" every Sunday School since the beginning of
+ * time, and listing them would put most of the ministry on the Sunday call list
+ * — including students seen two days ago. The roster is every student in the
+ * ministry, not a promise that each of them attends everything, so a row needs
+ * an expectation to have been broken: `wasRegular`, which is the check-in
+ * screen's own Recent rule asked as of the student's last visit.
  *
  * Students seen at *nothing* keep their place on the list — they are exactly
  * the person most worth a phone call — but they belong to no gathering, so
  * `computeUnseen` carries them instead, with no gathering named.
  */
-export interface GatheringStanding {
-  /** Nights of this gathering missed in a row, newest first. */
-  consecutiveMisses: number;
-  /** The most recent night of it they were at, within the loaded window. */
-  lastAttended: EventAttendanceSnapshot | null;
-  /** Nights of it held since they joined the roster — the streak's denominator. */
-  eligible: number;
-}
-
-/**
- * Where one student stands with one gathering.
- *
- * The single implementation of the streak rule, so the MIA list and the student
- * page cannot drift apart: a page that said "2 missed" beside a dashboard that
- * had already phoned the family about 3 is worse than either number alone.
- */
-export function standingIn(gathering: Gathering, student: Student): GatheringStanding {
-  // Only nights the student could plausibly have attended.
-  const eligible = gathering.snapshots.filter(
-    (snapshot) => snapshot.event.startAt.getTime() >= student.createdAt.getTime(),
-  );
-
-  let consecutiveMisses = 0;
-  let lastAttended: EventAttendanceSnapshot | null = null;
-
-  for (const snapshot of eligible) {
-    if (snapshot.presentStudentIds.has(student.id)) {
-      lastAttended = snapshot;
-      break;
-    }
-    consecutiveMisses += 1;
-  }
-
-  return { consecutiveMisses, lastAttended, eligible: eligible.length };
-}
-
 export function computeMiaFor(
   gathering: Gathering,
   students: readonly Student[],
@@ -196,13 +251,18 @@ export function computeMiaFor(
   for (const student of students) {
     if (student.status !== 'active') continue;
 
-    const { consecutiveMisses, lastAttended, eligible } = standingIn(gathering, student);
+    const { consecutiveMisses, lastAttended, eligible, wasRegular } = standingIn(
+      gathering,
+      student,
+      settings,
+    );
     if (eligible < settings.miaConsecutiveMisses) continue;
     if (consecutiveMisses < settings.miaConsecutiveMisses) continue;
-    // Never been to this one, so there is nothing to have drifted from. See the
-    // fourth exclusion above: without this, every Friday regular is missing
-    // from Sunday School.
-    if (!lastAttended) continue;
+    // Nobody was expecting them, so nobody can have missed them. See the fourth
+    // exclusion above: without this, every Friday regular is missing from
+    // Sunday School, and everyone who dropped in on one Sunday is missing from
+    // the seven Sundays they never intended to be at.
+    if (!wasRegular || !lastAttended) continue;
 
     results.push({
       student,
