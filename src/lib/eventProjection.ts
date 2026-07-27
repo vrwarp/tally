@@ -48,6 +48,8 @@ function asEvent(
     // The chain's root, resolved here so every projected instance carries the
     // same one and the derived ids stay stable.
     recurrenceRootId: source.recurrenceRootId ?? source.id,
+    // Nothing projected is a one-off, and only a one-off borrows a prediction.
+    predictFromChain: null,
     startAt: occurrence.startAt,
     endAt: occurrence.endAt,
     checkInOpensAt: occurrence.checkInOpensAt,

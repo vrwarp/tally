@@ -905,6 +905,10 @@ function collectWrites(now: Date): {
               : 'groups',
         mode: isOneOff ? 'oneoff' : 'recurring',
         seriesId: event.seriesId,
+        // The bus to the retreat is largely the Friday night crowd, and saying
+        // so is the only way a trip gets a predicted roster at all. The lock-in
+        // leaves it unset, so both halves of the choice are in the demo data.
+        predictFromChain: isRetreat ? SERIES_IDS.fridayFellowship : null,
         // A retreat happens once; everything else is the weekly slot its series
         // describes, phrased from the day the instance itself lands on.
         recurrence: isOneOff

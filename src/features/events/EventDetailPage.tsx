@@ -28,6 +28,7 @@ import { EventEditorModal } from '@/features/events/EventEditorModal';
 import { RsvpManager } from '@/features/events/RsvpManager';
 import { useAttendance } from '@/hooks/useAttendance';
 import { useNow } from '@/hooks/useNow';
+import { gatheringOptions } from '@/lib/gatherings';
 import { describeRecurrence } from '@/lib/recurrence';
 import { formatClock, formatEventDay, formatEventWindow, isCheckInOpen } from '@/lib/time';
 import { cn, ordinalGrade } from '@/lib/utils';
@@ -89,6 +90,11 @@ export function EventDetailPage() {
 
   const cancelled = event.status === 'cancelled';
   const seriesTitle = series.find((candidate) => candidate.id === event.seriesId)?.title ?? null;
+  // Said out loud, because a trip with a predicted roster looks identical to one
+  // without until somebody taps "Recent" and wonders where the list came from.
+  const predictedFrom =
+    gatheringOptions(events, series).find((chain) => chain.key === event.predictFromChain)?.title ??
+    null;
 
   /*
    * A finished gathering with nobody checked in.
@@ -186,6 +192,7 @@ export function EventDetailPage() {
 
           <dl className="divide-y divide-ink-800 border-t border-ink-800 pt-1">
             {seriesTitle ? <DetailRow label="Series" value={seriesTitle} /> : null}
+            {predictedFrom ? <DetailRow label="Regulars from" value={predictedFrom} /> : null}
             {event.recurrence ? (
               <DetailRow
                 label="Repeats"

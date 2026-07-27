@@ -238,11 +238,82 @@ describe('buildSeriesHistory', () => {
     ]);
   });
 
-  it('returns nothing for an event with no series (a one-off)', () => {
+  it('returns nothing for a one-off that borrows from nothing', () => {
     const retreat = makeOneOff({ id: 'retreat' });
     const snapshots = pastFridays(3).map((event) => held(event));
 
     expect(buildSeriesHistory(retreat, snapshots, settings)).toEqual([]);
+  });
+
+  /*
+   * A trip has no past of its own, but the students on the coach are the
+   * students who come on Friday nights. Naming that gathering is the whole
+   * feature — see `predictFromChain`.
+   */
+  describe('a one-off borrowing a gathering', () => {
+    const retreat = makeOneOff({ id: 'retreat', predictFromChain: FRIDAY });
+
+    it('predicts from the gathering it names', () => {
+      const snapshots = pastFridays(5).map((event) => held(event));
+
+      const history = buildSeriesHistory(retreat, snapshots, settings);
+
+      expect(history.map((snapshot) => snapshot.event.id)).toEqual([
+        `${FRIDAY}-1`,
+        `${FRIDAY}-2`,
+        `${FRIDAY}-3`,
+      ]);
+    });
+
+    it('reads a chain held together by a recurrence root, not only a series', () => {
+      const ROOT = 'saturday-root';
+      const rooted = (weeksBack: number) => {
+        const [instance] = makeWeeklyEvents({ count: weeksBack, seriesId: ROOT });
+        return makeEvent({ ...instance!, seriesId: null, recurrenceRootId: ROOT });
+      };
+      const outing = makeOneOff({ id: 'outing', predictFromChain: ROOT });
+      const snapshots = [rooted(1), rooted(2)].map((event) => held(event));
+
+      const history = buildSeriesHistory(outing, snapshots, settings);
+
+      expect(history.map((snapshot) => snapshot.event.id)).toEqual([`${ROOT}-1`, `${ROOT}-2`]);
+    });
+
+    it('takes nothing from the gatherings it did not name', () => {
+      const snapshots = [
+        ...pastFridays(2).map((event) => held(event)),
+        ...pastSundays(2).map((event) => held(event)),
+      ];
+
+      const history = buildSeriesHistory(retreat, snapshots, settings);
+
+      expect(history.every((snapshot) => snapshot.event.seriesId === FRIDAY)).toBe(true);
+    });
+
+    /*
+     * Two trips pointed at Friday are still two trips. A retreat is not
+     * evidence about who turns up to a retreat, whichever chain either names.
+     */
+    it('never counts another one-off, even one borrowing the same gathering', () => {
+      const lastYear = makeSnapshot(
+        makeOneOff({ id: 'last-retreat', predictFromChain: FRIDAY }),
+        [REGULAR],
+      );
+      const snapshots = [lastYear, ...pastFridays(2).map((event) => held(event))];
+
+      const history = buildSeriesHistory(retreat, snapshots, settings);
+
+      expect(history.map((snapshot) => snapshot.event.id)).not.toContain('last-retreat');
+      expect(history).toHaveLength(2);
+    });
+
+    it('predicts from nothing when the gathering it names has gone', () => {
+      const snapshots = pastSundays(3).map((event) => held(event));
+
+      expect(buildSeriesHistory(makeOneOff({ id: 't', predictFromChain: 'gone' }), snapshots, settings)).toEqual(
+        [],
+      );
+    });
   });
 
   /*
@@ -670,7 +741,7 @@ describe('buildRoster: one-off events', () => {
     expect(waiting(view)[0]!.warnings).toEqual([]);
   });
 
-  it('predicts nothing — a one-off has no series history', () => {
+  it('predicts nothing on its own — a one-off has no history', () => {
     const view = roster({
       event: retreat,
       students: [yes],
@@ -680,6 +751,27 @@ describe('buildRoster: one-off events', () => {
 
     expect(view.counts.historyWindow).toBe(0);
     expect(predicted(view)).toEqual([]);
+  });
+
+  /*
+   * The two roster rules on a trip are independent, and this is where that
+   * shows: the RSVP list says who may be on the coach, and the borrowed
+   * gathering says which of them a counselor should expect at the door.
+   */
+  it('marks the borrowed gathering’s regulars, without letting them past the RSVP list', () => {
+    const view = roster({
+      event: makeOneOff({ ...retreat, predictFromChain: FRIDAY }),
+      students: [yes, maybe, silent],
+      rsvps,
+      history: pastFridays(3).map((event) => makeSnapshot(event, [yes.id, silent.id])),
+      settings: makeSettings({ predictiveOfLastN: 3, predictiveMinAttended: 2 }),
+    });
+
+    expect(view.counts.historyWindow).toBe(3);
+    // `silent` is a Friday regular and did not RSVP, so the prediction says
+    // nothing about them: they are not on the trip at all.
+    expect(ids(predicted(view))).toEqual([yes.id]);
+    expect(view.counts.eligible).toBe(2);
   });
 });
 

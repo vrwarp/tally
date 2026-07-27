@@ -211,6 +211,9 @@ export function toEvent(snapshot: DocumentSnapshot<DocumentData>): TallyEvent {
     // dropped rather than rendered.
     recurrence: mode === 'recurring' ? toRecurrence(data.recurrence, startAt) : null,
     recurrenceRootId: strOrNull(data.recurrenceRootId),
+    // Only a trip borrows a prediction. A recurring gathering reads its own
+    // chain, and a stray value here would silently redirect it to another one.
+    predictFromChain: mode === 'oneoff' ? strOrNull(data.predictFromChain) : null,
     startAt,
     endAt,
     checkInOpensAt: toDate(data.checkInOpensAt, startAt),

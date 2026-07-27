@@ -74,6 +74,8 @@ export function ThresholdPreview({ draft, saved, valid }: ThresholdPreviewProps)
           // not the pattern that will schedule the next one.
           recurrence: null,
           recurrenceRootId: null,
+          // A gathering that repeats reads its own history; only a trip borrows.
+          predictFromChain: null,
           startAt: now,
           endAt: now,
           checkInOpensAt: now,

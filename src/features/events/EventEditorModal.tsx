@@ -39,6 +39,7 @@ import { useToast } from '@/context/toastContext';
 import { CheckInWindowField } from '@/features/events/CheckInWindowField';
 import { IconPickerField } from '@/features/events/IconPickerField';
 import { RecurrenceField } from '@/features/events/RecurrenceField';
+import { gatheringOptions } from '@/lib/gatherings';
 import { defaultRecurrence, retimeRecurrence, validateRecurrence } from '@/lib/recurrence';
 import { cn } from '@/lib/utils';
 import {
@@ -62,6 +63,8 @@ interface EditorForm {
   icon: string;
   mode: EventMode;
   seriesId: string;
+  /** A `chainKey`, or `''`. The gathering a one-off borrows its regulars from. */
+  predictFromChain: string;
   /**
   * Anchored on `start`, never on a date of its own. Always present — a
   * recurring gathering repeats by definition — and simply unused while the
@@ -134,6 +137,7 @@ function buildForm(
     icon: event?.icon ?? defaults?.icon ?? '',
     mode,
     seriesId: event?.seriesId ?? defaults?.seriesId ?? '',
+    predictFromChain: event?.predictFromChain ?? defaults?.predictFromChain ?? '',
     recurrence,
     start: toDateTimeLocalValue(startAt),
     end: toDateTimeLocalValue(endAt),
@@ -236,7 +240,7 @@ export function EventEditorModal({
   defaults,
   onSaved,
 }: EventEditorModalProps) {
-  const { series } = useData();
+  const { events, series } = useData();
   const { user } = useAuth();
   const { show } = useToast();
 
@@ -308,6 +312,10 @@ export function EventEditorModal({
       // rather than leaving a closed roster on a Friday night, where it would
       // hide every student who had not been added to a list nobody built.
       seriesId: mode === 'recurring' ? current.seriesId : '',
+      // The other direction of the same idea: a gathering that repeats reads its
+      // own past, so a borrowed one would be a second answer to a settled
+      // question — and one nothing on screen would still be showing.
+      predictFromChain: mode === 'oneoff' ? current.predictFromChain : '',
       requiresRsvp: mode === 'oneoff',
     }));
   };
@@ -354,6 +362,7 @@ export function EventEditorModal({
       icon: form.icon || null,
       mode: form.mode,
       seriesId: form.mode === 'recurring' ? form.seriesId || null : null,
+      predictFromChain: form.mode === 'oneoff' ? form.predictFromChain || null : null,
       recurrence: form.mode === 'recurring' ? form.recurrence : null,
       startAt: times.startAt,
       endAt: times.endAt,
@@ -407,6 +416,17 @@ export function EventEditorModal({
     (candidate) => candidate.active || candidate.id === form.seriesId,
   );
 
+  // The gatherings a trip can borrow its regulars from. Only offered on a
+  // one-off, so it costs nothing to compute for the other half of the form.
+  const chains = gatheringOptions(events, series);
+  // The same rule as the inactive series above, for the same reason: a chain
+  // whose last night is older than the loaded window is no longer in this list,
+  // and dropping it on open would quietly unset the field on the next save.
+  const chainOptions =
+    form.predictFromChain && !chains.some((chain) => chain.key === form.predictFromChain)
+      ? [...chains, { key: form.predictFromChain, title: 'The gathering already chosen' }]
+      : chains;
+
   return (
     <Modal
       open={open}
@@ -417,7 +437,9 @@ export function EventEditorModal({
           ? form.mode === 'recurring'
             ? 'The dates ahead follow the schedule; this changes them from here on.'
             : 'Changes apply to this gathering only.'
-          : 'Recurring gatherings predict their roster from past instances.'
+          : form.mode === 'recurring'
+            ? 'Recurring gatherings predict their roster from their own past nights.'
+            : 'A trip borrows its predicted roster from a gathering that repeats.'
       }
       size="lg"
       footer={
@@ -486,22 +508,37 @@ export function EventEditorModal({
             onChange={(changed) => handleModeChange(changed.target.value as EventMode)}
             hint={
               form.mode === 'recurring'
-                ? 'Everyone active is on the roster, with a predicted “Recent” block on top.'
-                : 'Happens once, never predicts, and can limit its roster to the students who RSVP’d.'
+                ? 'Everyone active is on the roster, and its own past nights mark the regulars “Recent”.'
+                : 'Happens once. Can borrow another gathering’s regulars, and limit its roster to the students who RSVP’d.'
             }
           >
             <option value="recurring">Recurring</option>
             <option value="oneoff">One-off — retreat, outing</option>
           </SelectField>
 
+          {/*
+            * Which gathering this *is*, not whether it predicts.
+            *
+            * It used to say "No series — no predicted roster", which was a
+            * leftover from when prediction keyed on the series document alone.
+            * It has not been true since history started grouping by the repeat
+            * chain: a weekly gathering scheduled here predicts from its own past
+            * nights whether or not a series exists to name it. What picking one
+            * actually does is join this to that series' history — Fridays under
+            * `friday-fellowship` are one gathering because they share it.
+            */}
           {form.mode === 'recurring' ? (
             <SelectField
               label="Series"
               value={form.seriesId}
               onChange={(changed) => handleSeriesChange(changed.target.value)}
-              hint="The series decides which past gatherings predict this roster."
+              hint={
+                form.seriesId
+                  ? 'Its roster is predicted from that series’ past gatherings.'
+                  : 'Optional. Either way this predicts from its own past gatherings — pick one to share an existing gathering’s history.'
+              }
             >
-              <option value="">No series — no predicted roster</option>
+              <option value="">Not part of one</option>
               {seriesOptions.map((candidate) => (
                 <option key={candidate.id} value={candidate.id}>
                   {candidate.title}
@@ -568,13 +605,45 @@ export function EventEditorModal({
             onClosesChange={(value) => patch({ checkInCloses: value, closesPinned: true })}
           />
 
+          {/*
+            * Where a trip gets a predicted roster, and the reason the series
+            * picker on the left is *not* about prediction.
+            *
+            * A one-off has no past of its own — it happens once — so on its own
+            * it opens on the whole ministry and the "Recent" filter has nothing
+            * to say. But a retreat is largely the Friday night crowd, and a
+            * leader knows which crowd. Naming that gathering here is what makes
+            * the filter mean something at the door of a coach.
+            */}
           {form.mode === 'oneoff' ? (
-            <CheckboxField
-              label="Limit the roster to students who RSVP’d"
-              hint="Nobody else appears at check-in, so the trip list stays closed."
-              checked={form.requiresRsvp}
-              onChange={(changed) => patch({ requiresRsvp: changed.target.checked })}
-            />
+            <>
+              <SelectField
+                label="Predicted roster"
+                value={form.predictFromChain}
+                onChange={(changed) => patch({ predictFromChain: changed.target.value })}
+                hint={
+                  form.predictFromChain
+                    ? 'Its regulars are marked “Recent” here. Everybody else is still on the roster.'
+                    : 'A trip has no past of its own. Borrow a gathering’s regulars and “Recent” still means something.'
+                }
+              >
+                <option value="">No prediction — the whole roster</option>
+                {chainOptions.map((chain) => (
+                  <option key={chain.key} value={chain.key}>
+                    {chain.title}
+                  </option>
+                ))}
+              </SelectField>
+
+              {/* Who may be on the coach at all, which the prediction above
+                  never decides — see `isEligible`. */}
+              <CheckboxField
+                label="Limit the roster to students who RSVP’d"
+                hint="Nobody else appears at check-in, so the trip list stays closed."
+                checked={form.requiresRsvp}
+                onChange={(changed) => patch({ requiresRsvp: changed.target.checked })}
+              />
+            </>
           ) : null}
 
           <TextField

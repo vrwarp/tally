@@ -6,13 +6,15 @@
  * fully testable and keeps the components dumb.
  *
  * The rule: a student is flagged `isRecent` when they attended at least
- * `predictiveMinAttended` of the last `predictiveOfLastN` instances of *this
- * specific series*. Friday history predicts Friday; Sunday history predicts
- * Sunday. They never cross.
+ * `predictiveMinAttended` of the last `predictiveOfLastN` instances of *one
+ * specific gathering*. Friday history predicts Friday; Sunday history predicts
+ * Sunday. They never cross. A one-off names the gathering it borrows from and
+ * otherwise predicts from nothing — see `lib/gatherings.ts`.
  *
  * The prediction is a *filter* on one list, not a block above it. See
  * `RosterFocus` for why the check-in screen stopped moving students around.
  */
+import { predictionChain } from '@/lib/gatherings';
 import { chainKey } from '@/lib/materialize';
 import { wasHeld } from '@/lib/sessionHistory';
 import { createSearchMatcher, sortByName } from '@/lib/utils';
@@ -114,17 +116,23 @@ export function effectiveThreshold(settings: AppSettings, historyWindow: number)
 /**
  * Selects the past instances that inform a given event's prediction.
  *
- * Only instances of the same series count, only instances that have already
+ * Only instances of the same chain count, only instances that have already
  * finished, and only the most recent `ofLastN` of them. The event being checked
  * into is excluded — an event never predicts itself.
  *
- * "Same series" is `chainKey`, not `seriesId`. A series document is one way to
+ * "Same chain" is `chainKey`, not `seriesId`. A series document is one way to
  * say two gatherings are the same gathering; a shared recurrence root is the
  * other, and it is the only one a weekly event created in the app has. Reading
  * `seriesId` alone meant such an event predicted from nothing forever, however
  * many Saturdays it had behind it, which looked exactly like a broken feature.
- * One-off events are still excluded outright — a retreat has no series to be
- * the latest instance of.
+ *
+ * A one-off names its chain instead of having one. A retreat is not the latest
+ * instance of anything, so there is nothing to derive — but the students on the
+ * coach are the ones who come on Friday nights, and `predictFromChain` is a
+ * leader saying so. Left unset, a trip predicts from nothing, as before.
+ *
+ * What is never borrowed *from* is another one-off: a retreat is not evidence
+ * about who turns up to a retreat, whichever chain either of them names.
  *
  * A gathering that never happened is excluded too, whether it was marked
  * cancelled or merely has nobody checked in (see `wasHeld`). That filter runs
@@ -133,12 +141,12 @@ export function effectiveThreshold(settings: AppSettings, historyWindow: number)
  * regular in the ministry to "not recent".
  */
 export function buildSeriesHistory(
-  event: Pick<TallyEvent, 'id' | 'mode' | 'seriesId' | 'recurrenceRootId'>,
+  event: Pick<TallyEvent, 'id' | 'mode' | 'seriesId' | 'recurrenceRootId' | 'predictFromChain'>,
   snapshots: readonly EventAttendanceSnapshot[],
   settings: AppSettings,
 ): EventAttendanceSnapshot[] {
-  if (event.mode === 'oneoff') return [];
-  const chain = chainKey(event);
+  const chain = predictionChain(event);
+  if (!chain) return [];
   return snapshots
     .filter(
       (snapshot) =>
