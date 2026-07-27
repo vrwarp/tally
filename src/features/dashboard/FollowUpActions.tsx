@@ -49,109 +49,119 @@ export interface FollowUpActionsProps {
 }
 
 /**
- * Contact affordances for one student — behind a tap.
+ * Contact affordances for one student.
  *
  * Tally does not hold parent contact details; Planning Center does, and they are
- * read one person at a time. That constraint turns out to make a better screen
- * than the one it replaced. A follow-up list of twenty students used to put
- * twenty parents' phone numbers on a leader's phone at once, which is both more
- * information than anyone needed at that moment and a lot of other people's
- * personal data sitting on a screen in a coffee shop. Now the row says who to
- * chase, and asks before it fetches how.
+ * read one person at a time. That used to be spent as a feature: the row named
+ * who to chase and offered to look up *how*, so a list of twenty students never
+ * put twenty parents' phone numbers on a leader's phone at once. The reads are
+ * cheap now — a cache in front of Planning Center absorbs them — and what is
+ * left of the old design is a tap between a leader and the only thing the row
+ * is for. So the row fetches on sight.
+ *
+ * The tap is gone; the honesty is not. Every state this can land in says which
+ * one it is, because a row that resolves to nothing is a row somebody has to
+ * work out by hand: no record upstream, no contact on the record, a Planning
+ * Center that could not be reached. Each is a different thing to go and fix.
  *
  * A leader chasing a 9th grader on a Tuesday morning usually texts first and
  * calls if that goes nowhere, so a phone number gets both.
  */
 export function FollowUpActions({ student, className }: FollowUpActionsProps) {
-  const { details, loading, error, unavailable, load } = usePersonDetails(student);
+  const { details, error, loaded, unavailable, retry } = usePersonDetails(student);
 
   const name = studentFullName(student);
   const phone = details?.parentPhone?.trim() ?? '';
   const email = details?.parentEmail?.trim() ?? '';
   const parent = details?.parentName?.trim() || `${name}'s parent`;
 
+  let body: ReactNode;
+
   if (unavailable) {
-    return (
-      <p className={cn('text-xs text-warn-400', className)}>
+    body = (
+      <p className="text-xs text-warn-400">
         Not in Planning Center yet, so there is nobody to call. Add them there to follow up.
       </p>
     );
-  }
-
-  if (error) {
-    return (
-      <div className={cn('flex flex-wrap items-center gap-2', className)}>
+  } else if (error) {
+    body = (
+      <div className="flex flex-wrap items-center gap-2">
         <p className="text-xs text-danger-400">{error}</p>
-        <Button variant="ghost" size="sm" onClick={load}>
+        <Button variant="ghost" size="sm" onClick={retry}>
           Try again
         </Button>
       </div>
     );
-  }
-
-  if (loading) {
-    return (
-      <p className={cn('flex items-center gap-2 text-xs text-ink-500', className)}>
+  } else if (!loaded) {
+    // Also the frame before the fetch starts, which is why this asks `loaded`
+    // rather than `loading` — otherwise every row blinks through an empty state
+    // on its way to the spinner.
+    body = (
+      <p className="flex items-center gap-2 text-xs text-ink-500">
         <Spinner /> Looking up contact details…
       </p>
     );
-  }
-
-  if (!details) {
-    return (
-      <Button
-        variant="secondary"
-        size="sm"
-        onClick={load}
-        className={className}
-        aria-label={`Look up contact details for ${name}`}
-      >
-        Show contact
-      </Button>
+  } else if (!details) {
+    // Read, and Planning Center returned nobody: the person behind this student
+    // was deleted or merged upstream. Distinct from "no contact on file", and
+    // fixed in a different place.
+    body = (
+      <p className="text-xs text-warn-400">
+        Planning Center no longer has a record for {name} — deleted or merged there. Nobody can
+        follow up until that is sorted out.
+      </p>
     );
-  }
-
-  if (!phone && !email) {
-    return (
-      <p className={cn('text-xs text-warn-400', className)}>
+  } else if (!phone && !email) {
+    body = (
+      <p className="text-xs text-warn-400">
         Planning Center has no parent contact for {name}. Nobody can follow up until somebody adds
         one there.
       </p>
     );
+  } else if (phone) {
+    body = (
+      <div className="flex flex-wrap items-center gap-2">
+        <ActionLink
+          href={`tel:${dialable(phone)}`}
+          label={`Call ${parent} about ${name} at ${formatPhone(phone)}`}
+          icon="📞"
+        >
+          Call
+        </ActionLink>
+        <ActionLink
+          href={`sms:${dialable(phone)}`}
+          label={`Text ${parent} about ${name} at ${formatPhone(phone)}`}
+          icon="💬"
+        >
+          Text
+        </ActionLink>
+        <span className="text-xs tabular-nums text-ink-500">{formatPhone(phone)}</span>
+      </div>
+    );
+  } else {
+    body = (
+      <div className="flex flex-wrap items-center gap-2">
+        <ActionLink
+          href={`mailto:${email}`}
+          label={`Email ${parent} about ${name} at ${email}`}
+          icon="✉"
+        >
+          Email
+        </ActionLink>
+        <span className="min-w-0 truncate text-xs text-ink-500">{email}</span>
+      </div>
+    );
   }
 
+  /*
+   * Named and grouped, which matters more now than it did behind a button. The
+   * button carried the student's name in its own label; a list that reveals
+   * everything at once would otherwise read to a screen reader as a run of
+   * loose phone numbers with nothing tying each to the student above it.
+   */
   return (
-    <div className={cn('flex flex-wrap items-center gap-2', className)}>
-      {phone ? (
-        <>
-          <ActionLink
-            href={`tel:${dialable(phone)}`}
-            label={`Call ${parent} about ${name} at ${formatPhone(phone)}`}
-            icon="📞"
-          >
-            Call
-          </ActionLink>
-          <ActionLink
-            href={`sms:${dialable(phone)}`}
-            label={`Text ${parent} about ${name} at ${formatPhone(phone)}`}
-            icon="💬"
-          >
-            Text
-          </ActionLink>
-          <span className="text-xs tabular-nums text-ink-500">{formatPhone(phone)}</span>
-        </>
-      ) : (
-        <>
-          <ActionLink
-            href={`mailto:${email}`}
-            label={`Email ${parent} about ${name} at ${email}`}
-            icon="✉"
-          >
-            Email
-          </ActionLink>
-          <span className="min-w-0 truncate text-xs text-ink-500">{email}</span>
-        </>
-      )}
+    <div role="group" aria-label={`Contact details for ${name}`} className={cn('min-w-0', className)}>
+      {body}
     </div>
   );
 }
