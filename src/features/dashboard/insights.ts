@@ -20,6 +20,7 @@
  */
 import { countRecentHits, effectiveThreshold } from '@/features/roster/predictiveRoster';
 import { chainKey } from '@/lib/materialize';
+import { toDateOnlyValue } from '@/lib/recurrenceCore';
 import { wasHeld } from '@/lib/sessionHistory';
 import { sortByName } from '@/lib/utils';
 import type {
@@ -459,20 +460,35 @@ export function computeIncompleteProfiles(students: readonly Student[]): Student
 }
 
 export interface AttendancePoint {
-  eventId: string;
+  /** One bar, one calendar day — which is also its React key. */
+  id: string;
+  /** The gathering, or every gathering that met that day, joined for a tooltip. */
   title: string;
   date: Date;
-  gatheringKey: string;
   count: number;
+  /** The events behind the bar, newest first. More than one on a busy day. */
+  eventIds: string[];
 }
 
 /**
- * Head-count per night, oldest first, for the trend strip.
+ * Head count per day, oldest first, for the trend strip.
  *
  * `gatheringKey` narrows it to one chain of repeats. Left out, the strip mixes
- * every gathering into one line of bars, which is only meaningful as "how busy
- * were we" — the shape of a single gathering is the question worth asking, and
- * it is why the dashboard passes a key.
+ * every gathering together, which is only meaningful as "how busy were we" —
+ * the shape of a single gathering is the sharper question, and it is why the
+ * dashboard passes a key.
+ *
+ * A day is one bar, whatever met on it. Two gatherings on one Sunday used to
+ * draw two bars a day apart on a strip labelled by date, which reads as two
+ * days — one of them apparently half-attended. Mixed, the honest shape is the
+ * day, and the bar is the day's total: switch to a gathering's own tab and its
+ * bars still add up to what "All" showed. The cost is that a student at both
+ * counts twice, which is what "we had 40 through the door on Sunday" means
+ * anyway — and inside one gathering it cannot happen, because a chain holds one
+ * occurrence per day.
+ *
+ * `limit` therefore counts days rather than events: eight bars are eight
+ * gatherings' worth of history whether or not a Sunday carried two of them.
  */
 export function computeAttendanceTrend(
   snapshots: readonly EventAttendanceSnapshot[],
@@ -482,16 +498,37 @@ export function computeAttendanceTrend(
     options.gatheringKey ? chainKey(snapshot.event) === options.gatheringKey : true,
   );
 
-  return filtered
-    .slice(0, options.limit ?? 8)
-    .reverse()
-    .map((snapshot) => ({
-      eventId: snapshot.event.id,
+  // Newest first, so the slice below takes the most recent days.
+  const byDay = new Map<string, AttendancePoint & { titles: Set<string> }>();
+
+  for (const snapshot of filtered) {
+    const day = toDateOnlyValue(snapshot.event.startAt);
+    const existing = byDay.get(day);
+
+    if (existing) {
+      existing.count += snapshot.presentStudentIds.size;
+      existing.eventIds.push(snapshot.event.id);
+      existing.titles.add(snapshot.event.title);
+      // The day is stamped with when it started, not with whichever of its
+      // gatherings happened to be read first.
+      if (snapshot.event.startAt < existing.date) existing.date = snapshot.event.startAt;
+      continue;
+    }
+
+    byDay.set(day, {
+      id: day,
       title: snapshot.event.title,
       date: snapshot.event.startAt,
-      gatheringKey: chainKey(snapshot.event),
       count: snapshot.presentStudentIds.size,
-    }));
+      eventIds: [snapshot.event.id],
+      titles: new Set([snapshot.event.title]),
+    });
+  }
+
+  return [...byDay.values()]
+    .slice(0, options.limit ?? 8)
+    .reverse()
+    .map(({ titles, ...point }) => ({ ...point, title: [...titles].join(' + ') }));
 }
 
 /* -------------------------------------------------------------------------- */

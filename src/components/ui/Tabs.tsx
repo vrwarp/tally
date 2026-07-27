@@ -34,7 +34,10 @@ export function TabBar({ label, options, selected, onSelect, className }: TabBar
     <div
       role="group"
       aria-label={label}
-      className={cn('flex gap-2 overflow-x-auto scroll-touch', className)}
+      // Wraps rather than scrolls: a ministry with four gatherings would
+      // otherwise have the fourth tab clipped at the edge of the screen with
+      // nothing to say it was there.
+      className={cn('flex flex-wrap gap-2', className)}
     >
       {options.map((option) => {
         const active = option.id === selected;

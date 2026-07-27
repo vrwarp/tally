@@ -914,13 +914,13 @@ describe('computeAttendanceTrend', () => {
       makeSnapshot(events[1]!, ['a', 'b']),
     ]);
 
-    expect(trend.map((point) => point.eventId)).toEqual([
+    expect(trend.flatMap((point) => point.eventIds)).toEqual([
       `${FRIDAY}-3`,
       `${FRIDAY}-2`,
       `${FRIDAY}-1`,
     ]);
     expect(trend.map((point) => point.count)).toEqual([1, 2, 3]);
-    expect(trend[0]).toMatchObject({ title: 'Friday Fellowship', gatheringKey: FRIDAY });
+    expect(trend[0]).toMatchObject({ title: 'Friday Fellowship' });
     expect(trend[0]!.date).toEqual(events[0]!.startAt);
   });
 
@@ -934,7 +934,7 @@ describe('computeAttendanceTrend', () => {
     const trend = computeAttendanceTrend(snapshots, { gatheringKey: SUNDAY });
 
     expect(trend).toHaveLength(2);
-    expect(trend.every((point) => point.gatheringKey === SUNDAY)).toBe(true);
+    expect(trend.every((point) => point.title === 'Sunday School')).toBe(true);
   });
 
   /*
@@ -963,7 +963,7 @@ describe('computeAttendanceTrend', () => {
       makeSnapshot(makeEvent({ ...events[1]!, status: 'cancelled' }), ['a']),
     ];
 
-    expect(computeAttendanceTrend(snapshots).map((point) => point.eventId)).toEqual([
+    expect(computeAttendanceTrend(snapshots).flatMap((point) => point.eventIds)).toEqual([
       `${FRIDAY}-3`,
     ]);
   });
@@ -977,7 +977,7 @@ describe('computeAttendanceTrend', () => {
 
     // A zero bar mid-strip reads as attendance collapsing, not as a night that
     // never happened — and the average underneath it would be wrong too.
-    expect(trend.map((point) => point.eventId)).toEqual([`${FRIDAY}-3`, `${FRIDAY}-1`]);
+    expect(trend.flatMap((point) => point.eventIds)).toEqual([`${FRIDAY}-3`, `${FRIDAY}-1`]);
     expect(trend.every((point) => point.count > 0)).toBe(true);
   });
 
@@ -988,19 +988,79 @@ describe('computeAttendanceTrend', () => {
       { limit: 3 },
     );
 
-    expect(trend.map((point) => point.eventId)).toEqual([
+    expect(trend.flatMap((point) => point.eventIds)).toEqual([
       `${FRIDAY}-3`,
       `${FRIDAY}-2`,
       `${FRIDAY}-1`,
     ]);
   });
 
-  it('defaults to the last eight gatherings', () => {
+  it('defaults to the last eight days', () => {
     const many = makeWeeklyEvents({ count: 12, seriesId: FRIDAY });
     const trend = computeAttendanceTrend(many.map((event) => makeSnapshot(event, ['a'])));
 
     expect(trend).toHaveLength(8);
-    expect(trend.at(-1)!.eventId).toBe(`${FRIDAY}-1`);
+    expect(trend.at(-1)!.eventIds).toEqual([`${FRIDAY}-1`]);
+  });
+
+  /*
+   * Two gatherings on one Sunday drew two bars a day apart on a strip labelled
+   * by date, which reads as two days — one of them apparently half-attended.
+   */
+  describe('a day that held more than one gathering', () => {
+    // Sunday School in the morning, an evening service the same night.
+    const morning = makeEvent({
+      id: 'sunday-morning',
+      title: 'Sunday School',
+      seriesId: SUNDAY,
+      startAt: new Date(2026, 1, 8, 9, 30),
+      endAt: new Date(2026, 1, 8, 10, 45),
+    });
+    const evening = makeEvent({
+      id: 'sunday-evening',
+      title: 'Evening Service',
+      seriesId: 'sunday-evening',
+      startAt: new Date(2026, 1, 8, 18, 0),
+      endAt: new Date(2026, 1, 8, 19, 30),
+    });
+
+    it('draws one bar, adding the gatherings up', () => {
+      const trend = computeAttendanceTrend([
+        makeSnapshot(morning, ['a', 'b', 'c']),
+        makeSnapshot(evening, ['a', 'd']),
+      ]);
+
+      expect(trend).toHaveLength(1);
+      expect(trend[0]!.count).toBe(5);
+      expect(trend[0]!.eventIds).toEqual(['sunday-evening', 'sunday-morning']);
+      // Named so a tooltip can say what the bar is made of.
+      expect(trend[0]!.title).toBe('Evening Service + Sunday School');
+      // Stamped with when the day started, not with whichever was read first.
+      expect(trend[0]!.date).toEqual(morning.startAt);
+    });
+
+    it('still charts each gathering on its own when one is asked for', () => {
+      const snapshots = [makeSnapshot(morning, ['a', 'b', 'c']), makeSnapshot(evening, ['a', 'd'])];
+
+      expect(computeAttendanceTrend(snapshots, { gatheringKey: SUNDAY })).toMatchObject([
+        { count: 3, title: 'Sunday School' },
+      ]);
+    });
+
+    it('counts days rather than events against the limit', () => {
+      const fridayNights = fridays(8);
+      const trend = computeAttendanceTrend(
+        [
+          ...fridayNights.map((event) => makeSnapshot(event, ['a'])),
+          makeSnapshot(morning, ['a']),
+          makeSnapshot(evening, ['a']),
+        ],
+        { limit: 3 },
+      );
+
+      // Three bars, and the busy Sunday is one of them rather than two.
+      expect(trend).toHaveLength(3);
+    });
   });
 });
 

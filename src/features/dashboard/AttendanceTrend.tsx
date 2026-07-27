@@ -54,7 +54,7 @@ export function AttendanceTrend({
         description={
           gatheringTitle
             ? `${gatheringTitle} — head count per night, oldest to newest.`
-            : 'Head count per gathering, oldest to newest. Every gathering, mixed.'
+            : 'Head count per day, oldest to newest. Every gathering that met, added up.'
         }
       />
 
@@ -68,9 +68,11 @@ export function AttendanceTrend({
           <div className="flex items-end gap-1.5" aria-hidden="true">
             {points.map((point, index) => (
               <div
-                key={point.eventId}
+                key={point.id}
                 className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1"
-                title={`${point.title} · ${formatShortDate(point.date)}: ${point.count}`}
+                title={`${point.title} · ${formatShortDate(point.date)}: ${point.count}${
+                  point.eventIds.length > 1 ? ` across ${point.eventIds.length} gatherings` : ''
+                }`}
               >
                 <span className="text-[10px] font-semibold tabular-nums text-ink-400">
                   {point.count}
@@ -98,12 +100,11 @@ export function AttendanceTrend({
           </div>
 
           <p className="mt-3 border-t border-ink-800 pt-2 text-xs text-ink-500">
-            {points.length} {points.length === 1 ? 'gathering' : 'gatherings'} · peak {peak} ·
-            average {average}
+            {points.length} {points.length === 1 ? 'day' : 'days'} · peak {peak} · average {average}
           </p>
 
           <table className="sr-only">
-            <caption>Head count per gathering, oldest first.</caption>
+            <caption>Head count per day, oldest first.</caption>
             <thead>
               <tr>
                 <th scope="col">Gathering</th>
@@ -113,7 +114,7 @@ export function AttendanceTrend({
             </thead>
             <tbody>
               {points.map((point) => (
-                <tr key={point.eventId}>
+                <tr key={point.id}>
                   <th scope="row">{point.title}</th>
                   <td>{formatShortDate(point.date)}</td>
                   <td>{point.count}</td>
