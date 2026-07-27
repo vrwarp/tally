@@ -14,7 +14,7 @@
 import { describe, expect } from 'vitest';
 import { forAll } from '../../../tests/fuzz/property';
 import { arbitraryRosterInput, arbitraryStudent } from '../../../tests/fuzz/arbitrary';
-import { buildRoster, effectiveThreshold, studentMatchesGroup } from './predictiveRoster';
+import { buildRoster, effectiveThreshold } from './predictiveRoster';
 import type { RosterEntry } from '@/types';
 
 const ids = (entries: readonly RosterEntry[]) => entries.map((entry) => entry.student.id);
@@ -254,16 +254,4 @@ describe('buildRoster properties', () => {
       expect(new Set(entry.warnings).size).toBe(entry.warnings.length);
     }
   });
-
-  forAll(
-    'lets an explicit small-group assignment override the grade/gender fallback',
-    (rng) => {
-      const student = arbitraryStudent(rng, { smallGroupId: 'g1' });
-      return { student, group: { id: 'g2', name: 'Other', grades: [student.grade], gender: 'mixed' as const, order: 0 } };
-    },
-    ({ student, group }) => {
-      // The student's own assignment wins even though grade and gender match.
-      expect(studentMatchesGroup(student, group)).toBe(false);
-    },
-  );
 });

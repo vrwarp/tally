@@ -115,26 +115,25 @@ describe('users', () => {
     );
   });
 
-  it('lets a counselor choose their own small group', async () => {
-    // Journey 2 depends on this being self-service.
-    const db = asUser(env, UID.counselor);
-    await assertSucceeds(
-      updateDoc(doc(db, paths.user(UID.counselor)), { assignedGroupId: '8th-grade-boys' }),
-    );
-  });
-
-  it('rejects a counselor assigning a group to someone else', async () => {
+  it('rejects a counselor touching a field outside the heartbeat', async () => {
     const db = asUser(env, UID.counselor);
     await assertFails(
-      updateDoc(doc(db, paths.user(UID.core)), { assignedGroupId: '8th-grade-boys' }),
+      updateDoc(doc(db, paths.user(UID.counselor)), { displayName: 'Renamed' }),
     );
   });
 
-  it('rejects a counselor smuggling a role change alongside their group', async () => {
+  it('rejects a counselor stamping the heartbeat on someone else', async () => {
+    const db = asUser(env, UID.counselor);
+    await assertFails(
+      updateDoc(doc(db, paths.user(UID.core)), { lastSeenAt: new Date() }),
+    );
+  });
+
+  it('rejects a counselor smuggling a role change alongside the heartbeat', async () => {
     const db = asUser(env, UID.counselor);
     await assertFails(
       updateDoc(doc(db, paths.user(UID.counselor)), {
-        assignedGroupId: '8th-grade-boys',
+        lastSeenAt: new Date(),
         role: 'admin',
       }),
     );
@@ -326,7 +325,7 @@ describe('students', () => {
 
   it('lets a counselor annotate a Planning Center student', async () => {
     // `students/pco_*` documents are created on demand — most students never
-    // have one until somebody assigns a group or checks them in.
+    // have one until somebody annotates them or checks them in.
     const db = asUser(env, UID.counselor);
     await assertSucceeds(
       setDoc(doc(db, paths.student('pco_4100010')), {
@@ -334,7 +333,7 @@ describe('students', () => {
         lastName: 'Okonkwo',
         grade: 8,
         searchName: 'amara okonkwo',
-        smallGroupId: 'grade-8-girls',
+        notes: 'Plays trumpet.',
         updatedAt: new Date(),
         updatedBy: UID.counselor,
       }),
@@ -549,18 +548,9 @@ describe('rsvps', () => {
 });
 
 describe('reference data', () => {
-  it('lets counselors read small groups and series but not write them', async () => {
+  it('lets counselors read the series but not write them', async () => {
     const db = asUser(env, UID.counselor);
-    await assertSucceeds(getDocs(collection(db, paths.smallGroups())));
     await assertSucceeds(getDocs(collection(db, paths.eventSeries())));
-    await assertFails(
-      setDoc(doc(db, paths.smallGroup('group-new')), {
-        name: 'New',
-        grades: [7],
-        gender: 'mixed',
-        order: 1,
-      }),
-    );
     await assertFails(
       setDoc(doc(db, paths.series('series-new')), {
         title: 'Wednesday',
@@ -569,21 +559,24 @@ describe('reference data', () => {
         endTime: '21:00',
         checkInOpensMinutesBefore: 60,
         checkInClosesMinutesAfter: 60,
-        defaultGroupingMode: 'all',
         active: true,
         order: 2,
       }),
     );
   });
 
-  it('lets core write small groups', async () => {
+  it('lets core write the series', async () => {
     const db = asUser(env, UID.core);
     await assertSucceeds(
-      setDoc(doc(db, paths.smallGroup('group-new')), {
-        name: 'New',
-        grades: [7],
-        gender: 'mixed',
-        order: 1,
+      setDoc(doc(db, paths.series('series-new')), {
+        title: 'Wednesday',
+        dayOfWeek: 3,
+        startTime: '19:00',
+        endTime: '21:00',
+        checkInOpensMinutesBefore: 60,
+        checkInClosesMinutesAfter: 60,
+        active: true,
+        order: 2,
       }),
     );
   });

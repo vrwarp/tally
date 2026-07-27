@@ -13,8 +13,8 @@ import { pcoStudentId, type Student } from '@/types';
  * appearing twice:
  *
  *  - A document whose id *is* a Planning Center id (`pco_123`) is an annotation:
- *    its small group, notes and attendance dates are layered onto the roster
- *    entry, and Planning Center keeps the name and grade.
+ *    its notes and attendance dates are layered onto the roster entry, and
+ *    Planning Center keeps the name and grade.
  *  - A document for a visitor Tally created (`tally-...`) and has since linked
  *    to a Planning Center person is the same person twice; the roster entry wins
  *    and the document contributes its annotations.
@@ -57,7 +57,6 @@ export function mergeRoster(
     byId.set(target.id, {
       ...target,
       // Everything Planning Center has no opinion about.
-      smallGroupId: document.smallGroupId,
       notes: document.notes,
       isVisitor: document.isVisitor && !target.profileComplete,
       firstAttendedAt: document.firstAttendedAt,

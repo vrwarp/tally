@@ -66,7 +66,6 @@ export interface RosterPerson {
   firstName: string;
   lastName: string;
   grade: number;
-  gender: 'male' | 'female' | 'unspecified';
   status: 'active' | 'inactive';
   searchName: string;
   /**
@@ -222,7 +221,6 @@ async function hydratePeople(
       firstName: mapped.firstName,
       lastName: mapped.lastName,
       grade: mapped.grade,
-      gender: mapped.gender,
       status: mapped.status,
       searchName: mapped.searchName,
       // Not looked up — see the note on the field. Hydrating households here

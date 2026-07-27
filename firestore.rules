@@ -102,15 +102,13 @@ service cloud.firestore {
        */
       allow create: if isAdmin() && request.auth.uid != uid && validUser();
       /**
-       * The two fields a person may maintain on themselves: the sign-in
-       * heartbeat, and which small group they are teaching this term. The
-       * latter is what makes Sunday School open on a counselor's own roster
-       * (Journey 2), so it has to be self-service — nobody is going to page an
-       * admin because the 8th grade boys moved rooms.
+       * The one field a person maintains on themselves: the sign-in heartbeat.
+       * Everything else on a profile is an authorisation decision, and those
+       * are made on someone else.
        */
       allow update: if (isAdmin() && validUser() && !(request.auth.uid == uid && touches(['role', 'active'])))
                     || (isSignedIn() && request.auth.uid == uid
-                        && touchesOnly(['lastSeenAt', 'assignedGroupId']));
+                        && touchesOnly(['lastSeenAt']));
       allow delete: if isAdmin() && request.auth.uid != uid;
     }
 
@@ -160,9 +158,9 @@ service cloud.firestore {
      * does not say is who they are: for a student linked to Planning Center the
      * name, grade and everything else are read live through a callable and
      * stored nowhere. What lives here is the membership itself plus what
-     * Planning Center has no opinion about — a small group, a note, when
-     * somebody first turned up — plus the whole record for a quick-added
-     * visitor until the push lands.
+     * Planning Center has no opinion about — a note, when somebody first
+     * turned up — plus the whole record for a quick-added visitor until the
+     * push lands.
      *
      * Three consequences for these rules. A document is sparse, so field
      * validation only applies to fields that are present. Parent contact and
@@ -326,11 +324,6 @@ service cloud.firestore {
       allow write: if isCore();
     }
 
-    match /smallGroups/{groupId} {
-      allow get, list: if isActive();
-      allow write: if isCore();
-    }
-
     /* ---------------------------------------------------------------- */
     /* config                                                            */
     /* ---------------------------------------------------------------- */
@@ -381,13 +374,12 @@ service cloud.firestore {
          */
         return d.keys().hasOnly([
               'rosterSource', 'studentListId', 'counselorListId',
-              'minGrade', 'maxGrade', 'writeBack', 'smallGroupField',
+              'minGrade', 'maxGrade', 'writeBack',
               'cacheTtlSeconds', 'baseUrl', 'updatedAt', 'updatedBy',
             ])
           && (!('rosterSource' in d.keys()) || d.rosterSource in ['list', 'grade'])
           && (!('studentListId' in d.keys()) || d.studentListId is string)
           && (!('counselorListId' in d.keys()) || d.counselorListId is string)
-          && (!('smallGroupField' in d.keys()) || d.smallGroupField is string)
           && (!('writeBack' in d.keys()) || d.writeBack in ['off', 'create', 'full'])
           && (!('minGrade' in d.keys()) || (d.minGrade is int && d.minGrade >= 6 && d.minGrade <= 12))
           && (!('maxGrade' in d.keys()) || (d.maxGrade is int && d.maxGrade >= 6 && d.maxGrade <= 12))

@@ -58,7 +58,7 @@ function dialable(phone: string): string {
 export function StudentDetailPage() {
   const { studentId } = useParams();
   const navigate = useNavigate();
-  const { students, events, groups, settings, loading, rosterError, refreshRoster } = useData();
+  const { students, events, settings, loading, rosterError, refreshRoster } = useData();
   const { user } = useAuth();
   const { show } = useToast();
   const now = useNow(60_000);
@@ -150,7 +150,6 @@ export function StudentDetailPage() {
   }
 
   const name = studentFullName(student);
-  const groupName = groups.find((group) => group.id === student.smallGroupId)?.name ?? null;
   const phone = details?.parentPhone?.trim() ?? '';
   const email = details?.parentEmail?.trim() ?? '';
   const parentLabel = details?.parentName?.trim() || `${name}'s parent`;
@@ -246,7 +245,7 @@ export function StudentDetailPage() {
         <div className="min-w-0 flex-1">
           <h1 className="text-xl font-bold text-ink-50">{name}</h1>
           <p className="mt-0.5 text-sm text-ink-500">
-            {ordinalGrade(student.grade)} grade{groupName ? ` · ${groupName}` : ''}
+            {ordinalGrade(student.grade)} grade
           </p>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {student.isVisitor ? <Badge tone="brand">Visitor</Badge> : null}
@@ -343,7 +342,6 @@ export function StudentDetailPage() {
           ) : null}
 
           <dl className="grid grid-cols-2 gap-3 text-sm">
-            <Detail label="Small group" value={groupName ?? 'None'} />
             <Detail label="Status" value={student.status === 'active' ? 'Active' : 'Inactive'} />
             <Detail
               label="First seen"

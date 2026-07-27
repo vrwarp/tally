@@ -1,6 +1,6 @@
 /**
  * The core team's control panel: prediction thresholds, the Planning Center
- * connection, who is on the team, and which small group you are teaching.
+ * connection, and who is on the team.
  *
  * The thresholds are the only genuinely dangerous controls here — they silently
  * reshape what every counselor sees at the door — so each one is followed by a
@@ -15,7 +15,6 @@ import {
   ErrorBanner,
   LoadingScreen,
   NumberStepperField,
-  SelectField,
 } from '@/components/ui';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
@@ -26,7 +25,6 @@ import { ThemeCard } from '@/features/settings/ThemeCard';
 import { ThresholdPreview } from '@/features/settings/ThresholdPreview';
 import { formatRelative } from '@/lib/time';
 import { saveSettings } from '@/services/events';
-import { setAssignedGroup } from '@/services/users';
 import type { AppSettings } from '@/types';
 
 /** Widest sensible window; matches the clamp in `toSettings`. */
@@ -57,14 +55,13 @@ function toForm(settings: AppSettings): ThresholdForm {
 }
 
 export function SettingsPage() {
-  const { settings, groups, series, loading } = useData();
-  const { user, profile } = useAuth();
+  const { settings, series, loading } = useData();
+  const { user } = useAuth();
   const { show } = useToast();
 
   const [form, setForm] = useState<ThresholdForm>(() => toForm(settings));
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [groupBusy, setGroupBusy] = useState(false);
 
   // Settings are live for everyone: if another leader saves while this form is
   // open, their values win rather than being silently overwritten on save.
@@ -109,20 +106,6 @@ export function SettingsPage() {
       setSaveError(cause instanceof Error ? cause.message : 'Could not save these settings.');
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleGroupChange = async (groupId: string) => {
-    if (!user) return;
-    setGroupBusy(true);
-    try {
-      await setAssignedGroup(user.uid, groupId || null);
-      const name = groups.find((group) => group.id === groupId)?.name;
-      show(name ? `You are teaching ${name}` : 'Small group cleared', { tone: 'success' });
-    } catch {
-      show('Could not save your small group.', { tone: 'error' });
-    } finally {
-      setGroupBusy(false);
     }
   };
 
@@ -238,29 +221,6 @@ export function SettingsPage() {
       <PlanningCenterCard />
 
       <TeamList />
-
-      <Card>
-        <CardHeader
-          title="Your assignment"
-          description="Which small group you are teaching this term."
-        />
-        <div className="flex flex-col gap-2 px-4 py-3">
-          <SelectField
-            label="My small group"
-            value={profile?.assignedGroupId ?? ''}
-            onChange={(changed) => void handleGroupChange(changed.target.value)}
-            disabled={groupBusy}
-            hint="Sunday School opens straight to this group instead of the whole ministry."
-          >
-            <option value="">No group</option>
-            {groups.map((group) => (
-              <option key={group.id} value={group.id}>
-                {group.name}
-              </option>
-            ))}
-          </SelectField>
-        </div>
-      </Card>
     </div>
   );
 }

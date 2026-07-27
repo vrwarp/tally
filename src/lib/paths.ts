@@ -5,7 +5,6 @@
  *
  *   users/{uid}                              counselor & core team profiles
  *   invitations/{emailKey}                   who an admin has said may sign in
- *   smallGroups/{groupId}                    Sunday School groupings
  *   eventSeries/{seriesId}                   recurring templates (friday, sunday)
  *   students/{studentId}                     what Tally owns about a person
  *   events/{eventId}                         a single dated gathering
@@ -37,7 +36,6 @@
 export const COLLECTIONS = {
   users: 'users',
   invitations: 'invitations',
-  smallGroups: 'smallGroups',
   eventSeries: 'eventSeries',
   students: 'students',
   events: 'events',
@@ -65,9 +63,6 @@ export const paths = {
   invitations: () => COLLECTIONS.invitations,
   /** Keyed by `emailKey`, because an invitation predates the uid it grants. */
   invitation: (key: string) => `${COLLECTIONS.invitations}/${key}`,
-
-  smallGroups: () => COLLECTIONS.smallGroups,
-  smallGroup: (groupId: string) => `${COLLECTIONS.smallGroups}/${groupId}`,
 
   eventSeries: () => COLLECTIONS.eventSeries,
   series: (seriesId: string) => `${COLLECTIONS.eventSeries}/${seriesId}`,

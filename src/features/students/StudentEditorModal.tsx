@@ -6,7 +6,7 @@
  * into them here would be silently reverted by the next pull. A form that
  * accepts an edit it cannot keep is worse than one that refuses it, so those
  * inputs render disabled with a link to the place the edit actually belongs.
- * Everything Tally owns — small group, parent contact, notes — stays editable.
+ * Everything Tally owns — notes — stays editable.
  */
 import { useEffect, useId, useState, type FormEvent } from 'react';
 import {
@@ -18,7 +18,6 @@ import {
   TextField,
 } from '@/components/ui';
 import { useAuth } from '@/context/authContext';
-import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { ordinalGrade } from '@/lib/utils';
 import { createStudent, updateStudent, type StudentDraft } from '@/services/students';
@@ -28,7 +27,6 @@ import {
   composeFirstName,
   splitFirstName,
   studentFullName,
-  type Gender,
   type Grade,
   type Student,
   type StudentStatus,
@@ -56,8 +54,6 @@ interface FormState {
   nickname: string;
   lastName: string;
   grade: Grade;
-  gender: Gender;
-  smallGroupId: string;
   notes: string;
   status: StudentStatus;
 }
@@ -67,8 +63,6 @@ const BLANK: FormState = {
   nickname: '',
   lastName: '',
   grade: 9,
-  gender: 'unspecified',
-  smallGroupId: '',
   notes: '',
   status: 'active',
 };
@@ -81,8 +75,6 @@ function fromStudent(student: Student | null): FormState {
     nickname: name.nickname ?? '',
     lastName: student.lastName,
     grade: student.grade,
-    gender: student.gender,
-    smallGroupId: student.smallGroupId ?? '',
     notes: student.notes ?? '',
     status: student.status,
   };
@@ -96,7 +88,6 @@ export interface StudentEditorModalProps {
 }
 
 export function StudentEditorModal({ open, onClose, student }: StudentEditorModalProps) {
-  const { groups } = useData();
   const { user } = useAuth();
   const { show } = useToast();
   const formId = useId();
@@ -141,10 +132,7 @@ export function StudentEditorModal({ open, onClose, student }: StudentEditorModa
 
     try {
       if (student) {
-        const patch: Partial<StudentDraft> = {
-          smallGroupId: form.smallGroupId || null,
-          notes: form.notes,
-        };
+        const patch: Partial<StudentDraft> = { notes: form.notes };
         // Managed fields are left out of the patch entirely rather than written
         // back unchanged — Tally should not be the last writer on a value it
         // does not own.
@@ -152,7 +140,6 @@ export function StudentEditorModal({ open, onClose, student }: StudentEditorModa
           patch.firstName = firstName;
           patch.lastName = lastName;
           patch.grade = form.grade;
-          patch.gender = form.gender;
           patch.status = form.status;
         }
         await updateStudent(student.id, patch, user.uid, student);
@@ -163,8 +150,6 @@ export function StudentEditorModal({ open, onClose, student }: StudentEditorModa
             firstName,
             lastName,
             grade: form.grade,
-            gender: form.gender,
-            smallGroupId: form.smallGroupId || null,
             notes: form.notes,
             status: form.status,
           },
@@ -210,7 +195,7 @@ export function StudentEditorModal({ open, onClose, student }: StudentEditorModa
 
         {linked && student?.pcoPersonId ? (
           <p className="rounded-xl bg-brand-500/10 px-3 py-2 text-xs text-brand-200 ring-1 ring-brand-500/25">
-            Name, grade, gender, allergies and status come from Planning Center and would be
+            Name, grade, allergies and status come from Planning Center and would be
             overwritten by the next sync.{' '}
             <a
               href={pcoPersonUrl(student.pcoPersonId)}
@@ -220,7 +205,7 @@ export function StudentEditorModal({ open, onClose, student }: StudentEditorModa
             >
               Edit them in Planning Center
             </a>
-            . Small group, parent contact and notes live in Tally.
+            . Notes live in Tally.
           </p>
         ) : null}
 
@@ -264,43 +249,16 @@ export function StudentEditorModal({ open, onClose, student }: StudentEditorModa
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <SelectField
-            label="Grade"
-            value={form.grade}
-            onChange={(changed) => update('grade', Number(changed.target.value) as Grade)}
-            hint={locked('grade') ? managedHint : undefined}
-            disabled={locked('grade')}
-          >
-            {GRADES.map((value) => (
-              <option key={value} value={value}>
-                {ordinalGrade(value)} grade
-              </option>
-            ))}
-          </SelectField>
-          <SelectField
-            label="Gender"
-            value={form.gender}
-            onChange={(changed) => update('gender', changed.target.value as Gender)}
-            hint={locked('gender') ? managedHint : 'Only used to split small groups.'}
-            disabled={locked('gender')}
-          >
-            <option value="unspecified">Not specified</option>
-            <option value="female">Female</option>
-            <option value="male">Male</option>
-          </SelectField>
-        </div>
-
         <SelectField
-          label="Small group"
-          value={form.smallGroupId}
-          onChange={(changed) => update('smallGroupId', changed.target.value)}
-          hint="Blank falls back to the group's grade and gender rules."
+          label="Grade"
+          value={form.grade}
+          onChange={(changed) => update('grade', Number(changed.target.value) as Grade)}
+          hint={locked('grade') ? managedHint : undefined}
+          disabled={locked('grade')}
         >
-          <option value="">No group</option>
-          {groups.map((group) => (
-            <option key={group.id} value={group.id}>
-              {group.name}
+          {GRADES.map((value) => (
+            <option key={value} value={value}>
+              {ordinalGrade(value)} grade
             </option>
           ))}
         </SelectField>

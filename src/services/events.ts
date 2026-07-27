@@ -18,7 +18,7 @@ import { db } from '@/lib/firebase';
 import { paths } from '@/lib/paths';
 import { chainKey } from '@/lib/materialize';
 import { normalizeRecurrence } from '@/lib/recurrence';
-import { toEvent, toEventSeries, toSettings, toSmallGroup } from '@/services/converters';
+import { toEvent, toEventSeries, toSettings } from '@/services/converters';
 import { materializeOccurrence } from '@/services/functions';
 import type {
   AppSettings,
@@ -26,8 +26,6 @@ import type {
   EventSeries,
   EventStatus,
   RecurrenceRule,
-  RosterGroupingMode,
-  SmallGroup,
   TallyEvent,
 } from '@/types';
 
@@ -46,7 +44,6 @@ export interface EventDraft {
   location?: string | null;
   notes?: string | null;
   requiresRsvp?: boolean;
-  defaultGroupingMode?: RosterGroupingMode;
   status?: EventStatus;
 }
 
@@ -103,17 +100,6 @@ export function subscribeEventSeries(
   );
 }
 
-export function subscribeSmallGroups(
-  onChange: (groups: SmallGroup[]) => void,
-  onError?: (error: Error) => void,
-): Unsubscribe {
-  return onSnapshot(
-    query(collection(db, paths.smallGroups()), orderBy('order')),
-    (snapshot) => onChange(snapshot.docs.map(toSmallGroup)),
-    (error) => onError?.(error),
-  );
-}
-
 export function subscribeSettings(
   onChange: (settings: AppSettings) => void,
   onError?: (error: Error) => void,
@@ -145,7 +131,6 @@ function buildEventPayload(draft: EventDraft, uid: string, isNew: boolean) {
     location: draft.location?.trim() || null,
     notes: draft.notes?.trim() || null,
     requiresRsvp: draft.requiresRsvp ?? draft.mode === 'oneoff',
-    defaultGroupingMode: draft.defaultGroupingMode ?? 'all',
     status: draft.status ?? 'scheduled',
     updatedAt: serverTimestamp(),
   };

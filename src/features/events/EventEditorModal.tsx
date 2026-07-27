@@ -47,7 +47,7 @@ import {
   toDateTimeLocalValue,
 } from '@/lib/time';
 import { createEvent, ensureMaterialized, updateEvent, type EventDraft } from '@/services/events';
-import type { EventMode, RecurrenceRule, RosterGroupingMode, TallyEvent } from '@/types';
+import type { EventMode, RecurrenceRule, TallyEvent } from '@/types';
 
 /** House defaults for the check-in window, in minutes around the event. */
 const OPENS_BEFORE_MIN = 60;
@@ -70,7 +70,6 @@ interface EditorForm {
   location: string;
   notes: string;
   requiresRsvp: boolean;
-  defaultGroupingMode: RosterGroupingMode;
   /**
    * A window left at the standard hour follows the event when its times move;
    * one somebody hand-tuned is pinned and never rewritten underneath them.
@@ -136,7 +135,6 @@ function buildForm(
     location: event?.location ?? defaults?.location ?? '',
     notes: event?.notes ?? defaults?.notes ?? '',
     requiresRsvp: event?.requiresRsvp ?? defaults?.requiresRsvp ?? mode === 'oneoff',
-    defaultGroupingMode: event?.defaultGroupingMode ?? defaults?.defaultGroupingMode ?? 'all',
     opensPinned:
       Math.round((startAt.getTime() - opensAt.getTime()) / 60_000) !== OPENS_BEFORE_MIN,
     closesPinned:
@@ -334,7 +332,6 @@ export function EventEditorModal({
         end: toDateTimeLocalValue(occurrence.endAt),
         checkInOpens: toDateTimeLocalValue(occurrence.checkInOpensAt),
         checkInCloses: toDateTimeLocalValue(occurrence.checkInClosesAt),
-        defaultGroupingMode: picked.defaultGroupingMode,
         opensPinned: picked.checkInOpensMinutesBefore !== OPENS_BEFORE_MIN,
         closesPinned: picked.checkInClosesMinutesAfter !== CLOSES_AFTER_MIN,
       };
@@ -356,7 +353,6 @@ export function EventEditorModal({
       location: form.location.trim() || null,
       notes: form.notes.trim() || null,
       requiresRsvp: form.mode === 'oneoff' && form.requiresRsvp,
-      defaultGroupingMode: form.defaultGroupingMode,
       // `buildEventPayload` writes `status` on every save, so an edit has to
       // carry the current one forward or it would quietly un-cancel the event.
       status: event?.status ?? 'scheduled',
@@ -539,18 +535,6 @@ export function EventEditorModal({
             onOpensChange={(value) => patch({ checkInOpens: value, opensPinned: true })}
             onClosesChange={(value) => patch({ checkInCloses: value, closesPinned: true })}
           />
-
-          <SelectField
-            label="Roster opens on"
-            value={form.defaultGroupingMode}
-            onChange={(changed) =>
-              patch({ defaultGroupingMode: changed.target.value as RosterGroupingMode })
-            }
-            hint="“Split by small group” is what makes Sunday School open on a counselor’s own group instead of the whole ministry."
-          >
-            <option value="all">One flat roster</option>
-            <option value="smallGroup">Split by small group</option>
-          </SelectField>
 
           {form.mode === 'oneoff' ? (
             <CheckboxField

@@ -17,7 +17,6 @@ export interface SimPerson {
   grade: number | null;
   graduation_year: number | null;
   /** Free text in the real API: "Male", "F", "female", "" have all been seen. */
-  gender: string | null;
   birthdate: string | null;
   child: boolean;
   medical_notes: string | null;

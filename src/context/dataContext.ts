@@ -3,7 +3,6 @@ import type {
   AppSettings,
   EventSeries,
   PcoErrorReport,
-  SmallGroup,
   Student,
   TallyEvent,
 } from '@/types';
@@ -27,7 +26,6 @@ export interface DataContextValue {
   students: Student[];
   events: TallyEvent[];
   series: EventSeries[];
-  groups: SmallGroup[];
   settings: AppSettings;
   /** True until every stream has delivered its first snapshot. */
   loading: boolean;

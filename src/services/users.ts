@@ -98,7 +98,6 @@ export async function upsertUser(
     email: string;
     displayName?: string | null;
     role: Role;
-    assignedGroupId?: string | null;
     active: boolean;
   },
 ): Promise<void> {
@@ -109,7 +108,6 @@ export async function upsertUser(
     email: patch.email.trim().toLowerCase(),
     displayName: patch.displayName?.trim() || null,
     role: patch.role,
-    assignedGroupId: patch.assignedGroupId || null,
     active: patch.active,
   };
   // Never re-stamp `createdAt` on an edit — it is the record of when someone
@@ -120,9 +118,4 @@ export async function upsertUser(
   }
 
   await setDoc(ref, payload, { merge: true });
-}
-
-/** Lets a counselor pick which small group they are teaching this term. */
-export async function setAssignedGroup(uid: string, groupId: string | null): Promise<void> {
-  await updateDoc(doc(db, paths.user(uid)), { assignedGroupId: groupId || null });
 }

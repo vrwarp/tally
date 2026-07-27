@@ -20,7 +20,6 @@ import {
   toEventSeries,
   toRsvp,
   toSettings,
-  toSmallGroup,
   toStudent,
   toUserProfile,
 } from './converters';
@@ -61,7 +60,6 @@ describe('converter properties', () => {
     expect(() => toAttendance(snap, 'e1')).not.toThrow();
     expect(() => toRsvp(snap, 'e1')).not.toThrow();
     expect(() => toUserProfile(snap)).not.toThrow();
-    expect(() => toSmallGroup(snap)).not.toThrow();
     expect(() => toEventSeries(snap)).not.toThrow();
     expect(() => toSettings(snap)).not.toThrow();
   });
@@ -69,12 +67,11 @@ describe('converter properties', () => {
   forAll('toStudent always yields a student the rest of the app can trust', arbitrarySnapshot, (snap) => {
     const student = toStudent(snap);
 
-    // Grade indexes into UI and drives the small-group fallback; out of band it
-    // would silently mis-group a child.
+    // Grade indexes into UI and into the grade filter; out of band it would
+    // silently misplace a child.
     expect(student.grade).toBeGreaterThanOrEqual(6);
     expect(student.grade).toBeLessThanOrEqual(12);
     expect(['active', 'inactive']).toContain(student.status);
-    expect(['male', 'female', 'unspecified']).toContain(student.gender);
     expect(typeof student.firstName).toBe('string');
     expect(typeof student.searchName).toBe('string');
     expect(isRealDate(student.createdAt)).toBe(true);
@@ -160,22 +157,11 @@ describe('converter properties', () => {
     expect(settings.newVisitorWindowDays).toBeGreaterThanOrEqual(1);
   });
 
-  forAll('toSmallGroup only reports grades the ministry has', arbitrarySnapshot, (snap) => {
-    const group = toSmallGroup(snap);
-
-    for (const grade of group.grades) {
-      expect(grade).toBeGreaterThanOrEqual(6);
-      expect(grade).toBeLessThanOrEqual(12);
-    }
-    expect(Number.isFinite(group.order)).toBe(true);
-  });
-
   forAll('toEventSeries yields a usable weekly template', arbitrarySnapshot, (snap) => {
     const series = toEventSeries(snap);
 
     expect(Number.isFinite(series.dayOfWeek)).toBe(true);
     expect(typeof series.startTime).toBe('string');
-    expect(['all', 'smallGroup']).toContain(series.defaultGroupingMode);
   });
 
   /**

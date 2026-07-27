@@ -5,7 +5,6 @@
  * from Planning Center, on demand, through `@/services/roster`. What lives here
  * is only what Planning Center has no opinion about:
  *
- *   - the small group a counselor assigned
  *   - a note somebody typed
  *   - when this student first and last turned up
  *   - the whole record for a quick-added visitor, until the push lands
@@ -36,8 +35,6 @@ export interface StudentDraft {
   firstName: string;
   lastName: string;
   grade: Grade;
-  gender?: Student['gender'];
-  smallGroupId?: string | null;
   notes?: string | null;
   status?: StudentStatus;
 }
@@ -70,8 +67,6 @@ export function buildStudentPayload(draft: StudentDraft, uid: string) {
     firstName,
     lastName,
     grade: draft.grade,
-    gender: draft.gender ?? 'unspecified',
-    smallGroupId: draft.smallGroupId ?? null,
     notes: draft.notes?.trim() || null,
     status: draft.status ?? 'active',
     isVisitor: false,
@@ -106,8 +101,8 @@ export async function createStudent(draft: StudentDraft, uid: string): Promise<s
  * Writes Tally's own fields for a student.
  *
  * `merge: true` rather than `update`, because most students have no document
- * until the moment somebody annotates them: assigning a small group to a
- * Planning Center student creates `students/pco_123` on the spot.
+ * until the moment somebody annotates them: typing a note against a Planning
+ * Center student creates `students/pco_123` on the spot.
  */
 export async function updateStudent(
   studentId: string,
@@ -120,13 +115,11 @@ export async function updateStudent(
   if (patch.firstName !== undefined) payload.firstName = patch.firstName.trim();
   if (patch.lastName !== undefined) payload.lastName = patch.lastName.trim();
   if (patch.grade !== undefined) payload.grade = patch.grade;
-  if (patch.gender !== undefined) payload.gender = patch.gender;
-  if (patch.smallGroupId !== undefined) payload.smallGroupId = patch.smallGroupId || null;
   if (patch.notes !== undefined) payload.notes = patch.notes?.trim() || null;
   if (patch.status !== undefined) payload.status = patch.status;
 
   // A document created purely to hold an annotation still needs enough identity
-  // to be readable on its own — a bare `{ smallGroupId }` in Firestore is not
+  // to be readable on its own — a bare `{ notes }` in Firestore is not
   // debuggable, and the rules check the name fields.
   const firstName = (payload.firstName as string | undefined) ?? current?.firstName;
   const lastName = (payload.lastName as string | undefined) ?? current?.lastName;

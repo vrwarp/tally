@@ -138,7 +138,6 @@ function toSource(id: string, data: Record<string, unknown>): OccurrenceSource |
     checkInClosesAt,
     location: str(data.location),
     notes: str(data.notes),
-    defaultGroupingMode: data.defaultGroupingMode === 'smallGroup' ? 'smallGroup' : 'all',
   };
 }
 
@@ -171,7 +170,6 @@ function payloadFor(
     location: source.location,
     notes: source.notes,
     requiresRsvp: false,
-    defaultGroupingMode: source.defaultGroupingMode,
     status: 'scheduled',
     createdAt: now,
     updatedAt: now,

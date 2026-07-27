@@ -15,7 +15,6 @@ import {
   countRecentHits,
   effectiveThreshold,
   isEligible,
-  studentMatchesGroup,
   type BuildRosterInput,
   type RosterView,
 } from '@/features/roster/predictiveRoster';
@@ -26,7 +25,6 @@ import {
   makeEvent,
   makeRsvp,
   makeSettings,
-  makeSmallGroup,
   makeSnapshot,
   makeStudent,
   makeWeeklyEvents,
@@ -309,51 +307,6 @@ describe('buildSeriesHistory', () => {
 
       expect(buildSeriesHistory(retreat, snapshots, settings)).toEqual([]);
     });
-  });
-});
-
-/* -------------------------------------------------------------------------- */
-/* studentMatchesGroup                                                         */
-/* -------------------------------------------------------------------------- */
-
-describe('studentMatchesGroup', () => {
-  const eighthGradeBoys = makeSmallGroup({ id: 'g-8b', grades: [8], gender: 'male' });
-
-  it('lets an explicit assignment win over grade and gender', () => {
-    const assigned = makeStudent({ smallGroupId: 'g-8b', grade: 11, gender: 'female' });
-    expect(studentMatchesGroup(assigned, eighthGradeBoys)).toBe(true);
-  });
-
-  it('excludes a student assigned elsewhere even when grade and gender fit', () => {
-    const elsewhere = makeStudent({ smallGroupId: 'g-9g', grade: 8, gender: 'male' });
-    expect(studentMatchesGroup(elsewhere, eighthGradeBoys)).toBe(false);
-  });
-
-  it('falls back to grade and gender only when the student has no group id', () => {
-    expect(
-      studentMatchesGroup(makeStudent({ smallGroupId: null, grade: 8, gender: 'male' }), eighthGradeBoys),
-    ).toBe(true);
-    expect(
-      studentMatchesGroup(makeStudent({ smallGroupId: null, grade: 9, gender: 'male' }), eighthGradeBoys),
-    ).toBe(false);
-    expect(
-      studentMatchesGroup(
-        makeStudent({ smallGroupId: null, grade: 8, gender: 'female' }),
-        eighthGradeBoys,
-      ),
-    ).toBe(false);
-  });
-
-  it('accepts any gender for a mixed group and any grade for an open group', () => {
-    const mixed = makeSmallGroup({ id: 'g-mixed', grades: [8], gender: 'mixed' });
-    expect(
-      studentMatchesGroup(makeStudent({ smallGroupId: null, grade: 8, gender: 'female' }), mixed),
-    ).toBe(true);
-
-    const allGrades = makeSmallGroup({ id: 'g-all', grades: [], gender: 'male' });
-    expect(
-      studentMatchesGroup(makeStudent({ smallGroupId: null, grade: 12, gender: 'male' }), allGrades),
-    ).toBe(true);
   });
 });
 
@@ -811,49 +764,32 @@ describe('buildRoster: search', () => {
 /* buildRoster — scoping filters                                               */
 /* -------------------------------------------------------------------------- */
 
-describe('buildRoster: group scoping', () => {
-  const eighthGradeBoys = makeSmallGroup({ id: 'g-8b', grades: [8], gender: 'male' });
+describe('buildRoster: scoping filters', () => {
+  const eighthA = makeStudent({ id: 'eighth-a', lastName: 'Brook', grade: 8 });
+  const ninthA = makeStudent({ id: 'ninth-a', lastName: 'Crane', grade: 9 });
+  const eighthB = makeStudent({ id: 'eighth-b', lastName: 'Doyle', grade: 8 });
 
-  const assigned = makeStudent({ id: 'assigned', lastName: 'Ames', smallGroupId: 'g-8b', grade: 11, gender: 'female' });
-  const byGradeAndGender = makeStudent({ id: 'derived', lastName: 'Brook', smallGroupId: null, grade: 8, gender: 'male' });
-  const wrongGrade = makeStudent({ id: 'wrong-grade', lastName: 'Crane', smallGroupId: null, grade: 9, gender: 'male' });
-  const assignedElsewhere = makeStudent({ id: 'elsewhere', lastName: 'Doyle', smallGroupId: 'g-9g', grade: 8, gender: 'male' });
+  const students = [eighthA, ninthA, eighthB];
 
-  const students = [assigned, byGradeAndGender, wrongGrade, assignedElsewhere];
-
-  it('scopes to the counselor group, explicit assignment winning over the fallback', () => {
-    const view = roster({ students, group: eighthGradeBoys });
-
-    expect(ids(waiting(view))).toEqual([assigned.id, byGradeAndGender.id]);
-    expect(view.counts.eligible).toBe(2);
-  });
-
-  it('takes the whole ministry when no group is passed', () => {
-    expect(roster({ students }).counts.eligible).toBe(4);
-    expect(roster({ students, group: null }).counts.eligible).toBe(4);
-  });
-
-  it('filters by explicit small group id without the grade/gender fallback', () => {
-    const view = roster({ students, filters: { smallGroupId: 'g-8b' } });
-    expect(ids(waiting(view))).toEqual([assigned.id]);
+  it('takes the whole ministry when nothing narrows it', () => {
+    expect(roster({ students }).counts.eligible).toBe(3);
   });
 
   it('filters by grade', () => {
     const view = roster({ students, filters: { grades: [8] } });
-    expect(ids(waiting(view))).toEqual([byGradeAndGender.id, assignedElsewhere.id]);
+    expect(ids(waiting(view))).toEqual([eighthA.id, eighthB.id]);
   });
 
   it('takes the union of several grades, and every grade for an empty list', () => {
-    const ninth = makeStudent({ id: 'ninth', lastName: 'Eaves', grade: 9 });
-    const roll = [...students, ninth];
+    const tenth = makeStudent({ id: 'tenth', lastName: 'Eaves', grade: 10 });
+    const roll = [...students, tenth];
 
     expect(ids(waiting(roster({ students: roll, filters: { grades: [8, 9] } })))).toEqual([
-      byGradeAndGender.id,
-      wrongGrade.id,
-      assignedElsewhere.id,
-      ninth.id,
+      eighthA.id,
+      ninthA.id,
+      eighthB.id,
     ]);
-    expect(roster({ students: roll, filters: { grades: [] } }).counts.eligible).toBe(5);
+    expect(roster({ students: roll, filters: { grades: [] } }).counts.eligible).toBe(4);
   });
 
   it('filters to incomplete profiles only', () => {
@@ -998,16 +934,6 @@ describe('buildRoster: focus', () => {
     const view = roster({ students, filters: { focus: 'recent' } });
 
     expect(view.counts.recent).toBe(0);
-    expect(view.focus).toBe('all');
-    expect(ids(view.entries)).toEqual([regular.id, stranger.id, visitor.id]);
-  });
-
-  /* Nine names already fit on a phone; what the leader came for is the list of
-     who is missing, and narrowing that to regulars only hides absences. */
-  it('stands down inside a small group', () => {
-    const group = makeSmallGroup({ id: 'g', grades: [], gender: 'mixed' });
-    const view = roster({ students, history, group, filters: { focus: 'recent' } });
-
     expect(view.focus).toBe('all');
     expect(ids(view.entries)).toEqual([regular.id, stranger.id, visitor.id]);
   });

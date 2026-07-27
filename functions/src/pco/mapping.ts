@@ -29,7 +29,6 @@ import {
 /* Tally-side shapes                                                           */
 /* -------------------------------------------------------------------------- */
 
-export type Gender = 'male' | 'female' | 'unspecified';
 export type StudentStatus = 'active' | 'inactive';
 export type Role = 'counselor' | 'core' | 'admin';
 
@@ -38,7 +37,6 @@ export interface MappedStudent {
   firstName: string;
   lastName: string;
   grade: number;
-  gender: Gender;
   allergies: string | null;
   status: StudentStatus;
   /** Denormalised search key; must match `buildSearchName` in src/types. */
@@ -283,19 +281,6 @@ function ownedBy(resource: JsonApiResource, personId: string): boolean {
 /* -------------------------------------------------------------------------- */
 
 /**
- * Normalises Planning Center's free-text gender.
- *
- * Only recorded because Sunday School small groups are split by it; anything
- * unrecognised is 'unspecified' rather than a guess.
- */
-export function normaliseGender(value: unknown): Gender {
-  const raw = trimmed(value)?.toLowerCase();
-  if (raw === 'm' || raw === 'male') return 'male';
-  if (raw === 'f' || raw === 'female') return 'female';
-  return 'unspecified';
-}
-
-/**
  * The US school year that ends in the given calendar year. August or later
  * belongs to the year that ends next spring, which is what "graduation year"
  * counts down to.
@@ -347,7 +332,6 @@ export function mapPersonToStudent(person: PcoPerson, ctx: StudentMappingContext
     firstName,
     lastName,
     grade: Math.min(ctx.maxGrade, Math.max(ctx.minGrade, grade ?? ctx.minGrade)),
-    gender: normaliseGender(attributes.gender),
     allergies: trimmed(attributes.medical_notes),
     status: normaliseStatus(person),
     searchName: buildSearchName(firstName, lastName),

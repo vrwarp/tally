@@ -85,8 +85,6 @@ export type PcoPersonAttributes = {
   name?: string | null;
   grade?: number | null;
   graduation_year?: number | null;
-  /** Free text — the API does not constrain it to an enum. */
-  gender?: string | null;
   birthdate?: string | null;
   child?: boolean | null;
   medical_notes?: string | null;

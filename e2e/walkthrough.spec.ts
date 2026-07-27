@@ -200,7 +200,7 @@ test('capture the walkthrough', async ({ page, signedInAs }) => {
     journey: 'The roster',
     title: 'Students',
     caption:
-      'The whole ministry, filterable by grade, small group and status. Each row says whether the record came from Planning Center or was created in Tally, so it is obvious which fields are safe to edit here.',
+      'The whole ministry, filterable by grade and status. Each row says whether the record came from Planning Center or was created in Tally, so it is obvious which fields are safe to edit here.',
   });
 
   await gotoReady(page, '/settings');
@@ -243,7 +243,7 @@ test('capture the walkthrough', async ({ page, signedInAs }) => {
     journey: 'The roster',
     title: 'A roster nobody stores',
     caption:
-      'These names are not in Tally’s database. They arrived from Planning Center on this page load, merged with the handful of things Planning Center has no opinion about — a small group, a note, when somebody first turned up.',
+      'These names are not in Tally’s database. They arrived from Planning Center on this page load, merged with the handful of things Planning Center has no opinion about — a note, when somebody first turned up.',
   });
 
   await page.getByRole('link', { name: /Adebayo/ }).first().click();

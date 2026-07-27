@@ -1,5 +1,5 @@
 /**
- * Journeys 1 and 2: high-volume check-in, and the small-group roster.
+ * Journey 1: high-volume check-in.
  *
  * These drive the real stack, so a tap here is a Firestore write that comes back
  * through `onSnapshot`. Where a test could pass on rendering alone, it also

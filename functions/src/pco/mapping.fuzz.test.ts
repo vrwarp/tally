@@ -2,8 +2,8 @@
  * Properties of the Planning Center mapping.
  *
  * This code reads a database Tally does not own and cannot validate. Fields are
- * free text, optional, and occasionally absent entirely — `gender` alone
- * arrives as "Male", "M", "female" and "". A mapper that throws on one odd
+ * free text, optional, and occasionally absent entirely — a grade arrives as a
+ * number, a graduation year, or nothing at all. A mapper that throws on one odd
  * record aborts the whole sync; one that lets a bad value through writes it
  * into a child's profile.
  */
@@ -97,11 +97,10 @@ describe('Planning Center mapping properties', () => {
     const student = mapPersonToStudent(person, CTX);
 
     // Outside the band, `Grade` in the app would silently rewrite it to 6 and
-    // put a 12th grader in a 6th-grade small group.
+    // report a 12th grader as a 6th grader.
     expect(student.grade).toBeGreaterThanOrEqual(CTX.minGrade);
     expect(student.grade).toBeLessThanOrEqual(CTX.maxGrade);
     expect(['active', 'inactive']).toContain(student.status);
-    expect(['male', 'female', 'unspecified']).toContain(student.gender);
     expect(typeof student.firstName).toBe('string');
     expect(typeof student.lastName).toBe('string');
     expect(student.searchName).toBe(student.searchName.toLowerCase());

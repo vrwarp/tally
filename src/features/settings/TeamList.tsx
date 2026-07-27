@@ -15,7 +15,7 @@
  * place for the decision — the people who edit Planning Center are not
  * necessarily the people who should be granting access to this.
  */
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import {
   Badge,
   Button,
@@ -29,7 +29,6 @@ import {
   TextField,
 } from '@/components/ui';
 import { useAuth } from '@/context/authContext';
-import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { formatRelative } from '@/lib/time';
 import {
@@ -51,7 +50,6 @@ const ROLE_OPTIONS: readonly Role[] = ['counselor', 'core', 'admin'];
 
 export function TeamList() {
   const { profile, can } = useAuth();
-  const { groups } = useData();
   const { show } = useToast();
 
   const [users, setUsers] = useState<UserProfile[] | null>(null);
@@ -73,10 +71,6 @@ export function TeamList() {
     if (!isAdmin) return;
     return subscribeInvitations(setInvitations, () => setInvitations([]));
   }, [isAdmin]);
-  const groupNames = useMemo(
-    () => new Map(groups.map((group) => [group.id, group.name])),
-    [groups],
-  );
 
   const patchMember = async (member: UserProfile, changes: { role?: Role; active?: boolean }) => {
     setBusyId(member.id);
@@ -87,7 +81,6 @@ export function TeamList() {
         email: member.email,
         displayName: member.displayName,
         role: changes.role ?? member.role,
-        assignedGroupId: member.assignedGroupId,
         active: changes.active ?? member.active,
       });
       show(`${member.displayName || member.email} updated`, { tone: 'success' });
@@ -170,9 +163,6 @@ export function TeamList() {
             <ul className="divide-y divide-ink-800">
               {users.map((member) => {
                 const isSelf = member.id === profile?.id;
-                const group = member.assignedGroupId
-                  ? groupNames.get(member.assignedGroupId)
-                  : undefined;
 
                 return (
                   <li key={member.id} className="flex flex-col gap-2 px-4 py-3">
@@ -181,10 +171,7 @@ export function TeamList() {
                         {member.displayName || member.email}
                         {isSelf ? <span className="ml-1 text-xs text-ink-500">(you)</span> : null}
                       </p>
-                      <p className="truncate text-xs text-ink-500">
-                        {member.email}
-                        {group ? ` · ${group}` : ''}
-                      </p>
+                      <p className="truncate text-xs text-ink-500">{member.email}</p>
                       <p className="text-xs text-ink-600">
                         {member.lastSeenAt
                           ? `Last seen ${formatRelative(member.lastSeenAt)}`

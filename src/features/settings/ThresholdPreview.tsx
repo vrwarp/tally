@@ -79,7 +79,6 @@ export function ThresholdPreview({ draft, saved, valid }: ThresholdPreviewProps)
           location: null,
           notes: null,
           requiresRsvp: false,
-          defaultGroupingMode: entry.defaultGroupingMode,
           status: 'scheduled',
           createdAt: now,
           updatedAt: now,

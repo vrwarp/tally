@@ -88,8 +88,6 @@ by exercising a decision the mapping code has to make:
 - a student with no `grade`, carrying only a `graduation_year`
 - a 5th grader, who must never reach a 6-12 ministry roster
 - an inactive student, who must be deactivated rather than deleted
-- `gender` spelled four ways — `Female`, `F`, `female`, `""` — because the real
-  field is free text
 - a household with two `parent_guardian` adults, so the contact pick has to be
   deterministic rather than "whichever the iteration order yielded"
 - a household whose only adult is an `other_adult` grandparent

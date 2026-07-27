@@ -22,10 +22,9 @@ The list will not narrow under a reader either — the prediction is a one-shot 
 behind a skeleton for it rather than showing all 43 names and then taking 18 away. Search reaches the
 whole roster as you type and stands the Recent filter down while it runs.
 
-**Journey 2 — Sunday School by small group.** Sunday School opens pre-scoped to a counselor's
-assigned group ("8th Grade Boys"), so the list is twelve names rather than two hundred. Prediction
-is per-series: Friday history never leaks into Sunday's regulars, because they are different
-crowds.
+**Journey 2 — Sunday School.** Prediction is per-series: Friday history never leaks into Sunday's
+regulars, because they are different crowds. A counselor who wants a slice of the roster narrows it
+by grade, on the same one list.
 
 **Journey 3 — a visitor nobody has met.** Quick-add takes a first name, a last name and a grade,
 creates the student and checks them in as a single atomic write. They are flagged as an incomplete
@@ -403,7 +402,7 @@ rules it deploys on merge with no prompt.
 
 The ministry stores data about children, so the roster is deliberately thin. Tally holds:
 
-- first and last name, grade, and gender (recorded only because Sunday School splits by it),
+- first and last name, and grade,
 - one parent or guardian contact — name, phone, email,
 - allergies and a free-text notes line, both optional,
 - attendance: which gatherings a student was marked present at, and by whom,
@@ -416,9 +415,9 @@ those live on a clipboard and in a cash box, and a stale second copy in an app i
 Nothing is stored that would not already be on a church check-in card.
 
 Most of that list is not Tally's to hold. Names, grades, parent contact and allergies live in
-Planning Center and are read when needed; `students/{id}` holds only what Tally owns — small group,
-notes, when they first turned up — plus the complete record for a quick-added visitor who does not
-exist upstream yet.
+Planning Center and are read when needed; `students/{id}` holds only what Tally owns — notes, when
+they first turned up — plus the complete record for a quick-added visitor who does not exist
+upstream yet.
 
 A student who leaves the ministry is marked inactive in Planning Center and simply stops coming back
 in the roster read. Nothing in Tally deletes them, and that is deliberate: attendance history at
