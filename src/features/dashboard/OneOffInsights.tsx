@@ -10,7 +10,7 @@
  * what it drew, and who we met there and have not seen since.
  */
 import { Link } from 'react-router-dom';
-import { Card, CardHeader, EmptyState } from '@/components/ui';
+import { Card, CardHeader, EmptyState, EventIcon } from '@/components/ui';
 import { CopyContactsButton, FollowUpActions } from '@/features/dashboard/FollowUpActions';
 import type { OneOffOnlyStudent, OneOffRecap } from '@/features/dashboard/insights';
 import { formatRelative, formatShortDate } from '@/lib/time';
@@ -39,6 +39,9 @@ export function OneOffRecapList({ items }: OneOffRecapListProps) {
         <ul className="divide-y divide-ink-800">
           {items.map((item) => (
             <li key={item.event.id} className="flex items-center gap-3 px-4 py-2">
+              {/* The same tile the events list gives it, so a trip looks like
+                  itself on both screens. */}
+              <EventIcon name={item.event.icon} size="sm" />
               <Link
                 to={`/events/${item.event.id}`}
                 className="flex min-h-11 min-w-0 flex-1 flex-col justify-center hover:text-brand-300"
