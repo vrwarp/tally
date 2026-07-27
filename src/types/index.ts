@@ -426,6 +426,19 @@ export interface TallyEvent
   checkInClosesAt: Date;
   createdAt: Date;
   updatedAt: Date;
+  /**
+   * Whether a document stands behind this gathering.
+   *
+   * False for one the recurrence rules describe but nothing has been done about
+   * yet — see `lib/eventProjection.ts`. Not a stored field: it is how the
+   * gathering reached the app, not something about the gathering.
+   *
+   * It reads exactly like a real event and can be listed, opened and predicted
+   * from. What it cannot be is *written to*, because `id` names a document that
+   * does not exist. Every write path calls `ensureMaterialized` first, which is
+   * a no-op when this is already true.
+   */
+  materialized: boolean;
 }
 
 /* -------------------------------------------------------------------------- */

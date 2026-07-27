@@ -31,7 +31,7 @@ import { describeRecurrence } from '@/lib/recurrence';
 import { formatClock, formatEventDay, formatEventWindow, isCheckInOpen } from '@/lib/time';
 import { cn, ordinalGrade } from '@/lib/utils';
 import { fetchAttendance } from '@/services/attendance';
-import { deleteEvent, setEventStatus } from '@/services/events';
+import { deleteEvent, ensureMaterialized, setEventStatus } from '@/services/events';
 import { studentFullName } from '@/types';
 
 function DetailRow({ label, value }: { label: string; value: string }) {
@@ -107,7 +107,10 @@ export function EventDetailPage() {
     if (!user) return;
     setBusy(true);
     try {
-      await setEventStatus(event.id, cancelled ? 'scheduled' : 'cancelled', user.uid);
+      // Calling off a gathering the rules merely describe is the act that makes
+      // it a document — there is nothing to set a status on until there is one.
+      const eventId = await ensureMaterialized(event);
+      await setEventStatus(eventId, cancelled ? 'scheduled' : 'cancelled', user.uid);
       show(cancelled ? `${event.title} is back on` : `${event.title} cancelled`, {
         tone: 'success',
       });
@@ -326,7 +329,19 @@ export function EventDetailPage() {
       <Card>
         <CardHeader title="Danger zone" />
         <div className="flex flex-col gap-2 p-4">
-          {attendance.length > 0 ? (
+          {!event.materialized ? (
+            /*
+             * Nothing to delete, and nothing that deleting would achieve: this
+             * gathering is the recurrence rule speaking, so removing it would
+             * hand back exactly the same night on the next read. Cancelling is
+             * what records the decision — it writes the one document that says
+             * this Friday is off, which the projection then defers to.
+             */
+            <p className="text-sm text-ink-400">
+              This gathering comes from the repeat schedule, so there is nothing to delete. Cancel
+              it to call off this one date, or edit the event to change the schedule itself.
+            </p>
+          ) : attendance.length > 0 ? (
             <p className="text-sm text-ink-400">
               {attendance.length} {attendance.length === 1 ? 'student has' : 'students have'} been
               checked in, so this event cannot be deleted — that history feeds the predictive

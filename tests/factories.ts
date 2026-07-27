@@ -88,6 +88,9 @@ export function makeEvent(overrides: Partial<TallyEvent> = {}): TallyEvent {
     createdAt: pick(overrides, 'createdAt', new Date('2026-01-01T12:00:00')),
     updatedAt: pick(overrides, 'updatedAt', new Date('2026-01-01T12:00:00')),
     createdBy: pick(overrides, 'createdBy', 'seed'),
+    // A fixture stands in for a document unless a test is specifically about
+    // the projected half of the calendar.
+    materialized: pick(overrides, 'materialized', true),
   };
 }
 

@@ -8,7 +8,6 @@ import {
   onSnapshot,
   orderBy,
   query,
-  runTransaction,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -17,9 +16,10 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { paths } from '@/lib/paths';
-import { type OccurrenceDraft } from '@/lib/materialize';
+import { chainKey } from '@/lib/materialize';
 import { normalizeRecurrence } from '@/lib/recurrence';
 import { toEvent, toEventSeries, toSettings, toSmallGroup } from '@/services/converters';
+import { materializeOccurrence } from '@/services/functions';
 import type {
   AppSettings,
   EventMode,
@@ -175,72 +175,33 @@ export async function updateEvent(
 }
 
 /**
- * Writes down occurrences the recurrence rules say ought to exist.
+ * Makes sure a gathering has a document behind it, and hands back its id.
  *
- * Two things make this safe to run on any app open.
+ * A no-op for anything that came out of Firestore, which is the overwhelmingly
+ * common case and must not cost a round trip. For a projected gathering — one
+ * the recurrence rules describe that nothing has been done about yet — this is
+ * the moment it becomes real.
  *
- * The id is derived from the chain and the date, so two leaders topping the
- * horizon up at the same moment address the same document rather than creating
- * two gatherings for one Friday.
+ * The write is a callable rather than a Firestore write for a reason the
+ * security rules cannot express: check-in belongs to counselors and `events` is
+ * core-team-writable, and rules have no loops, so they cannot check that a date
+ * is genuinely an occurrence of a rule. The server derives the id and every
+ * field from the chain's own template and refuses anything its projection does
+ * not recognise, which is what makes it safe for any active member to ask.
  *
- * And each write is a transaction that gives up if the document already exists.
- * Deterministic ids alone would converge, but a plain `setDoc` would also
- * happily overwrite next Friday's 19:30 start — the one somebody moved on
- * purpose — with the 19:00 the template still says. Existing means finished,
- * whatever state it is in.
- *
- * Returns how many were actually created. A permission error is swallowed per
- * occurrence: a counselor's app calling this is not a failure worth surfacing,
- * it is simply not their job.
+ * The id never changes: it was derived from the chain and the date before the
+ * document existed, so whatever the caller was already showing keeps working
+ * and nothing has to be re-resolved afterwards.
  */
-export async function materializeOccurrences(
-  drafts: readonly OccurrenceDraft[],
-  uid: string,
-): Promise<number> {
-  let created = 0;
+export async function ensureMaterialized(event: TallyEvent): Promise<string> {
+  if (event.materialized) return event.id;
 
-  for (const draft of drafts) {
-    const { source } = draft;
-    const ref = doc(db, paths.event(draft.id));
+  const { data } = await materializeOccurrence({
+    chain: chainKey(event),
+    startAt: event.startAt.getTime(),
+  });
 
-    try {
-      const wrote = await runTransaction(db, async (transaction) => {
-        if ((await transaction.get(ref)).exists()) return false;
-
-        transaction.set(
-          ref,
-          buildEventPayload(
-            {
-              title: source.title,
-              mode: 'recurring',
-              seriesId: source.seriesId,
-              recurrence: source.recurrence,
-              // The chain's root, resolved once here so every instance after
-              // the first carries the same one.
-              recurrenceRootId: source.recurrenceRootId ?? source.id,
-              startAt: draft.startAt,
-              endAt: draft.endAt,
-              checkInOpensAt: draft.checkInOpensAt,
-              checkInClosesAt: draft.checkInClosesAt,
-              location: source.location,
-              notes: source.notes,
-              defaultGroupingMode: source.defaultGroupingMode,
-              status: 'scheduled',
-            },
-            uid,
-            true,
-          ),
-        );
-        return true;
-      });
-
-      if (wrote) created += 1;
-    } catch {
-      // Offline, or not authorised. Both are states the next top-up fixes.
-    }
-  }
-
-  return created;
+  return data.id;
 }
 
 export async function setEventStatus(

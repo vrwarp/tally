@@ -266,6 +266,34 @@ export function normalizeRecurrence(rule: RecurrenceRule, anchor: Date): Recurre
   };
 }
 
+/**
+ * Whether two rules describe the same schedule.
+ *
+ * Field by field rather than by serialising: both sides have usually been
+ * through `normalizeRecurrence`, but one may have come back from Firestore with
+ * its keys in whatever order the document happened to store them, and a
+ * stringify would call that a different rule.
+ *
+ * Null is a rule too — "does not repeat" — so a gathering switched to one-off
+ * compares unequal to the weekly it used to be rather than throwing.
+ */
+export function recurrenceEquals(
+  a: RecurrenceRule | null,
+  b: RecurrenceRule | null,
+): boolean {
+  if (!a || !b) return a === b;
+
+  return (
+    a.frequency === b.frequency &&
+    a.interval === b.interval &&
+    a.monthlyMode === b.monthlyMode &&
+    a.until === b.until &&
+    a.count === b.count &&
+    a.weekdays.length === b.weekdays.length &&
+    a.weekdays.every((day, index) => day === b.weekdays[index])
+  );
+}
+
 /* -------------------------------------------------------------------------- */
 /* Expansion                                                                   */
 /* -------------------------------------------------------------------------- */

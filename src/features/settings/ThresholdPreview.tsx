@@ -84,6 +84,9 @@ export function ThresholdPreview({ draft, saved, valid }: ThresholdPreviewProps)
           createdAt: now,
           updatedAt: now,
           createdBy: '',
+          // Nothing stands behind it and nothing ever will — this one is not
+          // even on the calendar, it is a shape for the preview to reason over.
+          materialized: false,
         };
 
         const view = buildRoster({

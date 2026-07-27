@@ -219,3 +219,31 @@ export const pushPendingVisitors = httpsCallable<void, PushPendingResult>(
   functions,
   'pushPendingVisitors',
 );
+
+/* -------------------------------------------------------------------------- */
+/* Occurrences                                                                 */
+/* -------------------------------------------------------------------------- */
+
+export interface MaterializeOccurrenceResult {
+  /** The document id — the same one the app was already showing. */
+  id: string;
+  /** False when another device got there first. Not a failure. */
+  created: boolean;
+}
+
+/**
+ * Turns a projected gathering into a document.
+ *
+ * Server-side because the calendar is computed and `events` is core-team
+ * writable, while check-in is a counselor's job. The request is a question, not
+ * a payload: it names a chain and an instant, and the server refuses unless its
+ * own projection agrees that the occurrence exists. See
+ * `functions/src/occurrences.ts`.
+ *
+ * Called through `ensureMaterialized` in `services/events.ts` rather than
+ * directly — a gathering that already has a document must not cost a round trip.
+ */
+export const materializeOccurrence = httpsCallable<
+  { chain: string; startAt: number },
+  MaterializeOccurrenceResult
+>(functions, 'materializeOccurrence');

@@ -70,6 +70,10 @@ export class FakeFirestore implements FirestoreLike {
       },
       set: async (value, options) => this.write(path, value, options?.merge === true),
       update: async (value) => this.write(path, value, true),
+      delete: async () => {
+        this.data.delete(path);
+        this.writes.push({ path, data: { deleted: true } });
+      },
     };
   }
 

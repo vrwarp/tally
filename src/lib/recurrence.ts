@@ -13,6 +13,7 @@ import {
   EVERY_WEEKDAY,
   monthlyWeekdayPosition,
   normalizeRecurrence,
+  recurrenceEquals,
   recurrenceOccurrences,
   toDateOnlyValue,
   untilInstant,
@@ -198,18 +199,6 @@ export function recurrencePresets(anchor: Date): RecurrencePreset[] {
   }));
 }
 
-function sameRule(a: RecurrenceRule, b: RecurrenceRule): boolean {
-  return (
-    a.frequency === b.frequency &&
-    a.interval === b.interval &&
-    a.monthlyMode === b.monthlyMode &&
-    a.until === b.until &&
-    a.count === b.count &&
-    a.weekdays.length === b.weekdays.length &&
-    a.weekdays.every((day, index) => day === b.weekdays[index])
-  );
-}
-
 /**
  * Which preset a rule is, or `custom`. Editing an event has to reopen on the
  * shortlist entry it was saved from, not drop into the custom panel because the
@@ -221,7 +210,7 @@ export function matchRecurrencePreset(
 ): RecurrencePresetId {
   const normalized = normalizeRecurrence(candidate, anchor);
   const found = recurrencePresets(anchor).find((preset) =>
-    sameRule(preset.rule, normalized),
+    recurrenceEquals(preset.rule, normalized),
   );
 
   // `monthlyDay` and `monthlyWeekday` coincide when the anchor is, say, the

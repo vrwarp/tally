@@ -46,7 +46,7 @@ import {
   nextSeriesOccurrence,
   toDateTimeLocalValue,
 } from '@/lib/time';
-import { createEvent, updateEvent, type EventDraft } from '@/services/events';
+import { createEvent, ensureMaterialized, updateEvent, type EventDraft } from '@/services/events';
 import type { EventMode, RecurrenceRule, RosterGroupingMode, TallyEvent } from '@/types';
 
 /** House defaults for the check-in window, in minutes around the event. */
@@ -365,8 +365,17 @@ export function EventEditorModal({
     setSaving(true);
     try {
       let eventId = event?.id ?? '';
-      if (event) await updateEvent(event.id, draft, user.uid);
-      else eventId = await createEvent(draft, user.uid);
+
+      if (event) {
+        // Editing a gathering the rules describe but nothing has been done
+        // about yet: there is no document to update until this returns. The id
+        // does not change, so nothing below has to know which it was.
+        eventId = await ensureMaterialized(event);
+        await updateEvent(eventId, draft, user.uid);
+      } else {
+        eventId = await createEvent(draft, user.uid);
+      }
+
       show(event ? 'Event updated' : `${draft.title} scheduled`, { tone: 'success' });
       onSaved?.(eventId);
       onClose();
@@ -401,7 +410,7 @@ export function EventEditorModal({
       description={
         isEditing
           ? form.mode === 'recurring'
-            ? 'Changes apply to the upcoming gathering and the ones after it.'
+            ? 'The dates ahead follow the schedule; this changes them from here on.'
             : 'Changes apply to this gathering only.'
           : 'Recurring gatherings predict their roster from past instances.'
       }
