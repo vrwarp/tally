@@ -78,7 +78,7 @@ const MAX_EVENTS = 24;
 const ALL = 'all';
 
 export function DashboardPage() {
-  const { students, events, series, settings, loading } = useData();
+  const { students, events, series, settings, loading, rosterLoading } = useData();
   const now = useNow(60_000);
   const [selected, setSelected] = useState<string>(ALL);
 
@@ -207,6 +207,25 @@ export function DashboardPage() {
   if (loading) return <LoadingScreen message="Loading insights…" />;
 
   const awaitingHistory = snapshotsLoading && snapshots.length === 0;
+  /*
+   * The roster arrives separately from the streams — it is read from Planning
+   * Center — and every list on this screen is a statement about who is on it.
+   *
+   * Without this the screen spends its first second saying "Nobody has missed 3
+   * in a row — nice" and then replaces it with eleven names. The check-in screen
+   * holds its roster behind a skeleton for exactly this reason: a list that
+   * fills in after the fact is one a leader has already read and believed.
+   *
+   * `rosterLoading` alone, not "and there is nobody yet": the roster is the
+   * union of Planning Center's people and Tally's own documents, and the second
+   * half streams in from Firestore in milliseconds. Waiting only for an *empty*
+   * roster therefore waited for nothing at all — five quick-added visitors were
+   * enough to call it loaded and publish a call list missing everybody else.
+   */
+  const awaitingRoster = rosterLoading;
+  const awaiting = awaitingHistory || awaitingRoster;
+  /** The dash a tile shows rather than a zero it would have to take back. */
+  const pending = (value: number) => (awaitingRoster ? '—' : value);
   // The most recent night there is evidence for, not merely the most recent one
   // on the calendar — "Through Friday Fellowship" must not name a night nobody
   // came to.
@@ -274,28 +293,28 @@ export function DashboardPage() {
         />
         <StatTile
           label="MIA"
-          value={summary.miaCount}
+          value={pending(summary.miaCount)}
           hint={`${settings.miaConsecutiveMisses}+ missed in a row`}
-          tone={summary.miaCount > 0 ? 'danger' : 'neutral'}
+          tone={!awaitingRoster && summary.miaCount > 0 ? 'danger' : 'neutral'}
         />
         <StatTile
           label="New faces"
-          value={summary.newVisitorCount}
+          value={pending(summary.newVisitorCount)}
           hint={`last ${settings.newVisitorWindowDays} days`}
-          tone={summary.newVisitorCount > 0 ? 'success' : 'neutral'}
+          tone={!awaitingRoster && summary.newVisitorCount > 0 ? 'success' : 'neutral'}
         />
         <StatTile
           label="Incomplete"
-          value={summary.incompleteCount}
+          value={pending(summary.incompleteCount)}
           hint="no parent contact"
-          tone={summary.incompleteCount > 0 ? 'warn' : 'neutral'}
+          tone={!awaitingRoster && summary.incompleteCount > 0 ? 'warn' : 'neutral'}
         />
       </div>
 
-      {awaitingHistory ? (
+      {awaiting ? (
         <Card>
           <span role="status" className="sr-only">
-            Loading attendance history
+            {awaitingRoster ? 'Loading the roster' : 'Loading attendance history'}
           </span>
           <SkeletonRows count={4} />
         </Card>
@@ -327,12 +346,13 @@ export function DashboardPage() {
       )}
 
       {/* Independent of attendance history, so it renders even while snapshots
-          are in flight or the ministry has not run an event yet. */}
-      <IncompleteProfileList students={incomplete} now={now} />
+          are in flight or the ministry has not run an event yet — but not
+          before the roster it is a statement about has arrived. */}
+      {awaitingRoster ? null : <IncompleteProfileList students={incomplete} now={now} />}
 
       {/* Outside the tabs on purpose: a one-off belongs to no chain of repeats,
           so it neither filters by one nor answers the questions they do. */}
-      {oneOffRecaps.length > 0 || oneOffOnly.length > 0 ? (
+      {!awaiting && (oneOffRecaps.length > 0 || oneOffOnly.length > 0) ? (
         <>
           <OneOffRecapList items={oneOffRecaps} />
           <OneOffOnlyList items={oneOffOnly} />

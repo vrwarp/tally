@@ -23,7 +23,7 @@
  * What it does not cover is the handshake, and the log says so rather than
  * letting a green run imply otherwise.
  */
-import type { Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 
 /**
  * Who the seed authorises, and how.
@@ -248,12 +248,19 @@ export async function signOut(page: Page): Promise<void> {
   await page.goto('/login');
 }
 
+/**
+ * Waits until nothing on the screen is still loading.
+ *
+ * Every one of them, not the first one found. A screen can load in stages —
+ * the dashboard waits for its streams, renders, and only then discovers it is
+ * still waiting for the roster — and watching a single element meant returning
+ * the moment stage one finished, while stage two had not yet mounted its own
+ * status. Assertions then read a screen that was still filling in, and failed
+ * against a page that looked perfectly correct by the time anyone screenshotted
+ * it.
+ */
 async function waitUntilReady(page: Page): Promise<void> {
-  await page
-    .getByRole('status', { name: /loading/i })
-    .first()
-    .waitFor({ state: 'detached', timeout: 60_000 })
-    .catch(() => {
-      // Already gone by the time we looked, which is the happy path.
-    });
+  await expect(page.getByRole('status', { name: /loading/i })).toHaveCount(0, {
+    timeout: 60_000,
+  });
 }
