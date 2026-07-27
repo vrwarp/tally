@@ -22,12 +22,7 @@ import {
   signOut as firebaseSignOut,
   type User,
 } from 'firebase/auth';
-import {
-  auth,
-  firebaseApp,
-  popupRedirectResolver,
-  recoverFromWedgedPersistence,
-} from '@/lib/firebase';
+import { auth, firebaseApp, popupRedirectResolver } from '@/lib/firebase';
 import {
   googleSignInStrategy,
   isEmbeddedBrowser,
@@ -51,13 +46,6 @@ import {
  * every *other* tab pay for a handshake it never began.
  */
 const REDIRECT_PENDING_KEY = 'tally:google-redirect-pending';
-
-/**
- * How long Firestore may say nothing at all before the app assumes its local
- * cache has seized. Deliberately under the eight seconds after which the
- * restoring screen offers a manual reload: heal first, explain second.
- */
-const SILENT_CLIENT_MS = 7000;
 
 function redirectPending(): boolean {
   try {
@@ -179,7 +167,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
-    let heard = false;
 
     const unsubscribe = subscribeUserProfile(
       user.uid,
@@ -195,7 +182,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
          * not happened yet.
          */
         if (!next && source.fromCache) return;
-        heard = true;
         setProfile(next);
         setProfileResolved(true);
       },
@@ -203,30 +189,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // A rules denial here means "not a member" — surface it as pending
         // rather than as a crash.
         if (cancelled) return;
-        heard = true;
         setProfile(null);
         setProfileResolved(true);
       },
     );
 
-    /*
-     * Firestore is allowed to be slow. It is not allowed to be silent.
-     *
-     * Every ordinary failure — offline, denied, deleted — arrives as a snapshot
-     * or an error. Saying nothing the server has stood behind is the signature
-     * of the client itself having seized: a Web Locks lease that is never
-     * granted, an IndexedDB that never opens. Nothing inside the page can
-     * recover from that, because the cache is chosen once at startup — so the
-     * app reloads itself without it.
-     */
-    const watchdog = setTimeout(() => {
-      if (cancelled || heard) return;
-      recoverFromWedgedPersistence();
-    }, SILENT_CLIENT_MS);
-
     return () => {
       cancelled = true;
-      clearTimeout(watchdog);
       unsubscribe();
     };
   }, [user, profileEpoch]);
@@ -267,7 +236,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(next);
       setProfileResolved(true);
     } catch {
-      /* Offline, or denied. The listener remains the source of truth. */
+      /* Denied, or unreachable. The listener remains the source of truth. */
     } finally {
       setProfileEpoch((epoch) => epoch + 1);
     }

@@ -132,15 +132,16 @@ still bounded by the page cap and the repeated-cursor check.
 
 ## Not fixed
 
-- **Offline is not surfaced.** Firestore's persistent cache means a counselor
-  can keep checking students in with no network and the writes flush later,
-  which is the right behaviour — but nothing on screen says so. A counselor who
-  notices the wifi symbol drop has no way to tell whether their taps are landing.
-  The honest fix is a small connection indicator driven by Firestore's own
-  online/offline state; it is a real gap, not an oversight, and it is not
-  something to guess at without watching a real Friday night.
-- **A queued write is not distinguishable from a committed one.** Related to the
-  above and with the same reasoning.
+- **Losing the network is not surfaced.** Tally is an online-only app: Firestore
+  runs on an in-memory cache, so a check-in with no connection is a write that
+  sits in the SDK's queue until the connection returns or the tab is closed —
+  and nothing on screen says which. A counselor who notices the wifi symbol drop
+  has no way to tell whether their taps are landing. The honest fix is a small
+  connection indicator driven by Firestore's own online/offline state; it is a
+  real gap, not an oversight, and it is not something to guess at without
+  watching a real Friday night.
+- **An unacknowledged write is not distinguishable from a committed one.**
+  Related to the above and with the same reasoning.
 - **`updateStudent` has no optimistic-concurrency check.** Two core-team members
   editing the same profile in the same minute will have one silently overwrite
   the other. Rare enough, and the fix (a version field and a merge UI) is

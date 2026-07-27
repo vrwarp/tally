@@ -243,7 +243,8 @@ export async function reconcileChainSchedule(args: {
         await deleteDoc(doc(db, paths.event(event.id)));
         removed += 1;
       } catch {
-        // Offline, or not authorised. Both are states the next edit fixes.
+        // Not authorised, or the network dropped the write. Both are states the
+        // next edit fixes.
       }
     }),
     ...restated.map(async (event) => {
@@ -324,7 +325,8 @@ export async function materializeOccurrences(
 
       if (wrote) created += 1;
     } catch {
-      // Offline, or not authorised. Both are states the next top-up fixes.
+      // Not authorised, or the network dropped the write. Both are states the
+      // next top-up fixes.
     }
   }
 

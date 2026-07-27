@@ -33,10 +33,7 @@ import {
   connectFirestoreEmulator,
   initializeFirestore,
   memoryLocalCache,
-  persistentLocalCache,
-  persistentMultipleTabManager,
   type Firestore,
-  type FirestoreLocalCache,
 } from 'firebase/firestore';
 
 import { parseAuthDomains, resolveAuthDomain } from './authDomain';
@@ -114,99 +111,6 @@ function readConfig(): FirebaseOptions {
 export const firebaseApp: FirebaseApp = initializeApp(readConfig());
 
 /**
- * Set when offline persistence has been caught wedging this tab (see
- * `recoverFromWedgedPersistence`). Session-scoped on purpose: the next time the
- * counselor opens Tally it gets another chance at the good path.
- */
-const NO_PERSISTENCE_KEY = 'tally:no-persistence';
-
-function persistenceDisabled(): boolean {
-  try {
-    return window.sessionStorage.getItem(NO_PERSISTENCE_KEY) === '1';
-  } catch {
-    // Private mode. Nothing was ever stored, so nothing is disabled.
-    return false;
-  }
-}
-
-/**
- * Last resort for a Firestore client that has gone silent.
- *
- * The persistent cache coordinates tabs through the Web Locks API, and a lock
- * that is never granted takes the whole client with it: no listener fires, no
- * error is raised, nothing rejects. There is no way back from inside the page —
- * the cache is chosen at `initializeFirestore` and cannot be swapped — so the
- * only real recovery is to reload having decided not to use it.
- *
- * Returns false when persistence is already off, which means the silence has a
- * different cause and reloading would only cost the user their place.
- */
-export function recoverFromWedgedPersistence(): boolean {
-  if (persistenceDisabled()) return false;
-
-  try {
-    window.sessionStorage.setItem(NO_PERSISTENCE_KEY, '1');
-  } catch {
-    // Without somewhere to record the decision the reload would come straight
-    // back to the same wedge, and then reload again. Better to stay put.
-    return false;
-  }
-
-  console.warn('[tally] Firestore never responded; reloading without offline persistence.');
-  window.location.reload();
-  return true;
-}
-
-/**
- * The best cache this browser can actually run.
- *
- * A persistent multi-tab cache is what Tally wants: the roster stays readable
- * when the church wifi drops mid-check-in, `onSnapshot` resolves from cache
- * instantly on reopen, and writes queue locally and flush when the connection
- * returns.
- *
- * But `persistentMultipleTabManager` needs the Web Locks API to coordinate
- * between tabs, and Safari did not ship `navigator.locks` until version 16. On
- * anything older the tab manager never acquires its lock, so *no listener ever
- * fires* — no error, no rejection, just silence. Tally's own symptom was a
- * counselor sitting on a spinner forever, because the screen waits for the
- * `users/{uid}` snapshot that was never coming. Safari is the browser a youth
- * volunteer is most likely to be holding, which makes this the worst possible
- * place to assume a modern API.
- *
- * So: the persistent cache where the browser can be trusted to run it, memory
- * everywhere else — including on a browser that looked capable and then proved
- * otherwise. Losing offline support costs a little. Losing the whole app costs
- * the check-in.
- */
-function bestLocalCache(): FirestoreLocalCache {
-  const hasWebLocks = typeof navigator !== 'undefined' && 'locks' in navigator;
-
-  if (hasWebLocks && !persistenceDisabled()) {
-    return persistentLocalCache({ tabManager: persistentMultipleTabManager() });
-  }
-
-  /*
-   * Measured, not assumed: single-tab persistence was tried here first, on the
-   * reasoning that a counselor has one tab open so the lease is uncontended.
-   * It wedges the same way — the listener never fires and never errors, and the
-   * app sits on "restoring your session" forever.
-   *
-   * So on these browsers Tally gives up offline persistence entirely. That is a
-   * genuine loss: no cached roster when the church wifi drops, no writes queued
-   * across a reload. It is the smaller loss. An app that works while online
-   * beats an app that does not start, and the roster has its own copy in
-   * localStorage (see services/roster.ts) so the door still has names.
-   */
-  console.info(
-    hasWebLocks
-      ? '[tally] Offline persistence is off for this session after it stopped responding.'
-      : '[tally] No Web Locks API — offline persistence is off on this browser.',
-  );
-  return memoryLocalCache();
-}
-
-/**
  * Safari, and every browser on an iPhone — all WebKit underneath.
  *
  * Chrome and Edge on macOS both carry "Safari" in their user agent, so the
@@ -253,15 +157,27 @@ function createDb(): Firestore {
       }
     : {};
 
-  try {
-    return initializeFirestore(firebaseApp, { localCache: bestLocalCache(), ...transport });
-  } catch (cause) {
-    // Private browsing, a blocked IndexedDB, a quota refusal. An in-memory
-    // cache means no offline support, which is a real loss — and still
-    // enormously better than an app that does not start.
-    console.warn('[tally] Offline persistence unavailable; falling back to memory.', cause);
-    return initializeFirestore(firebaseApp, { localCache: memoryLocalCache(), ...transport });
-  }
+  /*
+   * In-memory cache, always. Tally is an online-only app.
+   *
+   * The persistent multi-tab cache used to be the default here, and it is the
+   * one that promises the nice things — a roster still readable when the church
+   * wifi drops, writes queued across a reload. It also coordinates tabs through
+   * the Web Locks API, and a lock that is never granted takes the whole client
+   * down with it: no listener fires, no error is raised, nothing rejects. The
+   * symptom was a counselor sitting on a spinner forever with a queue at the
+   * door, because the screen waits for a `users/{uid}` snapshot that was never
+   * coming. Single-tab persistence was tried and wedges the same way, and there
+   * is no way back from inside the page — the cache is chosen once, here.
+   *
+   * Offline data is not a requirement, so the trade is not worth making. A
+   * memory cache cannot wedge and cannot be refused by a browser that blocks
+   * IndexedDB in private mode, which is why nothing here needs a fallback. The
+   * door still has names when Planning Center is unreachable: the roster keeps
+   * its own copy in localStorage (see services/roster.ts), which is a cache of
+   * a callable's response and nothing to do with Firestore.
+   */
+  return initializeFirestore(firebaseApp, { localCache: memoryLocalCache(), ...transport });
 }
 
 export const db: Firestore = createDb();
