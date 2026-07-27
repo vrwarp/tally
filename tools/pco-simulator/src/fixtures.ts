@@ -34,11 +34,11 @@ import type {
 /** Fixed so `where[updated_at][gt]` behaviour is reproducible across runs. */
 export const FIXTURE_ANCHOR = new Date('2026-07-01T12:00:00.000Z');
 
-export const STUDENT_LIST_ID = 'FOOTPRINTS_STUDENTS';
-export const TEAM_LIST_ID = 'FOOTPRINTS_TEAM';
+export const STUDENT_LIST_ID = 'YOUTH_STUDENTS';
+export const TEAM_LIST_ID = 'YOUTH_TEAM';
 /** A list that exists, has members, and is the wrong answer. See `createFixtureOrg`. */
-export const STALE_LIST_ID = 'FOOTPRINTS_CAMP_2019';
-export const SMALL_GROUP_FIELD_SLUG = 'footprints_small_group';
+export const STALE_LIST_ID = 'YOUTH_CAMP_2019';
+export const SMALL_GROUP_FIELD_SLUG = 'small_group';
 
 /** Default Personal Access Token pair the simulator accepts. */
 export const DEFAULT_APP_ID = 'sim-app-id';
@@ -140,10 +140,10 @@ interface TeamSpec {
  * one. The fourth is new: it proves a sync actually adds access.
  */
 const TEAM: readonly TeamSpec[] = [
-  { id: '9100001', first: 'Dana', last: 'Ruiz', email: 'dana.ruiz@footprints.example.org', permissions: 'Manager', siteAdmin: true },
-  { id: '9100002', first: 'Miriam', last: 'Achebe', email: 'miriam.achebe@footprints.example.org', permissions: 'Manager' },
-  { id: '9100003', first: 'Sam', last: 'Whitfield', email: 'sam.whitfield@footprints.example.org', permissions: 'Viewer', smallGroup: '8th Grade Boys' },
-  { id: '9100004', first: 'Priya', last: 'Raman', email: 'priya.raman@footprints.example.org', permissions: 'Editor', smallGroup: '9th Grade Girls' },
+  { id: '9100001', first: 'Dana', last: 'Ruiz', email: 'dana.ruiz@example.org', permissions: 'Manager', siteAdmin: true },
+  { id: '9100002', first: 'Miriam', last: 'Achebe', email: 'miriam.achebe@example.org', permissions: 'Manager' },
+  { id: '9100003', first: 'Sam', last: 'Whitfield', email: 'sam.whitfield@example.org', permissions: 'Viewer', smallGroup: '8th Grade Boys' },
+  { id: '9100004', first: 'Priya', last: 'Raman', email: 'priya.raman@example.org', permissions: 'Editor', smallGroup: '9th Grade Girls' },
   // No email address on file: cannot be granted access, and must not crash the sync.
   { id: '9100005', first: 'Gerald', last: 'Fontaine', permissions: 'Viewer' },
 ];
@@ -185,7 +185,7 @@ export function createFixtureOrg(): SimOrg {
   const fieldDefinitions: SimFieldDefinition[] = [
     {
       id: 'FD1',
-      name: 'Footprints Small Group',
+      name: 'Small Group',
       slug: SMALL_GROUP_FIELD_SLUG,
       data_type: 'string',
     },
@@ -343,7 +343,7 @@ export function createFixtureOrg(): SimOrg {
   const lists: SimList[] = [
     {
       id: STUDENT_LIST_ID,
-      name: 'Footprints Students',
+      name: 'Youth Students',
       description: 'Everyone in the youth ministry, maintained by the youth pastor.',
       // The list is what a youth pastor maintains by hand, so it includes the
       // student with no grade and excludes the 5th grader — the two cases where
@@ -355,7 +355,7 @@ export function createFixtureOrg(): SimOrg {
     },
     {
       id: TEAM_LIST_ID,
-      name: 'Footprints Team',
+      name: 'Youth Team',
       description: 'Adult counselors and core team.',
       member_ids: TEAM.map((t) => t.id),
       refreshed_at: '2026-02-13T12:00:00Z',
@@ -368,7 +368,7 @@ export function createFixtureOrg(): SimOrg {
      */
     {
       id: STALE_LIST_ID,
-      name: 'Footprints Camp 2019',
+      name: 'Youth Camp 2019',
       description: 'Summer camp signups. Long over.',
       member_ids: YOUTH.slice(0, 3).map((y) => y.id),
       refreshed_at: '2019-07-04T12:00:00Z',

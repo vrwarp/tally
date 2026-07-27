@@ -75,7 +75,7 @@ const planningCenterEnv = {
    * access model — the break-glass that cannot be revoked from inside the app,
    * and the ordinary invitation that can.
    */
-  TALLY_ADMIN_EMAILS: 'dana.ruiz@footprints.example.org',
+  TALLY_ADMIN_EMAILS: 'dana.ruiz@example.org',
   // Short but non-zero, so the suite exercises the cache rather than routing
   // around it — and so a run does not depend on `functions/.env.demo-tally`
   // being in sync with the params the code declares.

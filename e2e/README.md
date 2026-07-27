@@ -53,9 +53,9 @@ Access comes from two places, and the suite covers both:
 
 | Role | Address | Authorised by |
 | --- | --- | --- |
-| admin | `dana.ruiz@footprints.example.org` | `TALLY_ADMIN_EMAILS`, the deploy-time standing grant |
-| core | `miriam.achebe@footprints.example.org` | an invitation `scripts/seed.ts` writes |
-| counselor | `sam.whitfield@footprints.example.org` | an invitation `scripts/seed.ts` writes |
+| admin | `dana.ruiz@example.org` | `TALLY_ADMIN_EMAILS`, the deploy-time standing grant |
+| core | `miriam.achebe@example.org` | an invitation `scripts/seed.ts` writes |
+| counselor | `sam.whitfield@example.org` | an invitation `scripts/seed.ts` writes |
 
 Use `gotoReady(page, path)` rather than `page.goto` after signing in. A bare
 `goto` resolves as soon as the document loads, but Tally still has to

@@ -1,7 +1,7 @@
 /**
  * Emulator seed data.
  *
- * Fills a *local* Firebase Emulator Suite with a believable Footprints ministry
+ * Fills a *local* Firebase Emulator Suite with a believable youth ministry
  * so every screen can be demonstrated and every journey walked end to end
  * without a real Firebase project, a real Planning Center token, or a real
  * child's name in a database.
@@ -366,21 +366,21 @@ interface SeedTeamMember {
 const SEED_TEAM: readonly SeedTeamMember[] = [
   {
     name: 'Dana Ruiz',
-    email: 'dana.ruiz@footprints.example.org',
+    email: 'dana.ruiz@example.org',
     role: 'admin',
     pcoPersonId: '9100001',
     assignedGroupId: null,
   },
   {
     name: 'Miriam Achebe',
-    email: 'miriam.achebe@footprints.example.org',
+    email: 'miriam.achebe@example.org',
     role: 'core',
     pcoPersonId: '9100002',
     assignedGroupId: null,
   },
   {
     name: 'Sam Whitfield',
-    email: 'sam.whitfield@footprints.example.org',
+    email: 'sam.whitfield@example.org',
     role: 'counselor',
     pcoPersonId: '9100003',
     assignedGroupId: '8th-grade-boys',

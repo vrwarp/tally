@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Attendance tracking for the Footprints youth ministry (6th-12th grade).",
+  "description": "Attendance tracking for a youth ministry (6th-12th grade).",
   "engines": {
     "node": ">=20"
   },

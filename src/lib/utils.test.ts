@@ -147,7 +147,7 @@ describe('normalizeForSearch', () => {
 });
 
 describe('ordinalGrade', () => {
-  it('labels the grades Footprints actually serves', () => {
+  it('labels the grades the ministry actually serves', () => {
     expect(ordinalGrade(6)).toBe('6th');
     expect(ordinalGrade(7)).toBe('7th');
     expect(ordinalGrade(8)).toBe('8th');

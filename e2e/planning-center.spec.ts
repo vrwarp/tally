@@ -82,8 +82,8 @@ test.describe('Planning Center', () => {
     /*
      * The whole point of moving membership into Tally.
      *
-     * A new person in the church database is *not* automatically a Footprints
-     * student — that was the flaw in pointing Tally at a Planning Center List,
+     * A new person in the church database is *not* automatically a student
+     * — that was the flaw in pointing Tally at a Planning Center List,
      * which is a saved query and moves on its own. Somebody decides, and the
      * decision is a document in Tally.
      */

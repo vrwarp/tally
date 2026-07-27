@@ -67,7 +67,7 @@ export function LoginPage() {
           </span>
           <h1 className="text-4xl font-bold tracking-tight text-ink-50">Tally</h1>
           <p className="text-sm text-ink-400">
-            Attendance for Footprints — 6th through 12th grade.
+            Attendance for youth ministry — 6th through 12th grade.
           </p>
         </header>
 

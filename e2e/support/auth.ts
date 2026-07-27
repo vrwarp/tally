@@ -33,9 +33,9 @@ import type { Page } from '@playwright/test';
  * can exist. The other two arrive on invitations `scripts/seed.ts` writes.
  */
 export const TEAM = {
-  admin: 'dana.ruiz@footprints.example.org',
-  core: 'miriam.achebe@footprints.example.org',
-  counselor: 'sam.whitfield@footprints.example.org',
+  admin: 'dana.ruiz@example.org',
+  core: 'miriam.achebe@example.org',
+  counselor: 'sam.whitfield@example.org',
 } as const;
 
 export type TeamRole = keyof typeof TEAM;

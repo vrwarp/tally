@@ -457,7 +457,7 @@ function emptyOrg(): SimOrg {
     lists: [
       {
         id: STUDENT_LIST_ID,
-        name: 'Footprints Students',
+        name: 'Youth Students',
         member_ids: [],
         auto_refresh: true,
         refreshed_at: '2026-02-13T12:00:00Z',
@@ -465,7 +465,7 @@ function emptyOrg(): SimOrg {
       },
       {
         id: TEAM_LIST_ID,
-        name: 'Footprints Team',
+        name: 'Youth Team',
         member_ids: [],
         auto_refresh: true,
         refreshed_at: '2026-02-13T12:00:00Z',
@@ -475,7 +475,7 @@ function emptyOrg(): SimOrg {
       // the setting is a bare id copied out of a URL.
       {
         id: STALE_LIST_ID,
-        name: 'Footprints Camp 2019',
+        name: 'Youth Camp 2019',
         member_ids: [],
         description: 'Summer camp signups. Long over.',
         auto_refresh: false,

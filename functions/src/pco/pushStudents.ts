@@ -122,7 +122,7 @@ function createAttributes(data: Record<string, unknown>): Record<string, unknown
     ...(name.nickname ? { nickname: name.nickname } : {}),
     last_name: readString(data, 'lastName') ?? '',
     grade: Number(data.grade ?? 0),
-    // Every Footprints student is a minor; the flag is what puts them in the
+    // Every student on the roster is a minor; the flag is what puts them in the
     // church's children/students views rather than the adult directory.
     child: true,
     ...(allergies ? { medical_notes: allergies } : {}),

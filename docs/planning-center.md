@@ -3,7 +3,7 @@
 Planning Center People is the system of record for *people*. Students and counselors are created,
 edited and retired there, and Tally reads them live and stores none of it.
 
-**Tally owns the two memberships.** Who is a Footprints student, and who may sign in to Tally, are
+**Tally owns the two memberships.** Who is a student, and who may sign in to Tally, are
 Tally's own lists. They used to be Planning Center Lists, and that was a mistake worth explaining,
 because it is the reason this page reads the way it does now: a List is *generated from filter
 rules*. There is no way to say "these forty-three teenagers" in a List — only "everyone in grades

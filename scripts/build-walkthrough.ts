@@ -312,7 +312,7 @@ const html = `<title>Tally — a walkthrough</title>
     <p class="eyebrow">Product walkthrough</p>
     <h1>Tally</h1>
     <p class="standfirst">
-      Attendance for the Footprints youth ministry — built so a volunteer holding a phone at
+      Attendance for a youth ministry — built so a volunteer holding a phone at
       the door can check a student in without looking away from the queue.
     </p>
     <p class="provenance">

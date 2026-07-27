@@ -312,7 +312,7 @@ export function createPcoClient(options: PcoClientOptions): PcoClient {
     const headers: Record<string, string> = {
       Authorization: authorization,
       Accept: 'application/json',
-      'User-Agent': options.userAgent ?? 'Tally/1.0 (Footprints attendance)',
+      'User-Agent': options.userAgent ?? 'Tally/1.0 (attendance)',
       ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
     };
     const traceRequest = (attempt: number): PcoRequestTrace => ({

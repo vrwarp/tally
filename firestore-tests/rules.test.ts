@@ -201,7 +201,7 @@ describe('users', () => {
  * from the ones who should be making it.
  */
 describe('invitations', () => {
-  const key = 'newcomer@footprints,example,org';
+  const key = 'newcomer@example,org';
 
   it('lets an admin invite somebody', async () => {
     const db = asUser(env, UID.admin);
