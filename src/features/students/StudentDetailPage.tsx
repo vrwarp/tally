@@ -71,9 +71,7 @@ export function StudentDetailPage() {
   });
 
   const student = students.find((candidate) => candidate.id === studentId) ?? null;
-  // Eager: this screen exists to answer "who do I call?", so waiting for a tap
-  // would just add a step to the one thing it is for.
-  const { details, loading: detailsLoading, error: detailsError } = usePersonDetails(student, true);
+  const { details, loading: detailsLoading, error: detailsError } = usePersonDetails(student);
 
   // Only finished gatherings: a night still in progress is not an absence.
   const recentEvents = useMemo(

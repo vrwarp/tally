@@ -67,12 +67,76 @@ function clientFor(config: PcoConfig): PcoClient | null {
   });
 }
 
+/**
+ * Who the caller is, held for a few seconds.
+ *
+ * Every gate below reads `users/{uid}`, and the screens that matter fire a
+ * burst of calls rather than one: a dashboard of twenty follow-up rows asks for
+ * twenty people's contact details, which is twenty reads of the same document
+ * for the same person inside the same second. Holding the answer briefly
+ * collapses that to one.
+ *
+ * It is deliberately *not* a custom claim on the auth token, which would cost
+ * nothing at all. A claim goes stale until the client refreshes its token, so
+ * revoking somebody's access would not take effect until they next signed in —
+ * and this is the check that stands between a former volunteer and a minor's
+ * parent's phone number. Firestore stays the source of truth; a revocation
+ * lands within `CALLER_TTL_MS` on every instance, without anybody having to
+ * think about token lifetimes.
+ *
+ * Denials are held on the same terms as grants, so a burst from somebody who is
+ * not allowed in costs one read too. The cost is that activating a counselor
+ * takes up to that long to be believed, which is a wait they can sit through
+ * and an admin can explain.
+ */
+const CALLER_TTL_MS = 10_000;
+
+/** Bounds memory on an instance a whole ministry signs in to. */
+const CALLER_MAX_ENTRIES = 200;
+
+interface Caller {
+  active: boolean;
+  role: string;
+}
+
+const callers = new Map<string, { record: Promise<Caller>; expiresAt: number }>();
+
+async function readCaller(uid: string): Promise<Caller> {
+  const at = Date.now();
+  const held = callers.get(uid);
+  if (held && held.expiresAt > at) return held.record;
+
+  const record = (async (): Promise<Caller> => {
+    const snapshot = await db().doc(`${PATHS.users}/${uid}`).get();
+    const data = snapshot.exists ? (snapshot.data() ?? {}) : {};
+    return {
+      active: data.active === true,
+      role: typeof data.role === 'string' ? data.role : '',
+    };
+  })();
+
+  // Never remember a failure: a Firestore blip must not lock somebody out for
+  // the rest of the TTL, and the next call should be a real attempt.
+  record.catch(() => {
+    if (callers.get(uid)?.record === record) callers.delete(uid);
+  });
+
+  callers.delete(uid);
+  callers.set(uid, { record, expiresAt: at + CALLER_TTL_MS });
+  while (callers.size > CALLER_MAX_ENTRIES) {
+    const oldest = callers.keys().next();
+    if (oldest.done) break;
+    callers.delete(oldest.value);
+  }
+
+  return record;
+}
+
 /** Any signed-in, active member of the team. The role is read from Firestore. */
 async function requireMember(uid: string | undefined): Promise<void> {
   if (!uid) throw new HttpsError('unauthenticated', 'Sign in first.');
-  const snapshot = await db().doc(`${PATHS.users}/${uid}`).get();
-  const data = snapshot.exists ? (snapshot.data() ?? {}) : {};
-  if (data.active !== true) {
+  const caller = await readCaller(uid);
+  if (!caller.active) {
     throw new HttpsError('permission-denied', 'Your access to Tally is not active.');
   }
 }
@@ -80,9 +144,8 @@ async function requireMember(uid: string | undefined): Promise<void> {
 /** Core-team gate. The role is read from Firestore, never from the request. */
 async function requireCoreTeam(uid: string | undefined): Promise<void> {
   if (!uid) throw new HttpsError('unauthenticated', 'Sign in first.');
-  const snapshot = await db().doc(`${PATHS.users}/${uid}`).get();
-  const data = snapshot.exists ? (snapshot.data() ?? {}) : {};
-  if (data.active !== true || (data.role !== 'core' && data.role !== 'admin')) {
+  const caller = await readCaller(uid);
+  if (!caller.active || (caller.role !== 'core' && caller.role !== 'admin')) {
     throw new HttpsError('permission-denied', 'Only the core team can do that.');
   }
 }

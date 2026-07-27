@@ -44,10 +44,10 @@ test.describe('dashboard', () => {
      * The PRD asks for actionable insights rather than a data table: a row that
      * cannot be acted on is a row somebody has to copy into their phone by hand.
      *
-     * It now takes one tap to get there. Parent contact lives in Planning
-     * Center and is read one person at a time, so a list of twenty students no
-     * longer puts twenty parents' phone numbers on a leader's screen at once.
-     * "Actionable" therefore means the row offers to fetch it, and then does.
+     * Parent contact lives in Planning Center and is read one person at a time,
+     * which used to be spent as a tap: the row offered to fetch it. The reads
+     * are cached now, so the row just fetches, and "actionable" means every one
+     * of them settles on something a leader can act on.
      *
      * Every row, which is what the name of this test claims and what it used to
      * only pretend: it poked the first row and demanded a phone number. Which
@@ -58,35 +58,34 @@ test.describe('dashboard', () => {
      * never reached one), so the old assertion passed or failed depending on
      * the hour the suite happened to run.
      */
-    // The accessible name is the aria-label, not the visible text: fifty rows
-    // of identically-labelled "Show contact" would be unusable with a screen
-    // reader, so each one names its student.
-    const reveals = page.getByRole('button', { name: /look up contact details for/i });
-    await expect(reveals.first()).toBeVisible();
+    // Each block names its student, so a list that reveals everything at once
+    // does not read as a run of loose phone numbers. That label is also the
+    // only thing here that is stable while the contents are still loading.
+    const blocks = page.getByRole('group', { name: /^Contact details for / });
+    await expect(blocks.first()).toBeVisible();
 
     const names = (
-      await reveals.evaluateAll((buttons) =>
-        buttons.map((button) => button.getAttribute('aria-label') ?? ''),
+      await blocks.evaluateAll((groups) =>
+        groups.map((group) => group.getAttribute('aria-label') ?? ''),
       )
-    ).map((label) => label.replace(/^look up contact details for /i, ''));
+    ).map((label) => label.replace(/^Contact details for /, ''));
 
     let reachable = 0;
     for (const name of names) {
-      await page
-        .getByRole('button', { name: `Look up contact details for ${name}` })
-        .first()
-        .click();
+      const block = page.getByRole('group', { name: `Contact details for ${name}` }).first();
 
       /*
        * Two honest outcomes: a way to reach them, or a plain statement of why
        * there is none — which tells a leader exactly what to go and fix. What
-       * must never happen is a tap that resolves to nothing, or spins forever,
+       * must never happen is a row that resolves to nothing, or spins forever,
        * which is the unactionable row this test exists to catch.
        */
-      const reachOut = page.getByRole('link', {
+      const reachOut = block.getByRole('link', {
         name: new RegExp(`about ${escapeForRegExp(name)} at `, 'i'),
       });
-      const nobodyToCall = page.getByText(`Planning Center has no parent contact for ${name}.`);
+      const nobodyToCall = block.getByText(
+        /has no parent contact for|no longer has a record for|Not in Planning Center yet/,
+      );
 
       await expect(reachOut.or(nobodyToCall).first()).toBeVisible({ timeout: 20_000 });
       if ((await reachOut.count()) > 0) reachable += 1;
