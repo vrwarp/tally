@@ -173,6 +173,27 @@ describe('toEvent', () => {
     ).toBe(true);
   });
 
+  it('reads a description, and treats an empty one as absent', () => {
+    expect(toEvent(fakeSnapshot({ data: { description: 'Pizza and a talk.' } })).description).toBe(
+      'Pizza and a talk.',
+    );
+    expect(toEvent(fakeSnapshot({ data: { description: '' } })).description).toBeNull();
+    expect(toEvent(fakeSnapshot({ data: {} })).description).toBeNull();
+  });
+
+  it('keeps an icon the app can actually draw', () => {
+    expect(toEvent(fakeSnapshot({ data: { icon: 'church' } })).icon).toBe('church');
+  });
+
+  it('drops an icon that is not in the catalogue', () => {
+    // A name from a future version, or one somebody typed into the console. An
+    // empty tile in a list of full ones reads as a bug; no tile reads as "this
+    // gathering has no icon", which is true.
+    expect(toEvent(fakeSnapshot({ data: { icon: 'rocket_launch_2000' } })).icon).toBeNull();
+    expect(toEvent(fakeSnapshot({ data: { icon: 42 } })).icon).toBeNull();
+    expect(toEvent(fakeSnapshot({ data: {} })).icon).toBeNull();
+  });
+
   it('coerces an unknown mode to recurring', () => {
     expect(toEvent(fakeSnapshot({ data: { mode: 'festival' } })).mode).toBe('recurring');
   });

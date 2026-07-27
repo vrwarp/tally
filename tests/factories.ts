@@ -69,6 +69,8 @@ export function makeEvent(overrides: Partial<TallyEvent> = {}): TallyEvent {
   return {
     id: pick(overrides, 'id', nextId('event')),
     title: pick(overrides, 'title', 'Friday Fellowship'),
+    description: pick(overrides, 'description', null),
+    icon: pick(overrides, 'icon', null),
     mode: pick(overrides, 'mode', 'recurring'),
     seriesId: pick(overrides, 'seriesId', 'friday-fellowship'),
     recurrence: pick(overrides, 'recurrence', null),

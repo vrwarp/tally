@@ -7,7 +7,7 @@
  * checking forty students into last Friday is the worst failure this app has.
  */
 import { useNavigate } from 'react-router-dom';
-import { Badge } from '@/components/ui';
+import { Badge, EventIcon } from '@/components/ui';
 import { formatEventDay, formatEventWindow, formatShortDate, isCheckInOpen } from '@/lib/time';
 import type { TallyEvent } from '@/types';
 
@@ -44,6 +44,11 @@ export function EventHeader({
   return (
     <div className="pt-2">
       <div className="flex items-start gap-3 px-3">
+        {/* Small, and only here: the header scrolls away, so the icon's job is
+            to make "am I in the right gathering?" answerable at a glance rather
+            than to decorate a screen a counselor is about to work down. */}
+        <EventIcon name={event.icon} size="sm" className="mt-0.5" />
+
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-lg font-bold leading-tight text-ink-50">{event.title}</h1>
           <p className="mt-0.5 truncate text-xs text-ink-400">

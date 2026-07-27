@@ -5,17 +5,23 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDocs,
+  limit,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
   setDoc,
+  startAfter,
   updateDoc,
   where,
+  type DocumentData,
+  type QueryDocumentSnapshot,
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { paths } from '@/lib/paths';
+import { findEventIcon } from '@/lib/eventIcons';
 import { chainKey } from '@/lib/materialize';
 import { normalizeRecurrence } from '@/lib/recurrence';
 import { toEvent, toEventSeries, toSettings } from '@/services/converters';
@@ -31,6 +37,10 @@ import type {
 
 export interface EventDraft {
   title: string;
+  /** What the gathering is, in a sentence. Shown on the hero card. */
+  description?: string | null;
+  /** A Material Symbols name from `lib/eventIcons`. */
+  icon?: string | null;
   mode: EventMode;
   seriesId?: string | null;
   /** How it repeats. `startAt`/`endAt` are the next occurrence, not the first. */
@@ -77,6 +87,71 @@ export function subscribeEvents(
   );
 }
 
+/**
+ * How many past gatherings one page of the history list holds.
+ *
+ * Enough to fill a phone screen and a bit more, so the first scroll gesture
+ * lands on real content rather than on a spinner. Small enough that each page
+ * is a handful of reads: the screen that uses this also asks for the attendance
+ * of everything it has loaded, and a page of fifty would be fifty collection
+ * reads on a hallway connection.
+ */
+export const PAST_EVENTS_PAGE_SIZE = 12;
+
+/**
+ * The cursor a caller hands back to ask for the next page.
+ *
+ * The raw Firestore snapshot rather than a date, because two gatherings can
+ * start at the same instant — a Friday and a Sunday-school class scheduled for
+ * one holiday morning — and a date cursor would either repeat one of them or
+ * skip it. Opaque on purpose: nothing outside this module should read it.
+ */
+export type PastEventsCursor = QueryDocumentSnapshot<DocumentData>;
+
+export interface PastEventsPage {
+  events: TallyEvent[];
+  /** Null once the collection is exhausted. */
+  cursor: PastEventsCursor | null;
+  /** False when this page was the last one. */
+  hasMore: boolean;
+}
+
+/**
+ * One page of gatherings that have already happened, newest first.
+ *
+ * A one-shot read rather than a listener, and deliberately outside the window
+ * `subscribeEvents` keeps live. History does not change while somebody scrolls
+ * it, and the whole point of paging into the past is to reach further back than
+ * the app is willing to hold open in memory.
+ *
+ * Everything here is a document by construction: the projection only ever
+ * offers gatherings the rules describe that have *not* finished, so a night in
+ * the past is on the calendar exactly when somebody did something about it.
+ */
+export async function fetchPastEvents(
+  before: Date,
+  cursor: PastEventsCursor | null = null,
+  pageSize: number = PAST_EVENTS_PAGE_SIZE,
+): Promise<PastEventsPage> {
+  const constraints = [
+    where('startAt', '<', before),
+    orderBy('startAt', 'desc'),
+    ...(cursor ? [startAfter(cursor)] : []),
+    limit(pageSize),
+  ];
+
+  const snapshot = await getDocs(query(collection(db, paths.events()), ...constraints));
+  const last = snapshot.docs.at(-1) ?? null;
+
+  return {
+    events: snapshot.docs.map(toEvent),
+    // A short page means the end of the collection, so the cursor is dropped
+    // with it — holding one would invite a request that can only come back empty.
+    cursor: snapshot.docs.length === pageSize ? last : null,
+    hasMore: snapshot.docs.length === pageSize,
+  };
+}
+
 export function subscribeEvent(
   eventId: string,
   onChange: (event: TallyEvent | null) => void,
@@ -114,6 +189,10 @@ export function subscribeSettings(
 function buildEventPayload(draft: EventDraft, uid: string, isNew: boolean) {
   const payload: Record<string, unknown> = {
     title: draft.title.trim(),
+    description: draft.description?.trim() || null,
+    // Only a name the app actually ships is written: a stale cached bundle
+    // must not be able to put an icon on an event that nothing can draw.
+    icon: findEventIcon(draft.icon)?.name ?? null,
     mode: draft.mode,
     seriesId: draft.mode === 'recurring' ? (draft.seriesId ?? null) : null,
     // A retreat happens once. Nulling it here rather than trusting the caller

@@ -17,6 +17,7 @@ import {
   CardHeader,
   EmptyState,
   ErrorBanner,
+  EventIcon,
   SkeletonRows,
   StatTile,
 } from '@/components/ui';
@@ -151,19 +152,26 @@ export function EventDetailPage() {
 
       <Card>
         <div className="flex flex-col gap-3 p-4">
-          <div>
-            <h1
-              className={cn(
-                'text-xl font-bold',
-                cancelled ? 'text-ink-400 line-through' : 'text-ink-50',
-              )}
-            >
-              {event.title}
-            </h1>
-            <p className="mt-1 text-sm text-ink-400">
-              {formatEventDay(event.startAt, now)} · {formatEventWindow(event)}
-            </p>
+          <div className="flex min-w-0 items-start gap-3">
+            <EventIcon name={event.icon} size="lg" tone="brand" />
+            <div className="min-w-0 flex-1">
+              <h1
+                className={cn(
+                  'text-xl font-bold',
+                  cancelled ? 'text-ink-400 line-through' : 'text-ink-50',
+                )}
+              >
+                {event.title}
+              </h1>
+              <p className="mt-1 text-sm text-ink-400">
+                {formatEventDay(event.startAt, now)} · {formatEventWindow(event)}
+              </p>
+            </div>
           </div>
+
+          {event.description ? (
+            <p className="text-sm leading-relaxed text-ink-300">{event.description}</p>
+          ) : null}
 
           <div className="flex flex-wrap items-center gap-1.5">
             <Badge tone={event.mode === 'recurring' ? 'neutral' : 'brand'}>

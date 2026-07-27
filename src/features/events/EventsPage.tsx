@@ -13,7 +13,15 @@
  */
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Badge, Button, Card, CardHeader, EmptyState, SkeletonRows } from '@/components/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  CardHeader,
+  EmptyState,
+  EventIcon,
+  SkeletonRows,
+} from '@/components/ui';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
@@ -53,8 +61,10 @@ function EventRow({
     <li className="flex min-w-0 items-stretch gap-2">
       <Link
         to={`/events/${event.id}`}
-        className="flex min-h-16 min-w-0 flex-1 items-center gap-3 rounded-xl bg-ink-900 px-4 py-3 ring-1 ring-ink-800 active:bg-ink-800"
+        className="flex min-h-16 min-w-0 flex-1 items-center gap-3 rounded-xl bg-ink-900 px-3 py-3 ring-1 ring-ink-800 active:bg-ink-800"
       >
+        <EventIcon name={event.icon} size="md" />
+
         <span className="min-w-0 flex-1">
           <span
             className={cn(

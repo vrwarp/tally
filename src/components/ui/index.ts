@@ -22,3 +22,4 @@ export {
   Spinner,
 } from '@/components/ui/Feedback';
 export { Card, CardHeader, StatTile } from '@/components/ui/Card';
+export { EventIcon, type EventIconProps, type EventIconSize } from '@/components/ui/EventIcon';

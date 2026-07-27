@@ -127,6 +127,11 @@ function toSource(id: string, data: Record<string, unknown>): OccurrenceSource |
   return {
     id,
     title: typeof data.title === 'string' ? data.title : 'Untitled event',
+    description: str(data.description),
+    // Not checked against the catalogue here, unlike the app: the icon
+    // catalogue is a client concern and the server would only be copying a list
+    // it has no other use for. An unknown name is dropped on read instead.
+    icon: str(data.icon),
     mode,
     seriesId: str(data.seriesId),
     recurrence: mode === 'recurring' ? toRecurrence(data.recurrence, startAt) : null,
@@ -157,6 +162,8 @@ function payloadFor(
 
   return {
     title: source.title,
+    description: source.description,
+    icon: source.icon,
     mode: 'recurring',
     seriesId: source.seriesId,
     recurrence: source.recurrence,

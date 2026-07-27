@@ -44,6 +44,14 @@ someone's clipboard and someone's cash box, and a half-kept copy in an app is wo
 missed three gatherings in a row, first-timers from the last week, profiles with no parent contact,
 and a head-count trend per series.
 
+**Journey 6 — the other six days.** Most of the week there is nothing to check into, and that screen
+is a calendar read from where the reader is standing. Today is the hero: whatever is on, with its
+icon and the sentence describing it, and a button that says whether check-in is open yet. Under it,
+the next seven days as rows. Under that, every gathering already held — newest first, paging back
+into the ministry's whole history as somebody scrolls, each row carrying how many students were
+checked in. That last part is what a counselor came for: they are looking for the Friday they missed,
+and "22 checked in" is how they recognise it.
+
 ---
 
 ## Quick start
@@ -268,6 +276,16 @@ counselor stands at the door, so those reads go through `useEventSnapshots`, whi
 event's attendance once and memoises it for the session. Only three things hold live `onSnapshot`
 listeners: the current event's attendance and RSVPs, the student roster, and the small shared
 reference data (events, series, groups, settings). Everything else is a one-shot read.
+
+**The calendar in memory is bounded; the history a leader can scroll is not.** `DataProvider` holds a
+fixed window of event documents open and projects the recurrence rules over it, which is the right
+shape for "what is on" and the wrong one for "what happened" — the window ends at a fixed number of
+days, which is exactly the boundary somebody looking for the Friday they missed is trying to cross.
+So the history at the foot of the check-in screen pages straight out of Firestore instead
+(`usePastEvents` → `fetchPastEvents`), a dozen gatherings at a time, cursored rather than offset so
+two gatherings sharing a start time cannot duplicate or skip one. Each row carries a head count from
+the same session cache the predictive roster fills, so scrolling back over a window the roster has
+already loaded costs nothing.
 
 **Firestore stores facts; the client derives meaning.** What is persisted is deliberately dumb —
 students, events, attendance rows, RSVPs. The Recent filter, MIA students, new visitors, incomplete
