@@ -47,6 +47,15 @@ const makeOneOff = (overrides: Partial<TallyEvent>): TallyEvent => ({
 const LONG_AGO = new Date(2025, 8, 1, 12, 0);
 
 /**
+ * A last visit that predates every fixture window.
+ *
+ * The unnamed half of the MIA list only speaks about students Tally has checked
+ * in at some point — the roster is a church directory, and somebody who has
+ * never come to youth group is not missing from it.
+ */
+const CAME_ONCE_LONG_AGO = new Date(2025, 10, 7, 19, 0);
+
+/**
  * A student who never misses anything, and who no test ever asks about.
  *
  * A gathering with an empty attendance list is read as a cancelled session, so a
@@ -152,15 +161,34 @@ describe('computeMia', () => {
     expect(computeMia([student], snapshots, settings)).toEqual([]);
   });
 
-  it('includes a student who has never attended, once enough gatherings have passed', () => {
+  /*
+   * This list used to hold a student with no attendance at all, on the grounds
+   * that they were the person most worth a phone call. They are not: Tally's
+   * roster is the ministry's Planning Center directory, which is full of young
+   * people who have never come to youth group, and none of them is missing.
+   * Nobody has met them.
+   */
+  it('says nothing about a student who has never been checked in anywhere', () => {
     const student = makeStudent({ id: 'never-came', createdAt: LONG_AGO });
+    const snapshots = events.map((event) => held(event));
+
+    expect(computeMia([student], snapshots, settings)).toEqual([]);
+  });
+
+  it('keeps a student who used to come and has since vanished', () => {
+    // Their last visit predates the loaded window, so no gathering can name it.
+    const student = makeStudent({
+      id: 'gone',
+      createdAt: LONG_AGO,
+      lastAttendedAt: new Date(2025, 10, 7, 19, 0),
+    });
     const snapshots = events.map((event) => held(event));
 
     const mia = computeMia([student], snapshots, settings);
 
     expect(studentIds(mia)).toEqual([student.id]);
     expect(mia[0]!.consecutiveMisses).toBe(4);
-    expect(mia[0]!.lastAttendedAt).toBeNull();
+    expect(mia[0]!.gatheringKey).toBeNull();
     expect(mia[0]!.lastAttendedEventTitle).toBeNull();
   });
 
@@ -231,7 +259,11 @@ describe('computeMia', () => {
   });
 
   it('does not let a gathering nobody attended break a streak', () => {
-    const student = makeStudent({ id: 'drifting', createdAt: LONG_AGO });
+    const student = makeStudent({
+      id: 'drifting',
+      createdAt: LONG_AGO,
+      lastAttendedAt: CAME_ONCE_LONG_AGO,
+    });
     const snapshots = [
       held(events[0]!),
       held(events[1]!),
@@ -248,7 +280,12 @@ describe('computeMia', () => {
   });
 
   it('orders longest-absent first, breaking ties by name', () => {
-    const worst = makeStudent({ id: 'worst', lastName: 'Zane', createdAt: LONG_AGO });
+    const worst = makeStudent({
+      id: 'worst',
+      lastName: 'Zane',
+      createdAt: LONG_AGO,
+      lastAttendedAt: CAME_ONCE_LONG_AGO,
+    });
     const tiedA = makeStudent({ id: 'tied-a', lastName: 'Ames', createdAt: LONG_AGO });
     const tiedB = makeStudent({ id: 'tied-b', lastName: 'Brook', createdAt: LONG_AGO });
 
@@ -662,7 +699,11 @@ describe('computeUnseen', () => {
    * and the count is pooled, because missing everything is the whole point.
    */
   it('lists a student the window has not seen at anything, naming no gathering', () => {
-    const student = makeStudent({ id: 'ghost', createdAt: LONG_AGO });
+    const student = makeStudent({
+      id: 'ghost',
+      createdAt: LONG_AGO,
+      lastAttendedAt: CAME_ONCE_LONG_AGO,
+    });
 
     const rows = computeUnseen([student], everything, settings);
 
@@ -701,7 +742,11 @@ describe('computeUnseen', () => {
    * gatherings the ministry runs rather than how long anybody had been away.
    */
   it('does not add three gatherings\u2019 first nights into one streak', () => {
-    const student = makeStudent({ id: 'ghost', createdAt: LONG_AGO });
+    const student = makeStudent({
+      id: 'ghost',
+      createdAt: LONG_AGO,
+      lastAttendedAt: CAME_ONCE_LONG_AGO,
+    });
     const openingNight = [FRIDAY, SUNDAY, 'wednesday-prayer'].map((seriesId, index) =>
       held(
         makeEvent({
@@ -740,9 +785,39 @@ describe('computeUnseen', () => {
   });
 
   it('excludes inactive students, who have already been followed up on', () => {
-    const gone = makeStudent({ id: 'graduated', status: 'inactive', createdAt: LONG_AGO });
+    const gone = makeStudent({
+      id: 'graduated',
+      status: 'inactive',
+      createdAt: LONG_AGO,
+      lastAttendedAt: CAME_ONCE_LONG_AGO,
+    });
 
     expect(computeUnseen([gone], everything, settings)).toEqual([]);
+  });
+
+  /*
+   * The roster is the ministry's Planning Center directory, which is full of
+   * young people who have never come to youth group. None of them is missing —
+   * nobody has met them — and listing them is the same "nobody was expecting
+   * them" mistake the named rows already avoid.
+   */
+  it('says nothing about somebody Tally has never checked in', () => {
+    const stranger = makeStudent({ id: 'never-came', createdAt: LONG_AGO });
+
+    expect(stranger.lastAttendedAt).toBeNull();
+    expect(computeUnseen([stranger], everything, settings)).toEqual([]);
+  });
+
+  it('ignores a last-seen timestamp that is not a date', () => {
+    const corrupt = makeStudent({
+      id: 'corrupt',
+      createdAt: LONG_AGO,
+      lastAttendedAt: new Date(Number.NaN),
+    });
+
+    // An unusable date fails every comparison silently, which is how a student
+    // ends up on a call list nobody can explain.
+    expect(computeUnseen([corrupt], everything, settings)).toEqual([]);
   });
 });
 

@@ -283,12 +283,13 @@ export function computeMiaFor(
 }
 
 /**
- * Students the loaded window has not seen at anything at all.
+ * Students who have been here before and whom the window has seen nowhere.
  *
  * The other half of the MIA list, and the half no gathering can claim: somebody
- * on the roster who has turned up to nothing has not drifted from Friday or
- * from Sunday, they have drifted from all of it. Their row names no gathering,
- * because naming one would be a guess about which crowd they used to belong to.
+ * who used to come and has now turned up to nothing has not drifted from Friday
+ * or from Sunday, they have drifted from all of it. Their row names no
+ * gathering, because naming one would be a guess about which crowd they used to
+ * belong to — the window holds no sighting to read it from.
  *
  * The count is pooled here, deliberately — across a student who attends nothing
  * it is the honest number, and it is the only place in this file where nights
@@ -316,6 +317,23 @@ export function computeUnseen(
     if (oneOffs.some((snapshot) => snapshot.presentStudentIds.has(student.id))) continue;
 
     /*
+     * They have to have been here at some point. `lastAttendedAt` is written on
+     * every check-in and never cleared, so it reaches back past the window.
+     *
+     * Tally's roster is the ministry's Planning Center directory, which holds
+     * plenty of young people who have never come to youth group and are not
+     * going to start because a list said so. Without this the screen fills with
+     * them the moment any gathering has met three times — the same "nobody was
+     * expecting them" mistake `wasRegular` fixes for the named rows. A student
+     * with no check-in anywhere is not missing; nobody has met them.
+     *
+     * A corrupt timestamp fails every comparison silently, so it is checked
+     * rather than trusted — see `computeNewVisitors` for the same guard.
+     */
+    const lastAttendedAt = student.lastAttendedAt;
+    if (!lastAttendedAt || !Number.isFinite(lastAttendedAt.getTime())) continue;
+
+    /*
      * The threshold is measured against one gathering, exactly as it is
      * everywhere else on this screen.
      *
@@ -341,7 +359,7 @@ export function computeUnseen(
       student,
       consecutiveMisses: eligible.length,
       // The student record is all there is: the window holds no sighting.
-      lastAttendedAt: student.lastAttendedAt,
+      lastAttendedAt,
       lastAttendedEventTitle: null,
       gatheringKey: null,
       gatheringTitle: null,
