@@ -14,7 +14,7 @@
 import { describe, expect } from 'vitest';
 import { forAll } from '../../../tests/fuzz/property';
 import { arbitraryRosterInput, arbitraryStudent } from '../../../tests/fuzz/arbitrary';
-import { buildRoster, effectiveThreshold, isBlocking, studentMatchesGroup } from './predictiveRoster';
+import { buildRoster, effectiveThreshold, studentMatchesGroup } from './predictiveRoster';
 import type { RosterEntry } from '@/types';
 
 const ids = (entries: readonly RosterEntry[]) => entries.map((entry) => entry.student.id);
@@ -247,21 +247,13 @@ describe('buildRoster properties', () => {
     },
   );
 
-  forAll(
-    'reports blocking warnings only for waivers and payments',
-    arbitraryRosterInput,
-    (input) => {
-      const view = buildRoster(input);
+  forAll('never repeats a warning on one row', arbitraryRosterInput, (input) => {
+    const view = buildRoster(input);
 
-      for (const entry of view.entries) {
-        for (const warning of entry.warnings) {
-          const blocking = isBlocking(warning);
-          expect(blocking).toBe(warning === 'missing-waiver' || warning === 'missing-payment');
-        }
-        expect(new Set(entry.warnings).size).toBe(entry.warnings.length);
-      }
-    },
-  );
+    for (const entry of view.entries) {
+      expect(new Set(entry.warnings).size).toBe(entry.warnings.length);
+    }
+  });
 
   forAll(
     'lets an explicit small-group assignment override the grade/gender fallback',

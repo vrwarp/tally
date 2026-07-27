@@ -50,7 +50,7 @@ export function useAttendance(eventId: string | null): {
   return { attendance, loading, error };
 }
 
-/** Live RSVP / waiver / payment state for one event (Journey 4). */
+/** Live RSVP list for one event — the check-in roster when `requiresRsvp` is set. */
 export function useRsvps(eventId: string | null, enabled = true): {
   rsvps: Rsvp[];
   loading: boolean;

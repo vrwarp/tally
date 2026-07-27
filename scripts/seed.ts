@@ -766,18 +766,13 @@ function buildAttendance(
 interface RsvpRow {
   studentId: string;
   status: 'yes' | 'no' | 'maybe';
-  waiverSigned: boolean;
-  paymentReceived: boolean;
-  amountPaidCents: number | null;
   notes: string | null;
 }
 
-const RETREAT_FEE_CENTS = 8_500;
-
 /**
- * Eighteen signups in every combination of waiver and payment state, because
- * Journey 4 is entirely about the ones that are *not* clean: the roster has to
- * show a counselor at the bus door who still owes a form or a cheque.
+ * Eighteen signups covering all three statuses, because the interesting cases
+ * are the ones that are not a clean yes: a maybe still deciding, and a no who
+ * has to stay off the check-in roster.
  */
 function buildRsvps(students: readonly BuiltStudent[]): RsvpRow[] {
   // Two regulars deliberately left off, so the RSVP list is a decision somebody
@@ -792,44 +787,19 @@ function buildRsvps(students: readonly BuiltStudent[]): RsvpRow[] {
     if (index === 16) {
       return {
         studentId: student.id,
-        status: 'maybe',
-        waiverSigned: false,
-        paymentReceived: false,
-        amountPaidCents: null,
+        status: 'maybe' as const,
         notes: 'Waiting to hear about a basketball tournament that weekend.',
       };
     }
     if (index === 17) {
       return {
         studentId: student.id,
-        status: 'no',
-        waiverSigned: false,
-        paymentReceived: false,
-        amountPaidCents: null,
+        status: 'no' as const,
         notes: 'Family trip — will be back for the following Friday.',
       };
     }
-    if (index === 15) {
-      return {
-        studentId: student.id,
-        status: 'yes',
-        waiverSigned: true,
-        paymentReceived: false,
-        amountPaidCents: 4_000,
-        notes: 'Half now, half at the bus.',
-      };
-    }
 
-    const paid = index < 10;
-    const signed = index < 14;
-    return {
-      studentId: student.id,
-      status: 'yes',
-      waiverSigned: signed,
-      paymentReceived: paid,
-      amountPaidCents: paid ? RETREAT_FEE_CENTS : null,
-      notes: null,
-    };
+    return { studentId: student.id, status: 'yes' as const, notes: null };
   });
 }
 
@@ -936,13 +906,8 @@ function collectWrites(now: Date): {
           : event.seriesId === SERIES_IDS.sundaySchool
             ? 'Education wing, rooms 201–206'
             : 'Fellowship Hall',
-        notes: isRetreat
-          ? 'Bus leaves at 5:30pm sharp. No waiver, no boarding.'
-          : null,
+        notes: isRetreat ? 'Bus leaves at 5:30pm sharp. Meet in the car park.' : null,
         requiresRsvp: isRetreat,
-        requiresWaiver: isRetreat,
-        requiresPayment: isRetreat,
-        feeCents: isRetreat ? RETREAT_FEE_CENTS : null,
         defaultGroupingMode: event.seriesId === SERIES_IDS.sundaySchool ? 'smallGroup' : 'all',
         status: 'scheduled',
         createdAt: schoolYearStart(now),
@@ -1053,9 +1018,6 @@ function collectWrites(now: Date): {
         studentId: rsvp.studentId,
         eventId: retreat.id,
         status: rsvp.status,
-        waiverSigned: rsvp.waiverSigned,
-        paymentReceived: rsvp.paymentReceived,
-        amountPaidCents: rsvp.amountPaidCents,
         notes: rsvp.notes,
         updatedAt: addDays(now, -2),
         updatedBy: SEED_AUTHOR,

@@ -216,12 +216,9 @@ export function toEvent(snapshot: DocumentSnapshot<DocumentData>): TallyEvent {
     checkInClosesAt: toDate(data.checkInClosesAt, endAt),
     location: strOrNull(data.location),
     notes: strOrNull(data.notes),
-    // A one-off without an explicit flag still defaults to an RSVP roster —
-    // Journey 4 depends on the bus list being closed by default.
+    // A one-off without an explicit flag still defaults to an RSVP roster: a
+    // trip with a fixed list is the reason one-offs have a roster story at all.
     requiresRsvp: bool(data.requiresRsvp, mode === 'oneoff'),
-    requiresWaiver: bool(data.requiresWaiver),
-    requiresPayment: bool(data.requiresPayment),
-    feeCents: numOrNull(data.feeCents),
     defaultGroupingMode: data.defaultGroupingMode === 'smallGroup' ? 'smallGroup' : 'all',
     status: data.status === 'cancelled' ? 'cancelled' : 'scheduled',
     createdAt: toDate(data.createdAt, fallback),
@@ -268,9 +265,6 @@ export function toRsvp(snapshot: DocumentSnapshot<DocumentData>, eventId: string
     studentId: str(data.studentId) || snapshot.id,
     eventId: str(data.eventId) || eventId,
     status: status === 'no' || status === 'maybe' ? status : 'yes',
-    waiverSigned: bool(data.waiverSigned),
-    paymentReceived: bool(data.paymentReceived),
-    amountPaidCents: numOrNull(data.amountPaidCents),
     notes: strOrNull(data.notes),
     updatedAt: toDate(data.updatedAt, pendingFallback(snapshot)),
     updatedBy: str(data.updatedBy),

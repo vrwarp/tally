@@ -1,20 +1,18 @@
 /**
- * Who is coming on the retreat, and who is still blocking the bus (Journey 4).
+ * Who is coming on the retreat.
  *
- * The week before a trip, a leader is not browsing an RSVP list — they are
- * chasing two numbers: outstanding waivers and outstanding payments. So those
- * lead the summary, and the names behind them are spelled out rather than left
- * for someone to find by scrolling. Declined students are excluded from both
- * counts; nobody chases a waiver from a student who is not going.
+ * With `requiresRsvp` set this list *is* the check-in roster, so the screen is
+ * built for the two things that actually change it: adding a batch of students
+ * off a sign-up sheet, and moving one student between going, maybe and no as
+ * they make up their mind. Success is visible in the live data, so only failures
+ * raise a toast.
  *
- * Every toggle writes straight through `upsertRsvp`, which merges: a counselor
- * ticking a waiver at the church door cannot clobber the payment a core team
- * member recorded from home a second earlier. Success is visible in the live
- * data, so only failures raise a toast.
+ * A declined student keeps their row rather than being removed. `no` is often
+ * reversed by a parent a day later, and a row that vanished would have to be
+ * found and re-added from scratch.
  */
 import { useMemo, useRef, useState } from 'react';
 import {
-  Badge,
   Button,
   Card,
   CardHeader,
@@ -29,13 +27,7 @@ import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { useRsvps } from '@/hooks/useAttendance';
 import { cn, createSearchMatcher, ordinalGrade, sortByName } from '@/lib/utils';
-import {
-  addRsvps,
-  removeRsvp,
-  setRsvpStatus,
-  upsertRsvp,
-  type RsvpDraft,
-} from '@/services/rsvps';
+import { addRsvps, removeRsvp, setRsvpStatus } from '@/services/rsvps';
 import { studentFullName, type Rsvp, type RsvpStatus, type Student, type TallyEvent } from '@/types';
 
 const STATUS_OPTIONS: { value: RsvpStatus; label: string; active: string }[] = [
@@ -44,51 +36,11 @@ const STATUS_OPTIONS: { value: RsvpStatus; label: string; active: string }[] = [
   { value: 'no', label: 'No', active: 'bg-ink-700 text-ink-200' },
 ];
 
-/** `2500` -> `$25.00`. */
-function formatFee(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
-
 interface RsvpRow {
   rsvp: Rsvp;
   /** Null when the student record is gone but the RSVP document survived. */
   student: Student | null;
   name: string;
-}
-
-function ToggleChip({
-  label,
-  pressed,
-  busy,
-  onPress,
-  ariaLabel,
-}: {
-  label: string;
-  pressed: boolean;
-  busy: boolean;
-  onPress: () => void;
-  ariaLabel: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="checkbox"
-      aria-checked={pressed}
-      aria-label={ariaLabel}
-      aria-busy={busy || undefined}
-      disabled={busy}
-      onClick={onPress}
-      className={cn(
-        'inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-xs font-semibold ring-1 transition-colors disabled:opacity-50',
-        pressed
-          ? 'bg-present-500/15 text-present-400 ring-present-500/30'
-          : 'bg-ink-800 text-ink-300 ring-ink-700 active:bg-ink-700',
-      )}
-    >
-      <span aria-hidden="true">{pressed ? '✓' : '○'}</span>
-      {label}
-    </button>
-  );
 }
 
 function AddStudentsModal({
@@ -263,25 +215,14 @@ export function RsvpManager({ event }: RsvpManagerProps) {
       );
   }, [rsvps, studentsById]);
 
-  const summary = useMemo(() => {
-    const going = rows.filter((row) => row.rsvp.status === 'yes');
-    const maybe = rows.filter((row) => row.rsvp.status === 'maybe');
-    const declined = rows.filter((row) => row.rsvp.status === 'no');
-    // Only people who might actually get on the bus are chased.
-    const expected = [...going, ...maybe];
-    return {
-      going,
-      maybe,
-      declined,
-      expected,
-      waiverMissing: event.requiresWaiver
-        ? expected.filter((row) => !row.rsvp.waiverSigned)
-        : [],
-      paymentMissing: event.requiresPayment
-        ? expected.filter((row) => !row.rsvp.paymentReceived)
-        : [],
-    };
-  }, [rows, event.requiresWaiver, event.requiresPayment]);
+  const summary = useMemo(
+    () => ({
+      going: rows.filter((row) => row.rsvp.status === 'yes').length,
+      maybe: rows.filter((row) => row.rsvp.status === 'maybe').length,
+      declined: rows.filter((row) => row.rsvp.status === 'no').length,
+    }),
+    [rows],
+  );
 
   const candidates = useMemo(() => {
     const onList = new Set(rsvps.map((rsvp) => rsvp.studentId));
@@ -314,19 +255,6 @@ export function RsvpManager({ event }: RsvpManagerProps) {
       `${row.rsvp.studentId}:status`,
       () => setRsvpStatus(event.id, row.rsvp.studentId, status, user.uid),
       `Could not update ${row.name}'s RSVP.`,
-    );
-  };
-
-  const handleFlag = (row: RsvpRow, field: 'waiverSigned' | 'paymentReceived') => {
-    if (!user) return;
-    const next = !row.rsvp[field];
-    // One field per write, so the merge only touches what was actually toggled.
-    const draft: RsvpDraft =
-      field === 'waiverSigned' ? { waiverSigned: next } : { paymentReceived: next };
-    void run(
-      `${row.rsvp.studentId}:${field}`,
-      () => upsertRsvp(event.id, row.rsvp.studentId, draft, user.uid),
-      `Could not update ${row.name}'s ${field === 'waiverSigned' ? 'waiver' : 'payment'}.`,
     );
   };
 
@@ -370,59 +298,10 @@ export function RsvpManager({ event }: RsvpManagerProps) {
         {error ? <ErrorBanner message={error} /> : null}
 
         <div className="grid grid-cols-3 gap-2">
-          <StatTile label="Going" value={summary.going.length} tone="success" />
-          <StatTile label="Maybe" value={summary.maybe.length} />
-          <StatTile label="Declined" value={summary.declined.length} />
+          <StatTile label="Going" value={summary.going} tone="success" />
+          <StatTile label="Maybe" value={summary.maybe} />
+          <StatTile label="Declined" value={summary.declined} />
         </div>
-
-        {event.requiresWaiver || event.requiresPayment ? (
-          <div
-            className={cn(
-              'grid gap-2',
-              event.requiresWaiver && event.requiresPayment ? 'grid-cols-2' : 'grid-cols-1',
-            )}
-          >
-            {event.requiresWaiver ? (
-              <StatTile
-                label="Waivers outstanding"
-                value={summary.waiverMissing.length}
-                tone={summary.waiverMissing.length > 0 ? 'danger' : 'success'}
-                hint={
-                  summary.waiverMissing.length > 0
-                    ? `of ${summary.expected.length} going or maybe`
-                    : 'All in.'
-                }
-              />
-            ) : null}
-            {event.requiresPayment ? (
-              <StatTile
-                label="Payments outstanding"
-                value={summary.paymentMissing.length}
-                tone={summary.paymentMissing.length > 0 ? 'danger' : 'success'}
-                hint={
-                  summary.paymentMissing.length > 0 && event.feeCents
-                    ? `${formatFee(summary.paymentMissing.length * event.feeCents)} to collect`
-                    : summary.paymentMissing.length > 0
-                      ? `of ${summary.expected.length} going or maybe`
-                      : 'All in.'
-                }
-              />
-            ) : null}
-          </div>
-        ) : null}
-
-        {summary.waiverMissing.length > 0 ? (
-          <p className="text-xs leading-relaxed text-danger-400">
-            <span className="font-bold">Waiver needed:</span>{' '}
-            {summary.waiverMissing.map((row) => row.name).join(', ')}
-          </p>
-        ) : null}
-        {summary.paymentMissing.length > 0 ? (
-          <p className="text-xs leading-relaxed text-danger-400">
-            <span className="font-bold">Payment due:</span>{' '}
-            {summary.paymentMissing.map((row) => row.name).join(', ')}
-          </p>
-        ) : null}
 
         {loading && rows.length === 0 ? (
           <SkeletonRows count={3} />
@@ -433,7 +312,7 @@ export function RsvpManager({ event }: RsvpManagerProps) {
             description={
               event.requiresRsvp
                 ? 'The check-in roster for this event stays empty until students are added here.'
-                : 'Add the students you expect so waivers and payments can be tracked.'
+                : 'Add the students you expect, so the head count has something to compare against.'
             }
             action={<Button onClick={() => setAddOpen(true)}>Add students</Button>}
           />
@@ -441,20 +320,9 @@ export function RsvpManager({ event }: RsvpManagerProps) {
           <ul className="flex flex-col gap-2">
             {rows.map((row) => {
               const { rsvp } = row;
-              const expected = rsvp.status !== 'no';
-              const blocked =
-                expected &&
-                ((event.requiresWaiver && !rsvp.waiverSigned) ||
-                  (event.requiresPayment && !rsvp.paymentReceived));
 
               return (
-                <li
-                  key={rsvp.id}
-                  className={cn(
-                    'rounded-xl p-3 ring-1',
-                    blocked ? 'bg-danger-500/10 ring-danger-500/40' : 'bg-ink-950 ring-ink-800',
-                  )}
-                >
+                <li key={rsvp.id} className="rounded-xl bg-ink-950 p-3 ring-1 ring-ink-800">
                   <div className="flex items-start gap-2">
                     <div className="min-w-0 flex-1">
                       <p className="flex items-baseline gap-2">
@@ -465,16 +333,6 @@ export function RsvpManager({ event }: RsvpManagerProps) {
                           </span>
                         ) : null}
                       </p>
-                      {blocked ? (
-                        <span className="mt-1 flex flex-wrap gap-1">
-                          {event.requiresWaiver && !rsvp.waiverSigned ? (
-                            <Badge tone="danger">No waiver</Badge>
-                          ) : null}
-                          {event.requiresPayment && !rsvp.paymentReceived ? (
-                            <Badge tone="danger">Unpaid</Badge>
-                          ) : null}
-                        </span>
-                      ) : null}
                     </div>
 
                     <button
@@ -488,7 +346,7 @@ export function RsvpManager({ event }: RsvpManagerProps) {
                     </button>
                   </div>
 
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <div className="mt-2">
                     <div
                       role="group"
                       aria-label={`RSVP for ${row.name}`}
@@ -514,26 +372,6 @@ export function RsvpManager({ event }: RsvpManagerProps) {
                         );
                       })}
                     </div>
-
-                    {event.requiresWaiver ? (
-                      <ToggleChip
-                        label="Waiver"
-                        pressed={rsvp.waiverSigned}
-                        busy={pending.has(`${rsvp.studentId}:waiverSigned`)}
-                        onPress={() => handleFlag(row, 'waiverSigned')}
-                        ariaLabel={`Waiver signed for ${row.name}`}
-                      />
-                    ) : null}
-
-                    {event.requiresPayment ? (
-                      <ToggleChip
-                        label={event.feeCents ? `Paid ${formatFee(event.feeCents)}` : 'Paid'}
-                        pressed={rsvp.paymentReceived}
-                        busy={pending.has(`${rsvp.studentId}:paymentReceived`)}
-                        onPress={() => handleFlag(row, 'paymentReceived')}
-                        ariaLabel={`Payment received from ${row.name}`}
-                      />
-                    ) : null}
                   </div>
                 </li>
               );

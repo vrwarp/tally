@@ -298,21 +298,21 @@ service cloud.firestore {
         allow delete: if isCounselor();
       }
 
+      /**
+       * Who is expected on a one-off event.
+       *
+       * Core-only for every write. A counselor reads the list — with
+       * `requiresRsvp` it is their roster — but who is on the trip is a decision
+       * made before the door, not at it.
+       */
       match /rsvps/{studentId} {
         function validRsvp() {
           let d = request.resource.data;
           return d.studentId == studentId && d.eventId == eventId;
         }
 
-        // The bus-door case: a counselor collects a signed waiver or a cheque
-        // as students board, but does not get to decide who is on the trip.
-        function counselorEditableOnly() {
-          return touchesOnly(['waiverSigned', 'paymentReceived', 'updatedAt', 'updatedBy']);
-        }
-
         allow get, list: if isActive();
-        allow create: if isCore() && validRsvp();
-        allow update: if validRsvp() && (isCore() || (isCounselor() && counselorEditableOnly()));
+        allow create, update: if isCore() && validRsvp();
         allow delete: if isCore();
       }
     }

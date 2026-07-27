@@ -5,8 +5,7 @@
  * looking at a queue of students, not at the screen. Nothing inside it competes
  * for the tap — secondary actions belong on the student detail screen.
  */
-import { WarningBadge, warningLabel } from '@/components/ui';
-import { isBlocking } from '@/features/roster/predictiveRoster';
+import { WarningBadge } from '@/components/ui';
 import { formatClock } from '@/lib/time';
 import { cn, initials, ordinalGrade } from '@/lib/utils';
 import { studentFullName, type RosterEntry } from '@/types';
@@ -36,17 +35,11 @@ export function StudentRow({
   const { student, attendance, warnings, isRecent, recentHits, recentWindow } = entry;
   const name = studentFullName(student);
   const grade = ordinalGrade(student.grade);
-  const blocking = warnings.filter(isBlocking);
   const showHint = showRecentHint && isRecent && recentWindow > 0;
 
   const label = attendance
     ? `Undo check-in for ${name}, ${grade} grade, checked in at ${formatClock(attendance.checkedInAt)}`
-    : [
-        `Check in ${name}, ${grade} grade`,
-        blocking.length > 0 ? `Blocked: ${blocking.map(warningLabel).join(', ')}` : '',
-      ]
-        .filter(Boolean)
-        .join('. ');
+    : `Check in ${name}, ${grade} grade`;
 
   return (
     <li>
@@ -62,9 +55,6 @@ export function StudentRow({
           attendance
             ? 'bg-present-500/10 ring-present-500/30 active:bg-present-500/20'
             : 'bg-ink-900 ring-ink-800 active:bg-ink-800',
-          // Journey 4: a missing waiver or unpaid fee has to be visible from arm's
-          // length, at the door of the bus, without reading any text.
-          !attendance && blocking.length > 0 && 'bg-danger-500/10 ring-2 ring-danger-500',
           flashing && 'animate-flash',
         )}
       >
@@ -109,13 +99,7 @@ export function StudentRow({
             </span>
           </span>
         ) : (
-          <span
-            aria-hidden="true"
-            className={cn(
-              'size-6 shrink-0 rounded-full ring-2',
-              blocking.length > 0 ? 'ring-danger-500/60' : 'ring-ink-700',
-            )}
-          />
+          <span aria-hidden="true" className="size-6 shrink-0 rounded-full ring-2 ring-ink-700" />
         )}
       </button>
     </li>

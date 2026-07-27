@@ -126,8 +126,6 @@ describe('converter properties', () => {
     const rsvp = toRsvp(snap, 'e1');
 
     expect(['yes', 'no', 'maybe']).toContain(rsvp.status);
-    expect(typeof rsvp.waiverSigned).toBe('boolean');
-    expect(typeof rsvp.paymentReceived).toBe('boolean');
     expect(isRealDate(rsvp.updatedAt)).toBe(true);
   });
 

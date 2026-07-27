@@ -68,9 +68,9 @@ harmlessly overwrites the first. No transaction, no client-side coordination, no
 `firestore.rules` enforces `request.resource.data.studentId == studentId` rather than trusting the
 client to key correctly, because idempotency that depends on well-behaved callers is not idempotency.
 
-The same reasoning applies to `events/{eventId}/rsvps/{studentId}`, with a second benefit: a counselor
-at the bus door ticking `waiverSigned` and a core member setting `paymentReceived` from the dashboard
-a minute earlier are `merge` writes to one document, so neither clobbers the other.
+The same reasoning applies to `events/{eventId}/rsvps/{studentId}`: adding a student to a trip list
+twice — off a paper sign-up sheet and again from a text message — addresses one document rather than
+producing two rows for the same kid.
 
 The cost is that a student can be present at most once per event, which is exactly the invariant we
 want, and that history cannot be re-keyed if a student record is merged — which is why students are
@@ -122,6 +122,36 @@ repairs (take the attendance now, or cancel the event on purpose).
 An explicit `'cancelled'` still wins over the inference, even when a few students were checked in
 before the call was made. A leader saying "this did not happen" outranks a guess, and the alternative
 would make un-cancelling the only way to stop a cancelled night counting as everyone else's absence.
+
+### 4. Tally does not track money or paperwork
+
+An earlier version of the RSVP feature carried `waiverSigned`, `paymentReceived`, `amountPaidCents`
+and an event-level `feeCents`, and rendered a red "blocked" badge at check-in for anyone outstanding.
+All of it is gone.
+
+The honest reason is that it was specified more thoroughly than it was built, and the half-built state
+was worse than nothing:
+
+- The security rules carefully let a **counselor** flip `waiverSigned` and `paymentReceived` and
+  nothing else — the bus-door case — but the only screen with those toggles lived behind a `core`
+  route. The person the red badge was aimed at could see it and had no way to clear it.
+- `amountPaidCents` was written by the seed and by no screen ever, so a part payment could not be
+  recorded. The "outstanding" total assumed the full fee per head and was therefore confidently wrong
+  for exactly the students it most mattered for.
+
+Underneath that, the feature claimed an authority the app does not have. A signed waiver lives in a
+folder and a cheque lives in a cash box; Tally reading from neither could only ever hold a stale
+second copy, and a counselor who trusts a green tick over the clipboard is worse off than one who
+never had the tick. Deciding whether a student may board is also not a call an attendance app should
+appear to make.
+
+What this buys, beyond the deletion: `isEligible` reduces to "checked in, or active and not
+declined"; `RosterWarning` loses its red tier, so nothing on a roster row looks like a stop sign; and
+Tally contains no currency handling at all, which turns [the privacy claim below](#what-is-not-stored)
+from a promise into something the code makes self-evident.
+
+The RSVP list itself stayed. Closing a trip roster to the students who signed up is eleven lines and
+it earns them.
 
 ---
 
@@ -199,15 +229,14 @@ One dated gathering.
 | Field | Type | Notes |
 | --- | --- | --- |
 | `title` | string | |
-| `mode` | `'recurring' \| 'oneoff'` | Recurring is speed-first with a predictive roster; one-off is accountability-first with an RSVP roster. |
+| `mode` | `'recurring' \| 'oneoff'` | Recurring is speed-first with a predictive roster. One-off does not repeat and never informs prediction, and its roster can be closed to the students who RSVP'd. |
 | `seriesId` | string \| null | Optional link to an `eventSeries` template, on recurring events only. Nothing in the app creates one — a series document comes from the seed — so most recurring events leave this null. |
 | `recurrence` | object \| null | How the event repeats (RFC 5545 subset, anchored on `startAt`). Occurrences are written down ahead of time rather than expanded at read time — see `lib/materialize.ts`. |
 | `recurrenceRootId` | string \| null | The hand-made event a chain of repeats grew from, or null when this event *is* that root. Copied onto every occurrence, so the chain has an identity that outlives any one instance. |
 | `startAt`, `endAt` | Timestamp | For a recurring event these are the *next* occurrence, not the first ever. Instances already held are their own documents and keep the times they ran at. |
 | `checkInOpensAt`, `checkInClosesAt` | Timestamp | The window during which this event is auto-selected as "active". Materialised per event rather than recomputed from the series, so moving one Friday does not need the template edited. |
 | `location`, `notes` | string \| null | |
-| `requiresRsvp`, `requiresWaiver`, `requiresPayment` | boolean | One-off accountability switches. A one-off with no explicit flag still defaults to an RSVP roster. |
-| `feeCents` | number \| null | Integer cents. Never a float, never a card number. |
+| `requiresRsvp` | boolean | Closes a one-off's roster to the students who RSVP'd. A one-off with no explicit flag still defaults to one. |
 | `defaultGroupingMode` | `'all' \| 'smallGroup'` | How the roster opens. |
 | `status` | `'scheduled' \| 'cancelled'` | Cancelled events are never auto-selected and never inform prediction. A *finished* event with no attendance is treated as cancelled too — see [decision 3](#3-a-gathering-with-no-attendance-is-a-cancelled-one). |
 | `createdAt`, `updatedAt`, `createdBy` | — | |
@@ -236,15 +265,17 @@ has to be as fast as the tap was.
 | Field | Type | Notes |
 | --- | --- | --- |
 | `studentId`, `eventId` | string | Both enforced against the path. |
-| `status` | `'yes' \| 'no' \| 'maybe'` | `no` removes a student from the roster; `yes` and `maybe` keep them on it. |
-| `waiverSigned`, `paymentReceived` | boolean | Drive the blocking badges at the bus door. |
-| `amountPaidCents` | number \| null | Integer cents, allows part payment. |
-| `notes` | string \| null | |
+| `status` | `'yes' \| 'no' \| 'maybe'` | `no` removes a student from the roster; `yes` and `maybe` keep them on it. A declined student keeps their document, because a `no` is often reversed. |
+| `notes` | string \| null | Why somebody is a maybe. Written by the seed only — no screen edits it yet. |
 | `updatedAt`, `updatedBy` | — | |
 
-**Who writes:** core creates and deletes. Core may update anything. A **counselor** may update only
-`waiverSigned`, `paymentReceived`, `updatedAt` and `updatedBy` — the bus-door case: they collect a
-signed form or a cheque as students board, but do not get to decide who is on the trip.
+**Who writes:** core, for everything. A counselor reads the list — with `requiresRsvp` it *is* their
+roster — but never writes it: who is on the trip is decided before the door, not at it.
+
+There is deliberately no waiver, fee or payment state here. An earlier version tracked all three;
+they were removed because Tally cannot be the system of record for money or signed paper, and a
+partial copy of both was worse than neither. See
+[decision 4](#4-tally-does-not-track-money-or-paperwork).
 
 ### `eventSeries/{seriesId}` and `smallGroups/{groupId}`
 
@@ -313,8 +344,8 @@ the ones who should be making it.
 ## What is *not* stored
 
 No birthdates, addresses, photographs, student phone numbers or emails, medical information beyond a
-single allergy line, and no payment details — a retreat payment is a boolean and an integer amount,
-never a card. See the data-handling note in the [README](../README.md#handling-minors-data).
+single allergy line, and nothing financial whatsoever — not a card number, not a fee, not a record of
+who has paid. See the data-handling note in the [README](../README.md#handling-minors-data).
 
 Everything the dashboard and the check-in screen display beyond the fields above is derived in the
 browser: the Recent filter, MIA students, new visitors, roster warnings, head-count trends. Those live
