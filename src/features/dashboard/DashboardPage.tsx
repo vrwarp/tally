@@ -4,14 +4,33 @@
  * Everything above the fold is a call list: who has drifted, who just arrived,
  * whose profile is still a name and a grade. Raw numbers only appear as the
  * four tiles that decide whether any of it needs attention today, and the trend
- * strip sits last because it is context rather than an action.
+ * strip sits last inside its block because it is context rather than an action.
  *
- * Attendance history is fetched once for a fixed window of recent gatherings
- * (see `useEventSnapshots`) — a Friday from six weeks ago will not change while
- * a leader reads this.
+ * The screen is split by gathering. Friday Fellowship and Sunday School are
+ * different crowds — the check-in roster has always predicted them separately —
+ * and pooling them here meant a Sunday regular who has never been to a Friday
+ * read as "missed three in a row". The tabs pick one chain of repeats and every
+ * scoped list below answers for that chain alone; "All" merges them, one row per
+ * student, worst streak winning.
+ *
+ * Below that sit the two sections no gathering owns: profiles missing a parent
+ * contact, which is a property of the roster, and one-off events, which are not
+ * instances of anything and so cannot be missed, trended or streaked.
+ *
+ * Attendance history is fetched once for a fixed window per gathering (see
+ * `useEventSnapshots`) — a Friday from six weeks ago will not change while a
+ * leader reads this.
  */
-import { useMemo } from 'react';
-import { Card, EmptyState, ErrorBanner, LoadingScreen, SkeletonRows, StatTile } from '@/components/ui';
+import { useMemo, useState } from 'react';
+import {
+  Card,
+  EmptyState,
+  ErrorBanner,
+  LoadingScreen,
+  SkeletonRows,
+  StatTile,
+  TabBar,
+} from '@/components/ui';
 import { useData } from '@/context/dataContext';
 import { useEventSnapshots } from '@/hooks/useEventSnapshots';
 import { useNow } from '@/hooks/useNow';
@@ -19,67 +38,171 @@ import { AttendanceTrend } from '@/features/dashboard/AttendanceTrend';
 import { IncompleteProfileList } from '@/features/dashboard/IncompleteProfileList';
 import { MiaList } from '@/features/dashboard/MiaList';
 import { NewVisitorList } from '@/features/dashboard/NewVisitorList';
+import { OneOffOnlyList, OneOffRecapList } from '@/features/dashboard/OneOffInsights';
 import {
   computeIncompleteProfiles,
-  computeMia,
+  computeMiaByGathering,
   computeNewVisitors,
+  computeOneOffOnly,
+  computeOneOffRecaps,
   computeSummary,
-  recurringSnapshots,
+  groupByGathering,
+  mergeMia,
 } from '@/features/dashboard/insights';
+import { chainKey } from '@/lib/materialize';
 import { presumedCancelled } from '@/lib/sessionHistory';
 import { formatShortDate } from '@/lib/time';
+import type { TallyEvent } from '@/types';
 
 /**
- * How many past gatherings the dashboard reasons over. Ten covers roughly a
- * month of Fridays and Sundays together — enough to spot a drift, short enough
- * that a student who left the ministry in the autumn does not haunt the list.
+ * How many past nights of *each* gathering the dashboard reasons over.
+ *
+ * Per gathering rather than across the calendar, which is the whole point of
+ * the split: a pooled window of ten covering both Fridays and Sundays gave each
+ * of them five, and a five-night window can barely hold a three-miss streak.
+ * Eight is about two months of one weekly gathering — long enough to see a
+ * drift, short enough that somebody who left in the autumn does not haunt it.
  */
-const GATHERING_WINDOW = 10;
+const PER_GATHERING_WINDOW = 8;
+
+/** Recent one-offs to recap. A ministry runs a handful a year, not a term of them. */
+const ONE_OFF_WINDOW = 4;
+
+/**
+ * A hard ceiling on the attendance reads one dashboard load costs, whatever the
+ * calendar looks like. Newest first, so what falls off the end is the oldest
+ * night of whichever gathering has the most of them.
+ */
+const MAX_EVENTS = 24;
+
+const ALL = 'all';
 
 export function DashboardPage() {
   const { students, events, series, settings, loading } = useData();
   const now = useNow(60_000);
-
-  const recentGatherings = useMemo(
-    () =>
-      events
-        .filter(
-          (event) =>
-            event.mode === 'recurring' &&
-            event.status !== 'cancelled' &&
-            // Only finished gatherings. A night still in progress would count
-            // as a miss for every student who has not walked in yet, and would
-            // put the whole ministry on the MIA list at 7:05pm.
-            event.checkInClosesAt < now,
-        )
-        .sort((a, b) => b.startAt.getTime() - a.startAt.getTime())
-        .slice(0, GATHERING_WINDOW),
-    [events, now],
-  );
-
-  const { snapshots, loading: snapshotsLoading, error } = useEventSnapshots(recentGatherings);
+  const [selected, setSelected] = useState<string>(ALL);
 
   /*
-   * The gatherings that actually happened, which is what every list below is
-   * really about. A scheduled night with nobody checked in was cancelled, and
-   * counting it would flag every student in the ministry as having missed it.
+   * The window, taken per gathering.
+   *
+   * Only finished events. A night still in progress would count as a miss for
+   * every student who has not walked in yet, and would put the whole ministry
+   * on the MIA list at 7:05pm.
    */
-  const held = useMemo(() => recurringSnapshots(snapshots), [snapshots]);
-  const skipped = useMemo(() => presumedCancelled(snapshots).length, [snapshots]);
+  const recentEvents = useMemo(() => {
+    const finished = events
+      .filter((event) => event.status !== 'cancelled' && event.checkInClosesAt < now)
+      .sort((a, b) => b.startAt.getTime() - a.startAt.getTime());
 
-  const mia = useMemo(
-    () => computeMia(students, snapshots, settings),
-    [students, snapshots, settings],
+    const takenPerGathering = new Map<string, number>();
+    let oneOffs = 0;
+    const picked: TallyEvent[] = [];
+
+    for (const event of finished) {
+      if (picked.length >= MAX_EVENTS) break;
+
+      if (event.mode === 'oneoff') {
+        if (oneOffs >= ONE_OFF_WINDOW) continue;
+        oneOffs += 1;
+      } else {
+        const key = chainKey(event);
+        const taken = takenPerGathering.get(key) ?? 0;
+        if (taken >= PER_GATHERING_WINDOW) continue;
+        takenPerGathering.set(key, taken + 1);
+      }
+
+      picked.push(event);
+    }
+
+    return picked;
+  }, [events, now]);
+
+  const { snapshots, loading: snapshotsLoading, error } = useEventSnapshots(recentEvents);
+
+  /*
+   * The gatherings that actually happened, grouped by the chain they belong to.
+   * A scheduled night with nobody checked in was cancelled, and counting it
+   * would flag every student in the ministry as having missed it.
+   */
+  const gatherings = useMemo(() => groupByGathering(snapshots, series), [snapshots, series]);
+
+  // A tab can vanish when the window scrolls past a dormant gathering; fall back
+  // rather than render lists for a chain that is no longer offered.
+  const active = gatherings.some((gathering) => gathering.key === selected) ? selected : ALL;
+  const activeGathering = gatherings.find((gathering) => gathering.key === active) ?? null;
+
+  /** The nights the header counts: one gathering's, or every gathering's. */
+  const held = useMemo(
+    () => (activeGathering ? activeGathering.snapshots : gatherings.flatMap((g) => g.snapshots)),
+    [activeGathering, gatherings],
   );
-  const newVisitors = useMemo(
+
+  // Said out loud rather than left implicit: "last 8 gatherings" when the
+  // calendar shows ten scheduled reads as a bug in the numbers, and a leader
+  // who knows two nights were called off can confirm it. One-offs are excluded
+  // — an empty retreat is not a cancelled gathering.
+  const skipped = useMemo(
+    () =>
+      presumedCancelled(snapshots).filter(
+        (snapshot) =>
+          snapshot.event.mode === 'recurring' &&
+          (active === ALL || chainKey(snapshot.event) === active),
+      ).length,
+    [snapshots, active],
+  );
+
+  /*
+   * Computed over the whole window and filtered afterwards, never computed from
+   * the filtered history: which gathering a first-timer walked into is a fact
+   * about the calendar, and a window narrowed to Sunday would attribute a
+   * Friday arrival to Sunday.
+   */
+  const miaRows = useMemo(
+    () => computeMiaByGathering(students, snapshots, settings, series),
+    [students, snapshots, settings, series],
+  );
+  const mia = useMemo(
+    () =>
+      activeGathering
+        ? miaRows.filter((row) => row.gatheringKey === activeGathering.key)
+        : mergeMia(miaRows),
+    [miaRows, activeGathering],
+  );
+
+  const visitorRows = useMemo(
     () => computeNewVisitors(students, snapshots, settings, now),
     [students, snapshots, settings, now],
   );
-  const incomplete = useMemo(() => computeIncompleteProfiles(students), [students]);
-  const summary = useMemo(
-    () => computeSummary({ snapshots, mia, newVisitors, incomplete }),
-    [snapshots, mia, newVisitors, incomplete],
+  const newVisitors = useMemo(
+    () =>
+      activeGathering
+        ? visitorRows.filter((row) => row.gatheringKey === activeGathering.key)
+        : visitorRows,
+    [visitorRows, activeGathering],
   );
+
+  const incomplete = useMemo(() => computeIncompleteProfiles(students), [students]);
+
+  /*
+   * Head counts always come from one gathering, even under "All".
+   *
+   * "17, down 5 from 22 before" was Sunday School measured against Friday
+   * Fellowship — two different crowds, and a number that read as a collapse
+   * every time the two took turns. The most recent gathering answers for the
+   * tile, and the tile says which one it was.
+   */
+  const headCount = activeGathering ?? gatherings[0] ?? null;
+  const summary = useMemo(
+    () =>
+      computeSummary({ snapshots: headCount?.snapshots ?? [], mia, newVisitors, incomplete }),
+    [headCount, mia, newVisitors, incomplete],
+  );
+
+  const oneOffRecaps = useMemo(
+    () => computeOneOffRecaps(snapshots, { limit: ONE_OFF_WINDOW }),
+    [snapshots],
+  );
+  const oneOffOnly = useMemo(() => computeOneOffOnly(students, snapshots), [students, snapshots]);
 
   if (loading) return <LoadingScreen message="Loading insights…" />;
 
@@ -91,12 +214,19 @@ export function DashboardPage() {
 
   const previous = summary.previousEventCount;
   const delta = summary.lastEventCount - previous;
-  const deltaHint =
+  const change =
     previous === 0
       ? 'first one in this window'
       : delta === 0
         ? `same as the ${previous} before`
         : `${delta > 0 ? '+' : ''}${delta} vs ${previous} before`;
+  // Named under "All", where the tile would otherwise be a number about a
+  // gathering the reader has not been told about.
+  const deltaHint = activeGathering || !headCount ? change : `${headCount.title} · ${change}`;
+
+  const scopeLabel = activeGathering
+    ? `of ${activeGathering.title}`
+    : 'across every gathering';
 
   return (
     <div className="mx-auto flex w-full max-w-lg flex-col gap-4 px-4 py-4">
@@ -106,14 +236,11 @@ export function DashboardPage() {
           {awaitingHistory
             ? 'Reading the recent attendance…'
             : lastGathering
-              ? `Through ${lastGathering.title}, ${formatShortDate(lastGathering.startAt)} · last ${held.length} ${held.length === 1 ? 'gathering' : 'gatherings'}`
-              : recentGatherings.length > 0
+              ? `Through ${lastGathering.title}, ${formatShortDate(lastGathering.startAt)} · last ${held.length} ${held.length === 1 ? 'night' : 'nights'} ${scopeLabel}`
+              : recentEvents.length > 0
                 ? 'Nobody has been checked into any of the recent gatherings.'
                 : 'No gatherings on record yet.'}
         </p>
-        {/* Said out loud rather than left implicit: "last 8 gatherings" when the
-            calendar shows ten scheduled reads as a bug in the numbers, and a
-            leader who knows two nights were called off can confirm it. */}
         {skipped > 0 ? (
           <p className="mt-1 text-xs text-ink-600">
             {skipped === 1
@@ -123,10 +250,28 @@ export function DashboardPage() {
         ) : null}
       </header>
 
+      {/* Only worth offering when there is more than one gathering to tell
+          apart. A ministry with a single Friday sees the screen it always saw. */}
+      {gatherings.length > 1 ? (
+        <TabBar
+          label="Show insights for"
+          options={[
+            { id: ALL, label: 'All' },
+            ...gatherings.map((gathering) => ({ id: gathering.key, label: gathering.title })),
+          ]}
+          selected={active}
+          onSelect={setSelected}
+        />
+      ) : null}
+
       {error ? <ErrorBanner message={`Could not load attendance history. ${error}`} /> : null}
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <StatTile label="Last gathering" value={summary.lastEventCount} hint={deltaHint} />
+        <StatTile
+          label={activeGathering ? 'Last night' : 'Last gathering'}
+          value={summary.lastEventCount}
+          hint={deltaHint}
+        />
         <StatTile
           label="MIA"
           value={summary.miaCount}
@@ -154,7 +299,7 @@ export function DashboardPage() {
           </span>
           <SkeletonRows count={4} />
         </Card>
-      ) : recentGatherings.length === 0 ? (
+      ) : recentEvents.length === 0 ? (
         <Card>
           <EmptyState
             title="No gatherings on record yet."
@@ -163,8 +308,21 @@ export function DashboardPage() {
         </Card>
       ) : (
         <>
-          <MiaList items={mia} threshold={settings.miaConsecutiveMisses} />
-          <NewVisitorList items={newVisitors} windowDays={settings.newVisitorWindowDays} />
+          <MiaList
+            items={mia}
+            threshold={settings.miaConsecutiveMisses}
+            gatheringTitle={activeGathering?.title ?? null}
+          />
+          <NewVisitorList
+            items={newVisitors}
+            windowDays={settings.newVisitorWindowDays}
+            gatheringTitle={activeGathering?.title ?? null}
+          />
+          <AttendanceTrend
+            snapshots={snapshots}
+            gatheringKey={activeGathering?.key ?? null}
+            gatheringTitle={activeGathering?.title ?? null}
+          />
         </>
       )}
 
@@ -172,8 +330,13 @@ export function DashboardPage() {
           are in flight or the ministry has not run an event yet. */}
       <IncompleteProfileList students={incomplete} now={now} />
 
-      {recentGatherings.length > 0 && !awaitingHistory ? (
-        <AttendanceTrend snapshots={snapshots} series={series} />
+      {/* Outside the tabs on purpose: a one-off belongs to no chain of repeats,
+          so it neither filters by one nor answers the questions they do. */}
+      {oneOffRecaps.length > 0 || oneOffOnly.length > 0 ? (
+        <>
+          <OneOffRecapList items={oneOffRecaps} />
+          <OneOffOnlyList items={oneOffOnly} />
+        </>
       ) : null}
     </div>
   );

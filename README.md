@@ -46,7 +46,16 @@ someone's clipboard and someone's cash box, and a half-kept copy in an app is wo
 
 **Journey 5 — the follow-up list.** The dashboard is a call list, not a report: students who have
 missed three gatherings in a row, first-timers from the last week, profiles with no parent contact,
-and a head-count trend per series.
+and a head-count trend. It is split by gathering, for the same reason prediction is — a student who
+comes every Sunday and has never been to a Friday has missed nothing, and the pooled version phoned
+their family about it. Each tab answers for one repeat chain, and a gathering only speaks about the
+students who come to it; somebody nothing has seen keeps their place on the list under no gathering at
+all.
+
+One-off events sit in a section below, outside the tabs, because a retreat is an instance of nothing:
+nobody can have missed it and it has no trend to be part of. What it can say is who turned up, and who
+we met there and have not seen at a gathering since — the friend brought along on the bus, invisible in
+every other view.
 
 **Journey 6 — the calendar.** The Events tab is read from where the leader is standing. Today is the
 hero: whatever is on, with its icon and the sentence describing it. Under it the next seven days as

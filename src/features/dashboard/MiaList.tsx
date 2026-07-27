@@ -5,6 +5,12 @@
  * coming is invisible in every other view. Longest-absent first, because that
  * is the order a leader should work the phone, and every row carries the way to
  * reach the family so nobody has to go hunting for a number.
+ *
+ * A streak belongs to one gathering. Looking at every gathering at once, each
+ * row has to say which one it means — "missed three in a row" is a different
+ * sentence about a Friday regular than about somebody who only ever comes on a
+ * Sunday, and the row that does not name the gathering is the row that gets a
+ * family the wrong phone call.
  */
 import { Link } from 'react-router-dom';
 import { Card, CardHeader, EmptyState } from '@/components/ui';
@@ -17,9 +23,11 @@ export interface MiaListProps {
   items: readonly MiaStudent[];
   /** `settings.miaConsecutiveMisses`, quoted back so the list explains itself. */
   threshold: number;
+  /** The gathering being shown, or null when every gathering is in the list. */
+  gatheringTitle?: string | null;
 }
 
-export function MiaList({ items, threshold }: MiaListProps) {
+export function MiaList({ items, threshold, gatheringTitle = null }: MiaListProps) {
   const students = items.map((item) => item.student);
 
   return (
@@ -27,7 +35,11 @@ export function MiaList({ items, threshold }: MiaListProps) {
       <CardHeader
         title="Missing in action"
         count={items.length}
-        description={`Missed ${threshold} or more gatherings in a row.`}
+        description={
+          gatheringTitle
+            ? `Missed ${threshold} or more ${gatheringTitle} nights in a row.`
+            : `Missed ${threshold} or more nights of the same gathering in a row.`
+        }
         action={
           items.length > 0 ? (
             <CopyContactsButton
@@ -41,12 +53,23 @@ export function MiaList({ items, threshold }: MiaListProps) {
       {items.length === 0 ? (
         <EmptyState
           title={`Nobody has missed ${threshold} in a row — nice.`}
-          description="Everyone on the active roster has turned up at one of the recent gatherings."
+          description={
+            gatheringTitle
+              ? `Everyone on the active roster has been to one of the recent ${gatheringTitle} nights.`
+              : 'Everyone on the active roster has turned up at one of the recent gatherings.'
+          }
         />
       ) : (
         <ul className="divide-y divide-ink-800">
           {items.map((item) => (
-            <MiaRow key={item.student.id} item={item} />
+            // Keyed by both: the merged list holds one row per student, but a
+            // single-gathering list is a slice of rows that also exist for
+            // other gatherings, and a student id alone is not unique across them.
+            <MiaRow
+              key={`${item.gatheringKey}:${item.student.id}`}
+              item={item}
+              showGathering={gatheringTitle === null}
+            />
           ))}
         </ul>
       )}
@@ -54,7 +77,7 @@ export function MiaList({ items, threshold }: MiaListProps) {
   );
 }
 
-function MiaRow({ item }: { item: MiaStudent }) {
+function MiaRow({ item, showGathering }: { item: MiaStudent; showGathering: boolean }) {
   const { student, consecutiveMisses, lastAttendedAt, lastAttendedEventTitle } = item;
   const name = studentFullName(student);
 
@@ -82,10 +105,29 @@ function MiaRow({ item }: { item: MiaStudent }) {
           <span className="truncate text-xs text-ink-500">
             {ordinalGrade(student.grade)} grade · {lastSeen}
           </span>
+          {showGathering ? (
+            <span className="truncate text-xs text-ink-500">
+              {item.gatheringTitle
+                ? `Missing from ${item.gatheringTitle}`
+                : // No gathering can claim them: the window holds no sighting of
+                  // them at any of them, which is the strongest version of this
+                  // list's case rather than a weaker one.
+                  'Not seen at any gathering'}
+              {item.alsoMissingCount > 0
+                ? ` · and ${item.alsoMissingCount} other ${
+                    item.alsoMissingCount === 1 ? 'gathering' : 'gatherings'
+                  }`
+                : ''}
+            </span>
+          ) : null}
         </Link>
 
         <span className="shrink-0 rounded-xl bg-danger-500/10 px-2.5 py-1 text-center ring-1 ring-danger-500/25">
-          <span className="sr-only">Missed {consecutiveMisses} gatherings in a row.</span>
+          <span className="sr-only">
+            {item.gatheringTitle
+              ? `Missed ${consecutiveMisses} ${item.gatheringTitle} nights in a row.`
+              : `Not seen at any of the last ${consecutiveMisses} gatherings.`}
+          </span>
           <span
             aria-hidden="true"
             className="block text-lg font-bold leading-tight tabular-nums text-danger-400"

@@ -19,20 +19,28 @@ export interface NewVisitorListProps {
   items: readonly NewVisitor[];
   /** `settings.newVisitorWindowDays`. */
   windowDays: number;
+  /** The gathering being shown, or null when every gathering is in the list. */
+  gatheringTitle?: string | null;
 }
 
-export function NewVisitorList({ items, windowDays }: NewVisitorListProps) {
+export function NewVisitorList({ items, windowDays, gatheringTitle = null }: NewVisitorListProps) {
   return (
     <Card>
       <CardHeader
         title="New faces"
         count={items.length}
-        description={`First time in the last ${windowDays} days.`}
+        description={
+          gatheringTitle
+            ? `First seen at ${gatheringTitle} in the last ${windowDays} days.`
+            : `First time in the last ${windowDays} days.`
+        }
       />
 
       {items.length === 0 ? (
         <EmptyState
-          title="No first-timers this week."
+          title={
+            gatheringTitle ? `No first-timers at ${gatheringTitle}.` : 'No first-timers this week.'
+          }
           description="Anyone checked in for the first time shows up here while the visit is still fresh."
         />
       ) : (
@@ -75,6 +83,15 @@ function NewVisitorRow({ visitor }: { visitor: NewVisitor }) {
             {firstEventTitle} · {formatShortDate(firstAttendedAt)}, {formatRelative(firstAttendedAt)}
           </span>
         </Link>
+
+        {/* Somebody met on a retreat is a different follow-up from somebody who
+            walked into a Friday: there is no next instance of a bus trip for
+            them to come back to, so the invitation has to name a gathering. */}
+        {visitor.viaOneOff ? (
+          <Badge tone="neutral" title="Met at a one-off event, not at a regular gathering">
+            One-off
+          </Badge>
+        ) : null}
 
         {student.profileComplete === false ? (
           <Badge tone="warn" title="No parent contact on file">

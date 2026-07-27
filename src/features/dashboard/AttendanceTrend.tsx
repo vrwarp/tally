@@ -3,20 +3,19 @@
  *
  * Eight bars drawn by hand: no chart library is installed and none is warranted
  * for a strip whose whole job is to answer "are we growing or shrinking?".
- * Friday and Sunday are separate questions, so the tabs never mix them.
  *
- * The counts are printed above the bars and repeated in a visually-hidden
- * table, which leaves the bars responsible for the shape alone — no gridlines,
- * no y-axis, nothing a leader would have to squint at on a phone.
+ * The strip used to carry its own series tabs. It no longer does: the whole
+ * insights screen is split by gathering now, and a second set of tabs inside
+ * one card meant the bars could be showing Sunday while every list above them
+ * showed Friday. The caller passes the gathering, and the strip charts it.
  */
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Card, CardHeader, EmptyState } from '@/components/ui';
-import { computeAttendanceTrend, recurringSnapshots } from '@/features/dashboard/insights';
+import { computeAttendanceTrend } from '@/features/dashboard/insights';
 import { formatShortDate } from '@/lib/time';
 import { cn } from '@/lib/utils';
-import type { EventAttendanceSnapshot, EventSeries } from '@/types';
+import type { EventAttendanceSnapshot } from '@/types';
 
-const ALL_SERIES = 'all';
 /** Tallest bar, in px. Fixed pixels rather than percentages so the bar heights
  *  do not depend on a flex container resolving its own height first. */
 const MAX_BAR_PX = 88;
@@ -24,37 +23,22 @@ const MIN_BAR_PX = 4;
 
 export interface AttendanceTrendProps {
   snapshots: readonly EventAttendanceSnapshot[];
-  /** Offered as tabs; series with no history in `snapshots` are dropped. */
-  series: readonly EventSeries[];
+  /** One chain of repeats, or null for every gathering at once. */
+  gatheringKey?: string | null;
+  /** Named in the description, so the card says which nights it is drawing. */
+  gatheringTitle?: string | null;
   limit?: number;
 }
 
-export function AttendanceTrend({ snapshots, series, limit = 8 }: AttendanceTrendProps) {
-  const [selected, setSelected] = useState<string>(ALL_SERIES);
-
-  // Only the gatherings that produced a bar: a series whose recent instances were
-  // all cancelled has nothing to chart, and offering its tab leads to an empty
-  // strip that reads as a broken filter.
-  const charted = useMemo(() => recurringSnapshots(snapshots), [snapshots]);
-
-  const tabs = useMemo(() => {
-    const withHistory = new Set(
-      charted.map((snapshot) => snapshot.event.seriesId).filter((id): id is string => id !== null),
-    );
-    return series.filter((entry) => withHistory.has(entry.id));
-  }, [series, charted]);
-
-  // A tab can vanish when the window scrolls past a dormant series; fall back
-  // rather than render an empty chart for a series that is no longer offered.
-  const active = tabs.some((tab) => tab.id === selected) ? selected : ALL_SERIES;
-
+export function AttendanceTrend({
+  snapshots,
+  gatheringKey = null,
+  gatheringTitle = null,
+  limit = 8,
+}: AttendanceTrendProps) {
   const points = useMemo(
-    () =>
-      computeAttendanceTrend(charted, {
-        seriesId: active === ALL_SERIES ? null : active,
-        limit,
-      }),
-    [charted, active, limit],
+    () => computeAttendanceTrend(snapshots, { gatheringKey, limit }),
+    [snapshots, gatheringKey, limit],
   );
 
   const peak = points.reduce((max, point) => Math.max(max, point.count), 0);
@@ -67,26 +51,12 @@ export function AttendanceTrend({ snapshots, series, limit = 8 }: AttendanceTren
     <Card>
       <CardHeader
         title="Attendance trend"
-        description="Head count per gathering, oldest to newest."
+        description={
+          gatheringTitle
+            ? `${gatheringTitle} — head count per night, oldest to newest.`
+            : 'Head count per gathering, oldest to newest. Every gathering, mixed.'
+        }
       />
-
-      {tabs.length > 1 ? (
-        <div className="flex gap-2 overflow-x-auto px-3 pt-3 scroll-touch">
-          <TrendTab
-            label="All"
-            active={active === ALL_SERIES}
-            onSelect={() => setSelected(ALL_SERIES)}
-          />
-          {tabs.map((tab) => (
-            <TrendTab
-              key={tab.id}
-              label={tab.title}
-              active={active === tab.id}
-              onSelect={() => setSelected(tab.id)}
-            />
-          ))}
-        </div>
-      ) : null}
 
       {points.length === 0 ? (
         <EmptyState
@@ -154,31 +124,5 @@ export function AttendanceTrend({ snapshots, series, limit = 8 }: AttendanceTren
         </div>
       )}
     </Card>
-  );
-}
-
-function TrendTab({
-  label,
-  active,
-  onSelect,
-}: {
-  label: string;
-  active: boolean;
-  onSelect: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      aria-pressed={active}
-      className={cn(
-        'min-h-11 shrink-0 rounded-xl px-3 text-sm font-semibold ring-1 transition-colors',
-        active
-          ? 'bg-brand-500/15 text-brand-300 ring-brand-500/30'
-          : 'bg-ink-900 text-ink-400 ring-ink-800 hover:text-ink-200',
-      )}
-    >
-      {label}
-    </button>
   );
 }

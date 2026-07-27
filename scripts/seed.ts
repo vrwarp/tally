@@ -216,6 +216,12 @@ type Band =
   | 'inactive'
   /** Quick-added a few weeks ago, came once, never came back. */
   | 'newcomer'
+  /**
+   * Came on the lock-in bus with a friend and has never been to a gathering.
+   * Lands on "Met once, never since", and on nothing else — which is the whole
+   * reason that list exists.
+   */
+  | 'oneOffGuest'
   /** Walked in at the most recent gathering — lands on New Visitors. */
   | 'firstTimer';
 
@@ -290,6 +296,10 @@ const SEED_STUDENTS: readonly SeedStudent[] = [
   { first: 'Kylie', last: 'Novak', grade: 9, band: 'newcomer' },
   { first: 'Jayden', last: 'Rivers', grade: 8, band: 'firstTimer' },
   { first: 'Selah', last: 'Mbeki', grade: 6, band: 'firstTimer' },
+
+  /* ---- Met on the lock-in bus, and nowhere since -------------------------- */
+  { first: 'Tomas', last: 'Vielle', grade: 10, band: 'oneOffGuest' },
+  { first: 'Bree', last: 'Sandoval', grade: 7, band: 'oneOffGuest', parent: 'Marisa Sandoval', contact: 'phone' },
 ];
 
 /** Base chance of attending any given instance of a series. */
@@ -300,9 +310,10 @@ const BASE_PROPENSITY: Record<Band, number> = {
   edge: 0.28,
   drifted: 0.85,
   inactive: 0.6,
-  // Both of these attend exactly one, named gathering, chosen below.
+  // These three attend exactly one, named event, chosen below.
   newcomer: 0,
   firstTimer: 0,
+  oneOffGuest: 0,
 };
 
 /* -------------------------------------------------------------------------- */
@@ -370,6 +381,10 @@ interface BuiltEvent {
   id: string;
   title: string;
   seriesId: string | null;
+  /** A trip or a retreat: an event that is an instance of nothing. */
+  isOneOff: boolean;
+  /** One-offs only: the roster is closed to the students who RSVP'd. */
+  requiresRsvp: boolean;
   startAt: Date;
   endAt: Date;
   checkInOpensAt: Date;
@@ -514,6 +529,8 @@ function buildEvents(now: Date): BuiltEvent[] {
         id: `${seriesId}-${isoDay(startAt)}`,
         title,
         seriesId,
+        isOneOff: false,
+        requiresRsvp: false,
         startAt,
         endAt,
         checkInOpensAt: addMinutes(startAt, -60),
@@ -534,12 +551,37 @@ function buildEvents(now: Date): BuiltEvent[] {
     id: `winter-retreat-${isoDay(retreatStart)}`,
     title: 'Winter Retreat',
     seriesId: null,
+    isOneOff: true,
+    requiresRsvp: true,
     startAt: retreatStart,
     endAt: retreatEnd,
     // Boarding, not the whole weekend: the roster is for the bus door.
     checkInOpensAt: addMinutes(retreatStart, -90),
     checkInClosesAt: addMinutes(retreatStart, 180),
     isPast: false,
+  });
+
+  /*
+   * A one-off that has already happened, three weeks back.
+   *
+   * Without one, every insight about trips is a section that never appears: no
+   * head-count recap, and nobody on "met once, never since" — the two students
+   * in the `oneOffGuest` band came to this and to nothing else. It takes no
+   * RSVP, because a lock-in in the church hall is not a bus with 42 seats.
+   */
+  const lockInStart = atTime(addDays(friday.startAt, -21), '19:00');
+  const lockInEnd = atTime(addDays(lockInStart, 1), '08:00');
+  events.push({
+    id: `fall-lock-in-${isoDay(lockInStart)}`,
+    title: 'Fall Lock-In',
+    seriesId: null,
+    isOneOff: true,
+    requiresRsvp: false,
+    startAt: lockInStart,
+    endAt: lockInEnd,
+    checkInOpensAt: addMinutes(lockInStart, -60),
+    checkInClosesAt: addMinutes(lockInStart, 240),
+    isPast: true,
   });
 
   /*
@@ -567,6 +609,8 @@ function buildEvents(now: Date): BuiltEvent[] {
       id: `${SERIES_IDS.fridayFellowship}-live-${isoDay(now)}`,
       title: 'Friday Fellowship',
       seriesId: SERIES_IDS.fridayFellowship,
+      isOneOff: false,
+      requiresRsvp: false,
       startAt,
       endAt,
       checkInOpensAt: addMinutes(startAt, -60),
@@ -590,11 +634,16 @@ function buildEvents(now: Date): BuiltEvent[] {
  * Getting this split right is the whole point of the demo data: it is what
  * proves the join in `mergeRoster` works against something realistic.
  */
+/** Bands that were typed in at a door rather than read from Planning Center. */
+function isQuickAddBand(band: Band): boolean {
+  return band === 'firstTimer' || band === 'newcomer' || band === 'oneOffGuest';
+}
+
 function buildStudents(now: Date, rng: () => number): BuiltStudent[] {
   const yearStart = schoolYearStart(now);
 
   return SEED_STUDENTS.map((seed, index) => {
-    const isQuickAdd = seed.band === 'firstTimer' || seed.band === 'newcomer';
+    const isQuickAdd = isQuickAddBand(seed.band);
     const pcoPersonId = isQuickAdd ? null : String(SEED_PCO_ID_BASE + index);
 
     return {
@@ -640,13 +689,16 @@ function buildAttendance(
   now: Date,
   rng: () => number,
 ): AttendanceRow[] {
-  const past = events.filter((event) => event.isPast && event.seriesId !== null);
+  // One-offs included: a trip nobody was checked into reads as cancelled, and a
+  // dashboard section about trips would then have nothing to say.
+  const past = events.filter((event) => event.isPast);
   if (past.length === 0) return [];
 
-  const mostRecent = past[past.length - 1]!;
+  const gatherings = past.filter((event) => !event.isOneOff);
+  const mostRecent = gatherings[gatherings.length - 1] ?? past[past.length - 1]!;
   // Whoever last met around three weeks ago: the one gathering the `newcomer`
   // visited before disappearing.
-  const newcomerEvent = past.reduce((best, event) =>
+  const newcomerEvent = gatherings.reduce((best, event) =>
     Math.abs(event.startAt.getTime() - (now.getTime() - 21 * DAY_MS)) <
     Math.abs(best.startAt.getTime() - (now.getTime() - 21 * DAY_MS))
       ? event
@@ -669,6 +721,9 @@ function buildAttendance(
         attending = event.id === mostRecent.id;
       } else if (band === 'newcomer') {
         attending = event.id === newcomerEvent.id;
+      } else if (band === 'oneOffGuest') {
+        // The whole of their history: one lock-in, and nothing before or since.
+        attending = event.isOneOff;
       } else if (band === 'drifted' && event.startAt >= driftCutoff) {
         attending = false;
       } else if (band === 'inactive' && event.startAt >= departureCutoff) {
@@ -683,7 +738,7 @@ function buildAttendance(
 
       if (!attending) continue;
 
-      const isQuickAdd = band === 'firstTimer' || band === 'newcomer';
+      const isQuickAdd = isQuickAddBand(band);
       const isFirstEver = isQuickAdd && !firstEver.has(student.id);
       firstEver.add(student.id);
 
@@ -823,10 +878,11 @@ function collectWrites(now: Date): {
   const students = buildStudents(now, rng);
   const attendance = buildAttendance(events, students, now, rng);
   const rsvps = buildRsvps(students);
-  const retreat = events.find((event) => event.seriesId === null)!;
+  const retreat = events.find((event) => event.requiresRsvp)!;
 
   for (const event of events) {
     const isRetreat = event.id === retreat.id;
+    const { isOneOff } = event;
     writes.push({
       path: paths.event(event.id),
       data: {
@@ -835,19 +891,23 @@ function collectWrites(now: Date): {
         // gathering, and the glyph it wears everywhere else.
         description: isRetreat
           ? 'Two nights at Camp Silverpine — hiking, campfires, and four sessions together.'
-          : event.seriesId === SERIES_IDS.sundaySchool
-            ? 'Small groups by grade, working through the Gospel of Mark this term.'
-            : 'Games, worship and a short talk, then pizza in the hall. Bring a friend.',
+          : isOneOff
+            ? 'Games, films and far too little sleep, from Friday night to Saturday breakfast.'
+            : event.seriesId === SERIES_IDS.sundaySchool
+              ? 'Small groups by grade, working through the Gospel of Mark this term.'
+              : 'Games, worship and a short talk, then pizza in the hall. Bring a friend.',
         icon: isRetreat
           ? 'cabin'
-          : event.seriesId === SERIES_IDS.sundaySchool
-            ? 'menu_book'
-            : 'groups',
-        mode: isRetreat ? 'oneoff' : 'recurring',
+          : isOneOff
+            ? 'bedtime'
+            : event.seriesId === SERIES_IDS.sundaySchool
+              ? 'menu_book'
+              : 'groups',
+        mode: isOneOff ? 'oneoff' : 'recurring',
         seriesId: event.seriesId,
         // A retreat happens once; everything else is the weekly slot its series
         // describes, phrased from the day the instance itself lands on.
-        recurrence: isRetreat
+        recurrence: isOneOff
           ? null
           : {
               frequency: 'weekly',
@@ -863,11 +923,17 @@ function collectWrites(now: Date): {
         checkInClosesAt: event.checkInClosesAt,
         location: isRetreat
           ? 'Camp Silverpine, Blue Ridge'
-          : event.seriesId === SERIES_IDS.sundaySchool
-            ? 'Education wing, rooms 201–206'
-            : 'Fellowship Hall',
-        notes: isRetreat ? 'Bus leaves at 5:30pm sharp. Meet in the car park.' : null,
-        requiresRsvp: isRetreat,
+          : isOneOff
+            ? 'Fellowship Hall'
+            : event.seriesId === SERIES_IDS.sundaySchool
+              ? 'Education wing, rooms 201–206'
+              : 'Fellowship Hall',
+        notes: isRetreat
+          ? 'Bus leaves at 5:30pm sharp. Meet in the car park.'
+          : isOneOff
+            ? 'Doors locked at 9pm. Breakfast at 7.'
+            : null,
+        requiresRsvp: event.requiresRsvp,
         status: 'scheduled',
         createdAt: schoolYearStart(now),
         updatedAt: schoolYearStart(now),
@@ -886,7 +952,7 @@ function collectWrites(now: Date): {
    */
   students.forEach((student) => {
     const { seed } = student;
-    const isVisitor = seed.band === 'firstTimer' || seed.band === 'newcomer';
+    const isVisitor = isQuickAddBand(seed.band);
 
     const owned: Record<string, unknown> = {
       firstName: seed.first,
@@ -1092,6 +1158,7 @@ function report(input: {
     (student) => student.firstAttendedAt !== null && student.firstAttendedAt > addDays(now, -7),
   ).length;
   const incomplete = students.filter((student) => !student.seed.parent).length;
+  const oneOffGuests = students.filter((student) => student.seed.band === 'oneOffGuest').length;
 
   const lines = [
     '',
@@ -1114,6 +1181,7 @@ function report(input: {
     `  • ${drifted} students last seen 4+ weeks ago, on the MIA list`,
     `  • ${firstTimers} first-timers inside the New Visitors window`,
     `  • ${incomplete} profiles with no way to reach a parent`,
+    `  • ${oneOffGuests} students met at the Fall Lock-In and nowhere since`,
     '',
     'Next up:',
   ];
