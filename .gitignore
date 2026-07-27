@@ -75,3 +75,4 @@ uxr/renders/
 /firestore-tests/**/*.js
 /e2e/**/*.js
 /uxr/**/*.js
+uxr/after/

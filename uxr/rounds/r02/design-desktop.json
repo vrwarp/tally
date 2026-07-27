@@ -1,0 +1,74 @@
+[
+  {
+    "scene": "events",
+    "viewport": "desktop",
+    "severity": "major",
+    "where": "the two-column grid below the fold — the tail of 'Later' against the bottom of 'Past gatherings'",
+    "finding": "The split fixed the fold and re-created the old problem underneath it. The right column is bounded — twelve gatherings and a 'Load older gatherings' button — while the left column is unbounded, because 'Later' is sixteen rows and growing. The columns are sized by whatever their content happens to be and nothing reconciles them, so the page ends on a 560px-wide, 1,305px-tall panel of flat ink-950 beside a narrow column of cards. That is more than a full screen of the exact composition round 1 set out to kill: a phone-width column with the rest of the laptop painted empty. A reader who scrolls past the fold watches the page collapse back into one column and has no way to know the layout ever had two.",
+    "evidence": "Last ink in the right column is y=1086; last ink in the left is y=2391; the page is 2,447px tall. So for 55% of the page's height the right half of the frame holds nothing at all. The sixteen 'Later' rows are 95px each and fifteen of them carry an identical grey 'Recurring' chip on a line of its own, which is where roughly 400px of that length comes from — a badge that is on every row is not a badge, it is a column of noise that is making the imbalance worse.",
+    "direction": "A two-column page has to hold for its whole length, not just its first screen. Two ways out and they combine: let the past column keep going (it has 27 gatherings and stops at 12, so it is short by choice, not by content), and stop 'Later' being an unbounded scroll — it is the least urgent block on the page and it is the one setting the page's height. On the row itself, the constants ('Recurring', the venue, the time) repeat identically down fifteen rows while only the date changes; constants belong to the group heading, not to every row, and pulling them up would shorten the column and let the date lead."
+  },
+  {
+    "scene": "events",
+    "viewport": "desktop",
+    "severity": "major",
+    "where": "'Past gatherings' and 'July 2026' against 'Next in each series' and 'Today' / 'Next seven days' / 'Later'",
+    "finding": "The split promoted 'Past gatherings' to the title of half the page and left it dressed as the smallest label on it. It is set exactly like 'Today', 'Next seven days' and 'Later' — which are groups *inside* the other column — and one hairline above 'July 2026', which is nested *inside it*. Meanwhile 'Next in each series', a two-row card, is by a distance the loudest section heading on the screen: sentence case, semibold, near-white, wrapped in a ringed container. So the page's three ranks (which half, which group, which month) are carried by two treatments, the largest block has the quietest label and the smallest has the loudest, and the two ranks that are genuinely nested are separated by 1px of size and one step of grey. Nothing on the page says 'upcoming' and 'past'; the columns simply start, in two different idioms, and read as two documents pushed together rather than one page in two parts.",
+    "evidence": "At the top of the frame the left column opens with a ringed card, a 16px semibold near-white title and a 14px explainer; the right column opens at the same y with a 12px uppercase tracked grey caption, a second 11px uppercase grey caption, and then bare rows sitting flush at the column edge with no container at all. 'Past gatherings' owns 27 rows and is quieter than 'Next in each series', which owns two. choose-event runs the same two systems for the same pair of ranks ('On today' against 'CATCH UP').",
+    "direction": "Three ranks want three treatments, and the loudest should belong to the halves. Give each column a heading of its own rank at its top so the reader is told what the left/right division means, then use one voice for the groups inside them — either bring 'Next in each series' down into the uppercase group vocabulary or take all four groups up into the card vocabulary, but not both on one page. The nested month labels then need to sit clearly below whatever the group rank becomes."
+  },
+  {
+    "scene": "dashboard",
+    "viewport": "desktop",
+    "severity": "major",
+    "where": "the right column — 'New faces', 'Incomplete profiles', 'Met once, never since' — and the INCOMPLETE tile above it",
+    "finding": "One fact now wears five costumes inside one 450px column: an amber numeral in the INCOMPLETE tile, an amber '⚠ Incomplete' badge, a 44px amber '+ Add parent contact' button, amber 'Waiting N days' chips, and a two-line amber sentence repeated verbatim on every row that carries it. Read at a squint the right column is a stripe of warn from top to bottom, so amber has stopped meaning 'this one needs fixing' and become the column's house colour. It also inverts a card: the loudest object inside 'New faces' is the amber CTA, not the two students, so a card about good news reads as a warning — while the tile 40px above it colours the same two students present-green. Same students, two accents, two feet apart, and the reader has to work out that they are not two populations. Stacking these four cards has made the overlap visible in a way the old single scroll hid: Selah Mbeki and Jayden Rivers are in the top two cards, Bree Sandoval and Tomas Vielle in the second and fourth, so four ruled cards read as one list of the same seven people re-sorted four times.",
+    "evidence": "'New faces' contains, per row, a name, a grade, a date line, an amber badge and an amber button that is taller than the name is tall — two of them fill the card. 'Met once, never since' repeats 'Planning Center has no parent contact for <name>. Nobody can follow up until somebody adds one there.' in warn-400 on both of its two rows, naming the student it sits directly beneath, and the same sentence appears a third time in 'Missing in action' in the left column. The only non-amber accents in the column are two brand 'Visitor' pills and two danger 'Waiting 329 days' chips.",
+    "direction": "Pick one carrier for 'no parent contact' and use it once per row. The badge is enough where the row is about something else; the button belongs where fixing it is the job — the 'Incomplete profiles' card — not in the card about new arrivals, which should be allowed to read as good news the tile above already says it is. The repeated sentence is a row *state*, not a message: said once per row in a two-row card it is the card's body copy, and it should be said once by the card, or reduced to the same badge everything else uses. If the four cards really are mostly one population, the column has just shown you that, and it is a grouping question, not a styling one."
+  },
+  {
+    "scene": "dashboard",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the 28rem right column — the 'Copy list' button and the meta lines inside 'Met once, never since'",
+    "finding": "The right column is narrower than the components put into it, and the components say so. 'Copy list' — the identical button that sits comfortably on one line in the left column's header 1,200px away — breaks to two lines inside its own pill, so a two-word label is stacked in a capsule. Two rows below it the same meta string truncates at two different points ('…Jul 10, 17 days a…' and '…Jul 10, 17 days …'), giving a two-row card a ragged pair of ellipses. Both of these are the exact defects round 1 named on the old 480px page and reported cured by the wider frame; they have simply moved into the right column. A component that sets correctly at 680px and breaks at 448px means the column was measured against its rows and not against its headers.",
+    "evidence": "The two columns render at 682px and 450px with a 23px gutter. In the left column 'Copy list' is one line; in the right column, in a header that is otherwise identical, it is two.",
+    "direction": "Either the right column takes the width its own cards need, or the cards that do not fit swap sides and the narrow column keeps only what is genuinely narrow — a name, a chip, a chevron. A label breaking inside its own button is the clearest possible signal that a column is 40px short; do not solve it by shortening the label."
+  },
+  {
+    "scene": "dashboard",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the four stat tiles against the two columns beneath them",
+    "finding": "The top of the page is on a different grid from the body. The tile row runs 6px gutters while everything below it — the columns, and the cards inside each column — runs 23–24px, so within one page frame the same kind of gap is set two ways and the four tiles fuse into one segmented bar rather than reading as four cards. Their seams agree with nothing: the tiles break at x≈541, 831 and 1121, and the body has one seam at x≈947, so no internal edge in the top 130px of the page lines up with any edge below it. The tiles also each took 284px and have no use for it — 'last 7 days' is about 60px of text in a 284px box — because the row's cells grew when the frame widened and its gutters stayed at their phone value.",
+    "evidence": "Measured at y=210 the tiles occupy 255–538, 545–828, 835–1118, 1125–1408 (284px each, 6px apart). Measured at y=500 the columns occupy 255–936 and 959–1408 (23px apart).",
+    "direction": "Give the tile row the page's gutter, and make its seams land on the body's, so there is one vertical seam running from the top of the page to the bottom instead of four that agree with nothing — three tiles over the left column and one over the right would do it, or scope the row to the left column entirely. Either way the row should look like it belongs to the same drawing as the cards."
+  },
+  {
+    "scene": "dashboard",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the MIA / NEW FACES / INCOMPLETE tiles against the cards of the same names",
+    "finding": "Three of the four tiles are now the headline of a card that is visible at the same time, with the same count and the same definition in almost the same words. 'NEW FACES 2 / last 7 days' sits about 40px above 'New faces 2 / First time in the last 7 days.'; 'INCOMPLETE 7 / no parent contact' sits above 'Incomplete profiles 7 / Active students with no parent phone or email on file.'; 'MIA 10 / 3+ missed in a row' sits above 'Missing in action 10 / Was a regular at one gathering, then missed 3 or more of it in a row.' A summary row earns its place by summarising something you cannot see; the split shortened the page enough that each tile is now a caption for the thing directly underneath it, and the reader reads every number twice before reaching a name. 'Last gathering, 16 · -2 vs 18 before' is the one tile that survives the comparison, because it is the only one carrying a fact no card below repeats.",
+    "evidence": "All three counts and all three definitions appear twice above the fold in the same frame; the counts are even set in the same chip idiom on the card headers.",
+    "direction": "Let the tiles carry what the cards cannot — a movement, a delta, a comparison against last time, the way 'Last gathering' already does — or drop the duplicated three and let the card headers, which already hold the counts, be the only place each number is stated. A row of four tiles is worth its 130px only if it answers something the page below does not."
+  },
+  {
+    "scene": "students",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the directory rows",
+    "finding": "The dense single-line row is right, but widening the frame widened the gap rather than the information: the row now runs the full 1,152px carrying a name at the far left and a grade at the far right with about 820px of empty row between them, forty-five times. Round 1 complained that a chevron floated unmoored across 390px of nothing; the grade column has now joined it out there, across twice the distance. The result is that the list does not read as rows at all — it reads as a column of names and a separate column of grades that happen to share divider lines, and pairing the two costs an eye movement across the whole screen on every row.",
+    "evidence": "Names begin at x=313 and 'Aisha Rahman' ends near x=440; the grade column begins at x≈1263 and the chevron sits at x=1392. Only five of the forty-five rows put anything in between, and those badges sit hard against the name, so the emptiness is unbroken for forty rows.",
+    "direction": "Close the row. Either bring the grade in to a fixed distance from the longest name so the two facts read as one line and let the row end where its content ends, or spend the frame properly and set the directory in two columns of rows side by side — this is not the roster, a mis-tap here opens a neighbour's record rather than filing a check-in wrongly, and thirty names above the fold would be worth having. What the row must not stay is two words at opposite ends of a laptop."
+  },
+  {
+    "scene": "students, roster",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the 'Incomplete profiles (5)' / 'Visitors (5)' chips in the Students toolbar, and the '+' square beside the roster search field",
+    "finding": "Round 1 pulled three stacked rows of controls into one toolbar, which was the right move, but two controls did not take the pointer-size step the rest did, so the band it produced has two heights. The header buttons render at 38px and the search field and both selects at 39px; the two filter chips render at 46px. Bottom-aligned, they stand 7px proud of the toolbar's top line and end up the tallest objects in the row — a filter reading heavier than 'New visitor' directly above it, and the set of four controls that was meant to look like a set reading as three plus one. The same slip put a 48px square '+' beside a 40px search field on the roster, where the button that round 1 moved into the band overhangs the field it is paired with by 8px.",
+    "evidence": "Students toolbar measured top-to-bottom: buttons 23–60, fields 117–155, chips 110–155. Roster band: field 182–220, '+' 172–219. The roster button does carry the compact pointer variant, but the plain size rule is declared after it in the overrides block and wins, so it draws at its touch size on a pointer screen.",
+    "direction": "One control height per band at pointer sizes — the chips and the quick-add square need the same compact step the buttons, inputs and selects already take, and the roster override needs to lose to the variant rather than beat it. If a chip is meant to carry more weight than the field beside it, make that decision in colour or fill; being the one control that did not shrink is not a decision, it is a leftover."
+  }
+]

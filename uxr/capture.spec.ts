@@ -18,7 +18,16 @@ import { test } from '../e2e/support/fixtures';
 import { freeze } from './snapshot';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const OUT = join(here, 'baseline');
+
+/**
+ * Where the frozen scenes land.
+ *
+ * `baseline/` by default and deliberately: it is the app as it was before the
+ * refinement, it is committed, and the before/after walkthrough is worth
+ * nothing if a later run quietly overwrites it. Point `UXR_OUT` somewhere else
+ * to photograph the app as it is now.
+ */
+const OUT = join(here, process.env.UXR_OUT ?? 'baseline');
 
 /** What each scene is *for*, handed to the critics as the brief they judge against. */
 export interface Scene {
