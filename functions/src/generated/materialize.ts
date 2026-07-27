@@ -40,6 +40,7 @@
  * attendance document's id *is* the student id.
  */
 import {
+  recurrenceEquals,
   recurrenceOccurrences,
   toDateOnlyValue,
   type RecurrenceRule,
@@ -257,6 +258,128 @@ export function pendingOccurrences(
   }
 
   return drafts.sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
+}
+
+/* -------------------------------------------------------------------------- */
+/* Reconciling a chain after its schedule changes                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * What a schedule change means for the gatherings already written down after
+ * the one that was edited.
+ *
+ * Materialising ahead of time is what makes next Friday a document a leader can
+ * cancel or move — and it is also what makes an edit incomplete on its own.
+ * Turning a weekly gathering monthly writes one document; the eight Fridays the
+ * old rule had already put on the calendar are still sitting there, and Upcoming
+ * shows a schedule nobody chose.
+ *
+ * So an edit has a second half: work out which of the ones ahead the new rule
+ * no longer lands on, and say so. `pendingOccurrences` then fills the gap on the
+ * next top-up, from the edited gathering as the template.
+ */
+export interface ChainReconciliation {
+  /**
+   * Later instances the new schedule no longer produces. To be deleted — they
+   * are gatherings that were never chosen, and cancelling them instead would
+   * leave a column of struck-through Fridays standing in for the mistake.
+   */
+  superseded: OccurrenceSource[];
+  /**
+   * Later instances that survive but still carry the rule they were written
+   * under. Only `recurrence` is stale, and it has to be brought up to date or
+   * the chain's own template would put the old schedule back: the horizon copies
+   * forward from the *latest* live instance, not from the one that was edited.
+   */
+  restated: OccurrenceSource[];
+}
+
+/**
+ * How far ahead a reconciliation will expand the new rule looking for matches.
+ *
+ * Bounded by the horizon rather than by the chain, so a single stray document
+ * dated years out cannot turn one edit into an unbounded expansion.
+ */
+const MAX_RECONCILE_DAYS = 400;
+
+/**
+ * Which gatherings after `edited` its new schedule contradicts.
+ *
+ * `chain` is the key the chain had *before* the edit, because a gathering
+ * switched to one-off loses its series and its root and would otherwise stop
+ * matching the very instances it needs to clean up. Callers holding the event as
+ * it was stored pass `chainKey(previous)`; the default is right everywhere else.
+ *
+ * Two kinds of instance are deliberately left alone.
+ *
+ * **Cancelled ones**, because calling a Friday off is a decision, and deleting
+ * the record of it would let the next top-up write that Friday back.
+ *
+ * **Ones somebody moved**, spotted by their id no longer being the one their
+ * date derives from — a Friday dragged to Saturday keeps `…-07-24` while
+ * sitting on the 25th. A leader who moved a gathering by hand meant it, and an
+ * edit to the series is not an instruction to undo that. They still get their
+ * rule restated, so a moved instance cannot quietly become the template that
+ * revives the old schedule.
+ */
+export function reconcileChain(
+  events: readonly OccurrenceSource[],
+  edited: OccurrenceSource,
+  chain: string = chainKey(edited),
+): ChainReconciliation {
+  const rule = edited.mode === 'recurring' ? edited.recurrence : null;
+
+  const later = events
+    .filter(
+      (event) =>
+        event.id !== edited.id &&
+        event.mode === 'recurring' &&
+        chainKey(event) === chain &&
+        event.startAt > edited.startAt,
+    )
+    .sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
+
+  if (later.length === 0) return { superseded: [], restated: [] };
+
+  /*
+   * Every instant the new rule lands on between the edited gathering and the
+   * last one already written down.
+   *
+   * Matched by instant rather than by day on purpose: moving a Friday night from
+   * 23:00 to 20:00 leaves the days alone but changes every gathering after it,
+   * and those documents are wrong until they are rewritten. Dropping them here
+   * is what lets the horizon put them back at the hour a leader actually chose.
+   */
+  const produced = new Set<number>();
+  if (rule) {
+    const span = Math.ceil(
+      (later[later.length - 1].startAt.getTime() - edited.startAt.getTime()) / 86_400_000,
+    );
+    for (const date of recurrenceOccurrences(rule, edited.startAt, {
+      // At most one occurrence a day, so the span bounds how many there can be.
+      limit: Math.min(span, MAX_RECONCILE_DAYS) + 2,
+      from: new Date(edited.startAt.getTime() + 1),
+    })) {
+      produced.add(date.getTime());
+    }
+  }
+
+  const superseded: OccurrenceSource[] = [];
+  const restated: OccurrenceSource[] = [];
+
+  for (const event of later) {
+    const moved = event.id !== occurrenceId(chain, event.startAt);
+    const orphaned = !produced.has(event.startAt.getTime());
+
+    if (orphaned && !moved && event.status !== 'cancelled') {
+      superseded.push(event);
+      continue;
+    }
+
+    if (!recurrenceEquals(event.recurrence, rule)) restated.push(event);
+  }
+
+  return { superseded, restated };
 }
 
 /**

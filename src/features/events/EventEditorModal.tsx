@@ -46,7 +46,12 @@ import {
   nextSeriesOccurrence,
   toDateTimeLocalValue,
 } from '@/lib/time';
-import { createEvent, updateEvent, type EventDraft } from '@/services/events';
+import {
+  createEvent,
+  reconcileChainSchedule,
+  updateEvent,
+  type EventDraft,
+} from '@/services/events';
 import type { EventMode, RecurrenceRule, RosterGroupingMode, TallyEvent } from '@/types';
 
 /** House defaults for the check-in window, in minutes around the event. */
@@ -231,7 +236,7 @@ export function EventEditorModal({
   defaults,
   onSaved,
 }: EventEditorModalProps) {
-  const { series } = useData();
+  const { events, series } = useData();
   const { user } = useAuth();
   const { show } = useToast();
 
@@ -365,9 +370,30 @@ export function EventEditorModal({
     setSaving(true);
     try {
       let eventId = event?.id ?? '';
-      if (event) await updateEvent(event.id, draft, user.uid);
-      else eventId = await createEvent(draft, user.uid);
-      show(event ? 'Event updated' : `${draft.title} scheduled`, { tone: 'success' });
+      let dropped = 0;
+
+      if (event) {
+        await updateEvent(event.id, draft, user.uid);
+        // The gatherings after this one were written down under the old
+        // schedule. Saving the rule is only half of changing it.
+        dropped = await reconcileChainSchedule({
+          events,
+          previous: event,
+          draft,
+          uid: user.uid,
+        });
+      } else {
+        eventId = await createEvent(draft, user.uid);
+      }
+
+      show(
+        event
+          ? dropped > 0
+            ? `Event updated · ${dropped} later ${dropped === 1 ? 'gathering' : 'gatherings'} rescheduled`
+            : 'Event updated'
+          : `${draft.title} scheduled`,
+        { tone: 'success' },
+      );
       onSaved?.(eventId);
       onClose();
     } catch {
@@ -401,7 +427,7 @@ export function EventEditorModal({
       description={
         isEditing
           ? form.mode === 'recurring'
-            ? 'Changes apply to the upcoming gathering and the ones after it.'
+            ? 'Changing the schedule rewrites the gatherings after this one.'
             : 'Changes apply to this gathering only.'
           : 'Recurring gatherings predict their roster from past instances.'
       }

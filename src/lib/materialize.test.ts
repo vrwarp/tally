@@ -12,6 +12,7 @@ import {
   missingOccurrenceNow,
   occurrenceId,
   pendingOccurrences,
+  reconcileChain,
 } from '@/lib/materialize';
 import type { OccurrenceDraft } from '@/lib/materialize';
 import type { RecurrenceRule, TallyEvent } from '@/types';
@@ -253,6 +254,167 @@ describe('pendingOccurrences', () => {
     // 19:30 on a Friday whose 19:00 start nobody wrote down.
     const drafts = pendingOccurrences([friday()], new Date(2026, 6, 31, 19, 30));
     expect(ids(drafts)[0]).toBe('friday-fellowship-2026-07-31');
+  });
+});
+
+describe('reconcileChain', () => {
+  const MONTHLY: RecurrenceRule = {
+    frequency: 'monthly',
+    interval: 1,
+    weekdays: [],
+    monthlyMode: 'dayOfMonth',
+    until: null,
+    count: null,
+  };
+
+  /** The seed plus the Fridays the horizon had already written down for it. */
+  const chain = applied([friday()], pendingOccurrences([friday()], FRIDAY));
+
+  /** The seed as it stands after an edit, still the earliest of the chain. */
+  function edited(overrides: Partial<TallyEvent> = {}): TallyEvent {
+    return friday(overrides);
+  }
+
+  it('drops the Fridays a monthly rule no longer lands on', () => {
+    // The reported bug: turning a weekly gathering monthly left every Friday
+    // the old rule had already materialised sitting in Upcoming.
+    const { superseded, restated } = reconcileChain(chain, edited({ recurrence: MONTHLY }));
+
+    // 24 July is the 24th; monthly on the 24th lands on 24 August, which the
+    // weekly rule never wrote — so every one of them goes.
+    expect(ids(superseded)).toEqual([
+      'friday-fellowship-2026-07-31',
+      'friday-fellowship-2026-08-07',
+      'friday-fellowship-2026-08-14',
+      'friday-fellowship-2026-08-21',
+      'friday-fellowship-2026-08-28',
+      'friday-fellowship-2026-09-04',
+      'friday-fellowship-2026-09-11',
+      'friday-fellowship-2026-09-18',
+    ]);
+    expect(restated).toEqual([]);
+  });
+
+  it('keeps the ones the new rule still lands on, and restates their rule', () => {
+    const fortnightly = { ...WEEKLY, interval: 2 };
+    const { superseded, restated } = reconcileChain(chain, edited({ recurrence: fortnightly }));
+
+    // Every other Friday survives — and has to stop claiming to be weekly, or
+    // the last of them becomes the template that puts the old schedule back.
+    expect(ids(superseded)).toEqual([
+      'friday-fellowship-2026-07-31',
+      'friday-fellowship-2026-08-14',
+      'friday-fellowship-2026-08-28',
+      'friday-fellowship-2026-09-11',
+    ]);
+    expect(ids(restated)).toEqual([
+      'friday-fellowship-2026-08-07',
+      'friday-fellowship-2026-08-21',
+      'friday-fellowship-2026-09-04',
+      'friday-fellowship-2026-09-18',
+    ]);
+  });
+
+  it('asks for nothing when the schedule did not change', () => {
+    // A leader fixing a typo in the title must not disturb the calendar.
+    expect(reconcileChain(chain, edited({ title: 'Friday Fellowship!' }))).toEqual({
+      superseded: [],
+      restated: [],
+    });
+  });
+
+  it('drops the ones ahead when the hour moves, so they can be rewritten', () => {
+    const later = new Date(2026, 6, 24, 19, 30);
+    const { superseded } = reconcileChain(
+      chain,
+      edited({ startAt: later, endAt: new Date(2026, 6, 24, 21, 30) }),
+    );
+
+    // Same Fridays, wrong time. `pendingOccurrences` writes them back at 19:30.
+    expect(superseded).toHaveLength(8);
+  });
+
+  it('leaves history and the edited gathering alone', () => {
+    const { superseded, restated } = reconcileChain(chain, edited({ recurrence: MONTHLY }));
+
+    for (const event of [...superseded, ...restated]) {
+      expect(event.startAt.getTime()).toBeGreaterThan(FRIDAY.getTime());
+      expect(event.id).not.toBe('friday-fellowship-2026-07-24');
+    }
+  });
+
+  /** The chain with one of its Fridays replaced by an altered copy. */
+  function withInstance(id: string, overrides: Partial<TallyEvent>): TallyEvent[] {
+    return chain.map((event) => (event.id === id ? friday({ ...event, ...overrides }) : event));
+  }
+
+  it('does not delete a Friday somebody called off', () => {
+    const withCancelled = withInstance('friday-fellowship-2026-08-07', {
+      status: 'cancelled',
+    });
+
+    const { superseded, restated } = reconcileChain(
+      withCancelled,
+      edited({ recurrence: MONTHLY }),
+    );
+
+    expect(ids(superseded)).not.toContain('friday-fellowship-2026-08-07');
+    // Still brought up to date, so un-cancelling it cannot revive the old rule.
+    expect(ids(restated)).toContain('friday-fellowship-2026-08-07');
+  });
+
+  it('does not delete a gathering somebody moved by hand', () => {
+    // Materialised for the 7th, then dragged to the Saturday.
+    const withMoved = withInstance('friday-fellowship-2026-08-07', {
+      startAt: new Date(2026, 7, 8, 19, 0),
+      endAt: new Date(2026, 7, 8, 21, 0),
+    });
+
+    const { superseded, restated } = reconcileChain(withMoved, edited({ recurrence: MONTHLY }));
+
+    expect(ids(superseded)).not.toContain('friday-fellowship-2026-08-07');
+    expect(ids(restated)).toContain('friday-fellowship-2026-08-07');
+  });
+
+  it('clears the calendar ahead when a gathering stops repeating', () => {
+    // Switching to one-off drops the series and the root, so the chain has to
+    // be named from the event as it was stored.
+    const oneoff = friday({ mode: 'oneoff', seriesId: null, recurrence: null });
+    const { superseded } = reconcileChain(chain, oneoff, chainKey(friday()));
+
+    expect(superseded).toHaveLength(8);
+  });
+
+  it('drops the ones past a newly set end date', () => {
+    const { superseded } = reconcileChain(
+      chain,
+      edited({ recurrence: { ...WEEKLY, until: '2026-08-14' } }),
+    );
+
+    expect(ids(superseded)).toEqual([
+      'friday-fellowship-2026-08-21',
+      'friday-fellowship-2026-08-28',
+      'friday-fellowship-2026-09-04',
+      'friday-fellowship-2026-09-11',
+      'friday-fellowship-2026-09-18',
+    ]);
+  });
+
+  it('ignores other chains entirely', () => {
+    const sunday = friday({
+      id: 'sunday-school-2026-08-02',
+      seriesId: 'sunday-school',
+      startAt: new Date(2026, 7, 2, 9, 30),
+      endAt: new Date(2026, 7, 2, 10, 45),
+      recurrence: { ...WEEKLY, weekdays: [0] },
+    });
+
+    const { superseded, restated } = reconcileChain(
+      [...chain, sunday],
+      edited({ recurrence: MONTHLY }),
+    );
+
+    expect(ids([...superseded, ...restated])).not.toContain('sunday-school-2026-08-02');
   });
 });
 

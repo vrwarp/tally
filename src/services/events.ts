@@ -17,8 +17,9 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { paths } from '@/lib/paths';
-import { type OccurrenceDraft } from '@/lib/materialize';
+import { chainKey, reconcileChain, type OccurrenceDraft } from '@/lib/materialize';
 import { normalizeRecurrence } from '@/lib/recurrence';
+import { fetchAttendanceByEvent } from '@/services/attendance';
 import { toEvent, toEventSeries, toSettings, toSmallGroup } from '@/services/converters';
 import type {
   AppSettings,
@@ -172,6 +173,93 @@ export async function updateEvent(
   uid: string,
 ): Promise<void> {
   await updateDoc(doc(db, paths.event(eventId)), buildEventPayload(draft, uid, false));
+}
+
+/**
+ * The second half of editing a repeating gathering: bringing the ones already
+ * written down after it into line with the schedule that was just saved.
+ *
+ * Without this, changing a weekly gathering to monthly saves one document and
+ * leaves the eight Fridays the horizon had already materialised sitting in
+ * Upcoming — the calendar showing a schedule nobody chose, and the next top-up
+ * happy with it because those Fridays are exactly the documents it checks for.
+ *
+ * What is planned here is decided by `reconcileChain`, which is pure and tested.
+ * This adds the two things only a service can do: confirming against the server
+ * that nobody has been checked in, and writing.
+ *
+ * Attendance is the one veto. A gathering somebody attended is history, and
+ * deleting it would orphan those records — so it is left standing, wrong date
+ * and all, exactly as `EventDetailPage` refuses to delete an event with
+ * attendance. That mirrors the reason the whole chain is not simply rewritten:
+ * an occurrence that already happened is not a prediction to be corrected.
+ *
+ * Returns how many gatherings were dropped, for the toast. Failures are
+ * swallowed per document — an edit that saved should not report itself as
+ * failed because one stale Friday could not be removed, and the next edit or
+ * top-up will find it again.
+ */
+export async function reconcileChainSchedule(args: {
+  /** Everything loaded, chain-mates included. Filtered by `reconcileChain`. */
+  events: readonly TallyEvent[];
+  /** The edited event as it was stored, for the chain key it had then. */
+  previous: TallyEvent;
+  /** What was just saved for it. */
+  draft: EventDraft;
+  uid: string;
+}): Promise<number> {
+  const { events, previous, draft, uid } = args;
+
+  const edited = {
+    ...previous,
+    title: draft.title,
+    mode: draft.mode,
+    seriesId: draft.mode === 'recurring' ? (draft.seriesId ?? null) : null,
+    recurrence:
+      draft.mode === 'recurring' && draft.recurrence
+        ? normalizeRecurrence(draft.recurrence, draft.startAt)
+        : null,
+    recurrenceRootId: draft.mode === 'recurring' ? (draft.recurrenceRootId ?? null) : null,
+    startAt: draft.startAt,
+    endAt: draft.endAt,
+    checkInOpensAt: draft.checkInOpensAt,
+    checkInClosesAt: draft.checkInClosesAt,
+    location: draft.location ?? null,
+    notes: draft.notes ?? null,
+    defaultGroupingMode: draft.defaultGroupingMode ?? previous.defaultGroupingMode,
+    status: draft.status ?? previous.status,
+  };
+
+  const { superseded, restated } = reconcileChain(events, edited, chainKey(previous));
+  if (superseded.length === 0 && restated.length === 0) return 0;
+
+  const attendance = await fetchAttendanceByEvent(superseded.map((event) => event.id));
+
+  let removed = 0;
+  await Promise.all([
+    ...superseded.map(async (event) => {
+      if ((attendance.get(event.id)?.size ?? 0) > 0) return;
+      try {
+        await deleteDoc(doc(db, paths.event(event.id)));
+        removed += 1;
+      } catch {
+        // Offline, or not authorised. Both are states the next edit fixes.
+      }
+    }),
+    ...restated.map(async (event) => {
+      try {
+        await updateDoc(doc(db, paths.event(event.id)), {
+          recurrence: edited.recurrence,
+          updatedAt: serverTimestamp(),
+          updatedBy: uid,
+        });
+      } catch {
+        // As above.
+      }
+    }),
+  ]);
+
+  return removed;
 }
 
 /**
