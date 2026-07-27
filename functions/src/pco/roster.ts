@@ -23,6 +23,7 @@ import {
   addToIncludedIndex,
   buildIncludedIndex,
   extractParentContact,
+  findParentCandidate,
   hasContactDetails,
   mapPersonToStudent,
   pcoGrade,
@@ -94,6 +95,18 @@ export interface RosterPerson {
 export interface PersonDetails extends ParentContact {
   pcoPersonId: string;
   allergies: string | null;
+  /**
+   * Whether the student's household holds an adult at all — irrespective of
+   * whether anybody has put a phone number on them.
+   *
+   * This is what separates the two ways a student ends up unreachable, and they
+   * are fixed differently: a household with a parent who has no number on file
+   * is a number Tally could add, while a student with no household is a family
+   * somebody has to build in Planning Center first. Deliberately not the same
+   * question as write-back being switched on — that is configuration, decided
+   * outside the cache this value is stored in.
+   */
+  householdAdult: boolean;
 }
 
 export interface RosterResult {
@@ -322,6 +335,18 @@ export interface ParentContactStatus {
 }
 
 /**
+ * The cache entry the church's reachable adults live in.
+ *
+ * Keyed by base URL alone: the answer is about the church's adults, not about
+ * whoever happens to be on Tally's roster this minute. Exported so a write that
+ * gives a household its first phone number can drop it — otherwise the
+ * "incomplete profiles" list goes on naming a student somebody just fixed.
+ */
+export function reachableAdultsCacheKey(baseUrl: string): string {
+  return cacheKey({ kind: 'reachable-adults', base: baseUrl });
+}
+
+/**
  * Which households hold an adult somebody could actually ring, keyed household
  * id -> the ids of the adults in it who have a phone number or an email.
  *
@@ -387,10 +412,8 @@ export async function fetchParentContactStatus(
   const before = cache.stats.misses;
 
   const hydrated = await hydratedRoster(options, now);
-  // Keyed by base URL alone: the answer is about the church's adults, not about
-  // whoever happens to be on Tally's roster this minute.
   const adults = await cache.get(
-    cacheKey({ kind: 'reachable-adults', base: config.baseUrl }),
+    reachableAdultsCacheKey(config.baseUrl),
     () => sweepReachableAdults(client),
     options.force,
   );
@@ -497,6 +520,42 @@ function householdIdsOf(person: PcoPerson): string[] {
   return list.map((item) => item.id);
 }
 
+/** One person and everything side-loaded about their household. */
+export interface LoadedPerson {
+  person: PcoPerson;
+  index: IncludedIndex;
+}
+
+/**
+ * One person, with their household hydrated far enough to name a parent.
+ *
+ * Uncached on purpose: the callers that want an answer they can *act* on — the
+ * write path — must not act on a view of Planning Center that is up to
+ * `PCO_CACHE_TTL_SECONDS` old. `fetchPersonDetails` puts its own cache in front
+ * of this for the read path, where a few seconds of staleness is the whole
+ * point.
+ */
+export async function loadPersonWithHousehold(
+  client: PcoClient,
+  personId: string,
+): Promise<LoadedPerson | null> {
+  const body = await client.get<PcoPerson>(`/people/${encodeURIComponent(personId)}`, {
+    include: [...ROSTER_INCLUDES, 'households.people'],
+  });
+
+  const person = Array.isArray(body.data) ? body.data[0] : body.data;
+  if (!person) return null;
+
+  const index = buildIncludedIndex(body.included);
+  await hydrateHouseholds(client, index, person);
+  return { person, index };
+}
+
+/** The cache entry one student's details live in, so a write can drop it. */
+export function personDetailsCacheKey(baseUrl: string, personId: string): string {
+  return cacheKey({ kind: 'person', base: baseUrl, id: personId });
+}
+
 /**
  * Parent contact and allergies for one student.
  *
@@ -513,16 +572,10 @@ export async function fetchPersonDetails(
   const { client, config, cache, personId } = options;
   const now = options.now ?? new Date();
 
-  return cache.get(cacheKey({ kind: 'person', base: config.baseUrl, id: personId }), async () => {
-    const body = await client.get<PcoPerson>(`/people/${encodeURIComponent(personId)}`, {
-      include: [...ROSTER_INCLUDES, 'households.people'],
-    });
-
-    const person = Array.isArray(body.data) ? body.data[0] : body.data;
-    if (!person) return null;
-
-    const index = buildIncludedIndex(body.included);
-    await hydrateHouseholds(client, index, person);
+  return cache.get(personDetailsCacheKey(config.baseUrl, personId), async () => {
+    const loaded = await loadPersonWithHousehold(client, personId);
+    if (!loaded) return null;
+    const { person, index } = loaded;
 
     const mapped = mapPersonToStudent(person, {
       minGrade: config.minGrade,
@@ -537,6 +590,7 @@ export async function fetchPersonDetails(
       parentName: contact.parentName,
       parentPhone: contact.parentPhone,
       parentEmail: contact.parentEmail,
+      householdAdult: findParentCandidate(person, index) !== null,
     };
   });
 }

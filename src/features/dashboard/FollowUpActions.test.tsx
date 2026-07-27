@@ -40,6 +40,8 @@ function details(overrides: Partial<PcoPersonDetails> = {}): PcoPersonDetails {
     parentPhone: null,
     parentEmail: null,
     allergies: null,
+    householdAdult: true,
+    contactWritable: false,
     ...overrides,
   };
 }
@@ -72,12 +74,17 @@ describe('FollowUpActions', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
-  it('says so when the record has no way to reach a parent', async () => {
+  it('says so when the record has no way to reach a parent, and where to fix it', async () => {
     getPersonDetails.mockResolvedValue({ data: details() });
 
     render(<FollowUpActions student={inPlanningCenter()} />);
 
     expect(await screen.findByText(/no parent contact for Iris Chen/)).toBeInTheDocument();
+    // The fix is upstream either way; the difference is whether the row makes a
+    // leader go and find the person themselves.
+    expect(
+      screen.getByRole('link', { name: /Add a parent contact for Iris Chen in Planning Center/ }),
+    ).toHaveAttribute('href', 'https://people.planningcenteronline.com/people/AC4021');
   });
 
   it('does not ask about a student Planning Center has never heard of', async () => {

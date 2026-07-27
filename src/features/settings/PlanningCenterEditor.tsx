@@ -26,7 +26,7 @@ import type { PcoEffectiveSettings, PcoWriteBackMode } from '@/types';
 const WRITE_BACK_HINT: Record<PcoWriteBackMode, string> = {
   off: 'Tally never writes to Planning Center. Visitors added at the door stay queued until this is turned on.',
   create: 'Tally creates people it has not seen before, after searching for a match. It never edits an existing person.',
-  full: 'Tally creates people, and updates first name, last name, grade and medical notes on the people it created or linked.',
+  full: 'Tally creates people, updates first name, last name, grade and medical notes on the people it created or linked, and lets a leader add a parent contact to an adult already in the household. It never creates a parent or a household, and never overwrites a number on file.',
 };
 
 /** A cache measured in minutes stops being a cache and starts being a mirror. */

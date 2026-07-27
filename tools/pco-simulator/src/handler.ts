@@ -398,6 +398,8 @@ const PERSON_PATH = /^\/people\/([^/]+)$/;
 const LIST_PEOPLE_PATH = /^\/lists\/([^/]+)\/people$/;
 const LIST_PATH = /^\/lists\/([^/]+)$/;
 const HOUSEHOLD_MEMBERSHIPS_PATH = /^\/households\/([^/]+)\/household_memberships$/;
+const PERSON_PHONES_PATH = /^\/people\/([^/]+)\/phone_numbers$/;
+const PERSON_EMAILS_PATH = /^\/people\/([^/]+)\/emails$/;
 
 function checkAuth(request: SimRequest, store: SimulatorStore): SimResponse | null {
   const header = request.authorization ?? '';
@@ -500,6 +502,38 @@ function route(request: SimRequest, store: SimulatorStore): SimResponse {
     }
     const created = store.createPerson(attributes);
     return json(201, { data: personResource(created, store) });
+  }
+
+  /*
+   * Contact records are created against their owner, not against `/emails` or
+   * `/phone_numbers` at the top level — the real API has no way to say who a
+   * loose one belongs to. Tally's parent-contact write-back is the only caller,
+   * and the nesting is exactly what stops it inventing a contact for nobody.
+   */
+  const phonesMatch = PERSON_PHONES_PATH.exec(request.path);
+  if (method === 'POST' && phonesMatch) {
+    const personId = decodeURIComponent(phonesMatch[1]!);
+    if (!store.personById(personId)) {
+      return error(404, 'Not Found', `No person with id "${personId}".`);
+    }
+    const attributes = extractAttributes(request.body);
+    const number = String(attributes?.number ?? '').trim();
+    if (!number) return error(422, 'Unprocessable Entity', 'number is required.');
+    const created = store.addPhone(personId, number, attributes?.primary !== false);
+    return json(201, { data: phoneResource(created) });
+  }
+
+  const emailsMatch = PERSON_EMAILS_PATH.exec(request.path);
+  if (method === 'POST' && emailsMatch) {
+    const personId = decodeURIComponent(emailsMatch[1]!);
+    if (!store.personById(personId)) {
+      return error(404, 'Not Found', `No person with id "${personId}".`);
+    }
+    const attributes = extractAttributes(request.body);
+    const address = String(attributes?.address ?? '').trim();
+    if (!address) return error(422, 'Unprocessable Entity', 'address is required.');
+    const created = store.addEmail(personId, address, attributes?.primary !== false);
+    return json(201, { data: emailResource(created) });
   }
 
   if (method === 'PATCH' && personMatch) {

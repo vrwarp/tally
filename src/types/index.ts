@@ -616,6 +616,26 @@ export interface PcoPersonDetails {
   parentPhone: string | null;
   parentEmail: string | null;
   allergies: string | null;
+  /**
+   * Whether Planning Center has an adult in this student's household at all,
+   * irrespective of whether anybody has put a number on them.
+   *
+   * The two ways a student ends up unreachable are fixed in different places: a
+   * parent with no phone number is a number somebody can add, while a student
+   * with no household is a family that has to be built in Planning Center
+   * first. A screen that offered the same action for both would send half of
+   * the people using it somewhere that cannot help them.
+   */
+  householdAdult: boolean;
+  /**
+   * Whether Tally may add that contact itself right now — an adult to hang it
+   * off, *and* `PCO_WRITE_BACK=full`.
+   *
+   * Answered by the server because the browser can see neither half. False is
+   * the ordinary case: write-back defaults to `create`, which permits pushing a
+   * new visitor upstream and nothing else.
+   */
+  contactWritable: boolean;
 }
 
 /**

@@ -45,6 +45,16 @@ export interface PersonDetailsResult {
   unavailable: boolean;
   /** Asks again after a failure. Does nothing once an answer is held. */
   retry: () => void;
+  /**
+   * Drops the held answer and asks again — for after something has *changed*
+   * upstream, which `retry` deliberately will not do.
+   *
+   * The distinction matters because the two are used in opposite situations. A
+   * retry follows a failure, where the memo holds nothing and re-asking is free.
+   * This follows a write, where the memo holds an answer that was true a second
+   * ago and is now the one thing on screen that is wrong.
+   */
+  refresh: () => void;
 }
 
 export function usePersonDetails(student: Student | null): PersonDetailsResult {
@@ -107,6 +117,14 @@ export function usePersonDetails(student: Student | null): PersonDetailsResult {
     setAttempt((count) => count + 1);
   }, []);
 
+  const refresh = useCallback(() => {
+    // The memo is what the fetch effect checks before asking, so dropping it is
+    // what turns the attempt bump below into a real read rather than a no-op.
+    invalidatePersonDetails(key);
+    setError(null);
+    setAttempt((count) => count + 1);
+  }, [key]);
+
   return {
     details: details ?? cache.get(key) ?? null,
     loading,
@@ -114,5 +132,6 @@ export function usePersonDetails(student: Student | null): PersonDetailsResult {
     loaded: loaded || cache.has(key),
     unavailable: student !== null && personId === null,
     retry,
+    refresh,
   };
 }

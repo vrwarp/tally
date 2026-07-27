@@ -357,6 +357,7 @@ export function DashboardPage() {
             items={newVisitors}
             windowDays={settings.newVisitorWindowDays}
             gatheringTitle={activeGathering?.title ?? null}
+            reachable={parentContact.reachable}
           />
           <AttendanceTrend
             snapshots={snapshots}
