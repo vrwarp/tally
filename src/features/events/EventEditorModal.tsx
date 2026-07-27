@@ -3,9 +3,9 @@
  *
  * Two things here are load-bearing. The check-in window, because an event whose
  * window does not cover it is invisible to temporal awareness — a counselor
- * would open Tally at the door and be told there is nothing on. And the one-off
- * accountability switches, because they are what turns a retreat roster into an
- * RSVP list with waiver and payment warnings (Journey 4).
+ * would open Tally at the door and be told there is nothing on. And the RSVP
+ * switch on a one-off, because it is what closes a retreat roster to the
+ * students who actually signed up.
  *
  * Load-bearing is not the same as needing to be on screen, though: the window
  * is collapsed behind a row that states the two times it resolved to, because
@@ -70,10 +70,6 @@ interface EditorForm {
   location: string;
   notes: string;
   requiresRsvp: boolean;
-  requiresWaiver: boolean;
-  requiresPayment: boolean;
-  /** Dollars, as typed. Converted to `feeCents` on submit. */
-  fee: string;
   defaultGroupingMode: RosterGroupingMode;
   /**
    * A window left at the standard hour follows the event when its times move;
@@ -84,10 +80,7 @@ interface EditorForm {
 }
 
 type EditorErrors = Partial<
-  Record<
-    'title' | 'start' | 'end' | 'checkInOpens' | 'checkInCloses' | 'fee' | 'recurrence',
-    string
-  >
+  Record<'title' | 'start' | 'end' | 'checkInOpens' | 'checkInCloses' | 'recurrence', string>
 >;
 
 interface ParsedTimes {
@@ -105,14 +98,6 @@ function parseLocal(value: string): Date | null {
   }
 }
 
-/** `"25"` / `"$25.00"` -> `2500`. Null when the text is not an amount. */
-function dollarsToCents(value: string): number | null {
-  const trimmed = value.replace(/[$,\s]/g, '');
-  if (!trimmed) return null;
-  const amount = Number(trimmed);
-  if (!Number.isFinite(amount) || amount < 0) return null;
-  return Math.round(amount * 100);
-}
 
 function buildForm(
   event: TallyEvent | null,
@@ -130,7 +115,6 @@ function buildForm(
     event?.checkInOpensAt ?? defaults?.checkInOpensAt ?? addMinutes(startAt, -OPENS_BEFORE_MIN);
   const closesAt =
     event?.checkInClosesAt ?? defaults?.checkInClosesAt ?? addMinutes(endAt, CLOSES_AFTER_MIN);
-  const feeCents = event?.feeCents ?? defaults?.feeCents ?? null;
 
   // Weekly on the day it starts, unless something more specific is known. That
   // is what almost every gathering here is, and it is the only honest default
@@ -152,9 +136,6 @@ function buildForm(
     location: event?.location ?? defaults?.location ?? '',
     notes: event?.notes ?? defaults?.notes ?? '',
     requiresRsvp: event?.requiresRsvp ?? defaults?.requiresRsvp ?? mode === 'oneoff',
-    requiresWaiver: event?.requiresWaiver ?? defaults?.requiresWaiver ?? false,
-    requiresPayment: event?.requiresPayment ?? defaults?.requiresPayment ?? false,
-    fee: feeCents === null ? '' : (feeCents / 100).toFixed(2),
     defaultGroupingMode: event?.defaultGroupingMode ?? defaults?.defaultGroupingMode ?? 'all',
     opensPinned:
       Math.round((startAt.getTime() - opensAt.getTime()) / 60_000) !== OPENS_BEFORE_MIN,
@@ -185,10 +166,6 @@ function validateForm(form: EditorForm): { errors: EditorErrors; times: ParsedTi
   if (!checkInClosesAt) errors.checkInCloses = 'Pick a time.';
   else if (endAt && checkInClosesAt < endAt) {
     errors.checkInCloses = 'Check-in has to stay open until the event ends.';
-  }
-
-  if (form.mode === 'oneoff' && form.requiresPayment && dollarsToCents(form.fee) === null) {
-    errors.fee = 'Enter the amount, or turn payment tracking off.';
   }
 
   // Only checkable once there is a start to anchor against — the rule is
@@ -322,14 +299,11 @@ export function EventEditorModal({
     setForm((current) => ({
       ...current,
       mode,
-      // A retreat is an RSVP list by default. Going back to recurring disarms
-      // the switches entirely rather than leaving a waiver requirement on a
-      // Friday night, where it would flag every student at the door.
+      // A retreat is an RSVP list by default. Going back to recurring disarms it
+      // rather than leaving a closed roster on a Friday night, where it would
+      // hide every student who had not been added to a list nobody built.
       seriesId: mode === 'recurring' ? current.seriesId : '',
       requiresRsvp: mode === 'oneoff',
-      requiresWaiver: mode === 'oneoff' && current.requiresWaiver,
-      requiresPayment: mode === 'oneoff' && current.requiresPayment,
-      fee: mode === 'oneoff' ? current.fee : '',
     }));
   };
 
@@ -382,10 +356,6 @@ export function EventEditorModal({
       location: form.location.trim() || null,
       notes: form.notes.trim() || null,
       requiresRsvp: form.mode === 'oneoff' && form.requiresRsvp,
-      requiresWaiver: form.mode === 'oneoff' && form.requiresWaiver,
-      requiresPayment: form.mode === 'oneoff' && form.requiresPayment,
-      feeCents:
-        form.mode === 'oneoff' && form.requiresPayment ? dollarsToCents(form.fee) : null,
       defaultGroupingMode: form.defaultGroupingMode,
       // `buildEventPayload` writes `status` on every save, so an edit has to
       // carry the current one forward or it would quietly un-cancel the event.
@@ -480,7 +450,7 @@ export function EventEditorModal({
             hint={
               form.mode === 'recurring'
                 ? 'Everyone active is on the roster, with a predicted “Recent” block on top.'
-                : 'Only students who RSVP’d are on the roster, with waiver and payment warnings.'
+                : 'Happens once, never predicts, and can limit its roster to the students who RSVP’d.'
             }
           >
             <option value="recurring">Recurring</option>
@@ -574,44 +544,12 @@ export function EventEditorModal({
           </SelectField>
 
           {form.mode === 'oneoff' ? (
-            <fieldset className="flex flex-col gap-3 rounded-xl bg-ink-950/40 p-3 ring-1 ring-ink-800">
-              <legend className="px-1 text-xs font-bold uppercase tracking-wider text-ink-400">
-                Accountability
-              </legend>
-
-              <CheckboxField
-                label="Limit the roster to students who RSVP’d"
-                hint="Nobody else appears at check-in, so the bus list stays closed."
-                checked={form.requiresRsvp}
-                onChange={(changed) => patch({ requiresRsvp: changed.target.checked })}
-              />
-              <CheckboxField
-                label="Requires a signed waiver"
-                hint="Students without one are flagged red at check-in."
-                checked={form.requiresWaiver}
-                onChange={(changed) => patch({ requiresWaiver: changed.target.checked })}
-              />
-              <CheckboxField
-                label="Requires payment"
-                checked={form.requiresPayment}
-                onChange={(changed) => patch({ requiresPayment: changed.target.checked })}
-              />
-
-              {form.requiresPayment ? (
-                <TextField
-                  label="Fee per student"
-                  type="number"
-                  inputMode="decimal"
-                  min="0"
-                  step="0.01"
-                  className="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                  value={form.fee}
-                  onChange={(changed) => patch({ fee: changed.target.value })}
-                  error={errors.fee ?? null}
-                  hint="Dollars. Used to total up what is still outstanding."
-                />
-              ) : null}
-            </fieldset>
+            <CheckboxField
+              label="Limit the roster to students who RSVP’d"
+              hint="Nobody else appears at check-in, so the trip list stays closed."
+              checked={form.requiresRsvp}
+              onChange={(changed) => patch({ requiresRsvp: changed.target.checked })}
+            />
           ) : null}
 
           <TextField

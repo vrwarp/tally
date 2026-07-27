@@ -20,7 +20,7 @@ So the split is now:
 | Who is on the roster | Tally | `students/{id}` — a document *is* the membership |
 | Who may sign in | Tally | `invitations/{emailKey}`, plus `TALLY_ADMIN_EMAILS` |
 | Names, grades, parent contact, allergies | Planning Center | read on demand, stored nowhere |
-| Attendance, small groups, RSVPs, waivers | Tally | Planning Center has no concept of them |
+| Attendance, small groups, RSVPs | Tally | Planning Center has no concept of them |
 
 This is the operational guide: how to get credentials, what every setting does, how counselor access
 actually flows, and what to do when it breaks. `functions/src/config.ts` is the source of truth for

@@ -35,12 +35,12 @@ export function Badge({ tone = 'neutral', children, className, title }: BadgePro
   );
 }
 
-/** Renders a roster warning as its badge. Blocking issues read red, not yellow. */
+/** Renders a roster warning as its badge. All warnings are advisory. */
 export function WarningBadge({ warning }: { warning: RosterWarning }) {
   const meta = WARNING_META[warning];
   return (
-    <Badge tone={meta.tone} title={meta.label}>
-      <span aria-hidden="true">{meta.tone === 'danger' ? '⛔' : '⚠'}</span>
+    <Badge tone="warn" title={meta.label}>
+      <span aria-hidden="true">⚠</span>
       <span className="sr-only">{meta.label}</span>
       <span aria-hidden="true">{meta.short}</span>
     </Badge>

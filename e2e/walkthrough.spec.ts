@@ -187,9 +187,9 @@ test('capture the walkthrough', async ({ page, signedInAs }) => {
     await page.waitForTimeout(1200);
     await capture(page, {
       journey: 'Journey 4 — the field trip',
-      title: 'RSVPs, waivers and payments',
+      title: 'The RSVP list',
       caption:
-        'A one-off event is about accountability rather than speed. The numbers a leader is actually chasing the week before a retreat — waivers outstanding, payments outstanding — are the prominent ones.',
+        'A one-off event carries its own guest list, and with “RSVP only” set that list is the check-in roster: going, maybe and declined, with declined students kept on the page but off the roster.',
     });
   }
 

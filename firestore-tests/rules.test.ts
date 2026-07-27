@@ -506,18 +506,6 @@ describe('attendance', () => {
 });
 
 describe('rsvps', () => {
-  it('lets a counselor flip waiver and payment at the bus door', async () => {
-    const db = asUser(env, UID.counselor);
-    await assertSucceeds(
-      updateDoc(doc(db, paths.rsvp(ID.event, ID.student)), {
-        waiverSigned: true,
-        paymentReceived: true,
-        updatedAt: new Date(),
-        updatedBy: UID.counselor,
-      }),
-    );
-  });
-
   it('rejects a counselor changing the RSVP status', async () => {
     const db = asUser(env, UID.counselor);
     await assertFails(updateDoc(doc(db, paths.rsvp(ID.event, ID.student)), { status: 'no' }));

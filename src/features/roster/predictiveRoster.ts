@@ -195,24 +195,19 @@ export function isEligible(
   return true;
 }
 
-export function computeWarnings(
-  student: Student,
-  event: Pick<TallyEvent, 'requiresWaiver' | 'requiresPayment'>,
-  rsvp: Rsvp | undefined,
-): RosterWarning[] {
+/**
+ * Advisory badges for one roster row.
+ *
+ * Both depend only on the student, never on the event: what a counselor needs
+ * to know about a kid does not change between a Friday and a retreat.
+ */
+export function computeWarnings(student: Student): RosterWarning[] {
   const warnings: RosterWarning[] = [];
-  if (event.requiresWaiver && !rsvp?.waiverSigned) warnings.push('missing-waiver');
-  if (event.requiresPayment && !rsvp?.paymentReceived) warnings.push('missing-payment');
   if (student.hasAllergies) warnings.push('allergy');
   // `=== false` deliberately, not falsy: `null` means nobody has checked, and a
   // badge on every row is a badge nobody reads.
   if (student.profileComplete === false) warnings.push('incomplete-profile');
   return warnings;
-}
-
-/** Warnings that should physically stop a student boarding (Journey 4). */
-export function isBlocking(warning: RosterWarning): boolean {
-  return warning === 'missing-waiver' || warning === 'missing-payment';
 }
 
 /* -------------------------------------------------------------------------- */
@@ -305,7 +300,7 @@ export function buildRoster(input: BuildRosterInput): RosterView {
       isRecent,
       attendance: record,
       rsvp: rsvp ?? null,
-      warnings: computeWarnings(student, event, rsvp),
+      warnings: computeWarnings(student),
       recentHits,
       recentWindow: historyWindow,
     });

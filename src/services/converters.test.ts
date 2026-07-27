@@ -265,15 +265,13 @@ describe('toRsvp', () => {
     expect(toRsvp(fakeSnapshot({ data: { status: 'maybe' } }), 'e').status).toBe('maybe');
   });
 
-  it('defaults the paperwork switches to "not done"', () => {
+  it('takes the student id from the document id, and the event id from the path', () => {
     const rsvp = toRsvp(fakeSnapshot({ id: 'student-3', data: {} }), 'retreat');
     expect(rsvp).toMatchObject({
       id: 'student-3',
       studentId: 'student-3',
       eventId: 'retreat',
-      waiverSigned: false,
-      paymentReceived: false,
-      amountPaidCents: null,
+      notes: null,
     });
   });
 });

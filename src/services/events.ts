@@ -46,9 +46,6 @@ export interface EventDraft {
   location?: string | null;
   notes?: string | null;
   requiresRsvp?: boolean;
-  requiresWaiver?: boolean;
-  requiresPayment?: boolean;
-  feeCents?: number | null;
   defaultGroupingMode?: RosterGroupingMode;
   status?: EventStatus;
 }
@@ -148,9 +145,6 @@ function buildEventPayload(draft: EventDraft, uid: string, isNew: boolean) {
     location: draft.location?.trim() || null,
     notes: draft.notes?.trim() || null,
     requiresRsvp: draft.requiresRsvp ?? draft.mode === 'oneoff',
-    requiresWaiver: draft.requiresWaiver ?? false,
-    requiresPayment: draft.requiresPayment ?? false,
-    feeCents: draft.feeCents ?? null,
     defaultGroupingMode: draft.defaultGroupingMode ?? 'all',
     status: draft.status ?? 'scheduled',
     updatedAt: serverTimestamp(),

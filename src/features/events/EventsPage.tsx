@@ -75,8 +75,7 @@ function EventRow({
               {event.mode === 'recurring' ? 'Recurring' : 'One-off'}
             </Badge>
             {cancelled ? <Badge tone="danger">Cancelled</Badge> : null}
-            {event.requiresWaiver ? <Badge tone="warn">Waiver</Badge> : null}
-            {event.requiresPayment ? <Badge tone="warn">Payment</Badge> : null}
+            {event.requiresRsvp ? <Badge tone="warn">RSVP only</Badge> : null}
           </span>
         </span>
 

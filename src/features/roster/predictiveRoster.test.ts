@@ -14,7 +14,6 @@ import {
   computeWarnings,
   countRecentHits,
   effectiveThreshold,
-  isBlocking,
   isEligible,
   studentMatchesGroup,
   type BuildRosterInput,
@@ -392,53 +391,22 @@ describe('isEligible', () => {
 });
 
 /* -------------------------------------------------------------------------- */
-/* computeWarnings / isBlocking                                                */
+/* computeWarnings                                                             */
 /* -------------------------------------------------------------------------- */
 
 describe('computeWarnings', () => {
-  const noPaperwork = { requiresWaiver: false, requiresPayment: false };
-  const fullPaperwork = { requiresWaiver: true, requiresPayment: true };
-  const clean = makeStudent({ hasAllergies: false, profileComplete: true });
-
-  it('stays quiet about paperwork the event does not require', () => {
-    expect(computeWarnings(clean, noPaperwork, undefined)).toEqual([]);
-    expect(computeWarnings(clean, noPaperwork, makeRsvp({ waiverSigned: false }))).toEqual([]);
+  it('says nothing about a student with no flags on file', () => {
+    expect(computeWarnings(makeStudent({ hasAllergies: false, profileComplete: true }))).toEqual([]);
   });
 
-  it('flags a missing waiver and payment when the event requires them', () => {
-    expect(computeWarnings(clean, fullPaperwork, undefined)).toEqual([
-      'missing-waiver',
-      'missing-payment',
-    ]);
-    expect(
-      computeWarnings(clean, fullPaperwork, makeRsvp({ waiverSigned: true, paymentReceived: false })),
-    ).toEqual(['missing-payment']);
-    expect(
-      computeWarnings(clean, fullPaperwork, makeRsvp({ waiverSigned: true, paymentReceived: true })),
-    ).toEqual([]);
-  });
-
-  it('flags allergies and incomplete profiles regardless of the event', () => {
+  it('flags allergies and incomplete profiles', () => {
     const needsCare = makeStudent({ hasAllergies: true, profileComplete: false });
-    expect(computeWarnings(needsCare, noPaperwork, undefined)).toEqual([
-      'allergy',
-      'incomplete-profile',
-    ]);
-    expect(computeWarnings(needsCare, fullPaperwork, undefined)).toEqual([
-      'missing-waiver',
-      'missing-payment',
-      'allergy',
-      'incomplete-profile',
-    ]);
+    expect(computeWarnings(needsCare)).toEqual(['allergy', 'incomplete-profile']);
   });
-});
 
-describe('isBlocking', () => {
-  it('blocks only on paperwork that would stop a student boarding', () => {
-    expect(isBlocking('missing-waiver')).toBe(true);
-    expect(isBlocking('missing-payment')).toBe(true);
-    expect(isBlocking('allergy')).toBe(false);
-    expect(isBlocking('incomplete-profile')).toBe(false);
+  it('treats an unchecked profile as complete, so the badge means something', () => {
+    const unchecked = makeStudent({ hasAllergies: false, profileComplete: null });
+    expect(computeWarnings(unchecked)).toEqual([]);
   });
 });
 
@@ -697,14 +665,7 @@ describe('buildRoster: recurring eligibility', () => {
 });
 
 describe('buildRoster: one-off events', () => {
-  const retreat = makeOneOff({
-    id: 'retreat',
-    title: 'Winter Retreat',
-    requiresRsvp: true,
-    requiresWaiver: true,
-    requiresPayment: true,
-    feeCents: 5000,
-  });
+  const retreat = makeOneOff({ id: 'retreat', title: 'Winter Retreat', requiresRsvp: true });
 
   const yes = makeStudent({ id: 'yes', lastName: 'Ames' });
   const maybe = makeStudent({ id: 'maybe', lastName: 'Brook' });
@@ -749,12 +710,11 @@ describe('buildRoster: one-off events', () => {
     expect(arrived(view)[0]!.rsvp?.status).toBe('no');
   });
 
-  it('flashes the blocking paperwork warnings and attaches the RSVP', () => {
+  it('attaches the RSVP to the row, and raises no warning for the trip itself', () => {
     const view = roster({ event: retreat, students: [yes], rsvps });
 
-    expect(waiting(view)[0]!.warnings).toEqual(['missing-waiver', 'missing-payment']);
-    expect(waiting(view)[0]!.warnings.every(isBlocking)).toBe(true);
     expect(waiting(view)[0]!.rsvp?.studentId).toBe(yes.id);
+    expect(waiting(view)[0]!.warnings).toEqual([]);
   });
 
   it('predicts nothing — a one-off has no series history', () => {

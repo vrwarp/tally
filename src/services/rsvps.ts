@@ -1,5 +1,9 @@
 /**
- * RSVP, waiver and payment tracking for one-off events (Journey 4).
+ * Who said they were coming to a one-off event.
+ *
+ * The list is the roster: with `requiresRsvp` set, only students on it appear at
+ * check-in. Nothing here tracks paperwork or money — Tally records who is
+ * expected, and a leader chases the rest by whatever means they already use.
  */
 import {
   collection,
@@ -7,7 +11,6 @@ import {
   doc,
   onSnapshot,
   serverTimestamp,
-  setDoc,
   updateDoc,
   writeBatch,
   type Unsubscribe,
@@ -29,41 +32,6 @@ export function subscribeRsvps(
   );
 }
 
-export interface RsvpDraft {
-  status?: RsvpStatus;
-  waiverSigned?: boolean;
-  paymentReceived?: boolean;
-  amountPaidCents?: number | null;
-  notes?: string | null;
-}
-
-/**
- * Creates or updates one RSVP. `merge: true` means the counselor at the bus
- * door can flip `waiverSigned` without clobbering the payment state a core team
- * member set from the dashboard a minute earlier.
- */
-export async function upsertRsvp(
-  eventId: string,
-  studentId: string,
-  draft: RsvpDraft,
-  uid: string,
-): Promise<void> {
-  const payload: Record<string, unknown> = {
-    studentId,
-    eventId,
-    updatedAt: serverTimestamp(),
-    updatedBy: uid,
-  };
-
-  if (draft.status !== undefined) payload.status = draft.status;
-  if (draft.waiverSigned !== undefined) payload.waiverSigned = draft.waiverSigned;
-  if (draft.paymentReceived !== undefined) payload.paymentReceived = draft.paymentReceived;
-  if (draft.amountPaidCents !== undefined) payload.amountPaidCents = draft.amountPaidCents;
-  if (draft.notes !== undefined) payload.notes = draft.notes?.trim() || null;
-
-  await setDoc(doc(db, paths.rsvp(eventId, studentId)), payload, { merge: true });
-}
-
 /** Adds several students to the RSVP list at once. */
 export async function addRsvps(
   eventId: string,
@@ -83,9 +51,6 @@ export async function addRsvps(
           studentId,
           eventId,
           status,
-          waiverSigned: false,
-          paymentReceived: false,
-          amountPaidCents: null,
           notes: null,
           updatedAt: serverTimestamp(),
           updatedBy: uid,

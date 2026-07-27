@@ -32,10 +32,14 @@ creates the student and checks them in as a single atomic write. They are flagge
 profile so the core team can chase a parent contact later, and queued for a push into Planning
 Center.
 
-**Journey 4 — the retreat bus.** A one-off event restricts its roster to students who RSVP'd yes or
-maybe, and flags anyone missing a signed waiver or a payment with a badge the counselor cannot miss.
-The counselor at the bus door can tick off a waiver or a cheque as it is handed over, but cannot
-change who is on the trip.
+**Journey 4 — the retreat bus.** A one-off event carries its own guest list, and restricts its roster
+to the students who RSVP'd yes or maybe: the counselor at the bus door sees the trip list, not the
+whole ministry. A student who declines keeps their row on the list — parents reverse a "no" often
+enough that losing it would mean re-adding them from scratch — but drops off the roster. Who is on
+the trip is a core-team decision made before the door, not at it.
+
+Tally deliberately stops there. It does not track signed waivers, fees or payments: those are
+someone's clipboard and someone's cash box, and a half-kept copy in an app is worse than none.
 
 **Journey 5 — the follow-up list.** The dashboard is a call list, not a report: students who have
 missed three gatherings in a row, first-timers from the last week, profiles with no parent contact,
@@ -402,12 +406,13 @@ The ministry stores data about children, so the roster is deliberately thin. Tal
 - one parent or guardian contact — name, phone, email,
 - allergies and a free-text notes line, both optional,
 - attendance: which gatherings a student was marked present at, and by whom,
-- for one-off trips: RSVP status, whether a waiver was signed, and whether payment was received.
+- for one-off trips: whether they RSVP'd yes, no or maybe.
 
 It deliberately does **not** hold birthdates, home addresses, photographs, the student's own phone
-number or email, medical information beyond a single allergy line, or any payment details — a
-retreat payment is a boolean and an amount, never a card number. Nothing is stored that would not
-already be on a church check-in card.
+number or email, medical information beyond a single allergy line, or anything financial at all — no
+card numbers, no fees, no record of who has paid. Waivers and payments are not Tally's to track:
+those live on a clipboard and in a cash box, and a stale second copy in an app is worse than none.
+Nothing is stored that would not already be on a church check-in card.
 
 Most of that list is not Tally's to hold. Names, grades, parent contact and allergies live in
 Planning Center and are read when needed; `students/{id}` holds only what Tally owns — small group,

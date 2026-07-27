@@ -34,11 +34,6 @@ import { fetchAttendance } from '@/services/attendance';
 import { deleteEvent, setEventStatus } from '@/services/events';
 import { studentFullName } from '@/types';
 
-/** `2500` -> `$25.00`. */
-function formatFee(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
-
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-4 py-1.5">
@@ -176,8 +171,6 @@ export function EventDetailPage() {
               <Badge tone="success">Check-in open</Badge>
             ) : null}
             {event.requiresRsvp ? <Badge tone="warn">RSVP only</Badge> : null}
-            {event.requiresWaiver ? <Badge tone="warn">Waiver</Badge> : null}
-            {event.requiresPayment ? <Badge tone="warn">Payment</Badge> : null}
           </div>
 
           <dl className="divide-y divide-ink-800 border-t border-ink-800 pt-1">
@@ -201,9 +194,6 @@ export function EventDetailPage() {
                   : 'One flat roster'
               }
             />
-            {event.feeCents !== null ? (
-              <DetailRow label="Fee" value={formatFee(event.feeCents)} />
-            ) : null}
           </dl>
 
           {event.notes ? (

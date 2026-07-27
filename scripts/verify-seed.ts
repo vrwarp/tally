@@ -20,7 +20,6 @@ import {
 import { toEvent, toRsvp, toSettings, toStudent } from '../src/services/converters';
 import { buildRoster } from '../src/features/roster/predictiveRoster';
 import { computeIncompleteProfiles, computeMia, computeNewVisitors } from '../src/features/dashboard/insights';
-import { isBlocking } from '../src/features/roster/predictiveRoster';
 import type { EventAttendanceSnapshot, TallyEvent } from '../src/types';
 
 const HOST = '127.0.0.1';
@@ -104,12 +103,12 @@ if (oneOff) {
     oneOff,
     rsvpDocs.docs.map((d) => toRsvp(d, oneOff.id)),
   );
-  const blocked = view.entries.filter((entry) => entry.warnings.some(isBlocking)).length;
+  const declined = rsvpDocs.docs.filter((d) => d.data().status === 'no').length;
   console.log(`\nOne-off "${oneOff.title}"\n`);
   console.log(
     `  Roster restricted to ${view.counts.eligible} RSVPs (of ${students.length} students)`,
   );
-  console.log(`  ${blocked} blocked on a waiver or payment`);
+  console.log(`  ${declined} declined, and so off the roster`);
 }
 
 console.log('');

@@ -355,8 +355,8 @@ import type { RecurrenceRule } from '@/lib/recurrenceCore';
 /**
  * `recurring` — Fridays/Sundays. Speed-first, roster = all active youth with a
  *               predictive "Recent" block on top.
- * `oneoff`    — retreats/outings. Accountability-first, roster = RSVPs only,
- *               with waiver/payment warnings.
+ * `oneoff`    — retreats/outings. Does not repeat and never informs prediction,
+ *               and its roster can be closed to the students who RSVP'd.
  */
 export type EventMode = 'recurring' | 'oneoff';
 
@@ -403,11 +403,8 @@ export interface TallyEventDoc {
   location: string | null;
   notes: string | null;
 
-  /** One-off accountability switches. */
+  /** Closes a one-off event's roster to the students who RSVP'd. */
   requiresRsvp: boolean;
-  requiresWaiver: boolean;
-  requiresPayment: boolean;
-  feeCents: number | null;
 
   defaultGroupingMode: RosterGroupingMode;
   status: EventStatus;
@@ -476,9 +473,6 @@ export interface RsvpDoc {
   studentId: string;
   eventId: string;
   status: RsvpStatus;
-  waiverSigned: boolean;
-  paymentReceived: boolean;
-  amountPaidCents: number | null;
   notes: string | null;
   updatedAt: Timestamp;
   updatedBy: string;
@@ -774,12 +768,13 @@ export function personIdFromStudentId(studentId: string): string | null {
 /* Derived view models                                                         */
 /* -------------------------------------------------------------------------- */
 
-/** Non-blocking flags rendered as badges on a roster row. */
-export type RosterWarning =
-  | 'missing-waiver'
-  | 'missing-payment'
-  | 'incomplete-profile'
-  | 'allergy';
+/**
+ * Advisory flags rendered as badges on a roster row.
+ *
+ * All of them are "worth knowing", none of them stops a check-in: nothing in
+ * Tally decides whether a student may be marked present.
+ */
+export type RosterWarning = 'incomplete-profile' | 'allergy';
 
 export interface RosterEntry {
   student: Student;
