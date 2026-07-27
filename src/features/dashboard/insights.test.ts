@@ -10,10 +10,16 @@ import {
   computeAttendanceTrend,
   computeIncompleteProfiles,
   computeMia,
+  computeMiaByGathering,
   computeNewVisitors,
+  computeOneOffOnly,
+  computeOneOffRecaps,
   computeSummary,
+  computeUnseen,
+  groupByGathering,
   orderSnapshotsNewestFirst,
   recurringSnapshots,
+  standingIn,
 } from '@/features/dashboard/insights';
 import type { EventAttendanceSnapshot, TallyEvent } from '@/types';
 import {
@@ -293,6 +299,415 @@ describe('computeMia', () => {
 });
 
 /* -------------------------------------------------------------------------- */
+/* groupByGathering                                                            */
+/* -------------------------------------------------------------------------- */
+
+describe('groupByGathering', () => {
+  const sundays = () => makeWeeklyEvents({ count: 2, seriesId: SUNDAY, title: 'Sunday School' });
+
+  it('splits the history into one group per chain of repeats, newest first', () => {
+    const snapshots = [
+      ...fridays(3).map((event) => held(event)),
+      ...sundays().map((event) => held(event)),
+    ];
+
+    const gatherings = groupByGathering(snapshots);
+
+    expect(gatherings.map((gathering) => gathering.key)).toEqual([FRIDAY, SUNDAY]);
+    expect(gatherings[0]!.snapshots.map((snapshot) => snapshot.event.id)).toEqual([
+      `${FRIDAY}-1`,
+      `${FRIDAY}-2`,
+      `${FRIDAY}-3`,
+    ]);
+    expect(gatherings[0]!.lastHeldAt).toEqual(gatherings[0]!.snapshots[0]!.event.startAt);
+  });
+
+  /*
+   * A weekly gathering created in the app has a recurrence root and no series
+   * document. Grouping on `seriesId` alone would file every such gathering
+   * under one "no series" heap — Tuesday small group pooled with Wednesday
+   * prayer, and a streak spanning both that describes neither.
+   */
+  it('groups a series-less chain by its recurrence root, not with every other one', () => {
+    const tuesday = makeWeeklyEvents({ count: 2, seriesId: 'ignored' }).map((event) =>
+      makeEvent({ ...event, id: `tue-${event.id}`, seriesId: null, recurrenceRootId: 'tuesday' }),
+    );
+    const wednesday = makeWeeklyEvents({ count: 2, seriesId: 'ignored' }).map((event) =>
+      makeEvent({ ...event, id: `wed-${event.id}`, seriesId: null, recurrenceRootId: 'wednesday' }),
+    );
+
+    const gatherings = groupByGathering([...tuesday, ...wednesday].map((event) => held(event)));
+
+    expect(gatherings.map((gathering) => gathering.key).sort()).toEqual(['tuesday', 'wednesday']);
+  });
+
+  it('names a group from its series document when there is one', () => {
+    const gatherings = groupByGathering(
+      fridays(2).map((event) => held(event)),
+      [
+        {
+          id: FRIDAY,
+          title: 'Friday Fellowship (renamed)',
+          dayOfWeek: 5,
+          startTime: '19:00',
+          endTime: '21:00',
+          checkInOpensMinutesBefore: 60,
+          checkInClosesMinutesAfter: 60,
+          active: true,
+          order: 1,
+        },
+      ],
+    );
+
+    expect(gatherings[0]!.title).toBe('Friday Fellowship (renamed)');
+  });
+
+  it('leaves out one-off events and nights that did not happen', () => {
+    const events = fridays(2);
+    const snapshots = [
+      held(events[0]!),
+      makeSnapshot(events[1]!, []),
+      makeSnapshot(makeOneOff({ id: 'retreat' }), ['a']),
+    ];
+
+    const gatherings = groupByGathering(snapshots);
+
+    expect(gatherings).toHaveLength(1);
+    expect(gatherings[0]!.snapshots).toHaveLength(1);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* standingIn                                                                  */
+/* -------------------------------------------------------------------------- */
+
+describe('standingIn', () => {
+  const events = fridays(3);
+  const settings = makeSettings();
+
+  it('reports no misses for a student who was at the most recent night', () => {
+    const student = makeStudent({ id: 'regular', createdAt: LONG_AGO });
+    const [gathering] = groupByGathering(events.map((event) => held(event, [student.id])));
+
+    expect(standingIn(gathering!, student, settings)).toMatchObject({ consecutiveMisses: 0, eligible: 3 });
+  });
+
+  it('counts back to the last night they were at', () => {
+    const student = makeStudent({ id: 'drifting', createdAt: LONG_AGO });
+    const [gathering] = groupByGathering([
+      held(events[0]!, [student.id]),
+      held(events[1]!),
+      held(events[2]!),
+    ]);
+
+    const standing = standingIn(gathering!, student, settings);
+
+    expect(standing.consecutiveMisses).toBe(2);
+    expect(standing.lastAttended!.event.id).toBe(events[0]!.id);
+  });
+
+  it('reads a regular from the Recent rule, as of their last visit', () => {
+    const student = makeStudent({ id: 'regular', createdAt: LONG_AGO });
+    const [gathering] = groupByGathering([
+      held(events[0]!, [student.id]),
+      held(events[1]!, [student.id]),
+      held(events[2]!),
+    ]);
+
+    expect(standingIn(gathering!, student, settings)).toMatchObject({
+      attended: 2,
+      wasRegular: true,
+    });
+  });
+
+  it('does not call a single drop-in a regular', () => {
+    const student = makeStudent({ id: 'drop-in', createdAt: LONG_AGO });
+    const nights = fridays(4);
+    const [gathering] = groupByGathering([
+      held(nights[0]!),
+      held(nights[1]!, [student.id]),
+      held(nights[2]!),
+      held(nights[3]!),
+    ]);
+
+    expect(standingIn(gathering!, student, settings)).toMatchObject({
+      attended: 1,
+      wasRegular: false,
+    });
+  });
+
+  it('does not count nights held before the student joined the roster', () => {
+    const student = makeStudent({
+      id: 'new',
+      createdAt: new Date(events[1]!.startAt.getTime() + 86_400_000),
+    });
+    const [gathering] = groupByGathering(events.map((event) => held(event)));
+
+    expect(standingIn(gathering!, student, settings)).toMatchObject({ consecutiveMisses: 1, eligible: 1 });
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* computeMia, split by gathering                                              */
+/* -------------------------------------------------------------------------- */
+
+describe('computeMia across several gatherings', () => {
+  const settings = makeSettings({ miaConsecutiveMisses: 3 });
+  const fridayNights = fridays(5);
+  const sundayNights = makeWeeklyEvents({ count: 5, seriesId: SUNDAY, title: 'Sunday School' });
+
+  /*
+   * The bug the split exists to fix, in its sharpest form. A student who comes
+   * every Sunday and has never once been to a Friday has missed no Sundays —
+   * and is not "missing" from Friday either, because Friday was never theirs.
+   * The pooled list phoned this family; the per-gathering list without this
+   * rule phoned them about the wrong gathering.
+   */
+  it('says nothing about a student who simply does not come to that gathering', () => {
+    const student = makeStudent({ id: 'sunday-only', createdAt: LONG_AGO });
+    const snapshots = [
+      ...fridayNights.map((event) => held(event)),
+      ...sundayNights.map((event) => held(event, [student.id])),
+    ];
+
+    expect(computeMiaByGathering([student], snapshots, settings)).toEqual([]);
+  });
+
+  it('lists a student who used to come to a gathering and stopped', () => {
+    const student = makeStudent({ id: 'lapsed-friday', createdAt: LONG_AGO });
+    const snapshots = [
+      held(fridayNights[0]!, [student.id]),
+      ...fridayNights.slice(1).map((event) => held(event)),
+      ...sundayNights.map((event) => held(event, [student.id])),
+    ];
+
+    const rows = computeMiaByGathering([student], snapshots, settings);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ gatheringKey: FRIDAY, gatheringTitle: 'Friday Fellowship' });
+  });
+
+  /*
+   * The eligibility half of the same rule. Two Fridays and two Sundays is four
+   * nights, and pooling them cleared a three-miss threshold that neither
+   * gathering could clear on its own.
+   */
+  it('measures the threshold against one gathering at a time', () => {
+    const student = makeStudent({ id: 'thin-history', createdAt: LONG_AGO });
+    const snapshots = [
+      held(fridayNights[2]!, [student.id]),
+      ...fridayNights.slice(3).map((event) => held(event)),
+      held(sundayNights[2]!, [student.id]),
+      ...sundayNights.slice(3).map((event) => held(event)),
+    ];
+
+    expect(computeMia([student], snapshots, settings)).toEqual([]);
+  });
+
+  it('gives a student one row per gathering they have drifted from', () => {
+    const student = makeStudent({ id: 'gone-quiet', createdAt: LONG_AGO });
+    const snapshots = [
+      held(fridayNights[0]!, [student.id]),
+      ...fridayNights.slice(1).map((event) => held(event)),
+      held(sundayNights[1]!, [student.id]),
+      ...sundayNights.slice(2).map((event) => held(event)),
+    ];
+
+    const rows = computeMiaByGathering([student], snapshots, settings);
+
+    expect(rows.map((row) => [row.gatheringKey, row.consecutiveMisses])).toEqual([
+      [FRIDAY, 4],
+      [SUNDAY, 3],
+    ]);
+  });
+
+  it('merges those rows into one call, keeping the worst streak', () => {
+    const student = makeStudent({ id: 'gone-quiet', createdAt: LONG_AGO });
+    const snapshots = [
+      held(fridayNights[0]!, [student.id]),
+      ...fridayNights.slice(1).map((event) => held(event)),
+      held(sundayNights[1]!, [student.id]),
+      ...sundayNights.slice(2).map((event) => held(event)),
+    ];
+
+    const merged = computeMia([student], snapshots, settings);
+
+    expect(merged).toHaveLength(1);
+    expect(merged[0]).toMatchObject({
+      consecutiveMisses: 4,
+      gatheringKey: FRIDAY,
+      alsoMissingCount: 1,
+    });
+  });
+
+  it('leaves alsoMissingCount at zero when only one gathering is affected', () => {
+    const student = makeStudent({ id: 'friday-only', createdAt: LONG_AGO });
+    const snapshots = [
+      held(fridayNights[0]!, [student.id]),
+      ...fridayNights.slice(1).map((event) => held(event)),
+      ...sundayNights.map((event) => held(event, [student.id])),
+    ];
+
+    expect(computeMia([student], snapshots, settings)[0]).toMatchObject({
+      gatheringKey: FRIDAY,
+      alsoMissingCount: 0,
+    });
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Who a gathering may expect                                                  */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * The roster is every student in the ministry, not a promise that each of them
+ * attends everything. So a miss needs an expectation behind it, and the
+ * expectation is the one check-in already computes: the Recent rule, asked as
+ * of the student's last visit. Without it the MIA list fills up with people who
+ * dropped in once in the spring and were never coming weekly.
+ */
+describe('computeMia and the expectation behind a miss', () => {
+  const settings = makeSettings({
+    miaConsecutiveMisses: 3,
+    predictiveMinAttended: 2,
+    predictiveOfLastN: 3,
+  });
+  // Oldest first: nights[0] is eight weeks back, nights[7] is the most recent.
+  const nights = fridays(8);
+  const snapshotsWith = (present: readonly number[]) =>
+    nights.map((event, index) => held(event, present.includes(index) ? ['drop-in'] : []));
+
+  it('says nothing about somebody who only ever dropped in once', () => {
+    const student = makeStudent({ id: 'drop-in', createdAt: LONG_AGO });
+
+    // One visit, with three nights behind it they were not at: 1 of 3 has never
+    // been the Recent bar, so nobody was expecting them the following week.
+    expect(computeMia([student], snapshotsWith([3]), settings)).toEqual([]);
+  });
+
+  it('lists a regular who stopped, counting only the nights since', () => {
+    const student = makeStudent({ id: 'drop-in', createdAt: LONG_AGO });
+
+    // Three in a row, then three missed: the shape of somebody drifting away.
+    const mia = computeMia([student], snapshotsWith([2, 3, 4]), settings);
+
+    expect(mia).toHaveLength(1);
+    expect(mia[0]!.consecutiveMisses).toBe(3);
+  });
+
+  it('takes its idea of a regular from the predictive settings', () => {
+    const student = makeStudent({ id: 'drop-in', createdAt: LONG_AGO });
+    const snapshots = snapshotsWith([3]);
+    const looser = makeSettings({
+      miaConsecutiveMisses: 3,
+      predictiveMinAttended: 1,
+      predictiveOfLastN: 3,
+    });
+
+    // A ministry that counts one visit in three as "we expect them" gets the
+    // longer list it asked for, from the same field the door screen reads.
+    expect(computeMia([student], snapshots, settings)).toEqual([]);
+    expect(computeMia([student], snapshots, looser)).toHaveLength(1);
+  });
+
+  /*
+   * The quick-added visitor, and the reason `wasRegular` is measured over the
+   * gathering's history rather than over the nights since the student joined:
+   * measured the second way, their first night is the oldest one they are
+   * eligible for, nothing sits behind it, and the clamp waves every one-visit
+   * visitor through as a regular.
+   */
+  it('does not turn a visitor who came once into a regular', () => {
+    const visitor = makeStudent({
+      id: 'drop-in',
+      isVisitor: true,
+      // Quick-added at the door on the night they first came, as `checkIn` does.
+      createdAt: new Date(nights[3]!.startAt.getTime() - 12 * 60_000),
+      firstAttendedAt: nights[3]!.startAt,
+    });
+
+    expect(computeMia([visitor], snapshotsWith([3]), settings)).toEqual([]);
+  });
+
+  /*
+   * The clamp, and the reason for it: there is nothing behind the oldest night
+   * in the window to judge a visit by. Excluding them would drop a genuine
+   * drifter whose last night is exactly where the window ends.
+   */
+  it('trusts a visit at the very edge of the window, having nothing behind it', () => {
+    const student = makeStudent({ id: 'drop-in', createdAt: LONG_AGO });
+
+    expect(computeMia([student], snapshotsWith([0]), settings)).toHaveLength(1);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* computeUnseen                                                               */
+/* -------------------------------------------------------------------------- */
+
+describe('computeUnseen', () => {
+  const settings = makeSettings({ miaConsecutiveMisses: 3 });
+  const fridayNights = fridays(2);
+  const sundayNights = makeWeeklyEvents({ count: 2, seriesId: SUNDAY, title: 'Sunday School' });
+  const everything = [
+    ...fridayNights.map((event) => held(event)),
+    ...sundayNights.map((event) => held(event)),
+  ];
+
+  /*
+   * The student no gathering can claim. Naming one on their row would be a
+   * guess about which crowd they used to belong to, so the row names none —
+   * and the count is pooled, because missing everything is the whole point.
+   */
+  it('lists a student the window has not seen at anything, naming no gathering', () => {
+    const student = makeStudent({ id: 'ghost', createdAt: LONG_AGO });
+
+    const rows = computeUnseen([student], everything, settings);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      consecutiveMisses: 4,
+      gatheringKey: null,
+      gatheringTitle: null,
+      lastAttendedEventTitle: null,
+    });
+  });
+
+  it('says nothing about a student some gathering has seen', () => {
+    const student = makeStudent({ id: 'seen-once', createdAt: LONG_AGO });
+    const snapshots = [held(fridayNights[0]!, [student.id]), ...everything.slice(1)];
+
+    expect(computeUnseen([student], snapshots, settings)).toEqual([]);
+  });
+
+  /* "Met once, never since" tells their story better, and two lists asking for
+     the same phone call is how a call list stops being worked. */
+  it('leaves a student we met at a one-off to the one-off list', () => {
+    const guest = makeStudent({ id: 'guest', createdAt: LONG_AGO });
+    const retreat = makeOneOff({ id: 'retreat', startAt: new Date(2026, 0, 26, 9, 0) });
+
+    expect(
+      computeUnseen([guest], [...everything, makeSnapshot(retreat, [guest.id])], settings),
+    ).toEqual([]);
+  });
+
+  it('waits until enough nights have passed since they joined the roster', () => {
+    const student = makeStudent({
+      id: 'brand-new',
+      createdAt: new Date(fridayNights[1]!.startAt.getTime() - 3_600_000),
+    });
+
+    expect(computeUnseen([student], everything, settings)).toEqual([]);
+  });
+
+  it('excludes inactive students, who have already been followed up on', () => {
+    const gone = makeStudent({ id: 'graduated', status: 'inactive', createdAt: LONG_AGO });
+
+    expect(computeUnseen([gone], everything, settings)).toEqual([]);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
 /* computeNewVisitors                                                          */
 /* -------------------------------------------------------------------------- */
 
@@ -375,6 +790,50 @@ describe('computeNewVisitors', () => {
     expect(visitor!.firstAttendedAt).toEqual(student.firstAttendedAt);
   });
 
+  it('attributes a first-timer to the gathering they walked into', () => {
+    const student = makeStudent({
+      id: 'friday-arrival',
+      firstAttendedAt: new Date(NOW.getTime() - 3 * 86_400_000),
+    });
+    const sundays = makeWeeklyEvents({ count: 2, seriesId: SUNDAY, title: 'Sunday School' });
+
+    const [visitor] = computeNewVisitors(
+      [student],
+      [
+        makeSnapshot(events[1]!, [student.id]),
+        ...sundays.map((event) => makeSnapshot(event, ['someone-else'])),
+      ],
+      settings,
+      NOW,
+    );
+
+    expect(visitor!.gatheringKey).toBe(FRIDAY);
+    expect(visitor!.viaOneOff).toBe(false);
+  });
+
+  /*
+   * Somebody met on the retreat bus is a different follow-up: there is no next
+   * instance of a trip for them to come back to, so the invitation has to name
+   * a gathering. The row is flagged rather than filed under one.
+   */
+  it('flags a first-timer we met at a one-off, and files them under no gathering', () => {
+    const student = makeStudent({
+      id: 'retreat-arrival',
+      firstAttendedAt: new Date(NOW.getTime() - 3 * 86_400_000),
+    });
+    const retreat = makeOneOff({
+      id: 'retreat',
+      title: 'Winter Retreat',
+      startAt: new Date(NOW.getTime() - 3 * 86_400_000),
+    });
+
+    const [visitor] = computeNewVisitors([student], [makeSnapshot(retreat, [student.id])], settings, NOW);
+
+    expect(visitor!.viaOneOff).toBe(true);
+    expect(visitor!.gatheringKey).toBeNull();
+    expect(visitor!.firstEventTitle).toBe('Winter Retreat');
+  });
+
   it('degrades to a placeholder when no loaded snapshot contains the student', () => {
     const student = makeStudent({
       id: 'off-window',
@@ -455,27 +914,45 @@ describe('computeAttendanceTrend', () => {
       makeSnapshot(events[1]!, ['a', 'b']),
     ]);
 
-    expect(trend.map((point) => point.eventId)).toEqual([
+    expect(trend.flatMap((point) => point.eventIds)).toEqual([
       `${FRIDAY}-3`,
       `${FRIDAY}-2`,
       `${FRIDAY}-1`,
     ]);
     expect(trend.map((point) => point.count)).toEqual([1, 2, 3]);
-    expect(trend[0]).toMatchObject({ title: 'Friday Fellowship', seriesId: FRIDAY });
+    expect(trend[0]).toMatchObject({ title: 'Friday Fellowship' });
     expect(trend[0]!.date).toEqual(events[0]!.startAt);
   });
 
-  it('filters to a single series when asked', () => {
+  it('filters to a single gathering when asked', () => {
     const sundays = makeWeeklyEvents({ count: 2, seriesId: SUNDAY, title: 'Sunday School' });
     const snapshots = [
       ...events.map((event) => makeSnapshot(event, ['a'])),
       ...sundays.map((event) => makeSnapshot(event, ['b', 'c'])),
     ];
 
-    const trend = computeAttendanceTrend(snapshots, { seriesId: SUNDAY });
+    const trend = computeAttendanceTrend(snapshots, { gatheringKey: SUNDAY });
 
     expect(trend).toHaveLength(2);
-    expect(trend.every((point) => point.seriesId === SUNDAY)).toBe(true);
+    expect(trend.every((point) => point.title === 'Sunday School')).toBe(true);
+  });
+
+  /*
+   * A weekly gathering created in the app has a recurrence root and no series
+   * document. Keying the strip on `seriesId` drew it a chart of nothing.
+   */
+  it('groups a series-less chain of repeats by its recurrence root', () => {
+    const rooted = makeWeeklyEvents({ count: 2, seriesId: 'small-group' }).map((event) =>
+      makeEvent({ ...event, seriesId: null, recurrenceRootId: 'tuesday-root' }),
+    );
+    const snapshots = [
+      ...events.map((event) => makeSnapshot(event, ['a'])),
+      ...rooted.map((event) => makeSnapshot(event, ['b'])),
+    ];
+
+    const trend = computeAttendanceTrend(snapshots, { gatheringKey: 'tuesday-root' });
+
+    expect(trend).toHaveLength(2);
   });
 
   it('excludes one-off and cancelled gatherings', () => {
@@ -486,7 +963,7 @@ describe('computeAttendanceTrend', () => {
       makeSnapshot(makeEvent({ ...events[1]!, status: 'cancelled' }), ['a']),
     ];
 
-    expect(computeAttendanceTrend(snapshots).map((point) => point.eventId)).toEqual([
+    expect(computeAttendanceTrend(snapshots).flatMap((point) => point.eventIds)).toEqual([
       `${FRIDAY}-3`,
     ]);
   });
@@ -500,7 +977,7 @@ describe('computeAttendanceTrend', () => {
 
     // A zero bar mid-strip reads as attendance collapsing, not as a night that
     // never happened — and the average underneath it would be wrong too.
-    expect(trend.map((point) => point.eventId)).toEqual([`${FRIDAY}-3`, `${FRIDAY}-1`]);
+    expect(trend.flatMap((point) => point.eventIds)).toEqual([`${FRIDAY}-3`, `${FRIDAY}-1`]);
     expect(trend.every((point) => point.count > 0)).toBe(true);
   });
 
@@ -511,19 +988,79 @@ describe('computeAttendanceTrend', () => {
       { limit: 3 },
     );
 
-    expect(trend.map((point) => point.eventId)).toEqual([
+    expect(trend.flatMap((point) => point.eventIds)).toEqual([
       `${FRIDAY}-3`,
       `${FRIDAY}-2`,
       `${FRIDAY}-1`,
     ]);
   });
 
-  it('defaults to the last eight gatherings', () => {
+  it('defaults to the last eight days', () => {
     const many = makeWeeklyEvents({ count: 12, seriesId: FRIDAY });
     const trend = computeAttendanceTrend(many.map((event) => makeSnapshot(event, ['a'])));
 
     expect(trend).toHaveLength(8);
-    expect(trend.at(-1)!.eventId).toBe(`${FRIDAY}-1`);
+    expect(trend.at(-1)!.eventIds).toEqual([`${FRIDAY}-1`]);
+  });
+
+  /*
+   * Two gatherings on one Sunday drew two bars a day apart on a strip labelled
+   * by date, which reads as two days — one of them apparently half-attended.
+   */
+  describe('a day that held more than one gathering', () => {
+    // Sunday School in the morning, an evening service the same night.
+    const morning = makeEvent({
+      id: 'sunday-morning',
+      title: 'Sunday School',
+      seriesId: SUNDAY,
+      startAt: new Date(2026, 1, 8, 9, 30),
+      endAt: new Date(2026, 1, 8, 10, 45),
+    });
+    const evening = makeEvent({
+      id: 'sunday-evening',
+      title: 'Evening Service',
+      seriesId: 'sunday-evening',
+      startAt: new Date(2026, 1, 8, 18, 0),
+      endAt: new Date(2026, 1, 8, 19, 30),
+    });
+
+    it('draws one bar, adding the gatherings up', () => {
+      const trend = computeAttendanceTrend([
+        makeSnapshot(morning, ['a', 'b', 'c']),
+        makeSnapshot(evening, ['a', 'd']),
+      ]);
+
+      expect(trend).toHaveLength(1);
+      expect(trend[0]!.count).toBe(5);
+      expect(trend[0]!.eventIds).toEqual(['sunday-evening', 'sunday-morning']);
+      // Named so a tooltip can say what the bar is made of.
+      expect(trend[0]!.title).toBe('Evening Service + Sunday School');
+      // Stamped with when the day started, not with whichever was read first.
+      expect(trend[0]!.date).toEqual(morning.startAt);
+    });
+
+    it('still charts each gathering on its own when one is asked for', () => {
+      const snapshots = [makeSnapshot(morning, ['a', 'b', 'c']), makeSnapshot(evening, ['a', 'd'])];
+
+      expect(computeAttendanceTrend(snapshots, { gatheringKey: SUNDAY })).toMatchObject([
+        { count: 3, title: 'Sunday School' },
+      ]);
+    });
+
+    it('counts days rather than events against the limit', () => {
+      const fridayNights = fridays(8);
+      const trend = computeAttendanceTrend(
+        [
+          ...fridayNights.map((event) => makeSnapshot(event, ['a'])),
+          makeSnapshot(morning, ['a']),
+          makeSnapshot(evening, ['a']),
+        ],
+        { limit: 3 },
+      );
+
+      // Three bars, and the busy Sunday is one of them rather than two.
+      expect(trend).toHaveLength(3);
+    });
   });
 });
 
@@ -608,13 +1145,25 @@ describe('computeSummary', () => {
     const student = makeStudent({ id: 'someone' });
     const summary = computeSummary({
       snapshots: [],
-      mia: [{ student, consecutiveMisses: 3, lastAttendedAt: null, lastAttendedEventTitle: null }],
+      mia: [
+        {
+          student,
+          consecutiveMisses: 3,
+          lastAttendedAt: null,
+          lastAttendedEventTitle: null,
+          gatheringKey: FRIDAY,
+          gatheringTitle: 'Friday Fellowship',
+          alsoMissingCount: 0,
+        },
+      ],
       newVisitors: [
         {
           student,
           firstEventId: 'e1',
           firstEventTitle: 'Friday Fellowship',
           firstAttendedAt: NOW,
+          gatheringKey: FRIDAY,
+          viaOneOff: false,
         },
       ],
       incomplete: [student, student],
@@ -628,5 +1177,142 @@ describe('computeSummary', () => {
       newVisitorCount: 1,
       incompleteCount: 2,
     });
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* One-off events                                                              */
+/* -------------------------------------------------------------------------- */
+
+describe('computeOneOffRecaps', () => {
+  const retreat = makeOneOff({
+    id: 'retreat',
+    title: 'Winter Retreat',
+    startAt: new Date(2026, 0, 26, 9, 0),
+  });
+  const busTrip = makeOneOff({
+    id: 'bus-trip',
+    title: 'Six Flags',
+    startAt: new Date(2026, 1, 7, 8, 0),
+  });
+
+  it('recaps the head count of each one-off, newest first', () => {
+    const recaps = computeOneOffRecaps([
+      makeSnapshot(retreat, ['a', 'b']),
+      makeSnapshot(busTrip, ['a', 'b', 'c']),
+      held(fridays(1)[0]!),
+    ]);
+
+    expect(recaps.map((recap) => [recap.event.id, recap.count])).toEqual([
+      ['bus-trip', 3],
+      ['retreat', 2],
+    ]);
+  });
+
+  it('leaves out a trip nobody was checked into', () => {
+    expect(computeOneOffRecaps([makeSnapshot(retreat, [])])).toEqual([]);
+  });
+
+  it('keeps the most recent `limit` of them', () => {
+    const trips = [retreat, busTrip].map((event) => makeSnapshot(event, ['a']));
+
+    expect(computeOneOffRecaps(trips, { limit: 1 }).map((recap) => recap.event.id)).toEqual([
+      'bus-trip',
+    ]);
+  });
+});
+
+describe('computeOneOffOnly', () => {
+  // Fridays fall on Jan 23, Jan 30 and Feb 6 relative to the fixed NOW.
+  const fridayNights = fridays(3);
+  const retreat = makeOneOff({
+    id: 'retreat',
+    title: 'Winter Retreat',
+    startAt: new Date(2026, 0, 26, 9, 0),
+  });
+
+  /*
+   * The friend somebody brought on the retreat bus. They are invisible in every
+   * other list: never MIA, because they belong to no gathering, and off the
+   * new-faces list the moment their first visit ages out of the window.
+   */
+  it('lists a student met at a one-off who has been to no gathering since', () => {
+    const guest = makeStudent({ id: 'guest', createdAt: LONG_AGO });
+    const rows = computeOneOffOnly(
+      [guest],
+      [...fridayNights.map((event) => held(event)), makeSnapshot(retreat, [guest.id, REGULAR])],
+    );
+
+    expect(studentIds(rows)).toEqual([guest.id]);
+    expect(rows[0]).toMatchObject({ missedSince: 2, metAt: retreat.startAt });
+    expect(rows[0]!.events.map((event) => event.id)).toEqual(['retreat']);
+  });
+
+  it('leaves out a student who has also been to a regular gathering', () => {
+    const regular = makeStudent({ id: 'regular', createdAt: LONG_AGO });
+    const rows = computeOneOffOnly(
+      [regular],
+      [
+        held(fridayNights[0]!, [regular.id]),
+        held(fridayNights[1]!),
+        held(fridayNights[2]!),
+        makeSnapshot(retreat, [regular.id, REGULAR]),
+      ],
+    );
+
+    expect(rows).toEqual([]);
+  });
+
+  /*
+   * A retreat that finished on Sunday has had no Friday after it. Telling a
+   * leader to chase somebody they will see tomorrow night is how a call list
+   * stops being read.
+   */
+  it('waits until a gathering has actually been held since the trip', () => {
+    const guest = makeStudent({ id: 'guest', createdAt: LONG_AGO });
+    const lastNight = makeOneOff({ id: 'lock-in', startAt: new Date(2026, 1, 12, 18, 0) });
+    const rows = computeOneOffOnly(
+      [guest],
+      [...fridayNights.map((event) => held(event)), makeSnapshot(lastNight, [guest.id, REGULAR])],
+    );
+
+    expect(rows).toEqual([]);
+  });
+
+  it('excludes inactive students and unheld trips', () => {
+    const gone = makeStudent({ id: 'moved-away', status: 'inactive', createdAt: LONG_AGO });
+    const guest = makeStudent({ id: 'guest', createdAt: LONG_AGO });
+
+    expect(
+      computeOneOffOnly(
+        [gone],
+        [...fridayNights.map((event) => held(event)), makeSnapshot(retreat, [gone.id, REGULAR])],
+      ),
+    ).toEqual([]);
+
+    // An empty trip is a trip that did not happen, so nobody was met on it.
+    expect(
+      computeOneOffOnly(
+        [guest],
+        [...fridayNights.map((event) => held(event)), makeSnapshot(retreat, [])],
+      ),
+    ).toEqual([]);
+  });
+
+  it('orders the freshest meeting first', () => {
+    const early = makeStudent({ id: 'early', createdAt: LONG_AGO });
+    const late = makeStudent({ id: 'late', createdAt: LONG_AGO });
+    const lockIn = makeOneOff({ id: 'lock-in', startAt: new Date(2026, 1, 2, 18, 0) });
+
+    const rows = computeOneOffOnly(
+      [early, late],
+      [
+        ...fridayNights.map((event) => held(event)),
+        makeSnapshot(retreat, [early.id, REGULAR]),
+        makeSnapshot(lockIn, [late.id, REGULAR]),
+      ],
+    );
+
+    expect(studentIds(rows)).toEqual([late.id, early.id]);
   });
 });

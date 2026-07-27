@@ -800,9 +800,23 @@ export interface RosterEntry {
 
 export interface MiaStudent {
   student: Student;
+  /** Consecutive misses of `gatheringKey`, never pooled across the calendar. */
   consecutiveMisses: number;
+  /** When they were last at *this* gathering. */
   lastAttendedAt: Date | null;
   lastAttendedEventTitle: string | null;
+  /**
+   * The chain of repeats they have drifted from — `chainKey` — or null for a
+   * student the window has not seen at anything, who belongs to none of them.
+   */
+  gatheringKey: string | null;
+  /** That chain's name, for a row that has to say which one it means. */
+  gatheringTitle: string | null;
+  /**
+   * How many *other* gatherings they are also missing from. Zero in a
+   * single-gathering view; only the merged list can count above it.
+   */
+  alsoMissingCount: number;
 }
 
 export interface NewVisitor {
@@ -810,6 +824,13 @@ export interface NewVisitor {
   firstEventId: string;
   firstEventTitle: string;
   firstAttendedAt: Date;
+  /**
+   * The gathering they first walked into, or null when that was a one-off (or
+   * when the loaded window cannot say).
+   */
+  gatheringKey: string | null;
+  /** True when we met them at a one-off rather than at a regular gathering. */
+  viaOneOff: boolean;
 }
 
 /** One past instance of a series, with the set of students who attended it. */

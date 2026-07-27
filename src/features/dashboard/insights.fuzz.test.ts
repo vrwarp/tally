@@ -18,9 +18,16 @@ import {
   computeAttendanceTrend,
   computeIncompleteProfiles,
   computeMia,
+  computeMiaByGathering,
   computeNewVisitors,
+  computeOneOffOnly,
   computeSummary,
+  groupByGathering,
+  mergeMia,
+  recurringSnapshots,
+  standingIn,
 } from './insights';
+import { chainKey } from '@/lib/materialize';
 import type { EventAttendanceSnapshot, Student } from '@/types';
 
 const NOW = new Date('2026-02-13T19:30:00');
@@ -104,6 +111,86 @@ describe('dashboard insight properties', () => {
       expect(visitors[i - 1]!.firstAttendedAt.getTime()).toBeGreaterThanOrEqual(
         visitors[i]!.firstAttendedAt.getTime(),
       );
+    }
+  });
+
+  /*
+   * The whole point of the split. A streak is a fact about one gathering, and a
+   * row that counted another gathering's nights would put a Sunday regular on
+   * the Friday call list — the exact phone call this list exists to avoid.
+   */
+  forAll('a streak never reaches past its own gathering', arbitraryDashboard, (input) => {
+    const rows = computeMiaByGathering(input.students, input.snapshots, input.settings);
+    const held = recurringSnapshots(input.snapshots);
+
+    for (const row of rows.filter((candidate) => candidate.gatheringKey !== null)) {
+      const nights = held.filter((snapshot) => chainKey(snapshot.event) === row.gatheringKey);
+
+      expect(row.consecutiveMisses).toBeLessThanOrEqual(nights.length);
+      // Whatever else is true, they were not at the most recent one.
+      expect(nights[0]!.presentStudentIds.has(row.student.id)).toBe(false);
+      // And this gathering could expect them, or it has no business naming
+      // them: a roster is not a promise that everybody attends everything.
+      const gathering = groupByGathering(input.snapshots).find(
+        (candidate) => candidate.key === row.gatheringKey,
+      );
+      expect(standingIn(gathering!, row.student, input.settings).wasRegular).toBe(true);
+    }
+  });
+
+  /*
+   * The unnamed rows are the other half, and the halves must not overlap: a
+   * student some gathering has seen belongs to that gathering's list, and one
+   * nothing has seen belongs to nobody's.
+   */
+  forAll('a row that names no gathering is a student nothing has seen', arbitraryDashboard, (input) => {
+    const rows = computeMiaByGathering(input.students, input.snapshots, input.settings);
+    const held = recurringSnapshots(input.snapshots);
+
+    for (const row of rows.filter((candidate) => candidate.gatheringKey === null)) {
+      expect(row.gatheringTitle).toBeNull();
+      expect(held.some((snapshot) => snapshot.presentStudentIds.has(row.student.id))).toBe(false);
+      expect(row.consecutiveMisses).toBeGreaterThanOrEqual(input.settings.miaConsecutiveMisses);
+      // Never both kinds of row for one student.
+      expect(
+        rows.filter((candidate) => candidate.student.id === row.student.id),
+      ).toHaveLength(1);
+    }
+  });
+
+  forAll('merging leaves one call per student, and says what it merged', arbitraryDashboard, (input) => {
+    const rows = computeMiaByGathering(input.students, input.snapshots, input.settings);
+    const merged = mergeMia(rows);
+
+    expect(new Set(merged.map((row) => row.student.id)).size).toBe(merged.length);
+
+    for (const row of merged) {
+      const mine = rows.filter((candidate) => candidate.student.id === row.student.id);
+      expect(row.alsoMissingCount).toBe(mine.length - 1);
+      // The worst streak wins the row: it is the one worth leading with.
+      expect(row.consecutiveMisses).toBe(
+        Math.max(...mine.map((candidate) => candidate.consecutiveMisses)),
+      );
+    }
+
+    expect(merged).toEqual(computeMia(input.students, input.snapshots, input.settings));
+  });
+
+  /*
+   * "Met once, never since" is only ever about people no gathering has seen.
+   * Anybody a Friday knows belongs to the MIA list instead, and appearing on
+   * both would mean two leaders phoning the same family about opposite things.
+   */
+  forAll('the one-off list holds nobody a gathering has seen', arbitraryDashboard, (input) => {
+    const rows = computeOneOffOnly(input.students, input.snapshots);
+    const held = recurringSnapshots(input.snapshots);
+
+    for (const row of rows) {
+      expect(row.student.status).toBe('active');
+      expect(row.events.length).toBeGreaterThan(0);
+      // A gathering has been held since we met them, and they were at none.
+      expect(row.missedSince).toBeGreaterThan(0);
+      expect(held.some((snapshot) => snapshot.presentStudentIds.has(row.student.id))).toBe(false);
     }
   });
 

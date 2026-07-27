@@ -107,7 +107,7 @@ no attendance as cancelled, whether or not it is marked. The rule is one predica
 | MIA list | Every student in the ministry gains a miss for a night that did not happen, and three snow weeks flag all of them. | The night is neither a miss nor a reprieve; streaks close over it. |
 | Recent filter | The cancelled Friday consumes one of the last three slots, and "2 of 3" becomes unreachable for regulars. | The window filters *before* it slices, so it reaches a week further back for a third real Friday. |
 | Trend strip | A zero bar mid-strip, which reads as attendance collapsing, and an average dragged down with it. | The gathering is simply not plotted. |
-| Student page | A row labelled "Missed", accusing a student of an absence at an event nobody attended. | A row labelled "No attendance", and the streak above it skips the night. |
+| Student page | A chip labelled "Missed", accusing a student of an absence at an event nobody attended. | A faded chip labelled "Cancelled" or "No one", and the streak beside it skips the night. |
 
 The cost is that a gathering somebody genuinely forgot to take attendance at also stops counting. That
 is unavoidable — the two cases are identical in the data — and it is the forgiving direction: nobody
@@ -288,7 +288,7 @@ A single document holding the four thresholds the core team can tune:
 | --- | --- | --- |
 | `predictiveMinAttended` | 2 | A student is "Recent" when they attended at least this many… |
 | `predictiveOfLastN` | 3 | …of the last this-many instances of the *same* series — meaning the same repeat chain: a shared `seriesId` when there is one, a shared `recurrenceRootId` otherwise. Friday history never predicts Sunday either way. |
-| `miaConsecutiveMisses` | 3 | Consecutive missed recurring gatherings before a student lands on the MIA list. |
+| `miaConsecutiveMisses` | 3 | Consecutive missed nights *of one gathering* before a student lands on the MIA list. Counted per repeat chain, like the Recent filter, and only for students that gathering could expect: `wasRegular` asks the two fields above as of the student's last visit to it, so a Friday regular is not missing from Sunday School and somebody who dropped in once is missing from nothing. A student the window has not seen anywhere is listed under no gathering, with the pooled count. |
 | `newVisitorWindowDays` | 7 | How far back "New Visitors" looks. |
 
 **Who writes:** core and up, and the rules validate the relationship — `predictiveOfLastN` must be at
@@ -343,6 +343,12 @@ browser: the Recent filter, MIA students, new visitors, roster warnings, head-co
 in `src/features/roster/predictiveRoster.ts` and `src/features/dashboard/insights.ts` as pure
 functions over data that is already loaded, so a threshold change in Settings takes effect everywhere
 immediately with nothing to backfill.
+
+Both files group history by the same key — `chainKey` in `src/lib/materialize.ts`: the `seriesId` when
+there is one, the recurrence root otherwise. That is what makes "the same gathering" mean one thing
+across the app, so the check-in roster, the dashboard's tabs and a student's attendance card cannot
+disagree about which nights predict, or accuse, each other. One-off events are outside it by
+definition and get their own derivations, which never produce a streak.
 
 ---
 

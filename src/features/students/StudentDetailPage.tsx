@@ -6,6 +6,13 @@
  * the consecutive-miss streak sit above the fold, and the attendance history
  * below is the evidence for the streak rather than a report in its own right.
  *
+ * The history is grouped by gathering, exactly as the dashboard is, and for the
+ * same reason: one pooled list of nights alternating Friday, Sunday, Friday made
+ * a Sunday-only student look like somebody missing half of everything. Each
+ * gathering carries its own streak — the one the MIA list computed, from the
+ * same function — and one-off events sit in a group of their own at the bottom,
+ * where "missed" is not a word that applies.
+ *
  * History is derived from the events already in memory, read once through
  * `useEventSnapshots` — past attendance does not change while this page is open.
  */
@@ -26,24 +33,60 @@ import { RosterErrorBanner } from '@/components/RosterErrorBanner';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
-import { orderSnapshotsNewestFirst, recurringSnapshots } from '@/features/dashboard/insights';
+import {
+  groupByGathering,
+  orderSnapshotsNewestFirst,
+  standingIn,
+  type GatheringStanding,
+} from '@/features/dashboard/insights';
 import { StudentEditorModal } from '@/features/students/StudentEditorModal';
 import { useEventSnapshots } from '@/hooks/useEventSnapshots';
 import { useNow } from '@/hooks/useNow';
 import { usePersonDetails } from '@/hooks/usePersonDetails';
-import { sessionOutcome } from '@/lib/sessionHistory';
+import { chainKey } from '@/lib/materialize';
+import { sessionOutcome, type SessionOutcome } from '@/lib/sessionHistory';
 import { formatRelative, formatShortDate } from '@/lib/time';
-import { formatPhone, initials, ordinalGrade } from '@/lib/utils';
+import { cn, formatPhone, initials, ordinalGrade } from '@/lib/utils';
 import {
   addRosterMember,
   pushStudentToPlanningCenter,
   removeRosterMember,
 } from '@/services/functions';
 import { setStudentStatus } from '@/services/students';
-import { studentFullName } from '@/types';
+import { studentFullName, type TallyEvent } from '@/types';
 
-/** How many finished gatherings the history list reaches back over. */
-const HISTORY_WINDOW = 12;
+/**
+ * How many finished nights of *each* gathering the history reaches back over.
+ *
+ * Per gathering rather than across the calendar: a pooled twelve split between
+ * two weekly gatherings left six of each, and a student's Sunday history ran
+ * out halfway down a page that claimed to be showing their attendance.
+ */
+const PER_GATHERING_WINDOW = 8;
+
+/** Recent one-off events to show alongside them. */
+const ONE_OFF_WINDOW = 4;
+
+/** Ceiling on the attendance reads one student page costs. */
+const MAX_EVENTS = 24;
+
+/** The group one-off events go in. Not a `chainKey`, and cannot collide with one. */
+const ONE_OFF_GROUP = 'one-off';
+
+interface HistoryEntry {
+  event: TallyEvent;
+  present: boolean;
+  outcome: SessionOutcome;
+}
+
+interface HistoryGroup {
+  key: string;
+  title: string;
+  /** Null for the one-off group, and for a gathering with no held night loaded. */
+  standing: GatheringStanding | null;
+  /** Every loaded night of it, newest first, cancelled ones included. */
+  entries: HistoryEntry[];
+}
 
 /** Deep link to a person in Planning Center People. Mirrored in StudentEditorModal. */
 function pcoPersonUrl(pcoPersonId: string): string {
@@ -58,7 +101,7 @@ function dialable(phone: string): string {
 export function StudentDetailPage() {
   const { studentId } = useParams();
   const navigate = useNavigate();
-  const { students, events, settings, loading, rosterError, refreshRoster } = useData();
+  const { students, events, series, settings, loading, rosterError, refreshRoster } = useData();
   const { user } = useAuth();
   const { show } = useToast();
   const now = useNow(60_000);
@@ -74,48 +117,131 @@ export function StudentDetailPage() {
   const { details, loading: detailsLoading, error: detailsError } = usePersonDetails(student);
 
   // Only finished gatherings: a night still in progress is not an absence.
-  const recentEvents = useMemo(
-    () =>
-      events
-        .filter((event) => event.status !== 'cancelled' && event.checkInClosesAt < now)
-        .sort((a, b) => b.startAt.getTime() - a.startAt.getTime())
-        .slice(0, HISTORY_WINDOW),
-    [events, now],
-  );
+  // Taken per gathering, so a fortnight of Fridays cannot crowd out Sunday.
+  const recentEvents = useMemo(() => {
+    const finished = events
+      .filter((event) => event.status !== 'cancelled' && event.checkInClosesAt < now)
+      .sort((a, b) => b.startAt.getTime() - a.startAt.getTime());
+
+    const takenPerGathering = new Map<string, number>();
+    let oneOffs = 0;
+    const picked: TallyEvent[] = [];
+
+    for (const event of finished) {
+      if (picked.length >= MAX_EVENTS) break;
+
+      if (event.mode === 'oneoff') {
+        if (oneOffs >= ONE_OFF_WINDOW) continue;
+        oneOffs += 1;
+      } else {
+        const key = chainKey(event);
+        const taken = takenPerGathering.get(key) ?? 0;
+        if (taken >= PER_GATHERING_WINDOW) continue;
+        takenPerGathering.set(key, taken + 1);
+      }
+
+      picked.push(event);
+    }
+
+    return picked;
+  }, [events, now]);
 
   const { snapshots, loading: historyLoading, error: historyError } = useEventSnapshots(recentEvents);
 
-  const history = useMemo(
-    () =>
-      student
-        ? orderSnapshotsNewestFirst(snapshots).map((snapshot) => ({
-            event: snapshot.event,
-            present: snapshot.presentStudentIds.has(student.id),
-            // A night nobody was checked into is not an absence: it is a night
-            // that did not happen. Labelling it here is what makes the streak
-            // above legible — otherwise it looks like the count skipped a row.
-            outcome: sessionOutcome(snapshot),
-          }))
-        : [],
-    [snapshots, student],
-  );
+  /**
+   * The history, split into the gatherings it belongs to, with each gathering's
+   * own streak — computed by `standingIn`, the same function behind the MIA
+   * list, so this page and the dashboard can never disagree about a number a
+   * leader is about to phone a family over.
+   *
+   * Built from every loaded snapshot rather than from `groupByGathering`'s held
+   * ones, because a cancelled night still earns a row here: it is the evidence
+   * for why the streak skipped it, and without the row the count looks wrong.
+   */
+  const groups = useMemo<HistoryGroup[]>(() => {
+    if (!student) return [];
+
+    const standings = new Map(
+      groupByGathering(snapshots, series).map((gathering) => [
+        gathering.key,
+        { title: gathering.title, standing: standingIn(gathering, student, settings) },
+      ]),
+    );
+
+    const recurring = new Map<string, HistoryGroup>();
+    const oneOff: HistoryEntry[] = [];
+
+    for (const snapshot of orderSnapshotsNewestFirst(snapshots)) {
+      const entry: HistoryEntry = {
+        event: snapshot.event,
+        present: snapshot.presentStudentIds.has(student.id),
+        // A night nobody was checked into is not an absence: it is a night that
+        // did not happen. Labelling it here is what makes the streak legible —
+        // otherwise it looks like the count skipped a row.
+        outcome: sessionOutcome(snapshot),
+      };
+
+      if (snapshot.event.mode === 'oneoff') {
+        oneOff.push(entry);
+        continue;
+      }
+
+      const key = chainKey(snapshot.event);
+      const existing = recurring.get(key);
+      if (existing) {
+        existing.entries.push(entry);
+        continue;
+      }
+
+      // A gathering whose every loaded night was cancelled has no standing —
+      // there is nothing it could tell us — but its nights still show.
+      const known = standings.get(key);
+      recurring.set(key, {
+        key,
+        title: known?.title ?? snapshot.event.title,
+        standing: known?.standing ?? null,
+        entries: [entry],
+      });
+    }
+
+    const groups = [...recurring.values()];
+    // One-offs last: they are not a gathering, and nothing above them applies.
+    if (oneOff.length > 0) {
+      groups.push({ key: ONE_OFF_GROUP, title: 'One-off events', standing: null, entries: oneOff });
+    }
+    return groups;
+  }, [snapshots, series, student, settings]);
 
   /**
-   * Consecutive missed recurring gatherings, newest first — the same rule the
-   * MIA list uses, including the "events before they joined are not misses" and
-   * "a night nobody attended did not happen" exclusions, so this page and the
-   * dashboard never disagree.
+   * The streak the tile reports: the gathering they have drifted furthest from,
+   * counting only the ones they actually come to.
+   *
+   * A Friday regular has "missed" every Sunday School there has ever been, and
+   * leading the page with that number would accuse them of drifting from a
+   * gathering that was never theirs — the same exclusion the MIA list makes.
+   * Somebody no gathering has seen falls through to the pooled count, which is
+   * what the dashboard shows them as too.
    */
-  const streak = useMemo(() => {
-    if (!student) return 0;
-    let misses = 0;
-    for (const snapshot of recurringSnapshots(snapshots)) {
-      if (snapshot.event.startAt < student.createdAt) break;
-      if (snapshot.presentStudentIds.has(student.id)) break;
-      misses += 1;
+  const worst = useMemo(() => {
+    const theirs = groups.filter((group) => group.standing?.wasRegular);
+
+    if (theirs.length > 0) {
+      const leader = theirs.reduce((best, group) =>
+        group.standing!.consecutiveMisses > best.standing!.consecutiveMisses ? group : best,
+      );
+      return { streak: leader.standing!.consecutiveMisses, scope: leader.title };
     }
-    return misses;
-  }, [snapshots, student]);
+
+    const seenAtAll = groups.some((group) => group.entries.some((entry) => entry.present));
+    if (seenAtAll) return { streak: 0, scope: null };
+
+    // Seen at nothing. Every night since they joined is a night they missed.
+    return {
+      streak: groups.reduce((sum, group) => sum + (group.standing?.eligible ?? 0), 0),
+      scope: null,
+    };
+  }, [groups]);
+  const streak = worst.streak;
 
   if (!student) {
     if (loading) return <LoadingScreen message="Loading student…" />;
@@ -414,8 +540,8 @@ export function StudentDetailPage() {
         <CardHeader
           title="Attendance"
           description={`The last ${recentEvents.length} finished ${
-            recentEvents.length === 1 ? 'gathering' : 'gatherings'
-          }.`}
+            recentEvents.length === 1 ? 'night' : 'nights'
+          }, by gathering.`}
         />
 
         <div className="grid grid-cols-2 gap-2 px-4 py-3">
@@ -423,9 +549,16 @@ export function StudentDetailPage() {
             label="Missed in a row"
             value={streak}
             hint={
-              streak >= settings.miaConsecutiveMisses
-                ? `on the MIA list at ${settings.miaConsecutiveMisses}`
-                : 'recurring gatherings only'
+              // Named, always. "Missed 3 in a row" without saying three of what
+              // is the pooled number this page used to print, and it read as an
+              // accusation about the whole ministry rather than about a Friday.
+              worst.scope
+                ? streak >= settings.miaConsecutiveMisses
+                  ? `${worst.scope} — on the MIA list at ${settings.miaConsecutiveMisses}`
+                  : `${worst.scope}, their worst run`
+                : streak > 0
+                  ? 'not seen at any gathering'
+                  : 'no gathering of their own yet'
             }
             tone={streakTone}
           />
@@ -442,51 +575,61 @@ export function StudentDetailPage() {
           </div>
         ) : null}
 
-        {historyLoading && history.length === 0 ? (
+        {historyLoading && groups.length === 0 ? (
           <SkeletonRows count={4} />
-        ) : history.length === 0 ? (
+        ) : groups.length === 0 ? (
           <EmptyState
             title="No gatherings on record yet."
             description="Attendance appears here as soon as this student has been checked into something."
           />
         ) : (
-          <ul className="divide-y divide-ink-800">
-            {history.map((entry) => (
-              <li key={entry.event.id} className="flex items-center gap-3 px-4 py-2">
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium text-ink-100">
-                    {entry.event.title}
-                  </span>
-                  <span className="block text-xs text-ink-500">
-                    {formatShortDate(entry.event.startAt)}
-                  </span>
-                </span>
-                {entry.present ? (
-                  <Badge tone="success">Present</Badge>
-                ) : entry.outcome !== 'held' ? (
-                  /* Nobody at all was checked in, so this is not their absence.
-                     The streak above skips it for the same reason. */
-                  <Badge
-                    tone="neutral"
-                    title={
-                      entry.outcome === 'cancelled'
-                        ? 'Cancelled — not counted as a miss'
-                        : 'Nobody was checked in, so this counts as cancelled rather than as a miss'
-                    }
-                  >
-                    {entry.outcome === 'cancelled' ? 'Cancelled' : 'No attendance'}
-                  </Badge>
-                ) : entry.event.mode === 'oneoff' ? (
-                  /* A retreat they never signed up for is not an absence. */
-                  <Badge tone="neutral" title="One-off event — they were not on this trip">
-                    Not on the list
-                  </Badge>
-                ) : (
-                  <Badge tone="neutral">Missed</Badge>
-                )}
-              </li>
-            ))}
-          </ul>
+          groups.map((group) => (
+            <section key={group.key} className="border-t border-ink-800">
+              <header className="flex items-baseline justify-between gap-3 bg-ink-950/40 px-4 py-2">
+                <h3 className="min-w-0 truncate text-sm font-semibold text-ink-100">
+                  {group.title}
+                </h3>
+                <p className="shrink-0 text-xs text-ink-500">
+                  {group.key === ONE_OFF_GROUP
+                    ? // Nothing to be missed: a retreat is not an instance of
+                      // anything, and a streak over trips would mean nothing.
+                      'Trips and retreats — no streak applies'
+                    : group.standing === null
+                      ? 'None of these nights happened'
+                      : !group.standing.wasRegular
+                        ? // Nobody was expecting them here, so nothing was
+                          // missed. A bare "8 missed in a row" beside a student
+                          // who goes on Fridays, or who dropped in once in the
+                          // spring, is an accusation rather than a count — and
+                          // the MIA list will not name them here either.
+                          group.standing.attended === 0
+                          ? 'Not one they come to'
+                          : `Drops in — ${group.standing.attended} of ${group.standing.eligible}`
+                        : group.standing.consecutiveMisses === 0
+                          ? 'At the most recent one'
+                          : `${group.standing.consecutiveMisses} missed in a row${
+                              group.standing.consecutiveMisses >= settings.miaConsecutiveMisses
+                                ? ' · MIA'
+                                : ''
+                            }`}
+                </p>
+              </header>
+
+              {/* Oldest to newest, left to right, which is how a run of misses
+                  reads as a run rather than as a list to count backwards. */}
+              <ul className="flex flex-wrap gap-1.5 px-4 py-3">
+                {[...group.entries].reverse().map((entry) => (
+                  <NightChip
+                    key={entry.event.id}
+                    entry={entry}
+                    // A trip is nobody's regular gathering, but "not on it" is
+                    // still worth saying out loud, so one-offs always count.
+                    theirs={group.key === ONE_OFF_GROUP || Boolean(group.standing?.wasRegular)}
+                  />
+                ))}
+              </ul>
+            </section>
+          ))
         )}
       </Card>
 
@@ -496,6 +639,85 @@ export function StudentDetailPage() {
         student={student}
       />
     </div>
+  );
+}
+
+/**
+ * One night, as a chip: the date, and what happened under it in small type.
+ *
+ * A dozen full-width rows of "Friday Fellowship / Jul 24 / Missed" repeated the
+ * gathering's name once per night and pushed the trip section off the screen.
+ * Grouped by gathering the title is already in the heading above, so all a
+ * night has left to say is when it was and whether they were there — and colour
+ * says the second part faster than any of the words do.
+ */
+function NightChip({ entry, theirs }: { entry: HistoryEntry; theirs: boolean }) {
+  const { present, outcome, event } = entry;
+
+  // Not held is not missed. A cancelled night is nobody's absence, so it reads
+  // as neither green nor grey — it fades out of the run entirely. A gathering
+  // the student does not come to fades for the same reason: eight grey
+  // "Missed" chips under a heading that says it was never theirs is the pooled
+  // accusation all over again, one night at a time.
+  const held = outcome === 'held';
+  const counts = held && (theirs || present);
+
+  const label = present
+    ? 'Present'
+    : !counts
+      ? !held
+        ? outcome === 'cancelled'
+          ? 'Cancelled'
+          : 'No one'
+        : '—'
+      : event.mode === 'oneoff'
+        ? 'Not on it'
+        : 'Missed';
+
+  const spoken = present
+    ? 'present'
+    : !held
+      ? 'this night did not happen, so it counts as neither'
+      : !theirs
+        ? 'not a gathering they come to'
+        : event.mode === 'oneoff'
+          ? 'not on this trip'
+          : 'missed';
+
+  return (
+    <li
+      title={`${event.title} · ${formatShortDate(event.startAt)}: ${spoken}`}
+      className={cn(
+        'w-16 rounded-xl px-1.5 py-1 text-center ring-1',
+        present
+          ? 'bg-present-500/15 ring-present-500/30'
+          : counts
+            ? 'bg-ink-800/60 ring-ink-700'
+            : 'bg-ink-900/40 opacity-60 ring-ink-800',
+      )}
+    >
+      <span className="sr-only">
+        {formatShortDate(event.startAt)}: {spoken}
+      </span>
+      <span
+        aria-hidden="true"
+        className={cn(
+          'block text-xs font-semibold tabular-nums',
+          present ? 'text-present-300' : counts ? 'text-ink-200' : 'text-ink-600',
+        )}
+      >
+        {formatShortDate(event.startAt)}
+      </span>
+      <span
+        aria-hidden="true"
+        className={cn(
+          'block text-[10px] leading-tight',
+          present ? 'text-present-400/90' : counts ? 'text-ink-500' : 'text-ink-600',
+        )}
+      >
+        {label}
+      </span>
+    </li>
   );
 }
 

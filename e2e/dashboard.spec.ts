@@ -113,4 +113,72 @@ test.describe('dashboard', () => {
 
     await expect(page.getByRole('heading', { name: /attendance trend/i })).toBeVisible();
   });
+
+  /*
+   * Friday and Sunday are different crowds — the check-in roster has always
+   * predicted them separately, and the seed's Sunday-heavy and Friday-heavy
+   * students exist to prove the dashboard now does too. A tab that does not
+   * narrow the lists is the failure mode this catches.
+   */
+  test('splits the lists by gathering, one tab each', async ({ page, signedInAs }) => {
+    await signedInAs('core');
+    await gotoReady(page, '/dashboard');
+
+    const tabs = page.getByRole('group', { name: /show insights for/i });
+    await expect(tabs.getByRole('button', { name: 'All' })).toBeVisible();
+    await expect(tabs.getByRole('button', { name: 'Friday Fellowship' })).toBeVisible();
+    await expect(tabs.getByRole('button', { name: 'Sunday School' })).toBeVisible();
+
+    // Every gathering at once: each row has to say which one it means.
+    await expect(page.getByText(/missing from friday fellowship/i).first()).toBeVisible();
+
+    await tabs.getByRole('button', { name: 'Friday Fellowship' }).click();
+
+    await expect(
+      page.getByText(/came to friday fellowship regularly, then missed \d+ or more in a row/i),
+    ).toBeVisible();
+    await expect(page.getByText(/friday fellowship — head count per night/i)).toBeVisible();
+    // Nobody else's gathering leaks into a scoped list.
+    await expect(page.getByText(/missing from sunday school/i)).toHaveCount(0);
+  });
+
+  /*
+   * A retreat is an instance of nothing: nobody can miss it, it has no trend,
+   * and the students met on it are invisible everywhere else in Tally. The seed
+   * runs a lock-in three weeks back with two guests who came to that and to
+   * nothing since, so both of these lists have somebody in them.
+   */
+  test('keeps one-off events in a section of their own', async ({ page, signedInAs }) => {
+    await signedInAs('core');
+    await gotoReady(page, '/dashboard');
+
+    await expect(page.getByRole('heading', { name: /one-off events/i })).toBeVisible();
+    // The recap row, which links to the trip — the name also appears in the
+    // "met once" rows below, which is why this asks for the link.
+    await expect(page.getByRole('link', { name: /^Fall Lock-In/ })).toBeVisible();
+
+    const metOnce = page.getByRole('heading', { name: /met once, never since/i });
+    await expect(metOnce).toBeVisible();
+    expect(Number(/(\d+)/.exec(await metOnce.innerText())?.[1] ?? 0)).toBeGreaterThan(0);
+  });
+
+  /*
+   * The same split, one student at a time. A pooled streak on this page was the
+   * number a leader read just before phoning: it has to agree with the list.
+   */
+  test('a student’s attendance is grouped by gathering', async ({ page, signedInAs }) => {
+    await signedInAs('core');
+    await gotoReady(page, '/dashboard');
+
+    await page.locator('a[href^="/students/"]').first().click();
+
+    const attendance = page.getByRole('heading', { name: 'Attendance' });
+    await expect(attendance).toBeVisible();
+
+    await expect(page.getByRole('heading', { name: 'Friday Fellowship' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Sunday School' })).toBeVisible();
+    // The streak tile names the gathering it is counting, rather than implying
+    // the student has missed everything.
+    await expect(page.getByText(/friday fellowship|sunday school/i).first()).toBeVisible();
+  });
 });
