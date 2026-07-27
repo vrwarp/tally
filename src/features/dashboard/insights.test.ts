@@ -19,6 +19,7 @@ import {
   groupByGathering,
   orderSnapshotsNewestFirst,
   recurringSnapshots,
+  seenAt,
   standingIn,
 } from '@/features/dashboard/insights';
 import type { EventAttendanceSnapshot, TallyEvent } from '@/types';
@@ -1072,6 +1073,49 @@ describe('computeIncompleteProfiles', () => {
     );
 
     expect(incomplete.map((s) => s.id)).toEqual(['tally-1', 'pco_1']);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* seenAt                                                                      */
+/* -------------------------------------------------------------------------- */
+
+describe('seenAt', () => {
+  const events = fridays(3);
+  const friday = (snapshots: EventAttendanceSnapshot[]) =>
+    groupByGathering(snapshots)[0]!;
+
+  it('keeps the students this gathering has actually seen', () => {
+    const gathering = friday([
+      held(events[0]!, ['a']),
+      held(events[1]!),
+      held(events[2]!, ['b']),
+    ]);
+    const students = [makeStudent({ id: 'a' }), makeStudent({ id: 'b' }), makeStudent({ id: 'c' })];
+
+    expect(seenAt(gathering, students).map((s) => s.id)).toEqual(['a', 'b']);
+  });
+
+  it('leaves the order it was given alone', () => {
+    // The lists that pass through here are already sorted for the screen —
+    // freshest to-do first — and re-sorting them by attendance would shuffle a
+    // call list every time a tab was pressed.
+    const gathering = friday([held(events[0]!, ['b', 'a'])]);
+    const students = [makeStudent({ id: 'b' }), makeStudent({ id: 'a' })];
+
+    expect(seenAt(gathering, students).map((s) => s.id)).toEqual(['b', 'a']);
+  });
+
+  it('says nobody when this gathering has not seen them', () => {
+    /*
+     * Which is the honest answer under a tab, not a reason to fall back to the
+     * whole ministry: a Sunday-only student with no parent contact is still on
+     * "All", where a leader looking at the roster rather than at one night will
+     * find them.
+     */
+    const gathering = friday([held(events[0]!, ['a'])]);
+
+    expect(seenAt(gathering, [makeStudent({ id: 'sunday-only' })])).toEqual([]);
   });
 });
 

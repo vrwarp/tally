@@ -13,9 +13,13 @@
  * scoped list below answers for that chain alone; "All" merges them, one row per
  * student, worst streak winning.
  *
- * Below that sit the two sections no gathering owns: profiles missing a parent
- * contact, which is a property of the roster, and one-off events, which are not
- * instances of anything and so cannot be missed, trended or streaked.
+ * That includes the profiles missing a parent contact, which is the one list
+ * here that is not about attendance at all — but "who do we see on a Friday and
+ * cannot reach" is a real question, and a card that ignored the tabs read as
+ * though picking a gathering had done nothing.
+ *
+ * Below it sits the one section no gathering owns: one-off events, which are
+ * not instances of anything and so cannot be missed, trended or streaked.
  *
  * Attendance history is fetched once for a fixed window per gathering (see
  * `useEventSnapshots`) — a Friday from six weeks ago will not change while a
@@ -49,6 +53,7 @@ import {
   computeSummary,
   groupByGathering,
   mergeMia,
+  seenAt,
 } from '@/features/dashboard/insights';
 import { chainKey } from '@/lib/materialize';
 import { presumedCancelled } from '@/lib/sessionHistory';
@@ -189,9 +194,23 @@ export function DashboardPage() {
    * Asked here, by the one screen that lists the students nobody can reach.
    */
   const parentContact = useParentContact();
-  const incomplete = useMemo(
+  const incompleteRows = useMemo(
     () => computeIncompleteProfiles(students, parentContact.reachable),
     [students, parentContact.reachable],
+  );
+  /*
+   * Narrowed to the gathering the tabs are showing, like every other list here.
+   *
+   * An unfinished profile is a fact about the roster rather than about a night,
+   * so this card used to ignore the tabs entirely — and read as though picking
+   * Friday had done nothing. "Who do we see on a Friday and cannot reach" is
+   * the question a leader is actually asking, and `seenAt` is what answers it.
+   * Students no loaded gathering has seen keep their place under "All", which
+   * is where the MIA list already leaves the people no gathering can claim.
+   */
+  const incomplete = useMemo(
+    () => (activeGathering ? seenAt(activeGathering, incompleteRows) : incompleteRows),
+    [incompleteRows, activeGathering],
   );
 
   /*
@@ -366,15 +385,19 @@ export function DashboardPage() {
         </>
       )}
 
-      {/* Independent of attendance history, so it renders even while snapshots
-          are in flight or the ministry has not run an event yet — but not
-          before the roster it is a statement about has arrived. */}
+      {/* Scoped by the tabs like everything above it, but rendered outside that
+          block on purpose: a ministry that has not run a gathering yet still has
+          quick-added visitors nobody can reach, and this is the only list that
+          can say so without any attendance history behind it. There are no tabs
+          in that state, so it shows the whole roster — which is what "All"
+          means. It still waits for the roster it is a statement about. */}
       {awaitingRoster ? null : (
         <IncompleteProfileList
           students={incomplete}
           now={now}
           checking={awaitingContacts}
           error={parentContact.error}
+          gatheringTitle={activeGathering?.title ?? null}
         />
       )}
 

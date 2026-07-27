@@ -523,6 +523,30 @@ export function computeIncompleteProfiles(
     );
 }
 
+/**
+ * The students one gathering has actually seen, in the order they were given.
+ *
+ * What lets a list that is *not* about attendance answer for one gathering
+ * anyway. An unfinished profile is a fact about the roster, not about a night,
+ * so there is no such thing as "incomplete at Friday" — but "who do we see on a
+ * Friday and cannot reach" is a real question, and it is the one a leader is
+ * asking when they pick that tab. Every other card on the screen narrows; a
+ * card that quietly kept showing the whole ministry read as the tab having no
+ * effect.
+ *
+ * Only the loaded window can answer, so a student whose last visit fell off the
+ * end of it belongs to no gathering here and is left to "All" — the same place
+ * the MIA list leaves the students no gathering can claim.
+ */
+export function seenAt(gathering: Gathering, students: readonly Student[]): Student[] {
+  const seen = new Set<string>();
+  for (const snapshot of gathering.snapshots) {
+    for (const id of snapshot.presentStudentIds) seen.add(id);
+  }
+
+  return students.filter((student) => seen.has(student.id));
+}
+
 export interface AttendancePoint {
   /** One bar, one calendar day — which is also its React key. */
   id: string;

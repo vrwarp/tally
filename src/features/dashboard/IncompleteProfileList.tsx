@@ -36,6 +36,8 @@ export interface IncompleteProfileListProps {
   checking?: boolean;
   /** Why the check could not be made, if it could not. */
   error?: string | null;
+  /** The gathering being shown, or null when every gathering is in the list. */
+  gatheringTitle?: string | null;
 }
 
 export function IncompleteProfileList({
@@ -43,13 +45,18 @@ export function IncompleteProfileList({
   now,
   checking = false,
   error = null,
+  gatheringTitle = null,
 }: IncompleteProfileListProps) {
   return (
     <Card>
       <CardHeader
         title="Incomplete profiles"
         count={students.length}
-        description="Active students with no parent phone or email on file."
+        description={
+          gatheringTitle
+            ? `Seen at ${gatheringTitle}, with no parent phone or email on file.`
+            : 'Active students with no parent phone or email on file.'
+        }
       />
 
       {error ? (
@@ -63,8 +70,16 @@ export function IncompleteProfileList({
           </p>
         ) : error ? null : (
           <EmptyState
-            title="Every profile has a parent contact."
-            description="Quick-added visitors and students with nobody on file land here — right now nobody is waiting."
+            title={
+              gatheringTitle
+                ? `Everyone at ${gatheringTitle} has a parent contact.`
+                : 'Every profile has a parent contact.'
+            }
+            description={
+              gatheringTitle
+                ? 'Somebody the ministry cannot reach may still be on another tab — this one only counts the people at this gathering.'
+                : 'Quick-added visitors and students with nobody on file land here — right now nobody is waiting.'
+            }
           />
         )
       ) : (

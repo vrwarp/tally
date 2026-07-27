@@ -25,6 +25,7 @@ import {
   groupByGathering,
   mergeMia,
   recurringSnapshots,
+  seenAt,
   standingIn,
 } from './insights';
 import { chainKey } from '@/lib/materialize';
@@ -235,6 +236,25 @@ describe('dashboard insight properties', () => {
 
     for (const student of unchecked) {
       expect(student.profileComplete).toBe(false);
+    }
+  });
+
+  /*
+   * A tab may only ever hide rows, never invent one and never reorder what is
+   * left. The lists it narrows are already sorted for the screen, and a call
+   * list that reshuffles itself when somebody presses a tab is one nobody can
+   * work down.
+   */
+  forAll('narrowing to a gathering is a subset, in order', arbitraryDashboard, (input) => {
+    const incomplete = computeIncompleteProfiles(input.students, input.reachable);
+
+    for (const gathering of groupByGathering(input.snapshots)) {
+      const scoped = seenAt(gathering, incomplete);
+      const attended = (id: string) =>
+        gathering.snapshots.some((snapshot) => snapshot.presentStudentIds.has(id));
+
+      expect(scoped.every((student) => attended(student.id))).toBe(true);
+      expect(scoped).toEqual(incomplete.filter((student) => attended(student.id)));
     }
   });
 

@@ -16,7 +16,10 @@ import type { Student } from '@/types';
 
 const NOW = new Date('2026-02-13T19:30:00');
 
-function show(students: Student[], props: { checking?: boolean; error?: string | null } = {}) {
+function show(
+  students: Student[],
+  props: { checking?: boolean; error?: string | null; gatheringTitle?: string | null } = {},
+) {
   render(
     <MemoryRouter>
       <IncompleteProfileList students={students} now={NOW} {...props} />
@@ -82,5 +85,27 @@ describe('IncompleteProfileList', () => {
     show([]);
 
     expect(screen.getByText(/Every profile has a parent contact/)).toBeInTheDocument();
+  });
+
+  /*
+   * Under a gathering tab this card answers for that gathering, like every other
+   * card on the screen. It used to ignore the tabs and keep listing the whole
+   * ministry, which read as though picking a gathering had done nothing at all.
+   */
+  it('names the gathering it is answering for', () => {
+    show([makeStudent({ id: 'tally-1', firstName: 'Kylie', lastName: 'Novak', profileComplete: false })], {
+      gatheringTitle: 'Friday Fellowship',
+    });
+
+    expect(screen.getByText(/Seen at Friday Fellowship, with no parent phone or email/)).toBeInTheDocument();
+  });
+
+  it('does not claim the whole ministry is fine when only one gathering is', () => {
+    show([], { gatheringTitle: 'Friday Fellowship' });
+
+    expect(screen.getByText('Everyone at Friday Fellowship has a parent contact.')).toBeInTheDocument();
+    // Somebody unreachable may well be sitting on another tab, and this must not
+    // be read as "nobody is waiting".
+    expect(screen.getByText(/may still be on another tab/)).toBeInTheDocument();
   });
 });
