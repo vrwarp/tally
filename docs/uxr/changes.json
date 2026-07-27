@@ -1,0 +1,166 @@
+{
+  "intro": [
+    "Tally has two audiences on one codebase, and they want opposite things. A counselor gets exactly one screen — check-in — and uses it standing at a door on a Friday night, one-handed, in a dim hallway, with a queue of teenagers in front of them and about three seconds per student. A leader gets four more screens and uses them on a Tuesday morning, sitting down, on a laptop, deciding who to phone this week.",
+    "The phone wanted bigger targets in better places. The laptop wanted more answered per screen. Neither is arguable from the code, so this was settled by looking: six screens were frozen out of the live app at both sizes, four agents argued over the frames, and three rounds later the findings stopped being structural."
+  ],
+  "method": [
+    "Six scenes were captured from the running app — real DOM, real stylesheet, real seeded ministry of forty-five students — and frozen into standalone HTML with the JavaScript stripped out. Not mockups: every pixel was rendered by the real components.",
+    "Two critics read the frames each round. One asked whether the person a screen is for could finish their job on the device they were holding; the other asked whether the screen was composed. Both worked from measurements, not impressions.",
+    "A third agent answered them in the prototypes and recorded what it declined, and why. Round one landed thirteen changes against twenty-one major findings; round two, sixteen against nine; round three, three.",
+    "The result was ported into React and re-captured from the running app. Every frame below is the real thing at both ends of the slider."
+  ],
+  "scenes": [
+    {
+      "scene": "dashboard",
+      "title": "Insights — the follow-up call list",
+      "audience": "Core team · Tuesday morning",
+      "job": "Work out who to phone this week: who has drifted, who is new, who nobody can reach.",
+      "notes": [
+        {
+          "viewport": "desktop",
+          "headline": "Three questions on one screen instead of one across four",
+          "why": "The page answered one of its three questions above the fold and hid the other two behind 1,200px of scroll — inside a 481px column with 735px of empty page beside it, because the layout had been built for a 390px phone and centred.",
+          "changes": [
+            "The content stops centring and anchors to the sidebar, in a frame shared with Events, Students and Settings — their left edges used to jump 592 → 464 → 512 between tabs whose sidebar never moved.",
+            "The long call list takes the fluid column; the three short lists stack beside it at a fixed 28rem, the width at which a name like “Bree Sandoval” stops truncating.",
+            "The MIA row folds from four lines to one, so all ten names and their Call/Text land above the fold instead of three and a half.",
+            "The page fell from 2,860px to 1,609px.",
+            "Three of the four tiles carried a saturated wash, so the eye landed by default on the one neutral tile — the only fact needing no action. The tint now belongs to the single tile that is a call to action; the rest colour the numeral."
+          ]
+        },
+        {
+          "viewport": "phone",
+          "headline": "The name is no longer the first thing to give up width",
+          "why": "On the card whose entire output is a list of people to chase, every name truncated — “Selah M…”, “Jayden …”, “Bree S…” — to make room for two badges that never shrank. Two of the five gave a given name only, which on a forty-five-student roll is not an identification.",
+          "changes": [
+            "The name gets the line to itself. The visitor badge went rather than moved: the card's own subtitle already scopes the list.",
+            "The “waiting N days” chip drops to the meta line, where its graduated tone still ranks the list.",
+            "The grade leaves the phone's meta line, so the last-seen date — the reason the row exists — stops being the thing that truncates.",
+            "The reading order is decided by question again: three name lists, then the attendance chart. A desktop column split had quietly put the chart in front of “who is new”."
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "roster",
+      "title": "The check-in roster",
+      "audience": "Counselor · Friday night, at the door",
+      "job": "Find the student at the front of the queue and mark them present in under three seconds, thumb only, without looking at the screen for long.",
+      "notes": [
+        {
+          "viewport": "phone",
+          "headline": "The add-visitor button left the scroll plane, and the list can be scanned",
+          "why": "Two problems, both invisible in a screenshot and both expensive at a door. The floating + sat permanently on top of the right-hand edge of two roster rows, and the seam between them is exactly where a right thumb lands. And the list was sorted by surname while every row printed the given name first, in one weight.",
+          "changes": [
+            "Quick-add moved into the search band, at the leading edge. Every row is a button that checks a student in, so an 8px miss on the old + either checked in the next student, undid the last one, or threw a full-screen visitor form over the queue — which a counselor dismisses without noticing the student was never checked in.",
+            "One sort key for the roster and the directory, and it is the given name both already print first. The surname sets a step back so the scan has something to land on.",
+            "Two amber ⚠ chips used to differ by one 11px word: one meant a student has allergies, the other that an office had not typed in a phone number. The clerical one is a neutral chip now reading “No contact”, so amber means exactly one thing on this row.",
+            "The “2 of 3” prediction ratio leads its line, so it forms a column instead of jumping 75px right on every row that carries a badge."
+          ]
+        },
+        {
+          "viewport": "desktop",
+          "headline": "One control height in a band that ran three",
+          "why": "The check-in screen is also opened from a laptop at a table. The band above the roster mixed a small grey capsule, a bare blue word with no boundary, and a large native select — the two controls that do the same job looking least alike, and the one with no visible boundary being the one that navigates.",
+          "changes": [
+            "“Change” takes the select's fill, ring and radius; the status badge stays at the leading edge and the two ways to a different gathering group together at the trailing one.",
+            "The filter chips and grade control take the same compact pointer step the fields already took."
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "roster-search",
+      "title": "Searching the roster",
+      "audience": "Counselor · Friday night, at the door",
+      "job": "Find someone the prediction did not offer, by typing two or three letters of their name.",
+      "notes": [
+        {
+          "viewport": "phone",
+          "headline": "Results ranked by why they matched",
+          "why": "Typing “ma” for the Maya at the front of the queue returned Aisha Rahman, Amara Osei, Chloe Bergman, Fatima Nasser and Hana Yamamoto first — five people whose surnames merely contain “ma” — and put Maya eighth, half of her below the fold. Every one of those is a legitimate match, so the fix was not to match less.",
+          "changes": [
+            "The matcher ranks: given-name prefix, then surname prefix, then contained anywhere, then the typo pass — holding A–Z inside each band so the list is still predictable.",
+            "The ranking applies only while a query is running. The roster's own order still changes between keystrokes and never as a consequence of checking somebody in, which is the rule that keeps a row from sliding out from under a thumb."
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "students",
+      "title": "The student directory",
+      "audience": "Core team · Tuesday morning",
+      "job": "Find one student among forty-five, see at a glance who is missing a parent contact, and open their record.",
+      "notes": [
+        {
+          "viewport": "desktop",
+          "headline": "Sixteen names above the fold, and the flag reads as a column",
+          "why": "Nine of forty-five names were visible in a 640px column with 576px of empty page beside it, and each 65px row spent 250px on its facts and left the rest blank. The flag a leader came to find trailed five names at whatever x each name happened to end.",
+          "changes": [
+            "The row goes from a 64px two-line card to a 44px single line above `lg`, keeping the touch card below it — two correct answers rather than one compromise height.",
+            "The grade moves from a second line to a fixed column, and the badges move out of the name block beside it, so “Missing info” forms a vertical run instead of a ragged mid-row scan.",
+            "The search field, the two selects and the two chips become one toolbar row. Stacked, they terminated at three different right edges and cost a row and a half of students."
+          ]
+        },
+        {
+          "viewport": "phone",
+          "headline": "The rare action stops being the loudest thing on the screen",
+          "why": "The only brand-filled object on a page whose job is finding one student among forty-five was “Add from Planning Center” — a bulk import somebody runs twice a year — while search, the actual instrument, was dressed as a form label.",
+          "changes": [
+            "The import drops to the quiet treatment the weekly action already had, and the weekly one leads.",
+            "Badges moved to the meta line, so five rows in forty-five stop wrapping to three lines and pushing the grade — the one fact every row shares — out of column.",
+            "The chips count in a pill, the form every other count in the app uses, rather than in parentheses inside the label."
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "events",
+      "title": "The event calendar",
+      "audience": "Core team · Tuesday morning",
+      "job": "See what is on, schedule next Friday, and find the gathering from three weeks ago you need the head count for.",
+      "notes": [
+        {
+          "viewport": "desktop",
+          "headline": "What is behind sits beside what is ahead",
+          "why": "One of this screen's three jobs is finding a past gathering, and the past was the furthest thing away: a leader scrolled past a hero card for the event happening right now, then past sixteen future occurrences, about 2,500px, before the first finished night appeared. Two of twenty-seven gatherings were above the fold.",
+          "changes": [
+            "Upcoming and past become two columns, so ten past gatherings are on the fold beside the whole of what is coming. The page fell from 2,447px to 1,661px.",
+            "“Upcoming” and “Past gatherings” are headings of the same rank, above the group labels inside them. Half the page had been titled like a group inside the other half.",
+            "The scheduling shortcut moved below tonight's gathering. It sat first, wearing the loudest heading on the page, so the card you touch when you notice something is missing outranked the gathering that is on tonight.",
+            "Sixteen “Recurring” chips left the calendar. A badge every row carries is not information, it is a repeated word — and it cost a line of height each while the one genuinely different gathering competed with sixteen decoys."
+          ]
+        },
+        {
+          "viewport": "phone",
+          "headline": "The date can be read, because it is the only thing that varies",
+          "why": "Eleven consecutive rows carry one of two titles, so the date is the only thing telling them apart — and it was set a step further back than the same line in the past list, which meant the archive was the more legible half.",
+          "changes": [
+            "The upcoming detail line moves to the tone the past list already used.",
+            "Losing the repeated badge took roughly 700px off the page.",
+            "The scheduling card's two-line explainer went: its rows already read “✓ … is scheduled” or “+ Schedule next …”, so the explainer was forty pixels restating them."
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "choose-event",
+      "title": "Which gathering are you at?",
+      "audience": "Counselor · Friday night, at the door",
+      "job": "Pick tonight's gathering in one tap, holding the phone one-handed with a queue of students in front of you.",
+      "notes": [
+        {
+          "viewport": "phone",
+          "headline": "The date stops losing to a number nobody can act on",
+          "why": "In every catch-up row the loudest element was a head count from a night that is over, set a full type step above the gathering it annotated — and in the green that means “this student is checked in right now”. Two of those rows are titled “Friday Fellowship”, exactly like tonight's, so the date is the only thing standing between a counselor and forty-five students filed against last week.",
+          "changes": [
+            "The count drops to the weight of the date line and out of the check-in green, so the accent keeps one meaning across the app.",
+            "The date comes up a step, because when two rows share a title it is the only discriminator.",
+            "The “Check-in open” badge and the sentence beside it saying “Check-in is open” were the same fact printed twice. The badge carries it alone.",
+            "Section headings share the left edge of the cards they label, instead of sitting 4px inboard — too small to read as a choice, too consistent to read as an accident."
+          ]
+        }
+      ]
+    }
+  ]
+}

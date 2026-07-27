@@ -16,6 +16,7 @@ import {
   LoadingScreen,
   NumberStepperField,
 } from '@/components/ui';
+import { PageFrame } from '@/components/PageFrame';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
@@ -112,7 +113,7 @@ export function SettingsPage() {
   if (loading) return <LoadingScreen message="Loading settings…" />;
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-4">
+    <PageFrame>
       <header>
         <h1 className="text-xl font-bold text-ink-50">Settings &amp; team</h1>
         <p className="mt-0.5 text-sm text-ink-500">
@@ -221,6 +222,6 @@ export function SettingsPage() {
       <PlanningCenterCard />
 
       <TeamList />
-    </div>
+    </PageFrame>
   );
 }

@@ -1,0 +1,217 @@
+{
+  "changes": [
+    {
+      "scene": "dashboard, events, students",
+      "viewport": "desktop",
+      "addresses": [
+        "design/desktop major: 'The sidebar is pinned hard to the left edge and the content is a 480px column centred in the 1218px that remains… the measure is not even shared across the section — Events runs at 736px and Students at 640px… Three pages that are obviously siblings read as three unrelated documents.'",
+        "usability/desktop major (dashboard): '735px of the 1216px content region — 60% — is empty page.'",
+        "usability/desktop minor: 'a two-word button wraps to two lines and a tile caption wraps to three… this is a width problem, not a density one.'"
+      ],
+      "change": "Stopped centring the core-team content. The page container on Insights, Events and Students now carries `lg:mx-0 lg:max-w-7xl lg:px-8 lg:py-6` on top of its existing phone classes, so at lg all three begin at a constant x=256 (rail 224 + 32px gutter) and run to a 32px right gutter. The three different phone measures (max-w-lg / max-w-2xl / max-w-3xl) still apply below lg and are simply overridden above it.",
+      "rationale": "The critics offered two ways to spend the recovered width and the loop owner picked one: columns, not a wider measure. This change alone does not widen any single block of prose — it just makes the frame available, and changes 2, 5, 11 and 12 spend it. Left-anchoring rather than centring is what makes the rail read as attached to the page, and it is why the left edge can be constant across three tabs whose rail never moves. `max-w-7xl` caps the frame at 80rem so an ultrawide monitor does not stretch the columns indefinitely; at 1440 it does not bind. The tile-caption and 'Copy list' wrapping fixed themselves, as the critic predicted.",
+      "breakpoint": "lg and up; below lg nothing changes",
+      "implementation": "The container div is duplicated per page today: `src/features/dashboard/DashboardPage.tsx:270`, `src/features/events/EventsPage.tsx:376`, `src/features/students/StudentsPage.tsx:96` (and `SettingsPage.tsx:115`, out of frame but the same section). Extract one `PageFrame` wrapper — or at minimum a shared class constant — emitting `mx-auto flex w-full flex-col px-4 py-4 lg:mx-0 lg:max-w-7xl lg:px-8 lg:py-6`, with each page passing only its below-lg `max-w-*` and its `gap-*`. Three literals drifting apart is exactly what produced the 592/464/512 staircase."
+    },
+    {
+      "scene": "dashboard",
+      "viewport": "desktop",
+      "addresses": [
+        "usability/desktop major: 'The list is the job, and one third of one screen of it is showing.'",
+        "usability/desktop major: 'These are two-name and seven-name lists — they are small, and they are stacked in single file behind the big one for no reason other than that the layout was built for a 390px phone.'",
+        "design/desktop major direction: 'Spend the recovered width on columns — the stat row and the MIA list are two blocks that can sit side by side rather than stacked.'"
+      ],
+      "change": "The six sections below the stat tiles are now two wrapper divs inside `flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_28rem] lg:items-start lg:gap-6`. Left column: Missing in action, then Attendance trend. Right column: New faces, Incomplete profiles, One-off events, Met once never since. The tiles stay full-frame above both.",
+      "rationale": "Chose the critic's own split rather than a wide table of MIA rows: MIA rows carry a phone number and two action buttons, and turning them into table columns would have meant re-laying-out the row on top of re-laying-out the page — two changes to judge at once. Column-splitting alone takes the fold from 3.5 MIA names to 5 MIA names + 2 new faces + 4 incomplete profiles, so three of the leader's three questions are answered on one screen instead of one of three across four screens. The right column is 28rem, not the 24rem I first shot: at 24rem 'Jayden Riv…' and 'Bree San…' truncated, and the names are the thing being acted on. The phone stack is unchanged except that Attendance trend and New faces swap — a consequence of the wrapper, and a mild improvement (a two-name list before a chart).",
+      "breakpoint": "lg and up; below lg both wrappers are plain `flex flex-col gap-4` and the page stacks as before",
+      "implementation": "`src/features/dashboard/DashboardPage.tsx` — wrap the six section components in the grid described above. The section components themselves (`MiaList`, `NewVisitorList`, `AttendanceTrend`, `IncompleteProfileList`, `OneOffInsights`) are untouched; they are already width-fluid. Nothing about the All/Sunday/Friday filter changes."
+    },
+    {
+      "scene": "dashboard",
+      "viewport": "phone + desktop",
+      "addresses": [
+        "design/desktop major: 'Three of the four tiles carry a saturated accent wash… When three quarters of a row is accented, the accent has stopped being a signal and become a decoration scheme.'"
+      ],
+      "change": "MIA keeps its `bg-danger-500/10 ring-danger-500/25` wash. New faces and Incomplete drop to `bg-ink-900 ring-ink-800` and move their accent onto the numeral only — `text-present-400` and `text-warn-400`.",
+      "rationale": "The critic's own prescription: 'the tints are the right tokens; the mistake is applying all of them at once.' One washed tile in the row means the red one is the one the eye lands on, which is the tile that is a call to action on a screen whose whole job is 'who do I phone this week'. Keeping the accent on the numeral means the good news is still green and the incomplete count is still amber, so nothing is lost semantically. No new colour — all four values are existing tokens.",
+      "breakpoint": "both",
+      "implementation": "`src/features/dashboard/DashboardPage.tsx` stat tile — the tone prop currently drives both the surface and the ring. Change it to drive the numeral's colour instead, and reserve the tinted surface for a single `emphasis` tile (MIA). Note: the phone capture froze the Incomplete tile mid-load, so only New faces visibly changed in `dashboard--phone`; it is one component and the desktop frame shows the resolved state."
+    },
+    {
+      "scene": "dashboard",
+      "viewport": "phone + desktop",
+      "addresses": [
+        "design/desktop minor: 'the second is a restatement of the tail of the first — \"…1 month ago at Sunday School\" followed by \"Missing from Sunday School\"… the block reads as one sentence stuttering rather than as two facts.'",
+        "design/desktop major evidence: 'All four MIA meta lines truncate mid-word (at Sund…, at Sunda…, at Frida…), each at a different point, producing a ragged column of ellipses.'"
+      ],
+      "change": "Dropped the trailing ' at <gathering>' from the first meta line of all ten MIA rows. Line one is now identity and history ('11th grade · Last seen Jun 21, 1 month ago'); line two is the reason the person is in this list ('Missing from Sunday School').",
+      "rationale": "The gathering was printed twice in four lines of a four-line row, and the first printing was the one that truncated — so the reader lost words the next line then repeated in full. Removing the duplicate is smaller than the critic's alternative (folding the gathering into the missed-count chip), which would have widened the chip and put a variable-length string in a fixed-width badge. In the wider desktop frame neither line truncates now. I tried swapping the two lines so the phone's truncation would fall on the date rather than the gathering, re-shot it, and reverted: 'Missing from Sund…' costs more than losing the tail of a date.",
+      "breakpoint": "both",
+      "implementation": "`src/features/dashboard/MiaList.tsx` — the first meta line should stop appending the gathering title; the 'Missing from …' line already carries it."
+    },
+    {
+      "scene": "events",
+      "viewport": "desktop",
+      "addresses": [
+        "usability/desktop major: 'the Past gatherings heading appears roughly 2,500px down, about three screens. The screen shows 2 of its 27 gatherings above the fold.'",
+        "usability/phone major (same finding, phone half): 'the past list begins 2,541px down… roughly six thumb flicks to reach a date the leader could have named out loud.'"
+      ],
+      "change": "Quick add / Today / Next seven days / Later are wrapped in one column and Past gatherings becomes the second, inside `flex flex-col gap-8 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8`. At 1440 that is two 560px columns.",
+      "rationale": "Declined the month grid the critic asked for — it is a new component, and a round that invents one resets the loop. The complaint underneath it is positional, not calendrical: 'the past is the half of this page that gets hunted through, and it is the half that is furthest away.' Putting the two halves side by side answers that with the width change 1 already recovered. Ten past gatherings back to Jun 28 are now on the fold alongside the whole of the upcoming list, versus two rows of anything before. The Today hero is untouched — the loop owner protects its shape, and it keeps it here at a narrower measure. Phone is unaffected: one wrapper div, same order, same gap.",
+      "breakpoint": "lg and up; below lg the wrapper is a plain `flex flex-col gap-8`",
+      "implementation": "`src/features/events/EventsPage.tsx:376` — wrap `<QuickAdd/> <Today/> <NextSeven/> <Later/>` in one div and leave `<PastGatherings/>` as the grid's second child. `PastGatherings.tsx` needs no change; its rows already truncate gracefully at 560px."
+    },
+    {
+      "scene": "events",
+      "viewport": "phone + desktop",
+      "addresses": [
+        "design/desktop major: 'Green tick plus past-participle plus dimmed text is the universal costume of a completed item, so the one control that saves a leader the most time reads as a log entry. The card's own heading says Quick add; nothing beneath it looks addable.'",
+        "design/phone major (same finding): 'a row you are meant to tap should not sit two steps back from the reader.'",
+        "usability/phone major: 'collapse the already scheduled confirmations into a single line.'"
+      ],
+      "change": "Took the critics' second option rather than their first. The rows genuinely are confirmations — `QuickAction` renders the '✓ … is scheduled' link only when the next occurrence already exists, and renders a brand-tinted '+ Schedule next …' button when it does not. So the card is renamed 'Next in each series' / 'Schedule the next one, or open the one already on the calendar', the confirmation row's title comes up from `text-ink-300` to `text-ink-100`, its ✓ drops from `text-present-400` to `text-ink-500`, and it gains the same `›` the Next-seven-days rows below it carry.",
+      "rationale": "Both critics were reading a card that happened to be in its all-scheduled state and concluding the affordance was mis-dressed; the affordance is fine, the card's promise was wrong. Renaming the card makes both of its row states honest under one heading. Two of the three complaints then dissolve on their own: the title is no longer two steps back from every other title on the page, and the row that is a link now looks like the links beneath it. The ✓ goes neutral because `present` is the app's word for a student who turned up — spending it on 'this date exists on the calendar' is what teaches the reader that green means nothing in particular.",
+      "breakpoint": "both",
+      "implementation": "`src/features/events/EventsPage.tsx` — the card header string, and `QuickAction`'s `existing` branch (~line 230): `text-present-400` → `text-ink-500` on the glyph, `text-ink-300` → `text-ink-100` on the title, add the trailing chevron span. The non-existing branch is already correct and stays as it is."
+    },
+    {
+      "scene": "choose-event, events",
+      "viewport": "phone + desktop",
+      "addresses": [
+        "design/desktop minor: 'a green ringed pill reading Check-in open followed 8px later by dim grey text reading Check-in is open. Two objects, one fact.'",
+        "design/phone minor (same finding): 'it puts a third piece of present-green into a card that already carries a brand-filled primary button.'"
+      ],
+      "change": "Removed the grey restatement next to the badge in the hero card. The `Check-in open` badge carries the status alone.",
+      "rationale": "One-line deletion answering the same finding on both viewports of two scenes. Kept the badge rather than the sentence because the badge is the compact form and the hero already has three things competing under the description line.",
+      "breakpoint": "both",
+      "implementation": "`src/features/events/EventHeroCard.tsx:93` — suppress the `eventStatusLine` span when the badge above it already says the same thing. Note this is state-dependent, not a straight delete: `eventStatusLine` (`src/features/events/eventStatus.ts:31`) returns useful text in every other state ('Check-in opens at 7:00 PM', 'Finished · 24 checked in'). Render the span only when `!open && !cancelled` — the cancelled branch duplicates its badge the same way."
+    },
+    {
+      "scene": "choose-event, events",
+      "viewport": "phone + desktop",
+      "addresses": [
+        "design/desktop major: 'the loudest element is the number on the right: 20px bold in the present green… The thing you tap — which gathering — is quieter than a historical total you cannot act on.'",
+        "design/phone major (same finding): 'Squint at the lower half of the frame and you read 16 24 18 26 21 as a column, and the names only afterwards.'",
+        "usability/phone major (partial): 'two of them are titled Friday Fellowship exactly like tonight's… a counselor who taps the wrong Friday does not get an error.'"
+      ],
+      "change": "In `PastEventRow`: the attendance count drops from `text-xl font-bold text-present-400` to `text-sm font-semibold text-ink-400`, and the date line comes up from `text-ink-500` to `text-ink-400`. Title weight left alone.",
+      "rationale": "The count is a footnote about a night that is over, and it was wearing the token that means a student is checked in right now. Demoting it makes the name and the date the first things read, which is also the cheapest available mitigation for the wrong-Friday risk: when two rows share a title, the date is the only discriminator, and it was the quietest thing in the row. I did not raise the title to `ink-50` as the critic suggested — `PastEventRow` is shared between Catch up and the Events page's Past gatherings (the source comment says two renderings of 'a Friday that already happened' would drift), and there a past row brighter than an upcoming row would be a new problem. Applied to the Events page's past list at the same time, for that reason.",
+      "breakpoint": "both",
+      "implementation": "`src/features/events/PastGatherings.tsx` — `AttendanceStat` (line 65) and the date line in `PastEventRow` (line 123). Both surfaces update together because both import this component."
+    },
+    {
+      "scene": "choose-event, events",
+      "viewport": "phone + desktop",
+      "addresses": [
+        "design/phone minor: 'Every section heading carries a small horizontal inset that its cards do not… the effect is a page where nothing quite lines up and the eye finds no spine.'"
+      ],
+      "change": "Dropped `px-1` from the section headings and their sub-lines on both scenes (10 headings). Headings now share the cards' left edge.",
+      "rationale": "A class removal that gives both pages one vertical spine. The alternative the critic offered — making the offset large enough to read as deliberate — would have been inventing a layout idea to justify a 4px accident.",
+      "breakpoint": "both",
+      "implementation": "`src/features/checkin/ChooseEvent.tsx:112ff` and `src/features/events/EventsPage.tsx` section headings: remove `px-1` from the `h1`/`h2`/`h3` and their explainer `p`s."
+    },
+    {
+      "scene": "students",
+      "viewport": "phone + desktop",
+      "addresses": [
+        "design/desktop major: 'The loudest, widest, most saturated object on this screen is a bulk-import button… The hierarchy is exactly inverted — the rarest action is the biggest, and the constant one is furniture.'",
+        "design/phone major (same finding): 'the rare administrative action wears the accent, the constant action wears a form label.'",
+        "usability/phone minor: 'the two largest, brightest targets… are admin actions a leader takes rarely, and they push the first name to y 409.'"
+      ],
+      "change": "'Add from Planning Center' drops from `bg-brand-500 text-white` to the same `bg-ink-800 … ring-ink-700` treatment 'New visitor' already has, and the two swap places so the weekly action leads. On a phone the header still wraps to two lines, but the orphan on the second line is now the twice-a-year import rather than the weekly one.",
+      "breakpoint": "both",
+      "rationale": "Demotion rather than removal: there is nowhere else in these six scenes for a bulk import to live, and inventing a home for it is out of scope for this round. Note that this leaves the page with no brand-filled element at all, which is correct here — the constant action on this screen is search, and search is an input, not a button. Change 11 gives search the top line to itself at lg instead, which is the 'let the search field carry the visual weight' half of the critic's direction.",
+      "implementation": "`src/features/students/StudentsPage.tsx` header — swap the two `<Button>`s and change the import's variant from primary to secondary."
+    },
+    {
+      "scene": "students",
+      "viewport": "desktop",
+      "addresses": [
+        "design/desktop minor: 'The filter stack has a staircase right edge: the search input runs the full 640px measure, the Grade and Status selects stop 216px short of it, and the two chips below stop shorter still.'",
+        "usability/desktop major (partial): 'scanning the directory takes three and a half screens.'"
+      ],
+      "change": "The search/selects/chips stack becomes one toolbar row at lg: the container gains `lg:flex-row lg:items-end lg:gap-4`, search takes `lg:flex-1`, the selects grid is pinned at `lg:w-[28rem] lg:grid-cols-2 lg:shrink-0`, and the chip group gets `lg:shrink-0`. Three rows become one, and the first name rises about 130px.",
+      "rationale": "The staircase was three controls dropped in at their natural widths; one line makes them a set, and the sm:grid-cols-3 that was leaving an empty third column is overridden rather than removed (it is still right at sm). This is also the cheapest density win on the page — it is a row and a half of students, for no change to any row.",
+      "breakpoint": "lg and up; the phone stack is unchanged",
+      "implementation": "`src/features/students/StudentsPage.tsx` filter block. Both prototype files carry the change — the phone file's input ids differ, which is worth knowing if anyone diffs the two by string."
+    },
+    {
+      "scene": "students",
+      "viewport": "desktop",
+      "addresses": [
+        "usability/desktop major: 'Nine names are visible… Each 65px row spends about 250px on initials, name and grade and leaves the remaining 390px — 61% of the row — empty, then puts a chevron at the far right of that emptiness.'",
+        "design/desktop minor: 'the chevron floats unmoored rather than closing the row.'"
+      ],
+      "change": "At lg the directory row goes from a 64px two-line card to a 44px single line: `lg:min-h-11 lg:py-1` on the row, `lg:size-8 lg:text-xs` on the initials, and the name/grade block becomes `lg:flex lg:items-center lg:gap-4` with the name taking `lg:flex-1` and the grade becoming a fixed `lg:w-28` column. Sixteen names above the fold instead of nine, and the grade column now closes the row against the chevron.",
+      "rationale": "Columns for facts the row already displays, per the brief's rule against inventing richer student cards — grade moves from a second line to a column, and the Visitor / Missing info badges stay where they are, trailing the name. Did not add a 'last seen' column: it is not on this screen today and is a new query about a minor. Below lg the row keeps its 64px two-line touch form; this is the responsive difference the brief asks for rather than a compromise height.",
+      "breakpoint": "lg and up",
+      "implementation": "`src/features/students/StudentsPage.tsx:298` — the row `<Link>` and the two spans inside it. Applies to all 45 rows; it is one row component."
+    },
+    {
+      "scene": "roster, roster-search",
+      "viewport": "phone + desktop",
+      "addresses": [
+        "usability/phone major: 'A tap that lands there does one of three things depending on 8px of error: check the next student in, undo the last student's check-in, or throw up a full-screen Add a visitor dialog on top of a queue.'",
+        "design/phone major (same finding): 'the blue disc… covering the ring on the Noah Fitzgerald row… the composition acquires a collision at its busiest point.'"
+      ],
+      "change": "Deleted the `fixed bottom-safe-bottom right-4 mb-20 size-14` FAB and put quick-add in the sticky search band as a 48px button beside the search input (`size-12`, `pointer-fine:size-9`), in the app's existing addable treatment — `bg-brand-500/10 ring-brand-500/30 text-brand-300`, the same one `QuickAction` uses on Events.",
+      "rationale": "Took the usability critic's second direction rather than the first. Padding the end of the list and adding a scrim only protects the end of the list: every row is a `<button>` that checks a student in, so a fixed disc anywhere over the scroll plane sits on top of a live target at some scroll position. Moving it out of that plane is the only fix that survives scrolling. The search band is where it belongs — 'this person isn't in the list' is a search outcome, not a scrolling one — and the counselor is already reaching up there to type. The cost is reach, and the brief permits it: adding a visitor is not something a counselor does repeatedly, and it now sits next to the control they must touch to discover they need it. The search input loses ~56px, which does not truncate its placeholder at 390px. No new colour introduced.",
+      "breakpoint": "both — the FAB was floating at lg too (`lg:mb-6`), and the button reads correctly in the desktop band at its pointer size",
+      "implementation": "`src/features/checkin/CheckInPage.tsx:456` — remove the floating button and render it inside the `SearchBar` row (`src/features/checkin/SearchBar.tsx`), wrapping the existing field in `flex items-end gap-2` with the field `flex-1`. The `QuickAddVisitorModal` it opens is unchanged. The `pb-24` on `<main>` was reserved for the FAB and can come back."
+    }
+  ],
+  "declined": [
+    {
+      "finding": "usability/phone major (choose-event): 'Invert the vertical priority: tonight's card belongs in the reachable zone and Catch up belongs above it or behind a disclosure.'",
+      "why": "The risk is real but the prescribed fix is a composition change on a screen whose shape the loop owner has protected (the Events Today hero and the check-in chooser are deliberately the same shape, so inverting one means inverting both). I took the mitigation the same critic offered as its fallback instead — see change 8: the catch-up rows' dates are now the second-loudest thing in the row rather than the quietest, and the borrowed green is gone, so the discriminator between two rows both titled 'Friday Fellowship' is legible at a glance. If round 2 still sees the reach problem, the cheaper next move is a disclosure on Catch up, not a reorder."
+    },
+    {
+      "finding": "design/phone major (roster): 'Which gathering you are on is stated four times in the top 200px… collapse Change and the select into a single control.'",
+      "why": "Two of the four statements are documented product decisions, and one of them exists for exactly the failure the choose-event finding is worried about. `EventHeader.tsx`'s own header comment: 'The date badge is the most important thing on this bar… Today is reassurance; anything else is a warning' — the chip turns amber and reads 'Past gathering' when the register is not today's. And 'Change' is a link to `/` while the select switches event directly: the comment there says it is a link 'because there is no longer a now the app has picked — somebody who is on the wrong night wants the question again, not a second guess at the answer.' The brief backs both ('the event is chosen by a person, not by the clock; / is a question'). The genuine residue is that two different jobs are dressed as three unrelated idioms — that is a styling problem to solve by giving 'Change' and the select one vocabulary, not by merging them, and it is a better fit for a round that is not also moving three page frames."
+    },
+    {
+      "finding": "design/desktop minor (roster): 'the select's radius, its chevron and its type all come from somewhere other than this design system.'",
+      "why": "True, and the fix is to replace a native `<select>` with the app's own chip/menu vocabulary — a new control, in a round whose brief is structure. Carrying it to round 2 with the point above, since they are the same edit."
+    },
+    {
+      "finding": "usability/desktop major (roster): 'At lg: two or three columns of the same A-Z list… Thirty names above the fold instead of nine.'",
+      "why": "Not ranked by the loop owner, and it is the one desktop density change that touches the constraint surface: a multi-column A–Z grid changes what 'the next name under my thumb' means, and check-in is the scene where a mis-tap files a student against the wrong record. It also interacts with the sticky section headers. Worth doing, but as its own round with its own critique, not stacked on top of five other structural changes."
+    },
+    {
+      "finding": "usability/desktop major (events): 'a month grid in the space that is already empty, so three weeks ago is a click on a date rather than a scroll.'",
+      "why": "A new component the app does not have, with its own empty/overflow/multi-event-per-day states. Change 5 answers the finding's actual complaint — the past being the furthest-away half — by putting it on the fold. If a grid is still wanted after that, it is a feature, not a refinement."
+    },
+    {
+      "finding": "design/desktop minor (events): 'let the primary action size to its label and sit on a line with the card's metadata rather than spanning it.'",
+      "why": "The full-bleed CTA is the shared shape between the Events Today hero and the check-in chooser, which the loop owner has ruled deliberate. Changing it on both would keep them consistent, but 'same shape' most plausibly means this bar, and a minor is not worth testing that reading."
+    },
+    {
+      "finding": "usability/phone minor (students): 'give the directory rows the roster's spacing so the tap boundaries are visible.'",
+      "why": "Declining on cost. The roster's `gap-2` card treatment is right for a list where a mis-tap files a student wrongly; here a mis-tap opens a neighbouring record and costs a back tap. Giving the phone cards and the desktop dividers means two row chromes in one component, at lg, for a recoverable error — and change 12 has just made the divided dense row the correct desktop form. Revisit if round 2 still sees it."
+    },
+    {
+      "finding": "usability/phone minor (dashboard): 'pick two characters that differ in silhouette… and raise the labels to at least 12px.'",
+      "why": "The glyph half risks introducing an icon idea the app has deliberately gone without, and I have no candidate that is clearly better than ▤/☰ without it. The 11→12px label half is cheap and I would take it, but not on its own — it belongs with whatever answers the glyph."
+    },
+    {
+      "finding": "design/phone minor (dashboard): 'Let the chip row stay on one line so the fold opens on the numbers rather than the filters.'",
+      "why": "The three gathering names are data, not labels — a fourth series would wrap whatever fits today. A one-line answer means a scroller or truncation, which is a control to design, not a class to change."
+    },
+    {
+      "finding": "design/phone minor (roster): 'Give the ratio a fixed position in the row… the badge also drops the loudest colour in the row into the quietest line.'",
+      "why": "Real, and cheap-looking, but the meta line is the one part of the roster row I did not want to touch in the same round the quick-add moved out of the scroll plane — the row is the scene's only affordance and it now has one change pending review. Round 2, with the amber weight, as one edit."
+    },
+    {
+      "finding": "usability/phone minor (dashboard): 'Make the whole row the target… and let the contact line resolve into something tappable rather than a spinner.'",
+      "why": "The spinner is the same frozen-mid-flight capture state as the INCOMPLETE dash — the desktop frame shows the resolved row with `tel:` Call and `sms:` Text links already in place. The 'whole row is the target' half is a real finding, but the row contains two competing links (the student record and the phone number), so making the row itself a target needs the contact actions to move out of it first. Not this round."
+    },
+    {
+      "finding": "usability/phone major: phone frames rendering under `pointer: fine`, and `-full` frames byte-identical to `-fold`.",
+      "why": "Harness, not design; fixed before r01b per the loop owner."
+    },
+    {
+      "finding": "usability/desktop major and design/phone major: the INCOMPLETE tile's em dash, and the dashboard's 7 versus the Students chip's 5.",
+      "why": "The dash is a loading state the capture froze, and the count mismatch is the loop owner's to fix in code. Left entirely alone; note the two numbers still disagree in the frames (dashboard 7, chip 5) and will until that lands."
+    }
+  ]
+}

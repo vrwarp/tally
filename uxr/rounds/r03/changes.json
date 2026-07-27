@@ -1,0 +1,105 @@
+{
+  "note": "Round 3 was the last round. Its findings were applied straight to src/ rather than to the prototypes: the loop had converged (21 majors, then 9, then 3), every remaining major was a small, well-specified change, and another prototype pass would have cost a capture cycle to re-derive files that were about to be thrown away. What the prototypes were for — arguing about the structure before paying for it — was finished.",
+  "changes": [
+    {
+      "scene": "dashboard",
+      "viewport": "desktop",
+      "addresses": [
+        "usability/desktop major: round 2 deleted the printed phone number at every width, which was a 390px decision applied to a 1440px screen — leaving no phone number anywhere on the one page whose job is phoning people, on a device where tel: and sms: mostly do not work"
+      ],
+      "change": "The number is printed again above `lg` and hidden below it (`hidden … lg:inline`). The parent email address beside the Email link takes the same rule, which also ends the one-row-in-ten inconsistency the critic found on Elena Petrova's row.",
+      "rationale": "This is the responsive difference the brief asks for rather than a compromise: the phone's 358px row genuinely could not hold the number, and the laptop's 680px row has 98px of empty space where it goes.",
+      "breakpoint": "lg and up",
+      "implementation": "src/features/dashboard/FollowUpActions.tsx"
+    },
+    {
+      "scene": "roster, roster-search",
+      "viewport": "phone + desktop",
+      "addresses": [
+        "usability/phone major: two amber ⚠ chips, pixel-identical apart from an 11px word — one meaning a student has allergies, the other that an office has not typed in a phone number"
+      ],
+      "change": "`WARNING_META` carries a tone. The allergy keeps amber and the ⚠; missing parent contact becomes a neutral chip reading “No contact” instead of “Info”.",
+      "rationale": "A counselor in a dim hallway either stops to read the word on every amber row or learns amber is usually clerical and stops reading it — and the one they stop reading is the allergy. “Info” also named nothing without a tooltip a thumb cannot produce. Amber and ⚠ now mean exactly one thing on a roster row: this has a consequence at the door.",
+      "breakpoint": "both",
+      "implementation": "src/components/ui/warnings.ts, src/components/ui/Badge.tsx"
+    },
+    {
+      "scene": "roster-search",
+      "viewport": "phone + desktop",
+      "addresses": [
+        "usability/phone major: results are sorted, not ranked — typing “ma” for the Maya at the front of the queue returned five people whose surnames merely contain “ma” and put Maya eighth, half of her below the fold. Round 2's re-key to given name caused it."
+      ],
+      "change": "`createSearchMatcher` gained `rank`: given-name prefix, then surname prefix, then contained, then typo-pass only. The roster sorts on that band first and by name inside each, but only while a query is running.",
+      "rationale": "Every one of those matches is legitimate, so the fix is not to match less. Ranking does not touch “a tap never moves a row”: the order changes between keystrokes, never as a consequence of checking somebody in.",
+      "breakpoint": "both",
+      "implementation": "src/lib/utils.ts, src/features/roster/predictiveRoster.ts"
+    },
+    {
+      "scene": "events",
+      "viewport": "phone + desktop",
+      "addresses": [
+        "usability/phone minor and design/phone minor: eleven upcoming rows carry one of two titles, so the date is the only thing telling them apart — and it was set a step further back than the same line in the past list"
+      ],
+      "change": "The upcoming detail line moves from `ink-500` to `ink-400`, the tone the past list already uses.",
+      "rationale": "One token, and it makes the two halves of the calendar set the same line at the same distance instead of the archive being the more legible one.",
+      "breakpoint": "both",
+      "implementation": "src/features/events/EventsPage.tsx"
+    },
+    {
+      "scene": "roster, roster-search",
+      "viewport": "desktop",
+      "addresses": [
+        "design/desktop minor: the Students toolbar now runs one control height at pointer sizes; the roster's band, the same kind of band, still ran three"
+      ],
+      "change": "The focus chips and the grade chip take the same `pointer-fine:min-h-9` step the fields already take, and the two event-switch controls take it too.",
+      "rationale": "Being the one control that did not shrink on a pointer screen is a leftover, not a decision.",
+      "breakpoint": "pointer-fine only",
+      "implementation": "src/features/checkin/FilterBar.tsx, src/features/checkin/GradeFilter.tsx, src/features/checkin/EventHeader.tsx"
+    },
+    {
+      "scene": "roster",
+      "viewport": "phone",
+      "addresses": [
+        "design/phone minor: the two controls that do the same job were the two that looked least alike, and proximity grouped the status chip with the link rather than the link with the select"
+      ],
+      "change": "“Change” gains the select's fill, ring and radius; the status badge stays at the leading edge and the two event-switch controls move together to the trailing end.",
+      "rationale": "The r01 disposition held this over twice as “a shared vocabulary, not a merge”. Round 2 did the vocabulary; this does the grouping.",
+      "breakpoint": "both",
+      "implementation": "src/features/checkin/EventHeader.tsx"
+    }
+  ],
+  "declined": [
+    {
+      "finding": "usability/desktop minor (students): two columns of the A–Z directory list at lg, to put ~32 of 45 names above the fold",
+      "why": "Deferred for the third time, and deliberately. It changes keyboard and screen-reader traversal order, which is a real cost that wants its own change and its own testing rather than being folded into the last round of a refinement. The row itself is now dense and its facts are columned; this is the next thing, not this thing."
+    },
+    {
+      "finding": "usability/desktop minor (events): let the Later cap be the phone's and not the laptop's, or spill Later into the right column once Past has run out",
+      "why": "Real, and the column-spill version is the better answer, but both need the list to know how long the other column is — which is layout state the page does not have. Recorded rather than bodged."
+    },
+    {
+      "finding": "design/desktop minor (dashboard): the MISSED count rides on whatever contact treatment the row has, so it never appears twice at the same x",
+      "why": "Would want the count in its own fixed column between the identity block and the actions. Worth doing; not worth doing in the same pass that just changed what the contact group contains, because the two interact and only one of them has been looked at."
+    },
+    {
+      "finding": "design/desktop minor (dashboard): the tile row's cell widths are inversely proportional to what the tiles have to say",
+      "why": "The seam alignment is the part that mattered and it landed. Re-assigning which tile gets the wide cell is a content decision about which of four numbers deserves a sentence, and the round-2 critique has already argued three of the four tiles should not exist in their present form — that is one question, for one future round, not two half-answers."
+    },
+    {
+      "finding": "design/phone minor (dashboard): the New faces badge still caps the text column, so both rows truncate their date",
+      "why": "The same pattern the Incomplete card just adopted would fix it, and it is a good catch. Left because New faces has already lost its amber button this round and I would rather one change to that card be judged before a second."
+    },
+    {
+      "finding": "design/phone minor: choose-event's two sections are labelled three steps apart; the events series card sits at a different left edge inside a ring within a ring",
+      "why": "Both are the same unfinished job — one heading system across choose-event and events — and both are cheap. Not taken because the events half moved this round and the pair should be settled together against a frame where both have stopped moving."
+    },
+    {
+      "finding": "design/phone minor (roster-search): the name sits at two different heights depending on whether the row has a ratio line",
+      "why": "Real. One token (`items-start` on the text block) and I could not verify it without another capture cycle, which is what this round was avoiding. First thing for a future round."
+    },
+    {
+      "finding": "design/phone minor (events): eleven rows truncate the location, which is a constant per series",
+      "why": "The fix is deciding what varies and printing only that, which changes what the row says rather than how it looks. A content decision, and the row already got its badge and its tone changed this round."
+    }
+  ]
+}

@@ -504,17 +504,48 @@ export function computeNewVisitors(
  *
  * Quick-added visitors surface first, since they are the freshest to-do.
  */
+/**
+ * The predicate itself, exported because two screens ask this question.
+ *
+ * Insights counts unreachable students; the students directory offers the same
+ * count as a filter chip. They used to answer it differently — the directory
+ * read `profileComplete === false` alone, which is `null` for everybody the
+ * roster did not hydrate — so the two screens showed different numbers under
+ * the same words, one click apart in the same sidebar. On the one screen whose
+ * whole value is that its counts can be trusted, that is not a rounding
+ * difference; it is a reason to stop believing either number.
+ */
+export function isUnreachable(
+  student: Student,
+  reachable: ReadonlyMap<string, boolean> = new Map(),
+): boolean {
+  if (student.status !== 'active') return false;
+  return hasNoParentContact(student.profileComplete, reachable.get(student.id));
+}
+
+/**
+ * The same resolution, for a caller that already holds one student's answer
+ * rather than the whole map — a memoised row, for instance.
+ *
+ * Split out because the expression had been written a third time by hand, and
+ * one of the three copies had already lost the `status` check. Two sources, one
+ * order of precedence, in one place: Tally's own answer wins where it has one,
+ * because a visitor who exists nowhere else cannot be looked up, and `null` on
+ * a roster row means nobody asked.
+ */
+export function hasNoParentContact(
+  profileComplete: boolean | null,
+  reachable: boolean | undefined,
+): boolean {
+  return (profileComplete ?? reachable ?? null) === false;
+}
+
 export function computeIncompleteProfiles(
   students: readonly Student[],
   reachable: ReadonlyMap<string, boolean> = new Map(),
 ): Student[] {
   return students
-    .filter((student) => {
-      if (student.status !== 'active') return false;
-      // Tally's own answer wins where it has one: a visitor who exists nowhere
-      // else cannot be looked up, and `null` on a roster row means unasked.
-      return (student.profileComplete ?? reachable.get(student.id) ?? null) === false;
-    })
+    .filter((student) => isUnreachable(student, reachable))
     .sort(
       (a, b) =>
         Number(b.isVisitor) - Number(a.isVisitor) ||

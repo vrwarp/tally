@@ -21,13 +21,16 @@ import {
   SkeletonRows,
   TextField,
 } from '@/components/ui';
+import { PageFrame } from '@/components/PageFrame';
 import { RosterErrorBanner } from '@/components/RosterErrorBanner';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
+import { useParentContact } from '@/hooks/useParentContact';
+import { isUnreachable } from '@/features/dashboard/insights';
 import { AddFromPlanningCenterModal } from '@/features/students/AddFromPlanningCenterModal';
 import { StudentEditorModal } from '@/features/students/StudentEditorModal';
 import { cn, createSearchMatcher, initials, ordinalGrade } from '@/lib/utils';
-import { GRADES, studentFullName, type Grade, type Student } from '@/types';
+import { GRADES, type Grade, type Student } from '@/types';
 
 type StatusFilter = 'active' | 'inactive' | 'all';
 type QuickFilter = 'none' | 'incomplete' | 'visitors';
@@ -47,26 +50,33 @@ export function StudentsPage() {
   /** Whoever is already here, so the Planning Center search can say so. */
   const rosterIds = useMemo(() => new Set(students.map((student) => student.id)), [students]);
 
+  /*
+   * Who has nobody to ring is Planning Center's answer, not the roster's, and
+   * this screen asks the same question the insights screen does — through the
+   * same session-held read, so opening one after the other costs nothing.
+   *
+   * It used to filter on `profileComplete === false` alone. That flag is `null`
+   * on every student a roster read did not hydrate, so the chip counted only
+   * Tally's own quick-adds and disagreed with the dashboard tile beside it in
+   * the sidebar: seven there, five here, same three words.
+   */
+  const { reachable } = useParentContact();
+
   const visible = useMemo(() => {
     const matcher = createSearchMatcher(query);
     return students.filter((student) => {
       if (status !== 'all' && student.status !== status) return false;
       if (grade !== null && student.grade !== grade) return false;
-      // `profileComplete` has three states and only `false` is a problem:
-      // `null` means a roster read did not hydrate households, so nobody has
-      // checked. Filtering on truthiness listed the entire ministry.
-      if (quick === 'incomplete' && student.profileComplete !== false) return false;
+      if (quick === 'incomplete' && !isUnreachable(student, reachable)) return false;
       if (quick === 'visitors' && !student.isVisitor) return false;
       if (!matcher.matches(student.searchName)) return false;
       return true;
     });
-  }, [students, status, grade, quick, query]);
+  }, [students, status, grade, quick, query, reachable]);
 
   const incompleteCount = useMemo(
-    () =>
-      students.filter((student) => student.status === 'active' && student.profileComplete === false)
-        .length,
-    [students],
+    () => students.filter((student) => isUnreachable(student, reachable)).length,
+    [students, reachable],
   );
   const visitorCount = useMemo(
     () => students.filter((student) => student.status === 'active' && student.isVisitor).length,
@@ -84,7 +94,7 @@ export function StudentsPage() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-4 py-4">
+    <PageFrame width="2xl">
       <header className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-ink-50">Students</h1>
@@ -95,34 +105,47 @@ export function StudentsPage() {
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
           {/*
-            Two ways onto the roster, and the order is the common case first.
-            Somebody the church already knows is looked up; a face at the door
-            nobody has met is typed in and pushed upstream later.
+            Two ways onto the roster, weekly first.
+
+            Both are quiet now. The import used to be the only brand-filled
+            thing on the screen — the loudest, widest object on a page whose job
+            is finding one student among forty-five, for an administrative act
+            somebody does twice a year. What this page is actually for is
+            search, and search is an input rather than a button; at `lg` it
+            takes the top line of the toolbar to itself.
           */}
-          <Button onClick={() => setAddFromPcoOpen(true)}>Add from Planning Center</Button>
           <Button variant="secondary" onClick={() => setEditorOpen(true)}>
             New visitor
+          </Button>
+          <Button variant="secondary" onClick={() => setAddFromPcoOpen(true)}>
+            Add from Planning Center
           </Button>
         </div>
       </header>
 
       <RosterErrorBanner />
 
-      <div className="flex flex-col gap-3">
-        <TextField
-          label="Search"
-          type="search"
-          inputMode="search"
-          enterKeyHint="search"
-          autoCapitalize="off"
-          autoCorrect="off"
-          spellCheck={false}
-          placeholder="Name…"
-          value={query}
-          onChange={(changed) => setQuery(changed.target.value)}
-        />
+      {/* One toolbar row where there is a pointer. Stacked, the search field,
+          the two selects and the two chips terminated at three different right
+          edges — three controls dropped in at their natural widths rather than
+          a set — and cost a row and a half of students. */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:gap-4">
+        <div className="lg:flex-1">
+          <TextField
+            label="Search"
+            type="search"
+            inputMode="search"
+            enterKeyHint="search"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+            placeholder="Name…"
+            value={query}
+            onChange={(changed) => setQuery(changed.target.value)}
+          />
+        </div>
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:w-[28rem] lg:shrink-0 lg:grid-cols-2">
           <SelectField
             label="Grade"
             value={grade ?? ''}
@@ -149,18 +172,20 @@ export function StudentsPage() {
           </SelectField>
         </div>
 
-        <div role="group" aria-label="Quick filters" className="flex flex-wrap gap-2">
+        <div role="group" aria-label="Quick filters" className="flex flex-wrap gap-2 lg:shrink-0">
           <FilterChip
             active={quick === 'incomplete'}
             onPress={() => setQuick((current) => (current === 'incomplete' ? 'none' : 'incomplete'))}
           >
-            Incomplete profiles ({incompleteCount})
+            Incomplete profiles
+            <ChipCount active={quick === 'incomplete'}>{incompleteCount}</ChipCount>
           </FilterChip>
           <FilterChip
             active={quick === 'visitors'}
             onPress={() => setQuick((current) => (current === 'visitors' ? 'none' : 'visitors'))}
           >
-            Visitors ({visitorCount})
+            Visitors
+            <ChipCount active={quick === 'visitors'}>{visitorCount}</ChipCount>
           </FilterChip>
           {isFiltered ? (
             <button
@@ -218,7 +243,11 @@ export function StudentsPage() {
         ) : (
           <ul className="divide-y divide-ink-800">
             {visible.map((student) => (
-              <StudentListRow key={student.id} student={student} />
+              <StudentListRow
+                key={student.id}
+                student={student}
+                unreachable={isUnreachable(student, reachable)}
+              />
             ))}
           </ul>
         )}
@@ -239,7 +268,7 @@ export function StudentsPage() {
         }}
         onRoster={rosterIds}
       />
-    </div>
+    </PageFrame>
   );
 }
 
@@ -258,7 +287,8 @@ function FilterChip({
       onClick={onPress}
       aria-pressed={active}
       className={cn(
-        'min-h-11 shrink-0 whitespace-nowrap rounded-full px-3.5 text-xs font-semibold ring-1 transition-colors',
+        'inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5',
+        'text-xs font-semibold ring-1 transition-colors pointer-fine:min-h-9',
         active
           ? 'bg-brand-500/20 text-brand-200 ring-brand-500/40'
           : 'bg-ink-900 text-ink-400 ring-ink-800 hover:bg-ink-800',
@@ -269,32 +299,79 @@ function FilterChip({
   );
 }
 
+/**
+ * A count beside a chip's label, in the form the rest of the app uses — the
+ * roster's "Recent 24", the dashboard's "Missing in action 10". These two chips
+ * printed theirs in parentheses inside the label, which buried the number in a
+ * run of 12px text and made two screens describe the same quantity two ways.
+ */
+function ChipCount({ active, children }: { active: boolean; children: ReactNode }) {
+  return (
+    <span
+      className={cn(
+        'rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums',
+        active ? 'bg-brand-500/25 text-brand-100' : 'bg-ink-800 text-ink-400',
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
 /** Memoised so retyping in the search box only re-renders the rows that change. */
-const StudentListRow = memo(function StudentListRow({ student }: { student: Student }) {
+const StudentListRow = memo(function StudentListRow({
+  student,
+  unreachable,
+}: {
+  student: Student;
+  /** Passed in rather than read here, so the row and the chip count agree. */
+  unreachable: boolean;
+}) {
   return (
     <li>
+      {/*
+        Two rows, not one row at two heights.
+
+        On a phone this is a 64px card with the grade on a second line, because
+        a thumb needs the target. On a laptop the same facts become columns on a
+        44px line — sixteen names above the fold instead of nine — which is the
+        responsive difference the two audiences actually need rather than a
+        compromise height that serves neither. No new fact is added: grade was
+        already on the row and simply moves from a line to a column.
+      */}
       <Link
         to={`/students/${student.id}`}
-        className="flex min-h-16 items-center gap-3 px-3 py-2 hover:bg-ink-800/40"
+        className="flex min-h-16 items-center gap-3 px-3 py-2 hover:bg-ink-800/40 lg:min-h-11 lg:py-1"
       >
         <span
           aria-hidden="true"
-          className="flex size-11 shrink-0 items-center justify-center rounded-full bg-ink-800 text-sm font-bold text-ink-300"
+          className="flex size-11 shrink-0 items-center justify-center rounded-full bg-ink-800 text-sm font-bold text-ink-300 lg:size-8 lg:text-xs"
         >
           {initials(student.firstName, student.lastName)}
         </span>
 
-        <span className="min-w-0 flex-1">
-          <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-            <span className="truncate text-base font-semibold text-ink-50">
-              {studentFullName(student)}
+        <span className="min-w-0 flex-1 lg:flex lg:items-center lg:gap-4">
+          <span className="min-w-0 truncate text-base text-ink-50 lg:flex-1">
+            <span className="font-semibold">{student.firstName}</span>{' '}
+            <span className="font-normal text-ink-300">{student.lastName}</span>
+          </span>
+          {/*
+            Badges annotate the row; they do not restructure it.
+
+            Laid out as part of the name they inherited its variable width, so
+            on a phone five rows in forty-five wrapped their badges to a second
+            line and pushed the grade to a third — the one fact every row shares
+            was the one whose position moved. On a laptop the same mistake put
+            "Missing info" at five different x positions, so the flag a leader
+            came to find was a ragged mid-row scan rather than a column.
+          */}
+          <span className="mt-0.5 flex items-center gap-2 text-xs text-ink-500 lg:mt-0 lg:w-64 lg:shrink-0 lg:justify-end">
+            <span className="truncate lg:w-20 lg:shrink-0 lg:text-right">
+              {ordinalGrade(student.grade)} grade
             </span>
             {student.isVisitor ? <Badge tone="brand">Visitor</Badge> : null}
-            {student.profileComplete === false ? <Badge tone="warn">Missing info</Badge> : null}
+            {unreachable ? <Badge tone="warn">Missing info</Badge> : null}
             {student.status === 'inactive' ? <Badge tone="neutral">Inactive</Badge> : null}
-          </span>
-          <span className="mt-0.5 flex items-center gap-2 text-xs text-ink-500">
-            <span className="truncate">{ordinalGrade(student.grade)} grade</span>
             <QueuedBadge pcoPersonId={student.pcoPersonId} />
           </span>
         </span>

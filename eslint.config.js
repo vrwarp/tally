@@ -15,6 +15,16 @@ export default tseslint.config(
       'functions/src/generated',
       '.emulator-data',
       'coverage',
+      // `npm run typecheck` is `tsc -b --noEmit false`, so it leaves a .js
+      // beside every .ts it checks. Linting the output as well as the source
+      // reports every finding twice — and reports it against rules the
+      // generated file cannot satisfy. Gitignored for the same reason.
+      'src/**/*.js',
+      'tests/**/*.js',
+      'scripts/**/*.js',
+      'firestore-tests/**/*.js',
+      'e2e/**/*.js',
+      'uxr/**/*.js',
     ],
   },
   {
@@ -56,8 +66,11 @@ export default tseslint.config(
      * which trips both the empty-pattern rule and the hooks rule — `use` is a
      * fixture callback, not a React hook.
      */
-    files: ['e2e/**/*.ts', 'playwright.config.ts'],
-    languageOptions: { globals: globals.node },
+    files: ['e2e/**/*.ts', 'playwright.config.ts', 'uxr/**/*.ts'],
+    // `uxr/` is the same shape: Node code that drives a browser, sharing the
+    // e2e fixtures. `snapshot.ts` also runs a block inside the page, so it
+    // needs the browser globals alongside Node's.
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
     rules: {
       'react-hooks/rules-of-hooks': 'off',
       'no-empty-pattern': 'off',

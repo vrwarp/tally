@@ -115,7 +115,7 @@ export function GradeFilter({ grades, onChange }: GradeFilterProps) {
         aria-controls={open ? panelId : undefined}
         aria-label={`Filter by grade, ${summarise(grades).toLowerCase()}`}
         className={cn(
-          'flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-xs font-semibold ring-1 transition-colors',
+          'flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-xs font-semibold ring-1 transition-colors pointer-fine:min-h-9',
           active
             ? 'bg-brand-500/20 text-brand-200 ring-brand-500/40'
             : 'bg-ink-900 text-ink-400 ring-ink-800 active:bg-ink-800',

@@ -130,27 +130,36 @@ function IncompleteRow({ student, now }: { student: Student; now: Date }) {
         to={`/students/${student.id}`}
         className="flex min-h-11 min-w-0 flex-1 flex-col justify-center hover:text-brand-300"
       >
-        <span className="flex items-baseline gap-2">
-          <span className="truncate text-base font-semibold text-ink-50">
-            {studentFullName(student)}
-          </span>
-          {student.isVisitor ? (
-            <Badge tone="brand" className="shrink-0">
-              Visitor
-            </Badge>
-          ) : null}
+        {/*
+          The name gets the line to itself.
+
+          It used to share it with a "Visitor" badge that never shrank, so at
+          390px every name in the card truncated to make room — "Selah M…",
+          "Jayden …", "Bree S…" — and two of the five gave a given name only,
+          which on a forty-five-student roll is not an identification. On the
+          one card whose entire output is a list of people to chase, the person
+          was the only element allowed to give up width. The visitor flag went
+          rather than moved: this card's own subtitle already scopes the list,
+          and the students directory states it on every row.
+        */}
+        <span className="truncate text-base font-semibold text-ink-50">
+          {studentFullName(student)}
         </span>
-        <span className="truncate text-xs text-ink-500">
-          {ordinalGrade(student.grade)} grade ·{' '}
-          {days === null
-            ? 'no parent contact in Planning Center'
-            : `added ${formatShortDate(student.createdAt)}`}
+        <span className="flex items-baseline gap-2">
+          <span className="truncate text-xs text-ink-500">
+            {ordinalGrade(student.grade)} grade ·{' '}
+            {days === null
+              ? 'no parent contact in Planning Center'
+              : `added ${formatShortDate(student.createdAt)}`}
+          </span>
+          {/* Kept, because its tone is graduated — neutral at a day, warn at a
+              fortnight, danger past a year — which is the only ranking in the
+              card. */}
+          <Badge tone={tone} className="shrink-0">
+            {badge}
+          </Badge>
         </span>
       </Link>
-
-      <Badge tone={tone} className="shrink-0">
-        {badge}
-      </Badge>
 
       <span aria-hidden="true" className="shrink-0 text-ink-600">
         ›

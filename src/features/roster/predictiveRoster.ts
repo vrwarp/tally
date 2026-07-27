@@ -300,11 +300,23 @@ export function buildRoster(input: BuildRosterInput): RosterView {
     return true;
   });
 
-  // One ordering for the one list, and it depends on nothing that a tap can
-  // change. A student's position is a function of their name alone, so checking
-  // somebody in paints their row green exactly where the thumb already is
-  // instead of teleporting it past the four names underneath.
-  entries.sort((a, b) => sortByName(a.student, b.student));
+  /*
+   * One ordering for the one list, and it depends on nothing that a tap can
+   * change. A student's position is a function of their name alone, so checking
+   * somebody in paints their row green exactly where the thumb already is
+   * instead of teleporting it past the four names underneath.
+   *
+   * While a query is running, why a row matched comes first and the name breaks
+   * ties inside each band. That is not the same rule bent: the order still
+   * changes only between keystrokes, never as a consequence of checking
+   * somebody in. Without it, typing "ma" for the Maya at the front of the queue
+   * put five people whose surnames merely contain "ma" above her.
+   */
+  entries.sort(
+    (a, b) =>
+      (isFiltered ? matcher.rank(a.student) - matcher.rank(b.student) : 0) ||
+      sortByName(a.student, b.student),
+  );
 
   return {
     entries,

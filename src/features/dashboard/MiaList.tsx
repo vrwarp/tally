@@ -81,15 +81,38 @@ function MiaRow({ item, showGathering }: { item: MiaStudent; showGathering: bool
   const { student, consecutiveMisses, lastAttendedAt, lastAttendedEventTitle } = item;
   const name = studentFullName(student);
 
+  /*
+   * The gathering is named once per row, not twice.
+   *
+   * The row is four lines tall and used to print it in both of them — and the
+   * first printing was the one that ran out of room, so the reader lost the
+   * words the next line then repeated in full ("…1 month ago at Sund…" over
+   * "Missing from Sunday School"). Line one is identity and history now; line
+   * two is the reason this person is on the list.
+   *
+   * The exception is the row nothing else can place: somebody who has been to
+   * nothing at all gets "Not seen at any gathering" below, which names no
+   * gathering, so where they were last seen is worth saying here.
+   */
+  const placedBelow = showGathering ? item.gatheringTitle !== null : true;
   const lastSeen = lastAttendedAt
     ? `Last seen ${formatShortDate(lastAttendedAt)}, ${formatRelative(lastAttendedAt)}${
-        lastAttendedEventTitle ? ` at ${lastAttendedEventTitle}` : ''
+        !placedBelow && lastAttendedEventTitle ? ` at ${lastAttendedEventTitle}` : ''
       }`
     : 'Never checked in';
 
   return (
-    <li className="px-3 py-2">
-      <div className="flex items-center gap-3">
+    /*
+      Four lines on a phone, one line on a laptop.
+
+      The row carried the name, two meta lines and a contact line stacked down
+      the left half of a 680px column, so a leader whose whole job is working
+      this list read four names before scrolling. Folded up, all ten and their
+      Call/Text land on one screen. Below `lg` it stays stacked: Call and Text
+      under the name is right at 358px, where they have to be thumb targets.
+    */
+    <li className="px-3 py-2 lg:flex lg:items-center lg:gap-4">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
         <span
           aria-hidden="true"
           className="flex size-11 shrink-0 items-center justify-center rounded-full bg-ink-800 text-sm font-bold text-ink-300"
@@ -103,7 +126,11 @@ function MiaRow({ item, showGathering }: { item: MiaStudent; showGathering: bool
         >
           <span className="truncate text-base font-semibold text-ink-50">{name}</span>
           <span className="truncate text-xs text-ink-500">
-            {ordinalGrade(student.grade)} grade · {lastSeen}
+            {/* The grade is the least load-bearing of the three facts on this
+                line and it leads it, so at 390px it is what pushes the last-seen
+                date — the reason the row exists — into an ellipsis. */}
+            <span className="hidden lg:inline">{ordinalGrade(student.grade)} grade · </span>
+            {lastSeen}
           </span>
           {showGathering ? (
             <span className="truncate text-xs text-ink-500">
@@ -142,7 +169,7 @@ function MiaRow({ item, showGathering }: { item: MiaStudent; showGathering: bool
         </span>
       </div>
 
-      <FollowUpActions student={student} className="mt-1 pb-1 pl-14" />
+      <FollowUpActions student={student} className="mt-1 pb-1 pl-14 lg:mt-0 lg:shrink-0 lg:pb-0 lg:pl-0" />
     </li>
   );
 }

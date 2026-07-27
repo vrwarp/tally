@@ -27,7 +27,8 @@
  */
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Badge, Button, Card, CardHeader, EmptyState, EventIcon, SkeletonRows } from '@/components/ui';
+import { Badge, Button, EmptyState, EventIcon, SkeletonRows } from '@/components/ui';
+import { PageFrame } from '@/components/PageFrame';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
@@ -70,6 +71,12 @@ function EventRow({
 }) {
   const cancelled = event.status === 'cancelled';
 
+  const badges = [
+    event.mode === 'oneoff' ? <Badge key="oneoff" tone="brand">One-off</Badge> : null,
+    cancelled ? <Badge key="cancelled" tone="danger">Cancelled</Badge> : null,
+    event.requiresRsvp ? <Badge key="rsvp" tone="warn">RSVP only</Badge> : null,
+  ].filter(Boolean);
+
   return (
     // `min-w-0` at every level of the flex chain: a flex item defaults to
     // `min-width: auto`, which refuses to shrink below its content and pushes
@@ -91,18 +98,27 @@ function EventRow({
             {event.title}
           </span>
 
-          <span className="mt-0.5 block truncate text-xs text-ink-500">
+          {/* One step closer than it was. Five of these rows say "Friday
+              Fellowship" and five say "Sunday School", so the date is the only
+              thing that tells them apart — and it was the quietest mark in the
+              row, a step further back than the same line in the past list. */}
+          <span className="mt-0.5 block truncate text-xs text-ink-400">
             {formatEventDay(event.startAt, now)} · {formatEventWindow(event)}
             {event.location ? ` · ${event.location}` : ''}
           </span>
 
-          <span className="mt-1.5 flex flex-wrap items-center gap-1">
-            <Badge tone={event.mode === 'recurring' ? 'neutral' : 'brand'}>
-              {event.mode === 'recurring' ? 'Recurring' : 'One-off'}
-            </Badge>
-            {cancelled ? <Badge tone="danger">Cancelled</Badge> : null}
-            {event.requiresRsvp ? <Badge tone="warn">RSVP only</Badge> : null}
-          </span>
+          {/*
+            Only what makes this row different from the sixteen around it.
+
+            Every recurring row carried a grey "Recurring" chip on a line of its
+            own — a badge on every row is not information, it is a repeated
+            word, and it cost a line of height each while the one genuinely
+            different gathering, a retreat with an RSVP list, had to compete
+            with sixteen decoys wearing the same chip shape.
+          */}
+          {badges.length > 0 ? (
+            <span className="mt-1.5 flex flex-wrap items-center gap-1">{badges}</span>
+          ) : null}
         </span>
 
         <span aria-hidden="true" className="shrink-0 text-lg text-ink-600">
@@ -146,7 +162,7 @@ function RowSection({
     <section aria-labelledby={`events-${title.replace(/\s+/g, '-').toLowerCase()}`}>
       <h2
         id={`events-${title.replace(/\s+/g, '-').toLowerCase()}`}
-        className="px-1 pb-2 text-xs font-bold uppercase tracking-wider text-ink-400"
+        className="pb-2 text-xs font-bold uppercase tracking-wider text-ink-400"
       >
         {title}
       </h2>
@@ -188,7 +204,7 @@ function Today({ events, now }: { events: readonly TallyEvent[]; now: Date }) {
     <section aria-labelledby="events-today">
       <h2
         id="events-today"
-        className="px-1 pb-2 text-xs font-bold uppercase tracking-wider text-ink-400"
+        className="pb-2 text-xs font-bold uppercase tracking-wider text-ink-400"
       >
         Today
       </h2>
@@ -373,55 +389,94 @@ export function EventsPage() {
   const nothingAhead = today.length === 0 && thisWeek.length === 0 && later.length === 0;
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-4 pb-8">
+    <PageFrame gap="lg" className="pb-8">
       <header className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-bold text-ink-50">Events</h1>
         <Button onClick={() => setEditor({ event: null })}>New event</Button>
       </header>
 
-      {quickActions.length > 0 ? (
-        <Card>
-          <CardHeader title="Quick add" description="Next occurrence of each series." />
-          <ul className="flex flex-col gap-2 p-3">
-            {quickActions.map(({ series: candidate, existing }) => (
-              <QuickAction
-                key={candidate.id}
-                series={candidate}
-                now={now}
-                existing={existing}
-                onSchedule={handleSchedule}
-              />
-            ))}
-          </ul>
-        </Card>
-      ) : null}
+      {/*
+        Ahead on the left, behind on the right — side by side where there is a
+        pointer, stacked where there is a thumb.
 
-      <Today events={today} now={now} />
+        The half of this page that gets hunted through was the half that was
+        furthest away: "find the Friday from three weeks ago" meant scrolling
+        past a hero card for the gathering happening right now and then past
+        sixteen future occurrences, about 2,500px, before the first past night
+        appeared. Ten of them are on the fold now, beside the whole of what is
+        coming. The phone keeps the original order, because there is only one
+        column there and the calendar reads forwards.
+      */}
+      <div className="flex flex-col gap-8 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8">
+        <section aria-labelledby="events-upcoming" className="flex min-w-0 flex-col gap-8">
+          {/* Three ranks, three treatments. The two halves of the calendar are
+              the loudest, the groups inside them a step down, the month
+              captions inside those a step down again. "Past gatherings" owned
+              half the page and was set like a group inside the other half. */}
+          <h2 id="events-upcoming" className="-mb-5 text-base font-semibold text-ink-100">
+            Upcoming
+          </h2>
 
-      {nothingAhead ? (
-        <EmptyState
-          icon="🗓"
-          title="Nothing scheduled yet"
-          description="Use a quick action above, or create a one-off for a retreat or outing."
-        />
-      ) : null}
+          <Today events={today} now={now} />
 
-      <RowSection
-        title="Next seven days"
-        events={thisWeek}
-        now={now}
-        onUncancel={onUncancel}
-        uncancelling={uncancelling}
-      />
-      <RowSection
-        title="Later"
-        events={later}
-        now={now}
-        onUncancel={onUncancel}
-        uncancelling={uncancelling}
-      />
+          {/*
+            Below tonight, not above it.
 
-      <PastGatherings before={dayStart} />
+            This is the maintenance shortcut — schedule next Friday — and it sat
+            first on the page wearing the loudest heading on it, so the card you
+            touch when you notice something is missing outranked the gathering
+            that is on tonight. Its rows already read "✓ … is scheduled" or
+            "+ Schedule next …", so the explainer under the title was forty
+            pixels restating them.
+          */}
+          {quickActions.length > 0 ? (
+            <section aria-labelledby="events-series">
+              <h3
+                id="events-series"
+                className="pb-2 text-xs font-bold uppercase tracking-wider text-ink-400"
+              >
+                Next in each series
+              </h3>
+              <ul className="flex flex-col gap-2">
+                {quickActions.map(({ series: candidate, existing }) => (
+                  <QuickAction
+                    key={candidate.id}
+                    series={candidate}
+                    now={now}
+                    existing={existing}
+                    onSchedule={handleSchedule}
+                  />
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          {nothingAhead ? (
+            <EmptyState
+              icon="🗓"
+              title="Nothing scheduled yet"
+              description="Use a quick action above, or create a one-off for a retreat or outing."
+            />
+          ) : null}
+
+          <RowSection
+            title="Next seven days"
+            events={thisWeek}
+            now={now}
+            onUncancel={onUncancel}
+            uncancelling={uncancelling}
+          />
+          <RowSection
+            title="Later"
+            events={later}
+            now={now}
+            onUncancel={onUncancel}
+            uncancelling={uncancelling}
+          />
+        </section>
+
+        <PastGatherings before={dayStart} />
+      </div>
 
       <EventEditorModal
         open={editor !== null}
@@ -429,6 +484,6 @@ export function EventsPage() {
         event={editor?.event ?? null}
         defaults={editor?.defaults}
       />
-    </div>
+    </PageFrame>
   );
 }

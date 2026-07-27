@@ -183,17 +183,16 @@ export function PastGatherings({ before }: PastGatheringsProps) {
 
   return (
     <section aria-labelledby="past-gatherings">
-      <h2
-        id="past-gatherings"
-        className="px-1 pb-2 text-xs font-bold uppercase tracking-wider text-ink-400"
-      >
+      {/* A half of the calendar, at the same rank as "Upcoming" opposite it —
+          not a group inside one. */}
+      <h2 id="past-gatherings" className="pb-3 text-base font-semibold text-ink-100">
         Past gatherings
       </h2>
 
       <div className="flex flex-col gap-5">
         {groups.map((group) => (
           <div key={group.key}>
-            <h3 className="px-1 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-500">
+            <h3 className="pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-500">
               {group.label}
             </h3>
             <ul className="flex flex-col gap-2">

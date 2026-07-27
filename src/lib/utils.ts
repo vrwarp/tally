@@ -105,9 +105,36 @@ export interface SearchMatcher {
   /** True when the query has no searchable characters, so everything matches. */
   readonly isEmpty: boolean;
   matches(searchName: string): boolean;
+  /**
+   * How well a name matches, for ordering results. Lower is better; `matches`
+   * decides membership and this decides position. See {@link MatchRank}.
+   */
+  rank(student: { firstName: string; lastName: string; searchName: string }): number;
 }
 
-const MATCH_EVERYTHING: SearchMatcher = { isEmpty: true, matches: () => true };
+/**
+ * Why a result is in the list, which is also the order a counselor expects it.
+ *
+ * Typing "ma" because Maya is at the front of the queue returned Aisha Rahman,
+ * Amara Osei, Chloe Bergman, Fatima Nasser and Hana Yamamoto first — five names
+ * that contain "ma" somewhere inside a surname — and put Maya eighth, half of
+ * her below the fold. Every one of those is a legitimate match, so the fix is
+ * not to match less; it is to rank, and to keep A-Z inside each band so the
+ * list is still predictable.
+ */
+const MatchRank = {
+  givenNamePrefix: 0,
+  lastNamePrefix: 1,
+  contained: 2,
+  /** Only the typo pass could place it, so it goes last. */
+  approximate: 3,
+} as const;
+
+const MATCH_EVERYTHING: SearchMatcher = {
+  isEmpty: true,
+  matches: () => true,
+  rank: () => MatchRank.givenNamePrefix,
+};
 
 /**
  * Builds a reusable predicate for one query.
@@ -130,6 +157,16 @@ export function createSearchMatcher(query: string): SearchMatcher {
       if (haystack.includes(needle)) return true;
       if (budget === 0 || haystack.length > FUZZY_MAX_LENGTH) return false;
       return approximatelyIncludes(haystack, needle, budget);
+    },
+    rank(student): number {
+      const first = compact(normalizeForSearch(student.firstName));
+      if (first.startsWith(needle)) return MatchRank.givenNamePrefix;
+      const last = compact(normalizeForSearch(student.lastName));
+      if (last.startsWith(needle)) return MatchRank.lastNamePrefix;
+      if (compact(normalizeForSearch(student.searchName)).includes(needle)) {
+        return MatchRank.contained;
+      }
+      return MatchRank.approximate;
     },
   };
 }
@@ -220,10 +257,26 @@ export function formatPhone(raw: string | null): string {
   return raw;
 }
 
+/**
+ * One ordering key for every list of students in the app: given name first.
+ *
+ * It used to be surname-first here and given-name-first in the student
+ * directory (which orders on `searchName`), while every row in both printed
+ * "Given Surname" in a single weight. So neither list could be scanned by its
+ * own key: a counselor with Marcus in front of them read down the leading word
+ * of a surname-sorted column — Maya, Andre, Chloe, Ruby, Marcus — and found no
+ * order at all, then either thumbed all twenty-four rows or fell back to
+ * typing, which is the escape hatch rather than the path.
+ *
+ * Given name won because it is the token both lists already print first, it is
+ * how a counselor holds a student in mind, and adopting it re-sorted only one
+ * of the two lists. `StudentRow` sets the surname a step back so the scan has
+ * something to land on.
+ */
 export function sortByName<T extends { lastName: string; firstName: string }>(a: T, b: T): number {
   return (
-    a.lastName.localeCompare(b.lastName, undefined, { sensitivity: 'base' }) ||
-    a.firstName.localeCompare(b.firstName, undefined, { sensitivity: 'base' })
+    a.firstName.localeCompare(b.firstName, undefined, { sensitivity: 'base' }) ||
+    a.lastName.localeCompare(b.lastName, undefined, { sensitivity: 'base' })
   );
 }
 

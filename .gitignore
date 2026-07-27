@@ -57,3 +57,31 @@ playwright-report/
 test-results/
 blob-report/
 tsconfig.tsbuildinfo
+
+# UXR refinement working files.
+#
+# `uxr/baseline/` and `uxr/prototype/` ARE committed: they are the frozen
+# derivations of the live app the refinement was argued over, and the record of
+# what was decided is worth nothing without them. The renders are not — every
+# round re-shoots every frame from the HTML in a couple of seconds.
+uxr/renders/
+
+# `npm run typecheck` is `tsc -b --noEmit false`, so it writes a .js beside
+# every .ts it checks. They are build output, not source — and there is no
+# hand-written JavaScript under any of these trees, so the pattern is safe.
+/src/**/*.js
+/tests/**/*.js
+/scripts/**/*.js
+/firestore-tests/**/*.js
+/e2e/**/*.js
+/uxr/**/*.js
+uxr/after/
+# `npm run typecheck` also emits beside the root-level configs it checks, and
+# those are not covered by the per-directory patterns above.
+/*.config.js
+!eslint.config.js
+
+# The assembled walkthrough page — a megabyte and a half of the same JPEGs
+# inlined as base64. `docs/uxr/before` and `docs/uxr/after` ARE committed; this
+# rebuilds from them with `npm run uxr:walkthrough`.
+docs/uxr/walkthrough.html

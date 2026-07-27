@@ -332,7 +332,7 @@ export function CheckInPage() {
         ref={searchBar}
       >
         <div className="mx-auto w-full max-w-3xl">
-          <SearchBar value={query} onChange={setQuery} />
+          <SearchBar value={query} onChange={setQuery} onQuickAdd={() => setQuickAddOpen(true)} />
         </div>
       </div>
 
@@ -352,9 +352,9 @@ export function CheckInPage() {
 
       {/* Capped width on desktop: stretched to a 27-inch monitor a roster row puts
           the student's name and the control that checks them in a foot apart, so
-          the eye and the mouse both have to travel the whole way. What clears
-          the floating add button at the end of the list is the frame's own
-          bottom padding, which every screen gets. */}
+          the eye and the mouse both have to travel the whole way. Nothing floats
+          over the end of this list any more — quick-add rides the search band,
+          see `SearchBar`. */}
       <div className="mx-auto w-full max-w-3xl">
         {attendanceError ? (
           <div className="px-3 pt-3">
@@ -449,15 +449,6 @@ export function CheckInPage() {
           </>
         )}
       </div>
-
-      <button
-        type="button"
-        onClick={() => setQuickAddOpen(true)}
-        aria-label="Quick add a visitor"
-        className="fixed bottom-safe-bottom right-4 z-30 mb-20 flex size-14 items-center justify-center rounded-full bg-brand-500 text-3xl leading-none text-white shadow-lg shadow-black/40 active:bg-brand-600 lg:mb-6"
-      >
-        <span aria-hidden="true">+</span>
-      </button>
 
       {user ? (
         <QuickAddVisitorModal

@@ -214,16 +214,22 @@ describe('formatPhone', () => {
 describe('sortByName', () => {
   const name = (firstName: string, lastName: string) => ({ firstName, lastName });
 
-  it('orders by last name, then first name', () => {
+  /*
+   * Given name first, and deliberately: it is the token every row in the app
+   * prints first, so it is the one a reader can scan a column by. Sorting on
+   * the surname while printing "Given Surname" made both lists unscannable —
+   * the leading word ran Maya, Andre, Chloe, Ruby with no order in it.
+   */
+  it('orders by first name, then last name', () => {
     const people = [
       name('Ana', 'Rivera'),
       name('Zed', 'Alvarez'),
       name('Ben', 'Rivera'),
     ];
     expect([...people].sort(sortByName).map((p) => `${p.firstName} ${p.lastName}`)).toEqual([
-      'Zed Alvarez',
       'Ana Rivera',
       'Ben Rivera',
+      'Zed Alvarez',
     ]);
   });
 

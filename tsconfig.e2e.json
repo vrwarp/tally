@@ -20,5 +20,7 @@
     "exactOptionalPropertyTypes": false,
     "types": ["node"]
   },
-  "include": ["e2e", "playwright.config.ts"]
+  // `uxr` is the same kind of code — Node driving a browser, on the e2e
+  // fixtures — so it types against the same environment rather than the app's.
+  "include": ["e2e", "playwright.config.ts", "uxr"]
 }

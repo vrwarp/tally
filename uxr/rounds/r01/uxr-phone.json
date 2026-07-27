@@ -1,0 +1,74 @@
+[
+  {
+    "scene": "roster",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "the blue '+' quick-add button, floating over the right edge of the list at roughly two-thirds down the screen",
+    "finding": "The counselor's thumb rests on the one pixel where three different actions collide. The quick-add FAB is `fixed`, so at every scroll position it sits on top of the right-hand edge of two student rows — and the point a right thumb naturally lands on is the seam between them. A tap that lands there does one of three things depending on 8px of error: check the next student in, undo the last student's check-in, or throw up a full-screen 'Add a visitor' dialog on top of a queue. The dialog case is the dangerous one, because the counselor aimed at a student's check circle, saw something happen, dismissed it, and moved on — and that student is not checked in.",
+    "evidence": "The FAB is `fixed bottom-safe-bottom right-4 mb-20 size-14 z-30` → a 56×56 box at x 318–374, y 708–764 CSS. In this frame Layla Farouk's row (undo) occupies y 668–733 and Noah Fitzgerald's row (check in) occupies y 740–805, both spanning x 12–378. The FAB's centre, (346, 736), is 3px from the seam between them. Its box covers y 708–733 of Layla's row and y 740–764 of Noah's — including the top of Noah's 24px check indicator, which is centred at (354, 772) and is the only visual affordance the row offers. The same collision appears in roster-search, where the FAB lands on Aisha Rahman's row at y 740.",
+    "direction": "Nothing about the FAB's job requires it to be over the list. The `mb-20` is lifting it 80px off the bottom of a screen that has no bottom bar on this scene, which is what pushes it into the rows in the first place. Either drop it to the bottom edge and let the list end above it (extra bottom padding on the list rather than a floating overlay), or move quick-add out of the scroll plane entirely — it belongs next to search, since 'this person isn't in the list' is a search outcome, not a scrolling one."
+  },
+  {
+    "scene": "choose-event",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "the CATCH UP list occupying the bottom half of the screen, versus the 'Start check-in' hero at the top",
+    "finding": "Every target inside a counselor's thumb arc opens the wrong night's register. The one action they came for — start tonight — sits at y 299–355, which needs a grip shift on a 844px phone; the five things they can reach without one are all past gatherings, and two of them are titled 'Friday Fellowship' exactly like tonight's. A counselor who taps the wrong Friday in a dim hallway does not get an error; they get a roster that looks identical and start filing forty-five students against last week's date. That is the wrong-data failure, and the layout puts the risky targets where the thumb is and the safe one where it is not.",
+    "evidence": "Hero `<a>` at (16,129) 358×246 CSS, with the 'Start check-in' block at y 299–355. The catch-up rows are 358×64 at y 467, 539, 611, 683, 755 — three of them sit wholly inside the bottom third (563–844), and 'Friday Fellowship · Fri 24' at y 539 shares its title with the hero. Once opened, the only thing on the roster screen distinguishing tonight from Fri 24 is a 12px 'Today · 3:12 PM – 5:12 PM' line and an 11px 'Today' chip at y 112. Total page height is 947px, so the whole screen is a single flick — there is no scroll cost to reordering it.",
+    "direction": "Invert the vertical priority: tonight's card belongs in the reachable zone and 'Catch up' belongs above it or behind a disclosure, since it is a deliberate, once-in-a-while intent, not a hallway one. Failing that, the past-register roster needs to announce its date at the weight the hero uses, not at 11–12px, so a wrong tap is caught on the first student rather than the forty-fifth."
+  },
+  {
+    "scene": "events",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "the whole fold — Quick add card, TODAY hero, and the first NEXT SEVEN DAYS row clipped by the bottom nav",
+    "finding": "Two of the three things this scene exists for cannot be started on the fold. 'See what is on' returns zero complete upcoming rows, because 190px at the top is spent on two green ticks confirming work that is already done and another 246px on a hero card duplicating the counselor's choose-event screen. 'Find the gathering from three weeks ago' is worse: the past list begins 2,541px down, behind fourteen future gatherings running out to Sep 20, with no search and no jump — roughly six thumb flicks to reach a date the leader could have named out loud.",
+    "evidence": "Quick add rows at (28,224) and (28,288), both reading '✓ … is scheduled'; the TODAY hero is 358×246 at (16,412); the first upcoming row is at (16,714) 358×93 and the bottom nav starts at y 776, so 62 of its 93px show and the next row at y 815 is entirely below the fold. Upcoming rows run y 714–2470 (14 rows × 93px). The first past row, 'Sunday School · Sun 26', is at y 2541; 'Load older gatherings' is at y 3441 on a 3,686px page. No search field or date jump exists anywhere on the scene.",
+    "direction": "The past is the half of this page that gets hunted through, and it is the half that is furthest away. Give the fold a way in — a period switch (upcoming / past) or a jump to today's position in one continuous list — and collapse the 'already scheduled' confirmations into a single line so the calendar itself starts above the fold."
+  },
+  {
+    "scene": "roster",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "every phone frame in this round, most visibly the roster search field at y 164",
+    "finding": "The phone frames are being rendered as a fine-pointer device, so the component library's desktop compactions are applied to the screenshots both critics are judging. Right now that only shifts the roster by 11px, so this round's conclusions still hold — but the whole point of the coming rounds is to widen the gap between touch and pointer via `pointer-fine:` variants, and every one of those edits will show up in the phone frames as the *pointer* version. The loop would then converge on a phone design nobody has actually looked at.",
+    "evidence": "`uxr/shoot.ts` builds the phone context with `viewport: {390,844}, deviceScaleFactor: 2` and no `hasTouch`/`isMobile`, so Chromium reports `pointer: fine`. The frozen CSS carries `@media (pointer: fine) { input, select, textarea { font-size: 14px } }` plus the `pointer-fine:*` utilities. In the shipped frame the search input measures 366×37 CSS at 14px; re-rendering the same file with `hasTouch: true, isMobile: true` gives 366×48 at 16px, and every row below it moves down 11px. Separately, the `-full` phone frames are byte-identical to `-fold` (all 780×1688) even though roster is 2,183px and events 3,686px tall, so the full-page frames currently carry no information.",
+    "direction": "Add `hasTouch: true, isMobile: true` to the phone context in `uxr/shoot.ts` and re-shoot before the ideator acts on anything, and check why full-page capture is collapsing to viewport height — likely the `h-full` root plus `min-h-dvh` making `document.scrollHeight` equal the viewport."
+  },
+  {
+    "scene": "dashboard",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the Missing in action rows, and the red 'MISSED' badge at the right of each",
+    "finding": "The loudest thing in each MIA row is not tappable and the tappable thing is a text block in the middle. A leader thumbing down the list to open Leila Haddad's record aims at the red '5 MISSED' badge — the only saturated element in the row — and gets nothing. Recoverable in one retry, but it happens on all ten rows, and only two of them fit above the fold to begin with.",
+    "evidence": "Each row's `<a>` measures 206×56 CSS starting at x 84; the row itself spans x 12–378. The 44px avatar to its left and the ~72px danger-tinted badge to its right are outside the link, leaving 44% of the row's width dead. First MIA link is at y 610, second at y 711, and the bottom nav starts at y 776 — two of ten visible. Each row also spends a 24px line on a 'Looking up contact details…' spinner, so about a quarter of every row is a placeholder for the phone number this screen exists to produce.",
+    "direction": "Make the whole row the target — the badge and avatar have no competing action — and let the contact line resolve into something tappable (a `tel:` link) rather than a spinner, since 'who to phone' ends in a phone call."
+  },
+  {
+    "scene": "dashboard",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the 'INCOMPLETE' stat tile, bottom-right of the 2×2 grid",
+    "finding": "One of the three questions the dashboard is for — who nobody can reach — reads as an em dash. A leader glancing at 'INCOMPLETE / — / no parent contact' cannot tell whether that means none, or not loaded, and will read it as 'nothing to do here'. The app knows the answer: the Students scene two taps away offers an 'Incomplete profiles (5)' filter.",
+    "evidence": "The tile renders `<p class=\"mt-1 text-2xl font-bold tabular-nums text-ink-50\">—</p>` in the same slot where the neighbouring tiles print 16, 10 and 2. The Students phone frame shows a chip labelled 'Incomplete profiles (5)' at (16,349).",
+    "direction": "Show the number, and make the tile carry the same tap-through the Students chip does. If it is genuinely pending, a skeleton reads as pending; an em dash reads as zero."
+  },
+  {
+    "scene": "students",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the header block above the list, and the hairline dividers between rows",
+    "finding": "Half the screen belongs to something other than the list of students. The two largest, brightest targets — 'Add from Planning Center' filling 61% of the width in solid brand blue, and 'New visitor' below it — are admin actions a leader takes rarely, and they push the first name to y 409, leaving six of forty-five students visible. Search rescues the job when the leader knows the name, which is why this is friction rather than failure, but browsing costs seven and a half flicks where it could cost four.",
+    "evidence": "'Add from Planning Center' is 237×44 at (137,65) and 'New visitor' 121×44 at (253,117) — 96px of vertical space for two rare actions, above a 358×48 search field at y 203. First row at (16,409) 358×64; bottom nav at y 776; six full rows fit. Rows are `divide-y divide-ink-800` with a 65px pitch on a 64px row, so adjacent students are separated by a 1px hairline and no gap — an 8px miss opens the wrong record. The roster's equivalent list uses `gap-2` between the same-height rows.",
+    "direction": "Demote the two import actions to a single secondary control (they are not what anyone opened this screen for) and give the directory rows the roster's spacing so the tap boundaries are visible, not just implied."
+  },
+  {
+    "scene": "dashboard",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the bottom navigation bar, Events and Students tabs",
+    "finding": "The two right-hand nav tabs are near-identical glyphs, flush against each other, sitting in the thumb zone. '▤' and '☰' differ by one horizontal rule at a glance, and the 11px labels underneath are below the size that survives a glance in a dim room. The two tabs go to entirely different places, and there is no gap between their hit boxes.",
+    "evidence": "Nav items measure 98×56 CSS at x 0, 98, 195 and 293, y 776 — abutting, zero gap. Labels render at 11px. The icons are single characters: ✓, ◎, ▤, ☰.",
+    "direction": "The app deliberately has no icon library, so the fix is glyph choice rather than iconography — pick two characters that differ in silhouette (a calendar-ish and a person-ish mark) and raise the labels to at least 12px, since the label is doing most of the discriminating work anyway."
+  }
+]

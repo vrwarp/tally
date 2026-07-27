@@ -913,10 +913,13 @@ describe('buildRoster: ordering', () => {
       ],
     });
 
-    expect(ids(predicted(view))).toEqual([perfect.id, twoEarly.id, twoLate.id]);
+    // Given-name order: Ada, then Ben, then Cara.
+    expect(ids(predicted(view))).toEqual([perfect.id, twoLate.id, twoEarly.id]);
     expect(predicted(view).map((entry) => entry.recentHits)).toEqual([3, 2, 2]);
   });
 
+  // Given name first, surname only to break a tie — the key the row prints
+  // first, so a counselor can scan the column by the word they are looking at.
   it('sorts the list by name, whatever the focus', () => {
     const students = [
       makeStudent({ id: 'c', firstName: 'Zoe', lastName: 'Crane' }),
@@ -925,8 +928,8 @@ describe('buildRoster: ordering', () => {
     ];
     const attendance = [makeAttendance({ studentId: 'c', eventId: tonight.id })];
 
-    expect(ids(roster({ students }).entries)).toEqual(['a', 'b', 'c']);
-    expect(ids(roster({ students, attendance }).entries)).toEqual(['a', 'b', 'c']);
+    expect(ids(roster({ students }).entries)).toEqual(['b', 'a', 'c']);
+    expect(ids(roster({ students, attendance }).entries)).toEqual(['b', 'a', 'c']);
     expect(
       ids(roster({ students, attendance, filters: { focus: 'checkedIn' } }).entries),
     ).toEqual(['c']);

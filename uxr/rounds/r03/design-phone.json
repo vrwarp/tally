@@ -1,0 +1,65 @@
+[
+  {
+    "scene": "roster",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the event-switch row under the header — the 'Today' chip, the 'Change' pill and the date select (same row in roster-search)",
+    "finding": "Round 2 gave 'Change' and the select one vocabulary — same radius, same fill, same ring, same 44px height, same 12px label — and then the layout put them at opposite ends of the row with 34px of nothing between, while the one object that is not a control, the static 'Today' chip, sits 8px from 'Change'. Proximity now says the opposite of what the styling says: the reader groups the grey status chip with the blue link, and reads the select as unrelated machinery parked in the corner. A dim ringed chip touching a ringed pill of the same family also invites the read that this is one two-part control with a dead left half.",
+    "evidence": "'Today' occupies x12–59.7, 'Change' x67.7–142.5, the select x177–378: an 8px gap inside the pair that does different things and a 34.5px gap inside the pair that was deliberately made to look alike. 'Change' also lands at x67.7 against the search field's x72 directly below it — 4px short of the only edge it could have shared.",
+    "direction": "Let the two ways of getting to another gathering sit together and the status stand apart, rather than the other way round — either move the chip to the far end of the row or close the gap between 'Change' and the select — and while the row is being re-set, give 'Change' the left edge of the field beneath it instead of landing 4px shy of it."
+  },
+  {
+    "scene": "roster-search",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the RESULTS list — rows that carry a 'x of 3' ratio against the rows that do not",
+    "finding": "Every row is the same 64px tall, but the text block inside it is vertically centred, so a two-line row puts the name 10px higher than a one-line row. Down nine results the given name — the token round 2 made the anchor of the whole scan — sits at two different heights in no pattern, and the avatar beside it stays put, so the name also drifts off the avatar's centre and back again. The list stops reading as ruled rows and starts reading as loose cards.",
+    "evidence": "roster-search--phone-full: Aisha, Amara, Chloe, Malik, Marcus all set their name line 9.7px below the row top; Fatima, Hana and Maya — the three results with no attendance ratio — set theirs at 20px. The check circles stay centred throughout, so the misalignment is only in the column being read.",
+    "direction": "Hold the name at one offset in every row whatever is under it — top-align the text block rather than centring it, or give every row the same number of lines so the ratio column is complete and the name column is straight."
+  },
+  {
+    "scene": "dashboard",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the New faces rows — the '⚠ Incomplete' badge against the name and date lines",
+    "finding": "This is the one list on the page where a badge still sets the width of the text. The badge is pinned in the row's trailing slot and does not shrink, so the text column is capped at 171px and both rows cut their date mid-value — 'Sunday School · Jul 26, 1 …' — on a card whose whole claim is 'first time in the last 7 days'. The line above it has 33px spare. Two blocks down, Incomplete profiles shows the same two students with a full-width name and its qualifier folded into the meta line, and the directory does the same with Visitor / Missing info; New faces is now the odd row out, and the fact it cuts is the one it exists to state.",
+    "evidence": "dashboard--phone-full: 'Selah Mbeki 6th' ends at x222 inside a 171px block that runs to x255, while the meta line beneath is clipped at x255 because the 95px badge holds x267–362. Both rows truncate at the same broken point, '1 …'.",
+    "direction": "Use the pattern the rest of the page already settled on: the badge yields, or moves down beside the meta the way the 'Waiting N days' chip did, so the row's date reads whole at 390px. The flag can stay — it just should not be what decides how much of the row the text gets."
+  },
+  {
+    "scene": "dashboard",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the 'Met once, never since' card header — the title, its count pill and 'Copy list'",
+    "finding": "The count pill is attached to the title in three of the four list cards and orphaned in the fourth. Squeezed to 213px by the Copy list button, this title wraps to two lines, and because the pill is centred against the wrapped block it ends up alone in the whitespace to the right of 'since', straddling the line break, about 150px from the words it counts. The header reads as three unrelated objects instead of a titled section with a count.",
+    "evidence": "dashboard--phone-full: the h2 box is 48px tall (two lines) and the '2' pill sits at x221–245, vertically centred on the wrap; on Missing in action, New faces and Incomplete profiles the identical pill sits 8px after the last word of a single-line title.",
+    "direction": "Bind the count to the title's last line rather than to the block — align it to the text baseline, or let the title have the width it needs at 390px by dropping Copy list below the description — so the count reads as part of the heading in every card."
+  },
+  {
+    "scene": "events",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the 'NEXT IN EACH SERIES' card against the TODAY / NEXT SEVEN DAYS / LATER groups",
+    "finding": "Round 2 gave this card the group-label vocabulary but left it at a different left edge and inside a different box, so the four labels that are now supposed to be one rank do not line up: three sit on the page at x16 and the fourth is indented to x32 inside a container lid with a rule under it. Inside that container the two rows carry their own rings 12px in from the card's ring, which is three nested boxes drawn around two rows — and their content starts at x69 where every other row on the page starts its text at x84. One rank, two indents, and the only place on the page where a ring sits inside a ring.",
+    "evidence": "events--phone-fold: 'TODAY' at x16, 'NEXT IN EACH SERIES' at x32; the calendar rows run x16–374 with text at x84, the series rows run x28–362 with text at x69. Card ring at x16–374, row rings at x28–362.",
+    "direction": "Finish the move round 2 started: if this is a group like the others, let its label sit on the page at the page's left edge and let its rows be rows at the same inset as the calendar's, so one of the two ring levels disappears. If it must stay a card, then it is not the same rank as TODAY and should not be wearing that label's clothes."
+  },
+  {
+    "scene": "events",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the detail line of every NEXT SEVEN DAYS and LATER row",
+    "finding": "Eleven consecutive upcoming rows end in an ellipsis, each at a different character, and what is being cut is the location — which is a constant per series, identical on every Friday row and every Sunday row. The line spends about 110px printing a time range that is also identical on every row of that series, and then runs out of width for the token it cut. So the reader gets a ragged column of ellipses down the whole upcoming half in exchange for repetition, and never once reads the room. Removing the Recurring badge freed the height but the line was never re-cut to fit.",
+    "evidence": "events--phone-full: '· Fellowshi…', '· Educa…', '· Fellows…', '· Educ…', '· Camp S…' down eleven rows, cutting at four different points because the date ahead of it varies in length. The past half, using the same 12px meta, prints 'Sun 26 · 9:30 AM – 10:45 AM' complete and drops the location entirely.",
+    "direction": "Decide what varies and print that. At 390px the row can carry the date and one more fact; the constants belong to the series or the group, not to eleven rows each. Whatever is chosen, the line should end because it finished, not with an ellipsis on every row."
+  },
+  {
+    "scene": "events",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the meta line of the past gathering rows against the meta line of the upcoming rows",
+    "finding": "The two halves of the calendar set the same line at two distances from the reader, and the archive is the nearer one: past rows print their date and time one full step brighter than upcoming rows. Scrolling the page, the list appears to get more legible as it goes backwards in time, which is the opposite of what the ramp is for. The two halves are visibly two different row components — the past row also swaps the chevron for a headcount and drops the location — but the only difference the reader can feel is that the finished half is louder than the coming one.",
+    "evidence": "Sampled from events--phone-full: upcoming detail lines render rgb(100,116,139) (ink-500), past detail lines rgb(148,163,184) (ink-400), while both halves set their row titles at the identical ink-100. The past treatment is shared with choose-event's CATCH UP rows, where being the brighter list is correct because it is the only list.",
+    "direction": "Pick one distance for a gathering's detail line and let the halves differ by their headings and their right-hand slot, not by how close the type is. If anything is to sit a step back it is the half the reader has already lived through."
+  }
+]
