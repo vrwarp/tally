@@ -34,7 +34,7 @@ import type { PcoStatus, PcoWriteBackMode } from '@/types';
 const WRITE_BACK_LABEL: Record<PcoWriteBackMode, string> = {
   off: 'Tally never writes to Planning Center. Visitors stay queued until this is turned on.',
   create: 'Tally creates people it has not seen before, but never edits an existing one.',
-  full: 'Tally creates people, and updates the fields Planning Center lets it manage.',
+  full: 'Tally creates people, updates the fields Planning Center lets it manage, and can add a parent contact to an adult already in a household.',
 };
 
 function describeCache(seconds: number): string {
