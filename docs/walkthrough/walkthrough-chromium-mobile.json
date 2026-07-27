@@ -7,143 +7,150 @@
     "viewport": "phone"
   },
   {
-    "journey": "Journey 1 \u2014 high-volume check-in",
+    "journey": "Journey 1 — high-volume check-in",
+    "title": "Which gathering are you at?",
+    "caption": "The first question, and the only one. Tally used to answer it from the clock and open straight into a roster — one fewer tap, and one way to be confidently, silently wrong: on a night with two things on, or one running late, forty students could be filed against the wrong gathering before anybody noticed. The card is the size of the answer because the person giving it is holding the phone one-handed with a queue in front of them, and the gathering whose window is actually open is ringed and sorted first.",
+    "file": "phone-02-which-gathering-are-you-at.png",
+    "viewport": "phone"
+  },
+  {
+    "journey": "Journey 1 — high-volume check-in",
     "title": "The predictive roster",
-    "caption": "Tally picked tonight\u2019s event from the clock; nobody chose it. The screen opens on \u201cRecent\u201d, the predictive filter: students who came to at least 2 of the last 3 Fridays. Friday history predicts Friday \u2014 Sunday\u2019s regulars are not in this list \u2014 and \u201cShow all\u201d is right underneath it.",
-    "file": "phone-02-the-predictive-roster.png",
+    "caption": "One tap later. The screen opens on “Recent”, the predictive filter: students who came to at least 2 of the last 3 Fridays. Friday history predicts Friday — Sunday’s regulars are not in this list — and “Show all” is right underneath it. The event is named in the bar above, with the date beside it, and it keeps saying so for as long as somebody is tapping.",
+    "file": "phone-03-the-predictive-roster.png",
     "viewport": "phone"
   },
   {
-    "journey": "Journey 1 \u2014 high-volume check-in",
+    "journey": "Journey 1 — high-volume check-in",
     "title": "One tap checks a student in",
-    "caption": "Maya Adebayo turned green exactly where they stood, and the header count went up. Nothing moves on a tap: with two counselors working one queue, a list that re-sorts on every write slides the next name out from under a thumb. The row flashed and buzzed before the write left the device \u2014 the authoritative state then arrives back through Firestore, so the second phone sees it too.",
-    "file": "phone-03-one-tap-checks-a-student-in.png",
+    "caption": "Maya Adebayo turned green exactly where they stood, and the header count went up. Nothing moves on a tap: with two counselors working one queue, a list that re-sorts on every write slides the next name out from under a thumb. The row flashed and buzzed before the write left the device — the authoritative state then arrives back through Firestore, so the second phone sees it too.",
+    "file": "phone-04-one-tap-checks-a-student-in.png",
     "viewport": "phone"
   },
   {
-    "journey": "Journey 1 \u2014 high-volume check-in",
+    "journey": "Journey 1 — high-volume check-in",
     "title": "Search for anyone the prediction missed",
-    "caption": "Two letters, filtered instantly against the in-memory roster. A search reaches the whole ministry \u2014 the Recent filter stands itself down while a query is running, so typing a visitor\u2019s name can never report that nobody by that name exists. The header counts deliberately do not move: they describe the event, not the query.",
-    "file": "phone-04-search-for-anyone-the-prediction-missed.png",
+    "caption": "Two letters, filtered instantly against the in-memory roster. A search reaches the whole ministry — the Recent filter stands itself down while a query is running, so typing a visitor’s name can never report that nobody by that name exists. The header counts deliberately do not move: they describe the event, not the query.",
+    "file": "phone-05-search-for-anyone-the-prediction-missed.png",
     "viewport": "phone"
   },
   {
-    "journey": "Journey 3 \u2014 bring a friend",
+    "journey": "Journey 3 — bring a friend",
     "title": "Quick-add a visitor",
-    "caption": "A first name, a last name, a grade. Nothing else, because anything more forms a queue at the door. \u201cSave & check in\u201d is one atomic write: the student is created and marked present together, then the modal closes.",
-    "file": "phone-05-quick-add-a-visitor.png",
+    "caption": "A first name, a last name, a grade. Nothing else, because anything more forms a queue at the door. “Save & check in” is one atomic write: the student is created and marked present together, then the modal closes.",
+    "file": "phone-06-quick-add-a-visitor.png",
     "viewport": "phone"
   },
   {
-    "journey": "Journey 3 \u2014 bring a friend",
+    "journey": "Journey 3 — bring a friend",
     "title": "The visitor is already checked in",
-    "caption": "Back on the roster with no interruption. The record is Tally\u2019s own and is queued for Planning Center \u2014 a Cloud Function pushes it upstream, and until it lands the student carries a \u201cnot pushed yet\u201d flag rather than a half-filled profile.",
-    "file": "phone-06-the-visitor-is-already-checked-in.png",
+    "caption": "Back on the roster with no interruption. The record is Tally’s own and is queued for Planning Center — a Cloud Function pushes it upstream, and until it lands the student carries a “not pushed yet” flag rather than a half-filled profile.",
+    "file": "phone-07-the-visitor-is-already-checked-in.png",
     "viewport": "phone"
   },
   {
-    "journey": "Journey 5 \u2014 pastoral follow-up",
+    "journey": "Journey 5 — pastoral follow-up",
     "title": "Insights, not a data table",
-    "caption": "Monday evening. The PRD asks for actionable insight rather than raw numbers, so every row leads somewhere: tap-to-call, tap-to-text, or through to the student. \u201cMissing in action\u201d is students who missed three or more gatherings in a row.",
-    "file": "phone-07-insights-not-a-data-table.png",
+    "caption": "Monday evening. The PRD asks for actionable insight rather than raw numbers, so every row leads somewhere: tap-to-call, tap-to-text, or through to the student. “Missing in action” is students who missed three or more gatherings in a row.",
+    "file": "phone-08-insights-not-a-data-table.png",
     "viewport": "phone"
   },
   {
-    "journey": "Journey 5 \u2014 pastoral follow-up",
+    "journey": "Journey 5 — pastoral follow-up",
     "title": "New faces and incomplete profiles",
-    "caption": "First-timers from the past week, and the profiles with no way to reach a parent \u2014 the visitors quick-added at the door, before anyone in the church office has met them. \u201cCopy list\u201d puts names and numbers on the clipboard for a group chat, which is what actually happens.",
-    "file": "phone-08-new-faces-and-incomplete-profiles.png",
+    "caption": "First-timers from the past week, and the profiles with no way to reach a parent — the visitors quick-added at the door, before anyone in the church office has met them. “Copy list” puts names and numbers on the clipboard for a group chat, which is what actually happens.",
+    "file": "phone-09-new-faces-and-incomplete-profiles.png",
     "viewport": "phone"
   },
   {
-    "journey": "Journey 5 \u2014 pastoral follow-up",
+    "journey": "Journey 5 — pastoral follow-up",
     "title": "Attendance trend",
-    "caption": "Head count per gathering, per series. Eight bars, no gridlines, no chart library \u2014 enough to see a slide starting, which is all this needs to do.",
-    "file": "phone-09-attendance-trend.png",
+    "caption": "Head count per gathering, per series. Eight bars, no gridlines, no chart library — enough to see a slide starting, which is all this needs to do.",
+    "file": "phone-10-attendance-trend.png",
     "viewport": "phone"
   },
   {
-    "journey": "Journey 4 \u2014 the field trip",
+    "journey": "Journey 4 — the field trip",
     "title": "The event calendar",
-    "caption": "Recurring gatherings and one-offs together. \u201cSchedule next Friday Fellowship\u201d is two taps, because somebody has to do it every single week.",
-    "file": "phone-10-the-event-calendar.png",
+    "caption": "Recurring gatherings and one-offs together. “Schedule next Friday Fellowship” is two taps, because somebody has to do it every single week.",
+    "file": "phone-11-the-event-calendar.png",
     "viewport": "phone"
   },
   {
-    "journey": "Journey 4 \u2014 the field trip",
+    "journey": "Journey 4 — the field trip",
     "title": "A gathering with a face",
-    "caption": "An event carries a description and an icon. The icon is searchable by what the thing is rather than by what Google called it \u2014 \u201ccampfire\u201d finds it \u2014 and the glyphs are bundled with the app rather than fetched from a font CDN, because Tally\u2019s home is a hallway with one bar of signal and a missing icon is a missing icon on exactly the night it mattered. The description is the sentence the check-in screen leads with; the \u201cNotes\u201d field on the right stays what one leader leaves for another.",
-    "file": "phone-11-a-gathering-with-a-face.png",
+    "caption": "An event carries a description and an icon. The icon is searchable by what the thing is rather than by what Google called it — “campfire” finds it — and the glyphs are bundled with the app rather than fetched from a font CDN, because Tally’s home is a hallway with one bar of signal and a missing icon is a missing icon on exactly the night it mattered. The description is the sentence the check-in screen leads with; the “Notes” field on the right stays what one leader leaves for another.",
+    "file": "phone-12-a-gathering-with-a-face.png",
     "viewport": "phone"
   },
   {
-    "journey": "Journey 4 \u2014 the field trip",
+    "journey": "Journey 4 — the field trip",
     "title": "The RSVP list",
-    "caption": "A one-off event carries its own guest list, and with \u201cRSVP only\u201d set that list is the check-in roster: going, maybe and declined, with declined students kept on the page but off the roster.",
-    "file": "phone-12-the-rsvp-list.png",
+    "caption": "A one-off event carries its own guest list, and with “RSVP only” set that list is the check-in roster: going, maybe and declined, with declined students kept on the page but off the roster.",
+    "file": "phone-13-the-rsvp-list.png",
     "viewport": "phone"
   },
   {
     "journey": "The roster",
     "title": "Students",
     "caption": "The whole ministry, filterable by grade and status. Each row says whether the record came from Planning Center or was created in Tally, so it is obvious which fields are safe to edit here.",
-    "file": "phone-13-students.png",
+    "file": "phone-14-students.png",
     "viewport": "phone"
   },
   {
     "journey": "Settings",
     "title": "Thresholds, in plain language",
-    "caption": "The prediction window is the one genuinely dangerous control here \u2014 it silently reshapes what every counselor sees at the door \u2014 so each number is restated as the behaviour it causes, and the panel beside it counts the students the change would actually move. Nobody should have to reason about \u201c2 of 3\u201d at 6:55pm.",
-    "file": "phone-14-thresholds-in-plain-language.png",
+    "caption": "The prediction window is the one genuinely dangerous control here — it silently reshapes what every counselor sees at the door — so each number is restated as the behaviour it causes, and the panel beside it counts the students the change would actually move. Nobody should have to reason about “2 of 3” at 6:55pm.",
+    "file": "phone-15-thresholds-in-plain-language.png",
     "viewport": "phone"
   },
   {
     "journey": "Planning Center",
     "title": "Connected, and holding nothing",
-    "caption": "Tally reads its people from Planning Center and keeps no copy of them. \u201cRefresh\u201d is a live read: browser \u2192 callable \u2192 Cloud Function \u2192 the Planning Center API \u2192 back. Between reads a short cache (30 seconds by default, 0 to turn it off) keeps a busy door from becoming a rate limit.",
-    "file": "phone-15-connected-and-holding-nothing.png",
+    "caption": "Tally reads its people from Planning Center and keeps no copy of them. “Refresh” is a live read: browser → callable → Cloud Function → the Planning Center API → back. Between reads a short cache (30 seconds by default, 0 to turn it off) keeps a busy door from becoming a rate limit.",
+    "file": "phone-16-connected-and-holding-nothing.png",
     "viewport": "phone"
   },
   {
     "journey": "Settings",
     "title": "The same screen, in daylight",
-    "caption": "Dark is the default because Tally\u2019s home is a dim room on a Friday night, but a Sunday morning classroom is not that room. Light, dark, or follow the device \u2014 the choice is per-person and local, unlike the thresholds above it, which are ministry-wide the instant they save.",
-    "file": "phone-16-the-same-screen-in-daylight.png",
+    "caption": "Dark is the default because Tally’s home is a dim room on a Friday night, but a Sunday morning classroom is not that room. Light, dark, or follow the device — the choice is per-person and local, unlike the thresholds above it, which are ministry-wide the instant they save.",
+    "file": "phone-17-the-same-screen-in-daylight.png",
     "viewport": "phone"
   },
   {
     "journey": "The roster",
     "title": "A roster nobody stores",
-    "caption": "These names are not in Tally\u2019s database. They arrived from Planning Center on this page load, merged with the handful of things Planning Center has no opinion about \u2014 a note, when somebody first turned up.",
-    "file": "phone-17-a-roster-nobody-stores.png",
+    "caption": "These names are not in Tally’s database. They arrived from Planning Center on this page load, merged with the handful of things Planning Center has no opinion about — a note, when somebody first turned up.",
+    "file": "phone-18-a-roster-nobody-stores.png",
     "viewport": "phone"
   },
   {
     "journey": "The roster",
     "title": "Who do I call, and only when asked",
-    "caption": "A parent\u2019s number, fetched for one student at the moment somebody needs it \u2014 resolved through her household, since Planning Center keeps contact on the parent\u2019s record rather than the child\u2019s. Firestore holds none of it: no parent name, no phone, no email, no allergies. For a database full of minors, the safest copy is the one that was never made.",
-    "file": "phone-18-who-do-i-call-and-only-when-asked.png",
+    "caption": "A parent’s number, fetched for one student at the moment somebody needs it — resolved through her household, since Planning Center keeps contact on the parent’s record rather than the child’s. Firestore holds none of it: no parent name, no phone, no email, no allergies. For a database full of minors, the safest copy is the one that was never made.",
+    "file": "phone-19-who-do-i-call-and-only-when-asked.png",
     "viewport": "phone"
   },
   {
-    "journey": "Journey 6 \u2014 the other six days",
+    "journey": "Journey 6 — the calendar",
     "title": "Today, in full",
-    "caption": "Most of the week there is nothing to check into, and saying only that wastes the screen. Today is the hero: whatever is on, with its icon and its description, and a line that answers the actual question \u2014 check-in opens at seven, or it is open now, or it finished and twenty-two people came. A gathering that ended this afternoon stays up here rather than dropping into the history, because the boundary is midnight and a counselor catching up at teatime is still thinking about \u201ctoday\u201d.",
-    "file": "phone-19-today-in-full.png",
+    "caption": "The Events tab, read from where the leader is standing. Today is the hero: whatever is on, with its icon and the sentence describing it, and a line that answers the actual question — check-in opens at seven, or it is open now, or it finished and twenty-two people came. A gathering that ended this afternoon stays up here rather than dropping into the history, because the boundary is midnight and somebody looking at it at teatime is still thinking about “today”.",
+    "file": "phone-20-today-in-full.png",
     "viewport": "phone"
   },
   {
-    "journey": "Journey 6 \u2014 the other six days",
+    "journey": "Journey 6 — the calendar",
     "title": "The week ahead, then everything held",
-    "caption": "The next seven days as rows \u2014 a glance, not a decision. Under it the whole history, newest first, cut into months and paging further back as you scroll. Each row carries the one fact that makes a past gathering recognisable: how many students were checked in. Somebody down here is looking for the Friday they missed, and \u201c22\u201d is how they find it.",
-    "file": "phone-20-the-week-ahead-then-everything-held.png",
+    "caption": "The next seven days as rows — a glance, not a decision — and then whatever the recurrence rules put further out, so a retreat four weeks away is still somewhere. Under all of it the history, newest first, cut into months and paging further back as you scroll. Each row carries the one fact that makes a past gathering recognisable: how many students were checked in.",
+    "file": "phone-21-the-week-ahead-then-everything-held.png",
     "viewport": "phone"
   },
   {
-    "journey": "Journey 6 \u2014 the other six days",
-    "title": "Scrolling into the ministry\u2019s past",
-    "caption": "The pages come straight out of Firestore, a dozen gatherings at a time, cursored rather than counted \u2014 the calendar the rest of the app holds in memory is a bounded window, and its far edge is exactly the boundary somebody looking for last March is trying to cross. The head counts come from the same cache the predictive roster fills, so scrolling back over a fortnight the roster already read costs nothing.",
-    "file": "phone-21-scrolling-into-the-ministry-s-past.png",
+    "journey": "Journey 6 — the calendar",
+    "title": "Scrolling into the ministry’s past",
+    "caption": "The pages come straight out of Firestore, a dozen gatherings at a time, cursored rather than counted — the calendar the rest of the app holds in memory is a bounded window, and its far edge is exactly the boundary somebody looking for last March is trying to cross. The head counts come from the same cache the predictive roster fills, so scrolling back over a fortnight the roster already read costs nothing.",
+    "file": "phone-22-scrolling-into-the-ministry-s-past.png",
     "viewport": "phone"
   }
 ]

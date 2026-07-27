@@ -381,7 +381,14 @@ export interface TallyEventDoc {
   recurrenceRootId: string | null;
   startAt: Timestamp;
   endAt: Timestamp;
-  /** Window during which this event is auto-selected as "active". */
+  /**
+   * Window during which this event counts as live.
+   *
+   * Advisory rather than decisive since the check-in screen started asking
+   * which gathering somebody is at: it rings the card in the chooser and sorts
+   * it first, and it decides whether the roster header warns that the window
+   * has closed. It no longer picks anything on a counselor's behalf.
+   */
   checkInOpensAt: Timestamp;
   checkInClosesAt: Timestamp;
   location: string | null;

@@ -6,35 +6,42 @@ import { pickActiveEvent, recentChainInstances } from '@/lib/time';
 import type { TallyEvent } from '@/types';
 
 export interface ActiveEventResult {
-  /** The event to check into, honouring an explicit override. */
+  /** The event named in the URL, or null when nobody has chosen one yet. */
   event: TallyEvent | null;
-  /** What temporal awareness alone would have chosen. */
-  autoEvent: TallyEvent | null;
-  /** True when the counselor overrode the automatic choice. */
-  isOverridden: boolean;
-  /** Ticking clock the selection was made against. */
+  /**
+   * The gathering whose check-in window covers this instant, if any.
+   *
+   * No longer *selects* anything — it is a fact about the clock the chooser
+   * uses to sort and highlight, and the header uses to warn. See below.
+   */
+  liveEvent: TallyEvent | null;
+  /** Ticking clock the screen was rendered against. */
   now: Date;
   /** Events a counselor may reasonably switch to: recent past plus upcoming. */
   selectableEvents: TallyEvent[];
 }
 
 /**
- * Resolves which event the counselor is checking into (PRD 4.3).
+ * Which event the counselor is checking into.
  *
- * Automatic by default — nobody should have to pick "Friday Fellowship" on a
- * Friday night — with an explicit override for the cases automation cannot
- * know about, like taking attendance for last week after the fact.
+ * The choice is the URL, and nothing else. Tally used to make it from the clock
+ * and open straight into the roster, which was one fewer tap and one more way
+ * to be wrong: on a night with two gatherings on, or one running late, the app
+ * made a confident silent choice and forty students could be filed against it
+ * before anybody noticed. `ChooseEvent` now asks, and this hook only resolves
+ * the answer.
+ *
+ * `pickActiveEvent` survives that change because "what is on right now" is
+ * still worth knowing — it is what puts the live gathering at the top of the
+ * chooser with the brand ring around it. It just no longer decides anything on
+ * the counselor's behalf.
  */
-export function useActiveEvent(eventIdOverride?: string | null): ActiveEventResult {
+export function useActiveEvent(eventId?: string | null): ActiveEventResult {
   const { events } = useData();
   const now = useNow();
 
   return useMemo(() => {
-    const autoEvent = pickActiveEvent(events, now);
-
-    const override = eventIdOverride
-      ? (events.find((event) => event.id === eventIdOverride) ?? null)
-      : null;
+    const chosen = eventId ? (events.find((event) => event.id === eventId) ?? null) : null;
 
     // Anything from the last month plus everything still ahead: enough to
     // back-fill a missed Sunday without scrolling through a year.
@@ -44,13 +51,12 @@ export function useActiveEvent(eventIdOverride?: string | null): ActiveEventResu
       .sort((a, b) => b.startAt.getTime() - a.startAt.getTime());
 
     return {
-      event: override ?? autoEvent,
-      autoEvent,
-      isOverridden: Boolean(override) && override?.id !== autoEvent?.id,
+      event: chosen,
+      liveEvent: pickActiveEvent(events, now),
       now,
       selectableEvents,
     };
-  }, [events, now, eventIdOverride]);
+  }, [events, now, eventId]);
 }
 
 /**

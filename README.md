@@ -12,8 +12,12 @@ also get the dashboard, the roster, event and RSVP management, and settings.
 
 ## What it does
 
-**Journey 1 — Friday night at the door.** Open the app and it has already picked tonight's event
-from the clock. There is one roster list, sorted A–Z, and it opens filtered to "Recent" — the
+**Journey 1 — Friday night at the door.** Open the app and it asks one question: which of today's
+gatherings are you at? Usually there is one, as a card the size of the answer, with the live one
+ringed. Tap it and you are on the roster. Tally used to skip that tap and pick from the clock, which
+was faster and could be confidently, silently wrong on a night with two things on — and forty
+check-ins filed against the wrong gathering is the worst failure this app has. There is one roster
+list, sorted A–Z, and it opens filtered to "Recent" — the
 students who attended at least two of the last three Friday Fellowships — with "Show all" underneath
 and a "Checked in" chip beside it. Tapping a row flashes green and buzzes before the write reaches
 the server, and the row stays exactly where it was: with two counselors working one queue, a list
@@ -44,13 +48,14 @@ someone's clipboard and someone's cash box, and a half-kept copy in an app is wo
 missed three gatherings in a row, first-timers from the last week, profiles with no parent contact,
 and a head-count trend per series.
 
-**Journey 6 — the other six days.** Most of the week there is nothing to check into, and that screen
-is a calendar read from where the reader is standing. Today is the hero: whatever is on, with its
-icon and the sentence describing it, and a button that says whether check-in is open yet. Under it,
-the next seven days as rows. Under that, every gathering already held — newest first, paging back
-into the ministry's whole history as somebody scrolls, each row carrying how many students were
-checked in. That last part is what a counselor came for: they are looking for the Friday they missed,
-and "22 checked in" is how they recognise it.
+**Journey 6 — the calendar.** The Events tab is read from where the leader is standing. Today is the
+hero: whatever is on, with its icon and the sentence describing it. Under it the next seven days as
+rows, then everything further ahead the recurrence rules describe. Under that, every gathering
+already held — newest first, paging back into the ministry's whole history as somebody scrolls, each
+row carrying how many students were checked in. That last part is what somebody came for: they are
+looking for the Friday they missed, and "22 checked in" is how they recognise it. A short tail of the
+same list hangs off the check-in chooser too, because taking the register after the fact is a
+counselor's job and the Events tab is core-team only.
 
 ---
 
@@ -281,11 +286,18 @@ reference data (events, series, groups, settings). Everything else is a one-shot
 fixed window of event documents open and projects the recurrence rules over it, which is the right
 shape for "what is on" and the wrong one for "what happened" — the window ends at a fixed number of
 days, which is exactly the boundary somebody looking for the Friday they missed is trying to cross.
-So the history at the foot of the check-in screen pages straight out of Firestore instead
+So the history at the foot of the Events tab pages straight out of Firestore instead
 (`usePastEvents` → `fetchPastEvents`), a dozen gatherings at a time, cursored rather than offset so
 two gatherings sharing a start time cannot duplicate or skip one. Each row carries a head count from
 the same session cache the predictive roster fills, so scrolling back over a window the roster has
 already loaded costs nothing.
+
+**Nothing picks the event but the person holding the phone.** `/` is a question — `ChooseEvent` —
+and `/event/:eventId` is the only URL that renders a roster. `pickActiveEvent` survives the change
+because "what is on right now" is still worth knowing: it sorts the live gathering to the top of the
+chooser and puts the brand ring around it. It just no longer decides anything on a counselor's
+behalf, and the check-in header keeps saying which night it is filing against for as long as
+somebody is tapping.
 
 **Firestore stores facts; the client derives meaning.** What is persisted is deliberately dumb —
 students, events, attendance rows, RSVPs. The Recent filter, MIA students, new visitors, incomplete

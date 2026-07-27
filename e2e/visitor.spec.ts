@@ -4,7 +4,7 @@
  * The requirement is speed and a clean handoff — three fields, an immediate
  * check-in, and a flag the core team can work later.
  */
-import { gotoReady } from './support/auth';
+import { gotoReady, openCheckIn } from './support/auth';
 import { expect, test } from './support/fixtures';
 
 const VISITOR = { first: 'Tamsin', last: 'Okorie', grade: '9' };
@@ -12,6 +12,7 @@ const VISITOR = { first: 'Tamsin', last: 'Okorie', grade: '9' };
 test.describe('quick-add visitor', () => {
   test('asks for a name and grade and nothing else', async ({ page, signedInAs }) => {
     await signedInAs('counselor');
+    await openCheckIn(page);
     await page.getByRole('button', { name: /quick add a visitor/i }).click();
 
     const dialog = page.getByRole('dialog', { name: /add a visitor/i });
@@ -26,6 +27,7 @@ test.describe('quick-add visitor', () => {
 
   test('saves and checks in without leaving the roster', async ({ page, signedInAs, firestore }) => {
     await signedInAs('counselor');
+    await openCheckIn(page);
     await page.getByRole('button', { name: /quick add a visitor/i }).click();
 
     const dialog = page.getByRole('dialog', { name: /add a visitor/i });
@@ -68,6 +70,7 @@ test.describe('quick-add visitor', () => {
 
   test('refuses to save a half-typed name', async ({ page, signedInAs }) => {
     await signedInAs('counselor');
+    await openCheckIn(page);
     await page.getByRole('button', { name: /quick add a visitor/i }).click();
 
     const dialog = page.getByRole('dialog', { name: /add a visitor/i });

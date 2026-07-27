@@ -1,21 +1,20 @@
 /**
  * Which event am I checking students into, and how many are here?
  *
- * The "Auto-selected" / "Viewing past event" distinction is the most important
- * thing on this bar. Tally picks the event by the clock, so the only way a
- * counselor ends up somewhere unexpected is by overriding it — and silently
- * checking forty students into last Friday is the worst failure this app has.
+ * The date badge is the most important thing on this bar. Checking forty
+ * students into last Friday is the worst failure this app has, and the event is
+ * now chosen by hand rather than by the clock — so the screen has to keep
+ * saying which night it is filing against, loudly, for as long as somebody is
+ * tapping. "Today" is reassurance; anything else is a warning.
  */
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Badge, EventIcon } from '@/components/ui';
 import { formatEventDay, formatEventWindow, formatShortDate, isCheckInOpen } from '@/lib/time';
+import { startOfDay } from '@/lib/time';
 import type { TallyEvent } from '@/types';
 
 export interface EventHeaderProps {
   event: TallyEvent;
-  /** What temporal awareness would have chosen, for the "back to now" escape. */
-  autoEvent: TallyEvent | null;
-  isOverridden: boolean;
   selectableEvents: readonly TallyEvent[];
   now: Date;
   present: number;
@@ -24,8 +23,6 @@ export interface EventHeaderProps {
 
 export function EventHeader({
   event,
-  autoEvent,
-  isOverridden,
   selectableEvents,
   now,
   present,
@@ -33,6 +30,7 @@ export function EventHeader({
 }: EventHeaderProps) {
   const navigate = useNavigate();
   const open = isCheckInOpen(event, now);
+  const isToday = startOfDay(event.startAt).getTime() === startOfDay(now).getTime();
 
   // The picker only offers the last month plus everything upcoming, so an event
   // reached by a deep link may not be in the list — its own option must exist or
@@ -72,25 +70,26 @@ export function EventHeader({
       </div>
 
       <div className="mt-2 flex items-center gap-2 px-3">
-        {isOverridden ? (
-          <Badge tone="warn" title="You picked this event manually">
-            {event.startAt < now ? 'Viewing past event' : 'Viewing another event'}
+        {isToday ? (
+          <Badge tone="neutral" title="This gathering is on today">
+            Today
           </Badge>
         ) : (
-          <Badge tone="neutral" title="Chosen automatically from the current time">
-            Auto-selected
+          <Badge tone="warn" title="This gathering is not today's">
+            {event.startAt < now ? 'Past gathering' : 'Not today'}
           </Badge>
         )}
 
-        {isOverridden && autoEvent ? (
-          <button
-            type="button"
-            onClick={() => navigate(`/event/${autoEvent.id}`)}
-            className="min-h-11 shrink-0 rounded-full px-2 text-xs font-semibold text-brand-300 active:bg-ink-800"
-          >
-            Back to now
-          </button>
-        ) : null}
+        {/* The way back to the chooser. It is a link rather than a "back to
+            now" jump because there is no longer a "now" the app has picked —
+            somebody who is on the wrong night wants the question again, not a
+            second guess at the answer. */}
+        <Link
+          to="/"
+          className="min-h-11 shrink-0 rounded-full px-2 text-xs font-semibold leading-[2.75rem] text-brand-300 active:bg-ink-800"
+        >
+          Change
+        </Link>
 
         <select
           aria-label="Switch event"

@@ -17,7 +17,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Page } from '@playwright/test';
-import { gotoReady, signOut } from './support/auth';
+import { gotoReady, openCheckIn, signOut } from './support/auth';
 import { test } from './support/fixtures';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -77,6 +77,19 @@ test('capture the walkthrough', async ({ page, signedInAs }) => {
 
   /* ---- Journey 1: the bouncer flow ------------------------------------- */
 
+  await page
+    .getByRole('link', { name: /start check-in|take attendance/i })
+    .first()
+    .waitFor({ timeout: 30_000 });
+  await capture(page, {
+    journey: 'Journey 1 — high-volume check-in',
+    title: 'Which gathering are you at?',
+    caption:
+      'The first question, and the only one. Tally used to answer it from the clock and open straight into a roster — one fewer tap, and one way to be confidently, silently wrong: on a night with two things on, or one running late, forty students could be filed against the wrong gathering before anybody noticed. The card is the size of the answer because the person giving it is holding the phone one-handed with a queue in front of them, and the gathering whose window is actually open is ringed and sorted first.',
+  });
+
+  await openCheckIn(page);
+
   // The Recent filter needs the past instances' attendance, which is fetched
   // once rather than streamed. Waiting for it is the difference between
   // photographing the predictive roster and photographing a plain list.
@@ -94,7 +107,7 @@ test('capture the walkthrough', async ({ page, signedInAs }) => {
     journey: 'Journey 1 — high-volume check-in',
     title: 'The predictive roster',
     caption:
-      'Tally picked tonight’s event from the clock; nobody chose it. The screen opens on “Recent”, the predictive filter: students who came to at least 2 of the last 3 Fridays. Friday history predicts Friday — Sunday’s regulars are not in this list — and “Show all” is right underneath it.',
+      'One tap later. The screen opens on “Recent”, the predictive filter: students who came to at least 2 of the last 3 Fridays. Friday history predicts Friday — Sunday’s regulars are not in this list — and “Show all” is right underneath it. The event is named in the bar above, with the date beside it, and it keeps saying so for as long as somebody is tapping.',
   });
 
   const firstRow = page.getByRole('button', { name: /^Check in / }).first();
@@ -269,23 +282,9 @@ test('capture the walkthrough', async ({ page, signedInAs }) => {
       'A parent’s number, fetched for one student at the moment somebody needs it — resolved through her household, since Planning Center keeps contact on the parent’s record rather than the child’s. Firestore holds none of it: no parent name, no phone, no email, no allergies. For a database full of minors, the safest copy is the one that was never made.',
   });
 
-  /* ---- Journey 6: the other six days ------------------------------------ */
+  /* ---- Journey 6: the calendar ------------------------------------------ */
 
-  /*
-   * Last, and deliberately so: this is the one section that has to lie to the
-   * browser about the time.
-   *
-   * The seed guarantees something is live, because the first screen anybody
-   * opens should be the one Tally exists for. That is the opposite of the
-   * screen below, which is what a counselor meets on the other six days — so
-   * the clock is pushed past tonight's window rather than the data being bent.
-   * Everything on screen is still the real seeded ministry.
-   */
-  const afterTonight = new Date(Date.now() + 5 * 60 * 60 * 1000);
-  await page.clock.install({ time: afterTonight });
-  await gotoReady(page, '/');
-  await page.clock.setSystemTime(afterTonight);
-
+  await gotoReady(page, '/events');
   await page
     .getByRole('region', { name: /past gatherings/i })
     .waitFor({ timeout: 30_000 })
@@ -297,25 +296,25 @@ test('capture the walkthrough', async ({ page, signedInAs }) => {
   await page.waitForTimeout(1500);
 
   await capture(page, {
-    journey: 'Journey 6 — the other six days',
+    journey: 'Journey 6 — the calendar',
     title: 'Today, in full',
     caption:
-      'Most of the week there is nothing to check into, and saying only that wastes the screen. Today is the hero: whatever is on, with its icon and its description, and a line that answers the actual question — check-in opens at seven, or it is open now, or it finished and twenty-two people came. A gathering that ended this afternoon stays up here rather than dropping into the history, because the boundary is midnight and a counselor catching up at teatime is still thinking about “today”.',
+      'The Events tab, read from where the leader is standing. Today is the hero: whatever is on, with its icon and the sentence describing it, and a line that answers the actual question — check-in opens at seven, or it is open now, or it finished and twenty-two people came. A gathering that ended this afternoon stays up here rather than dropping into the history, because the boundary is midnight and somebody looking at it at teatime is still thinking about “today”.',
   });
 
-  await page.mouse.wheel(0, 500);
+  await page.mouse.wheel(0, 700);
   await page.waitForTimeout(600);
   await capture(page, {
-    journey: 'Journey 6 — the other six days',
+    journey: 'Journey 6 — the calendar',
     title: 'The week ahead, then everything held',
     caption:
-      'The next seven days as rows — a glance, not a decision. Under it the whole history, newest first, cut into months and paging further back as you scroll. Each row carries the one fact that makes a past gathering recognisable: how many students were checked in. Somebody down here is looking for the Friday they missed, and “22” is how they find it.',
+      'The next seven days as rows — a glance, not a decision — and then whatever the recurrence rules put further out, so a retreat four weeks away is still somewhere. Under all of it the history, newest first, cut into months and paging further back as you scroll. Each row carries the one fact that makes a past gathering recognisable: how many students were checked in.',
   });
 
-  await page.mouse.wheel(0, 1400);
+  await page.mouse.wheel(0, 1600);
   await page.waitForTimeout(1500);
   await capture(page, {
-    journey: 'Journey 6 — the other six days',
+    journey: 'Journey 6 — the calendar',
     title: 'Scrolling into the ministry’s past',
     caption:
       'The pages come straight out of Firestore, a dozen gatherings at a time, cursored rather than counted — the calendar the rest of the app holds in memory is a bounded window, and its far edge is exactly the boundary somebody looking for last March is trying to cross. The head counts come from the same cache the predictive roster fills, so scrolling back over a fortnight the roster already read costs nothing.',
