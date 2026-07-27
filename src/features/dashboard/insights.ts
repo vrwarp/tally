@@ -283,12 +283,13 @@ export function computeMiaFor(
 }
 
 /**
- * Students the loaded window has not seen at anything at all.
+ * Students who have been here before and whom the window has seen nowhere.
  *
  * The other half of the MIA list, and the half no gathering can claim: somebody
- * on the roster who has turned up to nothing has not drifted from Friday or
- * from Sunday, they have drifted from all of it. Their row names no gathering,
- * because naming one would be a guess about which crowd they used to belong to.
+ * who used to come and has now turned up to nothing has not drifted from Friday
+ * or from Sunday, they have drifted from all of it. Their row names no
+ * gathering, because naming one would be a guess about which crowd they used to
+ * belong to — the window holds no sighting to read it from.
  *
  * The count is pooled here, deliberately — across a student who attends nothing
  * it is the honest number, and it is the only place in this file where nights
@@ -306,6 +307,7 @@ export function computeUnseen(
   const history = recurringSnapshots(snapshots);
   if (history.length === 0) return [];
   const oneOffs = oneOffSnapshots(snapshots);
+  const gatherings = groupByGathering(snapshots);
 
   const results: MiaStudent[] = [];
 
@@ -314,17 +316,50 @@ export function computeUnseen(
     if (history.some((snapshot) => snapshot.presentStudentIds.has(student.id))) continue;
     if (oneOffs.some((snapshot) => snapshot.presentStudentIds.has(student.id))) continue;
 
-    // Nights they could plausibly have been at, across every gathering.
+    /*
+     * They have to have been here at some point. `lastAttendedAt` is written on
+     * every check-in and never cleared, so it reaches back past the window.
+     *
+     * Tally's roster is the ministry's Planning Center directory, which holds
+     * plenty of young people who have never come to youth group and are not
+     * going to start because a list said so. Without this the screen fills with
+     * them the moment any gathering has met three times — the same "nobody was
+     * expecting them" mistake `wasRegular` fixes for the named rows. A student
+     * with no check-in anywhere is not missing; nobody has met them.
+     *
+     * A corrupt timestamp fails every comparison silently, so it is checked
+     * rather than trusted — see `computeNewVisitors` for the same guard.
+     */
+    const lastAttendedAt = student.lastAttendedAt;
+    if (!lastAttendedAt || !Number.isFinite(lastAttendedAt.getTime())) continue;
+
+    /*
+     * The threshold is measured against one gathering, exactly as it is
+     * everywhere else on this screen.
+     *
+     * Pooled — which is what this used to do — the trigger depends on how many
+     * gatherings a ministry runs rather than on how long anybody has been away:
+     * three weekly gatherings that have each met once clears "three in a row"
+     * inside a single week, and scheduling a fourth would make it fire sooner
+     * still. Somebody has to have gone missing from *something* for three of
+     * its nights before this list says so.
+     */
+    const missedOf = gatherings.map(
+      (gathering) => standingIn(gathering, student, settings).eligible,
+    );
+    if (!missedOf.some((nights) => nights >= settings.miaConsecutiveMisses)) continue;
+
+    // Every night they could have been at, anywhere — which is the number the
+    // row shows, because "not seen at any of the last N" is what it says.
     const eligible = history.filter(
       (snapshot) => snapshot.event.startAt.getTime() >= student.createdAt.getTime(),
     );
-    if (eligible.length < settings.miaConsecutiveMisses) continue;
 
     results.push({
       student,
       consecutiveMisses: eligible.length,
       // The student record is all there is: the window holds no sighting.
-      lastAttendedAt: student.lastAttendedAt,
+      lastAttendedAt,
       lastAttendedEventTitle: null,
       gatheringKey: null,
       gatheringTitle: null,

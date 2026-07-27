@@ -54,8 +54,12 @@ A miss needs somebody to have been expecting them. The roster is every student i
 promise that each of them attends everything, so "missing" means *was a regular here and stopped*:
 they cleared the check-in screen's own Recent bar as of their last visit — `predictiveMinAttended` of
 the last `predictiveOfLastN` nights of this gathering — and have since missed `miaConsecutiveMisses`
-in a row. The MIA list is exactly the people who fell off a gathering's Recent list. Somebody nothing
-has seen at all keeps their place under no gathering, with the pooled count.
+in a row. The MIA list is exactly the people who fell off a gathering's Recent list.
+
+Somebody who used to come and has since been at nothing keeps their place under no gathering — the
+window holds no sighting to name one from — but only if Tally has checked them in at some point. The
+roster is the ministry's Planning Center directory, and a young person who has never come to youth
+group is not missing from it: nobody has met them.
 
 One-off events sit in a section below, outside the tabs, because a retreat is an instance of nothing:
 nobody can have missed it and it has no trend to be part of. What it can say is who turned up, and who
