@@ -33,22 +33,16 @@ type StatusFilter = 'active' | 'inactive' | 'all';
 type QuickFilter = 'none' | 'incomplete' | 'visitors';
 
 export function StudentsPage() {
-  const { students, groups, loading, rosterError, refreshRoster } = useData();
+  const { students, loading, rosterError, refreshRoster } = useData();
   const { user } = useAuth();
 
   const [query, setQuery] = useState('');
   const [grade, setGrade] = useState<Grade | null>(null);
-  const [groupId, setGroupId] = useState<string>('');
   // Inactive students are history, not roster: the default view hides them.
   const [status, setStatus] = useState<StatusFilter>('active');
   const [quick, setQuick] = useState<QuickFilter>('none');
   const [editorOpen, setEditorOpen] = useState(false);
   const [addFromPcoOpen, setAddFromPcoOpen] = useState(false);
-
-  const groupNames = useMemo(
-    () => new Map(groups.map((group) => [group.id, group.name])),
-    [groups],
-  );
 
   /** Whoever is already here, so the Planning Center search can say so. */
   const rosterIds = useMemo(() => new Set(students.map((student) => student.id)), [students]);
@@ -58,7 +52,6 @@ export function StudentsPage() {
     return students.filter((student) => {
       if (status !== 'all' && student.status !== status) return false;
       if (grade !== null && student.grade !== grade) return false;
-      if (groupId && student.smallGroupId !== groupId) return false;
       // `profileComplete` has three states and only `false` is a problem:
       // `null` means a roster read did not hydrate households, so nobody has
       // checked. Filtering on truthiness listed the entire ministry.
@@ -67,7 +60,7 @@ export function StudentsPage() {
       if (!matcher.matches(student.searchName)) return false;
       return true;
     });
-  }, [students, status, grade, groupId, quick, query]);
+  }, [students, status, grade, quick, query]);
 
   const incompleteCount = useMemo(
     () =>
@@ -81,12 +74,11 @@ export function StudentsPage() {
   );
 
   const isFiltered =
-    query.trim().length > 0 || grade !== null || groupId !== '' || quick !== 'none' || status !== 'active';
+    query.trim().length > 0 || grade !== null || quick !== 'none' || status !== 'active';
 
   const clearFilters = () => {
     setQuery('');
     setGrade(null);
-    setGroupId('');
     setStatus('active');
     setQuick('none');
   };
@@ -142,19 +134,6 @@ export function StudentsPage() {
             {GRADES.map((value) => (
               <option key={value} value={value}>
                 {ordinalGrade(value)}
-              </option>
-            ))}
-          </SelectField>
-
-          <SelectField
-            label="Small group"
-            value={groupId}
-            onChange={(changed) => setGroupId(changed.target.value)}
-          >
-            <option value="">All groups</option>
-            {groups.map((group) => (
-              <option key={group.id} value={group.id}>
-                {group.name}
               </option>
             ))}
           </SelectField>
@@ -239,11 +218,7 @@ export function StudentsPage() {
         ) : (
           <ul className="divide-y divide-ink-800">
             {visible.map((student) => (
-              <StudentListRow
-                key={student.id}
-                student={student}
-                groupName={student.smallGroupId ? groupNames.get(student.smallGroupId) : undefined}
-              />
+              <StudentListRow key={student.id} student={student} />
             ))}
           </ul>
         )}
@@ -295,13 +270,7 @@ function FilterChip({
 }
 
 /** Memoised so retyping in the search box only re-renders the rows that change. */
-const StudentListRow = memo(function StudentListRow({
-  student,
-  groupName,
-}: {
-  student: Student;
-  groupName: string | undefined;
-}) {
+const StudentListRow = memo(function StudentListRow({ student }: { student: Student }) {
   return (
     <li>
       <Link
@@ -325,10 +294,7 @@ const StudentListRow = memo(function StudentListRow({
             {student.status === 'inactive' ? <Badge tone="neutral">Inactive</Badge> : null}
           </span>
           <span className="mt-0.5 flex items-center gap-2 text-xs text-ink-500">
-            <span className="truncate">
-              {ordinalGrade(student.grade)} grade
-              {groupName ? ` · ${groupName}` : ''}
-            </span>
+            <span className="truncate">{ordinalGrade(student.grade)} grade</span>
             <SourceBadge pcoPersonId={student.pcoPersonId} />
           </span>
         </span>

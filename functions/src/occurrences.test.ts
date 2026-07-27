@@ -52,7 +52,6 @@ function eventDoc(overrides: Record<string, unknown> = {}): Record<string, unkno
     location: 'Fellowship Hall',
     notes: null,
     status: 'scheduled',
-    defaultGroupingMode: 'all',
     ...overrides,
   };
 }

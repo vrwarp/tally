@@ -213,7 +213,6 @@ function personResource(person: SimPerson, store: SimulatorStore): Resource {
       name: `${person.first_name} ${person.last_name}`,
       grade: person.grade,
       graduation_year: person.graduation_year,
-      gender: person.gender,
       birthdate: person.birthdate,
       child: person.child,
       medical_notes: person.medical_notes,

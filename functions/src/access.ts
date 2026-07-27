@@ -159,8 +159,8 @@ export async function provisionAccessForCaller(
  * Writes the authorisation document.
  *
  * `createdAt` is preserved so "member since" does not reset every time somebody
- * signs in, and `assignedGroupId` is left alone because it is the counselor's
- * own choice of small group, not something a sign-in has an opinion about.
+ * signs in. The write merges, so any field a sign-in has no opinion about is
+ * left as it was.
  */
 async function writeProfile(
   userRef: { set: (data: Record<string, unknown>, options?: { merge?: boolean }) => Promise<unknown> },

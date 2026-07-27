@@ -20,10 +20,10 @@ import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { EventHeader } from '@/features/checkin/EventHeader';
+import { FilterBar } from '@/features/checkin/FilterBar';
 import { NoActiveEvent } from '@/features/checkin/NoActiveEvent';
 import { QuickAddVisitorModal } from '@/features/checkin/QuickAddVisitorModal';
 import { RosterList } from '@/features/checkin/RosterList';
-import { ScopeBar } from '@/features/checkin/ScopeBar';
 import { SearchBar } from '@/features/checkin/SearchBar';
 import { buildRoster, type RosterFocus } from '@/features/roster/predictiveRoster';
 import { useActiveEvent, useSeriesHistoryEvents } from '@/hooks/useActiveEvent';
@@ -66,8 +66,8 @@ export function CheckInPage() {
   const { event, autoEvent, isOverridden, now, selectableEvents } =
     useActiveEvent(eventId ?? null);
 
-  const { students, groups, settings, loading: dataLoading, rosterError } = useData();
-  const { profile, user } = useAuth();
+  const { students, settings, loading: dataLoading, rosterError } = useData();
+  const { user } = useAuth();
   const { show } = useToast();
 
   const { attendance, error: attendanceError } = useAttendance(
@@ -138,34 +138,6 @@ export function CheckInPage() {
     };
   }, []);
 
-  /* ---- Scope (Journey 2) ------------------------------------------------- */
-
-  // Sunday School opens on the counselor's own group; everything else opens on
-  // everyone. Derived from the event id rather than stored in an effect so that
-  // switching events cannot leave a previous event's scope behind.
-  const defaultScopeGroupId =
-    event?.mode === "recurring" && event.defaultGroupingMode === "smallGroup"
-      ? (profile?.assignedGroupId ?? null)
-      : null;
-  const [scopeOverride, setScopeOverride] = useState<{
-    eventId: string;
-    groupId: string | null;
-  } | null>(null);
-  const scopeGroupId =
-    scopeOverride && scopeOverride.eventId === event?.id
-      ? scopeOverride.groupId
-      : defaultScopeGroupId;
-  const group =
-    groups.find((candidate) => candidate.id === scopeGroupId) ?? null;
-
-  const handleScopeChange = useCallback(
-    (groupId: string | null) => {
-      if (!event) return;
-      setScopeOverride({ eventId: event.id, groupId });
-    },
-    [event],
-  );
-
   /* ---- The roster -------------------------------------------------------- */
 
   const roster = useMemo(() => {
@@ -178,20 +150,8 @@ export function CheckInPage() {
       history: snapshots,
       settings,
       filters: { query, grades, focus },
-      group,
     });
-  }, [
-    event,
-    students,
-    attendance,
-    rsvps,
-    snapshots,
-    settings,
-    query,
-    grades,
-    focus,
-    group,
-  ]);
+  }, [event, students, attendance, rsvps, snapshots, settings, query, grades, focus]);
 
   /* ---- Waiting for the prediction ---------------------------------------- */
 
@@ -332,9 +292,9 @@ export function CheckInPage() {
   const { counts, focus: appliedFocus } = roster;
 
   // Offering the prediction as a filter it cannot honour would be a chip that
-  // does nothing: a search has to reach the whole roster, a small group is
-  // already short, and a series with no regulars has none to show.
-  const canFocusRecent = !roster.isFiltered && !group && counts.recent > 0;
+  // does nothing: a search has to reach the whole roster, and a series with no
+  // regulars has none to show.
+  const canFocusRecent = !roster.isFiltered && counts.recent > 0;
 
   return (
     <div className="flex flex-col">
@@ -375,20 +335,14 @@ export function CheckInPage() {
 
       <div className="border-b border-ink-800">
         <div className="mx-auto w-full max-w-3xl">
-          <ScopeBar
-            groups={groups}
-            scopeGroupId={scopeGroupId}
-            onScopeChange={handleScopeChange}
+          <FilterBar
             grades={grades}
             onGradesChange={setGrades}
             focus={appliedFocus}
             onFocusChange={setFocus}
             showRecent={canFocusRecent}
             recentCount={counts.recent}
-            assignedGroupId={profile?.assignedGroupId ?? null}
             present={counts.present}
-            eligible={counts.eligible}
-            absent={counts.absent}
           />
         </div>
       </div>

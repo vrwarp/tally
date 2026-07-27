@@ -40,7 +40,6 @@ function harness(overrides: Partial<DataContextValue> = {}) {
     students: [],
     events: [],
     series: [],
-    groups: [],
     settings: makeSettings(),
     loading: false,
     error: null,

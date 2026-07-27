@@ -68,7 +68,6 @@ export interface OccurrenceSource {
   checkInClosesAt: Date;
   location: string | null;
   notes: string | null;
-  defaultGroupingMode: 'all' | 'smallGroup';
 }
 
 /**

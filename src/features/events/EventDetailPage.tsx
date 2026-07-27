@@ -189,14 +189,6 @@ export function EventDetailPage() {
               label="Check-in"
               value={`${formatClock(event.checkInOpensAt)} – ${formatClock(event.checkInClosesAt)}`}
             />
-            <DetailRow
-              label="Roster opens on"
-              value={
-                event.defaultGroupingMode === 'smallGroup'
-                  ? 'Each counselor’s small group'
-                  : 'One flat roster'
-              }
-            />
           </dl>
 
           {event.notes ? (

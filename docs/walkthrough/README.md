@@ -115,7 +115,7 @@ A one-off event is about accountability rather than speed. The numbers a leader 
 
 ### Students
 
-The whole ministry, filterable by grade, small group and status. Each row says whether the record came from Planning Center or was created in Tally, so it is obvious which fields are safe to edit here.
+The whole ministry, filterable by grade and status. Each row says whether the record came from Planning Center or was created in Tally, so it is obvious which fields are safe to edit here.
 
 ![Students](web/desktop-12-students.jpg)
 
@@ -155,7 +155,7 @@ Dark is the default because Tally’s home is a dim room on a Friday night, but 
 
 ### A roster nobody stores
 
-These names are not in Tally’s database. They arrived from Planning Center on this page load, merged with the handful of things Planning Center has no opinion about — a small group, a note, when somebody first turned up.
+These names are not in Tally’s database. They arrived from Planning Center on this page load, merged with the handful of things Planning Center has no opinion about — a note, when somebody first turned up.
 
 ![A roster nobody stores](web/desktop-16-a-roster-nobody-stores.jpg)
 

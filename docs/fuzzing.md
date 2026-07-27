@@ -76,10 +76,11 @@ and every pair of times, including a 22:00–01:00 lock-in that crosses midnight
 
 ### Planning Center (`functions/src/pco/mapping.fuzz.test.ts`)
 
-The mapper reads a database Tally does not own and cannot validate — `gender`
-alone arrives as `Male`, `M`, `female` and `""`. It must never throw (one odd
-record would abort the whole sync), always produce a grade inside the configured
-band, and never grant an access-roster entry without a usable email.
+The mapper reads a database Tally does not own and cannot validate — a grade
+alone arrives as a number, a `graduation_year`, or nothing at all. It must never
+throw (one odd record would abort the whole sync), always produce a grade inside
+the configured band, and never grant an access-roster entry without a usable
+email.
 
 ## What it found
 

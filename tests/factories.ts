@@ -10,7 +10,6 @@ import type {
   EventAttendanceSnapshot,
   Grade,
   Rsvp,
-  SmallGroup,
   Student,
   TallyEvent,
   UserProfile,
@@ -45,8 +44,6 @@ export function makeStudent(overrides: Partial<Student> = {}): Student {
     firstName,
     lastName,
     grade: (pick(overrides, 'grade', 8) as Grade),
-    gender: pick(overrides, 'gender', 'unspecified'),
-    smallGroupId: pick(overrides, 'smallGroupId', null),
     notes: pick(overrides, 'notes', null),
     status: pick(overrides, 'status', 'active'),
     isVisitor: pick(overrides, 'isVisitor', false),
@@ -83,7 +80,6 @@ export function makeEvent(overrides: Partial<TallyEvent> = {}): TallyEvent {
     location: pick(overrides, 'location', null),
     notes: pick(overrides, 'notes', null),
     requiresRsvp: pick(overrides, 'requiresRsvp', false),
-    defaultGroupingMode: pick(overrides, 'defaultGroupingMode', 'all'),
     status: pick(overrides, 'status', 'scheduled'),
     createdAt: pick(overrides, 'createdAt', new Date('2026-01-01T12:00:00')),
     updatedAt: pick(overrides, 'updatedAt', new Date('2026-01-01T12:00:00')),
@@ -121,23 +117,12 @@ export function makeRsvp(overrides: Partial<Rsvp> = {}): Rsvp {
   };
 }
 
-export function makeSmallGroup(overrides: Partial<SmallGroup> = {}): SmallGroup {
-  return {
-    id: pick(overrides, 'id', nextId('group')),
-    name: pick(overrides, 'name', '8th Grade Boys'),
-    grades: pick(overrides, 'grades', [8]),
-    gender: pick(overrides, 'gender', 'male'),
-    order: pick(overrides, 'order', 0),
-  };
-}
-
 export function makeUser(overrides: Partial<UserProfile> = {}): UserProfile {
   return {
     id: pick(overrides, 'id', nextId('user')),
     email: pick(overrides, 'email', 'counselor@example.org'),
     displayName: pick(overrides, 'displayName', 'Sam Counselor'),
     role: pick(overrides, 'role', 'counselor'),
-    assignedGroupId: pick(overrides, 'assignedGroupId', null),
     active: pick(overrides, 'active', true),
     createdAt: pick(overrides, 'createdAt', new Date('2025-08-01T12:00:00')),
     lastSeenAt: pick(overrides, 'lastSeenAt', null),

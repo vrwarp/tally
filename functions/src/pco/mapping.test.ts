@@ -8,7 +8,6 @@ import {
   isYouth,
   mapPersonToStudent,
   nameGradeKey,
-  normaliseGender,
   pcoGrade,
   splitFirstName,
 } from './mapping.js';
@@ -173,18 +172,6 @@ describe('mapPersonToStudent', () => {
   it('clamps an out-of-range grade into the configured band', () => {
     expect(mapPersonToStudent(person('1', { grade: 3, last_name: 'Lin' }), RANGE).grade).toBe(6);
     expect(mapPersonToStudent(person('1', { grade: 14, last_name: 'Lin' }), RANGE).grade).toBe(12);
-  });
-
-  it('normalises every gender spelling Planning Center allows', () => {
-    expect(normaliseGender('M')).toBe('male');
-    expect(normaliseGender('male')).toBe('male');
-    expect(normaliseGender('Male')).toBe('male');
-    expect(normaliseGender('F')).toBe('female');
-    expect(normaliseGender('Female')).toBe('female');
-    expect(normaliseGender('nonbinary')).toBe('unspecified');
-    expect(normaliseGender('')).toBe('unspecified');
-    expect(normaliseGender(null)).toBe('unspecified');
-    expect(normaliseGender(undefined)).toBe('unspecified');
   });
 
   it('carries medical notes across as allergies, blank means none', () => {

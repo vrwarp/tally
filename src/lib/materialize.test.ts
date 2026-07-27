@@ -127,7 +127,6 @@ describe('projectOccurrences', () => {
       checkInOpensAt: new Date(2026, 6, 24, 20, 30), // a window somebody widened
       checkInClosesAt: new Date(2026, 6, 25, 1, 30),
       location: 'Fellowship Hall',
-      defaultGroupingMode: 'smallGroup',
     });
 
     const [next] = projectOccurrences([source], new Date(2026, 6, 24, 22, 0));

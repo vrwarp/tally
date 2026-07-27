@@ -28,7 +28,6 @@ import type {
   InvitationDoc,
   PcoRuntimeConfigDoc,
   RsvpDoc,
-  SmallGroupDoc,
   StudentDoc,
   TallyEventDoc,
   UserProfileDoc,
@@ -56,7 +55,6 @@ export const ID = {
   otherStudent: 'student-2',
   event: 'event-1',
   series: 'friday-fellowship',
-  group: 'group-1',
 } as const;
 
 const T0 = Timestamp.fromDate(new Date('2026-02-13T19:00:00Z'));
@@ -101,7 +99,6 @@ export function userDoc(overrides: Partial<UserProfileDoc> = {}): UserProfileDoc
     email: 'sam@example.org',
     displayName: 'Sam Counselor',
     role: 'counselor',
-    assignedGroupId: null,
     active: true,
     createdAt: T0,
     lastSeenAt: null,
@@ -115,8 +112,6 @@ export function studentDoc(overrides: Partial<StudentDoc> = {}): StudentDoc {
     firstName: 'Jamie',
     lastName: 'Rivera',
     grade: 8,
-    gender: 'unspecified',
-    smallGroupId: null,
     notes: null,
     status: 'active',
     isVisitor: false,
@@ -154,7 +149,6 @@ export function eventDoc(overrides: Partial<TallyEventDoc> = {}): TallyEventDoc 
     location: null,
     notes: null,
     requiresRsvp: false,
-    defaultGroupingMode: 'all',
     status: 'scheduled',
     createdAt: T0,
     updatedAt: T0,
@@ -238,10 +232,6 @@ export function invitationDoc(overrides: Partial<InvitationDoc> = {}): Invitatio
   };
 }
 
-function smallGroupDoc(): SmallGroupDoc {
-  return { name: '8th Grade Boys', grades: [8], gender: 'male', order: 0 };
-}
-
 /* -------------------------------------------------------------------------- */
 /* Seeding                                                                     */
 /* -------------------------------------------------------------------------- */
@@ -278,7 +268,6 @@ export async function seedContent(env: RulesTestEnvironment): Promise<void> {
     await setDoc(doc(db, paths.event(ID.event)), eventDoc());
     await setDoc(doc(db, paths.attendance(ID.event, ID.student)), attendanceDoc());
     await setDoc(doc(db, paths.rsvp(ID.event, ID.student)), rsvpDoc());
-    await setDoc(doc(db, paths.smallGroup(ID.group)), smallGroupDoc());
     await setDoc(doc(db, paths.settings()), settingsDoc());
   });
 }

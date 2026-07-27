@@ -27,7 +27,6 @@ import {
   type RecurrenceFrequency,
   type RecurrenceRule,
   type Rsvp,
-  type SmallGroup,
   type Student,
   type TallyEvent,
   type UserProfile,
@@ -124,10 +123,6 @@ export function toStudent(snapshot: DocumentSnapshot<DocumentData>): Student {
     firstName,
     lastName,
     grade: grade(data.grade),
-    gender: (data.gender === 'male' || data.gender === 'female'
-      ? data.gender
-      : 'unspecified') as Student['gender'],
-    smallGroupId: strOrNull(data.smallGroupId),
     notes: strOrNull(data.notes),
     status: data.status === 'inactive' ? 'inactive' : 'active',
     isVisitor: bool(data.isVisitor),
@@ -219,7 +214,6 @@ export function toEvent(snapshot: DocumentSnapshot<DocumentData>): TallyEvent {
     // A one-off without an explicit flag still defaults to an RSVP roster: a
     // trip with a fixed list is the reason one-offs have a roster story at all.
     requiresRsvp: bool(data.requiresRsvp, mode === 'oneoff'),
-    defaultGroupingMode: data.defaultGroupingMode === 'smallGroup' ? 'smallGroup' : 'all',
     status: data.status === 'cancelled' ? 'cancelled' : 'scheduled',
     createdAt: toDate(data.createdAt, fallback),
     updatedAt: toDate(data.updatedAt, fallback),
@@ -275,7 +269,7 @@ export function toRsvp(snapshot: DocumentSnapshot<DocumentData>, eventId: string
 }
 
 /* -------------------------------------------------------------------------- */
-/* Users, groups, series, settings                                             */
+/* Users, series, settings                                                     */
 /* -------------------------------------------------------------------------- */
 
 export function toUserProfile(snapshot: DocumentSnapshot<DocumentData>): UserProfile {
@@ -288,26 +282,10 @@ export function toUserProfile(snapshot: DocumentSnapshot<DocumentData>): UserPro
     displayName: strOrNull(data.displayName),
     // Unknown or missing role means the least privilege we hand out.
     role: role === 'admin' || role === 'core' ? role : 'counselor',
-    assignedGroupId: strOrNull(data.assignedGroupId),
     active: bool(data.active, false),
     createdAt: toDate(data.createdAt, pendingFallback(snapshot)),
     lastSeenAt: toDateOrNull(data.lastSeenAt),
     pcoPersonId: strOrNull(data.pcoPersonId),
-  };
-}
-
-export function toSmallGroup(snapshot: DocumentSnapshot<DocumentData>): SmallGroup {
-  const data = snapshot.data() ?? {};
-  const rawGrades = Array.isArray(data.grades) ? data.grades : [];
-  const gender = data.gender;
-
-  return {
-    id: snapshot.id,
-    name: str(data.name, snapshot.id),
-    grades: rawGrades.filter(isGrade),
-    gender:
-      gender === 'male' || gender === 'female' || gender === 'unspecified' ? gender : 'mixed',
-    order: num(data.order, 0),
   };
 }
 
@@ -322,7 +300,6 @@ export function toEventSeries(snapshot: DocumentSnapshot<DocumentData>): EventSe
     endTime: str(data.endTime, '21:00'),
     checkInOpensMinutesBefore: num(data.checkInOpensMinutesBefore, 60),
     checkInClosesMinutesAfter: num(data.checkInClosesMinutesAfter, 60),
-    defaultGroupingMode: data.defaultGroupingMode === 'smallGroup' ? 'smallGroup' : 'all',
     active: bool(data.active, true),
     order: num(data.order, 0),
   };
@@ -364,9 +341,9 @@ export function toSettings(snapshot: DocumentSnapshot<DocumentData>): AppSetting
  * A roster row from Planning Center, in the shape the rest of the app already
  * speaks.
  *
- * The fields Tally owns and Planning Center knows nothing about — small group,
- * notes, when this student first turned up — are absent here and merged in from
- * the student's Firestore document if one exists. Most students never get one:
+ * The fields Tally owns and Planning Center knows nothing about — notes, when
+ * this student first turned up — are absent here and merged in from the
+ * student's Firestore document if one exists. Most students never get one:
  * a document is written only when Tally has something of its own to record.
  */
 /** See the note on `createdAt` in `fromRosterPerson`. */
@@ -378,8 +355,6 @@ export function fromRosterPerson(person: PcoRosterPerson, now: Date): Student {
     firstName: person.firstName,
     lastName: person.lastName,
     grade: grade(person.grade),
-    gender: person.gender,
-    smallGroupId: null,
     notes: null,
     status: person.status,
     isVisitor: false,

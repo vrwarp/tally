@@ -250,19 +250,18 @@ describe('provisionAccessForCaller', () => {
       expect(db.get(userPath())?.createdAt).toBe(joined);
     });
 
-    it('leaves the small group they chose alone', async () => {
-      // The counselor's own answer to "which group am I teaching this term".
-      // A sign-in has no opinion about it.
+    it('leaves a field the sign-in has no opinion about alone', async () => {
+      // The write merges, so anything another screen set survives a sign-in.
       const db = new FakeFirestore();
       db.seed(userPath(), {
         email: CALLER.email,
         role: 'core',
         active: true,
-        assignedGroupId: '8th-grade-boys',
+        pcoPersonId: '9100003',
       });
 
       await provisionAccessForCaller(db, CALLER, NOW, []);
-      expect(db.get(userPath())?.assignedGroupId).toBe('8th-grade-boys');
+      expect(db.get(userPath())?.pcoPersonId).toBe('9100003');
     });
 
     it('keeps the name it already had when the token carries none', async () => {

@@ -16,7 +16,6 @@ function rosterEntry(pcoPersonId: string, overrides = {}) {
     id: `pco_${pcoPersonId}`,
     pcoPersonId,
     fromPlanningCenter: true,
-    smallGroupId: null,
     notes: null,
     createdAt: new Date(0),
     ...overrides,
@@ -53,14 +52,12 @@ describe('mergeRoster', () => {
     const annotation = tallyDocument('pco_1', {
       firstName: 'Amara',
       lastName: 'Okonkwo',
-      smallGroupId: 'grade-8-girls',
       notes: 'Plays trumpet.',
     });
 
     const merged = mergeRoster(roster, [annotation]);
 
     expect(merged).toHaveLength(1);
-    expect(merged[0]?.smallGroupId).toBe('grade-8-girls');
     expect(merged[0]?.notes).toBe('Plays trumpet.');
   });
 
@@ -86,7 +83,7 @@ describe('mergeRoster', () => {
       lastName: 'Mbeki',
       pcoPersonId: '900',
       isVisitor: true,
-      smallGroupId: 'grade-6-girls',
+      notes: 'Plays trumpet.',
     });
 
     const merged = mergeRoster(roster, [linked]);
@@ -94,7 +91,7 @@ describe('mergeRoster', () => {
     expect(merged).toHaveLength(1);
     expect(merged[0]?.id).toBe('pco_900');
     // The annotation still travels, under the canonical id.
-    expect(merged[0]?.smallGroupId).toBe('grade-6-girls');
+    expect(merged[0]?.notes).toBe('Plays trumpet.');
   });
 
   it('keeps the document creation date, which is what MIA depends on', () => {

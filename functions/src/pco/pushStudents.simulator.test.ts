@@ -63,8 +63,6 @@ function tallyOnlyStudent(overrides: Record<string, unknown> = {}): Record<strin
     firstName: 'Nia',
     lastName: 'Fontaine',
     grade: 9,
-    gender: 'unspecified',
-    smallGroupId: null,
     parentName: null,
     parentPhone: null,
     parentEmail: null,

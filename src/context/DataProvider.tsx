@@ -1,10 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import {
-  subscribeEventSeries,
-  subscribeEvents,
-  subscribeSettings,
-  subscribeSmallGroups,
-} from '@/services/events';
+import { subscribeEventSeries, subscribeEvents, subscribeSettings } from '@/services/events';
 import { subscribeStudents } from '@/services/students';
 import { cachedRoster, fetchRoster, mergeRoster } from '@/services/roster';
 import { useNow } from '@/hooks/useNow';
@@ -15,7 +10,6 @@ import {
   type AppSettings,
   type EventSeries,
   type PcoErrorReport,
-  type SmallGroup,
   type Student,
   type TallyEvent,
 } from '@/types';
@@ -84,7 +78,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [documents, setDocuments] = useState<Student[]>([]);
   const [storedEvents, setStoredEvents] = useState<TallyEvent[]>([]);
   const [series, setSeries] = useState<EventSeries[]>([]);
-  const [groups, setGroups] = useState<SmallGroup[]>([]);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
 
   // Seeded from this device so a cold start on bad signal draws names
@@ -99,7 +92,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
     students: false,
     events: false,
     series: false,
-    groups: false,
     settings: false,
   });
   const [error, setError] = useState<string | null>(null);
@@ -134,11 +126,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setSeries(next);
         markReady('series');
       }, fail('series')),
-
-      subscribeSmallGroups((next) => {
-        setGroups(next);
-        markReady('groups');
-      }, fail('groups')),
 
       subscribeSettings((next) => {
         setSettings(next);
@@ -253,7 +240,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
       students,
       events,
       series,
-      groups,
       settings,
       loading,
       error,
@@ -267,7 +253,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
       students,
       events,
       series,
-      groups,
       settings,
       loading,
       error,

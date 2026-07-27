@@ -6,9 +6,9 @@
  *   1. Planning Center, through the `getRoster` callable. This is where names,
  *      grades and "is there an allergy" come from, and it is authoritative.
  *   2. Firestore `students/`, which holds only what Planning Center has no
- *      opinion about — the small group a counselor assigned, a note somebody
- *      typed, when this student first turned up — plus the full record for a
- *      quick-added visitor who does not exist upstream yet.
+ *      opinion about — a note somebody typed, when this student first turned
+ *      up — plus the full record for a quick-added visitor who does not exist
+ *      upstream yet.
  *
  * Most students never get a Firestore document at all. One is written the first
  * time Tally has something of its own to say about them, which for a typical

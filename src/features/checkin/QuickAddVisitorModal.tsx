@@ -2,7 +2,7 @@
  * Journey 3: a student nobody has ever seen walks in.
  *
  * Three fields, one button, done. Everything else about this person — parent
- * contact, allergies, small group — is the core team's problem later; asking a
+ * contact, allergies — is the core team's problem later; asking a
  * door volunteer for it while six people wait behind is how a queue stalls. The
  * incomplete profile is the handoff signal, so leaving it incomplete is correct.
  */

@@ -25,12 +25,6 @@ export function isGrade(value: unknown): value is Grade {
   return typeof value === 'number' && GRADES.includes(value as Grade);
 }
 
-/**
- * Recorded only because Sunday School small groups are split by it
- * (Journey 2: "8th Grade Boys"). Never surfaced as a standalone label.
- */
-export type Gender = 'male' | 'female' | 'unspecified';
-
 export type StudentStatus = 'active' | 'inactive';
 
 /**
@@ -56,8 +50,6 @@ export interface UserProfileDoc {
   email: string;
   displayName: string | null;
   role: Role;
-  /** Ties a counselor to a Sunday School small group (Journey 2). */
-  assignedGroupId: string | null;
   active: boolean;
   createdAt: Timestamp;
   lastSeenAt: Timestamp | null;
@@ -108,22 +100,6 @@ export interface Invitation extends Omit<InvitationDoc, 'invitedAt'> {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Small groups                                                                */
-/* -------------------------------------------------------------------------- */
-
-export interface SmallGroupDoc {
-  name: string;
-  grades: Grade[];
-  gender: Gender | 'mixed';
-  /** Display order in pickers. */
-  order: number;
-}
-
-export interface SmallGroup extends SmallGroupDoc {
-  id: string;
-}
-
-/* -------------------------------------------------------------------------- */
 /* Students                                                                    */
 /* -------------------------------------------------------------------------- */
 
@@ -131,8 +107,6 @@ export interface StudentDoc {
   firstName: string;
   lastName: string;
   grade: Grade;
-  gender: Gender;
-  smallGroupId: string | null;
 
   /**
    * Notes a counselor typed, about the ministry rather than about the child.
@@ -221,7 +195,6 @@ export const PCO_MANAGED_STUDENT_FIELDS = [
   'firstName',
   'lastName',
   'grade',
-  'gender',
   'status',
 ] as const satisfies readonly (keyof Student)[];
 
@@ -303,13 +276,6 @@ export function splitFirstName(value: string): { firstName: string; nickname: st
 /* Event series (the recurring templates)                                      */
 /* -------------------------------------------------------------------------- */
 
-/**
- * How a roster is grouped by default when a counselor opens an event.
- * `all`        — one flat predictive roster (Friday night door check-in).
- * `smallGroup` — pre-filtered to the counselor's assigned group (Sunday School).
- */
-export type RosterGroupingMode = 'all' | 'smallGroup';
-
 export interface EventSeriesDoc {
   title: string;
   /** 0 = Sunday … 6 = Saturday. */
@@ -319,7 +285,6 @@ export interface EventSeriesDoc {
   endTime: string;
   checkInOpensMinutesBefore: number;
   checkInClosesMinutesAfter: number;
-  defaultGroupingMode: RosterGroupingMode;
   active: boolean;
   order: number;
 }
@@ -406,7 +371,6 @@ export interface TallyEventDoc {
   /** Closes a one-off event's roster to the students who RSVP'd. */
   requiresRsvp: boolean;
 
-  defaultGroupingMode: RosterGroupingMode;
   status: EventStatus;
 
   createdAt: Timestamp;
@@ -565,7 +529,6 @@ export interface PcoRosterPerson {
   firstName: string;
   lastName: string;
   grade: number;
-  gender: Gender;
   status: StudentStatus;
   searchName: string;
   /** `null` when the roster read did not look. See the server-side note. */

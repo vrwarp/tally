@@ -39,7 +39,6 @@ import {
   buildSearchName,
   emailKey,
   pcoStudentId,
-  type Gender,
   type Grade,
   type Role,
 } from '../src/types';
@@ -193,41 +192,6 @@ function schoolYearStart(now: Date): Date {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Small groups                                                                */
-/* -------------------------------------------------------------------------- */
-
-interface SeedGroup {
-  id: string;
-  name: string;
-  grades: Grade[];
-  gender: Gender;
-}
-
-/**
- * Sunday School splits. The shape matters: `studentMatchesGroup` falls back to
- * grades + gender when a student has no explicit `smallGroupId`, so every group
- * has to describe itself well enough to sort an unassigned roster.
- */
-const SEED_GROUPS: readonly SeedGroup[] = [
-  { id: '6th-grade-boys', name: '6th Grade Boys', grades: [6], gender: 'male' },
-  { id: '6th-grade-girls', name: '6th Grade Girls', grades: [6], gender: 'female' },
-  { id: '7th-grade-boys', name: '7th Grade Boys', grades: [7], gender: 'male' },
-  { id: '7th-grade-girls', name: '7th Grade Girls', grades: [7], gender: 'female' },
-  { id: '8th-grade-boys', name: '8th Grade Boys', grades: [8], gender: 'male' },
-  { id: '8th-grade-girls', name: '8th Grade Girls', grades: [8], gender: 'female' },
-  { id: '9th-grade-boys', name: '9th Grade Boys', grades: [9], gender: 'male' },
-  { id: '9th-grade-girls', name: '9th Grade Girls', grades: [9], gender: 'female' },
-  { id: 'high-school-boys', name: 'High School Boys', grades: [10, 11, 12], gender: 'male' },
-  { id: 'high-school-girls', name: 'High School Girls', grades: [10, 11, 12], gender: 'female' },
-];
-
-function groupIdFor(grade: Grade, gender: Gender): string | null {
-  if (gender !== 'male' && gender !== 'female') return null;
-  const bucket = grade >= 10 ? 'high-school' : `${grade}th-grade`;
-  return `${bucket}-${gender === 'male' ? 'boys' : 'girls'}`;
-}
-
-/* -------------------------------------------------------------------------- */
 /* Students                                                                    */
 /* -------------------------------------------------------------------------- */
 
@@ -259,7 +223,6 @@ interface SeedStudent {
   first: string;
   last: string;
   grade: Grade;
-  gender: Gender;
   band: Band;
   /** Omitted when nobody has a way to reach a parent, which drives Incomplete Profiles. */
   parent?: string;
@@ -270,63 +233,63 @@ interface SeedStudent {
 
 const SEED_STUDENTS: readonly SeedStudent[] = [
   /* ---- The core: the Recent block on a Friday night ---------------------- */
-  { first: 'Maya', last: 'Adebayo', grade: 7, gender: 'female', band: 'core', parent: 'Adaeze Adebayo', contact: 'both' },
-  { first: 'Ethan', last: 'Nguyen', grade: 9, gender: 'male', band: 'core', parent: 'Linh Nguyen', contact: 'phone' },
-  { first: 'Sofia', last: 'Ramirez', grade: 8, gender: 'female', band: 'core', parent: 'Carmen Ramirez', contact: 'both', allergies: 'Peanuts — carries an EpiPen in her bag' },
-  { first: 'Malik', last: 'Johnson', grade: 11, gender: 'male', band: 'core', parent: 'Denise Johnson', contact: 'phone' },
-  { first: 'Grace', last: 'Kim', grade: 10, gender: 'female', band: 'core', parent: 'Soo-jin Kim', contact: 'both' },
-  { first: 'Isaiah', last: 'Brooks', grade: 6, gender: 'male', band: 'core', parent: 'Terrence Brooks', contact: 'phone', allergies: 'Bee stings' },
-  { first: 'Priya', last: 'Patel', grade: 12, gender: 'female', band: 'core', parent: 'Nisha Patel', contact: 'email', notes: 'Leads the Sunday worship team.' },
-  { first: 'Caleb', last: 'Okafor', grade: 9, gender: 'male', band: 'core', parent: 'Chidi Okafor', contact: 'phone' },
-  { first: 'Hannah', last: 'Schmidt', grade: 7, gender: 'female', band: 'core', parent: 'Ingrid Schmidt', contact: 'both' },
-  { first: 'Diego', last: 'Herrera', grade: 10, gender: 'male', band: 'core', parent: 'Rosa Herrera', contact: 'phone' },
-  { first: 'Amara', last: 'Osei', grade: 8, gender: 'female', band: 'core', parent: 'Kwabena Osei', contact: 'both' },
+  { first: 'Maya', last: 'Adebayo', grade: 7, band: 'core', parent: 'Adaeze Adebayo', contact: 'both' },
+  { first: 'Ethan', last: 'Nguyen', grade: 9, band: 'core', parent: 'Linh Nguyen', contact: 'phone' },
+  { first: 'Sofia', last: 'Ramirez', grade: 8, band: 'core', parent: 'Carmen Ramirez', contact: 'both', allergies: 'Peanuts — carries an EpiPen in her bag' },
+  { first: 'Malik', last: 'Johnson', grade: 11, band: 'core', parent: 'Denise Johnson', contact: 'phone' },
+  { first: 'Grace', last: 'Kim', grade: 10, band: 'core', parent: 'Soo-jin Kim', contact: 'both' },
+  { first: 'Isaiah', last: 'Brooks', grade: 6, band: 'core', parent: 'Terrence Brooks', contact: 'phone', allergies: 'Bee stings' },
+  { first: 'Priya', last: 'Patel', grade: 12, band: 'core', parent: 'Nisha Patel', contact: 'email', notes: 'Leads the Sunday worship team.' },
+  { first: 'Caleb', last: 'Okafor', grade: 9, band: 'core', parent: 'Chidi Okafor', contact: 'phone' },
+  { first: 'Hannah', last: 'Schmidt', grade: 7, band: 'core', parent: 'Ingrid Schmidt', contact: 'both' },
+  { first: 'Diego', last: 'Herrera', grade: 10, band: 'core', parent: 'Rosa Herrera', contact: 'phone' },
+  { first: 'Amara', last: 'Osei', grade: 8, band: 'core', parent: 'Kwabena Osei', contact: 'both' },
 
   /* ---- Steady: most weeks ------------------------------------------------ */
-  { first: 'Noah', last: 'Fitzgerald', grade: 6, gender: 'male', band: 'steady', parent: 'Erin Fitzgerald', contact: 'phone', allergies: 'Severe tree nut allergy' },
-  { first: 'Leila', last: 'Haddad', grade: 11, gender: 'female', band: 'steady', parent: 'Rania Haddad', contact: 'both' },
-  { first: 'Jonah', last: 'Weiss', grade: 12, gender: 'male', band: 'steady', parent: 'David Weiss', contact: 'phone' },
-  { first: 'Camila', last: 'Torres', grade: 9, gender: 'female', band: 'steady', parent: 'Luis Torres', contact: 'both' },
-  { first: 'Tyler', last: 'McAllister', grade: 8, gender: 'male', band: 'steady', parent: 'Beth McAllister', contact: 'phone' },
-  { first: 'Aisha', last: 'Rahman', grade: 7, gender: 'female', band: 'steady', parent: 'Farid Rahman', contact: 'email' },
-  { first: 'Marcus', last: 'Delgado', grade: 10, gender: 'male', band: 'steady', parent: 'Elena Delgado', contact: 'phone' },
-  { first: 'Zoe', last: 'Lindqvist', grade: 6, gender: 'female', band: 'steady', parent: 'Anders Lindqvist', contact: 'both' },
-  { first: 'Andre', last: 'Beaulieu', grade: 11, gender: 'male', band: 'steady', parent: 'Marie Beaulieu', contact: 'phone' },
-  { first: 'Naomi', last: 'Tanaka', grade: 12, gender: 'female', band: 'steady', parent: 'Kenji Tanaka', contact: 'both', allergies: 'Shellfish' },
-  { first: 'Josiah', last: 'Mensah', grade: 8, gender: 'male', band: 'steady', parent: 'Akosua Mensah', contact: 'phone' },
+  { first: 'Noah', last: 'Fitzgerald', grade: 6, band: 'steady', parent: 'Erin Fitzgerald', contact: 'phone', allergies: 'Severe tree nut allergy' },
+  { first: 'Leila', last: 'Haddad', grade: 11, band: 'steady', parent: 'Rania Haddad', contact: 'both' },
+  { first: 'Jonah', last: 'Weiss', grade: 12, band: 'steady', parent: 'David Weiss', contact: 'phone' },
+  { first: 'Camila', last: 'Torres', grade: 9, band: 'steady', parent: 'Luis Torres', contact: 'both' },
+  { first: 'Tyler', last: 'McAllister', grade: 8, band: 'steady', parent: 'Beth McAllister', contact: 'phone' },
+  { first: 'Aisha', last: 'Rahman', grade: 7, band: 'steady', parent: 'Farid Rahman', contact: 'email' },
+  { first: 'Marcus', last: 'Delgado', grade: 10, band: 'steady', parent: 'Elena Delgado', contact: 'phone' },
+  { first: 'Zoe', last: 'Lindqvist', grade: 6, band: 'steady', parent: 'Anders Lindqvist', contact: 'both' },
+  { first: 'Andre', last: 'Beaulieu', grade: 11, band: 'steady', parent: 'Marie Beaulieu', contact: 'phone' },
+  { first: 'Naomi', last: 'Tanaka', grade: 12, band: 'steady', parent: 'Kenji Tanaka', contact: 'both', allergies: 'Shellfish' },
+  { first: 'Josiah', last: 'Mensah', grade: 8, band: 'steady', parent: 'Akosua Mensah', contact: 'phone' },
 
   /* ---- The middle band --------------------------------------------------- */
-  { first: 'Ruby', last: 'Castellanos', grade: 7, gender: 'female', band: 'middle', parent: 'Marisol Castellanos', contact: 'phone' },
-  { first: 'Owen', last: 'Kowalski', grade: 9, gender: 'male', band: 'middle', parent: 'Piotr Kowalski', contact: 'both' },
-  { first: 'Layla', last: 'Farouk', grade: 10, gender: 'female', band: 'middle', parent: 'Yasmin Farouk', contact: 'phone', allergies: 'Lactose intolerant' },
-  { first: 'Sebastián', last: 'Vargas', grade: 6, gender: 'male', band: 'middle', parent: 'Hugo Vargas', contact: 'phone' },
-  { first: 'Elena', last: 'Petrova', grade: 11, gender: 'female', band: 'middle', parent: 'Irina Petrova', contact: 'email' },
-  { first: 'Micah', last: 'Sullivan', grade: 12, gender: 'male', band: 'middle', parent: 'Colleen Sullivan', contact: 'phone' },
-  { first: 'Nia', last: 'Washington', grade: 8, gender: 'female', band: 'middle', parent: 'Andre Washington', contact: 'both' },
-  { first: 'Rohan', last: 'Desai', grade: 9, gender: 'male', band: 'middle', parent: 'Meera Desai', contact: 'phone' },
+  { first: 'Ruby', last: 'Castellanos', grade: 7, band: 'middle', parent: 'Marisol Castellanos', contact: 'phone' },
+  { first: 'Owen', last: 'Kowalski', grade: 9, band: 'middle', parent: 'Piotr Kowalski', contact: 'both' },
+  { first: 'Layla', last: 'Farouk', grade: 10, band: 'middle', parent: 'Yasmin Farouk', contact: 'phone', allergies: 'Lactose intolerant' },
+  { first: 'Sebastián', last: 'Vargas', grade: 6, band: 'middle', parent: 'Hugo Vargas', contact: 'phone' },
+  { first: 'Elena', last: 'Petrova', grade: 11, band: 'middle', parent: 'Irina Petrova', contact: 'email' },
+  { first: 'Micah', last: 'Sullivan', grade: 12, band: 'middle', parent: 'Colleen Sullivan', contact: 'phone' },
+  { first: 'Nia', last: 'Washington', grade: 8, band: 'middle', parent: 'Andre Washington', contact: 'both' },
+  { first: 'Rohan', last: 'Desai', grade: 9, band: 'middle', parent: 'Meera Desai', contact: 'phone' },
 
   /* ---- The edges: come when a friend drags them along --------------------- */
-  { first: 'Chloe', last: 'Bergman', grade: 10, gender: 'female', band: 'edge', parent: 'Karin Bergman', contact: 'phone' },
-  { first: 'Isabella', last: 'Moreno', grade: 6, gender: 'female', band: 'edge', parent: 'Paola Moreno', contact: 'both' },
-  { first: 'Trevor', last: 'Boyd', grade: 12, gender: 'male', band: 'edge', notes: 'Drives himself; the office has never reached a parent.' },
-  { first: 'Fatima', last: 'Nasser', grade: 7, gender: 'female', band: 'edge', parent: 'Samir Nasser', contact: 'phone' },
-  { first: 'Kai', last: 'Alofa', grade: 11, gender: 'male', band: 'edge' },
+  { first: 'Chloe', last: 'Bergman', grade: 10, band: 'edge', parent: 'Karin Bergman', contact: 'phone' },
+  { first: 'Isabella', last: 'Moreno', grade: 6, band: 'edge', parent: 'Paola Moreno', contact: 'both' },
+  { first: 'Trevor', last: 'Boyd', grade: 12, band: 'edge', notes: 'Drives himself; the office has never reached a parent.' },
+  { first: 'Fatima', last: 'Nasser', grade: 7, band: 'edge', parent: 'Samir Nasser', contact: 'phone' },
+  { first: 'Kai', last: 'Alofa', grade: 11, band: 'edge' },
 
   /* ---- Drifted away: the whole point of the MIA list ---------------------- */
-  { first: 'Brandon', last: 'Whitaker', grade: 9, gender: 'male', band: 'drifted', parent: 'Susan Whitaker', contact: 'phone' },
-  { first: 'Jasmine', last: 'Cole', grade: 10, gender: 'female', band: 'drifted', parent: 'Renee Cole', contact: 'both' },
-  { first: 'Ana Lucia', last: 'Duarte', grade: 8, gender: 'female', band: 'drifted', parent: 'Beatriz Duarte', contact: 'phone' },
-  { first: 'Dominic', last: 'Russo', grade: 12, gender: 'male', band: 'drifted', parent: 'Gina Russo', contact: 'phone' },
-  { first: 'Hana', last: 'Yamamoto', grade: 6, gender: 'female', band: 'drifted', parent: 'Yuki Yamamoto', contact: 'both' },
+  { first: 'Brandon', last: 'Whitaker', grade: 9, band: 'drifted', parent: 'Susan Whitaker', contact: 'phone' },
+  { first: 'Jasmine', last: 'Cole', grade: 10, band: 'drifted', parent: 'Renee Cole', contact: 'both' },
+  { first: 'Ana Lucia', last: 'Duarte', grade: 8, band: 'drifted', parent: 'Beatriz Duarte', contact: 'phone' },
+  { first: 'Dominic', last: 'Russo', grade: 12, band: 'drifted', parent: 'Gina Russo', contact: 'phone' },
+  { first: 'Hana', last: 'Yamamoto', grade: 6, band: 'drifted', parent: 'Yuki Yamamoto', contact: 'both' },
 
   /* ---- Gone, but their attendance history must survive -------------------- */
-  { first: 'Peyton', last: 'Grant', grade: 12, gender: 'female', band: 'inactive', parent: 'Alicia Grant', contact: 'phone', notes: 'Family moved to Charlotte in the spring.' },
-  { first: 'Levi', last: 'Abrams', grade: 11, gender: 'male', band: 'inactive', parent: 'Jonathan Abrams', contact: 'email', notes: 'Switched to the Saturday service with his cousins.' },
+  { first: 'Peyton', last: 'Grant', grade: 12, band: 'inactive', parent: 'Alicia Grant', contact: 'phone', notes: 'Family moved to Charlotte in the spring.' },
+  { first: 'Levi', last: 'Abrams', grade: 11, band: 'inactive', parent: 'Jonathan Abrams', contact: 'email', notes: 'Switched to the Saturday service with his cousins.' },
 
   /* ---- Quick-added at the door, profile still incomplete ------------------ */
-  { first: 'Kylie', last: 'Novak', grade: 9, gender: 'female', band: 'newcomer' },
-  { first: 'Jayden', last: 'Rivers', grade: 8, gender: 'male', band: 'firstTimer' },
-  { first: 'Selah', last: 'Mbeki', grade: 6, gender: 'female', band: 'firstTimer' },
+  { first: 'Kylie', last: 'Novak', grade: 9, band: 'newcomer' },
+  { first: 'Jayden', last: 'Rivers', grade: 8, band: 'firstTimer' },
+  { first: 'Selah', last: 'Mbeki', grade: 6, band: 'firstTimer' },
 ];
 
 /** Base chance of attending any given instance of a series. */
@@ -351,7 +314,6 @@ interface SeedTeamMember {
   email: string;
   role: Role;
   pcoPersonId: string;
-  assignedGroupId: string | null;
 }
 
 /**
@@ -369,21 +331,18 @@ const SEED_TEAM: readonly SeedTeamMember[] = [
     email: 'dana.ruiz@example.org',
     role: 'admin',
     pcoPersonId: '9100001',
-    assignedGroupId: null,
   },
   {
     name: 'Miriam Achebe',
     email: 'miriam.achebe@example.org',
     role: 'core',
     pcoPersonId: '9100002',
-    assignedGroupId: null,
   },
   {
     name: 'Sam Whitfield',
     email: 'sam.whitfield@example.org',
     role: 'counselor',
     pcoPersonId: '9100003',
-    assignedGroupId: '8th-grade-boys',
   },
 ];
 
@@ -482,7 +441,6 @@ function simulatorPayload(students: readonly BuiltStudent[]) {
           firstName: seed.first,
           lastName: seed.last,
           grade: seed.grade,
-          gender: seed.gender,
           allergies: seed.allergies ?? null,
           status: seed.band === 'inactive' ? ('inactive' as const) : ('active' as const),
           parentName: seed.parent ?? null,
@@ -842,7 +800,6 @@ function collectWrites(now: Date): {
       endTime: '21:00',
       checkInOpensMinutesBefore: 60,
       checkInClosesMinutesAfter: 60,
-      defaultGroupingMode: 'all',
       active: true,
       order: 0,
     },
@@ -856,18 +813,9 @@ function collectWrites(now: Date): {
       endTime: '10:45',
       checkInOpensMinutesBefore: 30,
       checkInClosesMinutesAfter: 30,
-      defaultGroupingMode: 'smallGroup',
       active: true,
       order: 1,
     },
-  });
-
-  /* ---- smallGroups ------------------------------------------------------- */
-  SEED_GROUPS.forEach((group, order) => {
-    writes.push({
-      path: paths.smallGroup(group.id),
-      data: { name: group.name, grades: group.grades, gender: group.gender, order },
-    });
   });
 
   /* ---- events, students, attendance -------------------------------------- */
@@ -908,7 +856,6 @@ function collectWrites(now: Date): {
             : 'Fellowship Hall',
         notes: isRetreat ? 'Bus leaves at 5:30pm sharp. Meet in the car park.' : null,
         requiresRsvp: isRetreat,
-        defaultGroupingMode: event.seriesId === SERIES_IDS.sundaySchool ? 'smallGroup' : 'all',
         status: 'scheduled',
         createdAt: schoolYearStart(now),
         updatedAt: schoolYearStart(now),
@@ -921,24 +868,18 @@ function collectWrites(now: Date): {
    * `students` holds what Tally owns, and nothing else.
    *
    * Names, grades, parent contact and allergies are Planning Center's and are
-   * seeded there instead (see `simulatorPayload`). What lands here is the small
-   * group somebody assigned, a note somebody typed, and when each student
-   * turned up — plus the complete record for a quick-added visitor, who does
-   * not exist upstream yet.
+   * seeded there instead (see `simulatorPayload`). What lands here is a note
+   * somebody typed and when each student turned up — plus the complete record
+   * for a quick-added visitor, who does not exist upstream yet.
    */
-  students.forEach((student, index) => {
+  students.forEach((student) => {
     const { seed } = student;
     const isVisitor = seed.band === 'firstTimer' || seed.band === 'newcomer';
-    // Every fifth student is left unassigned so the grade/gender fallback in
-    // `studentMatchesGroup` is visible in Sunday School scoping.
-    const smallGroupId = isVisitor || index % 5 === 4 ? null : groupIdFor(seed.grade, seed.gender);
 
     const owned: Record<string, unknown> = {
       firstName: seed.first,
       lastName: seed.last,
       grade: seed.grade,
-      gender: seed.gender,
-      smallGroupId,
       notes: seed.notes ?? null,
       status: seed.band === 'inactive' ? 'inactive' : 'active',
       isVisitor,
@@ -965,7 +906,7 @@ function collectWrites(now: Date): {
      * and "no document" now means "not on the roster".
      *
      * What a linked student's document does *not* carry is who they are. The
-     * name, grade and gender are Planning Center's, read live and stored
+     * name, grade and status are Planning Center's, read live and stored
      * nowhere; writing them here would rebuild the mirror this design removed.
      */
     if (student.pcoPersonId) {
@@ -974,7 +915,6 @@ function collectWrites(now: Date): {
         data: {
           pcoPersonId: student.pcoPersonId,
           status: owned.status,
-          smallGroupId,
           notes: seed.notes ?? null,
           isVisitor: false,
           pcoPushPending: false,
@@ -1154,7 +1094,6 @@ function report(input: {
     `  events        ${events.length} (${events.filter((e) => e.isPast).length} past, ${upcoming.length} upcoming)`,
     `  attendance    ${attendance.length} check-ins across the past gatherings`,
     `  rsvps         ${input.rsvps.length} for the Winter Retreat`,
-    `  smallGroups   ${SEED_GROUPS.length}`,
     input.seededPeople === null
       ? '  planningCentre  NOT SEEDED — the simulator was unreachable'
       : `  planningCenter  ${input.seededPeople} people (students, their parents, and ${SEED_TEAM.length} team members)`,

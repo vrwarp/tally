@@ -10,7 +10,6 @@
  *   - a student with no `grade`, carrying only a `graduation_year`
  *   - a 5th grader, who must be excluded from a 6-12 ministry
  *   - an inactive person, who must be deactivated rather than deleted
- *   - `gender` spelled four different ways, because the real field is free text
  *   - a household with two adults, so the parent-contact pick has to be stable
  *   - a household with no adult at all
  *   - a team member with no email address, who cannot be granted access
@@ -38,7 +37,6 @@ export const STUDENT_LIST_ID = 'YOUTH_STUDENTS';
 export const TEAM_LIST_ID = 'YOUTH_TEAM';
 /** A list that exists, has members, and is the wrong answer. See `createFixtureOrg`. */
 export const STALE_LIST_ID = 'YOUTH_CAMP_2019';
-export const SMALL_GROUP_FIELD_SLUG = 'small_group';
 
 /** Default Personal Access Token pair the simulator accepts. */
 export const DEFAULT_APP_ID = 'sim-app-id';
@@ -55,44 +53,42 @@ interface YouthSpec {
   nickname?: string;
   grade: number | null;
   graduationYear?: number;
-  gender: string | null;
   allergies?: string;
   inactive?: boolean;
   /** Days before the anchor this person was last touched in Planning Center. */
   updatedDaysAgo: number;
   household?: string;
-  smallGroup?: string;
 }
 
 const YOUTH: readonly YouthSpec[] = [
-  { id: '4200001', first: 'Amara', last: 'Okonkwo', grade: 8, gender: 'Female', updatedDaysAgo: 2, household: 'H1', smallGroup: '8th Grade Girls' },
-  { id: '4200002', first: 'Benjamin', last: 'Okonkwo', nickname: 'Benji', grade: 6, gender: 'Male', updatedDaysAgo: 2, household: 'H1' },
-  { id: '4200003', first: 'Sofia', last: 'Delgado', grade: 11, gender: 'F', allergies: 'Severe peanut allergy — EpiPen in her bag', updatedDaysAgo: 5, household: 'H2' },
-  { id: '4200004', first: 'Mateo', last: 'Delgado', grade: 7, gender: 'M', updatedDaysAgo: 40, household: 'H2' },
-  { id: '4200005', first: 'Hannah', last: 'Kim', grade: 9, gender: 'female', updatedDaysAgo: 1, household: 'H3', smallGroup: '9th Grade Girls' },
-  { id: '4200006', first: 'Joshua', last: 'Kim', grade: 12, gender: 'male', updatedDaysAgo: 60, household: 'H3' },
-  { id: '4200007', first: 'Priyanka', last: 'Raman', nickname: 'Pri', grade: 10, gender: 'Female', updatedDaysAgo: 9, household: 'H4' },
-  { id: '4200008', first: 'Elijah', last: 'Brooks', grade: 8, gender: 'Male', allergies: 'Lactose intolerant', updatedDaysAgo: 3, household: 'H5', smallGroup: '8th Grade Boys' },
-  { id: '4200009', first: 'Naomi', last: 'Brooks', grade: 6, gender: 'Female', updatedDaysAgo: 3, household: 'H5' },
-  { id: '4200010', first: 'Tobias', last: 'Fischer', grade: 7, gender: '', updatedDaysAgo: 14, household: 'H6' },
-  { id: '4200011', first: 'Leila', last: 'Haddad', grade: 11, gender: 'Female', updatedDaysAgo: 21, household: 'H7' },
-  { id: '4200012', first: 'Caleb', last: 'Nguyen', grade: 9, gender: 'Male', updatedDaysAgo: 6, household: 'H8' },
-  { id: '4200013', first: 'Zara', last: 'Ahmed', grade: 10, gender: 'Female', updatedDaysAgo: 4, household: 'H9' },
-  { id: '4200014', first: 'Marcus', last: 'Johnson', grade: 12, gender: 'Male', updatedDaysAgo: 30, household: 'H10' },
+  { id: '4200001', first: 'Amara', last: 'Okonkwo', grade: 8, updatedDaysAgo: 2, household: 'H1' },
+  { id: '4200002', first: 'Benjamin', last: 'Okonkwo', nickname: 'Benji', grade: 6, updatedDaysAgo: 2, household: 'H1' },
+  { id: '4200003', first: 'Sofia', last: 'Delgado', grade: 11, allergies: 'Severe peanut allergy — EpiPen in her bag', updatedDaysAgo: 5, household: 'H2' },
+  { id: '4200004', first: 'Mateo', last: 'Delgado', grade: 7, updatedDaysAgo: 40, household: 'H2' },
+  { id: '4200005', first: 'Hannah', last: 'Kim', grade: 9, updatedDaysAgo: 1, household: 'H3' },
+  { id: '4200006', first: 'Joshua', last: 'Kim', grade: 12, updatedDaysAgo: 60, household: 'H3' },
+  { id: '4200007', first: 'Priyanka', last: 'Raman', nickname: 'Pri', grade: 10, updatedDaysAgo: 9, household: 'H4' },
+  { id: '4200008', first: 'Elijah', last: 'Brooks', grade: 8, allergies: 'Lactose intolerant', updatedDaysAgo: 3, household: 'H5' },
+  { id: '4200009', first: 'Naomi', last: 'Brooks', grade: 6, updatedDaysAgo: 3, household: 'H5' },
+  { id: '4200010', first: 'Tobias', last: 'Fischer', grade: 7, updatedDaysAgo: 14, household: 'H6' },
+  { id: '4200011', first: 'Leila', last: 'Haddad', grade: 11, updatedDaysAgo: 21, household: 'H7' },
+  { id: '4200012', first: 'Caleb', last: 'Nguyen', grade: 9, updatedDaysAgo: 6, household: 'H8' },
+  { id: '4200013', first: 'Zara', last: 'Ahmed', grade: 10, updatedDaysAgo: 4, household: 'H9' },
+  { id: '4200014', first: 'Marcus', last: 'Johnson', grade: 12, updatedDaysAgo: 30, household: 'H10' },
   // Grade is blank; only a graduation year is on file. The mapper has to derive it.
-  { id: '4200015', first: 'Ivy', last: 'Petrova', grade: null, graduationYear: 2030, gender: 'Female', updatedDaysAgo: 7 },
+  { id: '4200015', first: 'Ivy', last: 'Petrova', grade: null, graduationYear: 2030, updatedDaysAgo: 7 },
   // A 5th grader: too young for a 6-12 ministry and must never reach the roster.
-  { id: '4200016', first: 'Oliver', last: 'Grant', grade: 5, gender: 'Male', updatedDaysAgo: 8, household: 'H11' },
+  { id: '4200016', first: 'Oliver', last: 'Grant', grade: 5, updatedDaysAgo: 8, household: 'H11' },
   // Left the ministry — must be deactivated, never deleted, because attendance
   // history points at this record.
-  { id: '4200017', first: 'Ruth', last: 'Abebe', grade: 12, gender: 'Female', inactive: true, updatedDaysAgo: 11 },
+  { id: '4200017', first: 'Ruth', last: 'Abebe', grade: 12, inactive: true, updatedDaysAgo: 11 },
   // Lives with a grandparent whose household role is "other_adult".
-  { id: '4200018', first: 'Dexter', last: 'Cole', grade: 6, gender: 'Male', updatedDaysAgo: 12, household: 'H12' },
+  { id: '4200018', first: 'Dexter', last: 'Cole', grade: 6, updatedDaysAgo: 12, household: 'H12' },
   // A nickname in a script the roster cannot fold down to Latin letters.
   // Planning Center shows him as `Benson “蔡秉洲” Tsai`, and so must Tally —
   // keeping only one half means the profile and the roster row cannot be
   // matched up by eye.
-  { id: '4200019', first: 'Benson', last: 'Tsai', nickname: '蔡秉洲', grade: 6, gender: 'Male', updatedDaysAgo: 4, household: 'H13' },
+  { id: '4200019', first: 'Benson', last: 'Tsai', nickname: '蔡秉洲', grade: 6, updatedDaysAgo: 4, household: 'H13' },
 ];
 
 interface AdultSpec {
@@ -131,7 +127,6 @@ interface TeamSpec {
   email?: string;
   permissions: string | null;
   siteAdmin?: boolean;
-  smallGroup?: string;
 }
 
 /**
@@ -142,8 +137,8 @@ interface TeamSpec {
 const TEAM: readonly TeamSpec[] = [
   { id: '9100001', first: 'Dana', last: 'Ruiz', email: 'dana.ruiz@example.org', permissions: 'Manager', siteAdmin: true },
   { id: '9100002', first: 'Miriam', last: 'Achebe', email: 'miriam.achebe@example.org', permissions: 'Manager' },
-  { id: '9100003', first: 'Sam', last: 'Whitfield', email: 'sam.whitfield@example.org', permissions: 'Viewer', smallGroup: '8th Grade Boys' },
-  { id: '9100004', first: 'Priya', last: 'Raman', email: 'priya.raman@example.org', permissions: 'Editor', smallGroup: '9th Grade Girls' },
+  { id: '9100003', first: 'Sam', last: 'Whitfield', email: 'sam.whitfield@example.org', permissions: 'Viewer' },
+  { id: '9100004', first: 'Priya', last: 'Raman', email: 'priya.raman@example.org', permissions: 'Editor' },
   // No email address on file: cannot be granted access, and must not crash the sync.
   { id: '9100005', first: 'Gerald', last: 'Fontaine', permissions: 'Viewer' },
 ];
@@ -180,16 +175,8 @@ export function createFixtureOrg(): SimOrg {
   let emailSeq = 1;
   let phoneSeq = 1;
   let membershipSeq = 1;
-  let fieldDatumSeq = 1;
 
-  const fieldDefinitions: SimFieldDefinition[] = [
-    {
-      id: 'FD1',
-      name: 'Small Group',
-      slug: SMALL_GROUP_FIELD_SLUG,
-      data_type: 'string',
-    },
-  ];
+  const fieldDefinitions: SimFieldDefinition[] = [];
 
   for (const spec of YOUTH) {
     people.push({
@@ -200,7 +187,6 @@ export function createFixtureOrg(): SimOrg {
       given_name: spec.first,
       grade: spec.grade,
       graduation_year: spec.graduationYear ?? null,
-      gender: spec.gender,
       birthdate: null,
       child: true,
       medical_notes: spec.allergies ?? null,
@@ -223,14 +209,6 @@ export function createFixtureOrg(): SimOrg {
       });
     }
 
-    if (spec.smallGroup) {
-      fieldData.push({
-        id: `FDATA${fieldDatumSeq++}`,
-        person_id: spec.id,
-        field_definition_id: 'FD1',
-        value: spec.smallGroup,
-      });
-    }
   }
 
   for (const spec of PARENTS) {
@@ -242,7 +220,6 @@ export function createFixtureOrg(): SimOrg {
       given_name: spec.first,
       grade: null,
       graduation_year: null,
-      gender: null,
       birthdate: null,
       child: false,
       medical_notes: null,
@@ -294,7 +271,6 @@ export function createFixtureOrg(): SimOrg {
       given_name: spec.first,
       grade: null,
       graduation_year: null,
-      gender: null,
       birthdate: null,
       child: false,
       medical_notes: null,
@@ -314,14 +290,6 @@ export function createFixtureOrg(): SimOrg {
         location: 'Work',
         primary: true,
         blocked: false,
-      });
-    }
-    if (spec.smallGroup) {
-      fieldData.push({
-        id: `FDATA${fieldDatumSeq++}`,
-        person_id: spec.id,
-        field_definition_id: 'FD1',
-        value: spec.smallGroup,
       });
     }
   }

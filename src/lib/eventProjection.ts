@@ -53,7 +53,6 @@ function asEvent(
     location: source.location,
     notes: source.notes,
     requiresRsvp: false,
-    defaultGroupingMode: source.defaultGroupingMode,
     // A projected gathering is on by definition. Calling one off is an act, and
     // an act materialises it.
     status: 'scheduled',

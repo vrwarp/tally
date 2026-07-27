@@ -16,7 +16,6 @@ import {
   toEventSeries,
   toRsvp,
   toSettings,
-  toSmallGroup,
   toStudent,
   toUserProfile,
 } from '@/services/converters';
@@ -306,22 +305,8 @@ describe('toUserProfile', () => {
 
 
 /* -------------------------------------------------------------------------- */
-/* toSmallGroup & toEventSeries                                                */
+/* toEventSeries                                                               */
 /* -------------------------------------------------------------------------- */
-
-describe('toSmallGroup', () => {
-  it('drops grades outside 6-12 and defaults an unknown gender to mixed', () => {
-    const group = toSmallGroup(
-      fakeSnapshot({ data: { grades: [5, 8, 9, 13, 'eight'], gender: 'any' } }),
-    );
-    expect(group.grades).toEqual([8, 9]);
-    expect(group.gender).toBe('mixed');
-  });
-
-  it('tolerates a missing grades array', () => {
-    expect(toSmallGroup(fakeSnapshot({ data: { grades: 'all' } })).grades).toEqual([]);
-  });
-});
 
 describe('toEventSeries', () => {
   it('supplies workable defaults for a half-written series', () => {
@@ -333,7 +318,6 @@ describe('toEventSeries', () => {
       endTime: '21:00',
       checkInOpensMinutesBefore: 60,
       checkInClosesMinutesAfter: 60,
-      defaultGroupingMode: 'all',
       active: true,
       order: 0,
     });

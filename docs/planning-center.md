@@ -20,7 +20,7 @@ So the split is now:
 | Who is on the roster | Tally | `students/{id}` — a document *is* the membership |
 | Who may sign in | Tally | `invitations/{emailKey}`, plus `TALLY_ADMIN_EMAILS` |
 | Names, grades, parent contact, allergies | Planning Center | read on demand, stored nowhere |
-| Attendance, small groups, RSVPs | Tally | Planning Center has no concept of them |
+| Attendance, RSVPs | Tally | Planning Center has no concept of them |
 
 This is the operational guide: how to get credentials, what every setting does, how counselor access
 actually flows, and what to do when it breaks. `functions/src/config.ts` is the source of truth for
@@ -202,9 +202,9 @@ this: the server's fuzzy search indexes the halves separately, and writing the c
 recognising the person at all — which is how a duplicate child gets created.
 
 The fields Planning Center owns once a student is linked are listed in `PCO_MANAGED_STUDENT_FIELDS`:
-first name, last name, grade, gender, allergies, status. The student editor shows them read-only with
+first name, last name, grade, allergies, status. The student editor shows them read-only with
 a "managed in Planning Center" note unless write-back is `full`, because editing them in Tally would
-just be overwritten on the next pull. Small group, notes, attendance and RSVP data are Tally's alone
+just be overwritten on the next pull. Notes, attendance and RSVP data are Tally's alone
 and are never written from the sync.
 
 ---
@@ -227,7 +227,7 @@ flowchart LR
   D["Volunteer signs in with Google"] --> E["Firebase uid, no profile<br/>status: pending"]
   E --> F["provisionAccess<br/>callable"]
   B --> F
-  F --> G["users/{uid}<br/>role · active · assignedGroupId"]
+  F --> G["users/{uid}<br/>role · active"]
   G --> H["status: ready"]
 ```
 
@@ -337,7 +337,7 @@ collapsed onto the Planning Center person. Usually a nickname ("Nate" vs "Nathan
 surname typed one way at the door, or a grade that was off by one. To fix it by hand:
 
 1. In Tally, open the duplicate that has **no** Planning Center badge — that is the Tally-only one.
-2. Move anything worth keeping (small group, notes) onto the linked record.
+2. Move anything worth keeping (notes) onto the linked record.
 3. Set the Tally-only duplicate to inactive. Do not delete it; its attendance rows would be orphaned,
    and the head count for those past events would silently drop.
 4. If the student's attendance is on the wrong record, re-check them in on the correct one from the

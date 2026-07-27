@@ -19,8 +19,6 @@ Roles rank `counselor` < `core` < `admin`. "Active" means a `users/{uid}` docume
 ```mermaid
 erDiagram
     users ||--o{ attendance : "checkedInBy"
-    smallGroups ||--o{ users : "assignedGroupId"
-    smallGroups ||--o{ students : "smallGroupId"
     eventSeries ||--o{ events : "seriesId"
     events ||--o{ attendance : "subcollection"
     events ||--o{ rsvps : "subcollection"
@@ -39,7 +37,6 @@ erDiagram
 ```
 users/{uid}                              counselor & core team profiles
 invitations/{emailKey}                   who an admin has said may sign in
-smallGroups/{groupId}                    Sunday School groupings
 eventSeries/{seriesId}                   recurring templates (friday-fellowship, sunday-school)
 students/{studentId}                     the roster itself — a document is a membership
 events/{eventId}                         a single dated gathering
@@ -166,7 +163,6 @@ The authorisation table. Document id is the Firebase Auth uid.
 | `email` | string | The verified address the session signed in with. |
 | `displayName` | string \| null | From the auth token, else from the access roster. |
 | `role` | `'counselor' \| 'core' \| 'admin'` | Ranked; see above. |
-| `assignedGroupId` | string \| null | Ties a counselor to a Sunday School small group, so check-in opens pre-scoped. |
 | `active` | boolean | The switch. `false` means signed in but not admitted. |
 | `createdAt` | Timestamp | Preserved across re-provisioning, so "member since" does not reset on every sign-in. |
 | `lastSeenAt` | Timestamp \| null | Bumped by the app itself. |
@@ -190,8 +186,6 @@ because a student can exist in Tally before they exist in Planning Center.
 | --- | --- | --- |
 | `firstName`, `lastName` | string | Managed by Planning Center once linked. |
 | `grade` | 6–12 | Managed by Planning Center. The `Grade` type admits nothing else. |
-| `gender` | `'male' \| 'female' \| 'unspecified'` | Recorded **only** because Sunday School groups split by it. Never surfaced as a standalone label. Managed by Planning Center. |
-| `smallGroupId` | string \| null | Tally's own. Null falls back to the group's grade/gender definition. |
 | `parentName`, `parentPhone`, `parentEmail` | string \| null | One guardian contact. Written by the sync only when Planning Center actually knows a value — blanking a number a counselor collected at a retreat would be unrecoverable data loss. |
 | `allergies` | string \| null | Managed by Planning Center (`medical_notes`). Raises a badge on the roster row. |
 | `notes` | string \| null | Tally's own, free text. |
@@ -237,7 +231,6 @@ One dated gathering.
 | `checkInOpensAt`, `checkInClosesAt` | Timestamp | The window during which this event is auto-selected as "active". Materialised per event rather than recomputed from the series, so moving one Friday does not need the template edited. |
 | `location`, `notes` | string \| null | |
 | `requiresRsvp` | boolean | Closes a one-off's roster to the students who RSVP'd. A one-off with no explicit flag still defaults to one. |
-| `defaultGroupingMode` | `'all' \| 'smallGroup'` | How the roster opens. |
 | `status` | `'scheduled' \| 'cancelled'` | Cancelled events are never auto-selected and never inform prediction. A *finished* event with no attendance is treated as cancelled too — see [decision 3](#3-a-gathering-with-no-attendance-is-a-cancelled-one). |
 | `createdAt`, `updatedAt`, `createdBy` | — | |
 
@@ -277,15 +270,10 @@ they were removed because Tally cannot be the system of record for money or sign
 partial copy of both was worse than neither. See
 [decision 4](#4-tally-does-not-track-money-or-paperwork).
 
-### `eventSeries/{seriesId}` and `smallGroups/{groupId}`
+### `eventSeries/{seriesId}`
 
 Reference data. Series carry `title`, `dayOfWeek`, `startTime` / `endTime` as local `"HH:mm"`,
-`checkInOpensMinutesBefore` / `checkInClosesMinutesAfter`, `defaultGroupingMode`, `active` and
-`order`. Groups carry `name`, `grades`, `gender` (or `'mixed'`) and `order`.
-
-A group describes itself by grade and gender as well as by name because `studentMatchesGroup` falls
-back to that definition when a student has no explicit `smallGroupId` — a roster imported without
-group assignments still splits sensibly for Sunday School.
+`checkInOpensMinutesBefore` / `checkInClosesMinutesAfter`, `active` and `order`.
 
 **Who writes:** core and up. Readable by anyone active.
 

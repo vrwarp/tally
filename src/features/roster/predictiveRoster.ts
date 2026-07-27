@@ -24,7 +24,6 @@ import type {
   RosterEntry,
   RosterWarning,
   Rsvp,
-  SmallGroup,
   Student,
   TallyEvent,
 } from '@/types';
@@ -47,8 +46,6 @@ export type RosterFocus = 'all' | 'recent' | 'checkedIn';
 export interface RosterFilters {
   /** Free text from the persistent search bar. */
   query?: string;
-  /** Restrict to one small group (Journey 2). */
-  smallGroupId?: string | null;
   /** Restrict to these grades. Empty or omitted means every grade. */
   grades?: readonly Grade[];
   /** Only students still missing parent contact info. */
@@ -155,22 +152,8 @@ export function buildSeriesHistory(
 }
 
 /* -------------------------------------------------------------------------- */
-/* Eligibility & grouping                                                      */
+/* Eligibility                                                                 */
 /* -------------------------------------------------------------------------- */
-
-/**
- * Does a student belong to a small group?
- *
- * An explicit `smallGroupId` on the student always wins. Without one we fall
- * back to the group's grade/gender definition, so a roster imported without
- * group assignments still splits sensibly for Sunday School.
- */
-export function studentMatchesGroup(student: Student, group: SmallGroup): boolean {
-  if (student.smallGroupId) return student.smallGroupId === group.id;
-  if (group.grades.length > 0 && !group.grades.includes(student.grade)) return false;
-  if (group.gender !== 'mixed' && student.gender !== group.gender) return false;
-  return true;
-}
 
 /**
  * Who may appear on this event's roster at all, before any UI filtering.
@@ -225,8 +208,6 @@ export interface BuildRosterInput {
   history: readonly EventAttendanceSnapshot[];
   settings: AppSettings;
   filters?: RosterFilters;
-  /** The small group a counselor is scoped to, if any. */
-  group?: SmallGroup | null;
 }
 
 /**
@@ -234,21 +215,20 @@ export interface BuildRosterInput {
  *
  * `recent` is the default the check-in screen opens on, so it has to fail
  * gracefully rather than present an empty list. A search is a direct lookup and
- * must reach the whole roster; inside a small group the list is nine names and
- * narrowing it further only hides the absences the leader came for; and with no
- * regulars to show there is no filter to apply.
+ * must reach the whole roster; and with no regulars to show there is no filter
+ * to apply.
  */
 function resolveFocus(
   requested: RosterFocus,
-  context: { isFiltered: boolean; scoped: boolean; recent: number },
+  context: { isFiltered: boolean; recent: number },
 ): RosterFocus {
   if (requested !== 'recent') return requested;
-  if (context.isFiltered || context.scoped || context.recent === 0) return 'all';
+  if (context.isFiltered || context.recent === 0) return 'all';
   return 'recent';
 }
 
 export function buildRoster(input: BuildRosterInput): RosterView {
-  const { event, students, attendance, rsvps, settings, group } = input;
+  const { event, students, attendance, rsvps, settings } = input;
   const filters = input.filters ?? {};
 
   const attendanceByStudent = new Map(attendance.map((record) => [record.studentId, record]));
@@ -279,10 +259,8 @@ export function buildRoster(input: BuildRosterInput): RosterView {
     if (!isEligible(student, event, rsvp, record !== null)) continue;
 
     // Scope filters narrow *who is on this counselor's roster*; they apply
-    // before search so the counts below describe the group being taken, not
+    // before search so the counts below describe the slice being taken, not
     // the whole ministry.
-    if (group && !studentMatchesGroup(student, group)) continue;
-    if (filters.smallGroupId && student.smallGroupId !== filters.smallGroupId) continue;
     if (grades.length > 0 && !grades.includes(student.grade)) continue;
     if (filters.incompleteOnly && student.profileComplete !== false) continue;
 
@@ -306,11 +284,7 @@ export function buildRoster(input: BuildRosterInput): RosterView {
     });
   }
 
-  const focus = resolveFocus(filters.focus ?? 'all', {
-    isFiltered,
-    scoped: group != null,
-    recent: recentTotal,
-  });
+  const focus = resolveFocus(filters.focus ?? 'all', { isFiltered, recent: recentTotal });
 
   const entries = matched.filter((entry) => {
     if (focus === 'checkedIn') return entry.attendance !== null;

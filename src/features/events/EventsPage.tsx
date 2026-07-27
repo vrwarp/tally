@@ -214,7 +214,6 @@ export function EventsPage() {
           until: null,
           count: null,
         },
-        defaultGroupingMode: candidate.defaultGroupingMode,
         ...occurrence,
       },
     });

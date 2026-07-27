@@ -235,7 +235,6 @@ export class SimulatorStore {
       given_name: optionalString(attributes.given_name),
       grade: optionalNumber(attributes.grade),
       graduation_year: optionalNumber(attributes.graduation_year),
-      gender: optionalString(attributes.gender),
       birthdate: optionalString(attributes.birthdate),
       child: attributes.child === true,
       medical_notes: optionalString(attributes.medical_notes),
@@ -262,7 +261,6 @@ export class SimulatorStore {
     if ('last_name' in attributes) assign('last_name', String(attributes.last_name ?? ''));
     if ('nickname' in attributes) assign('nickname', optionalString(attributes.nickname));
     if ('grade' in attributes) assign('grade', optionalNumber(attributes.grade));
-    if ('gender' in attributes) assign('gender', optionalString(attributes.gender));
     if ('medical_notes' in attributes) {
       assign('medical_notes', optionalString(attributes.medical_notes));
     }
@@ -297,7 +295,6 @@ export class SimulatorStore {
     firstName: string;
     lastName: string;
     grade: number;
-    gender?: string;
     nickname?: string | null;
     allergies?: string | null;
     status?: 'active' | 'inactive';
@@ -310,7 +307,6 @@ export class SimulatorStore {
       last_name: input.lastName,
       nickname: input.nickname ?? null,
       grade: input.grade,
-      gender: input.gender ?? null,
       child: true,
       medical_notes: input.allergies ?? null,
       status: input.status ?? 'active',
