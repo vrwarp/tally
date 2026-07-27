@@ -32,7 +32,7 @@ export function MiaList({ items, threshold }: MiaListProps) {
           items.length > 0 ? (
             <CopyContactsButton
               students={students}
-              title={`Footprints follow-up — ${items.length} students we have not seen:`}
+              title={`Follow-up — ${items.length} students we have not seen:`}
             />
           ) : undefined
         }

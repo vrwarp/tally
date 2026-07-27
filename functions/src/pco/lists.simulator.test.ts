@@ -60,7 +60,7 @@ describe('fetchLists', () => {
     // Choosing a roster source without seeing what it would select is the
     // failure mode this replaces — the count has to survive the round trip.
     expect(students?.totalPeople).toBeGreaterThan(0);
-    expect(students?.name).toBe('Footprints Students');
+    expect(students?.name).toBe('Youth Students');
   });
 
   it('reports the health of a list somebody should not pick', async () => {
@@ -121,7 +121,7 @@ describe('fetchList', () => {
     const { client } = harness();
     const list = await fetchList(client, STUDENT_LIST_ID);
 
-    expect(list?.name).toBe('Footprints Students');
+    expect(list?.name).toBe('Youth Students');
   });
 
   it('reports a list that is no longer there as an error the caller decides about', async () => {

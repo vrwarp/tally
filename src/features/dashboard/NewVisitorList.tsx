@@ -27,7 +27,7 @@ export function NewVisitorList({ items, windowDays }: NewVisitorListProps) {
       <CardHeader
         title="New faces"
         count={items.length}
-        description={`First time at Footprints in the last ${windowDays} days.`}
+        description={`First time in the last ${windowDays} days.`}
       />
 
       {items.length === 0 ? (

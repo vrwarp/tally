@@ -98,7 +98,7 @@ by exercising a decision the mapping code has to make:
 
 Team member ids and addresses match the first three entries in
 `scripts/seed.ts`, so a sync against a seeded emulator updates the existing team
-instead of growing a parallel one. `priya.raman@footprints.example.org` is
+instead of growing a parallel one. `priya.raman@example.org` is
 deliberately absent from that seed: she is how an end-to-end test proves a sync
 actually granted new access.
 

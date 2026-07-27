@@ -219,7 +219,7 @@ function PendingScreen() {
   let body: ReactNode = (
     <div className="flex items-center gap-3 text-sm text-ink-400">
       <Spinner label="Checking access" />
-      <span>Looking for you on the Footprints team in Planning Center…</span>
+      <span>Looking for you on the team in Planning Center…</span>
     </div>
   );
 
@@ -242,7 +242,7 @@ function PendingScreen() {
       body = (
         <>
           <p className="text-sm text-ink-300">
-            Planning Center has you on the Footprints team
+            Planning Center has you on the team
             {role ? <> as {role}</> : null}. Your access is set up.
           </p>
           {stuck ? (
@@ -272,7 +272,7 @@ function PendingScreen() {
       body = (
         <>
           <p className="text-sm text-ink-300">
-            That email is not on the Footprints team in Planning Center, so Tally cannot let you
+            That email is not on the team in Planning Center, so Tally cannot let you
             in yet.
           </p>
           {email ? (
@@ -284,7 +284,7 @@ function PendingScreen() {
             </p>
           ) : null}
           <p className="text-sm text-ink-500">
-            Ask a core team leader to add this address to the Footprints team in Planning Center,
+            Ask a core team leader to add this address to the team in Planning Center,
             then try again. If you normally use a different address, sign out and use that one.
           </p>
           {message ? <p className="text-xs text-ink-500">{message}</p> : null}

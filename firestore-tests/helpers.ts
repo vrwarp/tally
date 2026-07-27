@@ -235,7 +235,7 @@ export function pcoConfigDoc(overrides: Partial<PcoRuntimeConfigDoc> = {}): PcoR
  */
 export function invitationDoc(overrides: Partial<InvitationDoc> = {}): InvitationDoc {
   return {
-    email: 'newcomer@footprints.example.org',
+    email: 'newcomer@example.org',
     role: 'counselor',
     active: true,
     invitedAt: T0,

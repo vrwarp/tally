@@ -18,11 +18,11 @@ const NOW = new Date('2026-03-06T19:00:00Z');
 
 const CALLER = {
   uid: 'uid-miriam',
-  email: 'miriam.achebe@footprints.example.org',
+  email: 'miriam.achebe@example.org',
   displayName: 'Miriam Achebe',
 };
 
-const ADMIN_EMAIL = 'dana.ruiz@footprints.example.org';
+const ADMIN_EMAIL = 'dana.ruiz@example.org';
 
 function invitationPath(email: string): string {
   return `${PATHS.invitations}/${emailKey(email)}`;
@@ -125,11 +125,11 @@ describe('provisionAccessForCaller', () => {
 
   it('matches the invitation however the address was typed', async () => {
     const db = new FakeFirestore();
-    db.seed(invitationPath('Miriam.Achebe@Footprints.Example.ORG'), { role: 'core', active: true });
+    db.seed(invitationPath('Miriam.Achebe@Example.ORG'), { role: 'core', active: true });
 
     const result = await provisionAccessForCaller(
       db,
-      { ...CALLER, email: '  MIRIAM.ACHEBE@footprints.example.org ' },
+      { ...CALLER, email: '  MIRIAM.ACHEBE@example.org ' },
       NOW,
       [],
     );
@@ -193,7 +193,7 @@ describe('provisionAccessForCaller', () => {
       const db = new FakeFirestore();
       const result = await provisionAccessForCaller(
         db,
-        { ...CALLER, email: 'Dana.Ruiz@Footprints.Example.org' },
+        { ...CALLER, email: 'Dana.Ruiz@Example.org' },
         NOW,
         [ADMIN_EMAIL],
       );

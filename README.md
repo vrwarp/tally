@@ -1,6 +1,6 @@
 # Tally
 
-Tally is an attendance app for **Footprints**, a 6th-through-12th-grade youth ministry: a counselor
+Tally is an attendance app for a 6th-through-12th-grade youth ministry: a counselor
 standing at the door taps a name and the student is marked present in under three seconds, live on
 every other counselor's phone. The core team uses the same data to see who has gone missing, who
 turned up for the first time, and whose profile still has no way to reach a parent.
@@ -90,8 +90,8 @@ a fake account chooser rather than talking to anyone.
 
 1. On the sign-in screen, press **Continue with Google**.
 2. In the emulator's chooser, pick **Add new account** and enter one of the seeded team addresses —
-   `dana.ruiz@footprints.example.org` (admin), `miriam.achebe@footprints.example.org` (core), or
-   `sam.whitfield@footprints.example.org` (counselor). Any display name will do.
+   `dana.ruiz@example.org` (admin), `miriam.achebe@example.org` (core), or
+   `sam.whitfield@example.org` (counselor). Any display name will do.
 3. You land back on the app as a signed-in stranger with no `users/{uid}` document. Tally calls the
    `provisionAccess` Cloud Function, which decides from *Tally's own* records: the admin is in
    `TALLY_ADMIN_EMAILS` (see `functions/.env.demo-tally`), the other two arrive on invitations the
@@ -299,7 +299,7 @@ still narrows on the first keystroke.
 Planning Center People is the system of record for *people*: names, grades, parent contact and
 medical notes originate there, are read on demand, and are stored nowhere in Tally.
 
-*Membership* is Tally's own — both of them. Who is a Footprints student is a document in `students/`,
+*Membership* is Tally's own — both of them. Who is a student is a document in `students/`,
 put there from **Students → Add from Planning Center**; who may sign in is an invitation an admin
 writes in **Settings → Team**, plus the addresses in `TALLY_ADMIN_EMAILS`. Both used to be Planning
 Center Lists, which cannot express either: a List is generated from filter rules, so "these
@@ -396,7 +396,7 @@ rules it deploys on merge with no prompt.
 
 ## Handling minors' data
 
-Footprints stores data about children, so the roster is deliberately thin. Tally holds:
+The ministry stores data about children, so the roster is deliberately thin. Tally holds:
 
 - first and last name, grade, and gender (recorded only because Sunday School splits by it),
 - one parent or guardian contact — name, phone, email,

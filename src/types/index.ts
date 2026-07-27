@@ -16,7 +16,7 @@ import type { Timestamp } from 'firebase/firestore';
 /* Primitives                                                                  */
 /* -------------------------------------------------------------------------- */
 
-/** Footprints serves 6th through 12th grade. */
+/** The ministry serves 6th through 12th grade. */
 export type Grade = 6 | 7 | 8 | 9 | 10 | 11 | 12;
 
 export const GRADES: readonly Grade[] = [6, 7, 8, 9, 10, 11, 12] as const;

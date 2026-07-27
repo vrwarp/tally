@@ -41,7 +41,7 @@ export const EVENTS = 'events';
  * wrong calendar day either side of a clock change. The entry point sets
  * `process.env.TZ` from this before the sweep runs.
  *
- * A constant rather than a deploy-time parameter: Footprints is one ministry in
+ * A constant rather than a deploy-time parameter: this is one ministry in
  * one place, and a setting nobody will ever change is a setting that can be
  * wrong in an environment nobody thought to check.
  */
