@@ -636,6 +636,26 @@ export interface PcoPersonDetails {
    * new visitor upstream and nothing else.
    */
   contactWritable: boolean;
+  /**
+   * Whether this student's managed fields — name, grade, allergies — may be
+   * edited from Tally, which is `PCO_WRITE_BACK=full` and nothing else.
+   *
+   * Not the same gate as `contactWritable`, which also needs an adult in the
+   * household to write onto. The student editor reads this one: a name is
+   * perfectly editable on a student whose family is not on file.
+   */
+  profileWritable: boolean;
+  /**
+   * Whether Tally may build this student a family — create the parent, and the
+   * household if Planning Center has none for them — which is `full` *and*
+   * nobody on file yet.
+   *
+   * The mirror image of `contactWritable`: exactly one of the two is ever true
+   * on a `full` install, because a household either has an adult to put a
+   * number on or it does not. That is what lets one screen offer "add a number"
+   * and "add a parent" from the same place without deciding which it is.
+   */
+  parentCreatable: boolean;
 }
 
 /**

@@ -2,11 +2,24 @@
  * Create or edit one student.
  *
  * The interesting constraint is Planning Center. Once a student is linked, the
- * fields listed in `PCO_MANAGED_STUDENT_FIELDS` are owned there: anything typed
- * into them here would be silently reverted by the next pull. A form that
- * accepts an edit it cannot keep is worse than one that refuses it, so those
- * inputs render disabled with a link to the place the edit actually belongs.
- * Everything Tally owns — notes — stays editable.
+ * fields listed in `PCO_MANAGED_STUDENT_FIELDS` are owned there, and what this
+ * form may do about that is a *setting* rather than a rule:
+ *
+ *   - Under `create` — the default — anything typed into them would be silently
+ *     reverted by the next read, because Tally keeps no copy and the roster is
+ *     Planning Center's answer. A form that accepts an edit it cannot keep is
+ *     worse than one that refuses it, so those inputs render disabled with a
+ *     link to the place the edit actually belongs.
+ *   - Under `full` the church has asked Tally to write, so the same boxes are
+ *     editable and Save carries them straight upstream through
+ *     `updateStudentProfile`. Nothing is written to Firestore on the way: a
+ *     linked student's name, grade and allergies are Planning Center's, and a
+ *     copy kept here would be shown by nothing and pushed back over a later
+ *     correction.
+ *
+ * Which of the two is in force is `profileWritable` on the person details —
+ * answered by the server, because the browser cannot see the setting. Everything
+ * Tally owns — notes — stays editable in both.
  */
 import { useEffect, useId, useState, type FormEvent } from 'react';
 import {
@@ -18,9 +31,13 @@ import {
   TextField,
 } from '@/components/ui';
 import { useAuth } from '@/context/authContext';
+import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
+import { AddParentContact } from '@/features/students/AddParentContact';
+import { invalidatePersonDetails, usePersonDetails } from '@/hooks/usePersonDetails';
 import { pcoPersonUrl } from '@/lib/planningCenter';
-import { ordinalGrade } from '@/lib/utils';
+import { formatPhone, ordinalGrade } from '@/lib/utils';
+import { updateStudentProfile } from '@/services/functions';
 import { createStudent, updateStudent, type StudentDraft } from '@/services/students';
 import {
   GRADES,
@@ -29,6 +46,7 @@ import {
   splitFirstName,
   studentFullName,
   type Grade,
+  type PcoPersonDetails,
   type Student,
   type StudentStatus,
 } from '@/types';
@@ -50,6 +68,8 @@ interface FormState {
   nickname: string;
   lastName: string;
   grade: Grade;
+  /** Planning Center's `medical_notes`. Only ever editable on a linked student. */
+  allergies: string;
   notes: string;
   status: StudentStatus;
 }
@@ -59,6 +79,7 @@ const BLANK: FormState = {
   nickname: '',
   lastName: '',
   grade: 9,
+  allergies: '',
   notes: '',
   status: 'active',
 };
@@ -71,6 +92,9 @@ function fromStudent(student: Student | null): FormState {
     nickname: name.nickname ?? '',
     lastName: student.lastName,
     grade: student.grade,
+    // Not on the student at all — it is read one person at a time and seeded
+    // below, once the details land.
+    allergies: '',
     notes: student.notes ?? '',
     status: student.status,
   };
@@ -81,10 +105,16 @@ export interface StudentEditorModalProps {
   onClose: () => void;
   /** Omitted or null for create mode. */
   student?: Student | null;
+  /**
+   * Called after a save that changed something in Planning Center, so a screen
+   * holding person details can re-read them. The roster refreshes itself.
+   */
+  onSaved?: () => void;
 }
 
-export function StudentEditorModal({ open, onClose, student }: StudentEditorModalProps) {
+export function StudentEditorModal({ open, onClose, student, onSaved }: StudentEditorModalProps) {
   const { user } = useAuth();
+  const { refreshRoster } = useData();
   const { show } = useToast();
   const formId = useId();
 
@@ -92,20 +122,77 @@ export function StudentEditorModal({ open, onClose, student }: StudentEditorModa
   const [errors, setErrors] = useState<{ firstName?: string; lastName?: string }>({});
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  /** Stops the seeding effect below from overwriting what somebody has typed. */
+  const [allergiesEdited, setAllergiesEdited] = useState(false);
+
+  // Free while the modal is open on a student whose page already asked: the
+  // hook memoises the answer for the session.
+  const { details, loading: detailsLoading, refresh: refreshDetails } = usePersonDetails(
+    open ? (student ?? null) : null,
+  );
 
   useEffect(() => {
     if (!open) return;
     setForm(fromStudent(student ?? null));
     setErrors({});
     setSaveError(null);
+    setAllergiesEdited(false);
   }, [open, student]);
 
+  /*
+   * Allergies are the one field that is not on screen when the form opens: they
+   * are not on the student, and the details read may still be in flight. Seeded
+   * when it lands, and only until somebody types — a leader who cleared the box
+   * while it was loading must not have their deletion undone by a late answer.
+   */
+  useEffect(() => {
+    if (!open || allergiesEdited || !details) return;
+    setForm((current) => ({ ...current, allergies: details.allergies ?? '' }));
+  }, [open, details, allergiesEdited]);
+
   const linked = Boolean(student?.pcoPersonId);
-  const locked = (field: keyof Student) => linked && isPcoManaged(field);
+  /** True only under `PCO_WRITE_BACK=full`; false while the details load. */
+  const writable = linked && details?.profileWritable === true;
+  const locked = (field: keyof Student) => linked && isPcoManaged(field) && !writable;
   const managedHint = 'Managed in Planning Center';
+  const upstreamHint = 'Saved in Planning Center';
 
   const update = <K extends keyof FormState>(field: K, value: FormState[K]) =>
     setForm((current) => ({ ...current, [field]: value }));
+
+  /**
+   * Carries the managed half of the form upstream. Returns the message to show,
+   * or throws so the caller can report a refusal without closing.
+   *
+   * Every managed field is sent on every save rather than only the changed
+   * ones. The server compares against a fresh read of the person and patches
+   * the difference, which is the only comparison worth making: the value this
+   * form opened with may have been corrected in Planning Center since.
+   */
+  const saveUpstream = async (current: Student, firstName: string, lastName: string) => {
+    const response = await updateStudentProfile({
+      studentId: current.id,
+      firstName: form.firstName.trim(),
+      nickname: form.nickname.trim() || null,
+      lastName,
+      grade: form.grade,
+      /*
+       * Safe to send as a value — including an empty one — only because
+       * `writable` is false until the details read lands, so this box has
+       * genuinely shown what Planning Center holds. An empty box on a form that
+       * never saw the current value would clear a child's medical note without
+       * anybody deciding to.
+       */
+      allergies: form.allergies.trim() || null,
+    });
+
+    if (response.data.status === 'updated' || response.data.status === 'unchanged') {
+      return response.data.status === 'updated'
+        ? response.data.message
+        : `${studentFullName({ firstName, lastName })} saved`;
+    }
+    throw new Error(response.data.message);
+  };
 
   const handleSubmit = async (submitted: FormEvent<HTMLFormElement>) => {
     submitted.preventDefault();
@@ -128,18 +215,50 @@ export function StudentEditorModal({ open, onClose, student }: StudentEditorModa
 
     try {
       if (student) {
+        // The upstream half first: it is the half that can be refused, and a
+        // note saved against a name Planning Center rejected is a half-done
+        // save nobody asked for.
+        const message = writable
+          ? await saveUpstream(student, firstName, lastName)
+          : `${studentFullName(student)} saved`;
+
         const patch: Partial<StudentDraft> = { notes: form.notes };
-        // Managed fields are left out of the patch entirely rather than written
-        // back unchanged — Tally should not be the last writer on a value it
-        // does not own.
+        // Managed fields are left out of the Firestore patch in both modes, and
+        // for the same reason in each: under `create` Tally does not own them,
+        // and under `full` they have just gone to the place that does.
         if (!linked) {
           patch.firstName = firstName;
           patch.lastName = lastName;
           patch.grade = form.grade;
           patch.status = form.status;
         }
-        await updateStudent(student.id, patch, user.uid, student);
-        show(`${studentFullName(student)} saved`, { tone: 'success' });
+        /*
+         * The name passed as `current` is the one that just went upstream, not
+         * the one the form opened with.
+         *
+         * An annotation document carries a name it does not own — enough
+         * identity for the security rules and for anybody reading Firestore
+         * directly — and `updateStudent` refreshes it from here. Handing it the
+         * pre-edit name would leave `students/pco_…` asserting a spelling
+         * Planning Center no longer holds.
+         */
+        await updateStudent(
+          student.id,
+          patch,
+          user.uid,
+          writable ? { firstName, lastName, grade: form.grade } : student,
+        );
+
+        if (writable) {
+          // The roster is where the name and grade on every other screen come
+          // from; the memoised details are where the allergies are. Dropping
+          // the memo rather than re-reading it here, because this modal is
+          // about to close — whoever opened it asks again.
+          await refreshRoster(true);
+          invalidatePersonDetails(student.id);
+          onSaved?.();
+        }
+        show(message, { tone: 'success' });
       } else {
         await createStudent(
           {
@@ -191,17 +310,35 @@ export function StudentEditorModal({ open, onClose, student }: StudentEditorModa
 
         {linked && student?.pcoPersonId ? (
           <p className="rounded-xl bg-brand-500/10 px-3 py-2 text-xs text-brand-200 ring-1 ring-brand-500/25">
-            Name, grade, allergies and status come from Planning Center and would be
-            overwritten by the next sync.{' '}
-            <a
-              href={pcoPersonUrl(student.pcoPersonId)}
-              target="_blank"
-              rel="noreferrer"
-              className="font-semibold underline"
-            >
-              Edit them in Planning Center
-            </a>
-            . Notes live in Tally.
+            {writable ? (
+              <>
+                Name, grade and allergies are Planning Center's, and Save writes them
+                there — Tally keeps no copy.{' '}
+                <a
+                  href={pcoPersonUrl(student.pcoPersonId)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-semibold underline"
+                >
+                  Open in Planning Center
+                </a>
+                . Notes live in Tally.
+              </>
+            ) : (
+              <>
+                Name, grade, allergies and status come from Planning Center and would be
+                overwritten by the next sync.{' '}
+                <a
+                  href={pcoPersonUrl(student.pcoPersonId)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-semibold underline"
+                >
+                  Edit them in Planning Center
+                </a>
+                . Notes live in Tally.
+              </>
+            )}
           </p>
         ) : null}
 
@@ -214,7 +351,7 @@ export function StudentEditorModal({ open, onClose, student }: StudentEditorModa
               value={form.firstName}
               onChange={(changed) => update('firstName', changed.target.value)}
               error={errors.firstName ?? null}
-              hint={locked('firstName') ? managedHint : undefined}
+              hint={locked('firstName') ? managedHint : writable ? upstreamHint : undefined}
               disabled={locked('firstName')}
               autoCapitalize="words"
               autoComplete="off"
@@ -225,7 +362,7 @@ export function StudentEditorModal({ open, onClose, student }: StudentEditorModa
               value={form.lastName}
               onChange={(changed) => update('lastName', changed.target.value)}
               error={errors.lastName ?? null}
-              hint={locked('lastName') ? managedHint : undefined}
+              hint={locked('lastName') ? managedHint : writable ? upstreamHint : undefined}
               disabled={locked('lastName')}
               autoCapitalize="words"
               autoComplete="off"
@@ -249,7 +386,7 @@ export function StudentEditorModal({ open, onClose, student }: StudentEditorModa
           label="Grade"
           value={form.grade}
           onChange={(changed) => update('grade', Number(changed.target.value) as Grade)}
-          hint={locked('grade') ? managedHint : undefined}
+          hint={locked('grade') ? managedHint : writable ? upstreamHint : undefined}
           disabled={locked('grade')}
         >
           {GRADES.map((value) => (
@@ -260,36 +397,26 @@ export function StudentEditorModal({ open, onClose, student }: StudentEditorModa
         </SelectField>
 
         {/*
-          Parent contact and allergies used to be edited here and stored in
-          Firestore. They are Planning Center's, and Tally no longer keeps a
-          copy — so this is a pointer rather than a form. It is a real
-          reduction: a leader who wants to record an emergency number does it
-          upstream, where the church's own records are, instead of in a second
-          place that has to be reconciled.
+          Allergies are Planning Center's `medical_notes`, and Tally holds none
+          of them. Under `full` this box is the church's own record being edited
+          in place; otherwise there is nothing to show that is not already on the
+          student's page, so the block below points upstream instead.
         */}
-        <div className="rounded-xl bg-ink-900 px-3 py-2.5 ring-1 ring-ink-800">
-          <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
-            Parent contact and allergies
-          </p>
-          <p className="mt-1 text-sm text-ink-300">
-            {student?.pcoPersonId ? (
-              <>
-                Kept in Planning Center, not in Tally.{' '}
-                <a
-                  href={pcoPersonUrl(student.pcoPersonId)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-semibold text-brand-300 underline"
-                >
-                  Edit them there
-                </a>
-                .
-              </>
-            ) : (
-              'Once this student reaches Planning Center, their parent contact and allergies are edited there.'
-            )}
-          </p>
-        </div>
+        {writable ? (
+          <TextAreaField
+            label="Allergies"
+            value={form.allergies}
+            onChange={(changed) => {
+              setAllergiesEdited(true);
+              update('allergies', changed.target.value);
+            }}
+            hint={
+              detailsLoading
+                ? 'Reading what Planning Center has…'
+                : 'Saved in Planning Center as medical notes. Clearing this deletes it there.'
+            }
+          />
+        ) : null}
 
         <TextAreaField
           label="Notes"
@@ -303,16 +430,100 @@ export function StudentEditorModal({ open, onClose, student }: StudentEditorModa
           value={form.status}
           onChange={(changed) => update('status', changed.target.value as StudentStatus)}
           hint={
-            locked('status')
-              ? managedHint
+            linked
+              ? // Never written upstream, in any mode: nothing in Planning
+                // Center is ever deactivated from Tally. Who is on the roster is
+                // Tally's own list, and that is the control on the student's page.
+                'Whether they are on the roster is set with Remove from roster.'
               : 'Inactive students stay in history but leave every roster.'
           }
-          disabled={locked('status')}
+          disabled={linked}
         >
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
         </SelectField>
       </form>
+
+      {/*
+        Outside the form on purpose. This section writes to Planning Center on
+        its own button the moment it is submitted — it is not part of Save
+        changes, and a form cannot be nested inside another one.
+      */}
+      <ParentContactSection
+        student={student ?? null}
+        details={details}
+        loading={detailsLoading}
+        onAdded={() => {
+          refreshDetails();
+          onSaved?.();
+        }}
+      />
     </Modal>
+  );
+}
+
+/**
+ * Parent contact, as this form can honestly offer it.
+ *
+ * Three different situations that used to share one sentence — "kept in
+ * Planning Center, edit them there" — which was true and useless in the case a
+ * leader is usually in: there is no number, write-back is on, and Tally could
+ * simply have taken one.
+ */
+function ParentContactSection({
+  student,
+  details,
+  loading,
+  onAdded,
+}: {
+  student: Student | null;
+  details: PcoPersonDetails | null;
+  loading: boolean;
+  onAdded: () => void;
+}) {
+  const onFile = details?.parentPhone || details?.parentEmail ? details : null;
+
+  return (
+    <div className="mt-4 rounded-xl bg-ink-900 px-3 py-2.5 ring-1 ring-ink-800">
+      <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Parent contact</p>
+
+      {!student?.pcoPersonId ? (
+        <p className="mt-1 text-sm text-ink-300">
+          Once this student reaches Planning Center, their parent contact is added there.
+        </p>
+      ) : loading && !details ? (
+        <p className="mt-1 text-sm text-ink-500">Reading what Planning Center has…</p>
+      ) : onFile ? (
+        // Already reachable, so there is nothing for Tally to add: the write
+        // path only ever fills a gap, and never overwrites what is on file.
+        <>
+          <p className="mt-1 text-sm text-ink-100">
+            {onFile.parentName ? `${onFile.parentName} · ` : ''}
+            {onFile.parentPhone ? (
+              <span className="tabular-nums">{formatPhone(onFile.parentPhone)}</span>
+            ) : null}
+            {onFile.parentPhone && onFile.parentEmail ? ' · ' : ''}
+            {onFile.parentEmail ? <span className="break-all">{onFile.parentEmail}</span> : null}
+          </p>
+          <p className="mt-1 text-xs text-ink-500">
+            Kept in Planning Center.{' '}
+            <a
+              href={pcoPersonUrl(student.pcoPersonId)}
+              target="_blank"
+              rel="noreferrer"
+              className="font-semibold text-brand-300 underline"
+            >
+              Change it there
+            </a>
+            .
+          </p>
+        </>
+      ) : (
+        // Every remaining case — writable, no household to write onto, or
+        // write-back turned down — is the gate `AddParentContact` already
+        // states, on the student's own page, in the same words.
+        <AddParentContact student={student} details={details} onAdded={onAdded} />
+      )}
+    </div>
   );
 }

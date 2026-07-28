@@ -299,6 +299,49 @@ describe('pushStudent against the simulator', () => {
       });
     });
 
+    /**
+     * The one that would have been a phone call from a parent.
+     *
+     * A linked student's document carries no allergy note — Tally has kept no
+     * copy of one since the mirror was removed — and reading that absence as
+     * "there are none" sent `medical_notes: ''` and deleted a real allergy from
+     * the church's database on the first reconcile.
+     */
+    it('never clears a medical note Tally does not hold a copy of', async () => {
+      const { allergies: _dropped, ...withoutAllergies } = tallyOnlyStudent({
+        firstName: 'Sofia',
+        lastName: 'Delgado',
+        grade: 11,
+        pcoPersonId: FIXTURE_IDS.sofiaWithAllergy,
+        pcoPushPending: false,
+      });
+      h.db.seed('students/s1', withoutAllergies);
+
+      const result = await push('s1', 'full');
+
+      expect(result.status).toBe('skipped');
+      expect(h.store.personById(FIXTURE_IDS.sofiaWithAllergy)?.medical_notes).toMatch(/peanut/);
+    });
+
+    it('still sends an allergy a counselor typed at the door', async () => {
+      h.db.seed(
+        'students/s1',
+        tallyOnlyStudent({
+          firstName: 'Amara',
+          lastName: 'Okonkwo',
+          grade: 8,
+          allergies: 'Bee stings — carries an EpiPen',
+          pcoPersonId: FIXTURE_IDS.amara,
+          pcoPushPending: false,
+        }),
+      );
+
+      const result = await push('s1', 'full');
+
+      expect(result.status).toBe('updated');
+      expect(h.store.personById(FIXTURE_IDS.amara)?.medical_notes).toMatch(/Bee stings/);
+    });
+
     it('does nothing when Planning Center already agrees', async () => {
       h.db.seed(
         'students/s1',

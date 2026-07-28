@@ -1,31 +1,29 @@
 /**
  * Write-back: a parent's phone number or email, Tally -> Planning Center.
  *
- * The second thing Tally writes into a database it does not own, and by far the
- * more constrained of the two. `pushStudents.ts` may create a person; this may
- * not create anything except a PhoneNumber or an Email hanging off an adult who
- * is *already* in the student's household. That restriction is the whole design:
+ * The narrowest of the write paths. This one adds a PhoneNumber or an Email to
+ * an adult who is *already* in the student's household, and does nothing else:
  *
- *   - No Person is created. An invented parent is a duplicate somebody merges by
- *     hand months later, and Tally has a first name and a phone number at best —
- *     nowhere near enough to say who this adult is.
- *   - No Household is created, and nobody is added to one. Household structure
- *     is a claim about a family, and getting it wrong puts a child in the wrong
- *     one.
+ *   - No Person is created and no household structure is touched. Building a
+ *     family is a bigger claim and lives in `household.ts`, behind its own
+ *     confirmation; this path is for the household that is already right and
+ *     merely has no number on it.
  *   - Nothing is overwritten. A field already on file is left exactly as it is
  *     and reported back as skipped, because this runs from a screen whose whole
  *     premise is that there was nothing there — and if there is, that premise
  *     expired while somebody was typing.
  *
- * A student with no household therefore has no write path at all, on purpose.
- * The app links out to Planning Center for that, which is where the family has
- * to be built anyway.
+ * The two paths are deliberately separate rather than one call that figures it
+ * out: "put a number on this child's mother" and "this child has no family on
+ * file, make one" are different decisions, and only one of them should be
+ * reachable by filling in a phone box.
  */
 import type { PcoConfig } from '../config.js';
 import type { PcoClient } from './client.js';
 import { contactFieldsOnFile, findParentCandidate } from './mapping.js';
-import { loadPersonWithHousehold, personIdFromStudentId } from './roster.js';
-import { PATHS, SILENT_LOGGER, type FirestoreLike, type FunctionLogger } from '../firestore.js';
+import { loadPersonWithHousehold } from './roster.js';
+import { resolveStudentPerson } from './studentPerson.js';
+import { SILENT_LOGGER, type FirestoreLike, type FunctionLogger } from '../firestore.js';
 import { PCO_TYPES } from './types.js';
 
 /** Which of the two fields a call touched. */
@@ -118,30 +116,59 @@ function result(
 }
 
 /**
- * Resolves which Planning Center person this student is.
+ * Adds a phone number, an email, or both, to one adult already in Planning
+ * Center — skipping whatever they already have on file.
  *
- * Read from Tally's own record rather than taken from the caller, for the same
- * reason `scanRoster` does it: the id says whose personal record is about to be
- * written to, and a browser may not be the one choosing that.
+ * Shared with `household.ts`, which reaches this point by a longer road: it may
+ * have had to create the adult first. The rule is the same either way, and it
+ * is the one rule this whole area turns on — a field on file is left exactly as
+ * it is and reported back as skipped, because every screen that calls this was
+ * opened on the premise that there was nothing there, and that premise expires
+ * while somebody is typing.
+ *
+ * Two independent writes, and no attempt to make them one. Planning Center has
+ * no transaction to enrol them in, so if the second fails the first stays. That
+ * is survivable precisely because of the skip: a retry sees the phone already on
+ * file, skips it, and writes only the email. The failure is reported rather than
+ * swallowed, and repeating it is safe — a better property than a rollback nobody
+ * could implement.
  */
-async function personIdFor(
-  db: FirestoreLike,
-  studentId: string,
-): Promise<{ personId: string | null; exists: boolean; active: boolean }> {
-  const snapshot = await db.doc(`${PATHS.students}/${studentId}`).get();
-  if (!snapshot.exists) {
-    // A roster student always has a document; there is nothing to write against
-    // an id nobody put on the roster.
-    return { personId: null, exists: false, active: false };
+export async function writeContactOnto(
+  client: PcoClient,
+  personId: string,
+  wanted: { phone?: string | null; email?: string | null },
+  onFile: { phone: boolean; email: boolean },
+): Promise<{ wrote: ContactField[]; skipped: ContactField[] }> {
+  const wrote: ContactField[] = [];
+  const skipped: ContactField[] = [];
+
+  if (wanted.phone) {
+    if (onFile.phone) skipped.push('phone');
+    else {
+      await client.post(`/people/${encodeURIComponent(personId)}/phone_numbers`, {
+        data: {
+          type: PCO_TYPES.phoneNumber,
+          attributes: { number: wanted.phone, location: 'Mobile', primary: true },
+        },
+      });
+      wrote.push('phone');
+    }
   }
 
-  const data = snapshot.data() ?? {};
-  const stored = typeof data.pcoPersonId === 'string' && data.pcoPersonId ? data.pcoPersonId : null;
-  return {
-    personId: personIdFromStudentId(studentId) ?? stored,
-    exists: true,
-    active: data.status !== 'inactive',
-  };
+  if (wanted.email) {
+    if (onFile.email) skipped.push('email');
+    else {
+      await client.post(`/people/${encodeURIComponent(personId)}/emails`, {
+        data: {
+          type: PCO_TYPES.email,
+          attributes: { address: wanted.email, location: 'Home', primary: true },
+        },
+      });
+      wrote.push('email');
+    }
+  }
+
+  return { wrote, skipped };
 }
 
 /**
@@ -173,7 +200,7 @@ export async function setParentContact(
     return result('nothing-to-write', 'Enter a phone number or an email address.');
   }
 
-  const target = await personIdFor(db, studentId);
+  const target = await resolveStudentPerson(db, studentId);
   if (!target.exists || !target.active) {
     return result('no-student', 'That student is not on the roster.');
   }
@@ -214,43 +241,7 @@ export async function setParentContact(
     loaded.index,
   );
 
-  /*
-   * Two independent writes, and no attempt to make them one.
-   *
-   * Planning Center has no transaction to enrol them in, so if the second fails
-   * the first stays. That is survivable precisely because of the skip above: a
-   * retry sees the phone already on file, skips it, and writes only the email.
-   * The failure is reported rather than swallowed, and repeating it is safe —
-   * which is a better property than a rollback nobody could implement.
-   */
-  const wrote: ContactField[] = [];
-  const skipped: ContactField[] = [];
-
-  if (phone) {
-    if (onFile.phone) skipped.push('phone');
-    else {
-      await client.post(`/people/${encodeURIComponent(parent.id)}/phone_numbers`, {
-        data: {
-          type: PCO_TYPES.phoneNumber,
-          attributes: { number: phone, location: 'Mobile', primary: true },
-        },
-      });
-      wrote.push('phone');
-    }
-  }
-
-  if (email) {
-    if (onFile.email) skipped.push('email');
-    else {
-      await client.post(`/people/${encodeURIComponent(parent.id)}/emails`, {
-        data: {
-          type: PCO_TYPES.email,
-          attributes: { address: email, location: 'Home', primary: true },
-        },
-      });
-      wrote.push('email');
-    }
-  }
+  const { wrote, skipped } = await writeContactOnto(client, parent.id, { phone, email }, onFile);
 
   if (wrote.length === 0) {
     return result(

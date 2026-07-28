@@ -100,10 +100,22 @@ export const getRoster = httpsCallable<{ force?: boolean } | void, RosterRespons
  * Split from the roster so a door volunteer's device never receives a minor's
  * medical notes: the screen they are on does not ask.
  */
-export const getPersonDetails = httpsCallable<{ pcoPersonId: string }, PcoPersonDetails | null>(
-  functions,
-  'getPersonDetails',
-);
+export const getPersonDetails = httpsCallable<
+  {
+    pcoPersonId: string;
+    /**
+     * Skip the server's held answer.
+     *
+     * For after a *write*, and only then. The screens that add a parent or a
+     * number re-read the moment the write lands, which is well inside the few
+     * seconds a read may be reused for — and the answer they would get back is
+     * the one from before their own edit, on the one screen where that reads as
+     * "it did not work".
+     */
+    force?: boolean;
+  },
+  PcoPersonDetails | null
+>(functions, 'getPersonDetails');
 
 export interface ParentContactStatusResponse {
   /**
@@ -266,6 +278,103 @@ export const setParentContact = httpsCallable<
   { studentId: string; phone?: string | null; email?: string | null },
   SetParentContactResult
 >(functions, 'setParentContact');
+
+/** An adult Planning Center already has, offered back before a duplicate is made. */
+export interface ExistingPerson {
+  pcoPersonId: string;
+  name: string;
+  /** Whether they already have a phone or an email on file. */
+  reachable: boolean;
+}
+
+export interface AddParentResult {
+  status:
+    | 'added'
+    | 'existing-people'
+    | 'disabled'
+    | 'no-student'
+    | 'not-in-planning-center'
+    | 'already-has-adult'
+    | 'not-an-adult'
+    | 'nothing-to-write';
+  parentName: string | null;
+  parentPersonId: string | null;
+  createdPerson: boolean;
+  createdHousehold: boolean;
+  wrote: ('phone' | 'email')[];
+  skipped: ('phone' | 'email')[];
+  /** Only on `existing-people`: who Planning Center already has by that name. */
+  candidates: ExistingPerson[];
+  message: string;
+}
+
+/**
+ * Builds a student a family: a parent, and a household if they have none.
+ *
+ * The one call that creates a *person*, and the reason it takes two rounds. Sent
+ * a name, it first searches Planning Center for adults who already have it and
+ * returns them as `existing-people` rather than creating a second record for
+ * somebody the church already knows — a parent is nearly always already in
+ * People, just not linked to their child. The caller then sends back either
+ * `personId` (that is them) or `createNew: true` (it is not).
+ *
+ * Off unless `PCO_WRITE_BACK=full`, and refused outright once the household has
+ * an adult — that is `setParentContact`'s job. Check
+ * `PcoPersonDetails.parentCreatable` before offering the form.
+ */
+export const addParent = httpsCallable<
+  {
+    studentId: string;
+    /** An adult chosen from a previous `existing-people` answer. */
+    personId?: string | null;
+    firstName?: string | null;
+    /** Defaults server-side to the student's own last name. */
+    lastName?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    /** Set once somebody has seen the candidates and still wants a new person. */
+    createNew?: boolean;
+  },
+  AddParentResult
+>(functions, 'addParent');
+
+export interface UpdateStudentProfileResult {
+  status:
+    | 'updated'
+    | 'unchanged'
+    | 'disabled'
+    | 'no-student'
+    | 'not-in-planning-center'
+    | 'invalid';
+  /** Planning Center attribute names this call wrote. Empty unless `updated`. */
+  wrote: string[];
+  message: string;
+}
+
+/**
+ * Saves the Edit profile form for a student Planning Center already has.
+ *
+ * The edit goes straight upstream and nothing is written to Firestore on the
+ * way: a linked student's name, grade and allergies are Planning Center's, and
+ * a copy kept in Tally would be shown by nothing — `mergeRoster` reads those
+ * fields off the roster — and pushed back over a later correction.
+ *
+ * Every field is optional and an omitted one is left alone. Off unless
+ * `PCO_WRITE_BACK=full`; check `PcoPersonDetails.profileWritable` before
+ * offering an editable form, for the same reason as `setParentContact`.
+ */
+export const updateStudentProfile = httpsCallable<
+  {
+    studentId: string;
+    /** The plain first name — never the `Benson “蔡秉洲”` composite. */
+    firstName?: string;
+    nickname?: string | null;
+    lastName?: string;
+    grade?: number;
+    allergies?: string | null;
+  },
+  UpdateStudentProfileResult
+>(functions, 'updateStudentProfile');
 
 export interface PushPendingResult {
   pushed: number;

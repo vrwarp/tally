@@ -545,4 +545,24 @@ describe('fetchPersonDetails', () => {
     await fetchPersonDetails({ ...world, config, personId: FIXTURE_IDS.sofiaWithAllergy });
     expect(world.requests.length).toBeGreaterThan(before);
   });
+
+  /**
+   * The read a screen makes immediately after writing.
+   *
+   * This is the difference between "we added the parent" and a screen that goes
+   * on saying nobody can be reached: the write happens, the page re-reads inside
+   * the retention window, and a held answer describes the family as it was
+   * before. `force` is the only thing that reaches a cache on whichever
+   * instance the re-read lands on.
+   */
+  it('goes back to Planning Center when a write asks it to', async () => {
+    const world = harness();
+    const config = baseConfig();
+
+    await fetchPersonDetails({ ...world, config, personId: FIXTURE_IDS.amara });
+    const cached = world.requests.length;
+
+    await fetchPersonDetails({ ...world, config, personId: FIXTURE_IDS.amara, force: true });
+    expect(world.requests.length).toBeGreaterThan(cached);
+  });
 });

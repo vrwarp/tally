@@ -42,6 +42,8 @@ function details(overrides: Partial<PcoPersonDetails> = {}): PcoPersonDetails {
     allergies: null,
     householdAdult: true,
     contactWritable: false,
+    profileWritable: false,
+    parentCreatable: false,
     ...overrides,
   };
 }

@@ -143,7 +143,6 @@ function driftedAttributes(
 
   const firstName = readString(data, 'firstName');
   const lastName = readString(data, 'lastName');
-  const allergies = readString(data, 'allergies');
   const grade = Number(data.grade ?? 0);
 
   // Both sides are compared as display names — `mapped.firstName` is composed
@@ -157,7 +156,20 @@ function driftedAttributes(
   }
   if (lastName && lastName !== mapped.lastName) attributes.last_name = lastName;
   if (Number.isFinite(grade) && grade > 0 && grade !== mapped.grade) attributes.grade = grade;
-  if ((allergies ?? null) !== mapped.allergies) attributes.medical_notes = allergies ?? '';
+
+  /*
+   * Allergies are added by a push and never cleared by one, which is not the
+   * symmetry the other fields have and is deliberate.
+   *
+   * Tally has kept no copy of this since the mirror was removed, so on every
+   * linked student the document simply has no allergy note — and "Tally holds
+   * none" read as "there are none" would send `medical_notes: ''` and wipe a
+   * peanut allergy out of the church's database on the first reconcile. A note
+   * that genuinely should go is removed in Planning Center, or from the student
+   * editor, where somebody is looking at the value they are deleting.
+   */
+  const allergies = readString(data, 'allergies');
+  if (allergies && allergies !== mapped.allergies) attributes.medical_notes = allergies;
 
   return attributes;
 }

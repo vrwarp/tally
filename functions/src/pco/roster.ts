@@ -572,27 +572,39 @@ export async function fetchPersonDetails(
   const { client, config, cache, personId } = options;
   const now = options.now ?? new Date();
 
-  return cache.get(personDetailsCacheKey(config.baseUrl, personId), async () => {
-    const loaded = await loadPersonWithHousehold(client, personId);
-    if (!loaded) return null;
-    const { person, index } = loaded;
+  /*
+   * `options.force` is forwarded, unlike in the version of this that only ever
+   * served reads. It is what a screen sends immediately after writing — a
+   * parent added, a number recorded, a name corrected — and without it the
+   * answer that comes back is the one from before the write, on the screen
+   * whose whole subject is the thing that just changed. The write path drops
+   * this key too, but only on the instance it happened to run on.
+   */
+  return cache.get(
+    personDetailsCacheKey(config.baseUrl, personId),
+    async () => {
+      const loaded = await loadPersonWithHousehold(client, personId);
+      if (!loaded) return null;
+      const { person, index } = loaded;
 
-    const mapped = mapPersonToStudent(person, {
-      minGrade: config.minGrade,
-      maxGrade: config.maxGrade,
-      now,
-    });
-    const contact = extractParentContact(person, index);
+      const mapped = mapPersonToStudent(person, {
+        minGrade: config.minGrade,
+        maxGrade: config.maxGrade,
+        now,
+      });
+      const contact = extractParentContact(person, index);
 
-    return {
-      pcoPersonId: person.id,
-      allergies: mapped.allergies,
-      parentName: contact.parentName,
-      parentPhone: contact.parentPhone,
-      parentEmail: contact.parentEmail,
-      householdAdult: findParentCandidate(person, index) !== null,
-    };
-  });
+      return {
+        pcoPersonId: person.id,
+        allergies: mapped.allergies,
+        parentName: contact.parentName,
+        parentPhone: contact.parentPhone,
+        parentEmail: contact.parentEmail,
+        householdAdult: findParentCandidate(person, index) !== null,
+      };
+    },
+    options.force,
+  );
 }
 
 /**

@@ -637,6 +637,9 @@ export function StudentDetailPage() {
         open={editorOpen}
         onClose={() => setEditorOpen(false)}
         student={student}
+        // An edit that reached Planning Center changed the allergies and parent
+        // contact this page is showing, not just the roster row behind it.
+        onSaved={refreshDetails}
       />
     </div>
   );

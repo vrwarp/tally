@@ -189,7 +189,7 @@ later.
 | --- | --- | --- |
 | `off` | Nothing at all. | Everything. Quick-added visitors stay queued (`pcoPushPending: true`) so switching the mode on later picks them up with nobody re-editing anything. |
 | `create` *(default)* | Creates a **Person** for a quick-added visitor — first name, last name, grade, `child: true`, and allergies as `medical_notes` — but only after searching for an exact first + last + grade match and linking to that instead. | Any existing person. No edits, ever. Planning Center still owns every field on everyone it already knows. |
-| `full` | Everything `create` does, plus patches drifted managed fields on **linked** people: `first_name`, `last_name`, `grade`, `medical_notes`. Also adds a **PhoneNumber** or **Email** to an adult already in a student's household — see below. | Households, membership, notes, anything not in that list. No person is ever created to hold a parent contact, nothing on file is ever overwritten, and nothing is ever deleted or deactivated in Planning Center; a student who leaves is deactivated in Tally only. |
+| `full` | Everything `create` does, plus edits to **linked** people — `first_name`, `nickname`, `last_name`, `grade`, `medical_notes` — from the student editor (`updateStudentProfile`) and from the reconcile push. Adds a **PhoneNumber** or **Email** to an adult already in a student's household. And, for a student with no adult on file, creates the **parent** — plus a **Household** and **HouseholdMembership** when there is none — through `addParent`, after offering any existing people of that name for a human to choose from. | Notes and anything not in that list. Nothing on file is ever overwritten, no person is created for a name a leader has not confirmed is new, and nothing is ever deleted or deactivated in Planning Center; a student who leaves is deactivated in Tally only. |
 
 In every mode, before creating a person Tally searches `where[search_name]` plus grade and filters
 the results again locally through the same accent- and punctuation-insensitive normalisation used to
@@ -201,6 +201,36 @@ this: the server's fuzzy search indexes the halves separately, and writing the c
 `first_name` would render as `Benson “蔡秉洲” “蔡秉洲” Tsai` on the next read and stop the matcher
 recognising the person at all — which is how a duplicate child gets created.
 
+### Editing a linked student (`full` only)
+
+Under `create` the student editor shows the managed fields disabled, with a link to Planning Center:
+Tally keeps no copy of a linked student's name, grade or allergies, so anything typed into them would
+be gone on the next read. Under `full` the same boxes are editable and Save calls
+`updateStudentProfile`, which patches the person upstream.
+
+The edit goes **straight** to Planning Center — nothing is written to Firestore on the way, and this
+is the reason the callable exists rather than the form writing a student document and letting the
+reconcile sweep notice the drift:
+
+- `mergeRoster` reads name and grade off the roster, so a copy in Firestore would not even show.
+- A copy left behind is a copy that gets pushed again later, over a correction somebody makes in
+  Planning Center next month.
+
+Only the attributes that actually differ from a fresh read of the person are sent, so a Save that
+changed the grade does not restate the name. A blank name or a grade outside 6–12 is refused before
+anything is written, and a new grade that leaves the configured band is saved *with* a warning that
+the student is about to drop off the roster.
+
+Two fields are not part of this. **Status** is never written upstream in any mode — who is on the
+roster is Tally's own list, and the control for it is Remove from roster on the student's page.
+**Allergies** can be cleared here, on a form showing the value being deleted, but a reconcile push
+will only ever *add* a `medical_notes` value, never blank one: a linked student's document holds no
+allergy note at all, and reading that absence as "there are none" would erase a real one.
+
+`PcoPersonDetails.profileWritable` carries the gate, for the same reason `contactWritable` does — the
+browser cannot see the setting, and offering an editable box that the write path then refuses is
+worse than showing it read-only.
+
 ### Parent contacts (`full` only)
 
 Every screen that finds a student nobody can reach says so and points at Planning Center, because
@@ -208,14 +238,13 @@ that is where the answer lives — Tally has held no parent contact of its own s
 removed. Under `full`, one screen can also fix it in place: the student's page offers a phone/email
 form, and `setParentContact` writes it upstream.
 
-What it may do is deliberately much narrower than "edit a household":
+What that path may do is deliberately narrow:
 
 - It writes onto the adult **already** in the student's household, chosen by `findParentCandidate` —
   the same ranking the read path uses to decide whose number to *show*. If the two disagreed, a
   leader could add a number and watch the row go on saying nobody can be reached.
-- It creates no Person, no Household and no HouseholdMembership. A student whose family is not on
-  file has no write path at all; `PcoPersonDetails.householdAdult` is how the screen knows to link
-  out instead of offering a form that would be refused.
+- It creates nothing: no Person, no Household, no HouseholdMembership. A student whose family is not
+  on file is the other path's job, below.
 - It never overwrites. A field already on file is left alone and reported as skipped — the form is
   only ever opened on the premise that there was nothing there, and that premise expires while
   somebody is typing.
@@ -223,10 +252,46 @@ What it may do is deliberately much narrower than "edit a household":
 `PcoPersonDetails.contactWritable` carries both halves of the gate (an adult to write onto, *and*
 `full`) so the browser never guesses at either. The token needs Editor or Manager access to People.
 
+### Building a family (`full` only)
+
+A student with no adult in their household used to be a dead end: nothing to write a number onto, so
+every screen could only point upstream. For a ministry whose visitors arrive at the door with nobody
+in Planning Center yet, that was the common case. Under `full`, the same place offers **Add a
+parent**, and `addParent` creates what is missing — the adult, and the Household too if Planning
+Center has none for the student.
+
+This is the widest thing Tally writes, and the only one that makes a claim about a *family* rather
+than about a field, so it has a human in the loop at the one point that matters:
+
+- **A name is a question before it is a record.** Sent a name it has not been told to accept,
+  `addParent` searches Planning Center for adults who already have it and returns them as
+  `existing-people` without writing anything. The form shows them, and a person decides: *this is
+  them* (`personId`) or *this is somebody else* (`createNew: true`). A church's parents are nearly
+  always already in People — they attend — just not linked to their child; and the two ways of
+  getting this wrong are not symmetric. A duplicate person is a merge somebody does by hand. A child
+  attached to the wrong household shows one family another family's phone number.
+- **It joins before it builds.** A student who already has a household gets the parent added to it
+  via `POST /households/{id}/household_memberships`. A new Household — `POST /households`, with the
+  parent as `primary_contact` and both of them in `people` — is created only when Planning Center
+  has none for that student at all.
+- **It refuses once there is an adult.** That is `setParentContact`'s job, and the refusal is
+  re-checked against a live read rather than against what the screen believed: a form opened on
+  "nobody can be reached" may have been sitting there while somebody fixed the family upstream, and
+  a second mother beside the first is not the repair.
+- **Everything is created as itself.** The parent is `child: false`, the membership carries
+  `household_role: parent_guardian`. The read path ranks by that role and falls back to the person's
+  own `child` flag, so the new parent resolves correctly even if Planning Center declines to set the
+  role on create.
+- **It still never overwrites a contact.** The phone and email go on through the same
+  `writeContactOnto` the narrow path uses, which skips a field already on file — including on an
+  adult somebody picked from the candidate list, who may well already have a mobile recorded.
+
+`PcoPersonDetails.parentCreatable` is the gate: `full` *and* nobody in the household yet. It and
+`contactWritable` are mirror images — on a `full` install exactly one of them is true — which is what
+lets one screen offer "add a number" and "add a parent" from the same place without deciding which.
+
 The fields Planning Center owns once a student is linked are listed in `PCO_MANAGED_STUDENT_FIELDS`:
-first name, last name, grade, allergies, status. The student editor shows them read-only with
-a "managed in Planning Center" note unless write-back is `full`, because editing them in Tally would
-just be overwritten on the next pull. Notes, attendance and RSVP data are Tally's alone
+first name, last name, grade, allergies, status. Notes, attendance and RSVP data are Tally's alone
 and are never written from the sync.
 
 ---
