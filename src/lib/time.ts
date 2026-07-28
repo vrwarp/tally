@@ -5,7 +5,15 @@
  * (PRD 4.3: "default to the active event based on the current date and time")
  * is deterministic under test. Nothing in this module reads the clock on its own.
  */
-import { format, formatDistanceToNowStrict, isSameDay, isToday, isTomorrow } from 'date-fns';
+import {
+  differenceInCalendarDays,
+  differenceInCalendarMonths,
+  format,
+  formatDistanceToNowStrict,
+  isSameDay,
+  isToday,
+  isTomorrow,
+} from 'date-fns';
 import { chainKey } from '@/lib/materialize';
 import type { EventSeries, TallyEvent } from '@/types';
 
@@ -166,6 +174,49 @@ export function formatClock(date: Date): string {
 
 export function formatRelative(date: Date): string {
   return `${formatDistanceToNowStrict(date)} ago`;
+}
+
+/**
+ * The same fact as `formatRelative`, short enough to be a column.
+ *
+ * The roster's last-seen column is 112px at 12px, right-aligned, and it exists
+ * to be scanned down rather than read: what a leader is doing with it is
+ * spotting the row that says months among rows that say weekdays. "3 weeks ago"
+ * does not fit and "about 2 months ago" fits nothing, so precision is spent
+ * where the eye can use it — a weekday inside the last week, because "Fri"
+ * answers "were they at the last gathering?" exactly, and a coarsening scale
+ * after that, because past a month the difference between 34 and 41 days is not
+ * a difference anybody acts on.
+ *
+ * Never "Never": a student nobody has seen renders blank at the call site. See
+ * `StudentsPage.tsx` — `lastAttendedAt` only reaches back to the day this
+ * ministry started using Tally, so "no sighting" is not the same claim as
+ * "never came", and sixty rows of grey "Never" teach the eye to skip the lane.
+ */
+export function formatSeenShort(date: Date, now: Date = new Date()): string {
+  const days = differenceInCalendarDays(now, date);
+  // A future date is a clock skew or a hand-typed event, not a sighting to
+  // describe in the past tense.
+  if (days <= 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return format(date, 'EEE');
+
+  if (days < 30) {
+    const weeks = Math.floor(days / 7);
+    return weeks === 1 ? '1 wk ago' : `${weeks} wks ago`;
+  }
+
+  /*
+   * Bounded by the day count either way, because calendar months disagree with
+   * "a month" at both ends: 28 Jan to 5 Feb is one calendar month and eight
+   * days, and 1 Jan to 31 Jan is thirty days and no calendar month at all.
+   * Weeks own everything under thirty days; months start at one.
+   */
+  const months = Math.max(1, differenceInCalendarMonths(now, date));
+  if (months < 12) return months === 1 ? '1 mth ago' : `${months} mths ago`;
+
+  const years = Math.floor(months / 12);
+  return years === 1 ? '1 yr ago' : `${years} yrs ago`;
 }
 
 /** `<input type="datetime-local">` round-trips through these two. */

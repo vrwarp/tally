@@ -50,6 +50,7 @@ export function makeStudent(overrides: Partial<Student> = {}): Student {
     fromPlanningCenter: pick(overrides, 'fromPlanningCenter', true),
     profileComplete: pick(overrides, 'profileComplete', true),
     hasAllergies: pick(overrides, 'hasAllergies', false),
+    birthday: pick(overrides, 'birthday', '03-14'),
     searchName: pick(overrides, 'searchName', buildSearchName(firstName, lastName)),
     firstAttendedAt: pick(overrides, 'firstAttendedAt', null),
     lastAttendedAt: pick(overrides, 'lastAttendedAt', null),

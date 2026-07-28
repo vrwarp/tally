@@ -38,6 +38,19 @@ export interface MappedStudent {
   lastName: string;
   grade: number;
   allergies: string | null;
+  /**
+   * The day of the year somebody has a birthday on, as `MM-DD`, or null when
+   * Planning Center holds no birthdate.
+   *
+   * Deliberately year-less. What a roster row does with this is say "cake on
+   * Friday" and "nobody has filled this in", and neither question needs to know
+   * how old a child is or what year they were born — which is the part of a
+   * birthdate that identifies a person. So the year is dropped here, at the
+   * boundary, rather than being carried to every browser on the roster and
+   * trusted not to be used. `getPersonDetails` is where a screen with a reason
+   * asks for more.
+   */
+  birthday: string | null;
   status: StudentStatus;
   /** Denormalised search key; must match `buildSearchName` in src/types. */
   searchName: string;
@@ -323,6 +336,29 @@ export function pcoGrade(person: PcoPerson, now?: Date): number | null {
   return null;
 }
 
+/**
+ * The month and day of a person's birthdate, or null.
+ *
+ * Planning Center sends `birthdate` as `YYYY-MM-DD`, and sometimes as nothing
+ * at all — an unfilled field on a person somebody added in a hurry, which is
+ * the case the roster's "no birthday" chip exists to surface. Anything that
+ * does not parse is treated as absent rather than guessed at: a half-typed date
+ * upstream should read as missing, not as a birthday on some arbitrary day.
+ */
+export function birthdayOf(person: PcoPerson): string | null {
+  const raw = trimmed((person.attributes ?? {}).birthdate);
+  if (raw === null) return null;
+
+  const match = /^\d{4}-(\d{2})-(\d{2})/.exec(raw);
+  if (!match) return null;
+
+  const month = Number(match[1]);
+  const day = Number(match[2]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+
+  return `${match[1]}-${match[2]}`;
+}
+
 export function normaliseStatus(person: PcoPerson): StudentStatus {
   const attributes: PcoPersonAttributes = person.attributes ?? {};
   if (trimmed(attributes.inactivated_at) !== null) return 'inactive';
@@ -343,6 +379,7 @@ export function mapPersonToStudent(person: PcoPerson, ctx: StudentMappingContext
     lastName,
     grade: Math.min(ctx.maxGrade, Math.max(ctx.minGrade, grade ?? ctx.minGrade)),
     allergies: trimmed(attributes.medical_notes),
+    birthday: birthdayOf(person),
     status: normaliseStatus(person),
     searchName: buildSearchName(firstName, lastName),
     pcoPersonId: person.id,

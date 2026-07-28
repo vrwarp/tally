@@ -89,6 +89,16 @@ export interface RosterPerson {
    * that makes a counselor look; the note itself stays behind a detail read.
    */
   hasAllergies: boolean;
+  /**
+   * `MM-DD`, or null when Planning Center holds no birthdate.
+   *
+   * The one field here that is about a child rather than about a check-in, and
+   * it is carried because the roster is where somebody notices: that a birthday
+   * is this Friday, and that nobody has ever filled one in. The year is dropped
+   * upstream in `birthdayOf` — see the note there — so what reaches a browser
+   * is a day of the year and not a date of birth.
+   */
+  birthday: string | null;
 }
 
 /** The sensitive fields, fetched only when a screen actually shows them. */
@@ -253,6 +263,7 @@ async function hydratePeople(
       // door.
       profileComplete: null,
       hasAllergies: mapped.allergies !== null && mapped.allergies.length > 0,
+      birthday: mapped.birthday,
     });
   }
 

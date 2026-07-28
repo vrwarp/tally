@@ -10,6 +10,9 @@
  *   - a student with no `grade`, carrying only a `graduation_year`
  *   - a 5th grader, who must be excluded from a 6-12 ministry
  *   - an inactive person, who must be deactivated rather than deleted
+ *   - students with no `birthdate` at all, and one born on 29 February
+ *   - birthdays either side of the anchor, so the roster's week-ahead and
+ *     week-behind chips both have somebody to land on
  *   - a household with two adults, so the parent-contact pick has to be stable
  *   - a household with no adult at all
  *   - a team member with no email address, who cannot be granted access
@@ -54,6 +57,12 @@ interface YouthSpec {
   grade: number | null;
   graduationYear?: number;
   allergies?: string;
+  /**
+   * `YYYY-MM-DD`, the way Planning Center sends it, or omitted for a profile
+   * nobody has finished — which is a real and common state and the one the
+   * roster's "no birthday" chip exists to surface.
+   */
+  birthdate?: string;
   inactive?: boolean;
   /** Days before the anchor this person was last touched in Planning Center. */
   updatedDaysAgo: number;
@@ -61,29 +70,29 @@ interface YouthSpec {
 }
 
 const YOUTH: readonly YouthSpec[] = [
-  { id: '4200001', first: 'Amara', last: 'Okonkwo', grade: 8, updatedDaysAgo: 2, household: 'H1' },
-  { id: '4200002', first: 'Benjamin', last: 'Okonkwo', nickname: 'Benji', grade: 6, updatedDaysAgo: 2, household: 'H1' },
-  { id: '4200003', first: 'Sofia', last: 'Delgado', grade: 11, allergies: 'Severe peanut allergy — EpiPen in her bag', updatedDaysAgo: 5, household: 'H2' },
-  { id: '4200004', first: 'Mateo', last: 'Delgado', grade: 7, updatedDaysAgo: 40, household: 'H2' },
-  { id: '4200005', first: 'Hannah', last: 'Kim', grade: 9, updatedDaysAgo: 1, household: 'H3' },
-  { id: '4200006', first: 'Joshua', last: 'Kim', grade: 12, updatedDaysAgo: 60, household: 'H3' },
-  { id: '4200007', first: 'Priyanka', last: 'Raman', nickname: 'Pri', grade: 10, updatedDaysAgo: 9, household: 'H4' },
-  { id: '4200008', first: 'Elijah', last: 'Brooks', grade: 8, allergies: 'Lactose intolerant', updatedDaysAgo: 3, household: 'H5' },
+  { id: '4200001', first: 'Amara', last: 'Okonkwo', grade: 8, birthdate: '2011-03-14', updatedDaysAgo: 2, household: 'H1' },
+  { id: '4200002', first: 'Benjamin', last: 'Okonkwo', nickname: 'Benji', grade: 6, birthdate: '2013-11-02', updatedDaysAgo: 2, household: 'H1' },
+  { id: '4200003', first: 'Sofia', last: 'Delgado', grade: 11, allergies: 'Severe peanut allergy — EpiPen in her bag', birthdate: '2008-06-28', updatedDaysAgo: 5, household: 'H2' },
+  { id: '4200004', first: 'Mateo', last: 'Delgado', grade: 7, birthdate: '2012-09-19', updatedDaysAgo: 40, household: 'H2' },
+  { id: '4200005', first: 'Hannah', last: 'Kim', grade: 9, birthdate: '2010-07-04', updatedDaysAgo: 1, household: 'H3' },
+  { id: '4200006', first: 'Joshua', last: 'Kim', grade: 12, birthdate: '2007-12-30', updatedDaysAgo: 60, household: 'H3' },
+  { id: '4200007', first: 'Priyanka', last: 'Raman', nickname: 'Pri', grade: 10, birthdate: '2009-05-21', updatedDaysAgo: 9, household: 'H4' },
+  { id: '4200008', first: 'Elijah', last: 'Brooks', grade: 8, allergies: 'Lactose intolerant', birthdate: '2011-01-09', updatedDaysAgo: 3, household: 'H5' },
   { id: '4200009', first: 'Naomi', last: 'Brooks', grade: 6, updatedDaysAgo: 3, household: 'H5' },
-  { id: '4200010', first: 'Tobias', last: 'Fischer', grade: 7, updatedDaysAgo: 14, household: 'H6' },
-  { id: '4200011', first: 'Leila', last: 'Haddad', grade: 11, updatedDaysAgo: 21, household: 'H7' },
-  { id: '4200012', first: 'Caleb', last: 'Nguyen', grade: 9, updatedDaysAgo: 6, household: 'H8' },
+  { id: '4200010', first: 'Tobias', last: 'Fischer', grade: 7, birthdate: '2012-08-15', updatedDaysAgo: 14, household: 'H6' },
+  { id: '4200011', first: 'Leila', last: 'Haddad', grade: 11, birthdate: '2008-02-29', updatedDaysAgo: 21, household: 'H7' },
+  { id: '4200012', first: 'Caleb', last: 'Nguyen', grade: 9, birthdate: '2010-10-11', updatedDaysAgo: 6, household: 'H8' },
   { id: '4200013', first: 'Zara', last: 'Ahmed', grade: 10, updatedDaysAgo: 4, household: 'H9' },
-  { id: '4200014', first: 'Marcus', last: 'Johnson', grade: 12, updatedDaysAgo: 30, household: 'H10' },
+  { id: '4200014', first: 'Marcus', last: 'Johnson', grade: 12, birthdate: '2007-04-06', updatedDaysAgo: 30, household: 'H10' },
   // Grade is blank; only a graduation year is on file. The mapper has to derive it.
-  { id: '4200015', first: 'Ivy', last: 'Petrova', grade: null, graduationYear: 2030, updatedDaysAgo: 7 },
+  { id: '4200015', first: 'Ivy', last: 'Petrova', grade: null, graduationYear: 2030, birthdate: '2012-06-25', updatedDaysAgo: 7 },
   // A 5th grader: too young for a 6-12 ministry and must never reach the roster.
-  { id: '4200016', first: 'Oliver', last: 'Grant', grade: 5, updatedDaysAgo: 8, household: 'H11' },
+  { id: '4200016', first: 'Oliver', last: 'Grant', grade: 5, birthdate: '2014-05-05', updatedDaysAgo: 8, household: 'H11' },
   // Left the ministry — must be deactivated, never deleted, because attendance
   // history points at this record.
-  { id: '4200017', first: 'Ruth', last: 'Abebe', grade: 12, inactive: true, updatedDaysAgo: 11 },
+  { id: '4200017', first: 'Ruth', last: 'Abebe', grade: 12, inactive: true, birthdate: '2007-09-13', updatedDaysAgo: 11 },
   // Lives with a grandparent whose household role is "other_adult".
-  { id: '4200018', first: 'Dexter', last: 'Cole', grade: 6, updatedDaysAgo: 12, household: 'H12' },
+  { id: '4200018', first: 'Dexter', last: 'Cole', grade: 6, birthdate: '2013-07-07', updatedDaysAgo: 12, household: 'H12' },
   // A nickname in a script the roster cannot fold down to Latin letters.
   // Planning Center shows him as `Benson “蔡秉洲” Tsai`, and so must Tally —
   // keeping only one half means the profile and the roster row cannot be
@@ -187,7 +196,7 @@ export function createFixtureOrg(): SimOrg {
       given_name: spec.first,
       grade: spec.grade,
       graduation_year: spec.graduationYear ?? null,
-      birthdate: null,
+      birthdate: spec.birthdate ?? null,
       child: true,
       medical_notes: spec.allergies ?? null,
       status: spec.inactive ? 'inactive' : 'active',
