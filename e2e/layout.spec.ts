@@ -58,4 +58,52 @@ test.describe('layout', () => {
       ).toBeLessThanOrEqual(1);
     });
   }
+
+  /*
+   * The seeded ministry has forty-five ordinary names, so it never exercised the
+   * case that actually broke this: one student whose name is long enough to
+   * matter. A row's name is clipped by `truncate`, which is `overflow: hidden`
+   * plus `white-space: nowrap` — and overflow does not apply to a non-replaced
+   * *inline* box. The directory's name span sat inside a parent that is only a
+   * flex container above `lg`, so on a phone the name was inline: it refused to
+   * wrap, was never clipped, and pushed every other row's content off the right
+   * edge of the screen.
+   *
+   * The name goes in through the app's own New-visitor form, so this is a real
+   * roster student, and the document is removed afterwards rather than left for
+   * whatever runs next.
+   */
+  test('/students survives a student with a very long name', async ({ page, firestore }) => {
+    const surname =
+      'Vandersteen-Okonkwo Fitzwilliam Abernathy Featherstonehaugh Wintermute Vasquez';
+
+    await gotoReady(page, '/students');
+    await page.getByRole('button', { name: /new visitor/i }).click();
+
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel(/first name/i).fill('Bartholomew');
+    await dialog.getByLabel(/last name/i).fill(surname);
+    await dialog.getByLabel(/^grade/i).selectOption('9');
+    await dialog.getByRole('button', { name: /add student/i }).click();
+    await dialog.waitFor({ state: 'detached', timeout: 30_000 });
+
+    // The row has to be on screen before measuring what it does to the page.
+    await page.getByText('Bartholomew', { exact: false }).first().waitFor({ timeout: 30_000 });
+
+    const amount = await page.evaluate(() => {
+      const root = document.documentElement;
+      return root.scrollWidth - root.clientWidth;
+    });
+
+    const created = await firestore.until(
+      'students',
+      (docs) => docs.some((doc) => doc.data.lastName === surname),
+      'the long-named student',
+    );
+    const id = created.find((doc) => doc.data.lastName === surname)?.id;
+    if (id) await firestore.remove(`students/${id}`);
+
+    expect(amount, `/students overflows by ${amount}px with one long name on the roster.`)
+      .toBeLessThanOrEqual(1);
+  });
 });
