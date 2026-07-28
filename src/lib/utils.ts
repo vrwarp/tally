@@ -258,6 +258,28 @@ export function formatPhone(raw: string | null): string {
 }
 
 /**
+ * What a phone field should hold after a keystroke: digits, grouped XXX-XXX-XXXX.
+ *
+ * Formatting as the number is typed rather than on blur is what makes the field
+ * refuse letters visibly — a stray character never lands, so there is nothing to
+ * correct later and nothing for the server to reject after a round trip.
+ *
+ * A leading `1` is a country code, not the first digit of an area code, so the
+ * eleventh digit drops it: pasting `+1 (555) 010-0123` and typing `15550100123`
+ * both settle on `555-010-0123`. Past that the number is US-shaped by
+ * construction — ten digits, and extra ones are ignored rather than appended,
+ * because there is no grouping this could give them that would be right.
+ */
+export function formatPhoneInput(raw: string): string {
+  let digits = raw.replace(/\D/g, '');
+  if (digits.length > 10 && digits.startsWith('1')) digits = digits.slice(1);
+  digits = digits.slice(0, 10);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
+/**
  * One ordering key for every list of students in the app: given name first.
  *
  * It used to be surname-first here and given-name-first in the student

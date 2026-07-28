@@ -164,7 +164,9 @@ test('capture the parent flows', async ({ page, signedInAs }) => {
   await page.getByRole('button', { name: /Add parent contact/ }).click();
   const phone = page.getByLabel('Parent phone');
   await phone.waitFor({ timeout: 15_000 });
-  await phone.fill('(555) 555-0142');
+  // The field takes digits and groups them itself, so this is what a leader
+  // actually presses.
+  await phone.fill('5555550142');
   await show(phone);
   await capture(page, {
     flow: 'Adding a phone number',

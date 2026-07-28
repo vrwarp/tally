@@ -27,7 +27,7 @@
  * phone number. Neither is a decision worth automating.
  */
 import { useState, type FormEvent } from 'react';
-import { Button, TextField } from '@/components/ui';
+import { Button, PhoneField, TextField } from '@/components/ui';
 import { useToast } from '@/context/toastContext';
 import { pcoPersonUrl } from '@/lib/planningCenter';
 import { cn, initials } from '@/lib/utils';
@@ -203,13 +203,11 @@ function ContactForm({
         enough.
       </p>
 
-      <TextField
+      <PhoneField
         label="Parent phone"
-        type="tel"
-        inputMode="tel"
         autoComplete="tel"
         value={phone}
-        onChange={(changed) => setPhone(changed.target.value)}
+        onValueChange={setPhone}
         error={phoneOk ? null : 'That is not a number anybody could ring.'}
       />
       <TextField
@@ -511,13 +509,11 @@ function ParentForm({
         />
       </div>
 
-      <TextField
+      <PhoneField
         label="Parent phone"
-        type="tel"
-        inputMode="tel"
         autoComplete="tel"
         value={phone}
-        onChange={(changed) => setPhone(changed.target.value)}
+        onValueChange={setPhone}
         error={phoneOk ? null : 'That is not a number anybody could ring.'}
       />
       <TextField
