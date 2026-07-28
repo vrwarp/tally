@@ -267,6 +267,44 @@ export const setParentContact = httpsCallable<
   SetParentContactResult
 >(functions, 'setParentContact');
 
+export interface UpdateStudentProfileResult {
+  status:
+    | 'updated'
+    | 'unchanged'
+    | 'disabled'
+    | 'no-student'
+    | 'not-in-planning-center'
+    | 'invalid';
+  /** Planning Center attribute names this call wrote. Empty unless `updated`. */
+  wrote: string[];
+  message: string;
+}
+
+/**
+ * Saves the Edit profile form for a student Planning Center already has.
+ *
+ * The edit goes straight upstream and nothing is written to Firestore on the
+ * way: a linked student's name, grade and allergies are Planning Center's, and
+ * a copy kept in Tally would be shown by nothing — `mergeRoster` reads those
+ * fields off the roster — and pushed back over a later correction.
+ *
+ * Every field is optional and an omitted one is left alone. Off unless
+ * `PCO_WRITE_BACK=full`; check `PcoPersonDetails.profileWritable` before
+ * offering an editable form, for the same reason as `setParentContact`.
+ */
+export const updateStudentProfile = httpsCallable<
+  {
+    studentId: string;
+    /** The plain first name — never the `Benson “蔡秉洲”` composite. */
+    firstName?: string;
+    nickname?: string | null;
+    lastName?: string;
+    grade?: number;
+    allergies?: string | null;
+  },
+  UpdateStudentProfileResult
+>(functions, 'updateStudentProfile');
+
 export interface PushPendingResult {
   pushed: number;
   skipped: number;

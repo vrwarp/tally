@@ -28,6 +28,11 @@ import {
   type SetParentContactResult,
 } from './pco/parentContact.js';
 import {
+  updateStudentProfile as updateStudentProfileUpstream,
+  type StudentProfilePatch,
+  type UpdateStudentProfileResult,
+} from './pco/profile.js';
+import {
   fetchParentContactStatus,
   fetchPersonDetails,
   fetchRoster,
@@ -329,6 +334,16 @@ interface PersonDetailsResponse extends PersonDetails {
    * `full`. Answered by the server because the browser can see neither half.
    */
   contactWritable: boolean;
+  /**
+   * Whether the student's own managed fields — name, grade, allergies — may be
+   * edited from Tally, which is `full` and nothing else.
+   *
+   * Separate from `contactWritable` because the two gates are not the same
+   * gate: editing this person needs only the mode, while writing a contact also
+   * needs somebody in the household to write it onto. A form that conflated
+   * them would lock a perfectly editable name behind a missing family.
+   */
+  profileWritable: boolean;
 }
 
 /**
@@ -373,7 +388,12 @@ export const getPersonDetails = onCall<
        * leader may have changed a second ago, and serving that from a cache
        * would leave a form on screen that the write path then refuses.
        */
-      return { ...details, contactWritable: details.householdAdult && config.writeBack === 'full' };
+      const writeBackFull = config.writeBack === 'full';
+      return {
+        ...details,
+        contactWritable: details.householdAdult && writeBackFull,
+        profileWritable: writeBackFull,
+      };
     } catch (error) {
       return reportPcoFailure(error, 'load this student');
     }
@@ -873,6 +893,66 @@ export const setParentContact = onCall<
     // true about this household.
     cache.invalidate(reachableAdultsCacheKey(config.baseUrl));
   }
+
+  return result;
+});
+
+/**
+ * Saves the Edit profile form for a student Planning Center already has.
+ *
+ * The counterpart of `pushStudentToPlanningCenter`, and deliberately a separate
+ * entry point: that one reconciles a student *Tally* holds, this one carries an
+ * edit straight upstream for a student Tally holds nothing about. Nothing is
+ * written to Firestore on the way through — a linked student's name, grade and
+ * allergies are Planning Center's, and a copy left in Tally would be shown by
+ * nothing and re-pushed later.
+ *
+ * Refuses unless write-back is `full`, and touches only the attributes that
+ * actually changed. Core team only, like every other write into the church's
+ * people database.
+ */
+export const updateStudentProfile = onCall<
+  { studentId: string } & StudentProfilePatch,
+  Promise<UpdateStudentProfileResult>
+>({ secrets: PCO_SECRETS, timeoutSeconds: 120, memory: '256MiB' }, async (request) => {
+  await requireCoreTeam(request.auth?.uid);
+
+  const studentId = request.data?.studentId;
+  if (typeof studentId !== 'string' || studentId.trim().length === 0) {
+    throw new HttpsError('invalid-argument', 'studentId is required.');
+  }
+
+  const config = await resolveConfig(db());
+  const client = clientFor(config);
+  if (!client) {
+    throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
+  }
+
+  let result: UpdateStudentProfileResult;
+  try {
+    result = await updateStudentProfileUpstream({
+      db: db(),
+      client,
+      config,
+      studentId,
+      firstName: request.data?.firstName,
+      nickname: request.data?.nickname,
+      lastName: request.data?.lastName,
+      grade: request.data?.grade,
+      allergies: request.data?.allergies,
+      logger,
+    });
+  } catch (error) {
+    return reportPcoFailure(error, 'save this profile to Planning Center');
+  }
+
+  /*
+   * The whole cache, not just this student's details: a renamed or regraded
+   * person changes the *roster* — how they sort, whether the grade band still
+   * includes them — and that answer is held under a different key on every
+   * device that asks. One edit is a fine price for one cold read.
+   */
+  if (result.status === 'updated') resetSharedCache();
 
   return result;
 });

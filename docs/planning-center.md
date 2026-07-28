@@ -189,7 +189,7 @@ later.
 | --- | --- | --- |
 | `off` | Nothing at all. | Everything. Quick-added visitors stay queued (`pcoPushPending: true`) so switching the mode on later picks them up with nobody re-editing anything. |
 | `create` *(default)* | Creates a **Person** for a quick-added visitor — first name, last name, grade, `child: true`, and allergies as `medical_notes` — but only after searching for an exact first + last + grade match and linking to that instead. | Any existing person. No edits, ever. Planning Center still owns every field on everyone it already knows. |
-| `full` | Everything `create` does, plus patches drifted managed fields on **linked** people: `first_name`, `last_name`, `grade`, `medical_notes`. Also adds a **PhoneNumber** or **Email** to an adult already in a student's household — see below. | Households, membership, notes, anything not in that list. No person is ever created to hold a parent contact, nothing on file is ever overwritten, and nothing is ever deleted or deactivated in Planning Center; a student who leaves is deactivated in Tally only. |
+| `full` | Everything `create` does, plus edits to **linked** people — `first_name`, `nickname`, `last_name`, `grade`, `medical_notes` — from the student editor (`updateStudentProfile`) and from the reconcile push. Also adds a **PhoneNumber** or **Email** to an adult already in a student's household — see below. | Households, membership, notes, anything not in that list. No person is ever created to hold a parent contact, nothing on file is ever overwritten, and nothing is ever deleted or deactivated in Planning Center; a student who leaves is deactivated in Tally only. |
 
 In every mode, before creating a person Tally searches `where[search_name]` plus grade and filters
 the results again locally through the same accent- and punctuation-insensitive normalisation used to
@@ -200,6 +200,36 @@ A name Tally holds as `Benson “蔡秉洲”` is split back into `first_name` a
 this: the server's fuzzy search indexes the halves separately, and writing the composite into
 `first_name` would render as `Benson “蔡秉洲” “蔡秉洲” Tsai` on the next read and stop the matcher
 recognising the person at all — which is how a duplicate child gets created.
+
+### Editing a linked student (`full` only)
+
+Under `create` the student editor shows the managed fields disabled, with a link to Planning Center:
+Tally keeps no copy of a linked student's name, grade or allergies, so anything typed into them would
+be gone on the next read. Under `full` the same boxes are editable and Save calls
+`updateStudentProfile`, which patches the person upstream.
+
+The edit goes **straight** to Planning Center — nothing is written to Firestore on the way, and this
+is the reason the callable exists rather than the form writing a student document and letting the
+reconcile sweep notice the drift:
+
+- `mergeRoster` reads name and grade off the roster, so a copy in Firestore would not even show.
+- A copy left behind is a copy that gets pushed again later, over a correction somebody makes in
+  Planning Center next month.
+
+Only the attributes that actually differ from a fresh read of the person are sent, so a Save that
+changed the grade does not restate the name. A blank name or a grade outside 6–12 is refused before
+anything is written, and a new grade that leaves the configured band is saved *with* a warning that
+the student is about to drop off the roster.
+
+Two fields are not part of this. **Status** is never written upstream in any mode — who is on the
+roster is Tally's own list, and the control for it is Remove from roster on the student's page.
+**Allergies** can be cleared here, on a form showing the value being deleted, but a reconcile push
+will only ever *add* a `medical_notes` value, never blank one: a linked student's document holds no
+allergy note at all, and reading that absence as "there are none" would erase a real one.
+
+`PcoPersonDetails.profileWritable` carries the gate, for the same reason `contactWritable` does — the
+browser cannot see the setting, and offering an editable box that the write path then refuses is
+worse than showing it read-only.
 
 ### Parent contacts (`full` only)
 
@@ -224,9 +254,7 @@ What it may do is deliberately much narrower than "edit a household":
 `full`) so the browser never guesses at either. The token needs Editor or Manager access to People.
 
 The fields Planning Center owns once a student is linked are listed in `PCO_MANAGED_STUDENT_FIELDS`:
-first name, last name, grade, allergies, status. The student editor shows them read-only with
-a "managed in Planning Center" note unless write-back is `full`, because editing them in Tally would
-just be overwritten on the next pull. Notes, attendance and RSVP data are Tally's alone
+first name, last name, grade, allergies, status. Notes, attendance and RSVP data are Tally's alone
 and are never written from the sync.
 
 ---

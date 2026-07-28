@@ -636,6 +636,15 @@ export interface PcoPersonDetails {
    * new visitor upstream and nothing else.
    */
   contactWritable: boolean;
+  /**
+   * Whether this student's managed fields — name, grade, allergies — may be
+   * edited from Tally, which is `PCO_WRITE_BACK=full` and nothing else.
+   *
+   * Not the same gate as `contactWritable`, which also needs an adult in the
+   * household to write onto. The student editor reads this one: a name is
+   * perfectly editable on a student whose family is not on file.
+   */
+  profileWritable: boolean;
 }
 
 /**
