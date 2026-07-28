@@ -448,6 +448,21 @@ surname typed one way at the door, or a grade that was off by one. To fix it by 
 5. To stop it recurring, put what counselors actually call the student in Planning Center's
    `first_name` or `nickname` — Tally carries both, so either one matches — and correct the grade.
 
+**A parent appears several times after one "Add parent"** — fixed, but worth knowing how to clean up
+if it already happened. Adding a parent is one `POST`, and the client used to resend it when the
+answer did not come back: on a dropped connection or a `5xx` it tried five times in all. A write that
+*reached* Planning Center and lost only its reply looks identical from Tally's side to one that never
+arrived, so each resend created another person — and because the last attempt failed too, the screen
+said Planning Center could not be reached while five copies had just been made. Pressing the button
+again then showed all five in the "which of these is the parent?" chooser, which is the same code
+correctly reporting the mess.
+
+A `POST` is now sent once and never replayed; a lost answer is reported as such, and the choice of
+what to do about it goes to a person. Reads and `PATCH`es still retry, because repeating them changes
+nothing. To clear duplicates already in the church database, merge them in Planning Center
+(**People → the person → Actions → Merge**), keeping whichever record the household points at; Tally
+follows the merge on its next read and needs no change of its own.
+
 **It says it is not configured** — the config refused to build a client, and the message names the
 value: a missing `PCO_APP_ID` or `PCO_SECRET`. Both are a Secret Manager job.
 
