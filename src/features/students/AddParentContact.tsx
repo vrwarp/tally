@@ -30,6 +30,7 @@ import { useState, type FormEvent } from 'react';
 import { Button, TextField } from '@/components/ui';
 import { useToast } from '@/context/toastContext';
 import { pcoPersonUrl } from '@/lib/planningCenter';
+import { cn, initials } from '@/lib/utils';
 import { addParent, setParentContact, type ExistingPerson } from '@/services/functions';
 import { studentFullName, type PcoPersonDetails, type Student } from '@/types';
 
@@ -266,6 +267,14 @@ function ParentForm({
   const [problem, setProblem] = useState<string | null>(null);
   /** Non-null once the server has said "these people already have this name". */
   const [candidates, setCandidates] = useState<ExistingPerson[] | null>(null);
+  /*
+   * Which choice is in flight — a candidate's id, or `new`.
+   *
+   * A single `busy` flag put a spinner on every row at once, which on a screen
+   * whose entire job is telling two people apart is the one thing it must not
+   * do.
+   */
+  const [pending, setPending] = useState<string | null>(null);
 
   const phoneOk = phone.trim() === '' || usablePhone(phone);
   const emailOk = email.trim() === '' || usableEmail(email);
@@ -277,6 +286,7 @@ function ParentForm({
    */
   const send = async (choice: { personId?: string; createNew?: boolean } = {}) => {
     setBusy(true);
+    setPending(choice.personId ?? (choice.createNew ? 'new' : 'ask'));
     setProblem(null);
     try {
       const response = await addParent({
@@ -316,6 +326,7 @@ function ParentForm({
       setProblem('Could not reach Planning Center to add this. Try again in a moment.');
     } finally {
       setBusy(false);
+      setPending(null);
     }
   };
 
@@ -323,48 +334,147 @@ function ParentForm({
   if (candidates && candidates.length > 0) {
     return (
       <div className="mt-2 flex flex-col gap-3">
-        <p className="text-sm text-ink-200">
-          Planning Center already has {candidates.length === 1 ? 'this person' : 'these people'} by
-          that name. Adding {student.firstName} to their household is almost always what you want —
-          a second record for the same parent has to be merged by hand later.
+        {/*
+          A question, then the reason — in that order and in that weight. The
+          reason used to lead, as four lines of body text a leader had to read
+          before they could see there was anything to decide.
+        */}
+        <p className="text-sm font-semibold text-ink-100">
+          {candidates.length === 1
+            ? `Is this ${student.firstName}'s parent?`
+            : `Which of these is ${student.firstName}'s parent?`}
         </p>
 
-        <ul className="flex flex-col gap-2">
-          {candidates.map((candidate) => (
-            <li
-              key={candidate.pcoPersonId}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-ink-800/60 px-3 py-2"
+        {/*
+          The whole row is the button, exactly as a student row on the check-in
+          screen is. Picking a person out of a short list is the same gesture in
+          both places, and it is the gesture a thumb is good at — a "This is
+          them" button beside the name wrapped onto two lines on a phone and
+          left the tap target smaller than the name it referred to.
+        */}
+        <ul className="flex flex-col gap-1.5">
+          {candidates.map((candidate) => {
+            const [first, ...rest] = candidate.name.split(/\s+/);
+            const choosing = pending === candidate.pcoPersonId;
+            return (
+              <li key={candidate.pcoPersonId}>
+                <button
+                  type="button"
+                  onClick={() => void send({ personId: candidate.pcoPersonId })}
+                  disabled={busy}
+                  aria-busy={choosing || undefined}
+                  aria-label={`${candidate.name} is ${student.firstName}'s parent`}
+                  className={cn(
+                    'flex min-h-14 w-full items-center gap-3 rounded-xl px-3 py-2 text-left ring-1',
+                    'bg-ink-900 ring-ink-800 transition-colors active:bg-ink-800 disabled:opacity-60',
+                  )}
+                >
+                  <span
+                    aria-hidden="true"
+                    className="flex size-10 shrink-0 items-center justify-center rounded-full bg-ink-800 text-xs font-bold text-ink-300"
+                  >
+                    {initials(first ?? candidate.name, rest.join(' '))}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-ink-100">
+                      {candidate.name}
+                    </span>
+                    <span className="block truncate text-xs text-ink-500">
+                      {candidate.reachable
+                        ? 'Has contact details in Planning Center'
+                        : 'No contact details on file yet'}
+                    </span>
+                  </span>
+                  {choosing ? (
+                    <span
+                      aria-hidden="true"
+                      className="size-4 shrink-0 animate-spin rounded-full border-2 border-ink-500 border-t-transparent"
+                    />
+                  ) : (
+                    <span aria-hidden="true" className="shrink-0 text-lg leading-none text-ink-500">
+                      ›
+                    </span>
+                  )}
+                </button>
+              </li>
+            );
+          })}
+
+          {/*
+            "None of these" is an answer to the question, not a way out of it,
+            so it is the last row rather than a button competing with the list.
+            The dashed ring and the ＋ are what keep it from reading as a third
+            person Planning Center found.
+          */}
+          <li>
+            <button
+              type="button"
+              onClick={() => void send({ createNew: true })}
+              disabled={busy}
+              aria-busy={pending === 'new' || undefined}
+              className={cn(
+                'flex min-h-14 w-full items-center gap-3 rounded-xl px-3 py-2 text-left',
+                // A dashed *border*: rings cannot be dashed, and the dash is
+                // what says this row is an action rather than a person.
+                'border border-dashed border-ink-700 transition-colors active:bg-ink-800 disabled:opacity-60',
+              )}
             >
-              <span className="text-sm text-ink-100">
-                {candidate.name}
-                <span className="block text-xs text-ink-500">
-                  {candidate.reachable
-                    ? 'Already has contact details in Planning Center'
-                    : 'No contact details on file yet'}
+              <span
+                aria-hidden="true"
+                className="flex size-10 shrink-0 items-center justify-center rounded-full bg-ink-800/60 text-base font-bold text-ink-400"
+              >
+                ＋
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium text-ink-100">
+                  None of these
+                </span>
+                <span className="block truncate text-xs text-ink-500">
+                  Add a different {`${firstName.trim()} ${lastName.trim()}`.trim() || 'person'}
                 </span>
               </span>
-              <Button
-                size="sm"
-                variant="secondary"
-                loading={busy}
-                onClick={() => void send({ personId: candidate.pcoPersonId })}
-              >
-                This is them
-              </Button>
-            </li>
-          ))}
+              {pending === 'new' ? (
+                <span
+                  aria-hidden="true"
+                  className="size-4 shrink-0 animate-spin rounded-full border-2 border-ink-500 border-t-transparent"
+                />
+              ) : (
+                <span aria-hidden="true" className="shrink-0 text-lg leading-none text-ink-500">
+                  ›
+                </span>
+              )}
+            </button>
+          </li>
         </ul>
 
         {problem ? <p className="text-sm text-danger-400">{problem}</p> : null}
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="ghost" loading={busy} onClick={() => void send({ createNew: true })}>
-            None of these — add a new person
-          </Button>
-          <Button type="button" variant="ghost" onClick={onClose}>
+        {/* Cancel is the only thing here that is not an answer to the question,
+            so it is the only thing outside the list. Pulled back by its own
+            padding so its label starts on the same line as everything above it. */}
+        <div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="-ml-3"
+            disabled={busy}
+            onClick={onClose}
+          >
             Cancel
           </Button>
         </div>
+
+        {/*
+          Under the choice rather than over it. It is the reason the recommended
+          answer is recommended, which is worth reading once and never again —
+          and above the list it was four lines standing between a leader and the
+          two buttons they came here for.
+        */}
+        <p className="text-xs text-ink-500">
+          Putting them in this household keeps one record. A second copy of the same parent has to be
+          merged by hand later.
+        </p>
       </div>
     );
   }

@@ -191,9 +191,11 @@ test('capture the parent flows', async ({ page, signedInAs }) => {
   await page.getByLabel('Parent last name').fill('Nguyen');
   await page.getByRole('button', { name: 'Save to Planning Center' }).click();
 
-  const thisIsThem = page.getByRole('button', { name: 'This is them' });
+  // The candidate rows are whole-row buttons, labelled with the choice they
+  // make — the same shape a student row on the check-in screen has.
+  const thisIsThem = page.getByRole('button', { name: /is Kai's parent/ });
   await thisIsThem.waitFor({ timeout: 30_000 });
-  await show(page.getByText(/already has/).first());
+  await show(page.getByText(/Is this Kai's parent\?/));
   await capture(page, {
     flow: 'The duplicate check',
     title: 'Planning Center already has a Linh Nguyen',

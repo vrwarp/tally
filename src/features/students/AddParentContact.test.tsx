@@ -320,7 +320,7 @@ describe('AddParentContact', () => {
         const onAdded = await askThenOffer();
 
         expect(await screen.findByText('Wen Lee')).toBeInTheDocument();
-        expect(screen.getByText(/Already has contact details/)).toBeInTheDocument();
+        expect(screen.getByText(/Has contact details in Planning Center/)).toBeInTheDocument();
         expect(onAdded).not.toHaveBeenCalled();
       });
 
@@ -328,7 +328,7 @@ describe('AddParentContact', () => {
         const onAdded = await askThenOffer();
         addParent.mockResolvedValueOnce(added);
 
-        await userEvent.click(await screen.findByRole('button', { name: 'This is them' }));
+        await userEvent.click(await screen.findByRole('button', { name: /is Janet's parent/ }));
 
         await waitFor(() => expect(onAdded).toHaveBeenCalled());
         expect(addParent).toHaveBeenLastCalledWith(
@@ -340,7 +340,7 @@ describe('AddParentContact', () => {
         const onAdded = await askThenOffer();
         addParent.mockResolvedValueOnce(added);
 
-        await userEvent.click(await screen.findByRole('button', { name: /add a new person/i }));
+        await userEvent.click(await screen.findByRole('button', { name: /None of these/ }));
 
         await waitFor(() => expect(onAdded).toHaveBeenCalled());
         expect(addParent).toHaveBeenLastCalledWith(expect.objectContaining({ createNew: true }));
