@@ -7,7 +7,8 @@
     "Six scenes were captured from the running app — real DOM, real stylesheet, real seeded ministry of forty-five students — and frozen into standalone HTML with the JavaScript stripped out. Not mockups: every pixel was rendered by the real components.",
     "Two critics read the frames each round. One asked whether the person a screen is for could finish their job on the device they were holding; the other asked whether the screen was composed. Both worked from measurements, not impressions.",
     "A third agent answered them in the prototypes and recorded what it declined, and why. Round one landed thirteen changes against twenty-one major findings; round two, sixteen against nine; round three, three.",
-    "The result was ported into React and re-captured from the running app. Every frame below is the real thing at both ends of the slider."
+    "The result was ported into React, and then both ends of every slider were re-captured from the running app by the same harness — the before frames from a worktree checked out at the commit this work started from. Nothing below is a prototype or a mockup. The measurements quoted are re-runnable against those captures rather than asserted; the first draft of this page quoted the prototypes and was out by several hundred pixels in both directions.",
+    "Two things the loop decided are not in the frames, and both are deliberate. Round two removed the amber “Add parent contact” button from the New faces rows, on the grounds that a student should be offered a next step in exactly one place; while the refinement was running, the main branch added a linked version of the same affordance to those rows for its own reasons, and on rebase that was kept over the removal. And a two-column student directory — which would put all forty-five names on one laptop screen — was proposed and declined three times, because it changes what a keyboard arrow key and a screen reader traverse and deserves its own change rather than a corner of this one."
   ],
   "scenes": [
     {
@@ -19,23 +20,23 @@
         {
           "viewport": "desktop",
           "headline": "Three questions on one screen instead of one across four",
-          "why": "The page answered one of its three questions above the fold and hid the other two behind 1,200px of scroll — inside a 481px column with 735px of empty page beside it, because the layout had been built for a 390px phone and centred.",
+          "why": "The page answered one of its three questions above the fold and started the other two 639px and 1,245px below it — inside a 480px column with 736px of empty page beside it, because the layout had been built for a 390px phone and then centred in a 1440px window.",
           "changes": [
             "The content stops centring and anchors to the sidebar, in a frame shared with Events, Students and Settings — their left edges used to jump 592 → 464 → 512 between tabs whose sidebar never moved.",
             "The long call list takes the fluid column; the three short lists stack beside it at a fixed 28rem, the width at which a name like “Bree Sandoval” stops truncating.",
-            "The MIA row folds from four lines to one, so all ten names and their Call/Text land above the fold instead of three and a half.",
-            "The page fell from 2,860px to 1,609px.",
+            "The MIA row folds from four lines to one — 125px to 73px — so seven of the nine names arrive with their Call and Text above the fold instead of four, and the whole card ends at y 1,003 instead of y 1,523. New faces and Incomplete profiles now both begin above the fold as well: all three questions are on screen at once.",
+            "Between them the page comes down from 3,168px to 1,623px — three and a half laptop screens to under two — with nothing hidden and nothing shrunk. The same six sections; two columns instead of one.",
             "Three of the four tiles carried a saturated wash, so the eye landed by default on the one neutral tile — the only fact needing no action. The tint now belongs to the single tile that is a call to action; the rest colour the numeral."
           ]
         },
         {
           "viewport": "phone",
           "headline": "The name is no longer the first thing to give up width",
-          "why": "On the card whose entire output is a list of people to chase, every name truncated — “Selah M…”, “Jayden …”, “Bree S…” — to make room for two badges that never shrank. Two of the five gave a given name only, which on a forty-five-student roll is not an identification.",
+          "why": "On the card whose entire output is a list of people to chase, five of the seven names truncated — “Selah M…”, “Jayden …”, “Bree S…”, “Tomas…”, “Kylie …” — to make room for two badges that never shrank. Two of the five gave a given name only, which on a forty-five-student roll is not an identification.",
           "changes": [
             "The name gets the line to itself. The visitor badge went rather than moved: the card's own subtitle already scopes the list.",
             "The “waiting N days” chip drops to the meta line, where its graduated tone still ranks the list.",
-            "The grade leaves the phone's meta line, so the last-seen date — the reason the row exists — stops being the thing that truncates.",
+            "In the Missing in action rows the grade leaves the phone's meta line, so “6th grade · Last seen Jun 12, 2 …” becomes “Last seen Jun 12, 2 months ago”. The date is the reason the row exists and it was the thing being cut; the grade is still there on a laptop, where the row is 680px wide instead of 358px.",
             "The reading order is decided by question again: three name lists, then the attendance chart. A desktop column split had quietly put the chart in front of “who is new”."
           ]
         }
@@ -78,10 +79,11 @@
         {
           "viewport": "phone",
           "headline": "Results ranked by why they matched",
-          "why": "Typing “ma” for the Maya at the front of the queue returned Aisha Rahman, Amara Osei, Chloe Bergman, Fatima Nasser and Hana Yamamoto first — five people whose surnames merely contain “ma” — and put Maya eighth, half of her below the fold. Every one of those is a legitimate match, so the fix was not to match less.",
+          "why": "Typing “ma” for the Maya at the front of the queue returned nine people in surname order — Adebayo, Bergman, Delgado, Johnson, Nasser, Osei, Rahman, Vielle — on a list where every row prints the given name first. To an eye scanning given names that is not an order at all, and the three students actually called Ma- sat at positions 1, 3 and 4, interleaved with five whose surnames merely contain the letters. Every one of those is a legitimate match, so the fix was not to match less.",
           "changes": [
-            "The matcher ranks: given-name prefix, then surname prefix, then contained anywhere, then the typo pass — holding A–Z inside each band so the list is still predictable.",
-            "The ranking applies only while a query is running. The roster's own order still changes between keystrokes and never as a consequence of checking somebody in, which is the rule that keeps a row from sliding out from under a thumb."
+            "The matcher ranks: given-name prefix, then surname prefix, then contained anywhere, then the typo pass — holding A–Z inside each band so the list is still predictable. Malik, Marcus and Maya now lead; Aisha, Amara, Chloe, Fatima and Hana follow.",
+            "The ranking applies only while a query is running. The roster's own order still changes between keystrokes and never as a consequence of checking somebody in, which is the rule that keeps a row from sliding out from under a thumb.",
+            "This one is worth being plain about: on the shipped app the surname sort had put Maya first by luck, because “Adebayo” sorts first. It was round two's own re-key to given-name order that buried her at eighth, and round three caught it. The ranking is a real improvement on both, but the frame on the left is not as bad as the loop's notes make it sound."
           ]
         }
       ]
@@ -95,7 +97,7 @@
         {
           "viewport": "desktop",
           "headline": "Sixteen names above the fold, and the flag reads as a column",
-          "why": "Nine of forty-five names were visible in a 640px column with 576px of empty page beside it, and each 65px row spent 250px on its facts and left the rest blank. The flag a leader came to find trailed five names at whatever x each name happened to end.",
+          "why": "Nine of forty-five names were visible in a 640px column with 576px of empty page beside it, and each 64px row spent 250px on its facts and left the rest blank. The flag a leader came to find trailed five names at whatever x each name happened to end.",
           "changes": [
             "The row goes from a 64px two-line card to a 44px single line above `lg`, keeping the touch card below it — two correct answers rather than one compromise height.",
             "The grade moves from a second line to a fixed column, and the badges move out of the name block beside it, so “Missing info” forms a vertical run instead of a ragged mid-row scan.",
@@ -109,7 +111,9 @@
           "changes": [
             "The import drops to the quiet treatment the weekly action already had, and the weekly one leads.",
             "Badges moved to the meta line, so five rows in forty-five stop wrapping to three lines and pushing the grade — the one fact every row shares — out of column.",
-            "The chips count in a pill, the form every other count in the app uses, rather than in parentheses inside the label."
+            "The chips count in a pill, the form every other count in the app uses, rather than in parentheses inside the label.",
+            "The number in that pill also changes, 5 to 7, and that is a bug the critique found rather than a design decision. This page and Insights were both answering “who has no parent contact” and answering it differently: the chip read only the roster's own stored flag, while Insights fell back to what Planning Center had just said about students the roster has no answer for — so two students nobody could reach were flagged on one screen and not the other. Both now ask one function. Two counts of the same thing that disagree make every other number on the page a question.",
+            "One student with a long enough surname used to push the whole page sideways. Truncation is “hide the overflow” plus “do not wrap”, and hiding overflow does nothing to an inline box — below the pointer breakpoint the name was inline, so it never wrapped and was never clipped. Forty-five ordinary names had kept it hidden."
           ]
         }
       ]
@@ -123,10 +127,11 @@
         {
           "viewport": "desktop",
           "headline": "What is behind sits beside what is ahead",
-          "why": "One of this screen's three jobs is finding a past gathering, and the past was the furthest thing away: a leader scrolled past a hero card for the event happening right now, then past sixteen future occurrences, about 2,500px, before the first finished night appeared. Two of twenty-seven gatherings were above the fold.",
+          "why": "One of this screen's three jobs is finding a past gathering, and the past was the furthest thing away: a leader scrolled past a hero card for the event happening right now, then past sixteen future occurrences — 2,515px — before the first finished night appeared. Two of twenty-seven gatherings were above the fold.",
           "changes": [
-            "Upcoming and past become two columns, so ten past gatherings are on the fold beside the whole of what is coming. The page fell from 2,447px to 1,661px.",
+            "Upcoming and past become two columns, so “Past gatherings” heads the screen at y 92 instead of y 2,515, and the page falls from 3,573px to 1,644px.",
             "“Upcoming” and “Past gatherings” are headings of the same rank, above the group labels inside them. Half the page had been titled like a group inside the other half.",
+            "“Later” stops at the end of next month and the rest sits behind a “Show N later gatherings” pill — the control the past column already had at its own end. Unbounded, it was the one list setting the page's height, so the two new columns would have ended 1,300px apart and collapsed the split they were made for.",
             "The scheduling shortcut moved below tonight's gathering. It sat first, wearing the loudest heading on the page, so the card you touch when you notice something is missing outranked the gathering that is on tonight.",
             "Sixteen “Recurring” chips left the calendar. A badge every row carries is not information, it is a repeated word — and it cost a line of height each while the one genuinely different gathering competed with sixteen decoys."
           ]
@@ -137,8 +142,9 @@
           "why": "Eleven consecutive rows carry one of two titles, so the date is the only thing telling them apart — and it was set a step further back than the same line in the past list, which meant the archive was the more legible half.",
           "changes": [
             "The upcoming detail line moves to the tone the past list already used.",
-            "Losing the repeated badge took roughly 700px off the page.",
-            "The scheduling card's two-line explainer went: its rows already read “✓ … is scheduled” or “+ Schedule next …”, so the explainer was forty pixels restating them."
+            "The repeated badge, the unbounded “Later” list and the explainer took 891px off the page between them — 3,786px to 2,895px — so the archive is about two flicks away instead of six.",
+            "The scheduling card's two-line explainer went: its rows already read “✓ … is scheduled” or “+ Schedule next …”, so the explainer was forty pixels restating them.",
+            "A past gathering's head count stops being the loudest mark in its row. It was set a full type step above the gathering it annotated, in the green that means “checked in right now” — so a list of finished nights read as a column of totals and the dates second, which is backwards when the dates are the only thing telling two rows apart."
           ]
         }
       ]

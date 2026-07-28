@@ -24,6 +24,7 @@ result portable back into `src/`.
 | `snapshot.ts` | The freeze: inlines every stylesheet, preserves the runtime custom properties and typed-in values, strips scripts, and appends an empty override block. |
 | `playwright.config.ts` | The end-to-end stack, at phone (390×844) and desktop (1440×900). |
 | `shoot.ts` | Renders prototype HTML to PNG. `-fold` is what fits without scrolling; `-full` is the whole page. |
+| `measure.ts` | Re-runs the walkthrough's measurements against the frozen scenes: how far each page scrolls, and whether it scrolls sideways. |
 | `baseline/` | The frozen app as it was. Never edited. |
 | `prototype/` | The working copy the ideation agent edits. |
 | `rounds/` | One directory per round: what the critics found, what the ideator did about it. |
@@ -51,3 +52,30 @@ npm run uxr:shoot -- uxr/prototype --out uxr/renders/r01
 ```
 
 The loop ends when a round produces no finding above `minor`.
+
+## The before/after page
+
+Once the result is ported into `src/`, the walkthrough is built from two fresh
+captures of the running app rather than from the prototypes — the prototypes
+drift from what actually shipped, and quoting their numbers is how the first
+version of the page came to be out by several hundred pixels.
+
+```bash
+git worktree add ../tally-before <the-commit-before-the-work>   # and copy this
+                                                                # harness into it
+UXR_OUT=before npm run uxr:capture   # in the worktree
+UXR_OUT=after  npm run uxr:capture   # here
+npm run uxr:measure                  # the numbers the page quotes
+npm run uxr:shoot -- uxr/before --out uxr/renders/before
+npm run uxr:shoot -- uxr/after  --out uxr/renders/after
+npm run uxr:shots                    # → docs/uxr/{before,after}/*.jpg
+npm run uxr:walkthrough              # build, then drag every slider to prove it moves
+```
+
+Both sides have to be captured by the same harness. The first before/after pair
+was not: the before frames came from an earlier revision of `capture.spec.ts`
+that froze Insights while the parent-contact lookup was still in flight, so half
+the page's "before" was a row of spinners reading *Looking up contact details…*
+and a tile reading *—*. The slider then appeared to show a design improving when
+part of what it showed was a page finishing loading.
+

@@ -351,7 +351,19 @@ const StudentListRow = memo(function StudentListRow({
         </span>
 
         <span className="min-w-0 flex-1 lg:flex lg:items-center lg:gap-4">
-          <span className="min-w-0 truncate text-base text-ink-50 lg:flex-1">
+          {/*
+            `block` is load-bearing, not tidiness.
+
+            `truncate` is `overflow: hidden` plus `white-space: nowrap`, and
+            overflow does not apply to a non-replaced *inline* box. Below `lg`
+            this span's parent is not a flex container, so without `block` the
+            name is inline: it refuses to wrap and is never clipped, and one
+            student with a very long name pushes the whole page sideways —
+            every other row's content off the right edge of a phone. It worked
+            before only because the span used to be a flex item, which
+            blockifies it.
+          */}
+          <span className="block min-w-0 truncate text-base text-ink-50 lg:flex-1">
             <span className="font-semibold">{student.firstName}</span>{' '}
             <span className="font-normal text-ink-300">{student.lastName}</span>
           </span>

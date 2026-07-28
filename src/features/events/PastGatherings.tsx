@@ -85,13 +85,25 @@ function AttendanceStat({ event, count }: { event: TallyEvent; count: number | u
     );
   }
 
+  /*
+   * A footnote, not the headline.
+   *
+   * This used to be `text-xl font-bold text-present-400` — a full type step
+   * above the gathering it annotated, in the green that means "this student is
+   * checked in right now". Squint at a list of these and you read
+   * "16 24 18 26 21" as a column and the names second, which is backwards: the
+   * thing being chosen is the gathering, and the count is a total from a night
+   * that is over. Demoting it also matters for the wrong-Friday risk — when two
+   * rows share a title, the date is the only discriminator, and it was the
+   * quietest mark in the row.
+   */
   return (
-    <span className="block text-right leading-none">
-      <span aria-hidden="true" className="text-xl font-bold tabular-nums text-present-400">
+    <span className="block text-right leading-tight">
+      <span aria-hidden="true" className="text-sm font-semibold tabular-nums text-ink-400">
         {count}
       </span>
       <span className="sr-only">{count} students checked in</span>
-      <span aria-hidden="true" className="mt-1 block text-[11px] leading-none text-ink-500">
+      <span aria-hidden="true" className="block text-[11px] leading-none text-ink-500">
         checked in
       </span>
     </span>
@@ -120,7 +132,9 @@ export function PastEventRow({
 
         <span className="min-w-0 flex-1">
           <span className="block truncate font-semibold text-ink-100">{event.title}</span>
-          <span className="mt-0.5 block truncate text-xs text-ink-500">
+          {/* A step closer than it was: with two series alternating down this
+              list, the date is the only thing telling one row from another. */}
+          <span className="mt-0.5 block truncate text-xs text-ink-400">
             {format(event.startAt, 'EEE d')} · {formatEventWindow(event)}
           </span>
         </span>

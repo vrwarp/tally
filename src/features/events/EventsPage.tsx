@@ -295,7 +295,20 @@ export function EventsPage() {
   const [editor, setEditor] = useState<EditorTarget | null>(null);
   const [uncancelling, setUncancelling] = useState<string | null>(null);
 
-  const { dayStart, today, thisWeek, later } = useMemo(() => {
+  /*
+   * How far "Later" reaches before it asks.
+   *
+   * The recurrence rules project months ahead, so "Later" was an unbounded
+   * list — sixteen rows and growing, alternating between two series, and the
+   * single thing setting the page's height. On a phone it put the past half six
+   * flicks away; on a laptop it made the two columns wildly different lengths,
+   * so the page collapsed back into one column with the other half blank. A
+   * month boundary rather than a row count, so it stays honest as the calendar
+   * fills.
+   */
+  const [allLater, setAllLater] = useState(false);
+
+  const { dayStart, today, thisWeek, later, laterHidden } = useMemo(() => {
     /*
      * The day boundary, not the current instant.
      *
@@ -314,13 +327,22 @@ export function EventsPage() {
         .filter((event) => event.startAt >= from && (to === null || event.startAt < to))
         .sort(byStart);
 
+    // The end of the month after this one: "the rest of this month and next".
+    const horizon = new Date(dayStart.getFullYear(), dayStart.getMonth() + 2, 1);
+
+    const everythingLater = between(weekEnd, null);
+    const nearLater = allLater
+      ? everythingLater
+      : everythingLater.filter((event) => event.startAt < horizon);
+
     return {
       dayStart,
       today: between(dayStart, dayEnd),
       thisWeek: between(dayEnd, weekEnd),
-      later: between(weekEnd, null),
+      later: nearLater,
+      laterHidden: everythingLater.length - nearLater.length,
     };
-  }, [events, now]);
+  }, [events, now, allLater]);
 
   const quickActions = useMemo(
     () =>
@@ -473,6 +495,18 @@ export function EventsPage() {
             onUncancel={onUncancel}
             uncancelling={uncancelling}
           />
+
+          {/* The same idiom `PastGatherings` uses at the other end of the
+              calendar, so both ends of the page ask the same way. */}
+          {laterHidden > 0 ? (
+            <button
+              type="button"
+              onClick={() => setAllLater(true)}
+              className="min-h-12 w-full rounded-xl bg-ink-900 text-sm font-semibold text-ink-300 ring-1 ring-ink-800 active:bg-ink-800"
+            >
+              Show {laterHidden} later {laterHidden === 1 ? 'gathering' : 'gatherings'}
+            </button>
+          ) : null}
         </section>
 
         <PastGatherings before={dayStart} />

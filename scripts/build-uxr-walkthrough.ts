@@ -50,7 +50,7 @@ function escapeHtml(value: string): string {
 /**
  * Marks the measurements.
  *
- * This document is an argument made out of numbers — 2,860px to 1,609px, nine
+ * This document is an argument made out of numbers — 3,293px to 1,623px, nine
  * names of forty-five — and the numbers are the part a reader checks. Setting
  * them in the utility face makes them findable while skimming without asking
  * the author to hand-tag every one.

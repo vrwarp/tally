@@ -90,7 +90,20 @@ export function EventHeroCard({
         {cancelled ? <Badge tone="danger">Cancelled</Badge> : null}
         {open ? <Badge tone="success">Check-in open</Badge> : null}
         {event.requiresRsvp ? <Badge tone="warn">RSVP only</Badge> : null}
-        <span className="text-xs text-ink-500">{eventStatusLine(event, now, present)}</span>
+        {/*
+          Said once.
+
+          A ringed green chip reading "Check-in open" sat 8px from grey text
+          reading "Check-in is open" — the same fact twice, which makes a reader
+          stop and check whether the second is qualifying the first. The badge is
+          the compact form and wins; the sentence is worth keeping in every other
+          state, where it says something no badge does ("Check-in opens at
+          7:00 PM", "Finished · 24 checked in"). The cancelled branch doubles up
+          the same way.
+        */}
+        {open || cancelled ? null : (
+          <span className="text-xs text-ink-500">{eventStatusLine(event, now, present)}</span>
+        )}
       </div>
 
       {/* Not a button. See the note at the top of this file. */}
