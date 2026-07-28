@@ -37,6 +37,16 @@ export interface StudentDraft {
   grade: Grade;
   notes?: string | null;
   status?: StudentStatus;
+  /**
+   * Whether this student is still new.
+   *
+   * Writable because until now nothing ever cleared it. It is set once, by the
+   * quick-add at a door, and read for the rest of a student's life by the
+   * dashboard's new-visitor list — so a student added in September was still
+   * being introduced as a visitor in March, and the badge came to mean "was new
+   * at some point". The roster's visitor badge is where somebody says otherwise.
+   */
+  isVisitor?: boolean;
 }
 
 /**
@@ -117,6 +127,7 @@ export async function updateStudent(
   if (patch.grade !== undefined) payload.grade = patch.grade;
   if (patch.notes !== undefined) payload.notes = patch.notes?.trim() || null;
   if (patch.status !== undefined) payload.status = patch.status;
+  if (patch.isVisitor !== undefined) payload.isVisitor = patch.isVisitor;
 
   // A document created purely to hold an annotation still needs enough identity
   // to be readable on its own — a bare `{ notes }` in Firestore is not

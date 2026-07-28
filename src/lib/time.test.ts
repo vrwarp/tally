@@ -10,6 +10,7 @@ import {
   addMinutes,
   atTimeOfDay,
   daysAgo,
+  formatSeenShort,
   fromDateTimeLocalValue,
   isCheckInOpen,
   nextSeriesOccurrence,
@@ -450,5 +451,56 @@ describe('datetime-local round-tripping', () => {
     expect(() => fromDateTimeLocalValue('2026-02-13')).toThrow(/Invalid datetime-local/);
     expect(() => fromDateTimeLocalValue('2026-02-13T19:00:00')).toThrow(/Invalid datetime-local/);
     expect(() => fromDateTimeLocalValue('2026-02-13 19:00')).toThrow(/Invalid datetime-local/);
+  });
+});
+
+describe('formatSeenShort', () => {
+  /** Fri 13 Feb 2026, 19:30 local — the same "now" the rest of the suite uses. */
+  const now = FRIDAY_EVENING;
+
+  it('names the day inside the last week, because that is the useful precision', () => {
+    expect(formatSeenShort(new Date(2026, 1, 13, 8, 0), now)).toBe('Today');
+    expect(formatSeenShort(new Date(2026, 1, 12, 19, 30), now)).toBe('Yesterday');
+    expect(formatSeenShort(new Date(2026, 1, 8, 10, 0), now)).toBe('Sun');
+    expect(formatSeenShort(new Date(2026, 1, 7, 10, 0), now)).toBe('Sat');
+  });
+
+  it('counts by calendar day, not by elapsed hours', () => {
+    // Twenty-three hours earlier, but a different date: a leader reading this
+    // means "which day", not "how many hours".
+    expect(formatSeenShort(new Date(2026, 1, 12, 20, 30), now)).toBe('Yesterday');
+    // Ninety minutes earlier, same date.
+    expect(formatSeenShort(new Date(2026, 1, 13, 18, 0), now)).toBe('Today');
+  });
+
+  it('coarsens to weeks from a week out, and keeps the singular singular', () => {
+    expect(formatSeenShort(new Date(2026, 1, 6, 19, 30), now)).toBe('1 wk ago');
+    expect(formatSeenShort(new Date(2026, 0, 23, 19, 30), now)).toBe('3 wks ago');
+    expect(formatSeenShort(new Date(2026, 0, 16, 19, 30), now)).toBe('4 wks ago');
+  });
+
+  it('lets weeks own everything under thirty days, whatever the calendar says', () => {
+    // 28 Jan -> 13 Feb is one calendar month by date-fns and sixteen days by
+    // the clock. Sixteen days is not "1 mth ago".
+    expect(formatSeenShort(new Date(2026, 0, 28, 19, 30), now)).toBe('2 wks ago');
+  });
+
+  it('switches to months at thirty days and to years at twelve', () => {
+    expect(formatSeenShort(new Date(2026, 0, 14, 19, 30), now)).toBe('1 mth ago');
+    expect(formatSeenShort(new Date(2025, 9, 13, 19, 30), now)).toBe('4 mths ago');
+    expect(formatSeenShort(new Date(2025, 1, 13, 19, 30), now)).toBe('1 yr ago');
+    expect(formatSeenShort(new Date(2023, 1, 13, 19, 30), now)).toBe('3 yrs ago');
+  });
+
+  it('does not describe a future date in the past tense', () => {
+    // A clock a few minutes out of step must not produce "-1 wks ago".
+    expect(formatSeenShort(new Date(2026, 1, 14, 9, 0), now)).toBe('Today');
+  });
+
+  it('stays inside the width the column is drawn at', () => {
+    const samples = [0, 1, 3, 6, 8, 20, 29, 45, 200, 400, 1200].map((days) =>
+      formatSeenShort(new Date(now.getTime() - days * 24 * 60 * 60 * 1000), now),
+    );
+    for (const sample of samples) expect(sample.length).toBeLessThanOrEqual(10);
   });
 });

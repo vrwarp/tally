@@ -135,6 +135,9 @@ export function toStudent(snapshot: DocumentSnapshot<DocumentData>): Student {
     fromPlanningCenter: false,
     profileComplete: false,
     hasAllergies: false,
+    // Planning Center's, like the two above it. A quick-added visitor genuinely
+    // has no birthday on file until their push lands and the roster answers.
+    birthday: null,
     searchName: str(data.searchName) || buildSearchName(firstName, lastName),
     firstAttendedAt: toDateOrNull(data.firstAttendedAt),
     lastAttendedAt: toDateOrNull(data.lastAttendedAt),
@@ -372,6 +375,10 @@ export function fromRosterPerson(person: PcoRosterPerson, now: Date): Student {
     fromPlanningCenter: true,
     profileComplete: person.profileComplete,
     hasAllergies: person.hasAllergies,
+    // `?? null` rather than a bare read: a roster parked in local storage by a
+    // build that predates this field comes back without it, and `undefined`
+    // would reach the badge as "not missing" and quietly say nothing.
+    birthday: person.birthday ?? null,
     searchName: person.searchName,
     firstAttendedAt: null,
     lastAttendedAt: null,

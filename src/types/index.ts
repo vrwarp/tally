@@ -182,6 +182,11 @@ export interface Student
   profileComplete: boolean | null;
   /** *That* there is an allergy, never what it is. See `PcoRosterPerson`. */
   hasAllergies: boolean;
+  /**
+   * The day of the year they have a birthday on, as `MM-DD`, or null when
+   * Planning Center holds no birthdate. Never the year — see `PcoRosterPerson`.
+   */
+  birthday: string | null;
 }
 
 /**
@@ -588,6 +593,16 @@ export interface PcoRosterPerson {
    * enough to render the badge that makes somebody look.
    */
   hasAllergies: boolean;
+  /**
+   * `MM-DD` — the day, never the year.
+   *
+   * A roster row asks two things of a birthday: is there cake this week, and
+   * has anybody ever filled this in. Neither needs a child's age or year of
+   * birth, which is the identifying half of a date of birth, so the year is
+   * dropped on the server rather than carried to every browser holding a
+   * roster. Null means Planning Center has no birthdate on file.
+   */
+  birthday: string | null;
 }
 
 /**

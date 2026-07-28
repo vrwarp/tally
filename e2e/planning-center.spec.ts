@@ -184,11 +184,14 @@ test.describe('Planning Center', () => {
     await signedInAs('core');
     await gotoReady(page, '/students');
 
-    // Scoped to the rows: the "add from Planning Center" dialog explains the
-    // 5th-grade case in prose, and matching that would prove nothing.
-    const rows = page.getByRole('link');
-    await rows.first().waitFor({ timeout: 30_000 });
-    await expect(rows.filter({ hasText: /5th grade/i })).toHaveCount(0);
+    // Matched on the rows' accessible names — "Amara Okonkwo, 8th grade" —
+    // rather than on page text, because the "add from Planning Center" dialog
+    // explains the 5th-grade case in prose and matching that would prove
+    // nothing.
+    await page.getByRole('link', { name: /\d+(st|nd|rd|th) grade$/ }).first().waitFor({
+      timeout: 30_000,
+    });
+    await expect(page.getByRole('link', { name: /5th grade$/ })).toHaveCount(0);
   });
 
   test('an unreachable Planning Center says so rather than showing an empty roster', async ({
@@ -238,7 +241,10 @@ test.describe('Planning Center', () => {
     await signedInAs('core');
     await gotoReady(page, '/students');
 
-    const first = page.getByRole('link').filter({ hasText: new RegExp(ROSTER_STUDENT) }).first();
+    // By accessible name rather than by text. A roster row's link is a layer
+    // over the whole row carrying the name — "Maya Adebayo, 9th grade" — so
+    // that the badges on it can be buttons; it has no text of its own to match.
+    const first = page.getByRole('link', { name: new RegExp(ROSTER_STUDENT) }).first();
     await first.waitFor({ timeout: 30_000 });
     await first.click();
 

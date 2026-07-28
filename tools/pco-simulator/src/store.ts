@@ -367,6 +367,8 @@ export class SimulatorStore {
     grade: number;
     nickname?: string | null;
     allergies?: string | null;
+    /** `YYYY-MM-DD`, or absent for a profile nobody has finished. */
+    birthdate?: string | null;
     status?: 'active' | 'inactive';
     parentName?: string | null;
     parentPhone?: string | null;
@@ -379,6 +381,7 @@ export class SimulatorStore {
       grade: input.grade,
       child: true,
       medical_notes: input.allergies ?? null,
+      birthdate: input.birthdate ?? null,
       status: input.status ?? 'active',
     });
     if (input.id) student.id = input.id;

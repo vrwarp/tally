@@ -176,6 +176,21 @@ describe('fetchRoster', () => {
     expect(people[0]?.hasAllergies).toBe(true);
   });
 
+  it('carries a birthday as a day of the year, never as a date of birth', async () => {
+    const { people } = await fetchRoster({
+      ...world,
+      config: baseConfig(),
+      personIds: YOUTH_IDS,
+    });
+
+    for (const person of people) {
+      // Either `MM-DD` or nothing. A four-digit year reaching a browser that
+      // holds the whole roster is the thing this shape exists to prevent.
+      if (person.birthday !== null) expect(person.birthday).toMatch(/^\d{2}-\d{2}$/);
+    }
+    expect(people.some((person) => person.birthday !== null)).toBe(true);
+  });
+
   it('shows the name the way the Planning Center profile shows it', async () => {
     const { people } = await fetchRoster({
       ...world,

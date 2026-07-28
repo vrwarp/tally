@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  birthdayOf,
   buildIncludedIndex,
   compareIds,
   displayFirstName,
@@ -179,6 +180,23 @@ describe('mapPersonToStudent', () => {
     expect(mapPersonToStudent(person('1', { medical_notes: 'Peanuts' }), RANGE).allergies).toBe('Peanuts');
     expect(mapPersonToStudent(person('1', { medical_notes: '   ' }), RANGE).allergies).toBeNull();
     expect(mapPersonToStudent(person('1', {}), RANGE).allergies).toBeNull();
+  });
+
+  it('carries the day of a birthday and drops the year', () => {
+    // The year is the identifying half of a date of birth and no badge needs
+    // it, so it does not leave the server. See `birthdayOf`.
+    expect(mapPersonToStudent(person('1', { birthdate: '2011-03-14' }), RANGE).birthday).toBe('03-14');
+    expect(birthdayOf(person('1', { birthdate: '2011-03-14T00:00:00Z' }))).toBe('03-14');
+  });
+
+  it('treats an unfilled or unparseable birthdate as no birthday at all', () => {
+    // Which is the case the roster's "no birthday" chip exists to surface: a
+    // half-typed date upstream should read as missing, not as some arbitrary day.
+    expect(birthdayOf(person('1', {}))).toBeNull();
+    expect(birthdayOf(person('1', { birthdate: null }))).toBeNull();
+    expect(birthdayOf(person('1', { birthdate: '   ' }))).toBeNull();
+    expect(birthdayOf(person('1', { birthdate: '14/03/2011' }))).toBeNull();
+    expect(birthdayOf(person('1', { birthdate: '2011-13-40' }))).toBeNull();
   });
 
   it('treats an inactivated person as inactive however it is spelled', () => {
