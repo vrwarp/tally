@@ -464,8 +464,19 @@ const StudentListRow = memo(function StudentListRow({
           one fact every row shares, at a different x on every row, which is the
           precise thing this lane was given a fixed width to stop.
         */}
-        <span className="relative z-10 mt-0.5 flex items-center gap-2 text-xs text-ink-500 lg:mt-0 lg:min-w-80 lg:shrink-0">
-          <span className="truncate lg:w-20 lg:shrink-0 lg:text-right">
+        <span className="relative z-10 mt-0.5 flex flex-wrap items-center gap-2 text-xs text-ink-500 lg:mt-0 lg:min-w-80 lg:shrink-0 lg:flex-nowrap">
+          {/*
+            Never the thing that gives way.
+
+            On a phone this line is the width of a card, and three badges on it
+            used to squeeze the grade until it truncated — "7…" on the one row
+            in the list that most needed reading, because a row wearing three
+            flags is a row somebody is looking at. It holds its width now and
+            the badges wrap beneath it instead, which costs a few pixels of
+            height on a handful of rows and costs the grade nothing. The wrap is
+            only below `lg`; the wide layout has a lane for this.
+          */}
+          <span className="shrink-0 lg:w-20 lg:text-right">
             {ordinalGrade(student.grade)} grade
           </span>
           <span className="hidden lg:block lg:flex-1" />
@@ -655,12 +666,23 @@ function BirthdayBadge({
      */
     if (!student.pcoPersonId) return null;
 
+    /*
+     * Desk work, so: the wide layout only.
+     *
+     * The other three faces are about a person — there is cake this week, or
+     * there was and nobody said anything — and they belong wherever the roster
+     * is being read. This one is about a record, and filling it in means being
+     * in Planning Center with a keyboard. On a phone it would be the most
+     * common badge in the list and the least actionable thing in it, crowding
+     * the two that a counselor actually stops for.
+     */
     return (
       <Badge
         tone="neutral"
         title="Planning Center holds no birthdate for this student"
         onPress={onPress}
         pressLabel={`No birthday on file for ${name}`}
+        className="hidden lg:inline-flex"
       >
         No birthday
       </Badge>
