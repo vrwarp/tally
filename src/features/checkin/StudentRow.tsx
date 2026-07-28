@@ -52,9 +52,13 @@ export function StudentRow({
         className={cn(
           'flex min-h-16 w-full items-center gap-3 rounded-xl px-3 py-2 text-left ring-1 transition-colors',
           'disabled:opacity-60',
+          // Hover is the pointer's version of the press state. Without it the
+          // roster was the one list in the app that gave a mouse nothing back —
+          // the student directory, the MIA list and the calendar all respond —
+          // on the screen where the tap has the largest consequence.
           attendance
-            ? 'bg-present-500/10 ring-present-500/30 active:bg-present-500/20'
-            : 'bg-ink-900 ring-ink-800 active:bg-ink-800',
+            ? 'bg-present-500/10 ring-present-500/30 hover:bg-present-500/20 active:bg-present-500/20'
+            : 'bg-ink-900 ring-ink-800 hover:bg-ink-800 active:bg-ink-800',
           flashing && 'animate-flash',
         )}
       >

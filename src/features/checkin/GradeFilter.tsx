@@ -118,7 +118,7 @@ export function GradeFilter({ grades, onChange }: GradeFilterProps) {
           'flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-xs font-semibold ring-1 transition-colors pointer-fine:min-h-9',
           active
             ? 'bg-brand-500/20 text-brand-200 ring-brand-500/40'
-            : 'bg-ink-900 text-ink-400 ring-ink-800 active:bg-ink-800',
+            : 'bg-ink-900 text-ink-400 ring-ink-800 hover:bg-ink-800 active:bg-ink-800',
         )}
       >
         {summarise(grades)}
@@ -176,7 +176,7 @@ function Option({
   onToggle: () => void;
 }) {
   return (
-    <label className="flex min-h-11 cursor-pointer items-center gap-2.5 px-3 text-sm text-ink-200 active:bg-ink-800">
+    <label className="flex min-h-11 cursor-pointer items-center gap-2.5 px-3 text-sm text-ink-200 hover:bg-ink-800 active:bg-ink-800">
       <input
         type="checkbox"
         checked={checked}

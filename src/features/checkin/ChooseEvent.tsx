@@ -19,6 +19,7 @@
  */
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { PageFrame } from '@/components/PageFrame';
 import { EmptyState } from '@/components/ui';
 import { useAuth } from '@/context/authContext';
 import { EventHeroCard } from '@/features/events/EventHeroCard';
@@ -109,7 +110,10 @@ export function ChooseEvent({ events, now }: ChooseEventProps) {
   }, [events, now]);
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 pt-4 pb-8">
+    /* Same frame as every other screen, and the same `widen: false` as the
+       roster it leads to — these two are one tab and must not move under a
+       counselor who taps from one to the other. */
+    <PageFrame widen={false} gap="lg" className="pb-8">
       {today.length > 0 ? (
         <section aria-labelledby="choose-heading">
           <h1 id="choose-heading" className="pb-1 text-xl font-bold text-ink-50">
@@ -147,7 +151,7 @@ export function ChooseEvent({ events, now }: ChooseEventProps) {
             can('core') ? (
               <Link
                 to="/events"
-                className="inline-flex min-h-11 items-center rounded-xl bg-ink-800 px-4 text-sm font-semibold text-ink-100 ring-1 ring-ink-700"
+                className="inline-flex min-h-11 items-center rounded-xl bg-ink-800 px-4 text-sm font-semibold text-ink-100 ring-1 ring-ink-700 hover:bg-ink-700"
               >
                 Go to events
               </Link>
@@ -157,6 +161,6 @@ export function ChooseEvent({ events, now }: ChooseEventProps) {
       )}
 
       <CatchUp before={dayStart} />
-    </div>
+    </PageFrame>
   );
 }

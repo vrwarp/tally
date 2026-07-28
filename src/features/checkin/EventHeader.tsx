@@ -40,8 +40,11 @@ export function EventHeader({
     : [event, ...selectableEvents];
 
   return (
-    <div className="pt-2">
-      <div className="flex items-start gap-3 px-3">
+    <div>
+      {/* The gutter is the page's, not this component's — see `BAND` in
+          `CheckInPage`. Every band on the screen shares one left edge, and it
+          is the same edge Insights, Events and Students start at. */}
+      <div className="flex items-start gap-3">
         {/* Small, and only here: the header scrolls away, so the icon's job is
             to make "am I in the right gathering?" answerable at a glance rather
             than to decorate a screen a counselor is about to work down. */}
@@ -79,7 +82,7 @@ export function EventHeader({
         at the leading edge and the pair sits together, so proximity says what
         the styling says.
       */}
-      <div className="mt-2 flex items-center gap-2 px-3">
+      <div className="mt-2 flex items-center gap-2">
         {isToday ? (
           <Badge tone="neutral" title="This gathering is on today">
             Today
@@ -96,7 +99,7 @@ export function EventHeader({
             second guess at the answer. */}
         <Link
           to="/"
-          className="ml-auto flex min-h-11 shrink-0 items-center rounded-full bg-ink-900 px-3 text-xs font-semibold text-brand-300 ring-1 ring-ink-700 active:bg-ink-800 pointer-fine:min-h-9"
+          className="ml-auto flex min-h-11 shrink-0 items-center rounded-full bg-ink-900 px-3 text-xs font-semibold text-brand-300 ring-1 ring-ink-700 hover:bg-ink-800 active:bg-ink-800 pointer-fine:min-h-9"
         >
           Change
         </Link>
@@ -116,7 +119,7 @@ export function EventHeader({
       </div>
 
       {!open ? (
-        <p className="mt-2 px-3 text-[11px] text-warn-400">
+        <p className="mt-2 text-[11px] text-warn-400">
           Check-in window is closed — you can still record attendance.
         </p>
       ) : null}
