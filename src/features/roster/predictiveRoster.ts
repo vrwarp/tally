@@ -42,6 +42,8 @@ import type {
  * prediction thought of them: a visitor quick-added mid-queue has to be visible
  * without the counselor changing filters, and an accidental tap has to stay
  * reachable so it can be undone.
+ *
+ * Undoing that tap must not take the row away either — see `pinned`.
  */
 export type RosterFocus = 'all' | 'recent' | 'checkedIn';
 
@@ -172,7 +174,9 @@ export function buildSeriesHistory(
  *
  * Anyone already checked in is always eligible regardless of the above. A
  * student who was checked in by mistake, or who turned up despite declining,
- * must remain visible so a counselor can see and undo it.
+ * must remain visible so a counselor can see and undo it — which is why
+ * `buildRoster` passes a pinned student here as checked in even once they are
+ * not.
  */
 export function isEligible(
   student: Student,
@@ -216,7 +220,26 @@ export interface BuildRosterInput {
   history: readonly EventAttendanceSnapshot[];
   settings: AppSettings;
   filters?: RosterFilters;
+  /**
+   * Students to keep on the roster whatever happens to their attendance.
+   *
+   * Checking somebody in pulls them onto the Recent list even when the
+   * prediction never expected them there. Undoing it used to drop them straight
+   * back off, which is exactly backwards: an undo is most often a correction of
+   * a mis-tap, and the row the counselor now needs is the one that just
+   * vanished. So the caller holds the ids it has seen checked in and passes
+   * them here, and they stay put — on Recent, and eligible for the roster at
+   * all — until the page is reloaded.
+   *
+   * Deliberately not persisted anywhere: it is a courtesy to the thumb in the
+   * middle of a correction, not a lasting claim that these students are
+   * regulars. Reload and the list is the prediction's again.
+   */
+  pinned?: ReadonlySet<string>;
 }
+
+/** Shared so an unpinned call allocates nothing per render. */
+const EMPTY_PINNED: ReadonlySet<string> = new Set();
 
 /**
  * Whether a requested focus can actually be honoured.
@@ -238,6 +261,7 @@ function resolveFocus(
 export function buildRoster(input: BuildRosterInput): RosterView {
   const { event, students, attendance, rsvps, settings } = input;
   const filters = input.filters ?? {};
+  const pinned = input.pinned ?? EMPTY_PINNED;
 
   const attendanceByStudent = new Map(attendance.map((record) => [record.studentId, record]));
   const rsvpByStudent = new Map(rsvps.map((record) => [record.studentId, record]));
@@ -264,7 +288,9 @@ export function buildRoster(input: BuildRosterInput): RosterView {
     const record = attendanceByStudent.get(student.id) ?? null;
     const rsvp = rsvpByStudent.get(student.id);
 
-    if (!isEligible(student, event, rsvp, record !== null)) continue;
+    const isPinned = pinned.has(student.id);
+
+    if (!isEligible(student, event, rsvp, record !== null || isPinned)) continue;
 
     // Scope filters narrow *who is on this counselor's roster*; they apply
     // before search so the counts below describe the slice being taken, not
@@ -295,8 +321,11 @@ export function buildRoster(input: BuildRosterInput): RosterView {
   const focus = resolveFocus(filters.focus ?? 'all', { isFiltered, recent: recentTotal });
 
   const entries = matched.filter((entry) => {
+    // `checkedIn` is a statement about right now and stays literal: a pinned
+    // student who has just been undone is precisely somebody who is *not* here.
     if (focus === 'checkedIn') return entry.attendance !== null;
-    if (focus === 'recent') return entry.isRecent || entry.attendance !== null;
+    if (focus === 'recent')
+      return entry.isRecent || entry.attendance !== null || pinned.has(entry.student.id);
     return true;
   });
 

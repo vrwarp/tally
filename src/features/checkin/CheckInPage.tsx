@@ -126,6 +126,43 @@ export function CheckInPage() {
   // the search box rather than to the top of the window.
   const searchBar = useHeightVar<HTMLDivElement>('--checkin-search-h');
 
+  /*
+   * Everybody this screen has seen checked in, for as long as it is open.
+   *
+   * Checking somebody in brings them onto the Recent list even when the
+   * prediction never expected them. Undoing it dropped them off again, and an
+   * undo is usually a mis-tap being corrected — so the row a counselor reaches
+   * for next was the one that had just disappeared out from under the thumb.
+   * Pinned ids keep it there until the page is reloaded.
+   *
+   * Derived from the attendance stream rather than from the tap handler, which
+   * costs nothing and covers the two cases a tap does not: a visitor arriving
+   * already checked in from the quick-add modal, and a student the *other*
+   * counselor's phone checked in a moment ago.
+   */
+  const [pinned, setPinned] = useState<ReadonlySet<string>>(() => new Set());
+
+  // A different gathering is a different queue: keep nothing from the last one.
+  // Guarded on the id it was built for rather than run on mount, so opening the
+  // screen does not spend a second render clearing a set that is already empty.
+  const pinnedFor = useRef(event?.id ?? null);
+  useEffect(() => {
+    const id = event?.id ?? null;
+    if (pinnedFor.current === id) return;
+    pinnedFor.current = id;
+    setPinned(new Set());
+  }, [event?.id]);
+
+  useEffect(() => {
+    setPinned((current) => {
+      const added = attendance.filter((record) => !current.has(record.studentId));
+      if (added.length === 0) return current;
+      const next = new Set(current);
+      for (const record of added) next.add(record.studentId);
+      return next;
+    });
+  }, [attendance]);
+
   const [flashing, setFlashing] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
@@ -155,8 +192,9 @@ export function CheckInPage() {
       history: snapshots,
       settings,
       filters: { query, grades, focus },
+      pinned,
     });
-  }, [event, students, attendance, rsvps, snapshots, settings, query, grades, focus]);
+  }, [event, students, attendance, rsvps, snapshots, settings, query, grades, focus, pinned]);
 
   /* ---- Waiting for the prediction ---------------------------------------- */
 

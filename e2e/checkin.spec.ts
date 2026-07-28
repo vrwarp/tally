@@ -344,6 +344,55 @@ test.describe('check-in', () => {
     await expect(page.getByRole('button', { name: new RegExp(`^Check in ${name},`) })).toBeVisible();
   });
 
+  /**
+   * The other half of the undo, on the filter the screen opens on.
+   *
+   * Checking somebody in pulls them onto Recent whether the prediction expected
+   * them or not. An undo is usually a mis-tap being corrected, so taking the row
+   * away again leaves the counselor hunting through filters for the student
+   * still standing in front of them — the row has to stay until the page is
+   * reloaded, which is when the list goes back to being the prediction's.
+   */
+  test('an unpredicted student stays on Recent after an undo, until a reload', async ({ page }) => {
+    await settledOnRecent(page);
+    const recent = page.getByRole('region', { name: /^Recent,/ });
+    await expect(recent).toBeVisible();
+    const regulars = new Set((await rosterRows(page)).map((row) => row.name));
+
+    await page.getByRole('button', { name: /^Show all \d+ students$/ }).click();
+    await expect(page.getByRole('region', { name: /^Roster,/ })).toBeVisible();
+    const outsider = (await rosterRows(page)).find(
+      (row) => !row.here && !regulars.has(row.name),
+    )?.name;
+    test.skip(!outsider, 'every student on this roster is a regular or already here');
+
+    await page
+      .getByRole('button', { name: new RegExp(`^Check in ${outsider},`) })
+      .first()
+      .click();
+    await page.getByRole('button', { name: /show likely regulars only/i }).click();
+
+    // On Recent because they are here, though nothing predicted them...
+    const undo = recent.getByRole('button', { name: new RegExp(`^Undo check-in for ${outsider}`) });
+    await expect(undo).toBeVisible();
+
+    await undo.click();
+
+    // ...and still on Recent now they are not.
+    await expect(
+      recent.getByRole('button', { name: new RegExp(`^Check in ${outsider},`) }),
+    ).toBeVisible();
+
+    // Nothing was written to make that true, so a reload hands the list back.
+    await reloadReady(page);
+    await settledOnRecent(page);
+    await expect(
+      page
+        .getByRole('region', { name: /^Recent,/ })
+        .getByRole('button', { name: new RegExp(`^Check in ${outsider},`) }),
+    ).toHaveCount(0);
+  });
+
   test('search filters instantly without appearing to lose students', async ({ page }) => {
     /*
      * The counts themselves, not the bar they sit in.

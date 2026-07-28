@@ -1012,6 +1012,66 @@ describe('buildRoster: focus', () => {
     expect(ids(view.entries)).toEqual([regular.id, visitor.id]);
   });
 
+  /**
+   * The undo case, and the reason `pinned` exists.
+   *
+   * An undo is nearly always a mis-tap being corrected. Dropping the row the
+   * moment the check-in went away sent the counselor hunting through filters
+   * for the student standing in front of them.
+   */
+  it('keeps a student on Recent once checked in, even after the undo', () => {
+    const view = roster({
+      students,
+      history,
+      attendance: [],
+      pinned: new Set([visitor.id]),
+      filters: { focus: 'recent' },
+    });
+
+    expect(ids(view.entries)).toEqual([regular.id, visitor.id]);
+    // Still not here, and still not a regular — only still on screen.
+    expect(view.entries[1]).toMatchObject({ isRecent: false, attendance: null });
+    expect(view.counts).toMatchObject({ present: 0, recent: 1 });
+  });
+
+  it('drops a pinned student from Checked in, which is about right now', () => {
+    const view = roster({
+      students,
+      history,
+      attendance: [],
+      pinned: new Set([visitor.id]),
+      filters: { focus: 'checkedIn' },
+    });
+
+    expect(ids(view.entries)).toEqual([]);
+  });
+
+  /**
+   * Eligibility has the same trapdoor: a student who is only on this roster
+   * because somebody checked them in — a declined RSVP, a lapsed profile —
+   * leaves it entirely on the undo, taking the way back with them.
+   */
+  it('keeps a pinned student who is otherwise ineligible', () => {
+    const trip = makeOneOff({ id: 'retreat', requiresRsvp: true });
+    const declined = makeStudent({ id: 'declined', lastName: 'Dale' });
+
+    const view = roster({
+      event: trip,
+      students: [declined],
+      rsvps: [makeRsvp({ studentId: declined.id, eventId: trip.id, status: 'no' })],
+      pinned: new Set([declined.id]),
+    });
+
+    expect(ids(view.entries)).toEqual([declined.id]);
+    expect(view.counts).toMatchObject({ eligible: 1, present: 0, absent: 1 });
+  });
+
+  it('ignores a pinned student who is not on this roster at all', () => {
+    const view = roster({ students, history, pinned: new Set(['someone-else']) });
+
+    expect(ids(view.entries)).toEqual([regular.id, stranger.id, visitor.id]);
+  });
+
   it('narrows to the students who are actually here', () => {
     const view = roster({ students, history, attendance, filters: { focus: 'checkedIn' } });
 
