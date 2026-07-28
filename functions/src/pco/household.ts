@@ -395,12 +395,21 @@ export async function addParent(options: AddParentOptions): Promise<AddParentRes
 
   const name = personName(parentPerson) ?? `${givenFirstName ?? ''} ${lastName}`.trim();
   const built = createdHousehold ? ' and a household to hold them' : '';
+  /*
+   * Four endings, because "nothing was written" means four different things to
+   * the person reading it. The one worth spelling out is the last pair: an adult
+   * the church already knew is usually already reachable, and telling somebody
+   * there are "no contact details yet" while the screen behind the toast shows a
+   * Call button is the kind of small lie that costs trust in the whole feature.
+   */
   const contact =
     wrote.length > 0
       ? ` with their ${wrote.join(' and ')}`
       : phone || email
         ? ' — the contact details were already on file'
-        : ', with no contact details yet';
+        : onFile.phone || onFile.email
+          ? ', who Planning Center already has a way to reach'
+          : ', with no contact details yet';
 
   return result(
     'added',

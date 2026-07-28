@@ -365,7 +365,7 @@ interface PersonDetailsResponse extends PersonDetails {
  * never asks for it.
  */
 export const getPersonDetails = onCall<
-  { pcoPersonId: string },
+  { pcoPersonId: string; force?: boolean },
   Promise<PersonDetailsResponse | null>
 >(
   { secrets: PCO_SECRETS, timeoutSeconds: 60, memory: '256MiB' },
@@ -387,6 +387,15 @@ export const getPersonDetails = onCall<
         config,
         cache: sharedCache(config),
         personId,
+        /*
+         * Asked for by a screen that has just written, and honoured because the
+         * alternative fails in the worst possible place. `addParent` drops this
+         * instance's cache when it succeeds, but the re-read that follows it is
+         * a *different* request and may land on a different instance, whose
+         * held answer still says this family has nobody in it — on the one
+         * screen whose entire subject is whether they do.
+         */
+        force: request.data?.force === true,
       });
       if (!details) return null;
 

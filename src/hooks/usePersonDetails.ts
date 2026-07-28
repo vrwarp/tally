@@ -12,7 +12,7 @@
  * Results are also memoised for the session, because a leader working down the
  * MIA list opens the same student more than once.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { getPersonDetails } from '@/services/functions';
 import { personIdFromStudentId, type PcoPersonDetails, type Student } from '@/types';
 
@@ -67,6 +67,17 @@ export function usePersonDetails(student: Student | null): PersonDetailsResult {
   const [error, setError] = useState<string | null>(null);
   /** Bumped by `retry`, purely to make the fetch effect run again. */
   const [attempt, setAttempt] = useState(0);
+  /*
+   * Whether the next read must skip the server's held answer too.
+   *
+   * Set only by `refresh`, and that asymmetry is the point: a retry follows a
+   * failure, where a few-seconds-old answer is a perfectly good one and cheaper
+   * than asking again. A refresh follows a *write*, where the held answer is
+   * the state from before the write and is the one thing on screen that is now
+   * wrong. Dropping the browser's memo alone is not enough — the answer is held
+   * on both sides of the wire.
+   */
+  const forceNext = useRef(false);
 
   // A different student means a different answer; anything held is not it.
   useEffect(() => {
@@ -83,7 +94,10 @@ export function usePersonDetails(student: Student | null): PersonDetailsResult {
     let stale = false;
     setLoading(true);
 
-    getPersonDetails({ pcoPersonId: personId })
+    const force = forceNext.current;
+    forceNext.current = false;
+
+    getPersonDetails({ pcoPersonId: personId, ...(force ? { force: true } : {}) })
       .then((response) => {
         if (stale) return;
         cache.set(key, response.data);
@@ -121,6 +135,7 @@ export function usePersonDetails(student: Student | null): PersonDetailsResult {
     // The memo is what the fetch effect checks before asking, so dropping it is
     // what turns the attempt bump below into a real read rather than a no-op.
     invalidatePersonDetails(key);
+    forceNext.current = true;
     setError(null);
     setAttempt((count) => count + 1);
   }, [key]);

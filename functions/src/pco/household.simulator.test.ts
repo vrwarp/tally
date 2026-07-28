@@ -252,6 +252,24 @@ describe('addParent against the simulator', () => {
       expect(h.store.people).toHaveLength(before + 1);
     });
 
+    /**
+     * The toast is read next to the screen it just changed. Saying "no contact
+     * details yet" about an adult the church has always been able to ring — and
+     * whose Call button is now right above the toast — reads as a failure.
+     */
+    it('says the parent is already reachable rather than that nobody is', async () => {
+      const rosa = h.store.people.find(
+        (person) => person.first_name === 'Rosa' && person.last_name === 'Delgado',
+      )!;
+
+      const result = await add({ personId: rosa.id });
+
+      expect(result.status).toBe('added');
+      expect(result.wrote).toEqual([]);
+      expect(result.message).toMatch(/already has a way to reach/);
+      expect(result.message).not.toMatch(/no contact details/);
+    });
+
     /** Never a second copy of a number the church already has for them. */
     it('leaves a contact detail the chosen adult already has alone', async () => {
       const rosa = h.store.people.find(

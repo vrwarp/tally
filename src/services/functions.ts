@@ -100,10 +100,22 @@ export const getRoster = httpsCallable<{ force?: boolean } | void, RosterRespons
  * Split from the roster so a door volunteer's device never receives a minor's
  * medical notes: the screen they are on does not ask.
  */
-export const getPersonDetails = httpsCallable<{ pcoPersonId: string }, PcoPersonDetails | null>(
-  functions,
-  'getPersonDetails',
-);
+export const getPersonDetails = httpsCallable<
+  {
+    pcoPersonId: string;
+    /**
+     * Skip the server's held answer.
+     *
+     * For after a *write*, and only then. The screens that add a parent or a
+     * number re-read the moment the write lands, which is well inside the few
+     * seconds a read may be reused for — and the answer they would get back is
+     * the one from before their own edit, on the one screen where that reads as
+     * "it did not work".
+     */
+    force?: boolean;
+  },
+  PcoPersonDetails | null
+>(functions, 'getPersonDetails');
 
 export interface ParentContactStatusResponse {
   /**

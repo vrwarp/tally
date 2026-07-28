@@ -52,7 +52,7 @@ const launchOptions = (executablePath: string | undefined) =>
  * opted in with `WALKTHROUGH=1` rather than ignored outright, so it can still
  * be run by path.
  */
-const SPEC_IGNORE = process.env.WALKTHROUGH ? [] : ['**/walkthrough.spec.ts'];
+const SPEC_IGNORE = process.env.WALKTHROUGH ? [] : ['**/*walkthrough.spec.ts'];
 
 const BROWSERS = [
   { name: 'chromium-desktop', use: { ...devices['Desktop Chrome'], ...launchOptions(chromiumExecutable) } },
