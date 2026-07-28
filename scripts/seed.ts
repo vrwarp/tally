@@ -439,7 +439,50 @@ const SIMULATOR_URL = proc.env.PCO_SIM_URL ?? 'http://127.0.0.1:4010';
  * Quick-added visitors are excluded — they exist only in Tally until a push
  * lands, which is exactly the state the write-back tests need.
  */
-function simulatorPayload(students: readonly BuiltStudent[]) {
+/**
+ * Whose birthday falls where, relative to the day the seed is run.
+ *
+ * The roster's birthday chips have three live states and a fourth for the
+ * blank, and a seeded ministry with fixed dates of birth would show none of the
+ * three for fifty-one weeks of the year. So three students are placed around
+ * today on purpose — one on it, one in the coming week, one just gone — and
+ * everybody else gets a date spread across the calendar.
+ *
+ * Keyed by name rather than by index so that reordering `SEED_STUDENTS` cannot
+ * silently move the demo off the students the walkthrough talks about.
+ */
+const BIRTHDAY_DAYS_FROM_TODAY: Record<string, number> = {
+  'Maya Adebayo': 0,
+  'Ethan Nguyen': 4,
+  'Grace Kim': -5,
+};
+
+/**
+ * A date of birth for one seeded student, or null.
+ *
+ * Every seventh student has none, because a ministry always has profiles
+ * somebody started and did not finish — which is the whole reason the roster
+ * says "no birthday" out loud rather than leaving the lane empty.
+ *
+ * The year is derived from the grade so an age is plausible if anybody looks.
+ * Tally is never sent it: the roster carries `MM-DD` and nothing else.
+ */
+function seedBirthdate(seed: SeedStudent, index: number, now: Date): string | null {
+  if (index % 7 === 3) return null;
+
+  const shift = BIRTHDAY_DAYS_FROM_TODAY[`${seed.first} ${seed.last}`];
+  const day =
+    shift === undefined
+      ? new Date(now.getFullYear(), 0, 1 + ((index * 29) % 365))
+      : new Date(now.getFullYear(), now.getMonth(), now.getDate() + shift);
+
+  const year = now.getFullYear() - (seed.grade + 6);
+  const month = String(day.getMonth() + 1).padStart(2, '0');
+  const date = String(day.getDate()).padStart(2, '0');
+  return `${year}-${month}-${date}`;
+}
+
+function simulatorPayload(students: readonly BuiltStudent[], now: Date) {
   return {
     empty: true,
     students: students
@@ -457,6 +500,7 @@ function simulatorPayload(students: readonly BuiltStudent[]) {
           lastName: seed.last,
           grade: seed.grade,
           allergies: seed.allergies ?? null,
+          birthdate: seedBirthdate(seed, index, now),
           status: seed.band === 'inactive' ? ('inactive' as const) : ('active' as const),
           parentName: seed.parent ?? null,
           parentPhone: contact === 'phone' || contact === 'both' ? parentPhone(index) : null,
@@ -484,12 +528,15 @@ function simulatorPayload(students: readonly BuiltStudent[]) {
  * looking at events rather than at people. It says so loudly instead, because
  * an empty roster with no explanation looks exactly like a broken app.
  */
-async function seedPlanningCenter(students: readonly BuiltStudent[]): Promise<number | null> {
+async function seedPlanningCenter(
+  students: readonly BuiltStudent[],
+  now: Date,
+): Promise<number | null> {
   try {
     const response = await fetch(`${SIMULATOR_URL}/_sim/seed`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(simulatorPayload(students)),
+      body: JSON.stringify(simulatorPayload(students, now)),
     });
     if (!response.ok) {
       throw new Error(`HTTP ${response.status} ${await response.text()}`);
@@ -1139,7 +1186,7 @@ async function main(): Promise<void> {
 
   // The roster is Planning Center's, so seeding Firestore alone leaves the app
   // with events and no people.
-  const seededPeople = await seedPlanningCenter(students);
+  const seededPeople = await seedPlanningCenter(students, now);
 
   report({ target, now, writes, events, students, attendance, rsvps, seededPeople });
 }

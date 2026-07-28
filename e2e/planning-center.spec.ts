@@ -241,7 +241,10 @@ test.describe('Planning Center', () => {
     await signedInAs('core');
     await gotoReady(page, '/students');
 
-    const first = page.getByRole('link').filter({ hasText: new RegExp(ROSTER_STUDENT) }).first();
+    // By accessible name rather than by text. A roster row's link is a layer
+    // over the whole row carrying the name — "Maya Adebayo, 9th grade" — so
+    // that the badges on it can be buttons; it has no text of its own to match.
+    const first = page.getByRole('link', { name: new RegExp(ROSTER_STUDENT) }).first();
     await first.waitFor({ timeout: 30_000 });
     await first.click();
 

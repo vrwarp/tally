@@ -457,11 +457,18 @@ const StudentListRow = memo(function StudentListRow({
           the rows everybody has, and grows into the note's space on the rare
           row carrying four flags at once, instead of overflowing them back
           across the columns to its left.
+
+          The grade sits at the lane's leading edge and the badges are pushed to
+          its trailing edge by a spacer that takes the slack. Packed together
+          against the right instead, the grade moved with the badge count — the
+          one fact every row shares, at a different x on every row, which is the
+          precise thing this lane was given a fixed width to stop.
         */}
-        <span className="relative z-10 mt-0.5 flex items-center gap-2 text-xs text-ink-500 lg:mt-0 lg:min-w-80 lg:shrink-0 lg:justify-end">
+        <span className="relative z-10 mt-0.5 flex items-center gap-2 text-xs text-ink-500 lg:mt-0 lg:min-w-80 lg:shrink-0">
           <span className="truncate lg:w-20 lg:shrink-0 lg:text-right">
             {ordinalGrade(student.grade)} grade
           </span>
+          <span className="hidden lg:block lg:flex-1" />
 
           {student.isVisitor ? (
             <Badge
@@ -637,6 +644,17 @@ function BirthdayBadge({
   const name = student.firstName;
 
   if (state === 'missing') {
+    /*
+     * Not on a student Planning Center has never heard of.
+     *
+     * A quick-added visitor has no birthday for the same reason they have no
+     * anything: their push has not landed. "Queued" already says that, and it
+     * is the chip with the action on it — so this one would be a second way of
+     * saying the same sentence, on precisely the rows that are already carrying
+     * the most badges.
+     */
+    if (!student.pcoPersonId) return null;
+
     return (
       <Badge
         tone="neutral"

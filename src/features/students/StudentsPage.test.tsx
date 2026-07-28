@@ -211,7 +211,7 @@ describe('StudentsPage note snippet', () => {
 
 describe('StudentsPage birthday badges', () => {
   const withBirthday = (birthday: string | null, firstName = 'Bea') =>
-    makeStudent({ id: 's1', firstName, lastName: 'Okafor', birthday });
+    makeStudent({ id: 'pco_7', firstName, lastName: 'Okafor', pcoPersonId: '7', birthday });
 
   it('marks the day itself', () => {
     renderRoster([withBirthday('03-14')]);
@@ -237,6 +237,24 @@ describe('StudentsPage birthday badges', () => {
   it('says so when Planning Center holds no birthdate', () => {
     renderRoster([withBirthday(null)]);
     expect(within(row(/Bea/)).getByText('No birthday')).toBeInTheDocument();
+  });
+
+  it('does not say it about a student Planning Center has never heard of', () => {
+    // A quick-added visitor has no birthday for the same reason they have no
+    // anything: their push has not landed. "Queued" already says that, and it
+    // is the chip with the action on it.
+    renderRoster([
+      makeStudent({
+        id: 'tally-1',
+        firstName: 'Kylie',
+        lastName: 'Novak',
+        pcoPersonId: null,
+        birthday: null,
+      }),
+    ]);
+
+    expect(within(row(/Kylie/)).queryByText('No birthday')).not.toBeInTheDocument();
+    expect(within(row(/Kylie/)).getByText('Queued')).toBeInTheDocument();
   });
 
   it('says nothing at all the rest of the year', () => {
