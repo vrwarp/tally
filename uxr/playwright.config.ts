@@ -102,7 +102,22 @@ export default defineConfig({
         PCO_CACHE_TTL_SECONDS: '5',
       },
       cwd: repoRoot,
-      reuseExistingServer: true,
+      /*
+       * Never adopt an emulator suite this run did not start.
+       *
+       * Readiness is taken from Firestore (see above), and Firestore is the one
+       * emulator that reliably outlives a killed run — the CLI leaves its JVM
+       * behind. So a leftover answers on 8080, Playwright concludes the stack is
+       * up, skips starting it, and `globalSetup` then dies on Auth. That cost
+       * this capture two runs, and the second time it was a *silent* hazard: had
+       * Auth happened to survive too, the exercise would have photographed the
+       * app against a stale seed and nothing would have said so.
+       *
+       * With reuse off, a leftover is a port-in-use error naming the port. A
+       * loud failure beats a wrong capture, and this config is a photographer,
+       * not an inner-loop test run.
+       */
+      reuseExistingServer: false,
       timeout: 420_000,
       stdout: 'pipe',
       stderr: 'pipe',
