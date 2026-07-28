@@ -8,6 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   formatPhone,
+  formatPhoneInput,
   initials,
   matchesQuery,
   normalizeForSearch,
@@ -208,6 +209,40 @@ describe('formatPhone', () => {
   it('renders an absent number as an empty string', () => {
     expect(formatPhone(null)).toBe('');
     expect(formatPhone('')).toBe('');
+  });
+});
+
+describe('formatPhoneInput', () => {
+  it('groups a number as it is typed', () => {
+    expect(formatPhoneInput('')).toBe('');
+    expect(formatPhoneInput('5')).toBe('5');
+    expect(formatPhoneInput('555')).toBe('555');
+    expect(formatPhoneInput('5550')).toBe('555-0');
+    expect(formatPhoneInput('555010')).toBe('555-010');
+    expect(formatPhoneInput('5550100')).toBe('555-010-0');
+    expect(formatPhoneInput('5550100123')).toBe('555-010-0123');
+  });
+
+  it('keeps only the digits out of anything else', () => {
+    expect(formatPhoneInput('abc')).toBe('');
+    expect(formatPhoneInput('(555) 010-0123')).toBe('555-010-0123');
+    expect(formatPhoneInput('555.010.0123')).toBe('555-010-0123');
+    expect(formatPhoneInput('call 5550100123 x')).toBe('555-010-0123');
+  });
+
+  it('reads an eleventh leading 1 as a country code', () => {
+    expect(formatPhoneInput('15550100123')).toBe('555-010-0123');
+    expect(formatPhoneInput('+1 (555) 010-0123')).toBe('555-010-0123');
+  });
+
+  it('ignores digits past the tenth', () => {
+    expect(formatPhoneInput('555010012345')).toBe('555-010-0123');
+    // The country code came off first, so eleven digits still leave ten.
+    expect(formatPhoneInput('1555010012399')).toBe('555-010-0123');
+  });
+
+  it('is idempotent, so re-formatting its own output changes nothing', () => {
+    expect(formatPhoneInput(formatPhoneInput('5550100123'))).toBe('555-010-0123');
   });
 });
 

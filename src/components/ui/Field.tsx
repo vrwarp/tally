@@ -1,5 +1,14 @@
-import { useId, useRef, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
-import { cn, haptic } from '@/lib/utils';
+import {
+  useId,
+  useLayoutEffect,
+  useRef,
+  type InputHTMLAttributes,
+  type ReactNode,
+  type RefObject,
+  type SelectHTMLAttributes,
+  type TextareaHTMLAttributes,
+} from 'react';
+import { cn, formatPhoneInput, haptic } from '@/lib/utils';
 
 /*
  * Two sizes, chosen by pointer rather than by viewport.
@@ -100,6 +109,12 @@ export interface TextFieldProps extends Omit<InputHTMLAttributes<HTMLInputElemen
    * Reads `value`, so it only does anything on a controlled field.
    */
   onClear?: () => void;
+  /**
+   * A second handle on the input, for a field that has to drive the caret —
+   * `PhoneField` below is the one that does. The clear button keeps its own
+   * handle either way, so this cannot take the keyboard focus away from it.
+   */
+  inputRef?: RefObject<HTMLInputElement | null>;
 }
 
 export function TextField({
@@ -111,6 +126,7 @@ export function TextField({
   required,
   onClear,
   onKeyDown,
+  inputRef: externalRef,
   ...rest
 }: TextFieldProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -152,7 +168,10 @@ export function TextField({
             </span>
           ) : null}
           <input
-            ref={inputRef}
+            ref={(node) => {
+              inputRef.current = node;
+              if (externalRef) externalRef.current = node;
+            }}
             id={id}
             aria-describedby={describedBy}
             aria-invalid={error ? true : undefined}
@@ -197,6 +216,111 @@ export function TextField({
       )}
     </FieldShell>
   );
+}
+
+export interface PhoneFieldProps
+  extends Omit<TextFieldProps, 'value' | 'onChange' | 'type' | 'inputMode' | 'inputRef'> {
+  value: string;
+  /** Called with the already-formatted value — never with what was typed. */
+  onValueChange: (value: string) => void;
+}
+
+/**
+ * A phone number, held in one shape.
+ *
+ * The field takes digits and nothing else, and prints them as `XXX-XXX-XXXX`
+ * while they are being typed. Two reasons it formats here rather than on blur or
+ * on save: a number is read back off this screen by somebody about to ring it,
+ * and every number in the app is printed grouped — a field that accepted
+ * `5105550142` unbroken was the one place a leader had to count digits.
+ *
+ * The rest of this is caret work, and it exists because reformatting a
+ * controlled input on every keystroke otherwise throws the cursor to the end of
+ * the value: editing the area code of a number already typed would move the
+ * caret past the last digit on the first keystroke. So each edit records which
+ * digit the caret was sitting after, and puts it back after that same digit once
+ * the new value has rendered.
+ */
+export function PhoneField({ value, onValueChange, onKeyDown, className, ...rest }: PhoneFieldProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const caret = useRef<number | null>(null);
+
+  const applyCaret = () => {
+    const node = inputRef.current;
+    if (!node || caret.current === null) return;
+    node.setSelectionRange(caret.current, caret.current);
+    caret.current = null;
+  };
+
+  useLayoutEffect(applyCaret);
+
+  /** Re-format, then aim the caret at the far side of the same digit. */
+  const commit = (next: string, digitsBefore: number) => {
+    const formatted = formatPhoneInput(next);
+    caret.current = caretAfterDigits(formatted, digitsBefore);
+    onValueChange(formatted);
+    // Nothing changed — a letter, or an eleventh digit — so no render is coming
+    // to run the layout effect. React restores the input's own value at the end
+    // of this event; the microtask lands after that.
+    if (formatted === value) queueMicrotask(applyCaret);
+  };
+
+  return (
+    <TextField
+      {...rest}
+      inputRef={inputRef}
+      type="tel"
+      inputMode="tel"
+      value={value}
+      // 12 characters is a full `XXX-XXX-XXXX`. The formatter already refuses to
+      // return more; this stops the browser accepting a longer paste first.
+      maxLength={12}
+      className={cn('tabular-nums', className)}
+      onChange={(event) => {
+        const node = event.target;
+        const pos = node.selectionStart ?? node.value.length;
+        commit(node.value, digitCount(node.value.slice(0, pos)));
+      }}
+      onKeyDown={(event) => {
+        onKeyDown?.(event);
+        if (event.defaultPrevented) return;
+
+        const { selectionStart: start, selectionEnd: end } = event.currentTarget;
+        if (start === null || start !== end) return;
+
+        /*
+         * A dash is ours, not something anybody typed, so a delete key aimed at
+         * one has to take the digit behind it instead. Left alone, the formatter
+         * would put the dash straight back and the key would appear dead.
+         */
+        if (event.key === 'Backspace' && start >= 2 && !isDigit(value[start - 1])) {
+          event.preventDefault();
+          commit(value.slice(0, start - 2) + value.slice(start), digitCount(value.slice(0, start - 2)));
+        } else if (event.key === 'Delete' && start < value.length - 1 && !isDigit(value[start])) {
+          event.preventDefault();
+          commit(value.slice(0, start) + value.slice(start + 2), digitCount(value.slice(0, start)));
+        }
+      }}
+    />
+  );
+}
+
+function isDigit(char: string | undefined): boolean {
+  return char !== undefined && char >= '0' && char <= '9';
+}
+
+function digitCount(text: string): number {
+  return text.replace(/\D/g, '').length;
+}
+
+/** The offset just past the `count`-th digit of `text`. */
+function caretAfterDigits(text: string, count: number): number {
+  if (count <= 0) return 0;
+  let seen = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    if (isDigit(text[i]) && ++seen === count) return i + 1;
+  }
+  return text.length;
 }
 
 export interface NumberStepperFieldProps {

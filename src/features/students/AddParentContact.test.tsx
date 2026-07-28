@@ -113,9 +113,11 @@ describe('AddParentContact', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Save to Planning Center' }));
 
       await waitFor(() => expect(onAdded).toHaveBeenCalled());
+      // Typed with the punctuation somebody's own phone shows; sent in the one
+      // shape every phone field in Tally holds.
       expect(setParentContact).toHaveBeenCalledWith({
         studentId: 'pco_4200014',
-        phone: '(510) 555-0142',
+        phone: '510-555-0142',
         email: null,
       });
       expect(show).toHaveBeenCalledWith('Added phone for Wen Lee in Planning Center.', {
@@ -205,7 +207,7 @@ describe('AddParentContact', () => {
 
       expect(await screen.findByText(/Could not reach Planning Center/)).toBeInTheDocument();
       // Retyping a number because the wifi dropped is the thing worth avoiding.
-      expect(screen.getByLabelText('Parent phone')).toHaveValue('(510) 555-0142');
+      expect(screen.getByLabelText('Parent phone')).toHaveValue('510-555-0142');
       expect(onAdded).not.toHaveBeenCalled();
     });
   });
@@ -270,7 +272,7 @@ describe('AddParentContact', () => {
         personId: null,
         firstName: 'Dana',
         lastName: 'Lee',
-        phone: '(510) 555-0142',
+        phone: '510-555-0142',
         email: null,
         createNew: false,
       });
