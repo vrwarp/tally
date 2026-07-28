@@ -276,6 +276,76 @@ export class SimulatorStore {
   }
 
   /**
+   * `POST /households`.
+   *
+   * The real endpoint takes the name and primary contact as attributes and the
+   * members as a JSON:API relationship, so that is what this reads. Everybody
+   * named in `people` gets a membership; the primary contact is recorded as the
+   * parent or guardian and everyone else as a dependent, which is the shape a
+   * household created from Tally's add-a-parent form actually has.
+   */
+  createHousehold(input: {
+    attributes: Record<string, unknown>;
+    memberIds: readonly string[];
+  }): SimHousehold | undefined {
+    const primaryId = optionalString(input.attributes.primary_contact_id) ?? input.memberIds[0];
+    const primary = primaryId ? this.personById(primaryId) : undefined;
+    if (!primary) return undefined;
+
+    const household: SimHousehold = {
+      id: `H${this.org.households.length + 1000}`,
+      name: optionalString(input.attributes.name) ?? `${primary.last_name} Household`,
+      primary_contact_id: primary.id,
+      primary_contact_name: `${primary.first_name} ${primary.last_name}`.trim(),
+    };
+    this.org.households.push(household);
+
+    const members = new Set([primary.id, ...input.memberIds]);
+    for (const memberId of members) {
+      this.addHouseholdMember(household.id, {
+        person_id: memberId,
+        household_role: memberId === primary.id ? 'parent_guardian' : 'child_or_dependent',
+      });
+    }
+
+    return household;
+  }
+
+  /**
+   * `POST /households/{id}/household_memberships`.
+   *
+   * Returns the membership already on file rather than a second one when the
+   * person is in this household twice over — the real API rejects the duplicate,
+   * and either way what a caller must never get is two links between the same
+   * pair.
+   */
+  addHouseholdMember(
+    householdId: string,
+    attributes: Record<string, unknown>,
+  ): SimHouseholdMembership | undefined {
+    const household = this.householdById(householdId);
+    const person = this.personById(optionalString(attributes.person_id) ?? '');
+    if (!household || !person) return undefined;
+
+    const existing = this.org.memberships.find(
+      (membership) => membership.household_id === householdId && membership.person_id === person.id,
+    );
+    if (existing) return existing;
+
+    const membership: SimHouseholdMembership = {
+      id: `M${this.org.memberships.length + 1000}`,
+      household_id: householdId,
+      person_id: person.id,
+      household_role:
+        optionalString(attributes.household_role) ?? (person.child ? 'child_or_dependent' : 'adult'),
+      person_name: `${person.first_name} ${person.last_name}`.trim(),
+      pending: attributes.pending === true,
+    };
+    this.org.memberships.push(membership);
+    return membership;
+  }
+
+  /**
    * Adds a whole family in one go: the student, a parent, the household that
    * ties them together, and the contact details on the parent.
    *

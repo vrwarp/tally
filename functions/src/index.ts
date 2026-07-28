@@ -32,6 +32,7 @@ import {
   type StudentProfilePatch,
   type UpdateStudentProfileResult,
 } from './pco/profile.js';
+import { addParent as addParentUpstream, type AddParentResult } from './pco/household.js';
 import {
   fetchParentContactStatus,
   fetchPersonDetails,
@@ -344,6 +345,15 @@ interface PersonDetailsResponse extends PersonDetails {
    * them would lock a perfectly editable name behind a missing family.
    */
   profileWritable: boolean;
+  /**
+   * Whether Tally may build this student a family — create the parent, and the
+   * household if there is none — which is `full` *and* nobody there yet.
+   *
+   * The second half is not a UI nicety: `addParent` refuses outright once an
+   * adult is on file, because adding a second one from a form whose premise was
+   * "nobody can be reached" is how a household ends up with two mothers.
+   */
+  parentCreatable: boolean;
 }
 
 /**
@@ -393,6 +403,7 @@ export const getPersonDetails = onCall<
         ...details,
         contactWritable: details.householdAdult && writeBackFull,
         profileWritable: writeBackFull,
+        parentCreatable: writeBackFull && !details.householdAdult,
       };
     } catch (error) {
       return reportPcoFailure(error, 'load this student');
@@ -953,6 +964,76 @@ export const updateStudentProfile = onCall<
    * device that asks. One edit is a fine price for one cold read.
    */
   if (result.status === 'updated') resetSharedCache();
+
+  return result;
+});
+
+/**
+ * Builds a student a family: a parent, and a household if they have none.
+ *
+ * The widest write Tally makes, and the only one that says something about a
+ * *family* rather than about a field — so it is also the one with a human in
+ * the loop. Given a name it has not been told to accept, it searches Planning
+ * Center for adults who already have it and hands them back rather than
+ * creating a second record for somebody the church already knows; the caller
+ * chooses one, or says to create a new person anyway.
+ *
+ * Refuses unless write-back is `full`, refuses once an adult is already in the
+ * household — `setParentContact` is that path — and never overwrites a contact
+ * detail on file. Core team only.
+ */
+export const addParent = onCall<
+  {
+    studentId: string;
+    personId?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    createNew?: boolean;
+  },
+  Promise<AddParentResult>
+>({ secrets: PCO_SECRETS, timeoutSeconds: 120, memory: '256MiB' }, async (request) => {
+  await requireCoreTeam(request.auth?.uid);
+
+  const studentId = request.data?.studentId;
+  if (typeof studentId !== 'string' || studentId.trim().length === 0) {
+    throw new HttpsError('invalid-argument', 'studentId is required.');
+  }
+
+  const config = await resolveConfig(db());
+  const client = clientFor(config);
+  if (!client) {
+    throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
+  }
+
+  let result: AddParentResult;
+  try {
+    result = await addParentUpstream({
+      db: db(),
+      client,
+      config,
+      studentId,
+      personId: request.data?.personId ?? null,
+      firstName: request.data?.firstName ?? null,
+      lastName: request.data?.lastName ?? null,
+      phone: request.data?.phone ?? null,
+      email: request.data?.email ?? null,
+      createNew: request.data?.createNew === true,
+      logger,
+    });
+  } catch (error) {
+    return reportPcoFailure(error, 'add a parent in Planning Center');
+  }
+
+  /*
+   * The whole cache, unlike `setParentContact`'s surgical drop. A new household
+   * changes who is reachable and who counts as unreachable across every screen
+   * that asks — the student's details, the incomplete-profiles sweep keyed by
+   * household, and the roster's own view of this family. One cold read is the
+   * right price for a family that did not exist a second ago.
+   */
+  if (result.status === 'added') resetSharedCache();
 
   return result;
 });

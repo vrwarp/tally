@@ -7,7 +7,14 @@
  * emails, the 429 with `Retry-After` — because those are the parts the client
  * has code to handle, and a simulator that smooths them over would test nothing.
  */
-import type { SimList, SimPerson, SimRequest, SimResponse } from './types.js';
+import type {
+  SimHousehold,
+  SimHouseholdMembership,
+  SimList,
+  SimPerson,
+  SimRequest,
+  SimResponse,
+} from './types.js';
 import type { SimulatorStore } from './store.js';
 
 /* -------------------------------------------------------------------------- */
@@ -536,6 +543,37 @@ function route(request: SimRequest, store: SimulatorStore): SimResponse {
     return json(201, { data: emailResource(created) });
   }
 
+  /*
+   * `POST /households` and `POST /households/{id}/household_memberships`.
+   *
+   * Both take their subject as a JSON:API *relationship* rather than an
+   * attribute — the household's members and the membership's person — which is
+   * the part of these two endpoints most worth modelling faithfully, because it
+   * is the part a caller is most likely to get wrong.
+   */
+  if (method === 'POST' && request.path === '/households') {
+    const attributes = extractAttributes(request.body) ?? {};
+    const memberIds = relationshipIds(request.body, 'people');
+    const created = store.createHousehold({ attributes, memberIds });
+    if (!created) {
+      return error(422, 'Unprocessable Entity', 'A household needs a primary contact who exists.');
+    }
+    return json(201, { data: householdResource(created, store) });
+  }
+
+  if (method === 'POST' && membershipMatch) {
+    const householdId = decodeURIComponent(membershipMatch[1]!);
+    const attributes = extractAttributes(request.body) ?? {};
+    // The relationship is authoritative; `person_id` is accepted alongside it
+    // because the real API documents both.
+    const personId = relationshipIds(request.body, 'person')[0] ?? attributes.person_id;
+    const created = store.addHouseholdMember(householdId, { ...attributes, person_id: personId });
+    if (!created) {
+      return error(404, 'Not Found', 'No such household, or no such person to add to it.');
+    }
+    return json(201, { data: membershipResource(created, householdId) });
+  }
+
   if (method === 'PATCH' && personMatch) {
     const attributes = extractAttributes(request.body);
     if (!attributes) return error(400, 'Bad Request', 'Expected a JSON:API document with data.attributes.');
@@ -545,6 +583,64 @@ function route(request: SimRequest, store: SimulatorStore): SimResponse {
   }
 
   return error(404, 'Not Found', `${method} ${request.path} is not implemented by the simulator.`);
+}
+
+/**
+ * The ids under `data.relationships.<name>.data`, which JSON:API allows to be
+ * either one identifier or a list of them.
+ */
+function relationshipIds(body: unknown, name: string): string[] {
+  if (!body || typeof body !== 'object') return [];
+  const data = (body as { data?: unknown }).data;
+  if (!data || typeof data !== 'object') return [];
+  const relationships = (data as { relationships?: unknown }).relationships;
+  if (!relationships || typeof relationships !== 'object') return [];
+  const entry = (relationships as Record<string, unknown>)[name];
+  if (!entry || typeof entry !== 'object') return [];
+
+  const identifiers = (entry as { data?: unknown }).data;
+  const list = Array.isArray(identifiers) ? identifiers : identifiers ? [identifiers] : [];
+  return list
+    .map((item) => (item && typeof item === 'object' ? (item as { id?: unknown }).id : null))
+    .filter((id): id is string => typeof id === 'string' && id.length > 0);
+}
+
+/** One household, as `POST /households` hands it back. */
+function householdResource(household: SimHousehold, store: SimulatorStore): Resource {
+  return {
+    type: 'Household',
+    id: household.id,
+    attributes: {
+      name: household.name,
+      member_count: store.memberCount(household.id),
+      primary_contact_id: household.primary_contact_id,
+      primary_contact_name: household.primary_contact_name,
+    },
+    relationships: {
+      people: {
+        data: store
+          .membershipsForHousehold(household.id)
+          .map((membership) => ({ type: 'Person', id: membership.person_id })),
+      },
+    },
+  };
+}
+
+/** One membership, in the shape `serveMemberships` uses. */
+function membershipResource(membership: SimHouseholdMembership, householdId: string): Resource {
+  return {
+    type: 'HouseholdMembership',
+    id: membership.id,
+    attributes: {
+      household_role: membership.household_role,
+      person_name: membership.person_name,
+      pending: membership.pending,
+    },
+    relationships: {
+      person: { data: { type: 'Person', id: membership.person_id } },
+      household: { data: { type: 'Household', id: householdId } },
+    },
+  };
 }
 
 function extractAttributes(body: unknown): Record<string, unknown> | null {

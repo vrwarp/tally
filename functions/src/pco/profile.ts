@@ -26,10 +26,10 @@
  */
 import { ABSOLUTE_MAX_GRADE, ABSOLUTE_MIN_GRADE, type PcoConfig } from '../config.js';
 import type { PcoClient } from './client.js';
-import { personIdFromStudentId } from './roster.js';
+import { resolveStudentPerson } from './studentPerson.js';
 import type { PcoPerson } from './types.js';
 import { PCO_TYPES } from './types.js';
-import { PATHS, SILENT_LOGGER, type FirestoreLike, type FunctionLogger } from '../firestore.js';
+import { SILENT_LOGGER, type FirestoreLike, type FunctionLogger } from '../firestore.js';
 
 export type UpdateStudentProfileStatus =
   /** At least one attribute was written upstream. */
@@ -93,29 +93,6 @@ function result(
 function trimmed(value: string | null | undefined): string | null {
   const text = (value ?? '').trim();
   return text.length > 0 ? text : null;
-}
-
-/**
- * Resolves which Planning Center person this student is.
- *
- * Read from Tally's own record rather than taken from the caller, exactly as
- * `setParentContact` does: the id decides whose permanent record is about to be
- * edited, and a browser may not be the one choosing that.
- */
-async function personIdFor(
-  db: FirestoreLike,
-  studentId: string,
-): Promise<{ personId: string | null; exists: boolean; active: boolean }> {
-  const snapshot = await db.doc(`${PATHS.students}/${studentId}`).get();
-  if (!snapshot.exists) return { personId: null, exists: false, active: false };
-
-  const data = snapshot.data() ?? {};
-  const stored = typeof data.pcoPersonId === 'string' && data.pcoPersonId ? data.pcoPersonId : null;
-  return {
-    personId: personIdFromStudentId(studentId) ?? stored,
-    exists: true,
-    active: data.status !== 'inactive',
-  };
 }
 
 /**
@@ -207,7 +184,7 @@ export async function updateStudentProfile(
     }
   }
 
-  const target = await personIdFor(db, studentId);
+  const target = await resolveStudentPerson(db, studentId);
   if (!target.exists || !target.active) {
     return result('no-student', 'That student is not on the roster.');
   }

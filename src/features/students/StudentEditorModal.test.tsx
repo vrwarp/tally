@@ -30,7 +30,8 @@ const updateStudentProfile = vi.hoisted(() =>
   ),
 );
 const setParentContact = vi.hoisted(() => vi.fn());
-vi.mock('@/services/functions', () => ({ updateStudentProfile, setParentContact }));
+const addParent = vi.hoisted(() => vi.fn());
+vi.mock('@/services/functions', () => ({ updateStudentProfile, setParentContact, addParent }));
 
 const updateStudent = vi.hoisted(() => vi.fn<(...args: unknown[]) => Promise<void>>(async () => {}));
 const createStudent = vi.hoisted(() =>
@@ -83,6 +84,7 @@ function details(overrides: Partial<PcoPersonDetails> = {}): PcoPersonDetails {
     householdAdult: true,
     contactWritable: true,
     profileWritable: true,
+    parentCreatable: false,
     ...overrides,
   };
 }

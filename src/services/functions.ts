@@ -267,6 +267,65 @@ export const setParentContact = httpsCallable<
   SetParentContactResult
 >(functions, 'setParentContact');
 
+/** An adult Planning Center already has, offered back before a duplicate is made. */
+export interface ExistingPerson {
+  pcoPersonId: string;
+  name: string;
+  /** Whether they already have a phone or an email on file. */
+  reachable: boolean;
+}
+
+export interface AddParentResult {
+  status:
+    | 'added'
+    | 'existing-people'
+    | 'disabled'
+    | 'no-student'
+    | 'not-in-planning-center'
+    | 'already-has-adult'
+    | 'not-an-adult'
+    | 'nothing-to-write';
+  parentName: string | null;
+  parentPersonId: string | null;
+  createdPerson: boolean;
+  createdHousehold: boolean;
+  wrote: ('phone' | 'email')[];
+  skipped: ('phone' | 'email')[];
+  /** Only on `existing-people`: who Planning Center already has by that name. */
+  candidates: ExistingPerson[];
+  message: string;
+}
+
+/**
+ * Builds a student a family: a parent, and a household if they have none.
+ *
+ * The one call that creates a *person*, and the reason it takes two rounds. Sent
+ * a name, it first searches Planning Center for adults who already have it and
+ * returns them as `existing-people` rather than creating a second record for
+ * somebody the church already knows — a parent is nearly always already in
+ * People, just not linked to their child. The caller then sends back either
+ * `personId` (that is them) or `createNew: true` (it is not).
+ *
+ * Off unless `PCO_WRITE_BACK=full`, and refused outright once the household has
+ * an adult — that is `setParentContact`'s job. Check
+ * `PcoPersonDetails.parentCreatable` before offering the form.
+ */
+export const addParent = httpsCallable<
+  {
+    studentId: string;
+    /** An adult chosen from a previous `existing-people` answer. */
+    personId?: string | null;
+    firstName?: string | null;
+    /** Defaults server-side to the student's own last name. */
+    lastName?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    /** Set once somebody has seen the candidates and still wants a new person. */
+    createNew?: boolean;
+  },
+  AddParentResult
+>(functions, 'addParent');
+
 export interface UpdateStudentProfileResult {
   status:
     | 'updated'

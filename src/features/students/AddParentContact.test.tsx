@@ -15,7 +15,8 @@ import { makeStudent } from '../../../tests/factories';
 import type { PcoPersonDetails, Student } from '@/types';
 
 const setParentContact = vi.hoisted(() => vi.fn());
-vi.mock('@/services/functions', () => ({ setParentContact }));
+const addParent = vi.hoisted(() => vi.fn());
+vi.mock('@/services/functions', () => ({ setParentContact, addParent }));
 
 const show = vi.hoisted(() => vi.fn());
 vi.mock('@/context/toastContext', () => ({ useToast: () => ({ show }) }));
@@ -41,6 +42,7 @@ function details(overrides: Partial<PcoPersonDetails> = {}): PcoPersonDetails {
     householdAdult: true,
     contactWritable: true,
     profileWritable: true,
+    parentCreatable: false,
     ...overrides,
   };
 }
@@ -53,6 +55,7 @@ function mount(student: Student, personDetails: PcoPersonDetails | null, onAdded
 describe('AddParentContact', () => {
   beforeEach(() => {
     setParentContact.mockReset();
+    addParent.mockReset();
     show.mockReset();
   });
 
@@ -204,6 +207,173 @@ describe('AddParentContact', () => {
       // Retyping a number because the wifi dropped is the thing worth avoiding.
       expect(screen.getByLabelText('Parent phone')).toHaveValue('(510) 555-0142');
       expect(onAdded).not.toHaveBeenCalled();
+    });
+  });
+
+  /*
+   * The half of this screen that did not exist until write-back was allowed to
+   * build a family. Everything above assumes Planning Center already has the
+   * adult; these are the students it does not — which for a ministry whose
+   * visitors arrive at the door with nobody upstream is most of them.
+   */
+  describe('when there is no adult to put a number on', () => {
+    const noFamily = () => details({ contactWritable: false, householdAdult: false, parentCreatable: true });
+
+    const added = {
+      data: {
+        status: 'added',
+        parentName: 'Dana Whitfield',
+        parentPersonId: '5200099',
+        createdPerson: true,
+        createdHousehold: false,
+        wrote: ['phone'],
+        skipped: [],
+        candidates: [],
+        message: 'Added Dana Whitfield in Planning Center with their phone.',
+      },
+    };
+
+    const openForm = async () => {
+      await userEvent.click(screen.getByRole('button', { name: /Add a parent/ }));
+    };
+
+    it('offers to add one instead of pointing at Planning Center', async () => {
+      mount(onRoster(), noFamily());
+
+      expect(screen.getByRole('button', { name: /Add a parent/ })).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Add it there' })).not.toBeInTheDocument();
+
+      await openForm();
+      expect(screen.getByLabelText(/Parent first name/)).toBeInTheDocument();
+    });
+
+    /** Right far more often than not, and one edit away when it is not. */
+    it("starts the surname at the student's own", async () => {
+      mount(onRoster(), noFamily());
+      await openForm();
+
+      expect(screen.getByLabelText(/Parent last name/)).toHaveValue('Lee');
+    });
+
+    it('creates the parent with whatever contact details were typed', async () => {
+      addParent.mockResolvedValue(added);
+      const onAdded = mount(onRoster(), noFamily());
+
+      await openForm();
+      await userEvent.type(screen.getByLabelText(/Parent first name/), 'Dana');
+      await userEvent.type(screen.getByLabelText('Parent phone'), '(510) 555-0142');
+      await userEvent.click(screen.getByRole('button', { name: 'Save to Planning Center' }));
+
+      await waitFor(() => expect(onAdded).toHaveBeenCalled());
+      expect(addParent).toHaveBeenCalledWith({
+        studentId: 'pco_4200014',
+        personId: null,
+        firstName: 'Dana',
+        lastName: 'Lee',
+        phone: '(510) 555-0142',
+        email: null,
+        createNew: false,
+      });
+      expect(show).toHaveBeenCalledWith(added.data.message, { tone: 'success' });
+    });
+
+    it('will not send a parent with no name', async () => {
+      mount(onRoster(), noFamily());
+      await openForm();
+
+      await userEvent.type(screen.getByLabelText('Parent phone'), '(510) 555-0142');
+
+      expect(screen.getByRole('button', { name: 'Save to Planning Center' })).toBeDisabled();
+      expect(addParent).not.toHaveBeenCalled();
+    });
+
+    /*
+     * The duplicate this exists to prevent. A parent is nearly always already in
+     * People — they attend the church — and a second record for them is a merge
+     * somebody does by hand months later.
+     */
+    describe('when Planning Center already has that name', () => {
+      const candidates = {
+        data: {
+          status: 'existing-people',
+          parentName: null,
+          parentPersonId: null,
+          createdPerson: false,
+          createdHousehold: false,
+          wrote: [],
+          skipped: [],
+          candidates: [{ pcoPersonId: '5200003', name: 'Wen Lee', reachable: true }],
+          message: 'Planning Center already has Wen Lee.',
+        },
+      };
+
+      const askThenOffer = async () => {
+        addParent.mockResolvedValueOnce(candidates);
+        const onAdded = mount(onRoster(), noFamily());
+        await openForm();
+        await userEvent.type(screen.getByLabelText(/Parent first name/), 'Wen');
+        await userEvent.click(screen.getByRole('button', { name: 'Save to Planning Center' }));
+        return onAdded;
+      };
+
+      it('offers who it found rather than creating a second record', async () => {
+        const onAdded = await askThenOffer();
+
+        expect(await screen.findByText('Wen Lee')).toBeInTheDocument();
+        expect(screen.getByText(/Already has contact details/)).toBeInTheDocument();
+        expect(onAdded).not.toHaveBeenCalled();
+      });
+
+      it('uses the person somebody picked', async () => {
+        const onAdded = await askThenOffer();
+        addParent.mockResolvedValueOnce(added);
+
+        await userEvent.click(await screen.findByRole('button', { name: 'This is them' }));
+
+        await waitFor(() => expect(onAdded).toHaveBeenCalled());
+        expect(addParent).toHaveBeenLastCalledWith(
+          expect.objectContaining({ personId: '5200003', createNew: false }),
+        );
+      });
+
+      it('creates a new person when told the match is somebody else', async () => {
+        const onAdded = await askThenOffer();
+        addParent.mockResolvedValueOnce(added);
+
+        await userEvent.click(await screen.findByRole('button', { name: /add a new person/i }));
+
+        await waitFor(() => expect(onAdded).toHaveBeenCalled());
+        expect(addParent).toHaveBeenLastCalledWith(expect.objectContaining({ createNew: true }));
+      });
+    });
+
+    /**
+     * Somebody built this family in Planning Center while the form sat open. The
+     * screen is out of date rather than wrong, and a second parent beside the
+     * first is not the repair.
+     */
+    it('re-reads instead of arguing when the household stopped being empty', async () => {
+      addParent.mockResolvedValue({
+        data: {
+          status: 'already-has-adult',
+          parentName: 'Wen Lee',
+          parentPersonId: '5200003',
+          createdPerson: false,
+          createdHousehold: false,
+          wrote: [],
+          skipped: [],
+          candidates: [],
+          message: 'Planning Center now has Wen Lee in this household.',
+        },
+      });
+      const onAdded = mount(onRoster(), noFamily());
+
+      await openForm();
+      await userEvent.type(screen.getByLabelText(/Parent first name/), 'Dana');
+      await userEvent.click(screen.getByRole('button', { name: 'Save to Planning Center' }));
+
+      await waitFor(() => expect(onAdded).toHaveBeenCalled());
+      expect(show).toHaveBeenCalledWith(expect.stringContaining('now has Wen Lee'), { tone: 'info' });
     });
   });
 });

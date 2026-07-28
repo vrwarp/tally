@@ -43,6 +43,7 @@ function details(overrides: Partial<PcoPersonDetails> = {}): PcoPersonDetails {
     householdAdult: true,
     contactWritable: false,
     profileWritable: false,
+    parentCreatable: false,
     ...overrides,
   };
 }
