@@ -412,3 +412,93 @@ describe('writes', () => {
     });
   });
 });
+
+/* -------------------------------------------------------------------------- */
+/* A create is never sent twice                                                */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * The failure these cover happened to a real family. One "add a parent" whose
+ * reply went missing was replayed the full four times, each attempt landing
+ * another Person upstream, and the leader was told Planning Center could not be
+ * reached at all — then offered five identical people to choose between when
+ * they tried again. A POST that got no answer is not a POST that did not happen.
+ */
+describe('non-idempotent requests', () => {
+  it('sends a POST once when the connection drops, and says so', async () => {
+    let attempts = 0;
+    const slept: number[] = [];
+    const client = createPcoClient({
+      appId: 'a',
+      secret: 'b',
+      sleep: async (ms) => {
+        slept.push(ms);
+      },
+      fetchImpl: (async () => {
+        attempts += 1;
+        throw new TypeError('fetch failed: ECONNRESET');
+      }) as unknown as typeof fetch,
+    });
+
+    await expect(
+      client.post('/people', { data: { type: 'Person', attributes: { first_name: 'Dana' } } }),
+    ).rejects.toBeInstanceOf(PcoNetworkError);
+    expect(attempts).toBe(1);
+    expect(slept).toEqual([]);
+  });
+
+  // 504 is what pcomirror answers when a write reached Planning Center and the
+  // response was lost coming back; 500 and 502 are what a proxy in front of it
+  // sends for the same event. None of them says the write did not happen.
+  it.each([500, 502, 504])('sends a POST once when the answer is a %i', async (status) => {
+    let attempts = 0;
+    const client = createPcoClient({
+      appId: 'a',
+      secret: 'b',
+      sleep: async () => {},
+      fetchImpl: (async () => {
+        attempts += 1;
+        return json({ errors: [{ detail: 'response was lost' }] }, { status });
+      }) as unknown as typeof fetch,
+    });
+
+    const error = (await client
+      .post('/people', { data: { type: 'Person' } })
+      .catch((caught: unknown) => caught)) as PcoApiError;
+
+    expect(error).toBeInstanceOf(PcoApiError);
+    expect(error.status).toBe(status);
+    expect(attempts).toBe(1);
+  });
+
+  it('still retries a POST on a 429, which is a refusal to start', async () => {
+    const { client, slept, urls } = makeClient([
+      json({ errors: [{ status: '429' }] }, { status: 429, headers: { 'Retry-After': '1' } }),
+      json({ data: { id: '901', type: 'Person' } }, { status: 201 }),
+    ]);
+
+    const body = await client.post<PcoPerson>('/people', { data: { type: 'Person' } });
+
+    expect(body.data.id).toBe('901');
+    expect(urls).toHaveLength(2);
+    expect(slept).toEqual([1000]);
+  });
+
+  it('still retries a GET and a PATCH on a 5xx', async () => {
+    const { client: reader, urls: reads } = makeClient([
+      json({}, { status: 503 }),
+      json({ data: [] }),
+    ]);
+    await reader.get('/people');
+    expect(reads).toHaveLength(2);
+
+    const { client: patcher, urls: patches } = makeClient([
+      json({}, { status: 503 }),
+      json({ data: { id: '1', type: 'Person' } }),
+    ]);
+    // A fixed attribute set rather than a delta, so it lands on the same record
+    // however many times it runs.
+    await patcher.patch('/people/1', { data: { type: 'Person', attributes: { grade: 8 } } });
+    expect(patches).toHaveLength(2);
+  });
+});

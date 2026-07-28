@@ -235,9 +235,43 @@ const DEFAULT_MAX_PAGES = 500;
 const BASE_BACKOFF_MS = 500;
 const MAX_BACKOFF_MS = 20_000;
 
-/** 429 is a *scheduling* problem; 5xx is Planning Center having a bad minute. */
-function isRetryableStatus(status: number): boolean {
-  return status === 429 || status >= 500;
+/**
+ * Whether a request that failed may simply be sent again.
+ *
+ * `POST` is the one that may not, and it is the only verb Tally creates anything
+ * with. A create that reached Planning Center and whose response was lost looks
+ * from here exactly like one that never arrived — same dropped socket, same
+ * gateway 502 — so a replay is a coin toss between retrying a failure and
+ * putting a second parent on a real family's record. It lost that toss: a single
+ * "add a parent" whose reply went missing sent five POSTs and created five
+ * people, then reported that it could not reach Planning Center at all.
+ *
+ * The other two are safe by construction. `GET` changes nothing, and every
+ * `PATCH` here sends a fixed set of attributes rather than a delta, so it lands
+ * on the same record however many times it runs.
+ *
+ * There is no third option — no idempotency key to send, because Planning Center
+ * has nowhere to put one. So the ambiguity is handed to the caller, which is the
+ * only layer that can resolve it: `addParent` re-runs its own duplicate search
+ * on the next attempt and puts the choice in front of a human.
+ */
+function isReplayable(method: 'GET' | 'POST' | 'PATCH'): boolean {
+  return method !== 'POST';
+}
+
+/**
+ * 429 is a *scheduling* problem; 5xx is Planning Center having a bad minute.
+ *
+ * The method matters for the second and not the first. A 429 is a refusal to
+ * *start* — the rate limiter answers before the request reaches anything that
+ * could write — so replaying one cannot duplicate a record whatever the verb. A
+ * 5xx carries no such promise: it may be Planning Center declining the work, or
+ * it may be a proxy in front of it failing to relay an answer to work already
+ * done.
+ */
+function isRetryableStatus(status: number, replayable: boolean): boolean {
+  if (status === 429) return true;
+  return replayable && status >= 500;
 }
 
 function parseRetryAfter(header: string | null, now: Date): number | null {
@@ -322,6 +356,8 @@ export function createPcoClient(options: PcoClientOptions): PcoClient {
       attempts: attempt + 1,
     });
 
+    const replayable = isReplayable(method);
+
     for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
       let response: Response;
       const startedAt = now().getTime();
@@ -333,9 +369,14 @@ export function createPcoClient(options: PcoClientOptions): PcoClient {
         });
       } catch (error) {
         // DNS blips and socket resets look nothing like an HTTP status but are
-        // exactly as transient, so they share the backoff.
+        // exactly as transient, so they share the backoff — for a read. For a
+        // create there is nothing transient about them: "the socket dropped" and
+        // "the person was created and the reply went missing" are the same event
+        // seen from this side, and only one of those is worth sending again.
         lastError = error;
-        if (attempt === maxRetries) throw new PcoNetworkError(traceRequest(attempt), error);
+        if (!replayable || attempt === maxRetries) {
+          throw new PcoNetworkError(traceRequest(attempt), error);
+        }
         await sleep(Math.min(MAX_BACKOFF_MS, BASE_BACKOFF_MS * 2 ** attempt));
         continue;
       }
@@ -362,7 +403,7 @@ export function createPcoClient(options: PcoClientOptions): PcoClient {
         });
       };
 
-      if (!isRetryableStatus(response.status)) throw await apiError();
+      if (!isRetryableStatus(response.status, replayable)) throw await apiError();
 
       if (attempt === maxRetries) throw await apiError();
 
