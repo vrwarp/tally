@@ -77,18 +77,18 @@ test.describe('dashboard', () => {
     // Each block names its student, so a list that reveals everything at once
     // does not read as a run of loose phone numbers. That label is also the
     // only thing here that is stable while the contents are still loading.
-    const blocks = page.getByRole('group', { name: /^Contact details for / });
+    const blocks = page.getByRole('group', { name: /^Parent contact for / });
     await expect(blocks.first()).toBeVisible();
 
     const names = (
       await blocks.evaluateAll((groups) =>
         groups.map((group) => group.getAttribute('aria-label') ?? ''),
       )
-    ).map((label) => label.replace(/^Contact details for /, ''));
+    ).map((label) => label.replace(/^Parent contact for /, ''));
 
     let reachable = 0;
     for (const name of names) {
-      const block = page.getByRole('group', { name: `Contact details for ${name}` }).first();
+      const block = page.getByRole('group', { name: `Parent contact for ${name}` }).first();
 
       /*
        * Two honest outcomes: a way to reach them, or a plain statement of why
@@ -125,44 +125,51 @@ test.describe('dashboard', () => {
      * to-do and once as a shrug, because only the second kind carries
      * `profileComplete: false`.
      *
-     * Both now lead somewhere. Which link a row gets depends on where the
-     * record lives, so this asserts the promise rather than the wording: every
-     * row that says nobody can be reached also offers the way to fix it.
+     * Both lead somewhere now, and where they lead is this screen: the row
+     * opens the same write form the student's own profile has, rather than a
+     * Planning Center tab. What the form then offers is the server's decision —
+     * a number, a whole parent, or a pointer upstream on an install that will
+     * not let Tally write — so this asserts the promise rather than the
+     * outcome: every row that says nobody can be reached also offers the way to
+     * fix it, and pressing it lands somewhere that names the family.
      */
     /*
      * Each of these rows is one Planning Center read, so counting before they
      * land counts nothing — which is a pass-shaped failure. Wait for the first,
      * then hold the rest to the same promise.
      */
-    const stuck = page.getByText(/has no parent contact for/);
+    const stuck = page
+      .getByRole('group', { name: /^Parent contact for / })
+      .filter({ hasText: 'has no parent contact for' });
     await expect(stuck.first()).toBeVisible({ timeout: 20_000 });
 
-    for (const row of await stuck.all()) {
-      await expect(row.getByRole('link', { name: /in Planning Center$/ })).toHaveAttribute(
-        'href',
-        /people\.planningcenteronline\.com\/people\/AC\d+/,
-      );
+    for (const block of await stuck.all()) {
+      await expect(block.getByRole('button', { name: /^Add parent contact for / })).toBeVisible();
     }
 
     /*
-     * And the list this whole change is about. "Add in Planning Center" is the
-     * New faces prompt specifically — the follow-up rows above word theirs
-     * differently — so its presence is the assertion: a first-timer off the
-     * roster with nobody on file now gets a prompt of their own rather than the
-     * paragraph that used to sit where a button was on the row above.
+     * And the list this whole change is about: a first-timer off the roster
+     * with nobody on file gets a prompt of their own rather than the paragraph
+     * that used to sit where a button was on the row above.
      *
      * The seed puts unreachable students in the visitor window on purpose. If
      * that ever stops being true this fails, which is the right signal: the
      * regression it guards would otherwise go unwatched.
      */
-    const prompt = page.getByRole('link', { name: /in Planning Center$/ }).filter({
-      hasText: 'Add in Planning Center',
-    });
-    await expect(prompt.first()).toBeVisible({ timeout: 20_000 });
-    await expect(prompt.first()).toHaveAttribute(
-      'href',
-      /people\.planningcenteronline\.com\/people\/AC\d+/,
-    );
+    const newFaces = page
+      .locator('section')
+      .filter({ has: page.getByRole('heading', { name: /new faces/i }) })
+      .first();
+    const prompt = newFaces.getByRole('button', { name: /^Add parent contact for / }).first();
+    await expect(prompt).toBeVisible({ timeout: 20_000 });
+
+    // And it opens here rather than somewhere else. The dialog is the whole
+    // change: on a `full` install the two fields are typed without leaving.
+    await prompt.click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(
+      page.getByRole('dialog').getByText(/Planning Center|parent/i).first(),
+    ).toBeVisible({ timeout: 20_000 });
   });
 
   test('a counselor cannot reach it', async ({ page, signedInAs }) => {

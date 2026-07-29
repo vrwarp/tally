@@ -11,8 +11,8 @@ import type { ReactNode } from 'react';
 import { Button, Spinner } from '@/components/ui';
 import { useToast } from '@/context/toastContext';
 import { usePersonDetails } from '@/hooks/usePersonDetails';
-import { pcoPersonUrl } from '@/lib/planningCenter';
 import { cn, formatPhone } from '@/lib/utils';
+import { AddParentContactButton } from '@/features/dashboard/AddParentContactButton';
 import { buildContactList } from '@/features/dashboard/contactList';
 import { studentFullName, type Student } from '@/types';
 
@@ -47,6 +47,12 @@ function ActionLink({
 export interface FollowUpActionsProps {
   student: Student;
   className?: string;
+  /**
+   * Called when this row has just put a parent contact into Planning Center, so
+   * a list holding its own "who can we reach" answer can ask again. The row
+   * itself re-reads without being told.
+   */
+  onContactAdded?: () => void;
 }
 
 /**
@@ -67,9 +73,18 @@ export interface FollowUpActionsProps {
  *
  * A leader chasing a 9th grader on a Tuesday morning usually texts first and
  * calls if that goes nowhere, so a phone number gets both.
+ *
+ * ## Every label says "parent"
+ *
+ * None of these numbers belong to the student. Tally holds no contact details
+ * for a 12-year-old and never will; what Planning Center hands back is an adult
+ * in their household. A row that reads "Aaron Sun … Call" invites exactly the
+ * wrong reading of that, and the row above it on the same card is a 6th grader.
+ * So the buttons name who is on the other end, and where there is room for it
+ * the line beside them names them outright.
  */
-export function FollowUpActions({ student, className }: FollowUpActionsProps) {
-  const { details, error, loaded, unavailable, retry } = usePersonDetails(student);
+export function FollowUpActions({ student, className, onContactAdded }: FollowUpActionsProps) {
+  const { details, error, loaded, unavailable, retry, refresh } = usePersonDetails(student);
 
   const name = studentFullName(student);
   const phone = details?.parentPhone?.trim() ?? '';
@@ -99,7 +114,7 @@ export function FollowUpActions({ student, className }: FollowUpActionsProps) {
     // on its way to the spinner.
     body = (
       <p className="flex items-center gap-2 text-xs text-ink-500">
-        <Spinner /> Looking up contact details…
+        <Spinner /> Looking up parent contact…
       </p>
     );
   } else if (!details) {
@@ -114,29 +129,26 @@ export function FollowUpActions({ student, className }: FollowUpActionsProps) {
     );
   } else if (!phone && !email) {
     /*
-     * The one state that is a job rather than a dead end. Tally holds no parent
-     * contact and cannot be given one, so the fix is upstream — but "the fix is
-     * upstream" was for a while the entire row, a sentence on a list where the
-     * row above it had a button. Saying where to go is the same information; a
-     * link is that information somebody can act on with a thumb.
+     * The one state that is a job rather than a dead end, and the job is now
+     * doable from here. It used to be a sentence pointing at Planning Center —
+     * true, and a new tab away from a call list — but the read this row already
+     * made is the same read the form needs, so the row can simply offer the
+     * form. What opens is decided inside `ParentContactModal`: a number on the
+     * adult on file, a parent and a household where there is neither, or the
+     * pointer at Planning Center on an install that will not let Tally write.
      */
     body = (
-      <p className="text-xs text-warn-400">
-        Planning Center has no parent contact for {name}.{' '}
-        {student.pcoPersonId ? (
-          <a
-            href={pcoPersonUrl(student.pcoPersonId)}
-            target="_blank"
-            rel="noreferrer"
-            aria-label={`Add a parent contact for ${name} in Planning Center`}
-            className="font-semibold underline"
-          >
-            Add one there
-          </a>
-        ) : (
-          'Nobody can follow up until somebody adds one there.'
-        )}
-      </p>
+      <div className="flex flex-col items-start gap-1.5">
+        <p className="text-xs text-warn-400">Planning Center has no parent contact for {name}.</p>
+        <AddParentContactButton
+          student={student}
+          onAdded={() => {
+            // The row is looking at an answer its own write just made wrong.
+            refresh();
+            onContactAdded?.();
+          }}
+        />
+      </div>
     );
   } else if (phone) {
     body = (
@@ -146,14 +158,14 @@ export function FollowUpActions({ student, className }: FollowUpActionsProps) {
           label={`Call ${parent} about ${name} at ${formatPhone(phone)}`}
           icon="📞"
         >
-          Call
+          Call parent
         </ActionLink>
         <ActionLink
           href={`sms:${dialable(phone)}`}
           label={`Text ${parent} about ${name} at ${formatPhone(phone)}`}
           icon="💬"
         >
-          Text
+          Text parent
         </ActionLink>
         {/*
           Printed where there is room for it.
@@ -162,10 +174,13 @@ export function FollowUpActions({ student, className }: FollowUpActionsProps) {
           fourth line onto it. On a laptop it is the opposite: `tel:` and
           `sms:` are protocols a desktop services unreliably, so a leader
           working this list on a Tuesday morning needs the digits themselves —
-          otherwise the only route to ten numbers is opening ten records.
+          otherwise the only route to ten numbers is opening ten records. The
+          name goes with them: "who am I about to ring" is a question a phone
+          number does not answer, and on a desktop it costs nothing to say.
         */}
-        <span className="hidden text-xs tabular-nums text-ink-500 lg:inline">
-          {formatPhone(phone)}
+        <span className="hidden text-xs text-ink-500 lg:inline">
+          {details.parentName ? `${details.parentName} · ` : ''}
+          <span className="tabular-nums">{formatPhone(phone)}</span>
         </span>
       </div>
     );
@@ -177,11 +192,14 @@ export function FollowUpActions({ student, className }: FollowUpActionsProps) {
           label={`Email ${parent} about ${name} at ${email}`}
           icon="✉"
         >
-          Email
+          Email parent
         </ActionLink>
         {/* Same rule as the phone number above: printed where there is room
             for it, and the mailto carries it either way. */}
-        <span className="hidden min-w-0 truncate text-xs text-ink-500 lg:inline">{email}</span>
+        <span className="hidden min-w-0 truncate text-xs text-ink-500 lg:inline">
+          {details.parentName ? `${details.parentName} · ` : ''}
+          {email}
+        </span>
       </div>
     );
   }
@@ -190,10 +208,16 @@ export function FollowUpActions({ student, className }: FollowUpActionsProps) {
    * Named and grouped, which matters more now than it did behind a button. The
    * button carried the student's name in its own label; a list that reveals
    * everything at once would otherwise read to a screen reader as a run of
-   * loose phone numbers with nothing tying each to the student above it.
+   * loose phone numbers with nothing tying each to the student above it. Whose
+   * number it is belongs in that name too — "contact details for Aaron Sun"
+   * read as Aaron's own.
    */
   return (
-    <div role="group" aria-label={`Contact details for ${name}`} className={cn('min-w-0', className)}>
+    <div
+      role="group"
+      aria-label={`Parent contact for ${name}`}
+      className={cn('min-w-0', className)}
+    >
       {body}
     </div>
   );

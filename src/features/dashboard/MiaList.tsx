@@ -25,9 +25,15 @@ export interface MiaListProps {
   threshold: number;
   /** The gathering being shown, or null when every gathering is in the list. */
   gatheringTitle?: string | null;
+  /**
+   * Called when a row has just put a parent contact into Planning Center — the
+   * screen holds a session-wide answer about who can be reached, and that row
+   * has just changed it.
+   */
+  onContactAdded?: () => void;
 }
 
-export function MiaList({ items, threshold, gatheringTitle = null }: MiaListProps) {
+export function MiaList({ items, threshold, gatheringTitle = null, onContactAdded }: MiaListProps) {
   const students = items.map((item) => item.student);
 
   return (
@@ -69,6 +75,7 @@ export function MiaList({ items, threshold, gatheringTitle = null }: MiaListProp
               key={`${item.gatheringKey}:${item.student.id}`}
               item={item}
               showGathering={gatheringTitle === null}
+              onContactAdded={onContactAdded}
             />
           ))}
         </ul>
@@ -77,7 +84,15 @@ export function MiaList({ items, threshold, gatheringTitle = null }: MiaListProp
   );
 }
 
-function MiaRow({ item, showGathering }: { item: MiaStudent; showGathering: boolean }) {
+function MiaRow({
+  item,
+  showGathering,
+  onContactAdded,
+}: {
+  item: MiaStudent;
+  showGathering: boolean;
+  onContactAdded?: () => void;
+}) {
   const { student, consecutiveMisses, lastAttendedAt, lastAttendedEventTitle } = item;
   const name = studentFullName(student);
 
@@ -169,7 +184,11 @@ function MiaRow({ item, showGathering }: { item: MiaStudent; showGathering: bool
         </span>
       </div>
 
-      <FollowUpActions student={student} className="mt-1 pb-1 pl-14 lg:mt-0 lg:shrink-0 lg:pb-0 lg:pl-0" />
+      <FollowUpActions
+        student={student}
+        onContactAdded={onContactAdded}
+        className="mt-1 pb-1 pl-14 lg:mt-0 lg:shrink-0 lg:pb-0 lg:pl-0"
+      />
     </li>
   );
 }

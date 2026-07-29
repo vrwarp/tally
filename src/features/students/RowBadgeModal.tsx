@@ -18,7 +18,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Badge, Button, ErrorBanner, Modal, Spinner } from '@/components/ui';
-import { AddParentContact } from '@/features/students/AddParentContact';
+import { ParentContactPanel } from '@/features/students/ParentContactModal';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
@@ -63,7 +63,7 @@ export function RowBadgeModal({ student, action, onClose, now }: RowBadgeModalPr
   return (
     <Modal open onClose={onClose} title={TITLES[action]} description={name} size="sm">
       {action === 'allergy' ? <AllergyPanel student={student} /> : null}
-      {action === 'contact' ? <ContactPanel student={student} onDone={onClose} /> : null}
+      {action === 'contact' ? <ParentContactPanel student={student} onDone={onClose} /> : null}
       {action === 'visitor' ? <VisitorPanel student={student} onDone={onClose} /> : null}
       {action === 'birthday' ? <BirthdayPanel student={student} now={now} /> : null}
       {action === 'inactive' ? <InactivePanel student={student} onDone={onClose} /> : null}
@@ -138,56 +138,12 @@ function AllergyPanel({ student }: { student: Student }) {
 /* Parent contact                                                              */
 /* -------------------------------------------------------------------------- */
 
-/**
- * The one thing the "no contact" chip is actually asking for.
- *
- * `AddParentContact` already carries every refusal this needs — no upstream
- * record, no adult in the household, write-back not turned up — so this is only
- * the read that feeds it, plus the invalidation that makes the row agree with
- * itself afterwards.
+/*
+ * The "no contact" chip opens `ParentContactPanel`, which is the same read and
+ * the same form every other screen that names an unreachable student now shows.
+ * It lives next to `AddParentContact` because the dashboard's call lists reach
+ * for it too, and a roster badge is no longer the only way in.
  */
-function ContactPanel({ student, onDone }: { student: Student; onDone: () => void }) {
-  const { details, loading, loaded, error, retry, refresh } = usePersonDetails(student);
-  const { refreshRoster } = useData();
-
-  if (error) {
-    return (
-      <div className="flex flex-col gap-3">
-        <ErrorBanner message={error} />
-        <div className="flex justify-end">
-          <Button variant="secondary" onClick={retry}>
-            Try again
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (loading || !loaded) {
-    return (
-      <p className="flex items-center gap-2 text-sm text-ink-400">
-        <Spinner /> Reading Planning Center…
-      </p>
-    );
-  }
-
-  return (
-    <AddParentContact
-      student={student}
-      details={details}
-      onAdded={() => {
-        // Three things held an answer that has just stopped being true: this
-        // student's details, the session-wide "who can we reach" map the chip
-        // count reads, and the roster row itself.
-        invalidatePersonDetails(student.id);
-        invalidateParentContact();
-        refresh();
-        void refreshRoster(true);
-        onDone();
-      }}
-    />
-  );
-}
 
 /* -------------------------------------------------------------------------- */
 /* Visitor                                                                     */

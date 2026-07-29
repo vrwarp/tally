@@ -19,12 +19,12 @@
  */
 import { Link } from 'react-router-dom';
 import { Badge, Card, CardHeader, EmptyState } from '@/components/ui';
+import { AddParentContactButton } from '@/features/dashboard/AddParentContactButton';
 import { FollowUpActions } from '@/features/dashboard/FollowUpActions';
 import { hasNoParentContact } from '@/features/dashboard/insights';
-import { pcoPersonUrl } from '@/lib/planningCenter';
 import { formatRelative, formatShortDate } from '@/lib/time';
 import { initials, ordinalGrade } from '@/lib/utils';
-import { studentFullName, type NewVisitor, type Student } from '@/types';
+import { studentFullName, type NewVisitor } from '@/types';
 
 export interface NewVisitorListProps {
   items: readonly NewVisitor[];
@@ -44,6 +44,11 @@ export interface NewVisitorListProps {
    * "nobody asked" must not render as "nobody can reach them".
    */
   reachable?: ReadonlyMap<string, boolean>;
+  /**
+   * Called when a row has just put a parent contact into Planning Center, so
+   * the map above — which said the opposite a second ago — is asked again.
+   */
+  onContactAdded?: () => void;
 }
 
 export function NewVisitorList({
@@ -51,6 +56,7 @@ export function NewVisitorList({
   windowDays,
   gatheringTitle = null,
   reachable,
+  onContactAdded,
 }: NewVisitorListProps) {
   return (
     <Card>
@@ -78,6 +84,7 @@ export function NewVisitorList({
               key={visitor.student.id}
               visitor={visitor}
               reachable={reachable?.get(visitor.student.id)}
+              onContactAdded={onContactAdded}
             />
           ))}
         </ul>
@@ -89,10 +96,12 @@ export function NewVisitorList({
 function NewVisitorRow({
   visitor,
   reachable,
+  onContactAdded,
 }: {
   visitor: NewVisitor;
   /** Planning Center's answer for this student, or undefined if unasked. */
   reachable: boolean | undefined;
+  onContactAdded?: () => void;
 }) {
   const { student, firstEventTitle, firstAttendedAt } = visitor;
 
@@ -153,52 +162,18 @@ function NewVisitorRow({
           `FollowUpActions`, which looks the contact up itself and names whichever
           state it lands in. `unreachable` is only ever true on an answer. */}
       {unreachable ? (
-        <AddContactLink student={student} />
+        <AddParentContactButton
+          student={student}
+          onAdded={onContactAdded}
+          className="mt-1 mb-1 ml-14"
+        />
       ) : (
-        <FollowUpActions student={student} className="mt-1 pb-1 pl-14" />
+        <FollowUpActions
+          student={student}
+          onContactAdded={onContactAdded}
+          className="mt-1 pb-1 pl-14"
+        />
       )}
     </li>
-  );
-}
-
-/**
- * Where somebody goes to make this student reachable.
- *
- * Two destinations, because a student the roster knows can be sent straight to
- * the record that needs fixing, and one Tally created cannot: they have no
- * Planning Center page to open yet. Theirs leads to their student page, which
- * knows whether they have reached Planning Center and says what to do about it
- * — the same page the write form lives on where write-back allows one.
- *
- * The Planning Center case is the whole point of this component. It used to
- * render as a sentence explaining that nobody could follow up, on a list where
- * the row directly above it had a button; the two rows meant the same thing and
- * only one of them was actionable.
- */
-function AddContactLink({ student }: { student: Student }) {
-  const name = studentFullName(student);
-  const className =
-    'mt-1 ml-14 mb-1 inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-warn-500/10 px-3 text-sm font-semibold text-warn-400 ring-1 ring-warn-500/25 hover:bg-warn-500/15';
-
-  if (student.pcoPersonId) {
-    return (
-      <a
-        href={pcoPersonUrl(student.pcoPersonId)}
-        target="_blank"
-        rel="noreferrer"
-        aria-label={`Add a parent contact for ${name} in Planning Center`}
-        className={className}
-      >
-        <span aria-hidden="true">＋</span>
-        Add in Planning Center
-      </a>
-    );
-  }
-
-  return (
-    <Link to={`/students/${student.id}`} aria-label={`Add parent contact for ${name}`} className={className}>
-      <span aria-hidden="true">＋</span>
-      Add parent contact
-    </Link>
   );
 }

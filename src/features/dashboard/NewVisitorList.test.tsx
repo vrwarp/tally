@@ -11,6 +11,7 @@
  * answer for them.
  */
 import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NewVisitorList } from '@/features/dashboard/NewVisitorList';
@@ -19,7 +20,11 @@ import { makeStudent } from '../../../tests/factories';
 import type { NewVisitor, Student } from '@/types';
 
 const getPersonDetails = vi.hoisted(() => vi.fn());
-vi.mock('@/services/functions', () => ({ getPersonDetails }));
+const setParentContact = vi.hoisted(() => vi.fn());
+const addParent = vi.hoisted(() => vi.fn());
+vi.mock('@/services/functions', () => ({ getPersonDetails, setParentContact, addParent }));
+vi.mock('@/context/toastContext', () => ({ useToast: () => ({ show: vi.fn() }) }));
+vi.mock('@/context/dataContext', () => ({ useData: () => ({ refreshRoster: vi.fn() }) }));
 
 const FIRST_SEEN = new Date('2026-02-13T19:30:00');
 
@@ -69,6 +74,8 @@ describe('NewVisitorList', () => {
   beforeEach(() => {
     invalidatePersonDetails();
     getPersonDetails.mockReset();
+    setParentContact.mockReset();
+    addParent.mockReset();
     // Nothing on file, which is the state every test below is about.
     getPersonDetails.mockResolvedValue({ data: null });
   });
@@ -76,18 +83,45 @@ describe('NewVisitorList', () => {
   it('offers a Planning Center student the same action as a quick-added one', async () => {
     show([quickAdded(), fromRoster()], new Map([['pco_4200014', false]]));
 
-    // The quick-add is finished in Tally; the roster student is fixed upstream.
-    // Different destinations, but both are something to press.
-    expect(screen.getByRole('link', { name: /Add parent contact for Kylie Novak/ })).toHaveAttribute(
+    // The quick-add has no upstream record to write onto, so their profile —
+    // where the push lives — is still the destination. The roster student's
+    // contact can be typed in from here.
+    expect(screen.getByRole('link', { name: 'Add parent contact for Kylie Novak' })).toHaveAttribute(
       'href',
       '/students/tally-1',
     );
     expect(
-      screen.getByRole('link', { name: /Add a parent contact for Janet Lee in Planning Center/ }),
-    ).toHaveAttribute('href', 'https://people.planningcenteronline.com/people/AC4200014');
+      screen.getByRole('button', { name: 'Add parent contact for Janet Lee' }),
+    ).toBeInTheDocument();
 
     // And the sentence it replaced is gone.
     expect(screen.queryByText(/Nobody can follow up/)).not.toBeInTheDocument();
+  });
+
+  it('takes the contact on this screen rather than sending anybody to another one', async () => {
+    // The row press used to be a link into Planning Center in a new tab, which
+    // on a `full` install is a trip to another product to type two fields Tally
+    // is allowed to write itself.
+    getPersonDetails.mockResolvedValue({
+      data: {
+        pcoPersonId: '4200014',
+        parentName: 'Wen Lee',
+        parentPhone: null,
+        parentEmail: null,
+        allergies: null,
+        householdAdult: true,
+        contactWritable: true,
+        profileWritable: true,
+        parentCreatable: false,
+      },
+    });
+
+    show([fromRoster()], new Map([['pco_4200014', false]]));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add parent contact for Janet Lee' }));
+
+    expect(await screen.findByLabelText('Parent phone')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save to Planning Center' })).toBeInTheDocument();
   });
 
   it('badges a roster student the screen already knows nobody can reach', () => {
@@ -127,7 +161,7 @@ describe('NewVisitorList', () => {
 
     expect(screen.queryByText('Incomplete')).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('link', { name: /Add a parent contact for Janet Lee/ }),
+      screen.queryByRole('button', { name: 'Add parent contact for Janet Lee' }),
     ).not.toBeInTheDocument();
     // It falls through to the lookup instead, which speaks for itself.
     expect(await screen.findByText(/Planning Center no longer has a record/)).toBeInTheDocument();
@@ -142,6 +176,8 @@ describe('NewVisitorList', () => {
     show([quickAdded()], new Map([['tally-1', true]]));
 
     expect(screen.getByText('Incomplete')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Add parent contact for Kylie Novak/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Add parent contact for Kylie Novak' }),
+    ).toBeInTheDocument();
   });
 });
