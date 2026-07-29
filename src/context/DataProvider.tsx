@@ -28,6 +28,18 @@ const EVENT_WINDOW_DAYS = 120;
 const ROSTER_REFRESH_MS = 10 * 60 * 1000;
 
 /**
+ * How recently the roster must have been read for coming back to the tab to
+ * leave it alone.
+ *
+ * The visibility resync below is for a phone that has been in a pocket, not for
+ * a counselor who flicked to their texts and back. Without a floor, every such
+ * flick spent a Planning Center round-trip — and, because a read in flight is
+ * what the insights screen waits on, blanked every tile on that screen on the
+ * way out and filled it back in on the way home.
+ */
+const ROSTER_RESYNC_AFTER_MS = 60 * 1000;
+
+/**
  * A cheap identity for a roster, so an unchanged one can be dropped.
  *
  * The provider paints from this device's saved copy immediately and then reads
@@ -84,6 +96,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // immediately rather than an empty roster with a spinner over it.
   const [roster, setRoster] = useState<Student[]>(() => cachedRoster()?.students ?? []);
   const [rosterLoading, setRosterLoading] = useState(true);
+  const [rosterSettled, setRosterSettled] = useState(false);
   const [rosterError, setRosterError] = useState<PcoErrorReport | null>(null);
   const [rosterOffline, setRosterOffline] = useState(() => cachedRoster() !== null);
   const [rosterFetchedAt, setRosterFetchedAt] = useState<Date | null>(null);
@@ -152,6 +165,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
    */
   const pending = useRef<{ force: boolean } | null>(null);
 
+  /**
+   * When a read last finished, landed or failed, for the freshness floor above.
+   *
+   * A failed read counts: Planning Center being unreachable is not a reason to
+   * ask it again every time the tab regains focus. Only the visibility resync
+   * consults this — the ten-minute interval and the "Try again" button both call
+   * `refreshRoster` directly, because both are already deliberate about when.
+   */
+  const lastAttemptAt = useRef(0);
+
   const refreshRoster = useCallback(async (force = false) => {
     if (inFlight.current) {
       // `force` is sticky: a deliberate refresh must not be downgraded by an
@@ -167,7 +190,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setRoster((current) =>
         rosterSignature(current) === rosterSignature(snapshot.students) ? current : snapshot.students,
       );
-      setRosterFetchedAt(snapshot.fetchedAt);
+      /*
+       * Compared by instant rather than by identity, for the same reason the
+       * signature above compares people rather than arrays.
+       *
+       * `fetchRoster` builds a new `Date` on every call, so setting this
+       * unconditionally published a new context value — and re-rendered every
+       * screen reading `useData` — even when the server had answered out of its
+       * own cache with the very same timestamp. It made the signature check
+       * pointless: the roster was correctly recognised as unchanged and then
+       * announced as changed anyway, one line later, for a relative time on the
+       * settings screen.
+       */
+      setRosterFetchedAt((current) =>
+        current?.getTime() === snapshot.fetchedAt?.getTime() ? current : snapshot.fetchedAt,
+      );
       setRosterOffline(false);
       setRosterError(null);
     } catch (cause) {
@@ -177,7 +214,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setRosterOffline(true);
     } finally {
       inFlight.current = false;
+      lastAttemptAt.current = Date.now();
       setRosterLoading(false);
+      setRosterSettled(true);
 
       const queued = pending.current;
       pending.current = null;
@@ -193,7 +232,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     // Coming back to a phone that has been in a pocket is the moment the roster
     // is most likely to be stale and most likely to matter.
     const resync = () => {
-      if (document.visibilityState === 'visible') void refreshRoster();
+      if (document.visibilityState !== 'visible') return;
+      if (Date.now() - lastAttemptAt.current < ROSTER_RESYNC_AFTER_MS) return;
+      void refreshRoster();
     };
     document.addEventListener('visibilitychange', resync);
 
@@ -244,6 +285,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       loading,
       error,
       rosterLoading,
+      rosterSettled,
       rosterError,
       rosterOffline,
       rosterFetchedAt,
@@ -257,6 +299,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       loading,
       error,
       rosterLoading,
+      rosterSettled,
       rosterError,
       rosterOffline,
       rosterFetchedAt,

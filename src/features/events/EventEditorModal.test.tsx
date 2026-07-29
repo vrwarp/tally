@@ -71,6 +71,7 @@ function show(event: TallyEvent | null = null) {
     loading: false,
     error: null,
     rosterLoading: false,
+    rosterSettled: true,
     rosterError: null,
     rosterOffline: false,
     rosterFetchedAt: null,

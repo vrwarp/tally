@@ -98,6 +98,7 @@ function open(student: Student | null, onSaved = vi.fn()) {
     loading: false,
     error: null,
     rosterLoading: false,
+    rosterSettled: true,
     rosterError: null,
     rosterOffline: false,
     rosterFetchedAt: null,

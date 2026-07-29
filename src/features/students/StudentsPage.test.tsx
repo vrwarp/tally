@@ -87,6 +87,7 @@ function renderRoster(students: Student[], reachable: Record<string, boolean> = 
     loading: false,
     error: null,
     rosterLoading: false,
+    rosterSettled: true,
     rosterError: null,
     rosterOffline: false,
     rosterFetchedAt: TODAY,
