@@ -85,7 +85,7 @@ const MAX_EVENTS = 24;
 const ALL = 'all';
 
 export function DashboardPage() {
-  const { students, events, series, settings, loading, rosterLoading } = useData();
+  const { students, events, series, settings, loading, rosterLoading, rosterSettled } = useData();
   const now = useNow(60_000);
   const [selected, setSelected] = useState<string>(ALL);
 
@@ -264,8 +264,16 @@ export function DashboardPage() {
    * half streams in from Firestore in milliseconds. Waiting only for an *empty*
    * roster therefore waited for nothing at all — five quick-added visitors were
    * enough to call it loaded and publish a call list missing everybody else.
+   *
+   * Only until the first read settles, though. `rosterLoading` is equally true
+   * of every re-read after it, including the one fired on coming back to the
+   * tab, and waiting on that meant a counselor returning from their texts
+   * watched every tile blank to a dash and every list vanish — the screen they
+   * had already read, taken away and handed back a second later. Once a roster
+   * has landed once, these numbers are computed from a real one, and a
+   * revalidation has nothing to correct until it comes back different.
    */
-  const awaitingRoster = rosterLoading;
+  const awaitingRoster = rosterLoading && !rosterSettled;
   /*
    * The same rule, for the same reason, about the other read this screen makes:
    * who has a parent contact is a separate question put to Planning Center, and

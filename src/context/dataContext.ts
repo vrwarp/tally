@@ -36,6 +36,16 @@ export interface DataContextValue {
   /** True while the roster is being read from Planning Center. */
   rosterLoading: boolean;
   /**
+   * True once a read has finished — landed or failed — at least once.
+   *
+   * The distinction `rosterLoading` cannot draw on its own: it is equally true
+   * of the first read, when there is nothing trustworthy on screen, and of the
+   * revalidation fired on coming back to the tab, when there is. A screen that
+   * holds its content behind a skeleton wants the first and not the second, or
+   * it takes back a number the reader has already believed.
+   */
+  rosterSettled: boolean;
+  /**
    * Set when Planning Center could not be reached. The roster may still hold
    * a copy from a previous session, so this is a warning rather than an empty
    * screen — `rosterOffline` says which.

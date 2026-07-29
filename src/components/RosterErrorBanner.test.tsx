@@ -44,6 +44,7 @@ function harness(overrides: Partial<DataContextValue> = {}) {
     loading: false,
     error: null,
     rosterLoading: false,
+    rosterSettled: true,
     rosterError: null,
     rosterOffline: false,
     rosterFetchedAt: null,
