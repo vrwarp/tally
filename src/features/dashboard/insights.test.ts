@@ -24,6 +24,7 @@ import {
   seenAt,
   standingIn,
 } from '@/features/dashboard/insights';
+import { pcoStudentId } from '@/types';
 import type { EventAttendanceSnapshot, TallyEvent } from '@/types';
 import {
   NOW,
@@ -961,6 +962,117 @@ describe('computeNewVisitors', () => {
 
     expect(visitor!.firstEventId).toBe('');
     expect(visitor!.firstEventTitle).toBe('Unknown event');
+  });
+
+  /*
+   * The calendar fallback, and the case that made it necessary.
+   *
+   * A first-timer is on this list from the moment of the tap, but the history
+   * behind it is finished nights only — so for the whole of a visitor's first
+   * evening, which is exactly when a leader reads the row, nothing loaded could
+   * name the gathering they were standing in.
+   */
+  it("names tonight's gathering while its check-in is still open", () => {
+    const tonight = makeEvent({
+      id: `${FRIDAY}-tonight`,
+      title: 'Friday Fellowship: Pizza Night',
+      seriesId: FRIDAY,
+    });
+    const student = makeStudent({ id: 'walked-in-tonight', firstAttendedAt: tonight.startAt });
+
+    const [visitor] = computeNewVisitors(
+      [student],
+      // Every finished night, and they are in none of them.
+      events.map((event) => held(event)),
+      settings,
+      NOW,
+      [...events, tonight],
+    );
+
+    expect(visitor!.firstEventId).toBe(tonight.id);
+    expect(visitor!.firstEventTitle).toBe('Friday Fellowship: Pizza Night');
+    expect(visitor!.gatheringKey).toBe(FRIDAY);
+    expect(visitor!.viaOneOff).toBe(false);
+  });
+
+  /*
+   * A quick-added visitor pushed to Planning Center is reachable under a new id
+   * — `mergeRoster` keys the row `pco_…` — while the attendance document keeps
+   * the Tally id it was written under. The join by id cannot be repaired from
+   * the merged row, because the old id is not on it; the instant is.
+   */
+  it('names the night for a visitor whose id has moved to Planning Center', () => {
+    const lastNight = makeEvent({
+      id: `${FRIDAY}-last-night`,
+      seriesId: FRIDAY,
+      startAt: new Date(NOW.getTime() - 86_400_000),
+      endAt: new Date(NOW.getTime() - 86_400_000 + 2 * 3_600_000),
+    });
+    const student = makeStudent({
+      id: pcoStudentId('4711'),
+      pcoPersonId: '4711',
+      firstAttendedAt: lastNight.startAt,
+    });
+
+    const [visitor] = computeNewVisitors(
+      [student],
+      [makeSnapshot(lastNight, ['tally-9f2c'])],
+      settings,
+      NOW,
+      [lastNight],
+    );
+
+    expect(visitor!.firstEventId).toBe(lastNight.id);
+    expect(visitor!.gatheringKey).toBe(FRIDAY);
+  });
+
+  // The attendance record is evidence of the check-in itself; the calendar is
+  // an inference from an instant, and only stands in when there is no evidence.
+  it('prefers the attendance record to a calendar entry sharing the instant', () => {
+    const retreat = makeOneOff({
+      id: 'retreat',
+      title: 'Winter Retreat',
+      startAt: new Date(NOW.getTime() - 2 * 86_400_000),
+    });
+    // The Friday this retreat displaced, dragged onto the same hour afterwards.
+    const coincidence = makeEvent({
+      id: `${FRIDAY}-moved`,
+      seriesId: FRIDAY,
+      startAt: retreat.startAt,
+    });
+    const student = makeStudent({ id: 'retreat-arrival', firstAttendedAt: retreat.startAt });
+
+    const [visitor] = computeNewVisitors(
+      [student],
+      [makeSnapshot(retreat, [student.id])],
+      settings,
+      NOW,
+      [coincidence],
+    );
+
+    expect(visitor!.firstEventTitle).toBe('Winter Retreat');
+    expect(visitor!.viaOneOff).toBe(true);
+    expect(visitor!.gatheringKey).toBeNull();
+  });
+
+  // Naming the wrong gathering is worse than naming none: the row is a
+  // follow-up instruction, and "come back to Friday" is wrong advice to
+  // somebody met on the retreat bus.
+  it('keeps the placeholder when two gatherings began on the same instant', () => {
+    const tonight = makeEvent({ id: `${FRIDAY}-tonight`, seriesId: FRIDAY });
+    const alsoTonight = makeOneOff({
+      id: 'winter-retreat',
+      title: 'Winter Retreat',
+      startAt: tonight.startAt,
+    });
+    const student = makeStudent({ id: 'ambiguous', firstAttendedAt: tonight.startAt });
+
+    const [visitor] = computeNewVisitors([student], [], settings, NOW, [tonight, alsoTonight]);
+
+    expect(visitor!.firstEventId).toBe('');
+    expect(visitor!.firstEventTitle).toBe('Unknown event');
+    expect(visitor!.gatheringKey).toBeNull();
+    expect(visitor!.viaOneOff).toBe(false);
   });
 });
 

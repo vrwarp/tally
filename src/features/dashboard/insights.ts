@@ -428,6 +428,28 @@ export function computeMia(
 }
 
 /**
+ * The gathering that began on exactly this instant, indexed for lookup.
+ *
+ * `firstAttendedAt` is not the moment of the tap: check-in writes the event's
+ * own `startAt` into it, verbatim (`services/attendance.ts`). So the calendar
+ * is a second, independent way to name a first-timer's night — one that needs
+ * no attendance read, and therefore still answers in the three cases a scan of
+ * the loaded snapshots cannot.
+ *
+ * Two gatherings that start on the same instant are not told apart: a wrong
+ * title is worse than none, so a contested instant maps to null and the row
+ * keeps its placeholder.
+ */
+function calendarByStart(events: readonly TallyEvent[]): Map<number, TallyEvent | null> {
+  const byStart = new Map<number, TallyEvent | null>();
+  for (const event of events) {
+    const key = event.startAt.getTime();
+    byStart.set(key, byStart.has(key) ? null : event);
+  }
+  return byStart;
+}
+
+/**
  * First-time attendees inside the recent window.
  *
  * `firstAttendedAt` is written exactly once, on a student's first ever
@@ -438,15 +460,39 @@ export function computeMia(
  * slice: the point of `gatheringKey` is to say which gathering a first-timer
  * walked into, and history narrowed to Sunday would attribute a Friday arrival
  * to Sunday. Callers showing one gathering filter the rows afterwards.
+ *
+ * `calendar` is what stops the row saying "Unknown event" about a visit that
+ * plainly happened. A first-timer arrives on this list the instant they are
+ * checked in, because `firstAttendedAt` is on the student document and streams
+ * live — while the night behind them is named from attendance history, which
+ * is loaded for *finished* events only, and keyed by the student id the
+ * attendance was written under. Three ordinary things break that join:
+ *
+ *  - the night is still open, so the history window does not cover it yet.
+ *    That is every first-timer between the tap and check-in closing — the
+ *    common case, and the one a leader sees while the visitor is still in
+ *    the room;
+ *  - the night has since scrolled out of the window;
+ *  - the student's id has moved, which is what happens when a quick-added
+ *    visitor is pushed to Planning Center: the attendance document keeps the
+ *    Tally id, and the roster row takes the `pco_` one (`mergeRoster`). That
+ *    one never heals on its own, because the old id is not recoverable from
+ *    the merged row.
+ *
+ * The snapshot stays the primary answer — it is evidence of the check-in
+ * itself, and it survives a gathering being moved afterwards. The calendar is
+ * consulted only when that evidence is not loaded.
  */
 export function computeNewVisitors(
   students: readonly Student[],
   snapshots: readonly EventAttendanceSnapshot[],
   settings: AppSettings,
   now: Date,
+  calendar: readonly TallyEvent[] = [],
 ): NewVisitor[] {
   const windowStart = new Date(now.getTime() - settings.newVisitorWindowDays * 86_400_000);
   const oldestFirst = orderSnapshotsNewestFirst(snapshots).reverse();
+  const byStart = calendarByStart(calendar);
 
   const results: NewVisitor[] = [];
 
@@ -458,19 +504,21 @@ export function computeNewVisitors(
     if (!firstAttendedAt || !Number.isFinite(firstAttendedAt.getTime())) continue;
     if (firstAttendedAt < windowStart) continue;
 
-    const firstEvent = oldestFirst.find((snapshot) => snapshot.presentStudentIds.has(student.id));
+    const firstEvent =
+      oldestFirst.find((snapshot) => snapshot.presentStudentIds.has(student.id))?.event ??
+      byStart.get(firstAttendedAt.getTime()) ??
+      null;
 
     results.push({
       student,
-      firstEventId: firstEvent?.event.id ?? '',
-      firstEventTitle: firstEvent?.event.title ?? 'Unknown event',
+      firstEventId: firstEvent?.id ?? '',
+      firstEventTitle: firstEvent?.title ?? 'Unknown event',
       firstAttendedAt,
       // Which gathering they arrived at, or null when they arrived at a one-off
       // — somebody met on the retreat bus is a different follow-up from a
       // first-timer who walked into a Friday, and the row says so.
-      gatheringKey:
-        firstEvent && firstEvent.event.mode === 'recurring' ? chainKey(firstEvent.event) : null,
-      viaOneOff: firstEvent?.event.mode === 'oneoff',
+      gatheringKey: firstEvent?.mode === 'recurring' ? chainKey(firstEvent) : null,
+      viaOneOff: firstEvent?.mode === 'oneoff',
     });
   }
 

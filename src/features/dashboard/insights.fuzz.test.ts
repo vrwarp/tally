@@ -126,6 +126,43 @@ describe('dashboard insight properties', () => {
   });
 
   /*
+   * The row names a night to a leader about to phone a family, so it may only
+   * ever name one it can justify: either the attendance says they were there,
+   * or the gathering began on the very instant check-in stamped onto them. An
+   * instant two gatherings share justifies neither.
+   */
+  forAll('a named first event is one the data can account for', arbitraryDashboard, (input) => {
+    const calendar = input.snapshots.map((snapshot) => snapshot.event);
+    const visitors = computeNewVisitors(
+      input.students,
+      input.snapshots,
+      input.settings,
+      NOW,
+      calendar,
+    );
+
+    for (const visitor of visitors) {
+      if (!visitor.firstEventId) continue;
+
+      const named = calendar.filter((event) => event.id === visitor.firstEventId);
+      expect(named.length).toBeGreaterThan(0);
+
+      const attended = input.snapshots.some(
+        (snapshot) =>
+          snapshot.event.id === visitor.firstEventId &&
+          snapshot.presentStudentIds.has(visitor.student.id),
+      );
+      const startedThen =
+        named.every((event) => event.startAt.getTime() === visitor.firstAttendedAt.getTime()) &&
+        calendar.filter(
+          (event) => event.startAt.getTime() === visitor.firstAttendedAt.getTime(),
+        ).length === 1;
+
+      expect(attended || startedThen).toBe(true);
+    }
+  });
+
+  /*
    * The whole point of the split. A streak is a fact about one gathering, and a
    * row that counted another gathering's nights would put a Sunday regular on
    * the Friday call list — the exact phone call this list exists to avoid.
