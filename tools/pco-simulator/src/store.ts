@@ -264,6 +264,7 @@ export class SimulatorStore {
     if ('medical_notes' in attributes) {
       assign('medical_notes', optionalString(attributes.medical_notes));
     }
+    if ('birthdate' in attributes) assign('birthdate', optionalString(attributes.birthdate));
     if ('child' in attributes) assign('child', attributes.child === true);
     if ('status' in attributes) {
       const inactive = attributes.status === 'inactive';

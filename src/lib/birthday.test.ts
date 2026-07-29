@@ -4,10 +4,13 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  birthdayParts,
   birthdayState,
+  composeBirthday,
   daysToBirthday,
   formatBirthdayLong,
   formatBirthdayShort,
+  isRealBirthday,
 } from '@/lib/birthday';
 
 /** Sat 14 March 2026. */
@@ -78,5 +81,78 @@ describe('formatting a birthday', () => {
   it('has nothing to say when there is no birthday', () => {
     expect(formatBirthdayShort(null, MARCH_14)).toBeNull();
     expect(formatBirthdayLong(null)).toBeNull();
+  });
+});
+
+describe('taking a birthday apart', () => {
+  it('gives the edit form its two boxes back', () => {
+    expect(birthdayParts('03-14')).toEqual({ month: 3, day: 14 });
+    expect(birthdayParts('12-01')).toEqual({ month: 12, day: 1 });
+  });
+
+  it('has nothing to hand back when there is no birthday on file', () => {
+    expect(birthdayParts(null)).toBeNull();
+    expect(birthdayParts(undefined)).toBeNull();
+    expect(birthdayParts('')).toBeNull();
+    // The year is never sent to a browser, so a date carrying one is not a
+    // roster value and reads as absent rather than being trusted.
+    expect(birthdayParts('2011-03-14')).toBeNull();
+    expect(birthdayParts('13-40')).toBeNull();
+  });
+});
+
+describe('isRealBirthday', () => {
+  it('accepts the days each month actually has', () => {
+    expect(isRealBirthday(1, 31)).toBe(true);
+    expect(isRealBirthday(4, 31)).toBe(false);
+    expect(isRealBirthday(2, 30)).toBe(false);
+  });
+
+  /**
+   * The year is optional, so 29 February has to be a day somebody can type
+   * before they have said which year they mean.
+   */
+  it('takes February at its leap-year length without a year', () => {
+    expect(isRealBirthday(2, 29)).toBe(true);
+  });
+
+  it('checks the real February once a year is given', () => {
+    expect(isRealBirthday(2, 29, 2008)).toBe(true);
+    expect(isRealBirthday(2, 29, 2011)).toBe(false);
+    // Divisible by 100 and not by 400, so not a leap year.
+    expect(isRealBirthday(2, 29, 1900)).toBe(false);
+    expect(isRealBirthday(2, 29, 2000)).toBe(true);
+  });
+
+  it('refuses a month or a day that is not one', () => {
+    expect(isRealBirthday(0, 14)).toBe(false);
+    expect(isRealBirthday(13, 14)).toBe(false);
+    expect(isRealBirthday(3, 0)).toBe(false);
+    expect(isRealBirthday(3, 14.5)).toBe(false);
+  });
+
+  it('refuses a year of birth before anybody alive was born', () => {
+    expect(isRealBirthday(3, 14, 1899)).toBe(false);
+    expect(isRealBirthday(3, 14, 1900)).toBe(true);
+  });
+});
+
+describe('composeBirthday', () => {
+  /**
+   * Two shapes, and the difference is the whole point: `MM-DD` asks the server
+   * to keep the year Planning Center holds, because Tally was never shown it.
+   */
+  it('leaves the year out when it was not given', () => {
+    expect(composeBirthday({ month: 3, day: 14 })).toBe('03-14');
+    expect(composeBirthday({ month: 3, day: 14, year: null })).toBe('03-14');
+  });
+
+  it('pads a single-digit month and day', () => {
+    expect(composeBirthday({ month: 1, day: 9, year: 2011 })).toBe('2011-01-09');
+  });
+
+  it('has nothing to send for a date that does not exist', () => {
+    expect(composeBirthday({ month: 2, day: 31 })).toBeNull();
+    expect(composeBirthday({ month: 2, day: 29, year: 2011 })).toBeNull();
   });
 });

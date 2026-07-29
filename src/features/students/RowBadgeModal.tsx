@@ -18,13 +18,14 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Badge, Button, ErrorBanner, Modal, Spinner } from '@/components/ui';
+import { EditBirthday } from '@/features/students/EditBirthday';
 import { ParentContactPanel } from '@/features/students/ParentContactModal';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { invalidateParentContact } from '@/hooks/useParentContact';
 import { invalidatePersonDetails, usePersonDetails } from '@/hooks/usePersonDetails';
-import { birthdayState, formatBirthdayLong } from '@/lib/birthday';
+import { birthdayState, formatBirthdayLong, type BirthdayState } from '@/lib/birthday';
 import { pcoPersonUrl } from '@/lib/planningCenter';
 import { formatShortDate } from '@/lib/time';
 import { pushStudentToPlanningCenter } from '@/services/functions';
@@ -204,57 +205,76 @@ function VisitorPanel({ student, onDone }: { student: Student; onDone: () => voi
 /* -------------------------------------------------------------------------- */
 
 /**
- * Either the date, or where to go and put one.
+ * The date, and — under `full` write-back — the box to correct it in.
  *
- * Tally does not own birthdates and will not start: this is Planning Center's
- * field, on a person Planning Center owns, and the honest thing a roster can do
- * about a blank one is say so and point at the record.
+ * The badge that says "No birthday" is where somebody notices, usually with the
+ * student in front of them having just said when it is. This used to end in a
+ * link to another product: Planning Center owns the field, so the honest thing
+ * was to say so and point at the record. That is still true about ownership and
+ * was a dead end in the one moment the answer was available — so when the church
+ * has turned write-back on, the same panel takes it.
+ *
+ * `profileWritable` is the gate, read from the person details like everywhere
+ * else: the browser cannot see the setting, and offering a box the write path
+ * then refuses is worse than a link.
  */
 function BirthdayPanel({ student, now }: { student: Student; now: Date }) {
   const state = birthdayState(student.birthday, now);
   const upstream = student.pcoPersonId ? pcoPersonUrl(student.pcoPersonId) : null;
+  const { details, loading, loaded } = usePersonDetails(student);
+  const writable = Boolean(student.pcoPersonId) && details?.profileWritable === true;
+  const [editing, setEditing] = useState(false);
 
-  if (state === 'missing') {
-    return (
-      <div className="flex flex-col gap-3">
-        <p className="text-sm text-ink-300">
-          Planning Center holds no birthdate for {student.firstName}, so Tally cannot tell you when
-          to say something. It is their field to fill in — Tally reads it and never writes it.
-        </p>
-        {upstream ? (
-          <a
-            href={upstream}
-            target="_blank"
-            rel="noreferrer"
-            className="text-sm text-brand-300 underline underline-offset-4"
-          >
-            Open {student.firstName} in Planning Center
-          </a>
-        ) : (
-          <p className="text-sm text-ink-400">
-            {student.firstName} does not exist in Planning Center yet, so there is nowhere to put
-            one until their push lands.
-          </p>
-        )}
-      </div>
-    );
-  }
-
-  const said: Record<Exclude<typeof state, 'missing'>, string> = {
+  const said: Record<Exclude<BirthdayState, 'missing'>, string> = {
     today: 'Today.',
     soon: 'Coming up this week.',
     recent: 'Just gone — this past week.',
     quiet: 'Not near today.',
   };
 
+  if (editing) return <EditBirthday student={student} onDone={() => setEditing(false)} />;
+
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-2xl font-bold text-ink-50">{formatBirthdayLong(student.birthday)}</p>
-      <p className="text-sm text-ink-400">{said[state]}</p>
-      <p className="text-sm text-ink-500">
-        The day only. Tally is not sent the year, so it does not know how old {student.firstName}{' '}
-        is.
-      </p>
+      {state === 'missing' ? (
+        <p className="text-sm text-ink-300">
+          Planning Center holds no birthdate for {student.firstName}, so Tally cannot tell you when
+          to say something.
+        </p>
+      ) : (
+        <>
+          <p className="text-2xl font-bold text-ink-50">{formatBirthdayLong(student.birthday)}</p>
+          <p className="text-sm text-ink-400">{said[state]}</p>
+          <p className="text-sm text-ink-500">
+            The day only. Tally is not sent the year, so it does not know how old{' '}
+            {student.firstName} is.
+          </p>
+        </>
+      )}
+
+      {writable ? (
+        <div className="mt-1 flex justify-end">
+          <Button variant="secondary" onClick={() => setEditing(true)}>
+            {state === 'missing' ? 'Add a birthday' : 'Change it'}
+          </Button>
+        </div>
+      ) : loading && !loaded ? (
+        <p className="text-sm text-ink-500">Reading what Planning Center allows…</p>
+      ) : upstream ? (
+        <a
+          href={upstream}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-1 text-sm text-brand-300 underline underline-offset-4"
+        >
+          {state === 'missing' ? 'Add one in Planning Center' : 'Change it in Planning Center'}
+        </a>
+      ) : (
+        <p className="text-sm text-ink-400">
+          {student.firstName} does not exist in Planning Center yet, so there is nowhere to put one
+          until their push lands.
+        </p>
+      )}
     </div>
   );
 }

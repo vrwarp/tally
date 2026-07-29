@@ -12,7 +12,8 @@
  * That is the whole reason this module exists rather than the form writing a
  * student document and letting the reconcile sweep notice the drift:
  *
- *   - Tally holds no copy of a linked student's name, grade or allergies. A
+ *   - Tally holds no copy of a linked student's name, grade, birthday or
+ *     allergies — of the birthday it holds only the day, never the year. A
  *     form that wrote one would put the church's own data back in Firestore,
  *     which is exactly what removing the mirror got rid of — and `mergeRoster`
  *     would ignore it anyway, so the edit would not even show.
@@ -23,6 +24,9 @@
  * Restraint, as everywhere on this side of the line: only the attributes that
  * actually changed are sent, nothing else on the person is touched, and a
  * student with no upstream record is refused rather than created.
+ *
+ * The birthday is the awkward one, because it is the only field Tally is shown
+ * *less* of than it can write — see the Birthdays section below.
  */
 import { ABSOLUTE_MAX_GRADE, ABSOLUTE_MIN_GRADE, type PcoConfig } from '../config.js';
 import type { PcoClient } from './client.js';
@@ -71,6 +75,22 @@ export interface StudentProfilePatch {
   lastName?: string;
   grade?: number;
   allergies?: string | null;
+  /**
+   * `MM-DD`, or `YYYY-MM-DD` when the year is being set too.
+   *
+   * Two shapes because Tally is never *told* the year — the roster carries the
+   * day only, deliberately, so a leader correcting the day on a birthday already
+   * on file cannot retype a year they have not been shown. `MM-DD` therefore
+   * means "this day, keeping whatever year Planning Center holds", and is
+   * refused on a person with no birthdate at all, because there is no year to
+   * keep and inventing one puts a wrong age on a child's record.
+   *
+   * No `null`. Every other field here can be cleared; this one cannot, because
+   * deleting a date of birth is not a correction anybody makes from a roster
+   * badge, and Tally not holding the value means a blank box has never been
+   * evidence that somebody meant to empty it.
+   */
+  birthday?: string;
 }
 
 export interface UpdateStudentProfileOptions extends StudentProfilePatch {
@@ -79,6 +99,8 @@ export interface UpdateStudentProfileOptions extends StudentProfilePatch {
   config: PcoConfig;
   /** Tally student id — `pco_123` for a roster student. */
   studentId: string;
+  /** Defaults to the real clock. Only read to refuse a year of birth in the future. */
+  now?: Date;
   logger?: FunctionLogger;
 }
 
@@ -93,6 +115,128 @@ function result(
 function trimmed(value: string | null | undefined): string | null {
   const text = (value ?? '').trim();
   return text.length > 0 ? text : null;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Birthdays                                                                   */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * A birthday is the one field here that arrives incomplete on purpose.
+ *
+ * Planning Center stores `birthdate` as a whole date and Tally is never sent the
+ * year — the roster carries `MM-DD` and nothing else, so that a browser holding
+ * eighty-five children does not hold eighty-five dates of birth. That makes the
+ * edit asymmetric: a leader can see and correct the day, and cannot see the year
+ * to retype it.
+ *
+ * So `MM-DD` means "this day, keeping the year already upstream" and is resolved
+ * against a fresh read of the person. When there is no birthdate at all there is
+ * no year to keep, and this refuses rather than choosing one: Planning Center
+ * shows an age computed from this field, and a guessed year is a wrong age on a
+ * child's permanent record that nobody would ever think to check.
+ */
+
+/** Days in each month, taking February at its leap-year length. */
+const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31] as const;
+
+function isLeapYear(year: number): boolean {
+  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+}
+
+/** The earliest year of birth this will accept. */
+const EARLIEST_BIRTH_YEAR = 1900;
+
+/**
+ * Whether a date somebody typed is a date that exists.
+ *
+ * A month and a day alone are checked against the longest February, because 29
+ * February is a birthday people have and the year is optional here. Given a
+ * year, the same date is checked against that year's real February, so
+ * "29 February 2011" is refused rather than written and silently moved to 1
+ * March by the far end.
+ *
+ * Must stay in step with `isRealBirthday` in src/lib/birthday.ts.
+ */
+export function isRealBirthday(month: number, day: number, year: number | null): boolean {
+  if (!Number.isInteger(month) || month < 1 || month > 12) return false;
+  if (!Number.isInteger(day) || day < 1) return false;
+
+  if (year === null) return day <= DAYS_IN_MONTH[month - 1];
+
+  if (!Number.isInteger(year) || year < EARLIEST_BIRTH_YEAR) return false;
+  const limit = month === 2 && !isLeapYear(year) ? 28 : DAYS_IN_MONTH[month - 1];
+  return day <= limit;
+}
+
+export interface BirthdayPatch {
+  month: number;
+  day: number;
+  /** Null when the caller is changing the day and leaving the year alone. */
+  year: number | null;
+}
+
+/**
+ * `MM-DD` or `YYYY-MM-DD` as the two numbers or three that it is, or null when
+ * it is neither.
+ *
+ * A year in the future is not a year of birth, and one in the past century that
+ * belongs to a grandparent typed into the wrong box is not either — but only the
+ * first of those is knowable, so only the first is refused.
+ *
+ * Must stay in step with `composeBirthday` in src/lib/birthday.ts.
+ */
+export function parseBirthdayPatch(raw: string, now: Date): BirthdayPatch | null {
+  const text = raw.trim();
+
+  const match = /^(?:(\d{4})-)?(\d{2})-(\d{2})$/.exec(text);
+  if (!match) return null;
+
+  const year = match[1] === undefined ? null : Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+
+  if (year !== null && year > now.getFullYear()) return null;
+  if (!isRealBirthday(month, day, year)) return null;
+
+  return { month, day, year };
+}
+
+/** The year Planning Center already holds on this person, or null. */
+function heldBirthYear(birthdate: string | null): number | null {
+  const match = /^(\d{4})-\d{2}-\d{2}/.exec(birthdate ?? '');
+  return match ? Number(match[1]) : null;
+}
+
+export type BirthdateResolution =
+  /** The whole date to send, or null when it already matches what is upstream. */
+  | { ok: true; birthdate: string | null }
+  /** `MM-DD` on a person with no birthdate: no year to keep, and none invented. */
+  | { ok: false; reason: 'no-year' }
+  /** 29 February kept against a year on file that does not have one. */
+  | { ok: false; reason: 'not-in-that-year' };
+
+/**
+ * The `YYYY-MM-DD` this edit means, given what Planning Center currently holds.
+ *
+ * A 29 February day kept against a year with no 29 February in it is refused
+ * rather than moved to 1 March: the year on file belongs to a person, and if it
+ * makes the date impossible then one of the two is wrong and a leader should say
+ * which.
+ */
+export function resolveBirthdate(
+  wanted: BirthdayPatch,
+  heldBirthdate: string | null,
+): BirthdateResolution {
+  const year = wanted.year ?? heldBirthYear(heldBirthdate);
+  if (year === null) return { ok: false, reason: 'no-year' };
+  if (!isRealBirthday(wanted.month, wanted.day, year)) {
+    return { ok: false, reason: 'not-in-that-year' };
+  }
+
+  const pad = (value: number) => String(value).padStart(2, '0');
+  const birthdate = `${year}-${pad(wanted.month)}-${pad(wanted.day)}`;
+  return { ok: true, birthdate: birthdate === trimmed(heldBirthdate) ? null : birthdate };
 }
 
 /**
@@ -140,6 +284,7 @@ const FIELD_LABELS: Record<string, string> = {
   nickname: 'nickname',
   grade: 'grade',
   medical_notes: 'allergies',
+  birthdate: 'birthday',
 };
 
 function describe(wrote: readonly string[]): string {
@@ -183,6 +328,19 @@ export async function updateStudentProfile(
       return result('invalid', `Grade has to be between ${ABSOLUTE_MIN_GRADE} and ${ABSOLUTE_MAX_GRADE}.`);
     }
   }
+  /*
+   * The shape of the date now; the year it resolves to only once the person has
+   * been read. Refusing "31 February" before a network round trip is worth the
+   * split, and the year genuinely cannot be settled until we know what is on
+   * file.
+   */
+  const wantedBirthday =
+    options.birthday === undefined
+      ? null
+      : parseBirthdayPatch(options.birthday, options.now ?? new Date());
+  if (options.birthday !== undefined && wantedBirthday === null) {
+    return result('invalid', 'That is not a date. Give a day and a month, and a year if you have it.');
+  }
 
   const target = await resolveStudentPerson(db, studentId);
   if (!target.exists || !target.active) {
@@ -204,6 +362,23 @@ export async function updateStudentProfile(
   }
 
   const attributes = changedAttributes(options, person.data);
+
+  if (wantedBirthday) {
+    const resolved = resolveBirthdate(
+      wantedBirthday,
+      trimmed((person.data.attributes ?? {}).birthdate),
+    );
+    if (!resolved.ok) {
+      return result(
+        'invalid',
+        resolved.reason === 'no-year'
+          ? 'Planning Center holds no birthdate for this student, so there is no year to keep the day against. Give the year too.'
+          : 'Planning Center holds a year for this student that has no 29 February in it. Give the year as well, so the whole date is one somebody decided on.',
+      );
+    }
+    if (resolved.birthdate !== null) attributes.birthdate = resolved.birthdate;
+  }
+
   const wrote = Object.keys(attributes);
   if (wrote.length === 0) {
     return result('unchanged', 'Planning Center already matches. Nothing was changed there.');
@@ -214,7 +389,8 @@ export async function updateStudentProfile(
   });
 
   // The field names, never the values: this line lands in a log a church admin
-  // may read, and a minor's medical note has no business being in one.
+  // may read, and neither a minor's medical note nor their date of birth has any
+  // business being in one.
   logger.info('Updated a Planning Center profile from Tally', {
     studentId,
     pcoPersonId: target.personId,

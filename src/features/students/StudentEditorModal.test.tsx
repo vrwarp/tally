@@ -253,6 +253,96 @@ describe('when write-back is full', () => {
     expect(screen.getByLabelText(/Status/)).toBeDisabled();
     expect(screen.getByText(/Remove from roster/)).toBeInTheDocument();
   });
+
+  /**
+   * The birthday is the one managed field Tally can write more of than it is
+   * shown — the roster carries the day and never the year — so these are about
+   * the year staying out of the way rather than about the day.
+   */
+  describe('the birthday', () => {
+    it('opens on the day Planning Center holds, with the year blank', () => {
+      open(linked({ birthday: '06-28' }));
+
+      expect(screen.getByLabelText('Month')).toHaveValue('6');
+      expect(screen.getByLabelText('Day')).toHaveValue('28');
+      expect(screen.getByLabelText('Year')).toHaveValue('');
+    });
+
+    it('sends the corrected day on its own, so the year upstream is kept', async () => {
+      open(linked({ birthday: '06-28' }));
+
+      const day = screen.getByLabelText('Day');
+      await userEvent.clear(day);
+      await userEvent.type(day, '26');
+      await save();
+
+      await waitFor(() => expect(updateStudentProfile).toHaveBeenCalled());
+      expect(updateStudentProfile.mock.calls[0]?.[0]).toMatchObject({ birthday: '06-26' });
+    });
+
+    it('sends the whole date when a leader types the year too', async () => {
+      open(linked({ birthday: null }));
+
+      await userEvent.selectOptions(screen.getByLabelText('Month'), '4');
+      await userEvent.type(screen.getByLabelText('Day'), '2');
+      await userEvent.type(screen.getByLabelText('Year'), '2013');
+      await save();
+
+      await waitFor(() => expect(updateStudentProfile).toHaveBeenCalled());
+      expect(updateStudentProfile.mock.calls[0]?.[0]).toMatchObject({ birthday: '2013-04-02' });
+    });
+
+    /**
+     * The bug this exists to stop: a leader fixing a *name* on a student with no
+     * birthdate upstream. Sending the birthday on every save — as every other
+     * managed field is — would make the server refuse the whole edit for want of
+     * a year nobody was asked for.
+     */
+    it('is left out of a save that did not touch it', async () => {
+      open(linked({ birthday: null }));
+
+      const first = screen.getByLabelText(/First name/);
+      await userEvent.clear(first);
+      await userEvent.type(first, 'Sofía');
+      await save();
+
+      await waitFor(() => expect(updateStudentProfile).toHaveBeenCalled());
+      expect(updateStudentProfile.mock.calls[0]?.[0]).not.toHaveProperty('birthday');
+    });
+
+    it('asks for the year rather than sending a day with nothing to anchor it', async () => {
+      open(linked({ birthday: null }));
+
+      await userEvent.selectOptions(screen.getByLabelText('Month'), '4');
+      await userEvent.type(screen.getByLabelText('Day'), '2');
+      await save();
+
+      expect(await screen.findByText(/the year is needed too/)).toBeInTheDocument();
+      expect(updateStudentProfile).not.toHaveBeenCalled();
+      // Refused before anything at all was written, not after a partial save.
+      expect(updateStudent).not.toHaveBeenCalled();
+    });
+
+    it('refuses a day that month does not have', async () => {
+      open(linked({ birthday: '06-28' }));
+
+      await userEvent.selectOptions(screen.getByLabelText('Month'), '2');
+      const day = screen.getByLabelText('Day');
+      await userEvent.clear(day);
+      await userEvent.type(day, '31');
+      await save();
+
+      expect(await screen.findByText(/does not exist/)).toBeInTheDocument();
+      expect(updateStudentProfile).not.toHaveBeenCalled();
+    });
+
+    it('offers no birthday boxes at all when Tally may not write them', () => {
+      personDetails.current = details({ profileWritable: false, contactWritable: false });
+      open(linked());
+
+      expect(screen.queryByLabelText('Month')).not.toBeInTheDocument();
+    });
+  });
 });
 
 describe('parent contact', () => {

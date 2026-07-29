@@ -372,6 +372,13 @@ export const updateStudentProfile = httpsCallable<
     lastName?: string;
     grade?: number;
     allergies?: string | null;
+    /**
+     * `MM-DD` to change the day and keep the year Planning Center holds, or
+     * `YYYY-MM-DD` to set the whole date — which is the only way to fill in a
+     * blank one, since there is then no year to keep. Build it with
+     * `composeBirthday`. No `null`: this field cannot be cleared from Tally.
+     */
+    birthday?: string;
   },
   UpdateStudentProfileResult
 >(functions, 'updateStudentProfile');

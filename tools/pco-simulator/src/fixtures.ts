@@ -375,6 +375,8 @@ export const FIXTURE_IDS = {
   ivyNoGrade: '4200015',
   oliverFifthGrader: '4200016',
   ruthInactive: '4200017',
+  /** No `birthdate` upstream at all: nothing for a day-only edit to keep. */
+  naomiNoBirthday: '4200009',
   dexterGrandparent: '4200018',
   /** In a household of his own, with no adult in it — nobody to ring. */
   marcusNoAdultAtHome: '4200014',
