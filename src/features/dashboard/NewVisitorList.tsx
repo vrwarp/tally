@@ -21,7 +21,7 @@ import { Link } from 'react-router-dom';
 import { Badge, Card, CardHeader, EmptyState } from '@/components/ui';
 import { AddParentContactButton } from '@/features/dashboard/AddParentContactButton';
 import { FollowUpActions } from '@/features/dashboard/FollowUpActions';
-import { hasNoParentContact } from '@/features/dashboard/insights';
+import { hasNoParentContact, reachableFor } from '@/features/dashboard/insights';
 import { formatRelative, formatShortDate } from '@/lib/time';
 import { initials, ordinalGrade } from '@/lib/utils';
 import { studentFullName, type NewVisitor } from '@/types';
@@ -42,6 +42,10 @@ export interface NewVisitorListProps {
    * list that consulted only the flag could never mark one of them incomplete,
    * however certain the screen already was. An absent entry stays `null`:
    * "nobody asked" must not render as "nobody can reach them".
+   *
+   * Read through `reachableFor`, because a first-timer is exactly the student
+   * this map files under an id their row does not have yet: quick-added under
+   * Tally's id, answered for under Planning Center's.
    */
   reachable?: ReadonlyMap<string, boolean>;
   /**
@@ -83,7 +87,7 @@ export function NewVisitorList({
             <NewVisitorRow
               key={visitor.student.id}
               visitor={visitor}
-              reachable={reachable?.get(visitor.student.id)}
+              reachable={reachable ? reachableFor(visitor.student, reachable) : undefined}
               onContactAdded={onContactAdded}
             />
           ))}

@@ -174,11 +174,19 @@ describe('FollowUpActions', () => {
     expect(screen.getByRole('link', { name: /Text Wen Chen/ })).toHaveTextContent('Text parent');
   });
 
-  it('names the parent beside the number where there is room for it', async () => {
+  it('prints the number and nothing beside it', async () => {
+    /*
+     * Whose number it is belongs on the buttons, not next to the digits. The
+     * parent's name reads well there and costs about 120px on the one row that
+     * folds onto a single line — where it came out of the student's own name,
+     * measured at nothing at all on a 1280px laptop. Pinned because the pull to
+     * add it back is strong and the damage is invisible in a unit test.
+     */
     getPersonDetails.mockResolvedValue({ data: details({ parentPhone: '(925) 336-6692' }) });
 
     mount(inPlanningCenter());
 
-    expect(await screen.findByText(/Wen Chen ·/)).toBeInTheDocument();
+    expect(await screen.findByText('(925) 336-6692')).toBeInTheDocument();
+    expect(screen.queryByText(/Wen Chen ·/)).not.toBeInTheDocument();
   });
 });

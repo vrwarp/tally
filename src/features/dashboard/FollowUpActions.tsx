@@ -80,8 +80,9 @@ export interface FollowUpActionsProps {
  * for a 12-year-old and never will; what Planning Center hands back is an adult
  * in their household. A row that reads "Aaron Sun … Call" invites exactly the
  * wrong reading of that, and the row above it on the same card is a 6th grader.
- * So the buttons name who is on the other end, and where there is room for it
- * the line beside them names them outright.
+ * So the buttons name who is on the other end. On the buttons rather than
+ * beside them: this component sits in a row that folds onto one line on a
+ * laptop, and every pixel spent there is taken from the student's name.
  */
 export function FollowUpActions({ student, className, onContactAdded }: FollowUpActionsProps) {
   const { details, error, loaded, unavailable, retry, refresh } = usePersonDetails(student);
@@ -174,13 +175,17 @@ export function FollowUpActions({ student, className, onContactAdded }: FollowUp
           fourth line onto it. On a laptop it is the opposite: `tel:` and
           `sms:` are protocols a desktop services unreliably, so a leader
           working this list on a Tuesday morning needs the digits themselves —
-          otherwise the only route to ten numbers is opening ten records. The
-          name goes with them: "who am I about to ring" is a question a phone
-          number does not answer, and on a desktop it costs nothing to say.
+          otherwise the only route to ten numbers is opening ten records.
+
+          The digits and nothing else. Naming the parent here as well reads
+          beautifully and costs about 120px, which on the one row that folds
+          onto a single line comes out of the student's own name — measured at
+          1280px, it took that name to nothing at all. Whose number this is, is
+          said on the buttons instead, where it costs the same width at every
+          size.
         */}
-        <span className="hidden text-xs text-ink-500 lg:inline">
-          {details.parentName ? `${details.parentName} · ` : ''}
-          <span className="tabular-nums">{formatPhone(phone)}</span>
+        <span className="hidden text-xs tabular-nums text-ink-500 lg:inline">
+          {formatPhone(phone)}
         </span>
       </div>
     );
@@ -196,10 +201,7 @@ export function FollowUpActions({ student, className, onContactAdded }: FollowUp
         </ActionLink>
         {/* Same rule as the phone number above: printed where there is room
             for it, and the mailto carries it either way. */}
-        <span className="hidden min-w-0 truncate text-xs text-ink-500 lg:inline">
-          {details.parentName ? `${details.parentName} · ` : ''}
-          {email}
-        </span>
+        <span className="hidden min-w-0 truncate text-xs text-ink-500 lg:inline">{email}</span>
       </div>
     );
   }

@@ -167,6 +167,38 @@ describe('NewVisitorList', () => {
     expect(await screen.findByText(/Planning Center no longer has a record/)).toBeInTheDocument();
   });
 
+  it('follows Planning Center once a quick-add has been pushed', async () => {
+    /*
+     * The half of the tri-state that had no way to resolve. A visitor pushed
+     * upstream keeps Tally's id until a roster read brings them back, while the
+     * answer about their family is filed under Planning Center's — so the row
+     * asked a map that could not have heard of them, fell back to a document
+     * flag that said "nobody can be reached" for ever, and went on saying so
+     * after somebody had added the contact.
+     */
+    getPersonDetails.mockResolvedValue({
+      data: {
+        pcoPersonId: '4200099',
+        parentName: 'Wen Lee',
+        parentPhone: '(510) 706-7079',
+        parentEmail: null,
+        allergies: null,
+        householdAdult: true,
+        contactWritable: false,
+        profileWritable: false,
+        parentCreatable: false,
+      },
+    });
+
+    show(
+      [makeStudent({ id: 'tally-1', isVisitor: true, pcoPersonId: '4200099', profileComplete: null })],
+      new Map([['pco_4200099', true]]),
+    );
+
+    expect(await screen.findByRole('link', { name: /Call Wen Lee/ })).toBeInTheDocument();
+    expect(screen.queryByText('Incomplete')).not.toBeInTheDocument();
+  });
+
   it('trusts Tally over Planning Center for a student Tally created', () => {
     /*
      * A quick-added visitor exists nowhere else, so a `reachable` entry for them

@@ -229,6 +229,27 @@ interface RosterScan {
    */
   personIds: string[];
   /**
+   * The people Tally itself put into Planning Center, whose documents still
+   * carry the id Tally gave them.
+   *
+   * A visitor quick-added at a door is `students/{tally-id}` with no person
+   * behind them. The push writes `pcoPersonId` onto that document — it does not
+   * rename it, because every attendance record already points at the id — so
+   * from then on Tally knows exactly which upstream person they are while the
+   * scan above, which reads the id and nothing else, does not.
+   *
+   * Kept apart from `personIds` rather than folded into it. The roster is a
+   * list of rows the check-in screen draws, and these students are already on
+   * it as their own documents; returning them a second time under a Planning
+   * Center id would put the same child on the door list twice. What they are
+   * missing is not a row — it is an *answer*, about whether anybody can be
+   * reached for them, and that is the one question below that asks for both.
+   *
+   * Trusted for the same reason `personIds` is: the field is written by the
+   * push, server-side. A browser cannot set it.
+   */
+  linkedPersonIds: string[];
+  /**
    * Active students with no Planning Center person yet — the same rows the
    * Students screen marks "Queued". Counted on this pass rather than its own
    * because the collection has already been read.
@@ -240,6 +261,7 @@ interface RosterScan {
 async function scanRoster(database: FirestoreLike): Promise<RosterScan> {
   const snapshot = await database.collection(PATHS.students).get();
   const personIds: string[] = [];
+  const linkedPersonIds: string[] = [];
   let queued = 0;
 
   for (const document of snapshot.docs) {
@@ -258,10 +280,14 @@ async function scanRoster(database: FirestoreLike): Promise<RosterScan> {
 
     const personId = personIdFromStudentId(document.id);
     if (personId) personIds.push(personId);
-    else if (typeof data.pcoPersonId !== 'string' || !data.pcoPersonId) queued += 1;
+    else if (typeof data.pcoPersonId === 'string' && data.pcoPersonId) {
+      // Pushed, so not queued — and not on the roster read either, which is
+      // what left them with no answer at all to the question below.
+      linkedPersonIds.push(data.pcoPersonId);
+    } else queued += 1;
   }
 
-  return { personIds, queued };
+  return { personIds, linkedPersonIds, queued };
 }
 
 /**
@@ -444,11 +470,25 @@ export const getParentContactStatus = onCall<
     if (!client) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
 
     try {
+      const scan = await scanRoster(db());
       return await fetchParentContactStatus({
         client,
         config,
         cache: sharedCache(config),
-        personIds: (await scanRoster(db())).personIds,
+        /*
+         * Both halves of the membership, which is what makes this different
+         * from every other read of the scan.
+         *
+         * A visitor Tally pushed upstream keeps their own document id, so the
+         * roster read does not carry them and this question had no answer for
+         * them — and "no answer" is not "no parent", so the dashboard could
+         * only fall back to the flag on their document, which says `false` for
+         * ever. A contact added through Tally, written into Planning Center and
+         * confirmed by the very next read left them on the "incomplete
+         * profiles" list anyway. Asking about them here is what lets Planning
+         * Center answer for the students Tally itself put there.
+         */
+        personIds: [...scan.personIds, ...scan.linkedPersonIds],
         force: request.data?.force === true,
       });
     } catch (error) {

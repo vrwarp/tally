@@ -264,7 +264,23 @@ test.describe('dashboard', () => {
     await signedInAs('core');
     await gotoReady(page, '/dashboard');
 
-    await page.locator('a[href^="/students/"]').first().click();
+    /*
+     * Out of the MIA list specifically, rather than whichever student link the
+     * page happens to render first.
+     *
+     * The cards do not arrive together — the incomplete-profiles list needs
+     * only the roster, while this one waits for attendance as well — so "the
+     * first student on the dashboard" was whoever won that race. A first-timer
+     * with one visit to their name is a perfectly good row and a useless
+     * subject for this test: it is about a student with history at two
+     * gatherings, and every row here has some by construction.
+     */
+    const mia = page
+      .locator('section')
+      .filter({ has: page.getByRole('heading', { name: /missing in action/i }) })
+      .first();
+    await expect(mia).toBeVisible();
+    await mia.locator('a[href^="/students/"]').first().click();
 
     const attendance = page.getByRole('heading', { name: 'Attendance' });
     await expect(attendance).toBeVisible();

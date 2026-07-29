@@ -118,15 +118,23 @@ function MiaRow({
 
   return (
     /*
-      Four lines on a phone, one line on a laptop.
+      Four lines on a phone, one line on a wide screen.
 
       The row carried the name, two meta lines and a contact line stacked down
-      the left half of a 680px column, so a leader whose whole job is working
-      this list read four names before scrolling. Folded up, all ten and their
-      Call/Text land on one screen. Below `lg` it stays stacked: Call and Text
-      under the name is right at 358px, where they have to be thumb targets.
+      the left half of the column, so a leader whose whole job is working this
+      list read four names before scrolling. Folded up, all ten and their
+      Call/Text land on one screen. Stacked below the fold: Call and Text under
+      the name is right at 358px, where they have to be thumb targets.
+
+      The fold happens at `2xl` rather than `lg`, because that is where it
+      actually fits. This column is 264px wide at 1024 and 520 at 1280 — the
+      folded row wants around 530 before the student's name gets a pixel, so
+      every laptop between the two was rendering a row whose name had been
+      squeezed to nothing while the phone number beside it stayed whole. It is
+      the name that has to survive: a call list of blank rows is not a call
+      list. Past 1536 the column reaches 744 and everything fits at once.
     */
-    <li className="px-3 py-2 lg:flex lg:items-center lg:gap-4">
+    <li className="px-3 py-2 2xl:flex 2xl:items-center 2xl:gap-4">
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <span
           aria-hidden="true"
@@ -187,7 +195,7 @@ function MiaRow({
       <FollowUpActions
         student={student}
         onContactAdded={onContactAdded}
-        className="mt-1 pb-1 pl-14 lg:mt-0 lg:shrink-0 lg:pb-0 lg:pl-0"
+        className="mt-1 pb-1 pl-14 2xl:mt-0 2xl:shrink-0 2xl:pb-0 2xl:pl-0"
       />
     </li>
   );

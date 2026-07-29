@@ -118,6 +118,7 @@ export function toStudent(snapshot: DocumentSnapshot<DocumentData>): Student {
   const fallback = pendingFallback(snapshot);
   const firstName = str(data.firstName);
   const lastName = str(data.lastName);
+  const pcoPersonId = strOrNull(data.pcoPersonId);
 
   return {
     id: snapshot.id,
@@ -127,13 +128,29 @@ export function toStudent(snapshot: DocumentSnapshot<DocumentData>): Student {
     notes: strOrNull(data.notes),
     status: data.status === 'inactive' ? 'inactive' : 'active',
     isVisitor: bool(data.isVisitor),
-    pcoPersonId: strOrNull(data.pcoPersonId),
+    pcoPersonId,
     pcoPushPending: bool(data.pcoPushPending),
     // A Tally document describes somebody Planning Center has not told us
     // about, so this is false by construction. When Planning Center *does* know
     // them, the roster entry wins and carries the real value.
     fromPlanningCenter: false,
-    profileComplete: false,
+    /*
+     * `false` — "nobody can be reached about them" — is only true while there
+     * is nowhere upstream for a parent to live. Tally stores no contact details
+     * and never will, so a document of its own is the whole answer for a
+     * visitor who exists nowhere else.
+     *
+     * The moment their push lands, it stops being the answer and starts being
+     * an accusation about a household nobody has looked at. This used to say
+     * `false` regardless, on the reasoning that the roster entry wins once
+     * Planning Center knows them — which holds only while the roster is
+     * carrying them. It does not in the gap after a push, nor for anyone the
+     * roster read could not resolve, and in that gap the flag outranks
+     * Planning Center's own answer: a contact typed into Tally and written
+     * upstream left the student on the "incomplete profiles" list for good,
+     * because the list was reading a boolean that could never change.
+     */
+    profileComplete: pcoPersonId ? null : false,
     hasAllergies: false,
     // Planning Center's, like the two above it. A quick-added visitor genuinely
     // has no birthday on file until their push lands and the roster answers.
