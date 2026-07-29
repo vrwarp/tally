@@ -176,9 +176,21 @@ export function DashboardPage() {
     [miaRows, activeGathering],
   );
 
+  /*
+   * The whole calendar, not `recentEvents`, and this is the one list here that
+   * wants it.
+   *
+   * A first-timer appears the instant they are checked in — `firstAttendedAt`
+   * is on the student document and streams live — but the history above is
+   * finished nights only, on purpose, so nothing in it can name the night they
+   * are standing in. The row said "Unknown event" for the whole of a visitor's
+   * first evening, which is exactly when a leader reads it. `computeNewVisitors`
+   * falls back to the gathering that began on that instant; passing the events
+   * unfiltered is what lets it.
+   */
   const visitorRows = useMemo(
-    () => computeNewVisitors(students, snapshots, settings, now),
-    [students, snapshots, settings, now],
+    () => computeNewVisitors(students, snapshots, settings, now, events),
+    [students, snapshots, settings, now, events],
   );
   const newVisitors = useMemo(
     () =>
