@@ -16,6 +16,7 @@
  */
 import { Link } from 'react-router-dom';
 import { Badge, Card, CardHeader, EmptyState, Spinner } from '@/components/ui';
+import { AddParentContactButton } from '@/features/dashboard/AddParentContactButton';
 import { formatShortDate } from '@/lib/time';
 import { initials, ordinalGrade } from '@/lib/utils';
 import { studentFullName, type Student } from '@/types';
@@ -38,6 +39,11 @@ export interface IncompleteProfileListProps {
   error?: string | null;
   /** The gathering being shown, or null when every gathering is in the list. */
   gatheringTitle?: string | null;
+  /**
+   * Called when a row has just put a parent contact into Planning Center — the
+   * answer this whole list is built from, and the row has just changed it.
+   */
+  onContactAdded?: () => void;
 }
 
 export function IncompleteProfileList({
@@ -46,6 +52,7 @@ export function IncompleteProfileList({
   checking = false,
   error = null,
   gatheringTitle = null,
+  onContactAdded,
 }: IncompleteProfileListProps) {
   return (
     <Card>
@@ -85,7 +92,12 @@ export function IncompleteProfileList({
       ) : (
         <ul className="divide-y divide-ink-800">
           {students.map((student) => (
-            <IncompleteRow key={student.id} student={student} now={now} />
+            <IncompleteRow
+              key={student.id}
+              student={student}
+              now={now}
+              onContactAdded={onContactAdded}
+            />
           ))}
         </ul>
       )}
@@ -106,7 +118,15 @@ function waitingDays(student: Student, now: Date): number | null {
   return Math.max(0, Math.floor((now.getTime() - student.createdAt.getTime()) / 86_400_000));
 }
 
-function IncompleteRow({ student, now }: { student: Student; now: Date }) {
+function IncompleteRow({
+  student,
+  now,
+  onContactAdded,
+}: {
+  student: Student;
+  now: Date;
+  onContactAdded?: () => void;
+}) {
   const days = waitingDays(student, now);
   const tone =
     days === null ? 'warn' : days >= VERY_STALE_DAYS ? 'danger' : days >= STALE_DAYS ? 'warn' : 'neutral';
@@ -118,52 +138,64 @@ function IncompleteRow({ student, now }: { student: Student; now: Date }) {
         : `Waiting ${days} ${days === 1 ? 'day' : 'days'}`;
 
   return (
-    <li className="flex items-center gap-3 px-3 py-2">
-      <span
-        aria-hidden="true"
-        className="flex size-11 shrink-0 items-center justify-center rounded-full bg-ink-800 text-sm font-bold text-ink-300"
-      >
-        {initials(student.firstName, student.lastName)}
-      </span>
-
-      <Link
-        to={`/students/${student.id}`}
-        className="flex min-h-11 min-w-0 flex-1 flex-col justify-center hover:text-brand-300"
-      >
-        {/*
-          The name gets the line to itself.
-
-          It used to share it with a "Visitor" badge that never shrank, so at
-          390px every name in the card truncated to make room — "Selah M…",
-          "Jayden …", "Bree S…" — and two of the five gave a given name only,
-          which on a forty-five-student roll is not an identification. On the
-          one card whose entire output is a list of people to chase, the person
-          was the only element allowed to give up width. The visitor flag went
-          rather than moved: this card's own subtitle already scopes the list,
-          and the students directory states it on every row.
-        */}
-        <span className="truncate text-base font-semibold text-ink-50">
-          {studentFullName(student)}
+    <li className="px-3 py-2">
+      <div className="flex items-center gap-3">
+        <span
+          aria-hidden="true"
+          className="flex size-11 shrink-0 items-center justify-center rounded-full bg-ink-800 text-sm font-bold text-ink-300"
+        >
+          {initials(student.firstName, student.lastName)}
         </span>
-        <span className="flex items-baseline gap-2">
-          <span className="truncate text-xs text-ink-500">
-            {ordinalGrade(student.grade)} grade ·{' '}
-            {days === null
-              ? 'no parent contact in Planning Center'
-              : `added ${formatShortDate(student.createdAt)}`}
+
+        <Link
+          to={`/students/${student.id}`}
+          className="flex min-h-11 min-w-0 flex-1 flex-col justify-center hover:text-brand-300"
+        >
+          {/*
+            The name gets the line to itself.
+
+            It used to share it with a "Visitor" badge that never shrank, so at
+            390px every name in the card truncated to make room — "Selah M…",
+            "Jayden …", "Bree S…" — and two of the five gave a given name only,
+            which on a forty-five-student roll is not an identification. On the
+            one card whose entire output is a list of people to chase, the person
+            was the only element allowed to give up width. The visitor flag went
+            rather than moved: this card's own subtitle already scopes the list,
+            and the students directory states it on every row.
+          */}
+          <span className="truncate text-base font-semibold text-ink-50">
+            {studentFullName(student)}
           </span>
-          {/* Kept, because its tone is graduated — neutral at a day, warn at a
-              fortnight, danger past a year — which is the only ranking in the
-              card. */}
-          <Badge tone={tone} className="shrink-0">
-            {badge}
-          </Badge>
-        </span>
-      </Link>
+          <span className="flex items-baseline gap-2">
+            <span className="truncate text-xs text-ink-500">
+              {ordinalGrade(student.grade)} grade ·{' '}
+              {days === null
+                ? 'no parent contact in Planning Center'
+                : `added ${formatShortDate(student.createdAt)}`}
+            </span>
+            {/* Kept, because its tone is graduated — neutral at a day, warn at a
+                fortnight, danger past a year — which is the only ranking in the
+                card. */}
+            <Badge tone={tone} className="shrink-0">
+              {badge}
+            </Badge>
+          </span>
+        </Link>
 
-      <span aria-hidden="true" className="shrink-0 text-ink-600">
-        ›
-      </span>
+        <span aria-hidden="true" className="shrink-0 text-ink-600">
+          ›
+        </span>
+      </div>
+
+      {/*
+        The fix, on the card whose whole subject is that it has not been made.
+
+        The row above still opens the profile — there is more to see there than
+        a phone number — but the one thing every student in this list is missing
+        can be typed in from here, without leaving the list somebody is working
+        down.
+      */}
+      <AddParentContactButton student={student} onAdded={onContactAdded} className="mt-1 ml-14" />
     </li>
   );
 }

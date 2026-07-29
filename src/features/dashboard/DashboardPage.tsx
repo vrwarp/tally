@@ -390,6 +390,7 @@ export function DashboardPage() {
                 items={mia}
                 threshold={settings.miaConsecutiveMisses}
                 gatheringTitle={activeGathering?.title ?? null}
+                onContactAdded={parentContact.refresh}
               />
               {/*
                 Ordered by question on a phone, by column on a laptop.
@@ -420,6 +421,7 @@ export function DashboardPage() {
               windowDays={settings.newVisitorWindowDays}
               gatheringTitle={activeGathering?.title ?? null}
               reachable={parentContact.reachable}
+              onContactAdded={parentContact.refresh}
             />
           ) : null}
 
@@ -429,7 +431,11 @@ export function DashboardPage() {
               only list that can say so without any attendance history behind
               it. There are no tabs in that state, so it shows the whole roster
               — which is what "All" means. It still waits for the roster it is a
-              statement about. */}
+              statement about.
+
+              Every one of the three lists on this screen is a view of the same
+              answer — who the ministry can reach — so a contact added in any of
+              them asks Planning Center again for all of them. */}
           {awaitingRoster ? null : (
             <IncompleteProfileList
               students={incomplete}
@@ -437,6 +443,7 @@ export function DashboardPage() {
               checking={awaitingContacts}
               error={parentContact.error}
               gatheringTitle={activeGathering?.title ?? null}
+              onContactAdded={parentContact.refresh}
             />
           )}
 

@@ -7,12 +7,22 @@
  * exactly like an empty list that is finished, which is how this section spent
  * a release looking as though every profile was in order.
  */
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { IncompleteProfileList } from '@/features/dashboard/IncompleteProfileList';
 import { makeStudent } from '../../../tests/factories';
 import type { Student } from '@/types';
+
+// Every row can now open the write form, which is a Planning Center read away.
+const getPersonDetails = vi.hoisted(() => vi.fn());
+vi.mock('@/services/functions', () => ({
+  getPersonDetails,
+  setParentContact: vi.fn(),
+  addParent: vi.fn(),
+}));
+vi.mock('@/context/toastContext', () => ({ useToast: () => ({ show: vi.fn() }) }));
+vi.mock('@/context/dataContext', () => ({ useData: () => ({ refreshRoster: vi.fn() }) }));
 
 const NOW = new Date('2026-02-13T19:30:00');
 
@@ -25,9 +35,23 @@ function show(
       <IncompleteProfileList students={students} now={NOW} {...props} />
     </MemoryRouter>,
   );
+  return screen.queryAllByRole('listitem')[0];
 }
 
 describe('IncompleteProfileList', () => {
+  it('offers the one fix every student on it is waiting for', () => {
+    // The card names a job on every row and used to offer only navigation: the
+    // number itself can be typed in from here now, without leaving the list
+    // somebody is working down.
+    const row = show([
+      makeStudent({ id: 'pco_9', firstName: 'Kylie', lastName: 'Novak', pcoPersonId: '9' }),
+    ]);
+
+    expect(
+      within(row!).getByRole('button', { name: 'Add parent contact for Kylie Novak' }),
+    ).toBeInTheDocument();
+  });
+
   it('ages a quick-added visitor, because a stale one is the emergency', () => {
     show([
       makeStudent({

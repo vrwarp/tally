@@ -23,6 +23,7 @@ import { chainKey } from '@/lib/materialize';
 import { toDateOnlyValue } from '@/lib/recurrenceCore';
 import { wasHeld } from '@/lib/sessionHistory';
 import { sortByName } from '@/lib/utils';
+import { pcoStudentId } from '@/types';
 import type {
   AppSettings,
   EventAttendanceSnapshot,
@@ -520,7 +521,31 @@ export function isUnreachable(
   reachable: ReadonlyMap<string, boolean> = new Map(),
 ): boolean {
   if (student.status !== 'active') return false;
-  return hasNoParentContact(student.profileComplete, reachable.get(student.id));
+  return hasNoParentContact(student.profileComplete, reachableFor(student, reachable));
+}
+
+/**
+ * Planning Center's answer about one student, under whichever id it arrived.
+ *
+ * The map is keyed by Planning Center's own ids (`pco_4200014`), because that
+ * is what a roster read is a list of. Most students are on screen under exactly
+ * that id, so most of the time this is a plain lookup.
+ *
+ * The exception is a visitor Tally created and later pushed upstream. They keep
+ * the id Tally gave them until a roster read brings them back as a person —
+ * which is a moment later at best, and never at all for somebody the read could
+ * not resolve — while the answer about their family is filed under the id
+ * Planning Center gave them. Looking under one id only meant the two halves of
+ * this question could not meet for exactly the students the question is most
+ * often about.
+ */
+export function reachableFor(
+  student: Student,
+  reachable: ReadonlyMap<string, boolean>,
+): boolean | undefined {
+  const own = reachable.get(student.id);
+  if (own !== undefined) return own;
+  return student.pcoPersonId ? reachable.get(pcoStudentId(student.pcoPersonId)) : undefined;
 }
 
 /**

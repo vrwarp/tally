@@ -1055,6 +1055,43 @@ describe('computeIncompleteProfiles', () => {
     expect(computeIncompleteProfiles([visitor], new Map()).map((s) => s.id)).toEqual(['tally-1']);
   });
 
+  /*
+   * The gap between a push and the next roster read, which used to be for ever.
+   *
+   * A visitor quick-added at a door keeps the id Tally gave them until a roster
+   * read brings them back as a Planning Center person. Their document said
+   * `profileComplete: false` throughout, and the flag outranks Planning
+   * Center's answer — so a parent contact typed into Tally, written upstream
+   * and confirmed by the very next read left them on this list anyway, with
+   * nothing anybody could do about it.
+   */
+  it('takes Planning Center\'s answer for a visitor whose push has landed', () => {
+    const pushed = makeStudent({
+      id: 'tally-1',
+      isVisitor: true,
+      pcoPersonId: '4200099',
+      // What `toStudent` reports once a document carries an upstream id: the
+      // answer is Planning Center's now, and nobody has asked yet.
+      profileComplete: null,
+    });
+
+    // Filed under the id Planning Center gave them, which is not the id their
+    // row still has.
+    expect(computeIncompleteProfiles([pushed], new Map([['pco_4200099', false]]))).toHaveLength(1);
+    expect(computeIncompleteProfiles([pushed], new Map([['pco_4200099', true]]))).toEqual([]);
+  });
+
+  it('still trusts Tally about a visitor who exists nowhere else', () => {
+    // No upstream id, so there is no upstream answer to prefer — and a stray
+    // entry under their own id must not talk the list out of a fact their
+    // document is certain about.
+    const own = makeStudent({ id: 'tally-1', isVisitor: true, profileComplete: false });
+
+    expect(computeIncompleteProfiles([own], new Map([['tally-1', true]])).map((s) => s.id)).toEqual([
+      'tally-1',
+    ]);
+  });
+
   it('sorts a roster student behind the visitors, oldest last', () => {
     const visitor = makeStudent({
       id: 'tally-1',

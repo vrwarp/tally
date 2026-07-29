@@ -86,6 +86,33 @@ describe('toStudent', () => {
     expect(understated.fromPlanningCenter).toBe(false);
   });
 
+  it('stops answering for a visitor once their push has landed', () => {
+    /*
+     * `false` means "nobody can be reached about them", and a document is only
+     * entitled to say that while there is nowhere upstream for a parent to
+     * live. After the push there is: the answer belongs to Planning Center, and
+     * `null` — nobody asked — is what lets it be given.
+     *
+     * Said `false` regardless once, on the reasoning that a roster entry wins
+     * as soon as Planning Center knows them. It does, while the roster is
+     * carrying them; it is not in the gap after a push, nor for anybody the
+     * roster read could not resolve. In that gap a contact Tally had just
+     * written upstream could not clear the flag, so the student stayed on the
+     * "incomplete profiles" list permanently.
+     */
+    const pushed = toStudent(fakeSnapshot({ data: { pcoPersonId: '4200099' } }));
+
+    expect(pushed.profileComplete).toBeNull();
+    // Still Tally's document, whatever it now points at.
+    expect(pushed.fromPlanningCenter).toBe(false);
+  });
+
+  it('answers for a visitor who exists nowhere else', () => {
+    const own = toStudent(fakeSnapshot({ data: { pcoPersonId: null } }));
+
+    expect(own.profileComplete).toBe(false);
+  });
+
   it('leaves attendance markers null until the student has been checked in', () => {
     const student = toStudent(fakeSnapshot({ data: {} }));
     expect(student.firstAttendedAt).toBeNull();

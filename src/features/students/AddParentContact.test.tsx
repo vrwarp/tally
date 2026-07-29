@@ -95,6 +95,55 @@ describe('AddParentContact', () => {
     });
   });
 
+  describe('when the host has already asked', () => {
+    /*
+     * The dashboard's rows open this inside a dialog titled "Add parent
+     * contact". Making somebody press a button of the same name on the other
+     * side of that is a tap that says nothing, so those surfaces open the form
+     * itself — and Cancel on one of them has to close the surface rather than
+     * drop back to the offer nobody navigated through.
+     */
+    it('opens straight into the form', () => {
+      render(
+        <AddParentContact student={onRoster()} details={details()} onAdded={vi.fn()} defaultOpen />,
+      );
+
+      expect(screen.getByLabelText('Parent phone')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /＋ Add parent contact/ })).not.toBeInTheDocument();
+    });
+
+    it('hands Cancel back to whoever opened it', async () => {
+      const onCancel = vi.fn();
+      render(
+        <AddParentContact
+          student={onRoster()}
+          details={details()}
+          onAdded={vi.fn()}
+          defaultOpen
+          onCancel={onCancel}
+        />,
+      );
+
+      await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+      expect(onCancel).toHaveBeenCalled();
+    });
+
+    it('still refuses where Tally may not write, however it was opened', () => {
+      render(
+        <AddParentContact
+          student={onRoster()}
+          details={details({ contactWritable: false })}
+          onAdded={vi.fn()}
+          defaultOpen
+        />,
+      );
+
+      expect(screen.queryByLabelText('Parent phone')).not.toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Add it there' })).toBeInTheDocument();
+    });
+  });
+
   describe('when Tally may write', () => {
     it('saves a number onto the parent and re-reads', async () => {
       setParentContact.mockResolvedValue({

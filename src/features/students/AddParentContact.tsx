@@ -40,6 +40,22 @@ export interface AddParentContactProps {
   details: PcoPersonDetails | null;
   /** Called after a write lands, so the screen re-reads what it now says. */
   onAdded: () => void;
+  /**
+   * Skip the "＋ Add a parent" step and open the form straight away.
+   *
+   * For the surfaces that are already the answer to that question: a dialog a
+   * leader opened by pressing "Add parent contact" has asked once, and asking
+   * again on the other side of it is a tap that says nothing.
+   */
+  defaultOpen?: boolean;
+  /**
+   * Called when the form is dismissed, for a host that opened straight into it.
+   *
+   * Without this, Cancel on a `defaultOpen` surface drops back to a state
+   * nobody navigated through — a dialog titled "Add parent contact" offering a
+   * button to add a parent contact.
+   */
+  onCancel?: () => void;
 }
 
 /** Mirrors `normalizePhone` on the server, so a refusal happens before a round trip. */
@@ -59,8 +75,14 @@ const MISSING = (
   </p>
 );
 
-export function AddParentContact({ student, details, onAdded }: AddParentContactProps) {
-  const [open, setOpen] = useState(false);
+export function AddParentContact({
+  student,
+  details,
+  onAdded,
+  defaultOpen = false,
+  onCancel,
+}: AddParentContactProps) {
+  const [open, setOpen] = useState(defaultOpen);
 
   /* ---- No upstream record at all ----------------------------------------- */
   if (!student.pcoPersonId) {
@@ -119,7 +141,10 @@ export function AddParentContact({ student, details, onAdded }: AddParentContact
     );
   }
 
-  const close = () => setOpen(false);
+  const close = () => {
+    setOpen(false);
+    onCancel?.();
+  };
 
   return creatable ? (
     <ParentForm student={student} onClose={close} onAdded={onAdded} />
