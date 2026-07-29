@@ -50,7 +50,9 @@ function Chip({
         'flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-xs font-semibold ring-1 transition-colors pointer-fine:min-h-9',
         active
           ? 'bg-brand-500/20 text-brand-200 ring-brand-500/40'
-          : 'bg-ink-900 text-ink-400 ring-ink-800 active:bg-ink-800',
+          // Hover, because these are the same chips the Students toolbar draws
+          // and a pointer gets a response there.
+          : 'bg-ink-900 text-ink-400 ring-ink-800 hover:bg-ink-800 active:bg-ink-800',
       )}
     >
       {children}
@@ -91,7 +93,7 @@ export function FilterBar({
       {/* The grade chip sits *outside* the scroller on purpose. Its dropdown is
           absolutely positioned, and `overflow-x-auto` clips in both axes — the
           panel would open into a hidden strip. */}
-      <div className="flex items-center gap-1.5 px-3">
+      <div className="flex items-center gap-1.5">
         <div className="scroll-touch flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
           <div role="group" aria-label="Show" className="flex shrink-0 items-center gap-1.5">
             {showRecent ? (

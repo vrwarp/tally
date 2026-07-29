@@ -18,38 +18,38 @@
  * 1200px-wide line of prose is worse than a 480px one. It is spent on columns:
  * see the two-column grids on Insights and Events, and the toolbar row and
  * single-line rows on Students. `PageFrame` only makes the room.
+ *
+ * Check-in is the fifth screen and the one that arrived late. It kept the
+ * centred phone column after the other four stopped, so a leader moving from
+ * Students to Check in watched the page slide 80px right and the rail detach
+ * from what it navigates. It now takes the same left edge as its siblings via
+ * `pageFrameWidth`, and is the reason `widen` exists: it is the one page whose
+ * *measure* should stay where it was.
  */
 import type { ReactNode } from 'react';
+import { pageFrameWidth, type PageFrameWidthOptions } from '@/components/pageFrameWidth';
 import { cn } from '@/lib/utils';
 
-export interface PageFrameProps {
-  /**
-   * The phone measure. Kept per-page because these screens genuinely differ at
-   * 390px — a call list wants a narrow column, a calendar wants what it can
-   * get — and because it stops mattering at `lg`, where the frame takes over.
-   */
-  width?: 'lg' | '2xl' | '3xl';
+export interface PageFrameProps extends PageFrameWidthOptions {
   /** Gap between the page's own top-level blocks. */
   gap?: 'md' | 'lg';
   className?: string;
   children: ReactNode;
 }
 
-const WIDTHS = {
-  lg: 'max-w-lg',
-  '2xl': 'max-w-2xl',
-  '3xl': 'max-w-3xl',
-} as const;
-
-export function PageFrame({ width = '3xl', gap = 'md', className, children }: PageFrameProps) {
+export function PageFrame({
+  width = '3xl',
+  widen = true,
+  gap = 'md',
+  className,
+  children,
+}: PageFrameProps) {
   return (
     <div
       className={cn(
-        'mx-auto flex w-full flex-col px-4 py-4',
-        WIDTHS[width],
+        'flex flex-col py-4 lg:py-6',
+        pageFrameWidth({ width, widen }),
         gap === 'lg' ? 'gap-8' : 'gap-4',
-        // Above lg: anchored, not centred, and as wide as the window allows.
-        'lg:mx-0 lg:max-w-7xl lg:px-8 lg:py-6',
         className,
       )}
     >

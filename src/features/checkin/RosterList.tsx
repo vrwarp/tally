@@ -44,10 +44,13 @@ export function RosterList({
   busy,
 }: RosterListProps) {
   return (
-    <section className="px-3 pb-3" aria-label={`${title}, ${entries.length}`}>
+    <section className="pb-3" aria-label={`${title}, ${entries.length}`}>
+      {/* `px-3` matches a row's own inner padding, not the page's gutter — that
+          is the page's job now — so the heading's words sit over the names
+          below them rather than 12px to their left. */}
       <h2
         style={{ top: 'calc(var(--app-header-h, 0px) + var(--checkin-search-h, 0px))' }}
-        className="sticky z-10 -mx-3 flex items-baseline gap-2 bg-ink-950/95 px-3 py-2 text-xs font-bold uppercase tracking-wider backdrop-blur"
+        className="sticky z-10 flex items-baseline gap-2 bg-ink-950/95 px-3 py-2 text-xs font-bold uppercase tracking-wider backdrop-blur"
       >
         <span className={tone === 'present' ? 'text-present-400' : 'text-ink-400'}>{title}</span>
         <span
@@ -66,7 +69,7 @@ export function RosterList({
       </h2>
 
       {entries.length === 0 ? (
-        <p className="px-1 py-3 text-sm text-ink-500">{emptyLabel}</p>
+        <p className="px-3 py-3 text-sm text-ink-500">{emptyLabel}</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {entries.map((entry) => (

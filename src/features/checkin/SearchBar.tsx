@@ -55,7 +55,7 @@ export function SearchBar({
       className={
         'flex size-12 shrink-0 items-center justify-center rounded-xl bg-brand-500/10 ' +
         'text-2xl leading-none font-semibold text-brand-300 ring-1 ring-brand-500/30 ' +
-        'active:bg-brand-500/20 pointer-fine:size-9 pointer-fine:text-xl'
+        'hover:bg-brand-500/20 active:bg-brand-500/20 pointer-fine:size-9 pointer-fine:text-xl'
       }
     >
       <span aria-hidden="true">+</span>
@@ -63,7 +63,7 @@ export function SearchBar({
   ) : null;
 
   return (
-    <div className="flex items-end gap-3 px-3 pb-2 pointer-fine:gap-2">
+    <div className="flex items-end gap-3 pb-2 pointer-fine:gap-2">
       {quickAdd}
       <div className="min-w-0 flex-1">
         <TextField

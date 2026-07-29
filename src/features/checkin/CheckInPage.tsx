@@ -20,6 +20,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { pageFrameWidth } from '@/components/pageFrameWidth';
 import { RosterErrorBanner } from '@/components/RosterErrorBanner';
 import { EmptyState, ErrorBanner, SkeletonRows } from '@/components/ui';
 import { useAuth } from '@/context/authContext';
@@ -36,11 +37,25 @@ import { useActiveEvent, useSeriesHistoryEvents } from '@/hooks/useActiveEvent';
 import { useAttendance, useRsvps } from '@/hooks/useAttendance';
 import { useHeightVar } from '@/hooks/useHeightVar';
 import { invalidateSnapshotCache, useEventSnapshots } from '@/hooks/useEventSnapshots';
-import { haptic } from '@/lib/utils';
+import { cn, haptic } from '@/lib/utils';
 import { checkIn, undoCheckIn } from '@/services/attendance';
 import { isCheckInOpen } from '@/lib/time';
 import { ensureMaterialized } from '@/services/events';
 import { studentFullName, type Grade, type RosterEntry } from '@/types';
+
+/**
+ * The one left edge this screen has.
+ *
+ * Check-in is four stacked bands rather than one column — the event header, the
+ * search box that sticks, the filter row and its rule, the roster — and each is
+ * its own element because two of them have to reach past the others (sticky
+ * offsets, an opaque background). They all carry this so the bands line up with
+ * each other and, more to the point, with Insights, Events, Students and
+ * Settings: same gutter off the rail, same measure, same page.
+ *
+ * `widen: false` is the deliberate half. See `PageFrame`.
+ */
+const BAND = pageFrameWidth({ width: '3xl', widen: false });
 
 /** Long enough to register as confirmation, short enough not to lag the queue. */
 const FLASH_MS = 700;
@@ -324,7 +339,7 @@ export function CheckInPage() {
   if (!event || !roster) {
     if (dataLoading) {
       return (
-        <div className="mx-auto w-full max-w-3xl pt-3">
+        <div className={cn(BAND, 'pt-4 lg:pt-6')}>
           <SkeletonRows />
         </div>
       );
@@ -345,7 +360,7 @@ export function CheckInPage() {
           here — a counselor reads that on arrival and then works the queue for
           an hour without needing it again, so it is the one part of the screen
           that can afford to cost nothing once it has been read. */}
-      <div className="mx-auto w-full max-w-3xl">
+      <div className={cn(BAND, 'pt-4 lg:pt-6')}>
         <EventHeader
           event={event}
           selectableEvents={selectableEvents}
@@ -369,33 +384,32 @@ export function CheckInPage() {
         style={{ top: 'var(--app-header-h, 0px)' }}
         ref={searchBar}
       >
-        <div className="mx-auto w-full max-w-3xl">
+        <div className={BAND}>
           <SearchBar value={query} onChange={setQuery} onQuickAdd={() => setQuickAddOpen(true)} />
         </div>
       </div>
 
-      <div className="border-b border-ink-800">
-        <div className="mx-auto w-full max-w-3xl">
-          <FilterBar
-            grades={grades}
-            onGradesChange={setGrades}
-            focus={appliedFocus}
-            onFocusChange={setFocus}
-            showRecent={canFocusRecent}
-            recentCount={counts.recent}
-            present={counts.present}
-          />
-        </div>
+      {/* The rule ends where the chips do. It used to run the full width of the
+          window while everything inside it stopped at a centred column, which
+          drew a full-bleed layout the page never delivered and underlined
+          nothing at all for 336px on either side. */}
+      <div className={cn(BAND, 'border-b border-ink-800')}>
+        <FilterBar
+          grades={grades}
+          onGradesChange={setGrades}
+          focus={appliedFocus}
+          onFocusChange={setFocus}
+          showRecent={canFocusRecent}
+          recentCount={counts.recent}
+          present={counts.present}
+        />
       </div>
 
-      {/* Capped width on desktop: stretched to a 27-inch monitor a roster row puts
-          the student's name and the control that checks them in a foot apart, so
-          the eye and the mouse both have to travel the whole way. Nothing floats
-          over the end of this list any more — quick-add rides the search band,
-          see `SearchBar`. */}
-      <div className="mx-auto w-full max-w-3xl">
+      {/* Nothing floats over the end of this list any more — quick-add rides
+          the search band, see `SearchBar`. */}
+      <div className={cn(BAND, 'pb-4 lg:pb-6')}>
         {attendanceError ? (
-          <div className="px-3 pt-3">
+          <div className="pt-3">
             <ErrorBanner message={attendanceError} />
           </div>
         ) : null}
@@ -403,7 +417,7 @@ export function CheckInPage() {
         {/* Above the roster rather than below it: a counselor who cannot find a
             student needs to know the list is short before they conclude the
             student is not on it and quick-add a duplicate. */}
-        <RosterErrorBanner className="mx-3 mt-3" />
+        <RosterErrorBanner className="mt-3" />
 
         {/* The list, and only the list, waits for the prediction. The header,
             the search box and the quick-add button are all still usable — a
@@ -442,7 +456,7 @@ export function CheckInPage() {
               <button
                 type="button"
                 onClick={() => setQuickAddOpen(true)}
-                className="min-h-11 rounded-xl bg-brand-500 px-4 text-sm font-semibold text-white active:bg-brand-600"
+                className="min-h-11 rounded-xl bg-brand-500 px-4 text-sm font-semibold text-white hover:bg-brand-400 active:bg-brand-600"
               >
                 Add as visitor
               </button>
@@ -474,11 +488,11 @@ export function CheckInPage() {
                 told the rest of the ministry is one tap away before they
                 conclude the student is missing and quick-add a duplicate. */}
             {appliedFocus !== "all" ? (
-              <div className="px-3 pb-3">
+              <div className="pb-3">
                 <button
                   type="button"
                   onClick={() => setFocus("all")}
-                  className="min-h-11 w-full rounded-xl bg-ink-900 px-4 text-sm font-semibold text-ink-300 ring-1 ring-ink-800 active:bg-ink-800"
+                  className="min-h-11 w-full rounded-xl bg-ink-900 px-4 text-sm font-semibold text-ink-300 ring-1 ring-ink-800 hover:bg-ink-800 active:bg-ink-800"
                 >
                   Show all {counts.eligible} students
                 </button>

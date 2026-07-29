@@ -136,7 +136,16 @@ export function AppShell({ children }: { children: ReactNode }) {
    * `CheckInPage`.
    */
   return (
-    <div className="flex min-h-dvh flex-col bg-ink-950 lg:flex-row">
+    /*
+     * `data-rail` is how a page frame knows whether it has a sidebar to sit
+     * beside — see `pageFrameWidth`. It is published here rather than derived
+     * per page so there is one answer to "is navigation on screen", and it is
+     * this one.
+     */
+    <div
+      data-rail={showNav ? '' : undefined}
+      className="group/shell flex min-h-dvh flex-col bg-ink-950 lg:flex-row"
+    >
       {/* Desktop: a persistent sidebar. */}
       {showNav ? (
         <aside className="hidden lg:flex lg:w-56 lg:shrink-0 lg:flex-col lg:gap-1 lg:border-r lg:border-ink-800 lg:px-3 lg:py-4">
