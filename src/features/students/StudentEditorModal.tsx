@@ -13,8 +13,8 @@
  *   - Under `full` the church has asked Tally to write, so the same boxes are
  *     editable and Save carries them straight upstream through
  *     `updateStudentProfile`. Nothing is written to Firestore on the way: a
- *     linked student's name, grade and allergies are Planning Center's, and a
- *     copy kept here would be shown by nothing and pushed back over a later
+ *     linked student's name, grade, birthday and allergies are Planning Center's,
+ *     and a copy kept here would be shown by nothing and pushed back over a later
  *     correction.
  *
  * Which of the two is in force is `profileWritable` on the person details —
@@ -34,7 +34,14 @@ import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { AddParentContact } from '@/features/students/AddParentContact';
+import { BirthdayFields } from '@/features/students/EditBirthday';
 import { invalidatePersonDetails, usePersonDetails } from '@/hooks/usePersonDetails';
+import {
+  BLANK_BIRTHDAY_FIELDS,
+  birthdayFieldsFrom,
+  readBirthdayFields,
+  type BirthdayFieldsState,
+} from '@/lib/birthdayFields';
 import { pcoPersonUrl } from '@/lib/planningCenter';
 import { formatPhone, ordinalGrade } from '@/lib/utils';
 import { updateStudentProfile } from '@/services/functions';
@@ -70,6 +77,11 @@ interface FormState {
   grade: Grade;
   /** Planning Center's `medical_notes`. Only ever editable on a linked student. */
   allergies: string;
+  /**
+   * Planning Center's `birthdate`, as three boxes — and the year box always opens
+   * empty, because Tally is never sent the year. See `lib/birthdayFields.ts`.
+   */
+  birthday: BirthdayFieldsState;
   notes: string;
   status: StudentStatus;
 }
@@ -80,6 +92,7 @@ const BLANK: FormState = {
   lastName: '',
   grade: 9,
   allergies: '',
+  birthday: BLANK_BIRTHDAY_FIELDS,
   notes: '',
   status: 'active',
 };
@@ -95,6 +108,7 @@ function fromStudent(student: Student | null): FormState {
     // Not on the student at all — it is read one person at a time and seeded
     // below, once the details land.
     allergies: '',
+    birthday: birthdayFieldsFrom(student.birthday),
     notes: student.notes ?? '',
     status: student.status,
   };
@@ -119,7 +133,11 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
   const formId = useId();
 
   const [form, setForm] = useState<FormState>(BLANK);
-  const [errors, setErrors] = useState<{ firstName?: string; lastName?: string }>({});
+  const [errors, setErrors] = useState<{
+    firstName?: string;
+    lastName?: string;
+    birthday?: string;
+  }>({});
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   /** Stops the seeding effect below from overwriting what somebody has typed. */
@@ -169,13 +187,27 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
    * the difference, which is the only comparison worth making: the value this
    * form opened with may have been corrected in Planning Center since.
    */
-  const saveUpstream = async (current: Student, firstName: string, lastName: string) => {
+  const saveUpstream = async (
+    current: Student,
+    firstName: string,
+    lastName: string,
+    birthday: string | undefined,
+  ) => {
     const response = await updateStudentProfile({
       studentId: current.id,
       firstName: form.firstName.trim(),
       nickname: form.nickname.trim() || null,
       lastName,
       grade: form.grade,
+      /*
+       * Omitted unless it changed, unlike every other managed field here.
+       *
+       * The rest are sent on every save so the server can compare them against a
+       * fresh read. This one cannot be: `MM-DD` on a student with no birthdate
+       * upstream is a refusal — there is no year to keep it against — and that
+       * refusal would fail a save whose author never touched the birthday.
+       */
+      ...(birthday === undefined ? {} : { birthday }),
       /*
        * Safe to send as a value — including an empty one — only because
        * `writable` is false until the details read lands, so this box has
@@ -210,6 +242,22 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
     }
     const firstName = composeFirstName(form.firstName, form.nickname);
 
+    /*
+     * Read before anything is written, and only when the boxes are on screen: a
+     * form that never showed the birthday has nothing to say about it, and
+     * `fromStudent` would otherwise hand back the day already on file as though
+     * somebody had typed it.
+     */
+    let birthday: string | undefined;
+    if (writable) {
+      const read = readBirthdayFields(form.birthday, { onFile: student?.birthday ?? null });
+      if (!read.ok) {
+        setErrors({ birthday: read.error });
+        return;
+      }
+      birthday = read.value;
+    }
+
     setSaving(true);
     setSaveError(null);
 
@@ -219,7 +267,7 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
         // note saved against a name Planning Center rejected is a half-done
         // save nobody asked for.
         const message = writable
-          ? await saveUpstream(student, firstName, lastName)
+          ? await saveUpstream(student, firstName, lastName, birthday)
           : `${studentFullName(student)} saved`;
 
         const patch: Partial<StudentDraft> = { notes: form.notes };
@@ -312,8 +360,8 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
           <p className="rounded-xl bg-brand-500/10 px-3 py-2 text-xs text-brand-200 ring-1 ring-brand-500/25">
             {writable ? (
               <>
-                Name, grade and allergies are Planning Center's, and Save writes them
-                there — Tally keeps no copy.{' '}
+                Name, grade, birthday and allergies are Planning Center's, and Save writes
+                them there — Tally keeps no copy.{' '}
                 <a
                   href={pcoPersonUrl(student.pcoPersonId)}
                   target="_blank"
@@ -326,8 +374,8 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
               </>
             ) : (
               <>
-                Name, grade, allergies and status come from Planning Center and would be
-                overwritten by the next sync.{' '}
+                Name, grade, birthday, allergies and status come from Planning Center and
+                would be overwritten by the next sync.{' '}
                 <a
                   href={pcoPersonUrl(student.pcoPersonId)}
                   target="_blank"
@@ -395,6 +443,24 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
             </option>
           ))}
         </SelectField>
+
+        {/*
+          The birthday, on the same terms as the name: Planning Center's field,
+          editable here only under `full`. The day opens from the roster; the year
+          opens blank and stays optional, because Tally is never sent it — the
+          whole argument is in `lib/birthdayFields.ts`.
+        */}
+        {writable ? (
+          <BirthdayFields
+            fields={form.birthday}
+            onChange={(changed) => {
+              setErrors((current) => ({ ...current, birthday: undefined }));
+              update('birthday', changed);
+            }}
+            onFile={student?.birthday ?? null}
+            error={errors.birthday ?? null}
+          />
+        ) : null}
 
         {/*
           Allergies are Planning Center's `medical_notes`, and Tally holds none

@@ -189,7 +189,7 @@ later.
 | --- | --- | --- |
 | `off` | Nothing at all. | Everything. Quick-added visitors stay queued (`pcoPushPending: true`) so switching the mode on later picks them up with nobody re-editing anything. |
 | `create` *(default)* | Creates a **Person** for a quick-added visitor — first name, last name, grade, `child: true`, and allergies as `medical_notes` — but only after searching for an exact first + last + grade match and linking to that instead. | Any existing person. No edits, ever. Planning Center still owns every field on everyone it already knows. |
-| `full` | Everything `create` does, plus edits to **linked** people — `first_name`, `nickname`, `last_name`, `grade`, `medical_notes` — from the student editor (`updateStudentProfile`) and from the reconcile push. Adds a **PhoneNumber** or **Email** to an adult already in a student's household. And, for a student with no adult on file, creates the **parent** — plus a **Household** and **HouseholdMembership** when there is none — through `addParent`, after offering any existing people of that name for a human to choose from. | Notes and anything not in that list. Nothing on file is ever overwritten, no person is created for a name a leader has not confirmed is new, and nothing is ever deleted or deactivated in Planning Center; a student who leaves is deactivated in Tally only. |
+| `full` | Everything `create` does, plus edits to **linked** people — `first_name`, `nickname`, `last_name`, `grade`, `medical_notes`, `birthdate` — from the student editor (`updateStudentProfile`) and from the reconcile push. Adds a **PhoneNumber** or **Email** to an adult already in a student's household. And, for a student with no adult on file, creates the **parent** — plus a **Household** and **HouseholdMembership** when there is none — through `addParent`, after offering any existing people of that name for a human to choose from. | Notes and anything not in that list. Nothing on file is ever overwritten, no person is created for a name a leader has not confirmed is new, and nothing is ever deleted or deactivated in Planning Center; a student who leaves is deactivated in Tally only. |
 
 In every mode, before creating a person Tally searches `where[search_name]` plus grade and filters
 the results again locally through the same accent- and punctuation-insensitive normalisation used to
@@ -204,8 +204,8 @@ recognising the person at all — which is how a duplicate child gets created.
 ### Editing a linked student (`full` only)
 
 Under `create` the student editor shows the managed fields disabled, with a link to Planning Center:
-Tally keeps no copy of a linked student's name, grade or allergies, so anything typed into them would
-be gone on the next read. Under `full` the same boxes are editable and Save calls
+Tally keeps no copy of a linked student's name, grade, birthday or allergies, so anything typed into
+them would be gone on the next read. Under `full` the same boxes are editable and Save calls
 `updateStudentProfile`, which patches the person upstream.
 
 The edit goes **straight** to Planning Center — nothing is written to Firestore on the way, and this
@@ -226,6 +226,34 @@ roster is Tally's own list, and the control for it is Remove from roster on the 
 **Allergies** can be cleared here, on a form showing the value being deleted, but a reconcile push
 will only ever *add* a `medical_notes` value, never blank one: a linked student's document holds no
 allergy note at all, and reading that absence as "there are none" would erase a real one.
+
+### The birthday, and the year Tally is not sent (`full` only)
+
+`birthdate` is the one field Tally can write more of than it is ever shown. The roster carries
+`MM-DD` and never the year — see §3 — because the year is the identifying half of a date of birth and
+a phone at a door holding eighty-five students has no use for it. That makes the edit asymmetric: a
+leader can see the day and correct it, and cannot see the year to retype it.
+
+So the callable takes two shapes, and the difference is the whole design:
+
+- **`MM-DD`** — "this day, keeping the year Planning Center holds". Resolved against a fresh read of
+  the person, like every other field here.
+- **`YYYY-MM-DD`** — the whole date. This is the only way to fill in a *blank* birthday, because
+  there is then no year to keep.
+
+A day-only edit on a person with no `birthdate` at all is **refused**, not guessed. Planning Center
+displays an age computed from this field, so an invented year is a wrong age on a child's permanent
+record that nobody would ever think to check. `29-02` kept against a year on file that has no 29
+February is refused for the same reason, rather than being rounded to 1 March by the far end.
+
+The form is three boxes — month, day, and an optional year — on the student editor and behind the
+roster's birthday badge, which is where somebody usually notices, with the student in front of them
+having just said when it is. Under anything other than `full` both places say where the field lives
+and link to it, as they always did.
+
+A birthday cannot be **deleted** from Tally, unlike allergies. Every screen that shows one has only
+ever been shown the day, so an empty box has never been evidence that somebody decided to empty the
+field — and deleting a date of birth is not a correction anybody makes from a roster badge.
 
 `PcoPersonDetails.profileWritable` carries the gate, for the same reason `contactWritable` does — the
 browser cannot see the setting, and offering an editable box that the write path then refuses is

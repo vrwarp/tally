@@ -13,9 +13,11 @@
  *    birthday; it is a profile somebody has not finished, and it is invisible
  *    until a list says so.
  *
- * Everything here works on `MM-DD` — the day of the year, never the year. See
- * `PcoRosterPerson.birthday` for why a browser holding the whole roster is not
- * given ages.
+ * Everything *read* here works on `MM-DD` — the day of the year, never the year.
+ * See `PcoRosterPerson.birthday` for why a browser holding the whole roster is
+ * not given ages. `composeBirthday` is the one exception and only in the other
+ * direction: a leader filling in a blank birthday can type the year, which goes
+ * upstream and is never sent back.
  */
 import { differenceInCalendarDays, format } from 'date-fns';
 
@@ -36,12 +38,19 @@ export const BIRTHDAY_WINDOW_DAYS = 7;
 
 const PATTERN = /^(\d{2})-(\d{2})$/;
 
-interface MonthDay {
+export interface MonthDay {
   month: number;
   day: number;
 }
 
-function parse(birthday: string | null | undefined): MonthDay | null {
+/**
+ * The two numbers out of an `MM-DD`, or null when there is no birthday on file
+ * or the string is not one.
+ *
+ * Exported because the edit form has to put the day and the month into two
+ * separate boxes, and `MM-DD` is the only form it is ever handed.
+ */
+export function birthdayParts(birthday: string | null | undefined): MonthDay | null {
   if (!birthday) return null;
 
   const match = PATTERN.exec(birthday);
@@ -52,6 +61,62 @@ function parse(birthday: string | null | undefined): MonthDay | null {
   if (month < 1 || month > 12 || day < 1 || day > 31) return null;
 
   return { month, day };
+}
+
+/** Days in each month, taking February at its leap-year length. */
+const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31] as const;
+
+function isLeapYear(year: number): boolean {
+  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+}
+
+/** The earliest year of birth Tally will send upstream. */
+export const EARLIEST_BIRTH_YEAR = 1900;
+
+/**
+ * Whether a day somebody typed is a day that exists.
+ *
+ * A month and a day alone are checked against the *longest* February, because
+ * 29 February is a birthday people have and the year is optional here — see
+ * `composeBirthday`. Given a year, the same date is checked against that year's
+ * real February, so "29 February 2011" is refused rather than written upstream
+ * and silently moved to 1 March.
+ *
+ * Must stay in step with `isRealBirthday` in functions/src/pco/profile.ts.
+ */
+export function isRealBirthday(month: number, day: number, year?: number | null): boolean {
+  if (!Number.isInteger(month) || month < 1 || month > 12) return false;
+  if (!Number.isInteger(day) || day < 1) return false;
+
+  if (year === undefined || year === null) return day <= DAYS_IN_MONTH[month - 1];
+
+  if (!Number.isInteger(year) || year < EARLIEST_BIRTH_YEAR) return false;
+  const limit = month === 2 && !isLeapYear(year) ? 28 : DAYS_IN_MONTH[month - 1];
+  return day <= limit;
+}
+
+/**
+ * The wire form of an edited birthday: `MM-DD`, or `YYYY-MM-DD` when a year was
+ * given. Null when the date does not exist.
+ *
+ * Two shapes rather than one because Tally is never told the year — see
+ * `PcoRosterPerson.birthday`. A leader correcting the day on a birthday already
+ * on file cannot retype a year they have not been shown, so the year is optional
+ * and the server keeps whatever Planning Center holds when it is left out.
+ *
+ * Must stay in step with `parseBirthdayPatch` in functions/src/pco/profile.ts.
+ */
+export function composeBirthday(parts: {
+  month: number;
+  day: number;
+  year?: number | null;
+}): string | null {
+  const { month, day, year } = parts;
+  if (!isRealBirthday(month, day, year)) return null;
+
+  const pad = (value: number) => String(value).padStart(2, '0');
+  const monthDay = `${pad(month)}-${pad(day)}`;
+  return year === undefined || year === null ? monthDay : `${year}-${monthDay}`;
 }
 
 /**
@@ -89,7 +154,7 @@ function nearestOccurrence({ month, day }: MonthDay, now: Date): Date {
  * positive in the future, zero today. Null when there is no birthday on file.
  */
 export function daysToBirthday(birthday: string | null | undefined, now: Date): number | null {
-  const parsed = parse(birthday);
+  const parsed = birthdayParts(birthday);
   if (!parsed) return null;
   return differenceInCalendarDays(nearestOccurrence(parsed, now), now);
 }
@@ -104,14 +169,14 @@ export function birthdayState(birthday: string | null | undefined, now: Date): B
 
 /** "14 Mar" — the badge's own label, sized for a roster lane. */
 export function formatBirthdayShort(birthday: string | null | undefined, now: Date): string | null {
-  const parsed = parse(birthday);
+  const parsed = birthdayParts(birthday);
   if (!parsed) return null;
   return format(nearestOccurrence(parsed, now), 'd MMM');
 }
 
 /** "14 March" — for a sentence, where there is room to say it properly. */
 export function formatBirthdayLong(birthday: string | null | undefined): string | null {
-  const parsed = parse(birthday);
+  const parsed = birthdayParts(birthday);
   if (!parsed) return null;
   // Any leap year, so 29 February is a real date to format rather than 1 March.
   return format(new Date(2024, parsed.month - 1, parsed.day), 'd MMMM');

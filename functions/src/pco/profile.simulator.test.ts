@@ -215,6 +215,122 @@ describe('updateStudentProfile against the simulator', () => {
     });
   });
 
+  /**
+   * The birthday is the one field Tally can write more of than it is shown, so
+   * these are mostly about the year: kept when the caller only names a day,
+   * required when there is nothing upstream to keep, and never invented.
+   */
+  describe('birthdays', () => {
+    it('keeps the year on file when only the day is corrected', async () => {
+      // Amara is 2011-03-14 upstream, and Tally was only ever told `03-14`.
+      h.db.seed(`students/pco_${FIXTURE_IDS.amara}`, annotation());
+
+      const result = await save(`pco_${FIXTURE_IDS.amara}`, { birthday: '03-16' });
+
+      expect(result.status).toBe('updated');
+      expect(result.wrote).toEqual(['birthdate']);
+      expect(h.store.personById(FIXTURE_IDS.amara)?.birthdate).toBe('2011-03-16');
+    });
+
+    it('names the field in words a leader would recognise', async () => {
+      h.db.seed(`students/pco_${FIXTURE_IDS.amara}`, annotation());
+
+      const result = await save(`pco_${FIXTURE_IDS.amara}`, { birthday: '03-16' });
+
+      expect(result.message).toMatch(/birthday/);
+    });
+
+    it('writes the whole date when the year comes with it', async () => {
+      const id = FIXTURE_IDS.naomiNoBirthday;
+      h.db.seed(`students/pco_${id}`, annotation());
+
+      const result = await save(`pco_${id}`, { birthday: '2013-04-02' });
+
+      expect(result.status).toBe('updated');
+      expect(h.store.personById(id)?.birthdate).toBe('2013-04-02');
+    });
+
+    it('sends nothing when the day already matches', async () => {
+      h.db.seed(`students/pco_${FIXTURE_IDS.amara}`, annotation());
+      const before = h.store.personById(FIXTURE_IDS.amara)?.updated_at;
+
+      const result = await save(`pco_${FIXTURE_IDS.amara}`, { birthday: '03-14' });
+
+      expect(result.status).toBe('unchanged');
+      expect(h.store.personById(FIXTURE_IDS.amara)?.updated_at).toBe(before);
+    });
+
+    /**
+     * The refusal this whole shape exists for. There is no year upstream to keep
+     * the day against, and a guessed one is a wrong age on a child's record that
+     * nobody would think to check.
+     */
+    it('refuses a day-only birthday when there is no year to keep', async () => {
+      const id = FIXTURE_IDS.naomiNoBirthday;
+      h.db.seed(`students/pco_${id}`, annotation());
+
+      const result = await save(`pco_${id}`, { birthday: '04-02' });
+
+      expect(result.status).toBe('invalid');
+      expect(result.message).toMatch(/year/);
+      expect(h.store.personById(id)?.birthdate).toBeNull();
+    });
+
+    it('will not write a day that does not exist', async () => {
+      h.db.seed(`students/pco_${FIXTURE_IDS.amara}`, annotation());
+
+      const result = await save(`pco_${FIXTURE_IDS.amara}`, { birthday: '02-31' });
+
+      expect(result.status).toBe('invalid');
+      expect(h.store.personById(FIXTURE_IDS.amara)?.birthdate).toBe('2011-03-14');
+    });
+
+    it('will not write a year of birth in the future', async () => {
+      const id = FIXTURE_IDS.naomiNoBirthday;
+      h.db.seed(`students/pco_${id}`, annotation());
+
+      const result = await save(`pco_${id}`, { birthday: '2999-04-02' });
+
+      expect(result.status).toBe('invalid');
+      expect(h.store.personById(id)?.birthdate).toBeNull();
+    });
+
+    /**
+     * Leila is 2008-02-29, so her day is one three years in four do not have.
+     * Moving her to 29 February against a year that has none is a date somebody
+     * has to decide about, not one to round to 1 March quietly.
+     */
+    it('refuses 29 February against a year on file that has none', async () => {
+      const id = FIXTURE_IDS.amara;
+      h.db.seed(`students/pco_${id}`, annotation());
+
+      const result = await save(`pco_${id}`, { birthday: '02-29' });
+
+      expect(result.status).toBe('invalid');
+      expect(result.message).toMatch(/29 February/);
+      expect(h.store.personById(id)?.birthdate).toBe('2011-03-14');
+    });
+
+    it('keeps a leap day when the year on file has one', async () => {
+      const id = FIXTURE_IDS.leilaPhoneOnlyParent;
+      h.db.seed(`students/pco_${id}`, annotation());
+
+      const result = await save(`pco_${id}`, { birthday: '02-29' });
+
+      // Already 2008-02-29 upstream, so this is the same date twice.
+      expect(result.status).toBe('unchanged');
+      expect(h.store.personById(id)?.birthdate).toBe('2008-02-29');
+    });
+
+    it('leaves the birthdate alone when the edit omits it', async () => {
+      h.db.seed(`students/pco_${FIXTURE_IDS.amara}`, annotation());
+
+      await save(`pco_${FIXTURE_IDS.amara}`, { firstName: 'Amarachi' });
+
+      expect(h.store.personById(FIXTURE_IDS.amara)?.birthdate).toBe('2011-03-14');
+    });
+  });
+
   describe('refusals', () => {
     it('will not blank a name', async () => {
       h.db.seed(`students/pco_${FIXTURE_IDS.amara}`, annotation());

@@ -1000,6 +1000,7 @@ export const updateStudentProfile = onCall<
       lastName: request.data?.lastName,
       grade: request.data?.grade,
       allergies: request.data?.allergies,
+      birthday: request.data?.birthday,
       logger,
     });
   } catch (error) {
