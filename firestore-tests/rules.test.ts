@@ -400,11 +400,23 @@ describe('events', () => {
     await assertFails(deleteDoc(doc(db, paths.event(ID.event))));
   });
 
-  it('lets core create, update and delete events', async () => {
+  it('lets core create and update events', async () => {
     const db = asUser(env, UID.core);
     await assertSucceeds(setDoc(doc(db, paths.event('event-new')), eventDoc()));
     await assertSucceeds(updateDoc(doc(db, paths.event(ID.event)), { title: 'Renamed' }));
-    await assertSucceeds(deleteDoc(doc(db, paths.event('event-new'))));
+  });
+
+  /**
+   * Deleting a gathering is offered — it just cannot happen from a browser.
+   *
+   * The document is only half of a gathering; its attendance is a subcollection
+   * that a document delete leaves standing, unreachable and still counted. So
+   * the whole act goes through `deleteEvents`, which runs on the Admin SDK and
+   * bypasses this rule, and the rule closes the half-way door behind it.
+   */
+  it('lets nobody delete an event from a client, including an admin', async () => {
+    await assertFails(deleteDoc(doc(asUser(env, UID.core), paths.event(ID.event))));
+    await assertFails(deleteDoc(doc(asUser(env, UID.admin), paths.event(ID.event))));
   });
 
   it('rejects a non-timestamp schedule', async () => {

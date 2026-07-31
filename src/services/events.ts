@@ -3,7 +3,6 @@
  */
 import {
   collection,
-  deleteDoc,
   doc,
   getDocs,
   limit,
@@ -25,7 +24,12 @@ import { findEventIcon } from '@/lib/eventIcons';
 import { chainKey } from '@/lib/materialize';
 import { normalizeRecurrence } from '@/lib/recurrence';
 import { toEvent, toEventSeries, toSettings } from '@/services/converters';
-import { materializeOccurrence } from '@/services/functions';
+import {
+  deleteEvents as deleteEventsCallable,
+  materializeOccurrence,
+  type DeletionSummary,
+  type DeletionTarget,
+} from '@/services/functions';
 import type {
   AppSettings,
   EventMode,
@@ -285,12 +289,43 @@ export async function setEventStatus(
   });
 }
 
+/* -------------------------------------------------------------------------- */
+/* Deleting                                                                    */
+/* -------------------------------------------------------------------------- */
+
+// Re-exported so a screen doing this reads one module, the way every other
+// event write here does.
+export type { DeletionSummary, DeletionTarget } from '@/services/functions';
+
 /**
- * Hard delete. Only offered for events with no attendance yet — the UI checks
- * first, and cancelling is the reversible option everywhere else.
+ * What deleting would remove, without removing any of it.
+ *
+ * The confirmation dialog's whole job is to say what is about to be lost, and
+ * for a chain of repeats the app cannot work that out: it holds a window of the
+ * calendar, not two years of Fridays, and it never loads the attendance under a
+ * night nobody opened. So the server counts, through the same code that would
+ * do the deleting.
  */
-export async function deleteEvent(eventId: string): Promise<void> {
-  await deleteDoc(doc(db, paths.event(eventId)));
+export async function previewEventDeletion(target: DeletionTarget): Promise<DeletionSummary> {
+  const { data } = await deleteEventsCallable({ ...target, preview: true });
+  return data;
+}
+
+/**
+ * Hard delete, with everything filed under it.
+ *
+ * `scope: 'event'` is one gathering and its check-ins. `scope: 'chain'` is every
+ * gathering in one chain of repeats — the past nights and, because the calendar
+ * ahead is projected from the chain's own instances rather than written down,
+ * the future ones with them.
+ *
+ * Cancelling remains the reversible option and is still what the event page
+ * leads with. This is the one that cannot be undone, which is why both callers
+ * put a typed confirmation in front of it — see `deleteConfirmation.ts`.
+ */
+export async function deleteEvents(target: DeletionTarget): Promise<DeletionSummary> {
+  const { data } = await deleteEventsCallable(target);
+  return data;
 }
 
 export async function saveSettings(

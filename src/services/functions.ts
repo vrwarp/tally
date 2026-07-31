@@ -428,3 +428,43 @@ export const materializeOccurrence = httpsCallable<
   { chain: string; startAt: number },
   MaterializeOccurrenceResult
 >(functions, 'materializeOccurrence');
+
+/** What a delete is aimed at. Mirrors `DeletionTarget` in functions/src/eventDeletion.ts. */
+export type DeletionTarget =
+  /** One gathering, whatever else shares its chain. */
+  | { scope: 'event'; eventId: string }
+  /** Every gathering in one chain of repeats — see `chainKey` in `lib/materialize`. */
+  | { scope: 'chain'; chain: string };
+
+export interface DeletionSummary {
+  /** Event documents removed, or that would be. */
+  events: number;
+  /** Attendance records that go with them. The number a confirmation leads with. */
+  checkIns: number;
+  rsvps: number;
+  /** One-off gatherings that were borrowing this chain's regulars and will stop. */
+  unlinked: number;
+  /** What the gathering is called, taken from its latest instance. */
+  title: string | null;
+}
+
+/**
+ * Erases a gathering, or a whole chain of them, and everything filed under it.
+ *
+ * Server-side for a reason the rules cannot fix: the core team may already
+ * delete an event document, but deleting a document does not delete its
+ * subcollections, and the attendance left behind is unreachable from every
+ * screen while still being counted by every collection-group query. Sweeping
+ * that from a browser means a multi-thousand-write loop on a phone at a church
+ * door, and a phone that goes through a tunnel halfway leaves exactly the mess
+ * the sweep was for.
+ *
+ * With `preview` it writes nothing and only counts, through the same code path
+ * — which is what lets the confirmation dialog promise a number that the delete
+ * then honours. Called through `previewEventDeletion` / `deleteEvents` in
+ * `services/events.ts`.
+ */
+export const deleteEvents = httpsCallable<
+  DeletionTarget & { preview?: boolean },
+  DeletionSummary
+>(functions, 'deleteEvents');

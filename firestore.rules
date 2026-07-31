@@ -275,7 +275,22 @@ service cloud.firestore {
       // Core and up only: moving an event's date mid-check-in would swap the
       // active event out from under every counselor's phone at once.
       allow create, update: if isCore() && validEvent();
-      allow delete: if isCore();
+
+      /**
+       * Never from a client, even for the core team who may do everything else
+       * here.
+       *
+       * Not because deleting a gathering is forbidden — the event page offers
+       * it, and offers ending a whole repeat — but because deleting *this
+       * document* is only half of it. The attendance and RSVPs underneath are a
+       * subcollection, and a subcollection does not go with its parent: what
+       * would be left is history no screen can reach and every collection-group
+       * query still counts. Rules cannot enumerate a subcollection, so they
+       * cannot make a client do the other half; what they can do is make sure
+       * the request goes to the one place that does. See
+       * `functions/src/eventDeletion.ts`.
+       */
+      allow delete: if false;
 
       match /attendance/{studentId} {
         /**

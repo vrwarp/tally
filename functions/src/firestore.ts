@@ -49,6 +49,12 @@ export interface CollectionRefLike {
 export interface WriteBatchLike {
   set(ref: DocumentRefLike, data: Record<string, unknown>, options?: { merge?: boolean }): unknown;
   update(ref: DocumentRefLike, data: Record<string, unknown>): unknown;
+  /**
+   * Same blind spot as `DocumentRefLike.delete`: subcollections are left where
+   * they are. Removing a gathering therefore means enumerating its attendance
+   * first — see `eventDeletion.ts`.
+   */
+  delete(ref: DocumentRefLike): unknown;
   commit(): Promise<unknown>;
 }
 

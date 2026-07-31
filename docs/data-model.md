@@ -239,8 +239,18 @@ One dated gathering.
 | `createdAt`, `updatedAt`, `createdBy` | — | |
 
 **Who writes:** core and up. A counselor cannot create or move an event — changing a date mid-check-in
-would swap the active event out from under every phone in the building at once. Hard deletion is
-offered only for events with no attendance yet; cancelling is the reversible option everywhere else.
+would swap the active event out from under every phone in the building at once. Cancelling is the
+reversible option and the one the event page leads with.
+
+**Hard deletion goes through a callable**, not through the rules that permit it. A document delete
+leaves the `attendance` and `rsvps` subcollections behind — unreachable from every screen, and still
+counted by every collection-group query — so `deleteEvents` (see
+[`functions/src/eventDeletion.ts`](../functions/src/eventDeletion.ts)) enumerates the children and
+removes them first. It takes either one event or a whole chain, grouped by the same `chainKey` the
+projection and the predictive roster use. A chain delete needs no separate handling for the future:
+occurrences ahead are not documents, they are the rule speaking, and the rule is read off the
+chain's own instances — so removing the last one empties the calendar ahead. It also nulls
+`predictFromChain` on any one-off left pointing at the chain that has gone.
 
 ### `events/{eventId}/attendance/{studentId}`
 
