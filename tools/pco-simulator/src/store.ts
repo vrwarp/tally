@@ -12,6 +12,10 @@ import {
   TEAM_LIST_ID,
 } from './fixtures.js';
 import type {
+  SimCheckIn,
+  SimCheckInsEvent,
+  SimCheckInsEventTime,
+  SimCheckInsPeriod,
   SimEmail,
   SimHousehold,
   SimHouseholdMembership,
@@ -75,6 +79,7 @@ export class SimulatorStore {
   private nextPersonId = 6_600_001;
   private nextEmailId = 9001;
   private nextPhoneId = 9001;
+  private nextCheckInsId = 9001;
 
   readonly appId: string;
   readonly secret: string;
@@ -112,6 +117,7 @@ export class SimulatorStore {
     this.rateLimit = null;
     this.failWith = null;
     this.nextPersonId = 6_600_001;
+    this.nextCheckInsId = 9001;
   }
 
   /**
@@ -216,6 +222,28 @@ export class SimulatorStore {
 
   fieldDefinitionById(id: string) {
     return this.org.fieldDefinitions.find((definition) => definition.id === id);
+  }
+
+  /* ---- Check-Ins reads --------------------------------------------------- */
+
+  get checkInsEvents(): readonly SimCheckInsEvent[] {
+    return this.org.checkInsEvents;
+  }
+
+  checkInsEventById(id: string): SimCheckInsEvent | undefined {
+    return this.org.checkInsEvents.find((event) => event.id === id);
+  }
+
+  checkInsPeriodsFor(eventId: string): SimCheckInsPeriod[] {
+    return this.org.checkInsPeriods.filter((period) => period.event_id === eventId);
+  }
+
+  checkInsEventTimesFor(periodId: string): SimCheckInsEventTime[] {
+    return this.org.checkInsEventTimes.filter((time) => time.event_period_id === periodId);
+  }
+
+  checkInsFor(eventId: string): SimCheckIn[] {
+    return this.org.checkIns.filter((checkIn) => checkIn.event_id === eventId);
   }
 
   /* ---- writes ---------------------------------------------------------- */
@@ -493,6 +521,102 @@ export class SimulatorStore {
     return phone;
   }
 
+  /**
+   * Seeds a whole Check-Ins event in one call: the event, its nights, the
+   * kiosk windows and every check-in. The same reasoning as `seedStudent` —
+   * the API is read-only, so realistic history is only expressible from
+   * inside, and a test that needs "two years of Fridays with a snow week and
+   * a duplicate" should be able to say so in one literal.
+   *
+   * Check-ins name people from the *same* person store the People API serves,
+   * because that is how the real host behaves and it is the identity Tally's
+   * import depends on. A `personId` that names nobody seeds a check-in whose
+   * person cannot be side-loaded — deliberately expressible, so a test can
+   * cover that too. A null `personId` is a one-time guest.
+   */
+  seedCheckInsEvent(input: {
+    id?: string;
+    name: string;
+    frequency?: string;
+    archivedAt?: string | null;
+    periods?: readonly {
+      id?: string;
+      /** ISO instant, or null for the odd upstream period with no date. */
+      startsAt: string | null;
+      endsAt?: string | null;
+      note?: string | null;
+      eventTimes?: readonly {
+        showsAt?: string | null;
+        hidesAt?: string | null;
+        dayOfWeek?: number | null;
+        hour?: number | null;
+        minute?: number | null;
+      }[];
+      checkIns?: readonly {
+        personId?: string | null;
+        /** "Regular" (default) | "Guest" | "Volunteer". */
+        kind?: string;
+        /** Defaults to the period's own start. */
+        createdAt?: string;
+        firstName?: string;
+        lastName?: string;
+      }[];
+    }[];
+  }): SimCheckInsEvent {
+    const now = this.clock().toISOString();
+    const event: SimCheckInsEvent = {
+      id: input.id ?? `CI${this.nextCheckInsId++}`,
+      name: input.name,
+      frequency: input.frequency ?? 'Weekly',
+      archived_at: input.archivedAt ?? null,
+      created_at: now,
+      updated_at: now,
+    };
+    this.org.checkInsEvents.push(event);
+
+    for (const periodInput of input.periods ?? []) {
+      const period: SimCheckInsPeriod = {
+        id: periodInput.id ?? `CIP${this.nextCheckInsId++}`,
+        event_id: event.id,
+        starts_at: periodInput.startsAt,
+        ends_at: periodInput.endsAt ?? null,
+        note: periodInput.note ?? null,
+      };
+      this.org.checkInsPeriods.push(period);
+
+      for (const timeInput of periodInput.eventTimes ?? []) {
+        this.org.checkInsEventTimes.push({
+          id: `CIT${this.nextCheckInsId++}`,
+          event_period_id: period.id,
+          starts_at: periodInput.startsAt,
+          shows_at: timeInput.showsAt ?? null,
+          hides_at: timeInput.hidesAt ?? null,
+          day_of_week: timeInput.dayOfWeek ?? null,
+          hour: timeInput.hour ?? null,
+          minute: timeInput.minute ?? null,
+        });
+      }
+
+      for (const checkInInput of periodInput.checkIns ?? []) {
+        const personId = checkInInput.personId ?? null;
+        const person = personId ? this.personById(personId) : undefined;
+        this.org.checkIns.push({
+          id: `CIC${this.nextCheckInsId++}`,
+          event_id: event.id,
+          event_period_id: period.id,
+          person_id: personId,
+          kind: checkInInput.kind ?? 'Regular',
+          first_name: checkInInput.firstName ?? person?.first_name ?? 'Guest',
+          last_name: checkInInput.lastName ?? person?.last_name ?? '',
+          created_at: checkInInput.createdAt ?? periodInput.startsAt ?? now,
+          one_time_guest: personId === null,
+        });
+      }
+    }
+
+    return event;
+  }
+
   /** Adds a person to a list, as a youth pastor would in the Planning Center UI. */
   addToList(listId: string, personId: string): void {
     const list = this.listById(listId);
@@ -524,6 +648,10 @@ function emptyOrg(): SimOrg {
     memberships: [],
     fieldDefinitions: [],
     fieldData: [],
+    checkInsEvents: [],
+    checkInsPeriods: [],
+    checkInsEventTimes: [],
+    checkIns: [],
     lists: [
       {
         id: STUDENT_LIST_ID,

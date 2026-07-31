@@ -34,6 +34,7 @@ import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { EventEditorModal } from '@/features/events/EventEditorModal';
 import { EventHeroCard } from '@/features/events/EventHeroCard';
+import { ImportCheckInsModal } from '@/features/events/ImportCheckInsModal';
 import { PastGatherings } from '@/features/events/PastGatherings';
 import { useEventSnapshots } from '@/hooks/useEventSnapshots';
 import { useNow } from '@/hooks/useNow';
@@ -293,6 +294,7 @@ export function EventsPage() {
   const now = useNow(60_000);
 
   const [editor, setEditor] = useState<EditorTarget | null>(null);
+  const [importing, setImporting] = useState(false);
   const [uncancelling, setUncancelling] = useState<string | null>(null);
 
   /*
@@ -414,7 +416,14 @@ export function EventsPage() {
     <PageFrame gap="lg" className="pb-8">
       <header className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-bold text-ink-50">Events</h1>
-        <Button onClick={() => setEditor({ event: null })}>New event</Button>
+        <div className="flex items-center gap-2">
+          {/* Quieter than "New event" on purpose: importing history happens a
+              handful of times in an install's life, scheduling happens weekly. */}
+          <Button variant="secondary" onClick={() => setImporting(true)}>
+            Import
+          </Button>
+          <Button onClick={() => setEditor({ event: null })}>New event</Button>
+        </div>
       </header>
 
       {/*
@@ -518,6 +527,8 @@ export function EventsPage() {
         event={editor?.event ?? null}
         defaults={editor?.defaults}
       />
+
+      <ImportCheckInsModal open={importing} onClose={() => setImporting(false)} />
     </PageFrame>
   );
 }

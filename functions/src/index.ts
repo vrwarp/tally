@@ -25,6 +25,13 @@ import {
   type DeletionTarget,
 } from './eventDeletion.js';
 import { materializeOccurrence as materializeOne, MINISTRY_TIME_ZONE } from './occurrences.js';
+import {
+  checkInsBaseUrl,
+  importCheckInsEvent as importCheckInsEventUpstream,
+  listCheckInsEvents as listCheckInsEventsUpstream,
+  type CheckInsEventSummary,
+  type CheckInsImportSummary,
+} from './pco/checkins.js';
 import { createPcoClient, PcoApiError, type PcoClient } from './pco/client.js';
 import { describePcoFailure } from './pco/debug.js';
 import { fetchListMemberIds, fetchLists, type PcoListSummary } from './pco/lists.js';
@@ -864,6 +871,102 @@ export const importPlanningCenterList = onCall<
 
   if (added + restored > 0) await batch.commit();
   return { added, restored, alreadyOnRoster, total: personIds.length };
+});
+
+/* -------------------------------------------------------------------------- */
+/* Check-Ins history import                                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A client for the Check-Ins product, or the reason there cannot be one.
+ *
+ * Check-Ins lives beside People on the same host, so its root is derived from
+ * the configured People root rather than being a second setting — pointing one
+ * at the simulator points both. The same Personal Access Token authenticates
+ * either product; whether it is *allowed* to read Check-Ins is Planning
+ * Center's call, and comes back as an ordinary 403 the error path explains.
+ */
+function checkInsClientFor(config: PcoConfig): PcoClient | { error: string } {
+  if (config.configError) return { error: config.configError };
+  const baseUrl = checkInsBaseUrl(config.baseUrl);
+  if (!baseUrl) {
+    return {
+      error: `The configured Planning Center URL ("${config.baseUrl}") does not end in /people/v2, so the Check-Ins API root cannot be derived from it.`,
+    };
+  }
+  return createPcoClient({ appId: config.appId, secret: config.secret, baseUrl });
+}
+
+/**
+ * The Check-Ins events a leader could import — Footprints, Sunday school, the
+ * preschool room — each with enough history attached to recognise the right
+ * one before anything is written.
+ *
+ * Core team only: this is a view over the whole church's check-in system, not
+ * something a door volunteer needs.
+ */
+export const listCheckInsEvents = onCall<void, Promise<{ events: CheckInsEventSummary[] }>>(
+  { secrets: PCO_SECRETS, timeoutSeconds: 120, memory: '256MiB' },
+  async (request) => {
+    await requireCoreTeam(request.auth?.uid);
+
+    const config = await resolveConfig(db());
+    const client = checkInsClientFor(config);
+    if ('error' in client) throw new HttpsError('failed-precondition', client.error);
+
+    try {
+      return { events: await listCheckInsEventsUpstream({ client, db: db() }) };
+    } catch (error) {
+      return reportPcoFailure(error, 'list your Check-Ins events');
+    }
+  },
+);
+
+/**
+ * Imports one Check-Ins event's whole history: every gathering anybody
+ * attended, everyone who attended one, and every check-in — as ordinary Tally
+ * events, roster members and attendance records. See ./pco/checkins.ts for
+ * what is written and what is deliberately skipped.
+ *
+ * Idempotent, and safe to re-run to top a chain up: every id is derived, and
+ * nothing a leader has since edited in Tally is overwritten. The timeout is
+ * generous because the largest of this church's events is a few thousand
+ * check-ins — about a minute of reads — and half a timeout would import half
+ * a history.
+ *
+ * Core team only, like every other write that reshapes the roster.
+ */
+export const importCheckInsEvent = onCall<
+  { pcoEventId: string },
+  Promise<CheckInsImportSummary>
+>({ secrets: PCO_SECRETS, timeoutSeconds: 540, memory: '512MiB' }, async (request) => {
+  await requireCoreTeam(request.auth?.uid);
+
+  const pcoEventId = request.data?.pcoEventId;
+  if (typeof pcoEventId !== 'string' || pcoEventId.trim().length === 0) {
+    throw new HttpsError('invalid-argument', 'pcoEventId is required.');
+  }
+
+  const config = await resolveConfig(db());
+  const client = checkInsClientFor(config);
+  if ('error' in client) throw new HttpsError('failed-precondition', client.error);
+
+  // Occurrence ids embed the ministry-local calendar day, and this container
+  // runs in UTC — same reasoning, same fix as `materializeOccurrence`.
+  process.env.TZ = MINISTRY_TIME_ZONE;
+
+  try {
+    return await importCheckInsEventUpstream({
+      db: db(),
+      client,
+      pcoEventId: pcoEventId.trim(),
+      uid: request.auth!.uid,
+      now: new Date(),
+      logger,
+    });
+  } catch (error) {
+    return reportPcoFailure(error, 'import that Check-Ins event');
+  }
 });
 
 /* -------------------------------------------------------------------------- */

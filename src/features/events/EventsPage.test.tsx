@@ -45,6 +45,14 @@ vi.mock('@/features/events/EventEditorModal', () => ({
     open ? <div role="dialog" aria-label="Event editor" /> : null,
 }));
 
+// Same reasoning: the Check-Ins import modal calls Cloud Functions through the
+// Firebase SDK, which cannot even be imported without a config. Its behaviour
+// is covered by ImportCheckInsModal.test.tsx.
+vi.mock('@/features/events/ImportCheckInsModal', () => ({
+  ImportCheckInsModal: ({ open }: { open: boolean }) =>
+    open ? <div role="dialog" aria-label="Import from Planning Center" /> : null,
+}));
+
 /** Wednesday 29 July 2026, quarter past four in the afternoon. */
 const NOW = new Date(2026, 6, 29, 16, 15);
 

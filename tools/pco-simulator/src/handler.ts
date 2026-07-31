@@ -7,6 +7,7 @@
  * emails, the 429 with `Retry-After` — because those are the parts the client
  * has code to handle, and a simulator that smooths them over would test nothing.
  */
+import { CHECKINS_BASE_PATH, routeCheckIns } from './checkinsHandler.js';
 import type {
   SimHousehold,
   SimHouseholdMembership,
@@ -460,6 +461,16 @@ function route(request: SimRequest, store: SimulatorStore): SimResponse {
 
   const query = parseQuery(request.query);
   const method = request.method.toUpperCase();
+
+  /*
+   * The other product on this host. On the real API, People and Check-Ins are
+   * `/people/v2` and `/check-ins/v2` beside each other, behind one credential
+   * and one rate limiter — which is why the delegation happens *after* the
+   * auth check and the fault above, not before.
+   */
+  if (request.path.startsWith(CHECKINS_BASE_PATH)) {
+    return routeCheckIns(request, query, store);
+  }
 
   if (method === 'GET' && request.path === '/people') {
     return servePeople(collectionFor(query, store), query, store, request.path, request.query);

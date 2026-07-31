@@ -273,7 +273,9 @@ export function toAttendance(
     checkedInAt: toDate(data.checkedInAt, snapshot.metadata.hasPendingWrites ? new Date() : new Date(0)),
     checkedInBy: str(data.checkedInBy),
     method:
-      method === 'search' || method === 'quick-add' || method === 'manual' ? method : 'tap',
+      method === 'search' || method === 'quick-add' || method === 'manual' || method === 'import'
+        ? method
+        : 'tap',
     isFirstEver: bool(data.isFirstEver),
   };
 }

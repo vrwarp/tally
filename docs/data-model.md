@@ -196,7 +196,7 @@ because a student can exist in Tally before they exist in Planning Center.
 | `pcoUpdatedAt` | Timestamp \| null | Planning Center's own `updated_at` at the last successful pull. The max of these is the incremental cursor. |
 | `pcoSyncedAt` | Timestamp \| null | When Tally last wrote from Planning Center. |
 | `pcoPushPending` | boolean | A Tally-created student still waiting to be pushed. |
-| `createdAt`, `updatedAt`, `createdBy` | — | `createdBy` is a uid, or `'planning-center'` for synced records. |
+| `createdAt`, `updatedAt`, `createdBy` | — | `createdBy` is a uid, or `'planning-center'` for synced records. For a student created by the Check-Ins history import, `createdAt` is their earliest attended gathering rather than the moment of import — the MIA derivation reads this field to decide which past nights a student could plausibly have been at, and "created today" would excuse them from all of them. |
 
 **A document here *is* the roster membership.** No document, not on the roster. For a student
 Planning Center knows, that document holds the membership and Tally's own annotations only — the
@@ -236,7 +236,8 @@ One dated gathering.
 | `notes` | string \| null | For the core team. Shown on the event page only — see `description` above. |
 | `requiresRsvp` | boolean | Closes a one-off's roster to the students who RSVP'd. A one-off with no explicit flag still defaults to one. |
 | `status` | `'scheduled' \| 'cancelled'` | Cancelled events are never offered as live and never inform prediction. A *finished* event with no attendance is treated as cancelled too — see [decision 3](#3-a-gathering-with-no-attendance-is-a-cancelled-one). |
-| `createdAt`, `updatedAt`, `createdBy` | — | |
+| `pcoCheckInsEventId`, `pcoCheckInsPeriodId` | string, on imported events only | Which Planning Center Check-Ins event and event period this gathering was imported from. Provenance for a re-import and for whoever is reading the console; nothing in the app renders them. |
+| `createdAt`, `updatedAt`, `createdBy` | — | `createdBy` is a uid, or `'planning-center'` for a gathering imported from Check-Ins history. |
 
 **Who writes:** core and up. A counselor cannot create or move an event — changing a date mid-check-in
 would swap the active event out from under every phone in the building at once. Cancelling is the
@@ -259,9 +260,9 @@ chain's own instances — so removing the last one empties the calendar ahead. I
 | `studentId` | string | Equal to the document id. Enforced by rules. |
 | `eventId` | string | Equal to the parent document id. Enforced by rules. |
 | `seriesId` | string \| null | Copied from the event so a collection-group query can count a series without joining. |
-| `checkedInAt` | Timestamp | `serverTimestamp()`. Reads back as null in the optimistic local snapshot, which the converters handle. |
-| `checkedInBy` | string | Must equal the caller's uid. Enforced by rules. |
-| `method` | `'tap' \| 'search' \| 'quick-add' \| 'manual'` | Purely diagnostic: it tells the core team whether the predictive roster is earning its keep. |
+| `checkedInAt` | Timestamp | `serverTimestamp()`. Reads back as null in the optimistic local snapshot, which the converters handle. For imported history it is the instant the kiosk recorded, which can trail the gathering by days when attendance was taken late. |
+| `checkedInBy` | string | Must equal the caller's uid — enforced by rules for client writes. Rows imported from Planning Center Check-Ins carry the sentinel `'planning-center'` instead (written by the Admin SDK, which rules do not govern). |
+| `method` | `'tap' \| 'search' \| 'quick-add' \| 'manual' \| 'import'` | Purely diagnostic: it tells the core team whether the predictive roster is earning its keep. `import` marks a row that came from Check-Ins history rather than from anybody's thumb. |
 | `isFirstEver` | boolean | True when this was the student's first ever check-in. |
 
 **Who writes:** any counselor may create, update and delete. Undoing a mistaken tap is a delete, and

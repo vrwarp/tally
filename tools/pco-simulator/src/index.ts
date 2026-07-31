@@ -11,6 +11,9 @@
  * unit test is the same behaviour the browser test exercises.
  */
 export {
+  CHECKINS_ARCHIVED_EVENT_ID,
+  CHECKINS_ONE_OFF_EVENT_ID,
+  CHECKINS_WEEKLY_EVENT_ID,
   createFixtureOrg,
   DEFAULT_APP_ID,
   DEFAULT_SECRET,
@@ -37,7 +40,13 @@ export {
   type SimulatorServerOptions,
 } from './server.js';
 
+export { CHECKINS_BASE_PATH } from './checkinsHandler.js';
+
 export type {
+  SimCheckIn,
+  SimCheckInsEvent,
+  SimCheckInsEventTime,
+  SimCheckInsPeriod,
   SimEmail,
   SimFieldDatum,
   SimFieldDefinition,

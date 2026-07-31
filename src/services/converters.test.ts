@@ -175,6 +175,12 @@ describe('toAttendance', () => {
       'quick-add',
     );
   });
+
+  it('keeps "import" — a row that came from Check-Ins history, not a thumb', () => {
+    // Coercing it to "tap" would silently claim a counselor tapped two years
+    // of kiosk records, which is exactly what `method` exists to distinguish.
+    expect(toAttendance(fakeSnapshot({ data: { method: 'import' } }), 'e').method).toBe('import');
+  });
 });
 
 /* -------------------------------------------------------------------------- */

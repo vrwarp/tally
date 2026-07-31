@@ -464,8 +464,12 @@ export interface TallyEvent
 /**
  * How the counselor found the student. Purely diagnostic — it tells the core
  * team whether the predictive roster is actually earning its keep.
+ *
+ * `import` marks a row that came from Planning Center Check-Ins history
+ * rather than from anybody's thumb; those rows also carry
+ * `checkedInBy: 'planning-center'` instead of a uid.
  */
-export type CheckInMethod = 'tap' | 'search' | 'quick-add' | 'manual';
+export type CheckInMethod = 'tap' | 'search' | 'quick-add' | 'manual' | 'import';
 
 /**
  * Stored at `events/{eventId}/attendance/{studentId}`.
@@ -834,6 +838,59 @@ export interface PcoList {
   autoRefresh: boolean;
   invalid: boolean;
   starred: boolean;
+}
+
+/**
+ * One Check-Ins event, as the import picker shows it.
+ *
+ * Check-Ins is the other Planning Center product: the door kiosk that has been
+ * counting the church's gatherings since before Tally. Each row carries enough
+ * history — how many nights, how many check-ins, since when — to recognise the
+ * right event before anything is written, which is the whole job of a picker.
+ */
+export interface CheckInsEventSummary {
+  id: string;
+  name: string;
+  /** As Planning Center spells it: "Weekly", "Daily", "None". */
+  frequency: string | null;
+  /** Gatherings on record upstream. */
+  gatheringCount: number;
+  /** Attendee check-ins across the event's whole history. */
+  checkInCount: number;
+  /** ISO instant of the first recorded gathering, or null for none yet. */
+  firstGatheringAt: string | null;
+  /** True when this event's chain already exists in Tally. */
+  alreadyImported: boolean;
+}
+
+/**
+ * What one Check-Ins import did — every count a leader needs to believe the
+ * history arrived whole, including what was deliberately skipped and why it
+ * is not missing. Mirrors `CheckInsImportSummary` in functions/src/pco.
+ */
+export interface CheckInsImportSummary {
+  pcoEventId: string;
+  eventName: string;
+  /** The chain's root document id — also its `chainKey`. */
+  rootEventId: string;
+  gatherings: {
+    found: number;
+    created: number;
+    existing: number;
+    /** Nights nobody attended — holiday weeks. Not imported, by design. */
+    skippedEmpty: number;
+  };
+  students: { found: number; added: number; existing: number };
+  checkIns: {
+    found: number;
+    written: number;
+    /** Rows left alone because a counselor wrote them in Tally itself. */
+    kept: number;
+    skippedVolunteers: number;
+    skippedOneTimeGuests: number;
+    duplicatesCollapsed: number;
+  };
+  warnings: string[];
 }
 
 /** The id Tally uses for a Planning Center person, everywhere. */

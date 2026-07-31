@@ -22,6 +22,10 @@
  * student that appears in Tally after a sync provably came from here.
  */
 import type {
+  SimCheckIn,
+  SimCheckInsEvent,
+  SimCheckInsEventTime,
+  SimCheckInsPeriod,
   SimEmail,
   SimFieldDatum,
   SimFieldDefinition,
@@ -44,6 +48,13 @@ export const STALE_LIST_ID = 'YOUTH_CAMP_2019';
 /** Default Personal Access Token pair the simulator accepts. */
 export const DEFAULT_APP_ID = 'sim-app-id';
 export const DEFAULT_SECRET = 'sim-secret';
+
+/** The Check-Ins event worth importing: weekly, with history and its quirks. */
+export const CHECKINS_WEEKLY_EVENT_ID = 'CI770001';
+/** Archived — must not be offered for import. */
+export const CHECKINS_ARCHIVED_EVENT_ID = 'CI770002';
+/** `frequency: "None"` — importable history, nothing to project ahead. */
+export const CHECKINS_ONE_OFF_EVENT_ID = 'CI770003';
 
 function iso(daysBefore: number): string {
   return new Date(FIXTURE_ANCHOR.getTime() - daysBefore * 86_400_000).toISOString();
@@ -354,6 +365,8 @@ export function createFixtureOrg(): SimOrg {
     },
   ];
 
+  const checkIns = createCheckInsFixture();
+
   return {
     people,
     emails,
@@ -363,7 +376,161 @@ export function createFixtureOrg(): SimOrg {
     fieldDefinitions,
     fieldData,
     lists,
+    ...checkIns,
   };
+}
+
+/**
+ * The Check-Ins half of the fixture organisation: the kiosk that was counting
+ * this ministry before Tally existed, with every quirk the import has to
+ * survive on display.
+ *
+ *  - four Friday nights, one of which nobody attended (a snow week)
+ *  - one period with no date at all, which the real API genuinely serves
+ *  - a duplicate check-in (checked out and back in on one night)
+ *  - a volunteer's check-in — a leader, not a student
+ *  - a one-time guest with no person record behind the name
+ *  - a `Guest`-kind check-in for a real person, who *is* an attendee
+ *  - an archived event and a `frequency: "None"` event, for the picker
+ *
+ * Fridays are 19:30 America/Los_Angeles, stored the way the API stores them —
+ * as UTC instants the night lands on Saturday in. Getting the local calendar
+ * day back out of these is exactly the work the import's id derivation does,
+ * so the fixture must not make it easy by lying in UTC.
+ */
+function createCheckInsFixture(): Pick<
+  SimOrg,
+  'checkInsEvents' | 'checkInsPeriods' | 'checkInsEventTimes' | 'checkIns'
+> {
+  const checkInsEvents: SimCheckInsEvent[] = [
+    {
+      id: CHECKINS_WEEKLY_EVENT_ID,
+      name: 'Friday Fellowship',
+      frequency: 'Weekly',
+      archived_at: null,
+      created_at: iso(400),
+      updated_at: iso(4),
+    },
+    {
+      id: CHECKINS_ARCHIVED_EVENT_ID,
+      name: 'VBS 2019',
+      frequency: 'Daily',
+      archived_at: '2019-08-01T12:00:00Z',
+      created_at: '2019-06-01T12:00:00Z',
+      updated_at: '2019-08-01T12:00:00Z',
+    },
+    {
+      id: CHECKINS_ONE_OFF_EVENT_ID,
+      name: 'Winter Retreat Check-In',
+      frequency: 'None',
+      archived_at: null,
+      created_at: iso(200),
+      updated_at: iso(150),
+    },
+  ];
+
+  /** Friday 19:30 PDT is Saturday 02:30 UTC; two hours long. */
+  const friday = (utcDay: string) => ({
+    startsAt: `${utcDay}T02:30:00Z`,
+    endsAt: `${utcDay}T04:30:00Z`,
+  });
+  const nights = [
+    { id: 'CIP1', ...friday('2026-06-06') },
+    { id: 'CIP2', ...friday('2026-06-13') }, // the snow week — nobody came
+    { id: 'CIP3', ...friday('2026-06-20') },
+    { id: 'CIP4', ...friday('2026-06-27') },
+  ];
+
+  const checkInsPeriods: SimCheckInsPeriod[] = [
+    ...nights.map((night) => ({
+      id: night.id,
+      event_id: CHECKINS_WEEKLY_EVENT_ID,
+      starts_at: night.startsAt,
+      ends_at: night.endsAt,
+      note: null,
+    })),
+    // The dateless period the real API serves — a kiosk opened against nothing.
+    {
+      id: 'CIP5',
+      event_id: CHECKINS_WEEKLY_EVENT_ID,
+      starts_at: null,
+      ends_at: null,
+      note: null,
+    },
+    {
+      id: 'CIP6',
+      event_id: CHECKINS_ONE_OFF_EVENT_ID,
+      starts_at: '2026-01-17T18:00:00Z',
+      ends_at: '2026-01-17T20:00:00Z',
+      note: null,
+    },
+  ];
+
+  const checkInsEventTimes: SimCheckInsEventTime[] = nights.map((night, index) => ({
+    id: `CIT${index + 1}`,
+    event_period_id: night.id,
+    starts_at: night.startsAt,
+    shows_at: new Date(Date.parse(night.startsAt) - 30 * 60_000).toISOString(),
+    hides_at: night.endsAt,
+    day_of_week: 5,
+    hour: 19,
+    minute: 30,
+  }));
+
+  let sequence = 1;
+  const checkIn = (input: {
+    periodId: string;
+    personId?: string | null;
+    kind?: string;
+    minutesAfter?: number;
+    firstName?: string;
+    lastName?: string;
+  }): SimCheckIn => {
+    const period = checkInsPeriods.find((candidate) => candidate.id === input.periodId)!;
+    const base = period.starts_at ? Date.parse(period.starts_at) : Date.parse(iso(30));
+    return {
+      id: `CIC${sequence++}`,
+      event_id: period.event_id,
+      event_period_id: period.id,
+      person_id: input.personId ?? null,
+      kind: input.kind ?? 'Regular',
+      first_name: input.firstName ?? 'Guest',
+      last_name: input.lastName ?? '',
+      created_at: new Date(base + (input.minutesAfter ?? 0) * 60_000).toISOString(),
+      one_time_guest: (input.personId ?? null) === null,
+    };
+  };
+
+  const amara = '4200001';
+  const benji = '4200002';
+  const sofia = '4200003';
+  const mateo = '4200004';
+  const chidiParent = '5200001';
+
+  const checkIns: SimCheckIn[] = [
+    // Night one: two regulars, a duplicate, and a volunteering parent.
+    checkIn({ periodId: 'CIP1', personId: amara, firstName: 'Amara', lastName: 'Okonkwo' }),
+    checkIn({ periodId: 'CIP1', personId: benji, minutesAfter: 3, firstName: 'Benjamin', lastName: 'Okonkwo' }),
+    // Checked out and back in 40 minutes later — one student, one night, one row.
+    checkIn({ periodId: 'CIP1', personId: amara, minutesAfter: 40, firstName: 'Amara', lastName: 'Okonkwo' }),
+    checkIn({ periodId: 'CIP1', personId: chidiParent, kind: 'Volunteer', firstName: 'Chidi', lastName: 'Okonkwo' }),
+
+    // Night three: a regular, a Guest-kind check-in for a real person, and a
+    // one-time guest who exists only as a name typed at the kiosk.
+    checkIn({ periodId: 'CIP3', personId: amara, firstName: 'Amara', lastName: 'Okonkwo' }),
+    checkIn({ periodId: 'CIP3', personId: mateo, kind: 'Guest', minutesAfter: 12, firstName: 'Mateo', lastName: 'Delgado' }),
+    checkIn({ periodId: 'CIP3', personId: null, kind: 'Guest', minutesAfter: 15, firstName: 'Walk-in', lastName: 'Wendy' }),
+
+    // Night four, the latest — what the recurrence rule anchors on.
+    checkIn({ periodId: 'CIP4', personId: amara, firstName: 'Amara', lastName: 'Okonkwo' }),
+    checkIn({ periodId: 'CIP4', personId: benji, minutesAfter: 2, firstName: 'Benjamin', lastName: 'Okonkwo' }),
+    checkIn({ periodId: 'CIP4', personId: sofia, minutesAfter: 5, firstName: 'Sofia', lastName: 'Delgado' }),
+
+    // The retreat: one night, one student.
+    checkIn({ periodId: 'CIP6', personId: sofia, firstName: 'Sofia', lastName: 'Delgado' }),
+  ];
+
+  return { checkInsEvents, checkInsPeriods, checkInsEventTimes, checkIns };
 }
 
 /** Ids referenced by tests, so an assertion never hard-codes a bare string. */
@@ -384,6 +551,8 @@ export const FIXTURE_IDS = {
   tobiasEmailOnlyParent: '4200010',
   /** Hers has a phone and no email. */
   leilaPhoneOnlyParent: '4200011',
+  /** Checked into Friday Fellowship as a `Guest` — an attendee all the same. */
+  mateoCheckInsGuest: '4200004',
   twoAdultHousehold: 'H1',
   adminDana: '9100001',
   managerMiriam: '9100002',
