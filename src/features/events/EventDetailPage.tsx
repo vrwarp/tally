@@ -1,12 +1,12 @@
 /**
- * One event: what it is, who came, and the three destructive-ish actions.
+ * One event: what it is, who came, and the destructive-ish actions.
  *
  * Cancel is the safe operation and is always available — it is reversible and
  * it keeps the attendance history that the predictive roster and the dashboard
- * are built from. Delete is only offered while the event has no attendance at
- * all, and is re-checked against the server at the moment of the tap, because
- * "no attendance" can stop being true between the page loading and the button
- * being pressed.
+ * are built from, so it stays the thing this page offers beside Edit. Deleting
+ * — one gathering with its check-ins, or a whole repeat with all of them — is
+ * the thing that cannot be undone, and it lives at the foot of the page behind
+ * a typed confirmation. See `EventDangerZone`.
  */
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -24,6 +24,7 @@ import {
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
+import { EventDangerZone } from '@/features/events/EventDangerZone';
 import { EventEditorModal } from '@/features/events/EventEditorModal';
 import { RsvpManager } from '@/features/events/RsvpManager';
 import { useAttendance } from '@/hooks/useAttendance';
@@ -32,8 +33,7 @@ import { gatheringOptions } from '@/lib/gatherings';
 import { describeRecurrence } from '@/lib/recurrence';
 import { formatClock, formatEventDay, formatEventWindow, isCheckInOpen } from '@/lib/time';
 import { cn, ordinalGrade } from '@/lib/utils';
-import { fetchAttendance } from '@/services/attendance';
-import { deleteEvent, ensureMaterialized, setEventStatus } from '@/services/events';
+import { ensureMaterialized, setEventStatus } from '@/services/events';
 import { studentFullName } from '@/types';
 
 function DetailRow({ label, value }: { label: string; value: string }) {
@@ -57,7 +57,6 @@ export function EventDetailPage() {
   const { attendance, error: attendanceError } = useAttendance(event?.id ?? null);
 
   const [editorOpen, setEditorOpen] = useState(false);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -123,28 +122,6 @@ export function EventDetailPage() {
       });
     } catch {
       show('Could not change this event. Try again.', { tone: 'error' });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    setBusy(true);
-    try {
-      // The live listener is a snapshot of a moment ago; another counselor may
-      // have checked someone in since. Deleting an event with attendance would
-      // orphan that history, so confirm against the server first.
-      const records = await fetchAttendance(event.id);
-      if (records.length > 0) {
-        setConfirmingDelete(false);
-        show('Someone has been checked in — cancel this event instead.', { tone: 'error' });
-        return;
-      }
-      await deleteEvent(event.id);
-      show('Event deleted', { tone: 'success' });
-      navigate('/events', { replace: true });
-    } catch {
-      show('Could not delete this event. Try again.', { tone: 'error' });
     } finally {
       setBusy(false);
     }
@@ -234,7 +211,7 @@ export function EventDetailPage() {
                 <Button
                   variant="secondary"
                   className="flex-1"
-                  loading={busy && !confirmingDelete}
+                  loading={busy}
                   onClick={() => void toggleStatus()}
                 >
                   Un-cancel
@@ -247,7 +224,7 @@ export function EventDetailPage() {
                   <Button
                     variant="danger"
                     className="flex-1"
-                    loading={busy && !confirmingDelete}
+                    loading={busy}
                     onClick={() => {
                       setConfirmingCancel(false);
                       void toggleStatus();
@@ -333,63 +310,11 @@ export function EventDetailPage() {
 
       {event.mode === 'oneoff' ? <RsvpManager event={event} /> : null}
 
-      <Card>
-        <CardHeader title="Danger zone" />
-        <div className="flex flex-col gap-2 p-4">
-          {!event.materialized ? (
-            /*
-             * Nothing to delete, and nothing that deleting would achieve: this
-             * gathering is the recurrence rule speaking, so removing it would
-             * hand back exactly the same night on the next read. Cancelling is
-             * what records the decision — it writes the one document that says
-             * this Friday is off, which the projection then defers to.
-             */
-            <p className="text-sm text-ink-400">
-              This gathering comes from the repeat schedule, so there is nothing to delete. Cancel
-              it to call off this one date, or edit the event to change the schedule itself.
-            </p>
-          ) : attendance.length > 0 ? (
-            <p className="text-sm text-ink-400">
-              {attendance.length} {attendance.length === 1 ? 'student has' : 'students have'} been
-              checked in, so this event cannot be deleted — that history feeds the predictive
-              roster and the dashboard. Cancel it instead; it stays reversible.
-            </p>
-          ) : confirmingDelete ? (
-            <>
-              <p className="text-sm text-ink-300">
-                Delete “{event.title}” permanently? Cancelling keeps it on the calendar and can be
-                undone.
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  variant="secondary"
-                  className="flex-1"
-                  onClick={() => setConfirmingDelete(false)}
-                >
-                  Keep it
-                </Button>
-                <Button
-                  variant="danger"
-                  className="flex-1"
-                  loading={busy}
-                  onClick={() => void handleDelete()}
-                >
-                  Delete
-                </Button>
-              </div>
-            </>
-          ) : (
-            <>
-              <p className="text-sm text-ink-400">
-                Nobody has been checked in, so this event can still be removed entirely.
-              </p>
-              <Button variant="secondary" onClick={() => setConfirmingDelete(true)}>
-                Delete event
-              </Button>
-            </>
-          )}
-        </div>
-      </Card>
+      <EventDangerZone
+        event={event}
+        checkedIn={attendance.length}
+        onDeleted={() => navigate('/events', { replace: true })}
+      />
 
       <EventEditorModal
         open={editorOpen}

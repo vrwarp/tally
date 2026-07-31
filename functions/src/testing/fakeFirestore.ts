@@ -98,6 +98,11 @@ export class FakeFirestore implements FirestoreLike {
     return {
       set: (ref, value, options) => queued.push(() => this.write(ref.path, value, options?.merge === true)),
       update: (ref, value) => queued.push(() => this.write(ref.path, value, true)),
+      delete: (ref) =>
+        queued.push(() => {
+          this.data.delete(ref.path);
+          this.writes.push({ path: ref.path, data: { deleted: true } });
+        }),
       commit: async () => {
         for (const apply of queued) apply();
         queued.length = 0;

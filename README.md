@@ -78,6 +78,19 @@ looking for the Friday they missed, and "22 checked in" is how they recognise it
 same list hangs off the check-in chooser too, because taking the register after the fact is a
 counselor's job and the Events tab is core-team only.
 
+**Journey 7 — undoing a night, and ending a gathering.** Cancelling is what the event page leads
+with, because it is reversible and it keeps the attendance every derived screen is built from. Two
+things it cannot fix live at the foot of the page. A night recorded by mistake — the wrong Friday, a
+duplicate, a test event with eleven students in it — can be deleted along with its check-ins, which
+is the one operation in Tally that genuinely destroys history. And a gathering that has stopped
+happening can be ended outright: every night in the repeat, past and future, in one act. There is no
+other way to stop a recurrence rule, because the calendar ahead is computed from the chain's own
+instances rather than written down, so removing the last of them is what turns the schedule off.
+Both ask for a phrase to be typed rather than a second tap — one word for a single night, the
+gathering's own name for the whole repeat, which cannot be typed without naming which of the
+ministry's gatherings is about to stop existing. The dialog says what it is about to remove, counted
+by the server through the same code that would do the removing.
+
 ---
 
 ## Quick start
@@ -312,6 +325,18 @@ So the history at the foot of the Events tab pages straight out of Firestore ins
 two gatherings sharing a start time cannot duplicate or skip one. Each row carries a head count from
 the same session cache the predictive roster fills, so scrolling back over a window the roster has
 already loaded costs nothing.
+
+**Deleting an event runs on a server, even though the rules already allow it.** The core team may
+delete an `events/{eventId}` document directly — but deleting a document does not delete its
+subcollections, and the attendance left underneath is unreachable from every screen while still
+being returned by every collection-group query. Sweeping it from a browser means a write loop on a
+phone at a church door, and a phone that goes through a tunnel halfway leaves exactly the orphaned
+state the sweep existed to prevent. Ending a whole repeat makes that four figures of deletes. So
+both go through one callable (`functions/src/eventDeletion.ts`), which enumerates the children,
+deletes them before their parents — a run that dies partway leaves attendance under an event that
+still exists, which is untidy and fixable, rather than the reverse — and clears the
+`predictFromChain` pointer on any trip that was borrowing the chain's regulars. The same call with
+`preview` counts without writing, which is where the confirmation dialog's numbers come from.
 
 **Nothing picks the event but the person holding the phone.** `/` is a question — `ChooseEvent` —
 and `/event/:eventId` is the only URL that renders a roster. `pickActiveEvent` survives the change

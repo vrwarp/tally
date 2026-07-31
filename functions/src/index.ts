@@ -19,6 +19,11 @@ import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { PCO_SECRETS, resolveConfig, type PcoConfig } from './config.js';
 import { asFirestoreLike, PATHS, type FirestoreLike } from './firestore.js';
+import {
+  deleteEvents as removeEvents,
+  type DeletionSummary,
+  type DeletionTarget,
+} from './eventDeletion.js';
 import { materializeOccurrence as materializeOne, MINISTRY_TIME_ZONE } from './occurrences.js';
 import { createPcoClient, PcoApiError, type PcoClient } from './pco/client.js';
 import { describePcoFailure } from './pco/debug.js';
@@ -1214,4 +1219,57 @@ export const materializeOccurrence = onCall<
   }
 
   return result;
+});
+
+/**
+ * Removes a gathering, or every gathering in one chain of repeats, along with
+ * the check-ins filed under it.
+ *
+ * Core team only, matching the rules on `events` — and a step beyond what those
+ * rules can do on their own, because deleting a document leaves its
+ * subcollections behind. See `functions/src/eventDeletion.ts` for why that is
+ * the whole reason this runs on a server.
+ *
+ * `preview` is how the confirmation dialog knows what it is asking about. It
+ * counts through exactly the code that would delete, so the number somebody
+ * agrees to is the number that goes.
+ */
+export const deleteEvents = onCall<
+  { scope?: unknown; eventId?: unknown; chain?: unknown; preview?: unknown },
+  Promise<DeletionSummary>
+>({ timeoutSeconds: 300, memory: '256MiB' }, async (request) => {
+  await requireCoreTeam(request.auth?.uid);
+
+  const scope = request.data?.scope;
+  let target: DeletionTarget;
+
+  if (scope === 'event') {
+    const eventId = request.data?.eventId;
+    if (typeof eventId !== 'string' || eventId.trim().length === 0) {
+      throw new HttpsError('invalid-argument', 'eventId is required.');
+    }
+    target = { scope: 'event', eventId };
+  } else if (scope === 'chain') {
+    const chain = request.data?.chain;
+    if (typeof chain !== 'string' || chain.trim().length === 0) {
+      throw new HttpsError('invalid-argument', 'chain is required.');
+    }
+    target = { scope: 'chain', chain };
+  } else {
+    throw new HttpsError('invalid-argument', "scope must be 'event' or 'chain'.");
+  }
+
+  const summary = await removeEvents(db(), target, logger, {
+    apply: request.data?.preview !== true,
+  });
+
+  // Only reachable for a single event: a chain that matches nothing deletes
+  // nothing and says so. Either the gathering is one the recurrence rules
+  // merely describe — there is no document to remove — or another device
+  // removed it first, and both read the same way to whoever is looking.
+  if (!summary) {
+    throw new HttpsError('not-found', 'That gathering is no longer here.');
+  }
+
+  return summary;
 });
