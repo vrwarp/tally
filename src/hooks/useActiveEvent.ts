@@ -1,8 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { useData } from '@/context/dataContext';
 import { useNow } from '@/hooks/useNow';
 import { predictionChain } from '@/lib/gatherings';
 import { pickActiveEvent, recentChainInstances } from '@/lib/time';
+import { sameItems } from '@/lib/utils';
 import type { TallyEvent } from '@/types';
 
 export interface ActiveEventResult {
@@ -81,18 +82,34 @@ const CANCELLED_ALLOWANCE = 2;
  * A trip with nothing chosen loads nothing, by design: a retreat is not evidence
  * about who turns up to a retreat. See `lib/gatherings.ts`.
  */
+/** One shared "no history", so an event with no chain answers identically every render. */
+const NO_HISTORY: TallyEvent[] = [];
+
 export function useSeriesHistoryEvents(event: TallyEvent | null): TallyEvent[] {
   const { events, settings } = useData();
   const now = useNow(60_000);
 
+  /*
+   * The clock is a dependency, but almost every tick picks exactly the same
+   * instances — and a new array for the same instances is not a new answer.
+   * Downstream, this array's identity decides whether `useEventSnapshots`
+   * republishes and therefore whether the check-in screen rebuilds and repaints
+   * its whole roster; without this, that happened once a minute for the entire
+   * time a counselor had the screen open.
+   */
+  const last = useRef<TallyEvent[]>(NO_HISTORY);
+
   return useMemo(() => {
     const chain = event ? predictionChain(event) : null;
-    if (!event || !chain) return [];
-    return recentChainInstances(
+    if (!event || !chain) return NO_HISTORY;
+    const instances = recentChainInstances(
       events,
       chain,
       now,
       settings.predictiveOfLastN + CANCELLED_ALLOWANCE,
     ).filter((instance) => instance.id !== event.id);
+
+    if (!sameItems(last.current, instances)) last.current = instances;
+    return last.current;
   }, [event, events, now, settings.predictiveOfLastN]);
 }

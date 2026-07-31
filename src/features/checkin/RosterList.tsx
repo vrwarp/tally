@@ -13,6 +13,7 @@
  * they are looking through. Both offsets are measured at runtime and published
  * as custom properties; see `useHeightVar`.
  */
+import { memo } from 'react';
 import { StudentRow } from '@/features/checkin/StudentRow';
 import { cn } from '@/lib/utils';
 import type { RosterEntry } from '@/types';
@@ -32,7 +33,16 @@ export interface RosterListProps {
   busy: ReadonlySet<string>;
 }
 
-export function RosterList({
+/*
+ * Memoised because the screen above it re-renders on a 30-second clock (the
+ * event header's temporal awareness) and on every tap, while this — the several
+ * hundred DOM nodes of the roster itself — usually has nothing new to say. Every
+ * prop is identity-stable across those renders, so the shallow compare is
+ * enough; when a tap changes the `flashing` or `busy` set, the list re-renders
+ * and the per-row memo on `StudentRow` narrows the repaint to the row that
+ * changed.
+ */
+export const RosterList = memo(function RosterList({
   title,
   entries,
   description,
@@ -86,4 +96,4 @@ export function RosterList({
       )}
     </section>
   );
-}
+});

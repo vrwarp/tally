@@ -88,16 +88,36 @@ export function useEventSnapshots(events: readonly TallyEvent[]): EventSnapshots
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, version]);
 
-  const snapshots = useMemo(
-    () =>
-      events
-        .map((event) => ({ event, presentStudentIds: cache.get(event.id) }))
-        .filter(
-          (entry): entry is EventAttendanceSnapshot => entry.presentStudentIds !== undefined,
-        ),
+  /*
+   * The previous answer, handed back whenever the new one says the same thing.
+   *
+   * `events` is in the dependency list because the snapshots wrap its members,
+   * but several callers derive that array from a ticking clock, so its identity
+   * can change while its contents do not — and each entry here is a fresh
+   * wrapper object either way. Republishing an equivalent list makes every
+   * consumer recompute: the check-in screen rebuilds its entire roster from it.
+   */
+  const last = useRef<EventAttendanceSnapshot[]>([]);
+
+  const snapshots = useMemo(() => {
+    const next = events
+      .map((event) => ({ event, presentStudentIds: cache.get(event.id) }))
+      .filter(
+        (entry): entry is EventAttendanceSnapshot => entry.presentStudentIds !== undefined,
+      );
+
+    const unchanged =
+      next.length === last.current.length &&
+      next.every(
+        (entry, index) =>
+          entry.event === last.current[index].event &&
+          entry.presentStudentIds === last.current[index].presentStudentIds,
+      );
+
+    if (!unchanged) last.current = next;
+    return last.current;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [key, version, events],
-  );
+  }, [key, version, events]);
 
   return { snapshots, loading, error };
 }
