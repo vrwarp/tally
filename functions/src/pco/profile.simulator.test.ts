@@ -218,7 +218,8 @@ describe('updateStudentProfile against the simulator', () => {
   /**
    * The birthday is the one field Tally can write more of than it is shown, so
    * these are mostly about the year: kept when the caller only names a day,
-   * required when there is nothing upstream to keep, and never invented.
+   * stored as Planning Center's own 1885 when there is none to keep, and never
+   * invented.
    */
   describe('birthdays', () => {
     it('keeps the year on file when only the day is corrected', async () => {
@@ -261,18 +262,42 @@ describe('updateStudentProfile against the simulator', () => {
     });
 
     /**
-     * The refusal this whole shape exists for. There is no year upstream to keep
-     * the day against, and a guessed one is a wrong age on a child's record that
-     * nobody would think to check.
+     * No year upstream to keep the day against, and none guessed — Planning
+     * Center's own answer for a birthday nobody knows the year of is 1885, which
+     * it stores and shows no age against. A guessed *real* year would be a wrong
+     * age on a child's record that nobody would think to check.
      */
-    it('refuses a day-only birthday when there is no year to keep', async () => {
+    it('stores a day-only birthday with the year Planning Center keeps for "no year"', async () => {
       const id = FIXTURE_IDS.naomiNoBirthday;
       h.db.seed(`students/pco_${id}`, annotation());
 
       const result = await save(`pco_${id}`, { birthday: '04-02' });
 
+      expect(result.status).toBe('updated');
+      expect(h.store.personById(id)?.birthdate).toBe('1885-04-02');
+    });
+
+    /** And having stored one, a later correction keeps it year-less. */
+    it('keeps a birthday year-less once it is', async () => {
+      const id = FIXTURE_IDS.naomiNoBirthday;
+      h.db.seed(`students/pco_${id}`, annotation());
+      await save(`pco_${id}`, { birthday: '04-02' });
+
+      const result = await save(`pco_${id}`, { birthday: '04-03' });
+
+      expect(result.status).toBe('updated');
+      expect(h.store.personById(id)?.birthdate).toBe('1885-04-03');
+    });
+
+    /** 1885 is not a leap year, so this is the one date that still needs one. */
+    it('asks for the year for a leap day with nothing to keep it against', async () => {
+      const id = FIXTURE_IDS.naomiNoBirthday;
+      h.db.seed(`students/pco_${id}`, annotation());
+
+      const result = await save(`pco_${id}`, { birthday: '02-29' });
+
       expect(result.status).toBe('invalid');
-      expect(result.message).toMatch(/year/);
+      expect(result.message).toMatch(/29 February/);
       expect(h.store.personById(id)?.birthdate).toBeNull();
     });
 

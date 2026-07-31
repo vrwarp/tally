@@ -111,10 +111,23 @@ export interface TextFieldProps extends Omit<InputHTMLAttributes<HTMLInputElemen
   onClear?: () => void;
   /**
    * A second handle on the input, for a field that has to drive the caret —
-   * `PhoneField` below is the one that does. The clear button keeps its own
+   * `MaskedField` below is the one that does. The clear button keeps its own
    * handle either way, so this cannot take the keyboard focus away from it.
    */
   inputRef?: RefObject<HTMLInputElement | null>;
+  /**
+   * The rest of the shape this field is being typed into, drawn faded after
+   * whatever has been typed so far — `MM / DD / YYYY` on an empty birthday box,
+   * ` / YYYY` once the day is in.
+   *
+   * A placeholder cannot do this: it is all or nothing, and it disappears on the
+   * first keystroke, which is the moment the shape starts being useful. So it is
+   * a second layer over the input, holding an invisible copy of the value to
+   * push itself along by exactly the width of what is already there. Everything
+   * about it that matters is the alignment — same font size, same padding, same
+   * tabular digits — because a pixel out is a wobble on every keystroke.
+   */
+  ghost?: string;
 }
 
 export function TextField({
@@ -127,6 +140,7 @@ export function TextField({
   onClear,
   onKeyDown,
   inputRef: externalRef,
+  ghost,
   ...rest
 }: TextFieldProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -197,6 +211,22 @@ export function TextField({
             )}
             {...rest}
           />
+          {ghost ? (
+            <span
+              aria-hidden="true"
+              className={cn(
+                // `whitespace-pre` because the separators are spaces, and the
+                // font sizes restate `index.css`'s rule for form controls — a
+                // span does not inherit it.
+                'pointer-events-none absolute inset-0 flex items-center whitespace-pre',
+                'text-[16px] tabular-nums pointer-fine:text-[14px]',
+                'px-3 py-3 pointer-fine:px-2.5 pointer-fine:py-2',
+              )}
+            >
+              <span className="invisible">{String(rest.value ?? '')}</span>
+              <span className="text-ink-600">{ghost}</span>
+            </span>
+          ) : null}
           {clearable ? (
             <button
               type="button"
@@ -218,30 +248,39 @@ export function TextField({
   );
 }
 
-export interface PhoneFieldProps
-  extends Omit<TextFieldProps, 'value' | 'onChange' | 'type' | 'inputMode' | 'inputRef'> {
+export interface MaskedFieldProps
+  extends Omit<TextFieldProps, 'value' | 'onChange' | 'inputRef'> {
   value: string;
   /** Called with the already-formatted value — never with what was typed. */
   onValueChange: (value: string) => void;
+  /** Whatever is in the box, in the one shape this field holds it in. */
+  format: (raw: string) => string;
 }
 
 /**
- * A phone number, held in one shape.
+ * A field that re-punctuates itself while somebody types into it — a phone
+ * number as `XXX-XXX-XXXX`, a birthday as `MM / DD / YYYY`.
  *
- * The field takes digits and nothing else, and prints them as `XXX-XXX-XXXX`
- * while they are being typed. Two reasons it formats here rather than on blur or
- * on save: a number is read back off this screen by somebody about to ring it,
- * and every number in the app is printed grouped — a field that accepted
- * `5105550142` unbroken was the one place a leader had to count digits.
+ * Formatting as it is typed rather than on blur or on save is the point: both
+ * of those values are read back off a screen by somebody about to use them, and
+ * a box that accepted `5105550142` unbroken was the one place a leader had to
+ * count digits.
  *
  * The rest of this is caret work, and it exists because reformatting a
  * controlled input on every keystroke otherwise throws the cursor to the end of
  * the value: editing the area code of a number already typed would move the
  * caret past the last digit on the first keystroke. So each edit records which
  * digit the caret was sitting after, and puts it back after that same digit once
- * the new value has rendered.
+ * the new value has rendered. Digits are the anchor because they are the only
+ * part a person typed; the separators belong to the format and move around.
  */
-export function PhoneField({ value, onValueChange, onKeyDown, className, ...rest }: PhoneFieldProps) {
+export function MaskedField({
+  value,
+  onValueChange,
+  format,
+  onKeyDown,
+  ...rest
+}: MaskedFieldProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const caret = useRef<number | null>(null);
 
@@ -256,7 +295,7 @@ export function PhoneField({ value, onValueChange, onKeyDown, className, ...rest
 
   /** Re-format, then aim the caret at the far side of the same digit. */
   const commit = (next: string, digitsBefore: number) => {
-    const formatted = formatPhoneInput(next);
+    const formatted = format(next);
     caret.current = caretAfterDigits(formatted, digitsBefore);
     onValueChange(formatted);
     // Nothing changed — a letter, or an eleventh digit — so no render is coming
@@ -269,13 +308,7 @@ export function PhoneField({ value, onValueChange, onKeyDown, className, ...rest
     <TextField
       {...rest}
       inputRef={inputRef}
-      type="tel"
-      inputMode="tel"
       value={value}
-      // 12 characters is a full `XXX-XXX-XXXX`. The formatter already refuses to
-      // return more; this stops the browser accepting a longer paste first.
-      maxLength={12}
-      className={cn('tabular-nums', className)}
       onChange={(event) => {
         const node = event.target;
         const pos = node.selectionStart ?? node.value.length;
@@ -289,18 +322,47 @@ export function PhoneField({ value, onValueChange, onKeyDown, className, ...rest
         if (start === null || start !== end) return;
 
         /*
-         * A dash is ours, not something anybody typed, so a delete key aimed at
-         * one has to take the digit behind it instead. Left alone, the formatter
-         * would put the dash straight back and the key would appear dead.
+         * A separator is ours, not something anybody typed, so a delete key
+         * aimed at one has to reach past it for the nearest digit. Left alone,
+         * the formatter would put the separator straight back and the key would
+         * appear dead — and a birthday's separators are three characters wide,
+         * so "the character behind it" is not good enough either.
          */
-        if (event.key === 'Backspace' && start >= 2 && !isDigit(value[start - 1])) {
+        if (event.key === 'Backspace' && !isDigit(value[start - 1])) {
+          const at = lastDigitBefore(value, start);
+          if (at === null) return;
           event.preventDefault();
-          commit(value.slice(0, start - 2) + value.slice(start), digitCount(value.slice(0, start - 2)));
-        } else if (event.key === 'Delete' && start < value.length - 1 && !isDigit(value[start])) {
+          commit(value.slice(0, at) + value.slice(at + 1), digitCount(value.slice(0, at)));
+        } else if (event.key === 'Delete' && !isDigit(value[start])) {
+          const at = firstDigitFrom(value, start);
+          if (at === null) return;
           event.preventDefault();
-          commit(value.slice(0, start) + value.slice(start + 2), digitCount(value.slice(0, start)));
+          commit(value.slice(0, at) + value.slice(at + 1), digitCount(value.slice(0, at)));
         }
       }}
+    />
+  );
+}
+
+export interface PhoneFieldProps
+  extends Omit<TextFieldProps, 'value' | 'onChange' | 'type' | 'inputMode' | 'inputRef'> {
+  value: string;
+  /** Called with the already-formatted value — never with what was typed. */
+  onValueChange: (value: string) => void;
+}
+
+/** A phone number, grouped as `XXX-XXX-XXXX` while it is typed. */
+export function PhoneField({ className, ...rest }: PhoneFieldProps) {
+  return (
+    <MaskedField
+      {...rest}
+      format={formatPhoneInput}
+      type="tel"
+      inputMode="tel"
+      // 12 characters is a full `XXX-XXX-XXXX`. The formatter already refuses to
+      // return more; this stops the browser accepting a longer paste first.
+      maxLength={12}
+      className={cn('tabular-nums', className)}
     />
   );
 }
@@ -313,12 +375,35 @@ function digitCount(text: string): number {
   return text.replace(/\D/g, '').length;
 }
 
-/** The offset just past the `count`-th digit of `text`. */
+/** The digit a backspace at `from` should take, however many separators away. */
+function lastDigitBefore(text: string, from: number): number | null {
+  for (let i = from - 1; i >= 0; i -= 1) if (isDigit(text[i])) return i;
+  return null;
+}
+
+function firstDigitFrom(text: string, from: number): number | null {
+  for (let i = from; i < text.length; i += 1) if (isDigit(text[i])) return i;
+  return null;
+}
+
+/**
+ * The offset just past the `count`-th digit of `text`.
+ *
+ * With one exception, which is the whole reason a birthday box works: when
+ * nothing but separators follows that digit, the caret goes to the end instead.
+ * A format that puts a separator on *after* the last digit — `12 / 14 / ` — would
+ * otherwise park the caret in front of it on every keystroke, and the next
+ * character typed would land inside the value rather than after it. Anywhere
+ * there are still digits ahead, the caret stays where it was aimed, so editing
+ * the middle of a phone number is untouched.
+ */
 function caretAfterDigits(text: string, count: number): number {
   if (count <= 0) return 0;
   let seen = 0;
   for (let i = 0; i < text.length; i += 1) {
-    if (isDigit(text[i]) && ++seen === count) return i + 1;
+    if (isDigit(text[i]) && ++seen === count) {
+      return digitCount(text.slice(i + 1)) === 0 ? text.length : i + 1;
+    }
   }
   return text.length;
 }

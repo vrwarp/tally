@@ -48,12 +48,21 @@ const ROSTER_RESYNC_AFTER_MS = 60 * 1000;
  * after it appeared — visible as a flicker, and worse than that on a slow
  * device: a counselor's thumb is already moving toward a row when it is
  * replaced, and Playwright sees the same thing as "element was detached from
- * the DOM". Only the fields the roster renders are compared; anything else
- * changing would not be visible anyway.
+ * the DOM".
+ *
+ * Every field the roster renders has to be in here, and the bug this comment
+ * now exists for is what happens to one that is not. `birthday` was missing:
+ * saving a birthday from the badge wrote it to Planning Center, re-read the
+ * roster, found a snapshot this function called identical, and kept the old
+ * array — so the screen behind the panel still said "no birthday" until
+ * somebody reloaded the page. A field worth drawing is a field worth comparing.
  */
 function rosterSignature(students: readonly Student[]): string {
   return students
-    .map((s) => `${s.id}|${s.firstName}|${s.lastName}|${s.grade}|${s.status}|${s.profileComplete}|${s.hasAllergies}`)
+    .map(
+      (s) =>
+        `${s.id}|${s.firstName}|${s.lastName}|${s.grade}|${s.status}|${s.profileComplete}|${s.hasAllergies}|${s.birthday}`,
+    )
     .join('\n');
 }
 

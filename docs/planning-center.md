@@ -238,18 +238,35 @@ So the callable takes two shapes, and the difference is the whole design:
 
 - **`MM-DD`** — "this day, keeping the year Planning Center holds". Resolved against a fresh read of
   the person, like every other field here.
-- **`YYYY-MM-DD`** — the whole date. This is the only way to fill in a *blank* birthday, because
-  there is then no year to keep.
+- **`YYYY-MM-DD`** — the whole date, for a leader who knows the year.
 
-A day-only edit on a person with no `birthdate` at all is **refused**, not guessed. Planning Center
-displays an age computed from this field, so an invented year is a wrong age on a child's permanent
-record that nobody would ever think to check. `29-02` kept against a year on file that has no 29
-February is refused for the same reason, rather than being rounded to 1 March by the far end.
+On a person with no `birthdate` at all there is no year to keep, and none is invented: an age is
+displayed from this field, and a guessed year is a wrong age on a child's permanent record that
+nobody would ever think to check. Planning Center's own answer is used instead — a birthday nobody
+knows the year of is stored as **1885**, which its help asks people to type and which makes it show
+no age at all. So a day-only edit on a blank birthday writes `1885-MM-DD`, and a later day-only
+correction keeps the 1885 that is by then on file. (One consequence upstream, from the same help
+page: Groups and Services chat is 13-and-up, and a person with no year on their birthday cannot join
+one.)
 
-The form is three boxes — month, day, and an optional year — on the student editor and behind the
-roster's birthday badge, which is where somebody usually notices, with the student in front of them
-having just said when it is. Under anything other than `full` both places say where the field lives
-and link to it, as they always did.
+`29-02` is the single date this cannot do, because 1885 is not a leap year: on a person with no
+birthdate it asks for the year, and against a year on file that has no 29 February it is refused
+rather than rounded to 1 March by the far end.
+
+The form is **one box** — on the student editor and behind the roster's birthday badge, which is
+where somebody usually notices, with the student in front of them having just said when it is.
+Behind the badge it is open on arrival: there is no "Add a birthday" press between a leader and the
+one thing that panel is for.
+
+The box takes digits and punctuates itself, drawing the rest of `MM / DD / YYYY` faded after what
+has been typed. Slots fill greedily and forwards — a slot takes a second digit only when a second
+digit would still leave a value it can hold — so `1214` is 14 December, `112` is 2 November, `13` is
+3 January and `4` is April the moment it is typed. A separator somebody types closes the slot it
+follows, which is how `4/2/2013` says the second where `422013` says the twenty-second. The date is
+printed back in words under the box as it is typed, because a reading made in silence is one nobody
+can correct. See `src/lib/birthdayInput.ts` for the slot rules and `src/lib/birthdayField.ts` for
+what the box means. Under anything other than `full` both places say where the field lives and link
+to it, as they always did.
 
 A birthday cannot be **deleted** from Tally, unlike allergies. Every screen that shows one has only
 ever been shown the day, so an empty box has never been evidence that somebody decided to empty the

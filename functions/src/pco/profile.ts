@@ -81,9 +81,9 @@ export interface StudentProfilePatch {
    * Two shapes because Tally is never *told* the year — the roster carries the
    * day only, deliberately, so a leader correcting the day on a birthday already
    * on file cannot retype a year they have not been shown. `MM-DD` therefore
-   * means "this day, keeping whatever year Planning Center holds", and is
-   * refused on a person with no birthdate at all, because there is no year to
-   * keep and inventing one puts a wrong age on a child's record.
+   * means "this day, keeping whatever year Planning Center holds", and on a
+   * person with no birthdate at all it means "this day, with no year", which
+   * Planning Center stores as 1885 — see `UNKNOWN_BIRTH_YEAR`.
    *
    * No `null`. Every other field here can be cleared; this one cannot, because
    * deleting a date of birth is not a correction anybody makes from a roster
@@ -131,10 +131,14 @@ function trimmed(value: string | null | undefined): string | null {
  * to retype it.
  *
  * So `MM-DD` means "this day, keeping the year already upstream" and is resolved
- * against a fresh read of the person. When there is no birthdate at all there is
- * no year to keep, and this refuses rather than choosing one: Planning Center
- * shows an age computed from this field, and a guessed year is a wrong age on a
- * child's permanent record that nobody would ever think to check.
+ * against a fresh read of the person.
+ *
+ * When there is no birthdate at all there is no year to keep — and none is
+ * invented, because Planning Center shows an age computed from this field and a
+ * guessed year is a wrong age on a child's permanent record that nobody would
+ * ever think to check. Planning Center has its own answer for this and Tally
+ * uses it: a birthday whose year nobody knows is stored as 1885, which its own
+ * documentation asks people to type and which makes it show no age at all.
  */
 
 /** Days in each month, taking February at its leap-year length. */
@@ -144,8 +148,22 @@ function isLeapYear(year: number): boolean {
   return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
 }
 
-/** The earliest year of birth this will accept. */
+/** The earliest year of birth this will accept from a caller. */
 const EARLIEST_BIRTH_YEAR = 1900;
+
+/**
+ * The year Planning Center keeps for a birthday nobody knows the year of.
+ *
+ * Its own help says so — "use 1885 as the birth year, which will show no age" —
+ * and a person entered that way in Planning Center's own form comes back from
+ * the API as `1885-12-14`. So this is not a sentinel Tally invented; it is the
+ * one already in the data, and writing it is how a day-only birthday is stored
+ * without claiming an age for a child.
+ *
+ * Below `EARLIEST_BIRTH_YEAR` on purpose: a caller cannot type it, because a
+ * leader typing 1885 in the year box means a mistake rather than this.
+ */
+export const UNKNOWN_BIRTH_YEAR = 1885;
 
 /**
  * Whether a date somebody typed is a date that exists.
@@ -211,26 +229,34 @@ function heldBirthYear(birthdate: string | null): number | null {
 export type BirthdateResolution =
   /** The whole date to send, or null when it already matches what is upstream. */
   | { ok: true; birthdate: string | null }
-  /** `MM-DD` on a person with no birthdate: no year to keep, and none invented. */
-  | { ok: false; reason: 'no-year' }
-  /** 29 February kept against a year on file that does not have one. */
+  /** 29 February kept against a year — held or unknown — that does not have one. */
   | { ok: false; reason: 'not-in-that-year' };
 
 /**
  * The `YYYY-MM-DD` this edit means, given what Planning Center currently holds.
  *
+ * Three ways the year is settled, in order: the one the caller gave, the one
+ * already on the person, and — for a day typed against a person with no
+ * birthdate at all — `UNKNOWN_BIRTH_YEAR`, which is Planning Center's own way of
+ * holding a birthday with no year rather than a guess at this child's.
+ *
  * A 29 February day kept against a year with no 29 February in it is refused
  * rather than moved to 1 March: the year on file belongs to a person, and if it
  * makes the date impossible then one of the two is wrong and a leader should say
- * which.
+ * which. 1885 is not a leap year either, which is the one date this cannot store
+ * without being told the year.
  */
 export function resolveBirthdate(
   wanted: BirthdayPatch,
   heldBirthdate: string | null,
 ): BirthdateResolution {
-  const year = wanted.year ?? heldBirthYear(heldBirthdate);
-  if (year === null) return { ok: false, reason: 'no-year' };
-  if (!isRealBirthday(wanted.month, wanted.day, year)) {
+  const year = wanted.year ?? heldBirthYear(heldBirthdate) ?? UNKNOWN_BIRTH_YEAR;
+  // `isRealBirthday` has a floor of 1900, which 1885 is deliberately under.
+  const real =
+    year === UNKNOWN_BIRTH_YEAR
+      ? isRealBirthday(wanted.month, wanted.day, null) && !(wanted.month === 2 && wanted.day === 29)
+      : isRealBirthday(wanted.month, wanted.day, year);
+  if (!real) {
     return { ok: false, reason: 'not-in-that-year' };
   }
 
@@ -371,9 +397,7 @@ export async function updateStudentProfile(
     if (!resolved.ok) {
       return result(
         'invalid',
-        resolved.reason === 'no-year'
-          ? 'Planning Center holds no birthdate for this student, so there is no year to keep the day against. Give the year too.'
-          : 'Planning Center holds a year for this student that has no 29 February in it. Give the year as well, so the whole date is one somebody decided on.',
+        'The year this day would be kept against has no 29 February in it. Give the year as well, so the whole date is one somebody decided on.',
       );
     }
     if (resolved.birthdate !== null) attributes.birthdate = resolved.birthdate;

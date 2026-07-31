@@ -66,7 +66,9 @@ export function RowBadgeModal({ student, action, onClose, now }: RowBadgeModalPr
       {action === 'allergy' ? <AllergyPanel student={student} /> : null}
       {action === 'contact' ? <ParentContactPanel student={student} onDone={onClose} /> : null}
       {action === 'visitor' ? <VisitorPanel student={student} onDone={onClose} /> : null}
-      {action === 'birthday' ? <BirthdayPanel student={student} now={now} /> : null}
+      {action === 'birthday' ? (
+        <BirthdayPanel student={student} now={now} onDone={onClose} />
+      ) : null}
       {action === 'inactive' ? <InactivePanel student={student} onDone={onClose} /> : null}
       {action === 'queued' ? <QueuedPanel student={student} onDone={onClose} /> : null}
 
@@ -214,16 +216,28 @@ function VisitorPanel({ student, onDone }: { student: Student; onDone: () => voi
  * was a dead end in the one moment the answer was available — so when the church
  * has turned write-back on, the same panel takes it.
  *
+ * The box is open on arrival rather than behind an "Add a birthday" button. The
+ * button was a press between a leader and the one thing this panel is for, on a
+ * screen they opened *because* they had the answer — and it made a panel that
+ * fits in a modal look like a page with somewhere else to go.
+ *
  * `profileWritable` is the gate, read from the person details like everywhere
  * else: the browser cannot see the setting, and offering a box the write path
  * then refuses is worse than a link.
  */
-function BirthdayPanel({ student, now }: { student: Student; now: Date }) {
+function BirthdayPanel({
+  student,
+  now,
+  onDone,
+}: {
+  student: Student;
+  now: Date;
+  onDone: () => void;
+}) {
   const state = birthdayState(student.birthday, now);
   const upstream = student.pcoPersonId ? pcoPersonUrl(student.pcoPersonId) : null;
   const { details, loading, loaded } = usePersonDetails(student);
   const writable = Boolean(student.pcoPersonId) && details?.profileWritable === true;
-  const [editing, setEditing] = useState(false);
 
   const said: Record<Exclude<BirthdayState, 'missing'>, string> = {
     today: 'Today.',
@@ -232,32 +246,28 @@ function BirthdayPanel({ student, now }: { student: Student; now: Date }) {
     quiet: 'Not near today.',
   };
 
-  if (editing) return <EditBirthday student={student} onDone={() => setEditing(false)} />;
-
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3">
       {state === 'missing' ? (
         <p className="text-sm text-ink-300">
           Planning Center holds no birthdate for {student.firstName}, so Tally cannot tell you when
           to say something.
         </p>
       ) : (
-        <>
+        <div className="flex flex-col gap-1">
           <p className="text-2xl font-bold text-ink-50">{formatBirthdayLong(student.birthday)}</p>
           <p className="text-sm text-ink-400">{said[state]}</p>
-          <p className="text-sm text-ink-500">
-            The day only. Tally is not sent the year, so it does not know how old{' '}
-            {student.firstName} is.
-          </p>
-        </>
+          {writable ? null : (
+            <p className="text-sm text-ink-500">
+              The day only. Tally is not sent the year, so it does not know how old{' '}
+              {student.firstName} is.
+            </p>
+          )}
+        </div>
       )}
 
       {writable ? (
-        <div className="mt-1 flex justify-end">
-          <Button variant="secondary" onClick={() => setEditing(true)}>
-            {state === 'missing' ? 'Add a birthday' : 'Change it'}
-          </Button>
-        </div>
+        <EditBirthday student={student} onDone={onDone} />
       ) : loading && !loaded ? (
         <p className="text-sm text-ink-500">Reading what Planning Center allows…</p>
       ) : upstream ? (
@@ -265,7 +275,7 @@ function BirthdayPanel({ student, now }: { student: Student; now: Date }) {
           href={upstream}
           target="_blank"
           rel="noreferrer"
-          className="mt-1 text-sm text-brand-300 underline underline-offset-4"
+          className="text-sm text-brand-300 underline underline-offset-4"
         >
           {state === 'missing' ? 'Add one in Planning Center' : 'Change it in Planning Center'}
         </a>

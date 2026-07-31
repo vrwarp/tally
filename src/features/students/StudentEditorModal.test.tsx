@@ -260,20 +260,18 @@ describe('when write-back is full', () => {
    * the year staying out of the way rather than about the day.
    */
   describe('the birthday', () => {
-    it('opens on the day Planning Center holds, with the year blank', () => {
+    it('opens on the day Planning Center holds, and never on a year', () => {
       open(linked({ birthday: '06-28' }));
 
-      expect(screen.getByLabelText('Month')).toHaveValue('6');
-      expect(screen.getByLabelText('Day')).toHaveValue('28');
-      expect(screen.getByLabelText('Year')).toHaveValue('');
+      expect(screen.getByLabelText('Birthday')).toHaveValue('06 / 28 / ');
     });
 
     it('sends the corrected day on its own, so the year upstream is kept', async () => {
       open(linked({ birthday: '06-28' }));
 
-      const day = screen.getByLabelText('Day');
-      await userEvent.clear(day);
-      await userEvent.type(day, '26');
+      const box = screen.getByLabelText('Birthday');
+      await userEvent.clear(box);
+      await userEvent.type(box, '6/26');
       await save();
 
       await waitFor(() => expect(updateStudentProfile).toHaveBeenCalled());
@@ -283,9 +281,7 @@ describe('when write-back is full', () => {
     it('sends the whole date when a leader types the year too', async () => {
       open(linked({ birthday: null }));
 
-      await userEvent.selectOptions(screen.getByLabelText('Month'), '4');
-      await userEvent.type(screen.getByLabelText('Day'), '2');
-      await userEvent.type(screen.getByLabelText('Year'), '2013');
+      await userEvent.type(screen.getByLabelText('Birthday'), '4/2/2013');
       await save();
 
       await waitFor(() => expect(updateStudentProfile).toHaveBeenCalled());
@@ -295,8 +291,8 @@ describe('when write-back is full', () => {
     /**
      * The bug this exists to stop: a leader fixing a *name* on a student with no
      * birthdate upstream. Sending the birthday on every save — as every other
-     * managed field is — would make the server refuse the whole edit for want of
-     * a year nobody was asked for.
+     * managed field is — would make the server refuse the whole edit over a box
+     * nobody typed in.
      */
     it('is left out of a save that did not touch it', async () => {
       open(linked({ birthday: null }));
@@ -310,37 +306,38 @@ describe('when write-back is full', () => {
       expect(updateStudentProfile.mock.calls[0]?.[0]).not.toHaveProperty('birthday');
     });
 
-    it('asks for the year rather than sending a day with nothing to anchor it', async () => {
+    /**
+     * Planning Center holds a birthday with no year — it keeps 1885 for one and
+     * shows no age — so a leader who has just been told "the second of April"
+     * is not asked for a year they were never given.
+     */
+    it('takes a day with no year on a student who has no birthdate upstream', async () => {
       open(linked({ birthday: null }));
 
-      await userEvent.selectOptions(screen.getByLabelText('Month'), '4');
-      await userEvent.type(screen.getByLabelText('Day'), '2');
+      await userEvent.type(screen.getByLabelText('Birthday'), '4/2');
       await save();
 
-      expect(await screen.findByText(/the year is needed too/)).toBeInTheDocument();
-      expect(updateStudentProfile).not.toHaveBeenCalled();
-      // Refused before anything at all was written, not after a partial save.
-      expect(updateStudent).not.toHaveBeenCalled();
+      await waitFor(() => expect(updateStudentProfile).toHaveBeenCalled());
+      expect(updateStudentProfile.mock.calls[0]?.[0]).toMatchObject({ birthday: '04-02' });
     });
 
     it('refuses a day that month does not have', async () => {
       open(linked({ birthday: '06-28' }));
 
-      await userEvent.selectOptions(screen.getByLabelText('Month'), '2');
-      const day = screen.getByLabelText('Day');
-      await userEvent.clear(day);
-      await userEvent.type(day, '31');
+      const box = screen.getByLabelText('Birthday');
+      await userEvent.clear(box);
+      await userEvent.type(box, '2/31');
       await save();
 
       expect(await screen.findByText(/does not exist/)).toBeInTheDocument();
       expect(updateStudentProfile).not.toHaveBeenCalled();
     });
 
-    it('offers no birthday boxes at all when Tally may not write them', () => {
+    it('offers no birthday box at all when Tally may not write it', () => {
       personDetails.current = details({ profileWritable: false, contactWritable: false });
       open(linked());
 
-      expect(screen.queryByLabelText('Month')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Birthday')).not.toBeInTheDocument();
     });
   });
 });
