@@ -130,8 +130,8 @@ describe('the birthday badge', () => {
     openBadge(linked({ birthday: null }));
 
     expect(screen.getByText(/holds no birthdate/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Add a birthday' }));
-
+    // No "Add a birthday" press in between: the panel was opened by somebody
+    // who already has the answer.
     expect(screen.getByRole('textbox', { name: 'Birthday' })).toBeInTheDocument();
     expect(screen.getByText(/year is optional/)).toBeInTheDocument();
   });
@@ -142,17 +142,22 @@ describe('the birthday badge', () => {
    */
   it('says back the date it made of what was typed, as it is typed', async () => {
     openBadge(linked({ birthday: null }));
-    await userEvent.click(screen.getByRole('button', { name: 'Add a birthday' }));
 
     const box = screen.getByRole('textbox', { name: 'Birthday' });
     await userEvent.type(box, '112');
+    expect(box).toHaveValue('11 / 2');
     expect(screen.getByText(/^2 November/)).toBeInTheDocument();
 
     await userEvent.clear(box);
     await userEvent.type(box, '1214');
+    // The slashes are the box's, and the rest of the shape is drawn faded after
+    // them — `MM / DD / YYYY` with the year still to come.
+    expect(box).toHaveValue('12 / 14 / ');
+    expect(screen.getByText('YYYY')).toBeInTheDocument();
     expect(screen.getByText(/^14 December/)).toBeInTheDocument();
 
     await userEvent.type(box, '2011');
+    expect(box).toHaveValue('12 / 14 / 2011');
     expect(screen.getByText('14 December 2011.')).toBeInTheDocument();
   });
 
@@ -162,7 +167,6 @@ describe('the birthday badge', () => {
    */
   it('takes a day with no year for a student it holds no birthdate for', async () => {
     openBadge(linked({ birthday: null }));
-    await userEvent.click(screen.getByRole('button', { name: 'Add a birthday' }));
 
     await userEvent.type(screen.getByRole('textbox', { name: 'Birthday' }), '4/2');
     await userEvent.click(screen.getByRole('button', { name: /Save to Planning Center/ }));
@@ -178,7 +182,6 @@ describe('the birthday badge', () => {
     openBadge(linked({ birthday: '03-14' }));
 
     expect(screen.getByText('14 March')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Change it' }));
 
     const box = screen.getByRole('textbox', { name: 'Birthday' });
     await userEvent.clear(box);
@@ -200,7 +203,6 @@ describe('the birthday badge', () => {
     });
     openBadge(linked({ birthday: '03-14' }));
 
-    await userEvent.click(screen.getByRole('button', { name: 'Change it' }));
     const box = screen.getByRole('textbox', { name: 'Birthday' });
     await userEvent.clear(box);
     await userEvent.type(box, '3/16');

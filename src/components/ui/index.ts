@@ -1,12 +1,14 @@
 export { Button, type ButtonProps } from '@/components/ui/Button';
 export {
   CheckboxField,
+  MaskedField,
   NumberStepperField,
   PhoneField,
   SelectField,
   TextAreaField,
   TextField,
   type CheckboxFieldProps,
+  type MaskedFieldProps,
   type NumberStepperFieldProps,
   type PhoneFieldProps,
   type SelectFieldProps,

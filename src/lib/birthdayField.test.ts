@@ -18,8 +18,8 @@ const note = (text: string, onFile: string | null) =>
   describeBirthdayField(text, { onFile, now: NOW });
 
 describe('birthdayFieldFrom', () => {
-  it('opens on the day on file, written the way it would be typed back', () => {
-    expect(birthdayFieldFrom('03-14')).toBe('3/14');
+  it('opens on the day on file, in the shape the box holds it in', () => {
+    expect(birthdayFieldFrom('03-14')).toBe('03 / 14 / ');
   });
 
   it('opens empty for a student with no birthdate upstream', () => {
@@ -71,8 +71,8 @@ describe('readBirthdayField', () => {
 
   it('will not take half a date, or one that does not exist', () => {
     expect(read('12', null).ok).toBe(false);
+    expect(read('12 / 14 / 20', null).ok).toBe(false);
     expect(read('2/31', '03-14').ok).toBe(false);
-    expect(read('nonsense', null).ok).toBe(false);
   });
 });
 
@@ -80,7 +80,7 @@ describe('describeBirthdayField', () => {
   it('says the date back, so a greedy reading is one somebody can correct', () => {
     expect(note('112', '03-14').say).toMatch(/^2 November/);
     expect(note('1214', null).say).toMatch(/^14 December/);
-    expect(note('12/14/2011', null)).toEqual({ tone: 'good', say: '14 December 2011.' });
+    expect(note('12 / 14 / 2011', null)).toEqual({ tone: 'good', say: '14 December 2011.' });
   });
 
   it('says which year a day on its own will be stored against', () => {
@@ -92,12 +92,12 @@ describe('describeBirthdayField', () => {
   it('stays quiet while a date is still being typed', () => {
     expect(note('', null).tone).toBe('quiet');
     expect(note('12', null).tone).toBe('quiet');
-    expect(note('12/14/201', null).tone).toBe('quiet');
+    expect(note('12 / 14 / 201', null).tone).toBe('quiet');
   });
 
   it('says so as soon as a date cannot be one', () => {
     expect(note('2/30', null).tone).toBe('bad');
     expect(note('2/29', null).tone).toBe('bad');
-    expect(note('12/14/2999', null).tone).toBe('bad');
+    expect(note('12 / 14 / 2999', null).tone).toBe('bad');
   });
 });

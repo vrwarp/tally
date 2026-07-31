@@ -263,7 +263,7 @@ describe('when write-back is full', () => {
     it('opens on the day Planning Center holds, and never on a year', () => {
       open(linked({ birthday: '06-28' }));
 
-      expect(screen.getByLabelText('Birthday')).toHaveValue('6/28');
+      expect(screen.getByLabelText('Birthday')).toHaveValue('06 / 28 / ');
     });
 
     it('sends the corrected day on its own, so the year upstream is kept', async () => {

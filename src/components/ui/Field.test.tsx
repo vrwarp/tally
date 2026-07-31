@@ -1,6 +1,6 @@
 /**
- * The phone field, which is the only control in the app that rewrites what
- * somebody typed while they are typing it.
+ * The two controls in the app that rewrite what somebody typed while they are
+ * typing it: a phone number, and anything else built on `MaskedField`.
  *
  * Everything here is about that rewrite staying invisible: digits land, nothing
  * else does, and the caret ends up where the person editing expects it rather
@@ -10,7 +10,7 @@ import { useState } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { PhoneField } from '@/components/ui/Field';
+import { MaskedField, PhoneField, TextField } from '@/components/ui/Field';
 
 function Harness({ initial = '' }: { initial?: string }) {
   const [value, setValue] = useState(initial);
@@ -97,5 +97,62 @@ describe('PhoneField', () => {
 
     expect(input).toHaveValue('555-010-123');
     expect(input.selectionStart).toBe(7);
+  });
+});
+
+/**
+ * A format that puts its separator on *after* a slot is full — `12-` — which is
+ * the shape a `MM / DD / YYYY` box takes, and the one that used to swallow the
+ * next keystroke.
+ */
+function slotted(raw: string): string {
+  const digits = raw.replace(/\D/g, '').slice(0, 4);
+  if (digits.length < 2) return digits;
+  return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+}
+
+function SlotHarness() {
+  const [value, setValue] = useState('');
+  return (
+    <MaskedField
+      label="Slots"
+      value={value}
+      onValueChange={setValue}
+      format={slotted}
+      ghost={'X'.repeat(4 - value.replace(/\D/g, '').length)}
+    />
+  );
+}
+
+describe('MaskedField', () => {
+  it('carries on typing past a separator it has just added', async () => {
+    render(<SlotHarness />);
+    const input = screen.getByLabelText('Slots') as HTMLInputElement;
+
+    await userEvent.type(input, '1234');
+
+    // The caret has to clear the trailing dash by itself: parked in front of it,
+    // every later digit lands inside the value instead of after it.
+    expect(input).toHaveValue('12-34');
+  });
+
+  it('lets backspace reach back over a separator for the digit behind it', async () => {
+    render(<SlotHarness />);
+    const input = screen.getByLabelText('Slots') as HTMLInputElement;
+
+    await userEvent.type(input, '12');
+    await userEvent.keyboard('{Backspace}');
+
+    expect(input).toHaveValue('1');
+  });
+
+  it('draws what is still owed after the value, out of the way of everything', () => {
+    render(<TextField label="Slots" value="12" ghost="XX" onChange={() => {}} />);
+
+    const ghost = screen.getByText('XX');
+    // Faded, unselectable and unread: the value beside it is the only text on
+    // this control anybody is meant to hear or copy.
+    expect(ghost.closest('[aria-hidden="true"]')).not.toBeNull();
+    expect(ghost.closest('span')?.className).toContain('text-ink-600');
   });
 });

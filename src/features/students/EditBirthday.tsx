@@ -15,10 +15,11 @@
  * it, plus the one screen that has to own its own Save.
  */
 import { useState } from 'react';
-import { Button, TextField } from '@/components/ui';
+import { Button, MaskedField } from '@/components/ui';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { birthdayFieldFrom, describeBirthdayField, readBirthdayField } from '@/lib/birthdayField';
+import { birthdayMaskGhost, formatBirthdayInput } from '@/lib/birthdayInput';
 import { updateStudentProfile } from '@/services/functions';
 import type { Student } from '@/types';
 
@@ -35,18 +36,20 @@ export interface BirthdayFieldProps {
 }
 
 /**
- * One box, and a sentence under it that keeps up with the typing.
+ * One box that punctuates itself, over a sentence that keeps up with the typing.
  *
  * The three controls this replaced — a month dropdown, a day box, a year box —
  * were the database's shape rather than a person's. Nobody says a birthday in
  * three fields; they say "December the fourteenth", and on a phone at a door
- * they type `1214`. Reading that takes a parser, and a parser that guesses
- * silently is worse than the dropdown was — so the guess is printed under the
- * box, in words, before anybody presses Save.
+ * they type `1214`. So the box takes digits and puts the slashes in itself, and
+ * draws the rest of `MM / DD / YYYY` faded behind what is still to come — the
+ * shape is answered rather than asked for.
  *
- * The sentence goes through `hint` and `error` rather than a paragraph of its
- * own so that the control is described by it, turns red with it, and reads the
- * same as every other field in the app.
+ * The sentence underneath is the other half. `1214` and `112` are readings of
+ * what somebody meant, and a reading made silently is one nobody can correct, so
+ * the date is printed in words before anybody presses Save. It goes through
+ * `hint` and `error` rather than a paragraph of its own so that the control is
+ * described by it, turns red with it, and reads like every other field here.
  */
 export function BirthdayField({
   value,
@@ -60,17 +63,21 @@ export function BirthdayField({
   const wrong = error ?? (note.tone === 'bad' ? note.say : null);
 
   return (
-    <TextField
+    <MaskedField
       label="Birthday"
       value={value}
-      onChange={(changed) => onChange(changed.target.value)}
+      onValueChange={onChange}
+      format={formatBirthdayInput}
+      ghost={birthdayMaskGhost(value)}
       disabled={disabled}
-      // A numeric keypad is the right one at a door: `1214` is the fastest way
-      // to say this, and the parser is built around it. A physical keyboard
-      // ignores the hint, so "14 Dec 2011" still works wherever there is one.
+      // Digits are the whole vocabulary now, so a numeric keypad is the right
+      // one — and it is the keyboard this is used on, at a door, one-handed.
       inputMode="numeric"
       autoComplete="off"
-      placeholder="12/14/2011"
+      // A full `MM / DD / YYYY`. The formatter refuses to return more; this
+      // stops the browser accepting a longer paste first.
+      maxLength={14}
+      className="tabular-nums"
       hint={wrong ? undefined : note.say}
       error={wrong}
     />

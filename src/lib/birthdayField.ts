@@ -36,22 +36,27 @@ import {
   formatBirthdayLong,
   EARLIEST_BIRTH_YEAR,
 } from '@/lib/birthday';
-import { parseBirthdayInput, type ImpossibleReason } from '@/lib/birthdayInput';
+import {
+  formatBirthdayInput,
+  parseBirthdayInput,
+  type ImpossibleReason,
+} from '@/lib/birthdayInput';
 
 /** An empty box, which means "leave whatever is upstream alone". */
 export const BLANK_BIRTHDAY_FIELD = '';
 
-/** How to type one, in the fewest characters that show the shape. */
-const EXAMPLES = '12/14, 1214, or 14 Dec 2011';
-
 /**
- * The box as it should open for this student: the day Planning Center holds,
- * written the way somebody would type it back, and never a year — see above.
+ * The box as it should open for this student: the day Planning Center holds, in
+ * the shape the box holds it in, and never a year — see above.
  */
 export function birthdayFieldFrom(birthday: string | null | undefined): string {
   const parts = birthdayParts(birthday);
   if (!parts) return BLANK_BIRTHDAY_FIELD;
-  return `${parts.month}/${parts.day}`;
+  return formatBirthdayInput(`${pad(parts.month)}${pad(parts.day)}`);
+}
+
+function pad(value: number): string {
+  return String(value).padStart(2, '0');
 }
 
 export type BirthdayFieldRead =
@@ -81,10 +86,12 @@ export function readBirthdayField(text: string, options: BirthdayFieldOptions): 
     return { ok: true, value: undefined };
   }
   if (reading.state === 'partial') {
-    return { ok: false, error: `That is half a date. Try ${EXAMPLES}.` };
-  }
-  if (reading.state === 'unreadable') {
-    return { ok: false, error: `Tally cannot read that as a date. Try ${EXAMPLES}.` };
+    return {
+      ok: false,
+      error: reading.year
+        ? 'Finish the year, or take it out — a birthday can go in without one.'
+        : 'That is half a date. Give a month and a day at least.',
+    };
   }
   if (reading.state === 'impossible') {
     return { ok: false, error: refusal(reading.reason) };
@@ -134,13 +141,15 @@ export function describeBirthdayField(
       tone: 'quiet',
       say:
         onFile === null
-          ? `Any way you like — ${EXAMPLES}. The year is optional.`
+          ? 'Just the numbers — the year is optional.'
           : 'Left empty, the birthday Planning Center holds stays as it is.',
     };
   }
-  if (reading.state === 'partial') return { tone: 'quiet', say: `Keep going — ${EXAMPLES}.` };
-  if (reading.state === 'unreadable') {
-    return { tone: 'bad', say: `Not a date Tally can read. Try ${EXAMPLES}.` };
+  if (reading.state === 'partial') {
+    return {
+      tone: 'quiet',
+      say: reading.year ? 'Keep going, or leave the year out.' : 'Keep going.',
+    };
   }
   if (reading.state === 'impossible') return { tone: 'bad', say: refusal(reading.reason) };
 

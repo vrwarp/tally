@@ -1,46 +1,39 @@
 /**
- * A birthday the way somebody types one, read while they are still typing.
+ * A birthday as somebody types one into a `MM / DD / YYYY` box.
  *
- * Tally used to ask for a birthday in three controls — a month dropdown, a day
- * box, a year box — which is the shape a form takes when the form is thinking
- * about the database. Nobody says a birthday that way. A leader standing in
- * front of the student who has just answered types `1214`, or `12/14`, or
- * `Dec 14`, and every one of those is unambiguous to a person.
+ * Tally used to ask for this in three controls — a month dropdown, a day box, a
+ * year box — which is the shape a form takes when the form is thinking about the
+ * database. Nobody says a birthday that way. A leader standing in front of the
+ * student who has just answered types `1214`, and the box should do the rest.
  *
- * So it is one box and this parser. The rules, in the order they matter:
+ * So there is one box, it takes digits, and this module decides three things
+ * from them at once: where the separators go, what is still owed (drawn faded
+ * after what has been typed), and what date it all adds up to. One walk over the
+ * digits answers all three, which is what keeps them from disagreeing — the
+ * sentence under the box can never describe a date the box is not showing.
  *
- *   - **Separators are noise.** `12/14`, `12-14`, `12.14`, `12 14` and `1214`
- *     are one date. Anything that is not a letter or a digit is a boundary and
- *     nothing else.
- *   - **A bare run of digits is read month-first and greedily.** `112` is 2
- *     November rather than 12 January, because taking the longest month is what
- *     makes `1212` mean 12 December — and a rule that changed its mind between
- *     three digits and four would be worse than either answer. The month is
- *     decided once, from the front: a run whose first two digits are a month is
- *     never re-read as a one-digit one, or the date under the box would jump
- *     from December to January and back while somebody typed.
- *   - **The year is optional, and never guessed.** `12/14` is a birthday with
- *     no year, which Planning Center can hold — see `birthdayField.ts`.
- *   - **Half-typed is not wrong.** `1`, `12`, `12/1` on the way to `12/14`, two
- *     digits of a four-digit year: all `partial`, which the field draws in the
- *     same grey as a hint. An error that appears on the first keystroke and
- *     clears on the fourth teaches nothing and reads as a fault.
+ * The walk is greedy, and the greed is the whole design:
  *
- * The refusals are the other half. `2/30` is `impossible` rather than
- * `unreadable`: the difference is whether Tally understood somebody and has to
- * disagree, or did not understand them at all, and the two want different
- * sentences under the box.
+ *   - **The month takes two digits when two digits are a month.** `12` is
+ *     December; `13` is January the 3rd, because there is no thirteenth month;
+ *     `4` is April and closes immediately, because no month starts with a 4.
+ *   - **Then the day, the same way.** `112` is 2 November, `131` is 31 January.
+ *   - **Then the year, up to four digits, and it is optional** — Planning Center
+ *     holds a birthday with no year. See `birthdayField.ts`.
+ *
+ * A slot that could still take another digit is *open*, and an open slot is why
+ * `1` shows as `1M / DD / YYYY` rather than guessing between January and
+ * December. Nothing is refused while a slot is open: an error that appears on
+ * the first keystroke and clears on the fourth teaches nothing and reads as a
+ * fault.
  */
-import { format } from 'date-fns';
 import { EARLIEST_BIRTH_YEAR, isRealBirthday } from '@/lib/birthday';
 
 export type BirthdayInputReading =
   /** Nothing typed. */
   | { state: 'empty' }
   /** Could still become a date if they keep going. Say nothing sharp. */
-  | { state: 'partial' }
-  /** Not a date, and not on the way to one. */
-  | { state: 'unreadable' }
+  | { state: 'partial'; /** The year is what is unfinished, rather than the day. */ year: boolean }
   /** Understood, and refused. */
   | { state: 'impossible'; reason: ImpossibleReason }
   /** Understood. `year` is null when they did not give one. */
@@ -56,244 +49,161 @@ export type ImpossibleReason =
   /** Before `EARLIEST_BIRTH_YEAR`, which is nobody on a youth roster. */
   | 'early-year';
 
-const ENGLISH_MONTHS = [
-  'january',
-  'february',
-  'march',
-  'april',
-  'may',
-  'june',
-  'july',
-  'august',
-  'september',
-  'october',
-  'november',
-  'december',
+/** `MM / DD / YYYY`, one slot at a time. */
+export interface BirthdaySlots {
+  month: string;
+  day: string;
+  year: string;
+  /** Where the next digit would land: 0 month, 1 day, 2 year, 3 nowhere left. */
+  at: 0 | 1 | 2 | 3;
+}
+
+const SEPARATOR = ' / ';
+
+/** What each slot holds: how many digits, and which values are legal in it. */
+const SLOTS = [
+  { size: 2, least: 1, most: 12 },
+  { size: 2, least: 1, most: 31 },
+  { size: 4, least: 0, most: 9999 },
 ] as const;
 
 /**
- * Month names a typed word is matched against.
+ * The typing, dealt into the three slots.
  *
- * English always, because the abbreviations people type are English on a form
- * whose every other word is; plus the reader's own locale, so a month name this
- * app would *print* is one it can also read back.
+ * A slot takes a second digit only when a second digit would still leave a value
+ * it can hold: `1` waits, because 10, 11 and 12 exist; `4` closes at once,
+ * because no month starts with a 4; `13` closes as January and hands the 3 on to
+ * the day. That is the greed, and doing it forwards — never re-reading the run
+ * from the front — is what stops the month on screen changing its mind about
+ * itself because of something typed after it.
+ *
+ * A separator somebody typed closes the slot it follows, and that is the escape
+ * hatch the greed needs: `422013` is 22 April, and `4/2/2013` is the second,
+ * because the slash after the 2 said so.
  */
-const MONTH_NAMES: readonly (readonly string[])[] = ENGLISH_MONTHS.map((english, index) => {
-  // Any year: only the month name is read off it.
-  const local = format(new Date(2024, index, 1), 'MMMM').toLowerCase();
-  return local === english ? [english] : [english, local];
-});
+export function birthdaySlots(raw: string): BirthdaySlots {
+  const slots = ['', '', ''];
+  let at = 0;
 
-/** A number read off the input, or why it is not one yet. */
-type Figure = number | 'growing' | 'bad';
+  for (const char of raw) {
+    if (at > 2) break;
+
+    if (!/\d/.test(char)) {
+      // Leading and doubled separators are noise; one after a digit is a person
+      // saying "that slot is finished".
+      if (slots[at] !== '') at += 1;
+      continue;
+    }
+
+    // Down the slots until one can hold this digit, which is how a run with no
+    // separators in it spills from month to day to year.
+    while (at <= 2 && !accepts(slots[at], char, at)) at += 1;
+    if (at > 2) break;
+
+    slots[at] += char;
+    if (finished(slots[at], at)) at += 1;
+  }
+
+  return { month: slots[0], day: slots[1], year: slots[2], at: slotIndex(at) };
+}
+
+/** The walk above counts past the last slot; the type says where it stopped. */
+function slotIndex(value: number): 0 | 1 | 2 | 3 {
+  if (value <= 0) return 0;
+  if (value === 1) return 1;
+  return value === 2 ? 2 : 3;
+}
+
+/** Whether this slot could hold what it has plus one more digit. */
+function accepts(text: string, char: string, at: number): boolean {
+  const slot = SLOTS[at];
+  const grown = text + char;
+  if (grown.length > slot.size) return false;
+  // A first digit is always a prefix of something the slot can hold; a second
+  // has to make a real value, or `34` would be a day.
+  return grown.length === 1 || inRange(grown, slot);
+}
+
+/** Full, or as full as it can usefully get — `9` is September, not the 90th. */
+function finished(text: string, at: number): boolean {
+  const slot = SLOTS[at];
+  if (text.length === slot.size) return true;
+  for (let next = 0; next <= 9; next += 1) {
+    if (inRange(`${text}${next}`, slot)) return false;
+  }
+  return true;
+}
+
+function inRange(digits: string, slot: { least: number; most: number }): boolean {
+  const value = Number(digits);
+  return value >= slot.least && value <= slot.most;
+}
 
 /**
- * What somebody has typed so far, as a date or as the reason it is not one.
+ * What goes in the box: what has been typed, with the separators the shape calls
+ * for — including a trailing one, once a slot is closed and the next is empty.
  *
- * `now` settles two things and only two: which years are in the future, and
- * which century a two-digit year belongs to.
+ * The trailing separator is load-bearing rather than decoration: it is where a
+ * typed `/` is *kept*. Without it, `4/` would come back out of the formatter as
+ * `4`, be re-read as a month still waiting for a second digit, and quietly
+ * un-decide the thing the person had just decided.
+ */
+export function formatBirthdayInput(raw: string): string {
+  const { month, day, year, at } = birthdaySlots(raw);
+  if (month === '') return '';
+
+  const closed = (slot: number) => (at > slot ? SEPARATOR : '');
+  return `${month}${closed(0)}${day}${closed(1)}${year}`;
+}
+
+/**
+ * What is still owed, drawn faded after the value — the rest of `MM / DD / YYYY`
+ * from wherever the typing has got to.
+ *
+ * `YYYY` stays in view to the last digit even though the year is optional. It is
+ * a shape rather than a demand, and "with no year" is said in words underneath,
+ * where a sentence can explain itself.
+ */
+export function birthdayMaskGhost(raw: string): string {
+  const { month, day, year, at } = birthdaySlots(raw);
+
+  if (month === '') return `MM${SEPARATOR}DD${SEPARATOR}YYYY`;
+  // Whatever the value ends in, the ghost carries on from exactly there: a slot
+  // still open is short by one, and a closed one has had its separator printed.
+  if (at === 0) return `M${SEPARATOR}DD${SEPARATOR}YYYY`;
+  if (at === 1) return day === '' ? `DD${SEPARATOR}YYYY` : `D${SEPARATOR}YYYY`;
+  if (at === 2) return 'Y'.repeat(4 - year.length);
+  return '';
+}
+
+/**
+ * What has been typed so far, as a date or as the reason it is not one yet.
+ *
+ * `now` settles one thing only: which years are in the future.
  */
 export function parseBirthdayInput(raw: string, now: Date = new Date()): BirthdayInputReading {
-  // `14th Dec` is the same date as `14 Dec`, and stripping the suffix here
-  // keeps `th` away from the month matcher.
-  const text = raw.trim().toLowerCase().replace(/(\d)(st|nd|rd|th)\b/g, '$1');
-  if (text === '') return { state: 'empty' };
-
-  const tokens = text.match(/\p{L}+|\d+/gu);
-  // Separators and nothing else — a half-deleted `12/`, say.
-  if (!tokens) return { state: 'partial' };
-
-  const words = tokens.filter((token) => /\p{L}/u.test(token));
-  const numbers = tokens.filter((token) => /\d/.test(token));
-  // Two words: two month names, or one and something that is not a month.
-  if (words.length > 1) return { state: 'unreadable' };
-
-  return words.length === 1 ? fromNamedMonth(words[0], numbers, now) : fromNumbers(numbers, now);
-}
-
-/** "dec", "december", "sept" — or the two answers that are not one month. */
-function monthFromWord(word: string): number | 'none' | 'ambiguous' {
-  const matches = MONTH_NAMES.flatMap((names, index) =>
-    names.some((name) => name.startsWith(word)) ? [index + 1] : [],
-  );
-
-  if (matches.length === 0) return 'none';
-  // "j" is January, June and July at once: somebody mid-word, not a mistake.
-  if (matches.length > 1) return 'ambiguous';
-  return matches[0];
-}
-
-function fromNamedMonth(word: string, numbers: readonly string[], now: Date): BirthdayInputReading {
-  const month = monthFromWord(word);
-  if (month === 'none') return { state: 'unreadable' };
-  if (month === 'ambiguous') return { state: 'partial' };
-  // "December" alone: the month is settled and the day is still coming.
-  if (numbers.length === 0) return { state: 'partial' };
-  if (numbers.length > 2) return { state: 'unreadable' };
-
-  if (numbers.length === 2) {
-    // "2011 December 14" as readily as "December 14 2011".
-    const yearFirst = numbers[0].length === 4;
-    const day = readSmall(yearFirst ? numbers[1] : numbers[0]);
-    const year = readYear(yearFirst ? numbers[0] : numbers[1], now);
-    return finish(month, day, year, now);
+  const { month, day, year } = birthdaySlots(raw);
+  if (month === '') return { state: 'empty' };
+  // A slot holding `0` is the first digit of `01`, not a month or a day.
+  if (Number(month) === 0 || day === '' || Number(day) === 0) {
+    return { state: 'partial', year: false };
   }
+  if (year !== '' && year.length < 4) return { state: 'partial', year: true };
 
-  const only = numbers[0];
-  if (only.length <= 2) return finish(month, readSmall(only), null, now);
-
-  // "dec 142011" — a day and a year with nothing between them.
-  const split = splitDayAndYear(only, now);
-  return split ? finish(month, split.day, split.year, now) : { state: 'partial' };
-}
-
-function fromNumbers(numbers: readonly string[], now: Date): BirthdayInputReading {
-  if (numbers.length === 0) return { state: 'partial' };
-  if (numbers.length === 1) return fromDigitRun(numbers[0], now);
-  if (numbers.length > 3) return { state: 'unreadable' };
-
-  // ISO, which is what a date pasted from anywhere else tends to look like.
-  if (numbers[0].length === 4) {
-    if (numbers.length === 2) return { state: 'partial' };
-    return finish(readSmall(numbers[1]), readSmall(numbers[2]), Number(numbers[0]), now);
-  }
-
-  if (numbers.length === 2 && numbers[1].length > 2) {
-    // "12/142011", and every keystroke of "12/2011" on the way to somewhere.
-    const split = splitDayAndYear(numbers[1], now);
-    return split
-      ? finish(readSmall(numbers[0]), split.day, split.year, now)
-      : { state: 'partial' };
-  }
-
-  return finish(
-    readSmall(numbers[0]),
-    readSmall(numbers[1]),
-    numbers.length === 3 ? readYear(numbers[2], now) : null,
-    now,
-  );
-}
-
-/**
- * A single run of digits: the month off the front, then the day, then whatever
- * is left as a year.
- *
- * Only a whole year is taken here. `12122011` is 12 December 2011 and `121211`
- * is still `partial` — a two-digit year is fine when somebody separated it
- * themselves (`12/12/11`), but inside a bare run it would make every keystroke
- * on the way to a four-digit year land on a different plausible date, and
- * `12120` reading as 1 December 2020 for exactly one keystroke is worse than
- * saying nothing for two.
- */
-function fromDigitRun(digits: string, now: Date): BirthdayInputReading {
-  // `20111214` — but only when the leading four could be a year of birth, or
-  // `12122011` would be read as the year 1212.
-  if (digits.length === 8) {
-    const leading = Number(digits.slice(0, 4));
-    if (leading >= EARLIEST_BIRTH_YEAR && leading <= now.getFullYear()) {
-      return finish(Number(digits.slice(4, 6)), Number(digits.slice(6, 8)), leading, now);
-    }
-  }
-
-  // The month, greedily and once. Two digits win whenever they are a month at
-  // all; `131` falls back to January because 13 is not one.
-  const monthLength = digits.length >= 2 && isMonth(Number(digits.slice(0, 2))) ? 2 : 1;
-  const month = Number(digits.slice(0, monthLength));
-  const rest = digits.slice(monthLength);
-  if (!isMonth(month)) {
-    // Not a month yet, but `0` is the first digit of one.
-    return digits.length === 1 && digits === '0' ? { state: 'partial' } : { state: 'unreadable' };
-  }
-  if (rest === '') return { state: 'partial' };
-
-  const split = splitDayAndYear(rest, now);
-  if (split) return finish(month, split.day, split.year, now);
-
-  // `mmddyyyy` is the longest this shape gets, so anything shorter that has a
-  // month on the front is still on its way somewhere.
-  return digits.length < 8 ? { state: 'partial' } : { state: 'unreadable' };
-}
-
-/**
- * The digits after the month, as a day and the year that may follow it.
- *
- * Greedy in the same direction: a two-digit day is preferred, and given up only
- * when what it leaves behind is not a year. `1212011` is 1 December 2011
- * because `12|12|011` has no year in it and `12|1|2011` does.
- */
-function splitDayAndYear(digits: string, now: Date): { day: number; year: number | null } | null {
-  for (const dayLength of [2, 1] as const) {
-    if (digits.length < dayLength) continue;
-    const day = Number(digits.slice(0, dayLength));
-    if (day < 1 || day > 31) continue;
-
-    const yearDigits = digits.slice(dayLength);
-    if (yearDigits === '') return { day, year: null };
-    if (yearDigits.length === 4) {
-      const year = Number(yearDigits);
-      // A year that cannot be one leaves the day free to be read the other way.
-      if (year >= EARLIEST_BIRTH_YEAR && year <= now.getFullYear()) return { day, year };
-    }
-  }
-  return null;
-}
-
-function isMonth(value: number): boolean {
-  return Number.isInteger(value) && value >= 1 && value <= 12;
-}
-
-/** A month or a day: at most two digits, and zero means "still typing". */
-function readSmall(digits: string): Figure {
-  if (digits.length > 2) return 'bad';
-  return Number(digits) === 0 ? 'growing' : Number(digits);
-}
-
-/**
- * A year as typed: four digits as they stand, two expanded around today.
- *
- * One digit or three is somebody part-way through typing a year; five is a
- * mistake. `finish` is where that difference becomes a state.
- */
-function readYear(digits: string, now: Date): Figure | null {
-  if (digits === '') return null;
-  if (digits.length === 4) return Number(digits);
-  if (digits.length === 1 || digits.length === 3) return 'growing';
-  if (digits.length !== 2) return 'bad';
-
-  // `11` is 2011 rather than 1911 on a roster of children, and `99` is 1999
-  // rather than a year that has not happened.
-  const century = Math.floor(now.getFullYear() / 100) * 100;
-  const value = Number(digits);
-  return value <= now.getFullYear() % 100 ? century + value : century - 100 + value;
-}
-
-/**
- * The last word on a month, a day and a year that have all been read off the
- * box — including the two ways of not being a date yet.
- */
-function finish(
-  month: Figure,
-  day: Figure,
-  year: Figure | null,
-  now: Date,
-): BirthdayInputReading {
-  if (month === 'bad' || day === 'bad' || year === 'bad') return { state: 'unreadable' };
-  if (month === 'growing' || day === 'growing' || year === 'growing') return { state: 'partial' };
-
-  if (!isMonth(month)) return { state: 'unreadable' };
-  if (!Number.isInteger(day) || day < 1 || day > 31) return { state: 'unreadable' };
-
-  if (year !== null) {
-    if (year > now.getFullYear()) return { state: 'impossible', reason: 'future-year' };
-    if (year < EARLIEST_BIRTH_YEAR) return { state: 'impossible', reason: 'early-year' };
+  const numbers = { month: Number(month), day: Number(day), year: year === '' ? null : Number(year) };
+  if (numbers.year !== null) {
+    if (numbers.year > now.getFullYear()) return { state: 'impossible', reason: 'future-year' };
+    if (numbers.year < EARLIEST_BIRTH_YEAR) return { state: 'impossible', reason: 'early-year' };
   }
 
   // The day against the longest February first, so 29 February is refused for
   // the year it was given rather than for existing at all.
-  if (!isRealBirthday(month, day)) return { state: 'impossible', reason: 'no-such-day' };
-  if (year !== null && !isRealBirthday(month, day, year)) {
+  if (!isRealBirthday(numbers.month, numbers.day)) {
+    return { state: 'impossible', reason: 'no-such-day' };
+  }
+  if (numbers.year !== null && !isRealBirthday(numbers.month, numbers.day, numbers.year)) {
     return { state: 'impossible', reason: 'not-that-year' };
   }
 
-  return { state: 'read', month, day, year };
+  return { state: 'read', ...numbers };
 }

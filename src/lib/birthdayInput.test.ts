@@ -1,36 +1,89 @@
 /**
- * One box, and every shape a birthday arrives in.
+ * One box, punctuating itself as somebody types into it.
  *
- * The cases worth pinning are the greedy ones and the half-typed ones: `112` is
- * 2 November because the month is taken longest-first, and `12` is not yet
- * anything at all. The second is what makes live feedback bearable — a form
- * that shouted on the first keystroke would teach a leader to ignore it.
+ * Three things come off the same walk over the digits — where the slashes go,
+ * what is still owed, and what date it adds up to — so most of these check that
+ * the three agree. The greedy cases are the ones worth pinning: `112` is 2
+ * November because the month takes two digits whenever two digits are a month,
+ * and `13` is 3 January because thirteen is not one.
  */
 import { describe, expect, it } from 'vitest';
-import { parseBirthdayInput } from '@/lib/birthdayInput';
+import {
+  birthdayMaskGhost,
+  formatBirthdayInput,
+  parseBirthdayInput,
+} from '@/lib/birthdayInput';
 
 /** Friday 31 July 2026 — the day these are read against. */
 const NOW = new Date(2026, 6, 31, 9, 0);
 
 const read = (raw: string) => parseBirthdayInput(raw, NOW);
 const state = (raw: string) => read(raw).state;
+/** What the box shows in total: the value, then the faded rest of the shape. */
+const shown = (raw: string) => formatBirthdayInput(raw) + birthdayMaskGhost(raw);
 
-describe('separators', () => {
-  it('reads the same date however it was punctuated', () => {
-    for (const raw of ['12/12', '12-12', '12.12', '12 12', '1212', '12,12']) {
-      expect(read(raw), raw).toEqual({ state: 'read', month: 12, day: 12, year: null });
+describe('the box as it fills up', () => {
+  it('lays the shape out before anything is typed', () => {
+    expect(formatBirthdayInput('')).toBe('');
+    expect(birthdayMaskGhost('')).toBe('MM / DD / YYYY');
+  });
+
+  it('puts the separators in, and keeps the shape whole while it does', () => {
+    expect(shown('1')).toBe('1M / DD / YYYY');
+    expect(shown('12')).toBe('12 / DD / YYYY');
+    expect(shown('121')).toBe('12 / 1D / YYYY');
+    expect(shown('1214')).toBe('12 / 14 / YYYY');
+    expect(shown('12142')).toBe('12 / 14 / 2YYY');
+    expect(shown('12142011')).toBe('12 / 14 / 2011');
+  });
+
+  /**
+   * The escape hatch the greed needs. `422013` is 22 April; the slash after the
+   * 2 is how somebody says they meant the second.
+   */
+  it('lets a typed separator close a slot early', () => {
+    expect(shown('4/2/2013')).toBe('4 / 2 / 2013');
+    expect(shown('422013')).toBe('4 / 22 / 013Y');
+    expect(shown('1/')).toBe('1 / DD / YYYY');
+    expect(shown('1/1')).toBe('1 / 1D / YYYY');
+  });
+
+  /** Whatever it prints has to come back in unchanged, or a keystroke moves it. */
+  it('is unchanged by being formatted again', () => {
+    for (const raw of ['1', '12', '4', '4/', '1/1', '12142011', '2/29/2012']) {
+      const once = formatBirthdayInput(raw);
+
+      expect(formatBirthdayInput(once), raw).toBe(once);
+      expect(birthdayMaskGhost(once), raw).toBe(birthdayMaskGhost(raw));
     }
   });
 
-  it('is not thrown by the spaces around a date somebody pasted', () => {
-    expect(read('  12 / 14  ')).toEqual({ state: 'read', month: 12, day: 14, year: null });
+  /**
+   * A slot stops taking digits the moment no second digit could land in it, so
+   * `4` is April rather than a month still waiting to become the forty-fifth.
+   */
+  it('closes a slot early when no second digit could fit', () => {
+    expect(shown('4')).toBe('4 / DD / YYYY');
+    expect(shown('45')).toBe('4 / 5 / YYYY');
+    expect(shown('1234')).toBe('12 / 3 / 4YYY');
+  });
+
+  it('takes what was already punctuated back without moving it', () => {
+    expect(formatBirthdayInput('12 / 14 / 2011')).toBe('12 / 14 / 2011');
+    expect(formatBirthdayInput('12/14/2011')).toBe('12 / 14 / 2011');
+  });
+
+  it('stops at the eight digits a date has', () => {
+    expect(formatBirthdayInput('121420119999')).toBe('12 / 14 / 2011');
   });
 });
 
-describe('a bare run of digits', () => {
-  /** The instruction this whole parser was written to obey. */
+describe('the date it adds up to', () => {
+  /** The instruction this whole thing was written to obey. */
   it('is greedy about the month, so 112 is 2 November', () => {
     expect(read('112')).toEqual({ state: 'read', month: 11, day: 2, year: null });
+    expect(formatBirthdayInput('112')).toBe('11 / 2');
+    expect(read('11/2')).toEqual({ state: 'read', month: 11, day: 2, year: null });
   });
 
   it('falls back to a one-digit month only when two are not a month', () => {
@@ -39,32 +92,26 @@ describe('a bare run of digits', () => {
     expect(read('229')).toEqual({ state: 'read', month: 2, day: 29, year: null });
   });
 
-  it('takes a leading zero as part of the month', () => {
-    expect(read('0102')).toEqual({ state: 'read', month: 1, day: 2, year: null });
+  it('reads the same date however it arrived', () => {
+    for (const raw of ['1212', '12/12', '12-12', '12 / 12']) {
+      expect(read(raw), raw).toEqual({ state: 'read', month: 12, day: 12, year: null });
+    }
   });
 
-  it('takes a whole year off the end', () => {
+  it('never disagrees with what the box is showing', () => {
+    for (const digits of ['112', '1212', '45', '131', '12142011']) {
+      const reading = read(digits);
+      const displayed = formatBirthdayInput(digits);
+
+      expect(reading.state, digits).toBe('read');
+      // The formatted value parses back to the same date: the separators the box
+      // put in are the reading it made, written down.
+      expect(read(displayed), displayed).toEqual(reading);
+    }
+  });
+
+  it('takes the year when the whole of it is there', () => {
     expect(read('12142011')).toEqual({ state: 'read', month: 12, day: 14, year: 2011 });
-  });
-
-  /** `12|12|011` has no year in it, so the day gives a digit back. */
-  it('gives up the second digit of the day to make the year work', () => {
-    expect(read('1212011')).toEqual({ state: 'read', month: 12, day: 1, year: 2011 });
-  });
-
-  it('reads a pasted ISO date, without mistaking 12122011 for the year 1212', () => {
-    expect(read('20111214')).toEqual({ state: 'read', month: 12, day: 14, year: 2011 });
-    expect(read('12122011')).toEqual({ state: 'read', month: 12, day: 12, year: 2011 });
-  });
-
-  /**
-   * The month is decided once, from the front. Re-reading `12` as January the
-   * moment the day failed would swing the date under the box from December to
-   * January and back on consecutive keystrokes.
-   */
-  it('does not re-read the month when the rest of the run is not ready', () => {
-    expect(state('120')).toBe('partial');
-    expect(state('1212')).toBe('read');
   });
 });
 
@@ -78,74 +125,28 @@ describe('what is not finished yet', () => {
     expect(state('1')).toBe('partial');
     expect(state('12')).toBe('partial');
     expect(state('0')).toBe('partial');
-    expect(state('12/')).toBe('partial');
   });
 
-  it('waits through a year being typed rather than calling it a mistake', () => {
-    expect(state('12/14/2')).toBe('partial');
-    expect(state('12/14/201')).toBe('partial');
-    expect(state('12120')).toBe('partial');
-    expect(state('121201')).toBe('partial');
-  });
-
-  it('waits through a month name being typed', () => {
-    expect(state('j')).toBe('partial');
-    expect(state('ju')).toBe('partial');
-    expect(state('dec')).toBe('partial');
+  /** The year is the half somebody may mean to leave out, so it says so. */
+  it('knows the year is what is unfinished', () => {
+    expect(read('12142')).toEqual({ state: 'partial', year: true });
+    expect(read('1214')).toEqual({ state: 'read', month: 12, day: 14, year: null });
+    expect(read('12')).toEqual({ state: 'partial', year: false });
   });
 });
 
-describe('a month somebody spelled', () => {
-  it('takes a name, an abbreviation or a prefix of one', () => {
-    expect(read('dec 14')).toEqual({ state: 'read', month: 12, day: 14, year: null });
-    expect(read('December 14')).toEqual({ state: 'read', month: 12, day: 14, year: null });
-    expect(read('sept 3')).toEqual({ state: 'read', month: 9, day: 3, year: null });
-    expect(read('may 1')).toEqual({ state: 'read', month: 5, day: 1, year: null });
-  });
-
-  it('does not mind which side the day is on, or an ordinal on it', () => {
-    expect(read('14 December 2011')).toEqual({ state: 'read', month: 12, day: 14, year: 2011 });
-    expect(read('December 14th, 2011')).toEqual({ state: 'read', month: 12, day: 14, year: 2011 });
-    expect(read('2011 December 14')).toEqual({ state: 'read', month: 12, day: 14, year: 2011 });
-  });
-
-  it('refuses a word that is not a month', () => {
-    expect(state('hello')).toBe('unreadable');
-    expect(state('dec 14 tuesday')).toBe('unreadable');
-  });
-});
-
-describe('the year', () => {
-  it('is optional', () => {
-    expect(read('12/14')).toEqual({ state: 'read', month: 12, day: 14, year: null });
-  });
-
-  it('expands two digits around today', () => {
-    expect(read('12/14/11')).toEqual({ state: 'read', month: 12, day: 14, year: 2011 });
-    expect(read('12/14/26')).toEqual({ state: 'read', month: 12, day: 14, year: 2026 });
-    expect(read('12/14/99')).toEqual({ state: 'read', month: 12, day: 14, year: 1999 });
-  });
-
-  it('refuses one that has not happened, or one nobody on a roster was born in', () => {
-    expect(read('12/14/2999')).toEqual({ state: 'impossible', reason: 'future-year' });
-    expect(read('12/14/1800')).toEqual({ state: 'impossible', reason: 'early-year' });
-  });
-});
-
-describe('days that do not exist', () => {
-  it('separates a day the month never has from something unreadable', () => {
-    expect(read('2/30')).toEqual({ state: 'impossible', reason: 'no-such-day' });
-    expect(read('4/31')).toEqual({ state: 'impossible', reason: 'no-such-day' });
+describe('dates that cannot be', () => {
+  it('separates a day the month never has from a year that cannot be one', () => {
+    expect(read('230')).toEqual({ state: 'impossible', reason: 'no-such-day' });
+    expect(read('431')).toEqual({ state: 'impossible', reason: 'no-such-day' });
+    expect(read('12142999')).toEqual({ state: 'impossible', reason: 'future-year' });
+    expect(read('12141800')).toEqual({ state: 'impossible', reason: 'early-year' });
   });
 
   /** 29 February is a birthday people have, until a year says otherwise. */
   it('keeps a leap day open until a year closes it', () => {
-    expect(read('2/29')).toEqual({ state: 'read', month: 2, day: 29, year: null });
+    expect(read('229')).toEqual({ state: 'read', month: 2, day: 29, year: null });
     expect(read('2/29/2012')).toEqual({ state: 'read', month: 2, day: 29, year: 2012 });
-    expect(read('2/29/2011')).toEqual({ state: 'impossible', reason: 'not-that-year' });
-  });
-
-  it('refuses more numbers than a date has', () => {
-    expect(state('12/14/2011/9')).toBe('unreadable');
+    expect(read('02292011')).toEqual({ state: 'impossible', reason: 'not-that-year' });
   });
 });

@@ -254,13 +254,19 @@ birthdate it asks for the year, and against a year on file that has no 29 Februa
 rather than rounded to 1 March by the far end.
 
 The form is **one box** — on the student editor and behind the roster's birthday badge, which is
-where somebody usually notices, with the student in front of them having just said when it is. It
-takes a birthday in whatever shape it was typed: `12/14`, `12-14`, `1214`, `14 Dec 2011`. The
-reading is greedy and month-first, so `112` is 2 November, and it is printed back in words under the
-box as it is typed — a parser that guesses in silence is worse than the three boxes it replaced. See
-`src/lib/birthdayInput.ts` for the rules and `src/lib/birthdayField.ts` for what the box means.
-Under anything other than `full` both places say where the field lives and link to it, as they
-always did.
+where somebody usually notices, with the student in front of them having just said when it is.
+Behind the badge it is open on arrival: there is no "Add a birthday" press between a leader and the
+one thing that panel is for.
+
+The box takes digits and punctuates itself, drawing the rest of `MM / DD / YYYY` faded after what
+has been typed. Slots fill greedily and forwards — a slot takes a second digit only when a second
+digit would still leave a value it can hold — so `1214` is 14 December, `112` is 2 November, `13` is
+3 January and `4` is April the moment it is typed. A separator somebody types closes the slot it
+follows, which is how `4/2/2013` says the second where `422013` says the twenty-second. The date is
+printed back in words under the box as it is typed, because a reading made in silence is one nobody
+can correct. See `src/lib/birthdayInput.ts` for the slot rules and `src/lib/birthdayField.ts` for
+what the box means. Under anything other than `full` both places say where the field lives and link
+to it, as they always did.
 
 A birthday cannot be **deleted** from Tally, unlike allergies. Every screen that shows one has only
 ever been shown the day, so an empty box has never been evidence that somebody decided to empty the
