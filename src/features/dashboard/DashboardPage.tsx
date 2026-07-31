@@ -25,7 +25,7 @@
  * `useEventSnapshots`) — a Friday from six weeks ago will not change while a
  * leader reads this.
  */
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   Card,
   EmptyState,
@@ -59,6 +59,7 @@ import {
 import { chainKey } from '@/lib/materialize';
 import { presumedCancelled } from '@/lib/sessionHistory';
 import { formatShortDate } from '@/lib/time';
+import { sameItems } from '@/lib/utils';
 import type { TallyEvent } from '@/types';
 
 /**
@@ -96,6 +97,16 @@ export function DashboardPage() {
    * every student who has not walked in yet, and would put the whole ministry
    * on the MIA list at 7:05pm.
    */
+  /*
+   * The clock ticks once a minute and almost never moves an event across the
+   * "finished" boundary, so almost every tick picks exactly the same window.
+   * Handing back a new array anyway recomputed every list on this screen —
+   * gatherings, MIA, new faces, the summary tiles — sixty times an hour for a
+   * leader who left the tab open. The window's identity only changes when its
+   * members do.
+   */
+  const lastWindow = useRef<TallyEvent[]>([]);
+
   const recentEvents = useMemo(() => {
     const finished = events
       .filter((event) => event.status !== 'cancelled' && event.checkInClosesAt < now)
@@ -121,7 +132,8 @@ export function DashboardPage() {
       picked.push(event);
     }
 
-    return picked;
+    if (!sameItems(lastWindow.current, picked)) lastWindow.current = picked;
+    return lastWindow.current;
   }, [events, now]);
 
   const { snapshots, loading: snapshotsLoading, error } = useEventSnapshots(recentEvents);

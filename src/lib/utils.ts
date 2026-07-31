@@ -302,6 +302,21 @@ export function sortByName<T extends { lastName: string; firstName: string }>(a:
   );
 }
 
+/**
+ * Whether two arrays hold the very same items in the same order.
+ *
+ * This is what lets a memo hand back its previous array instead of a fresh one
+ * that says exactly the same thing. Several derivations in Tally are keyed on a
+ * ticking clock, and almost every tick selects the same objects — but a `.filter`
+ * or `.sort` mints a new array anyway, and everything downstream treats the new
+ * identity as news. Identity comparison is enough because the inputs being
+ * selected from are themselves identity-stable (see `DataProvider`'s calendar):
+ * an item that genuinely changed arrives as a new object and fails this check.
+ */
+export function sameItems<T>(a: readonly T[], b: readonly T[]): boolean {
+  return a.length === b.length && a.every((item, index) => item === b[index]);
+}
+
 /** Splits an array into the items that pass a predicate and those that do not. */
 export function partition<T>(items: readonly T[], predicate: (item: T) => boolean): [T[], T[]] {
   const pass: T[] = [];

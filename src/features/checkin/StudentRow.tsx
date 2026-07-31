@@ -5,9 +5,10 @@
  * looking at a queue of students, not at the screen. Nothing inside it competes
  * for the tap — secondary actions belong on the student detail screen.
  */
+import { memo } from 'react';
 import { WarningBadge } from '@/components/ui';
 import { formatClock } from '@/lib/time';
-import { cn, initials, ordinalGrade } from '@/lib/utils';
+import { cn, initials, ordinalGrade, sameItems } from '@/lib/utils';
 import { studentFullName, type RosterEntry } from '@/types';
 
 export interface StudentRowProps {
@@ -25,7 +26,27 @@ export interface StudentRowProps {
   showRecentHint?: boolean;
 }
 
-export function StudentRow({
+/**
+ * Whether two roster entries would paint the same row.
+ *
+ * `buildRoster` mints fresh entry objects on every rebuild, so identity alone
+ * would let one check-in re-render every row on the screen — two hundred rows
+ * repainted so that one could turn green. The fields compared are exactly the
+ * ones the row renders; `rsvp` is on the entry but never drawn here.
+ */
+function sameEntry(a: RosterEntry, b: RosterEntry): boolean {
+  return (
+    a.student === b.student &&
+    (a.attendance?.checkedInAt.getTime() ?? null) ===
+      (b.attendance?.checkedInAt.getTime() ?? null) &&
+    a.isRecent === b.isRecent &&
+    a.recentHits === b.recentHits &&
+    a.recentWindow === b.recentWindow &&
+    sameItems(a.warnings, b.warnings)
+  );
+}
+
+export const StudentRow = memo(function StudentRow({
   entry,
   onPress,
   flashing = false,
@@ -126,4 +147,10 @@ export function StudentRow({
       </button>
     </li>
   );
-}
+},
+(prev, next) =>
+  prev.onPress === next.onPress &&
+  prev.flashing === next.flashing &&
+  prev.busy === next.busy &&
+  prev.showRecentHint === next.showRecentHint &&
+  sameEntry(prev.entry, next.entry));
