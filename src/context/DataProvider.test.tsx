@@ -139,6 +139,47 @@ describe('DataProvider, on the first read', () => {
   });
 });
 
+/**
+ * The other side of dropping an unchanged roster: a changed one has to get
+ * through. `birthday` was missing from the comparison, so saving one from the
+ * roster badge wrote it upstream, re-read the roster, and then kept the array it
+ * already had — the row behind the panel still said "no birthday" until the page
+ * was reloaded.
+ */
+describe('DataProvider, when a read comes back different', () => {
+  const readAgainWith = async (students: unknown[]) => {
+    fetchRoster.mockImplementationOnce(() =>
+      Promise.resolve({ students, fetchedAt: new Date(FETCHED_AT), offline: false }),
+    );
+    offset += 61_000;
+    comeBackToTheTab();
+    await waitFor(() => expect(fetchRoster).toHaveBeenCalledTimes(2));
+  };
+
+  it('publishes a roster whose only change is a birthday', async () => {
+    mount();
+    await waitFor(() => expect(latest?.rosterLoading).toBe(false));
+    const before = latest?.students;
+
+    await readAgainWith([makeStudent({ id: 'pco_1', birthday: '12-14' })]);
+
+    await waitFor(() => expect(latest?.students).not.toBe(before));
+    expect(latest?.students[0]?.birthday).toBe('12-14');
+  });
+
+  it('still drops one that changed nothing at all', async () => {
+    mount();
+    await waitFor(() => expect(latest?.rosterLoading).toBe(false));
+    const before = latest?.students;
+
+    await readAgainWith(reply().students);
+
+    // Same people, new objects: replacing the array here re-sorts the list under
+    // a thumb already moving toward a row.
+    expect(latest?.students).toBe(before);
+  });
+});
+
 describe('DataProvider, on coming back to the tab', () => {
   it('leaves a roster read moments ago alone', async () => {
     mount();

@@ -9,118 +9,71 @@
  * `PCO_WRITE_BACK=full` the church has already said Tally may write to people it
  * is linked to, and this is a smaller claim than the name.
  *
- * Three boxes rather than a date picker, and an optional year: the whole argument
- * for that shape is in `lib/birthdayFields.ts`, which is also where the reading
- * of them lives. This file is the drawing of them, plus the one screen that has
- * to own its own Save.
+ * One box rather than a date picker or three controls, and an optional year: the
+ * argument for that shape is in `lib/birthdayField.ts`, and the reading of what
+ * gets typed into it is in `lib/birthdayInput.ts`. This file is the drawing of
+ * it, plus the one screen that has to own its own Save.
  */
-import { useId, useState } from 'react';
-import { format } from 'date-fns';
-import { Button, SelectField, TextField } from '@/components/ui';
+import { useState } from 'react';
+import { Button, TextField } from '@/components/ui';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
-import {
-  birthdayFieldsFrom,
-  readBirthdayFields,
-  type BirthdayFieldsState,
-} from '@/lib/birthdayFields';
+import { birthdayFieldFrom, describeBirthdayField, readBirthdayField } from '@/lib/birthdayField';
 import { updateStudentProfile } from '@/services/functions';
 import type { Student } from '@/types';
 
-/** Month names in the reader's own locale, for the dropdown. */
-const MONTHS = Array.from({ length: 12 }, (_, index) => ({
-  value: String(index + 1),
-  // Any year: only the month name is read off it.
-  label: format(new Date(2024, index, 1), 'MMMM'),
-}));
-
-export interface BirthdayFieldsProps {
-  fields: BirthdayFieldsState;
-  onChange: (fields: BirthdayFieldsState) => void;
-  /** Null when Planning Center has no birthdate, which makes the year required. */
+export interface BirthdayFieldProps {
+  value: string;
+  onChange: (value: string) => void;
+  /** Null when Planning Center holds no birthdate for them. */
   onFile: string | null;
+  /** A refusal from a save attempt, which outranks the live reading below. */
   error?: string | null;
   disabled?: boolean;
+  /** Injectable so a test can decide which years are in the future. */
+  now?: Date;
 }
 
 /**
- * Month on its own line, then day and year side by side.
+ * One box, and a sentence under it that keeps up with the typing.
  *
- * Three controls in one row clipped "September" in the narrow modal the roster
- * badge opens, and a month a leader cannot read is worse than a taller form. The
- * year comes last and stays optional, because it is the box they most often have
- * no answer for.
+ * The three controls this replaced — a month dropdown, a day box, a year box —
+ * were the database's shape rather than a person's. Nobody says a birthday in
+ * three fields; they say "December the fourteenth", and on a phone at a door
+ * they type `1214`. Reading that takes a parser, and a parser that guesses
+ * silently is worse than the dropdown was — so the guess is printed under the
+ * box, in words, before anybody presses Save.
  *
- * A `fieldset` rather than three loose fields: "Day" and "Year" mean nothing on
- * their own, and somebody moving through the form with a screen reader has to be
- * told what the three of them are between them. The legend sits outside the flex
- * container it labels, because `<legend>` in a flex parent is laid out by rules
- * of its own.
+ * The sentence goes through `hint` and `error` rather than a paragraph of its
+ * own so that the control is described by it, turns red with it, and reads the
+ * same as every other field in the app.
  */
-export function BirthdayFields({
-  fields,
+export function BirthdayField({
+  value,
   onChange,
   onFile,
   error,
   disabled,
-}: BirthdayFieldsProps) {
-  const hintId = useId();
-  const set = <K extends keyof BirthdayFieldsState>(key: K, value: string) =>
-    onChange({ ...fields, [key]: value });
-  const digits = (raw: string, length: number) => raw.replace(/\D/g, '').slice(0, length);
+  now,
+}: BirthdayFieldProps) {
+  const note = describeBirthdayField(value, { onFile, now });
+  const wrong = error ?? (note.tone === 'bad' ? note.say : null);
 
   return (
-    <fieldset className="min-w-0" aria-describedby={hintId}>
-      <legend className="mb-1.5 text-sm font-medium text-ink-300 pointer-fine:mb-1 pointer-fine:text-xs">
-        Birthday
-      </legend>
-      <div className="flex flex-col gap-2">
-        <SelectField
-          label="Month"
-          value={fields.month}
-          onChange={(changed) => set('month', changed.target.value)}
-          disabled={disabled}
-        >
-          <option value="">—</option>
-          {MONTHS.map((month) => (
-            <option key={month.value} value={month.value}>
-              {month.label}
-            </option>
-          ))}
-        </SelectField>
-        <div className="grid grid-cols-2 gap-2">
-          <TextField
-            label="Day"
-            value={fields.day}
-            onChange={(changed) => set('day', digits(changed.target.value, 2))}
-            disabled={disabled}
-            inputMode="numeric"
-            autoComplete="off"
-            placeholder="14"
-          />
-          <TextField
-            label="Year"
-            value={fields.year}
-            onChange={(changed) => set('year', digits(changed.target.value, 4))}
-            disabled={disabled}
-            inputMode="numeric"
-            autoComplete="off"
-            placeholder="2011"
-          />
-        </div>
-      </div>
-      {error ? (
-        <p id={hintId} className="mt-1.5 text-xs leading-snug text-danger-400">
-          {error}
-        </p>
-      ) : (
-        <p id={hintId} className="mt-1.5 text-xs leading-snug text-ink-500">
-          {onFile === null
-            ? 'Saved in Planning Center. It needs the whole date the first time, so the year is required.'
-            : 'Saved in Planning Center. Leave the year blank to keep the one it holds — Tally is never sent the year.'}
-        </p>
-      )}
-    </fieldset>
+    <TextField
+      label="Birthday"
+      value={value}
+      onChange={(changed) => onChange(changed.target.value)}
+      disabled={disabled}
+      // A numeric keypad is the right one at a door: `1214` is the fastest way
+      // to say this, and the parser is built around it. A physical keyboard
+      // ignores the hint, so "14 Dec 2011" still works wherever there is one.
+      inputMode="numeric"
+      autoComplete="off"
+      placeholder="12/14/2011"
+      hint={wrong ? undefined : note.say}
+      error={wrong}
+    />
   );
 }
 
@@ -138,14 +91,12 @@ export interface EditBirthdayProps {
 export function EditBirthday({ student, onDone }: EditBirthdayProps) {
   const { show } = useToast();
   const { refreshRoster } = useData();
-  const [fields, setFields] = useState<BirthdayFieldsState>(() =>
-    birthdayFieldsFrom(student.birthday),
-  );
+  const [text, setText] = useState<string>(() => birthdayFieldFrom(student.birthday));
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const save = async () => {
-    const read = readBirthdayFields(fields, { onFile: student.birthday });
+    const read = readBirthdayField(text, { onFile: student.birthday });
     if (!read.ok) {
       setProblem(read.error);
       return;
@@ -183,11 +134,11 @@ export function EditBirthday({ student, onDone }: EditBirthdayProps) {
 
   return (
     <div className="flex flex-col gap-3">
-      <BirthdayFields
-        fields={fields}
+      <BirthdayField
+        value={text}
         onChange={(changed) => {
           setProblem(null);
-          setFields(changed);
+          setText(changed);
         }}
         onFile={student.birthday}
         error={problem}

@@ -34,14 +34,13 @@ import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { AddParentContact } from '@/features/students/AddParentContact';
-import { BirthdayFields } from '@/features/students/EditBirthday';
+import { BirthdayField } from '@/features/students/EditBirthday';
 import { invalidatePersonDetails, usePersonDetails } from '@/hooks/usePersonDetails';
 import {
-  BLANK_BIRTHDAY_FIELDS,
-  birthdayFieldsFrom,
-  readBirthdayFields,
-  type BirthdayFieldsState,
-} from '@/lib/birthdayFields';
+  BLANK_BIRTHDAY_FIELD,
+  birthdayFieldFrom,
+  readBirthdayField,
+} from '@/lib/birthdayField';
 import { pcoPersonUrl } from '@/lib/planningCenter';
 import { formatPhone, ordinalGrade } from '@/lib/utils';
 import { updateStudentProfile } from '@/services/functions';
@@ -78,10 +77,10 @@ interface FormState {
   /** Planning Center's `medical_notes`. Only ever editable on a linked student. */
   allergies: string;
   /**
-   * Planning Center's `birthdate`, as three boxes — and the year box always opens
-   * empty, because Tally is never sent the year. See `lib/birthdayFields.ts`.
+   * Planning Center's `birthdate`, as one box of text — and never with a year in
+   * it, because Tally is never sent one. See `lib/birthdayField.ts`.
    */
-  birthday: BirthdayFieldsState;
+  birthday: string;
   notes: string;
   status: StudentStatus;
 }
@@ -92,7 +91,7 @@ const BLANK: FormState = {
   lastName: '',
   grade: 9,
   allergies: '',
-  birthday: BLANK_BIRTHDAY_FIELDS,
+  birthday: BLANK_BIRTHDAY_FIELD,
   notes: '',
   status: 'active',
 };
@@ -108,7 +107,7 @@ function fromStudent(student: Student | null): FormState {
     // Not on the student at all — it is read one person at a time and seeded
     // below, once the details land.
     allergies: '',
-    birthday: birthdayFieldsFrom(student.birthday),
+    birthday: birthdayFieldFrom(student.birthday),
     notes: student.notes ?? '',
     status: student.status,
   };
@@ -243,14 +242,14 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
     const firstName = composeFirstName(form.firstName, form.nickname);
 
     /*
-     * Read before anything is written, and only when the boxes are on screen: a
+     * Read before anything is written, and only when the box is on screen: a
      * form that never showed the birthday has nothing to say about it, and
      * `fromStudent` would otherwise hand back the day already on file as though
      * somebody had typed it.
      */
     let birthday: string | undefined;
     if (writable) {
-      const read = readBirthdayFields(form.birthday, { onFile: student?.birthday ?? null });
+      const read = readBirthdayField(form.birthday, { onFile: student?.birthday ?? null });
       if (!read.ok) {
         setErrors({ birthday: read.error });
         return;
@@ -446,13 +445,13 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
 
         {/*
           The birthday, on the same terms as the name: Planning Center's field,
-          editable here only under `full`. The day opens from the roster; the year
-          opens blank and stays optional, because Tally is never sent it — the
-          whole argument is in `lib/birthdayFields.ts`.
+          editable here only under `full`. The box opens on the day the roster
+          carries and never on a year, because Tally is never sent one — the
+          whole argument is in `lib/birthdayField.ts`.
         */}
         {writable ? (
-          <BirthdayFields
-            fields={form.birthday}
+          <BirthdayField
+            value={form.birthday}
             onChange={(changed) => {
               setErrors((current) => ({ ...current, birthday: undefined }));
               update('birthday', changed);

@@ -6,9 +6,9 @@
  * panel takes the answer rather than sending them to another product, and that
  * it only offers to when the church has turned write-back on.
  *
- * The year carries the rest of the weight. Tally is never sent it, so a form
- * that showed one would be inventing it, and a day sent on its own has to be
- * refused for a student Planning Center holds no birthdate for.
+ * The box carries the rest of the weight. It is one field that reads whatever
+ * shape a birthday was typed in, and says back what it made of it before
+ * anybody presses Save.
  */
 import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
@@ -132,8 +132,46 @@ describe('the birthday badge', () => {
     expect(screen.getByText(/holds no birthdate/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Add a birthday' }));
 
-    expect(screen.getByLabelText('Month')).toBeInTheDocument();
-    expect(screen.getByText(/the year is required/)).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Birthday' })).toBeInTheDocument();
+    expect(screen.getByText(/year is optional/)).toBeInTheDocument();
+  });
+
+  /**
+   * The whole point of one box rather than three: `1214` is a reading of what
+   * somebody meant, and a reading nobody is shown is one nobody can correct.
+   */
+  it('says back the date it made of what was typed, as it is typed', async () => {
+    openBadge(linked({ birthday: null }));
+    await userEvent.click(screen.getByRole('button', { name: 'Add a birthday' }));
+
+    const box = screen.getByRole('textbox', { name: 'Birthday' });
+    await userEvent.type(box, '112');
+    expect(screen.getByText(/^2 November/)).toBeInTheDocument();
+
+    await userEvent.clear(box);
+    await userEvent.type(box, '1214');
+    expect(screen.getByText(/^14 December/)).toBeInTheDocument();
+
+    await userEvent.type(box, '2011');
+    expect(screen.getByText('14 December 2011.')).toBeInTheDocument();
+  });
+
+  /**
+   * Planning Center stores a birthday with no year — 1885, and it shows no age
+   * — so the day on its own is a complete answer rather than half of one.
+   */
+  it('takes a day with no year for a student it holds no birthdate for', async () => {
+    openBadge(linked({ birthday: null }));
+    await userEvent.click(screen.getByRole('button', { name: 'Add a birthday' }));
+
+    await userEvent.type(screen.getByRole('textbox', { name: 'Birthday' }), '4/2');
+    await userEvent.click(screen.getByRole('button', { name: /Save to Planning Center/ }));
+
+    await waitFor(() => expect(updateStudentProfile).toHaveBeenCalled());
+    expect(updateStudentProfile.mock.calls[0]?.[0]).toEqual({
+      studentId: 'pco_4200003',
+      birthday: '04-02',
+    });
   });
 
   it('writes the day upstream and refreshes the roster it came from', async () => {
@@ -142,9 +180,9 @@ describe('the birthday badge', () => {
     expect(screen.getByText('14 March')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Change it' }));
 
-    const day = screen.getByLabelText('Day');
-    await userEvent.clear(day);
-    await userEvent.type(day, '16');
+    const box = screen.getByRole('textbox', { name: 'Birthday' });
+    await userEvent.clear(box);
+    await userEvent.type(box, '3/16');
     await userEvent.click(screen.getByRole('button', { name: /Save to Planning Center/ }));
 
     await waitFor(() => expect(updateStudentProfile).toHaveBeenCalled());
@@ -163,13 +201,13 @@ describe('the birthday badge', () => {
     openBadge(linked({ birthday: '03-14' }));
 
     await userEvent.click(screen.getByRole('button', { name: 'Change it' }));
-    const day = screen.getByLabelText('Day');
-    await userEvent.clear(day);
-    await userEvent.type(day, '16');
+    const box = screen.getByRole('textbox', { name: 'Birthday' });
+    await userEvent.clear(box);
+    await userEvent.type(box, '3/16');
     await userEvent.click(screen.getByRole('button', { name: /Save to Planning Center/ }));
 
     expect(await screen.findByText('Give the year too.')).toBeInTheDocument();
-    expect(screen.getByLabelText('Day')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Birthday' })).toBeInTheDocument();
   });
 
   /**
