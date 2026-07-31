@@ -9,6 +9,8 @@
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'firebase/functions';
 import { USE_EMULATORS, firebaseApp } from '@/lib/firebase';
 import type {
+  CheckInsEventSummary,
+  CheckInsImportSummary,
   PcoPersonSearchResult,
   PcoRosterPerson,
   PcoStatus,
@@ -227,6 +229,35 @@ export const refreshPlanningCenter = httpsCallable<void, { status: 'ok' }>(
   functions,
   'refreshPlanningCenter',
 );
+
+/* -------------------------------------------------------------------------- */
+/* Check-Ins history import                                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The Check-Ins events this church could import — the door kiosk's own list,
+ * each with enough history attached to recognise the right one. Core team
+ * only; the Check-Ins API is read-only, so this can see and never touch.
+ */
+export const listCheckInsEvents = httpsCallable<void, { events: CheckInsEventSummary[] }>(
+  functions,
+  'listCheckInsEvents',
+);
+
+/**
+ * Imports one Check-Ins event's whole history: every gathering anybody
+ * attended, everyone who attended one, and every check-in — as ordinary Tally
+ * events, roster members and attendance records. Idempotent; re-running tops
+ * the chain up and never overwrites anything a leader has edited in Tally.
+ *
+ * The client-side timeout is stretched to match the server's: a long history
+ * is a minute or two of reads, and the default 70 seconds would abandon the
+ * browser's wait — not the import — partway through.
+ */
+export const importCheckInsEvent = httpsCallable<
+  { pcoEventId: string },
+  CheckInsImportSummary
+>(functions, 'importCheckInsEvent', { timeout: 540_000 });
 
 export interface PushStudentResult {
   status: 'created' | 'updated' | 'skipped';

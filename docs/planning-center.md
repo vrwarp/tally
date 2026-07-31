@@ -110,7 +110,7 @@ closed set of keys, so credentials cannot be stashed in it even by an admin.
 | --- | --- | --- |
 | `PCO_APP_ID` | *(secret, required)* | Personal Access Token application id. Sent as the HTTP Basic username. Secret Manager only. |
 | `PCO_SECRET` | *(secret, required)* | Personal Access Token secret. Sent as the HTTP Basic password. Secret Manager only. |
-| `TALLY_ADMIN_EMAILS` | *(empty)* | Google addresses that are admins on every sign-in, whatever the database says. The bootstrap for a fresh install and the break-glass for a lockout. Comma- or whitespace-separated. Not a Planning Center setting at all — see §5. |
+| `TALLY_ADMIN_EMAILS` | *(empty)* | Google addresses that are admins on every sign-in, whatever the database says. The bootstrap for a fresh install and the break-glass for a lockout. Comma- or whitespace-separated. Not a Planning Center setting at all — see §6. |
 | `PCO_MIN_GRADE` | `6` | Bottom of the grade band. Clamped into 6–12, because those are the only grades the app's `Grade` type admits. Selects nobody; see §3. |
 | `PCO_MAX_GRADE` | `12` | Top of the grade band. Clamped into `PCO_MIN_GRADE`–12. |
 | `PCO_WRITE_BACK` | `create` | How much Tally may change in Planning Center: `off`, `create` or `full`. See §4. Any other value falls back to `create`. |
@@ -341,7 +341,61 @@ and are never written from the sync.
 
 ---
 
-## 5. How counselor access works, end to end
+## 5. Importing a gathering's history from Check-Ins
+
+Check-Ins is the other Planning Center product this church runs: the door kiosk that has been
+counting Footprints, Shining Stars, Little Foot and The Rock since before Tally existed. **Events →
+Import** (core team) brings one of those events across whole, so the dashboard's trends, the
+predictive roster and a student's attendance history reach back into the kiosk era instead of
+starting the day Tally was adopted.
+
+Its API is read-only — Planning Center publishes no way to write a check-in — so the import is
+structurally incapable of changing anything upstream. The same Personal Access Token authenticates
+both products; whether it may *read* Check-Ins is Planning Center's call, and comes back as an
+ordinary 403 if the token's owner lacks access to that product. The Check-Ins API root is derived
+from `PCO_API_BASE_URL` (`…/people/v2` → `…/check-ins/v2`), so a simulator or proxy configured once
+covers both.
+
+What one import writes, and why it is shaped that way:
+
+- **One recurrence chain of events.** Every upstream "event period" (one night of the gathering)
+  that anybody attended becomes a Tally event, under the same identity scheme the app itself uses —
+  a root document `pco-checkins-{eventId}` and occurrences at `{root}-{YYYY-MM-DD}` in the
+  ministry's own calendar days. The chain carries a recurrence rule derived from the upstream
+  frequency, so after an import the gathering simply continues as a native Tally event: future
+  nights project from the latest imported one, and prediction groups the whole history. Nights
+  nobody attended are skipped — a Tally gathering with no attendance *is* a cancelled one (see
+  [data-model.md](data-model.md)), and two years of holiday weeks would render as a column of
+  "No one" rows.
+- **Roster memberships.** Check-Ins shares Planning Center's person store, so every attendee
+  becomes the same sparse `students/pco_{personId}` document **Students → Add from Planning
+  Center** writes, and the roster read puts live names on them. `createdAt` is their earliest
+  attended night — not the moment of import — because the dashboard uses that date to decide which
+  past gatherings a student could plausibly have missed.
+- **Attendance records**, keyed by student id like every other check-in, with
+  `checkedInBy: 'planning-center'` and `method: 'import'` so provenance is visible per row.
+
+What is deliberately *not* imported, each reported with a count rather than silently dropped:
+**volunteer check-ins** (they are leaders; Tally's attendance is a record of students), **one-time
+guests** (a name typed at the kiosk with no person record behind it — nothing to put on a roster),
+**duplicate check-ins** (checked out and back in; the earliest record is the arrival), and
+**empty nights** (above).
+
+**Re-importing is the supported way to top a chain up** — say, weekly while the church transitions
+door duty from the kiosk to Tally. Every id is derived, so a re-run converges on the same
+documents; an event a leader has since renamed, moved or cancelled in Tally is left exactly as they
+left it; attendance rows are only ever rewritten when the import itself wrote them; and a student
+somebody removed from the roster stays removed. Students who exist in Tally already keep their
+`firstAttendedAt` — the field is written once and never moved, so a back-filled history cannot
+reshuffle the "New Visitors" list.
+
+Grades outside 6–12 (the elementary and preschool ministries) are clamped for display, exactly as
+they are for any other out-of-band roster member — see §3, "What the grade band is still for".
+Archived Check-Ins events are not offered.
+
+---
+
+## 6. How counselor access works, end to end
 
 Authentication grants nothing. Authorisation is an active `users/{uid}` document, and no client may
 create one — a rule that lets you write your own role is a rule that lets anyone with a Google
@@ -408,7 +462,7 @@ roster of minors.
 | `core` | Counselor, plus the dashboard, roster management, events, RSVPs and settings. |
 | `admin` | Core, plus granting access: invitations, roles, and deactivation. |
 
-## 6. What Tally reads, and when
+## 7. What Tally reads, and when
 
 There is no scheduled anything. Four reads, and each one is somebody looking at a screen:
 
@@ -443,7 +497,7 @@ reach got a sentence explaining that while the row above them had a button. Tall
 where it has one (a quick-added visitor exists nowhere else and cannot be looked up); `null` on both
 sides means unasked, and must never render as "nobody can reach them".
 
-## 7. Troubleshooting
+## 8. Troubleshooting
 
 Start at **Settings → Planning Center** in the app. It shows the last run's status, counts, and the
 verbatim error message. `firebase functions:log` has the rest.

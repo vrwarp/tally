@@ -388,6 +388,14 @@ forty-three teenagers" is only sayable by inventing a custom field on every pers
 Tally writes back only what the church asked for: by default it creates a Person for a quick-added
 visitor and changes nothing else.
 
+The church's *history* also lives in Planning Center — the Check-Ins kiosk was counting these
+gatherings for years before Tally. **Events → Import** brings one Check-Ins event across whole:
+every night anybody attended becomes a Tally gathering in one recurrence chain, everyone who
+attended joins the roster, and every check-in becomes an attendance record, so the dashboard's
+trends and the predictive roster reach back into the kiosk era. The Check-Ins API is read-only, so
+the import cannot change anything upstream, and re-running it tops a chain up without overwriting
+anything a leader has edited in Tally.
+
 Setup, configuration parameters, role mapping and troubleshooting live in
 **[docs/planning-center.md](docs/planning-center.md)**.
 

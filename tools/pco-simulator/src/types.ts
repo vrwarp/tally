@@ -98,6 +98,61 @@ export interface SimList {
   starred?: boolean;
 }
 
+/* -------------------------------------------------------------------------- */
+/* Check-Ins (the other product on the same host, `/check-ins/v2`)             */
+/* -------------------------------------------------------------------------- */
+
+/** One Check-Ins event — a gathering the kiosk has been counting for years. */
+export interface SimCheckInsEvent {
+  id: string;
+  name: string;
+  /** As the real API spells it: "Weekly" | "Daily" | "None". */
+  frequency: string;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** One night of an event. `starts_at` can genuinely be null upstream. */
+export interface SimCheckInsPeriod {
+  id: string;
+  event_id: string;
+  starts_at: string | null;
+  ends_at: string | null;
+  note: string | null;
+}
+
+/** The kiosk window for one period — Tally's check-in window, ready-made. */
+export interface SimCheckInsEventTime {
+  id: string;
+  event_period_id: string;
+  starts_at: string | null;
+  shows_at: string | null;
+  hides_at: string | null;
+  day_of_week: number | null;
+  hour: number | null;
+  minute: number | null;
+}
+
+/**
+ * One check-in. `person_id` is an id in the *same* person store the People API
+ * serves — that shared identity is the fact Tally's import leans on, so the
+ * simulator must reproduce it rather than minting its own people.
+ */
+export interface SimCheckIn {
+  id: string;
+  event_id: string;
+  event_period_id: string;
+  /** Null for a one-time guest: a name typed at the kiosk, nobody behind it. */
+  person_id: string | null;
+  /** "Regular" | "Guest" | "Volunteer". */
+  kind: string;
+  first_name: string;
+  last_name: string;
+  created_at: string;
+  one_time_guest: boolean;
+}
+
 export interface SimOrg {
   people: SimPerson[];
   emails: SimEmail[];
@@ -107,6 +162,10 @@ export interface SimOrg {
   fieldDefinitions: SimFieldDefinition[];
   fieldData: SimFieldDatum[];
   lists: SimList[];
+  checkInsEvents: SimCheckInsEvent[];
+  checkInsPeriods: SimCheckInsPeriod[];
+  checkInsEventTimes: SimCheckInsEventTime[];
+  checkIns: SimCheckIn[];
 }
 
 /* -------------------------------------------------------------------------- */
