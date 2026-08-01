@@ -1,9 +1,9 @@
 # PWA icons
 
 This folder is referenced by the web app manifest declared in `vite.config.ts`, and by the
-`apple-touch-icon` link in `index.html`. Three files are expected, and none of them is in the
-repository yet — they are generated from `public/favicon.svg` so the mark has exactly one source of
-truth. Commit the generated PNGs or produce them in CI, but do not hand-edit them:
+`apple-touch-icon` link in `index.html`. Three files are expected, and the committed PNGs are
+generated from `public/favicon.svg` so the mark has exactly one source of truth. If the SVG
+changes, regenerate all three — do not hand-edit them:
 
 | File | Used by |
 | --- | --- |
