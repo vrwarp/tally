@@ -398,6 +398,10 @@ export function fromRosterPerson(person: PcoRosterPerson, now: Date): Student {
     // build that predates this field comes back without it, and `undefined`
     // would reach the badge as "not missing" and quietly say nothing.
     birthday: person.birthday ?? null,
+    // Same storage story, opposite default: a stored roster that predates the
+    // field is treated as the old behavior — trust the roster's grade — for
+    // the one refresh it takes a fresh read to replace it.
+    gradeOnFile: person.gradeOnFile ?? true,
     searchName: person.searchName,
     firstAttendedAt: null,
     lastAttendedAt: null,

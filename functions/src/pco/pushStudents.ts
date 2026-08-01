@@ -155,7 +155,38 @@ function driftedAttributes(
     if ((wanted.nickname ?? null) !== held) attributes.nickname = wanted.nickname ?? '';
   }
   if (lastName && lastName !== mapped.lastName) attributes.last_name = lastName;
-  if (Number.isFinite(grade) && grade > 0 && grade !== mapped.grade) attributes.grade = grade;
+
+  /*
+   * The grade is compared against what Planning Center *holds*, in two steps,
+   * because "holds nothing" and "holds a different number" are different cases:
+   *
+   *  - A blank upstream grade is repaired from the document. `mapped.grade`
+   *    clamps a blank into the band, so comparing against it alone made a blank
+   *    look like agreement whenever the student happened to be in the landing
+   *    grade — and every student this function touches had a grade typed by a
+   *    human at quick-add.
+   *  - A *different* number upstream is left alone unless the clamped views
+   *    disagree, exactly as before: Planning Center owns the field, and a
+   *    correction made there must not be stomped by an old copy here.
+   */
+  const heldGrade = (person.attributes ?? {}).grade;
+  if (Number.isFinite(grade) && grade > 0) {
+    if (heldGrade === null || heldGrade === undefined) {
+      attributes.grade = grade;
+      /*
+       * A blank grade next to a missing child flag is the signature of a
+       * create Planning Center silently thinned (see `repairThinnedCreate`):
+       * the student is filed as a grade-less adult — absent from the church's
+       * own children views, absent from the roster's `where[child]=true`
+       * sweep, and offered as a *parent* candidate by the adult search. Both
+       * dropped fields are restored together, and only together: a person who
+       * has a grade upstream and `child: false` may be Planning Center's own
+       * child-to-adult promotion of a graduated senior, which is not Tally's
+       * to reverse.
+       */
+      if (person.attributes?.child !== true) attributes.child = true;
+    } else if (grade !== mapped.grade) attributes.grade = grade;
+  }
 
   /*
    * Allergies are added by a push and never cleared by one, which is not the
@@ -257,13 +288,16 @@ export async function pushStudent(options: PushStudentOptions): Promise<PushStud
     };
   }
 
+  const wanted = createAttributes(data);
   const created = await client.post<PcoPerson>('/people', {
-    data: { type: 'Person', attributes: createAttributes(data) },
+    data: { type: 'Person', attributes: wanted },
   });
   const createdId = created.data?.id ?? null;
   if (!createdId) {
     return { status: 'skipped', pcoPersonId: null, message: 'Planning Center returned no person id.' };
   }
+
+  await repairThinnedCreate(client, createdId, wanted, created.data, logger);
 
   await ref.update({
     pcoPersonId: createdId,
@@ -272,6 +306,50 @@ export async function pushStudent(options: PushStudentOptions): Promise<PushStud
     updatedAt: nowTs,
   });
   return { status: 'created', pcoPersonId: createdId, message: 'Created the person in Planning Center.' };
+}
+
+/**
+ * Re-sends whatever the create silently lost.
+ *
+ * Planning Center can answer a write with success and keep less than it was
+ * sent: measured on a live organization, a `POST /people` carrying
+ * `child: true` and a numeric `grade` returned `201` — and the person it
+ * created had `child: false` and no grade at all. The same API demonstrably
+ * holds both fields when they arrive by `PATCH`. A student filed that way is a
+ * grade-less *adult* in the church's permanent database: invisible to its
+ * children views, invisible to the roster's `where[child]=true` sweep, never
+ * again matched by the duplicate check above (which requires the exact grade),
+ * and offered as a parent candidate by the adult search.
+ *
+ * So the `201` body is read as a report, not a receipt, and the difference is
+ * sent again the one way that is known to stick. When the create kept
+ * everything — the response echoes every attribute — this costs nothing.
+ */
+async function repairThinnedCreate(
+  client: PcoClient,
+  personId: string,
+  wanted: Record<string, unknown>,
+  held: PcoPerson | undefined,
+  logger: FunctionLogger,
+): Promise<void> {
+  const kept = held?.attributes ?? {};
+  const dropped: Record<string, unknown> = {};
+  for (const [name, value] of Object.entries(wanted)) {
+    // Strict equality is right for everything sent: names and notes are
+    // strings, `child` a boolean, `grade` a number — and `undefined` (the
+    // response not carrying the attribute at all) must count as dropped.
+    if ((kept as Record<string, unknown>)[name] !== value) dropped[name] = value;
+  }
+  if (Object.keys(dropped).length === 0) return;
+
+  await client.patch(`/people/${encodeURIComponent(personId)}`, {
+    data: { type: 'Person', id: personId, attributes: dropped },
+  });
+  // Field names only, never values — this lands in a log an admin may read.
+  logger.warn('Planning Center dropped attributes from a create; sent them again as a patch', {
+    pcoPersonId: personId,
+    repaired: Object.keys(dropped),
+  });
 }
 
 /* -------------------------------------------------------------------------- */

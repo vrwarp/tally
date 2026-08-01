@@ -518,7 +518,13 @@ function route(request: SimRequest, store: SimulatorStore): SimResponse {
     if (!String(attributes.first_name ?? '').trim() || !String(attributes.last_name ?? '').trim()) {
       return error(422, 'Unprocessable Entity', 'first_name and last_name are required.');
     }
-    const created = store.createPerson(attributes);
+    // The measured behaviour this models answers `201` as if it had kept
+    // everything — so the discard happens before the store, and the response
+    // below faithfully reports the thinner person that resulted.
+    const kept = Object.fromEntries(
+      Object.entries(attributes).filter(([name]) => !store.createDiscards.includes(name)),
+    );
+    const created = store.createPerson(kept);
     return json(201, { data: personResource(created, store) });
   }
 

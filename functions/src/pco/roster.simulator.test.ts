@@ -133,6 +133,26 @@ describe('fetchRoster', () => {
     );
   });
 
+  it('says whether the grade is real or the clamp talking', async () => {
+    // The client shows a clamped 6 for a student upstream holds no grade for —
+    // unless the document has one a human typed, which needs this flag to win.
+    // A graduation year counts as a grade on file: the mapper derives it, and
+    // deriving is not inventing. Genuinely gradeless is the thinned-create
+    // shape — no grade *and* no graduation year.
+    const gradeless = world.store.createPerson({ first_name: 'Nia', last_name: 'Fontaine' });
+
+    const { people } = await fetchRoster({
+      ...world,
+      config: baseConfig(),
+      personIds: [FIXTURE_IDS.oliverFifthGrader, FIXTURE_IDS.ivyNoGrade, gradeless.id],
+    });
+
+    const byId = new Map(people.map((person) => [person.pcoPersonId, person]));
+    expect(byId.get(FIXTURE_IDS.oliverFifthGrader)?.gradeOnFile).toBe(true);
+    expect(byId.get(FIXTURE_IDS.ivyNoGrade)?.gradeOnFile).toBe(true);
+    expect(byId.get(gradeless.id)?.gradeOnFile).toBe(false);
+  });
+
   it('reports somebody who is on the roster and no longer in Planning Center', async () => {
     // Deleted or merged upstream. Dropping them silently would mean a roster
     // that is quietly short by one, which is the failure nobody notices.

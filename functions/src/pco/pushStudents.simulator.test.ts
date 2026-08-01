@@ -45,8 +45,8 @@ interface Harness {
   client: PcoClient;
 }
 
-function harness(): Harness {
-  const store = new SimulatorStore({ pageSize: 50 });
+function harness(options: { createDiscards?: readonly string[] } = {}): Harness {
+  const store = new SimulatorStore({ pageSize: 50, ...options });
   const client = createPcoClient({
     appId: DEFAULT_APP_ID,
     secret: DEFAULT_SECRET,
@@ -126,6 +126,36 @@ describe('pushStudent against the simulator', () => {
       const result = await push('s1', 'create');
 
       expect(h.store.personById(result.pcoPersonId!)?.medical_notes).toMatch(/Bee stings/);
+    });
+
+    /**
+     * Planning Center was measured answering a create with `201` and a person
+     * missing the `child` flag and the grade it was sent — a student filed as
+     * a grade-less adult in the church's permanent database. The `201` body is
+     * a report, not a receipt: whatever it dropped goes straight back as a
+     * patch, which the same API demonstrably honours.
+     */
+    it('re-sends whatever the create silently kept back', async () => {
+      h = harness({ createDiscards: ['child', 'grade'] });
+      h.db.seed('students/s1', tallyOnlyStudent());
+
+      const result = await push('s1', 'create');
+
+      expect(result.status).toBe('created');
+      expect(h.store.personById(result.pcoPersonId!)).toMatchObject({ child: true, grade: 9 });
+      const repair = h.store.requestLog.filter(
+        (entry) => entry.method === 'PATCH' && entry.path === `/people/${result.pcoPersonId}`,
+      );
+      expect(repair).toHaveLength(1);
+    });
+
+    it('does not patch after a create that kept everything', async () => {
+      h.db.seed('students/s1', tallyOnlyStudent());
+
+      const result = await push('s1', 'create');
+
+      expect(result.status).toBe('created');
+      expect(h.store.requestLog.some((entry) => entry.method === 'PATCH')).toBe(false);
     });
 
     /**
@@ -253,6 +283,41 @@ describe('pushStudent against the simulator', () => {
 
       expect(result.status).toBe('updated');
       expect(h.store.personById(FIXTURE_IDS.amara)?.grade).toBe(9);
+    });
+
+    it('restores the grade and child flag a thinned create left behind', async () => {
+      // The shape an unrepaired create leaves in the church's database: a
+      // grade-less adult. The reconcile push heals both fields together.
+      const person = h.store.createPerson({ first_name: 'Nia', last_name: 'Fontaine' });
+      h.db.seed(
+        'students/s1',
+        tallyOnlyStudent({ pcoPersonId: person.id, pcoPushPending: false, grade: 9 }),
+      );
+
+      const result = await push('s1', 'full');
+
+      expect(result.status).toBe('updated');
+      expect(h.store.personById(person.id)).toMatchObject({ grade: 9, child: true });
+    });
+
+    it('leaves a promoted adult alone when a grade is on file', async () => {
+      // `child: false` next to a real grade may be Planning Center's own
+      // child-to-adult promotion of a graduated senior. Not Tally's to undo.
+      const person = h.store.createPerson({
+        first_name: 'Nia',
+        last_name: 'Fontaine',
+        grade: 12,
+        child: false,
+      });
+      h.db.seed(
+        'students/s1',
+        tallyOnlyStudent({ pcoPersonId: person.id, pcoPushPending: false, grade: 12 }),
+      );
+
+      const result = await push('s1', 'full');
+
+      expect(result.status).toBe('skipped');
+      expect(h.store.personById(person.id)?.child).toBe(false);
     });
 
     it('does not rewrite a name that only looks different because of the nickname', async () => {

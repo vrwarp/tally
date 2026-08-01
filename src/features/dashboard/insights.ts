@@ -473,11 +473,13 @@ function calendarByStart(events: readonly TallyEvent[]): Map<number, TallyEvent 
  *    common case, and the one a leader sees while the visitor is still in
  *    the room;
  *  - the night has since scrolled out of the window;
- *  - the student's id has moved, which is what happens when a quick-added
- *    visitor is pushed to Planning Center: the attendance document keeps the
- *    Tally id, and the roster row takes the `pco_` one (`mergeRoster`). That
- *    one never heals on its own, because the old id is not recoverable from
- *    the merged row.
+ *  - the student's id has moved. A pushed visitor's row now keeps its Tally id
+ *    (`mergeRoster` grafts Planning Center's fields onto the document), so
+ *    this is down to one case: somebody also added the person from Planning
+ *    Center on purpose, and the membership document made the `pco_` id
+ *    canonical while the attendance stayed under the Tally one. That one
+ *    never heals on its own, because the old id is not recoverable from the
+ *    merged row.
  *
  * The snapshot stays the primary answer — it is evidence of the check-in
  * itself, and it survives a gathering being moved afterwards. The calendar is

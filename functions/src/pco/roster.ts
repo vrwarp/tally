@@ -99,6 +99,19 @@ export interface RosterPerson {
    * is a day of the year and not a date of birth.
    */
   birthday: string | null;
+  /**
+   * Whether Planning Center itself holds a grade (or a graduation year) for
+   * this person — as opposed to `grade` above, which is clamped into the band
+   * and therefore always a number.
+   *
+   * `false` means the 6 in `grade` is the landing spot, not a fact. The client
+   * needs the difference for exactly one case: a visitor Tally created whose
+   * upstream record lost its grade (Planning Center has been measured
+   * discarding attributes on create with a 200). The document still holds the
+   * grade a human typed at the door, and showing the clamp instead of it would
+   * be a number nobody chose.
+   */
+  gradeOnFile: boolean;
 }
 
 /** The sensitive fields, fetched only when a screen actually shows them. */
@@ -264,6 +277,7 @@ async function hydratePeople(
       profileComplete: null,
       hasAllergies: mapped.allergies !== null && mapped.allergies.length > 0,
       birthday: mapped.birthday,
+      gradeOnFile: pcoGrade(person, now) !== null,
     });
   }
 

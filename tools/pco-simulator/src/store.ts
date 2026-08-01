@@ -65,6 +65,19 @@ export interface SimulatorOptions {
   empty?: boolean;
   /** Fixed clock, so `created_at` on written records is reproducible. */
   now?: () => Date;
+  /**
+   * Attribute names `POST /people` silently discards, answering `201` as if it
+   * had kept them.
+   *
+   * The real API was measured doing exactly this — a create carrying
+   * `child: true` and a numeric `grade` returned success and a person with
+   * `child: false` and no grade, while the same fields sent by `PATCH` stuck —
+   * and the write-back code now reads the `201` body as a report rather than a
+   * receipt. This knob exists so that behaviour has somewhere to be tested;
+   * the default stays an API that keeps what it is sent, which is also real
+   * behaviour and what every other test assumes.
+   */
+  createDiscards?: readonly string[];
 }
 
 export interface RateLimitPlan {
@@ -253,6 +266,15 @@ export class SimulatorStore {
    * on `POST /people`. Unknown attributes are ignored rather than rejected,
    * which is what the real API does.
    */
+  /**
+   * What `POST /people` silently keeps back, or an empty list. Consulted by
+   * the handler — the loss is the *API's* behaviour, so seed helpers calling
+   * this store directly stay faithful to what they say they create.
+   */
+  get createDiscards(): readonly string[] {
+    return this.options.createDiscards ?? [];
+  }
+
   createPerson(attributes: Record<string, unknown>): SimPerson {
     const now = this.clock().toISOString();
     const person: SimPerson = {
