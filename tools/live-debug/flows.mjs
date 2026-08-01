@@ -48,6 +48,13 @@ async function studentCreate() {
   const pid = result.pcoPersonId;
   saveState({ studentPersonId: pid });
 
+  // Tally's own durable state: the document is the link, and the link must be
+  // complete — id written, queue flag cleared, sync stamped.
+  const doc = (await db.doc(`students/${DOC_ID}`).get()).data();
+  check('doc holds the pco id', doc?.pcoPersonId === pid, String(doc?.pcoPersonId));
+  check('doc push flag cleared', doc?.pcoPushPending === false, String(doc?.pcoPushPending));
+  check('doc sync stamped', Boolean(doc?.pcoSyncedAt));
+
   const { mirror, pco } = await personBothSides(clients, pid);
   check('PCO holds the student', pco?.id === pid);
   check('PCO first_name carries the marker', pco?.attributes?.first_name === KID_FIRST);
@@ -86,6 +93,51 @@ async function studentUpdate() {
   check('roster grade follows', row?.grade === 9, String(row?.grade));
   check('roster birthday is day-only', row?.birthday === '03-14', String(row?.birthday));
   check('roster flags the allergy without the note', row?.hasAllergies === true);
+
+  // The document is an annotation plus a link, not a copy: the profile edit
+  // went to Planning Center and must NOT have been written back into the doc,
+  // while every read above serves the new values regardless. This split is the
+  // consistency contract — Tally holds the door-typed history, PCO the truth.
+  const doc = (await db.doc(`students/${DOC_ID}`).get()).data();
+  check('doc keeps the door-typed grade, not a copy of PCO', doc?.grade === 8,
+    String(doc?.grade));
+}
+
+async function cacheSemantics() {
+  const { createTtlCache } = await import('../../functions/lib/pco/cache.js');
+  const { studentPersonId: pid } = S();
+  const warm = createTtlCache({ ttlMs: 30_000 });
+  const read = async (force = false) => {
+    const roster = await fetchRoster({
+      client: clients.mirror, config, cache: warm, personIds: [pid], force });
+    return roster.people.find((p) => p.pcoPersonId === pid)?.grade ?? null;
+  };
+  const before = await read();
+  const bumped = before === 12 ? 11 : before + 1;
+  const result = await updateStudentProfile({
+    db, client: clients.mirror, config, studentId: DOC_ID, logger, grade: bumped });
+  check('grade bumped upstream', result.status === 'updated', result.message);
+  check('a warm cache serves the pre-write copy within its TTL',
+    (await read()) === before, 'documented staleness, bounded by the TTL');
+  warm.invalidate();          // what the callable's resetSharedCache does
+  check('the callable-style reset makes the next read cold',
+    (await read()) === bumped, `expected ${bumped}`);
+  check('a forced read is also fresh', (await read(true)) === bumped);
+}
+
+async function tallyState() {
+  const { studentPersonId: pid } = S();
+  const doc = (await db.doc(`students/${DOC_ID}`).get()).data();
+  console.log('   doc:', JSON.stringify(doc));
+  const roster = await fetchRoster({ client: clients.mirror, config, cache, personIds: [pid] });
+  const row = roster.people.find((p) => p.pcoPersonId === pid);
+  if (row) {
+    check('doc link resolves on the roster', true, `${row.firstName} ${row.lastName}`);
+  } else {
+    // The linked person is gone upstream: the roster must SAY so, not shrink.
+    check('a deleted upstream person is reported, not dropped',
+      roster.unresolved.includes(pid), JSON.stringify(roster.unresolved));
+  }
 }
 
 async function parentCreate() {
@@ -232,6 +284,8 @@ const commands = {
   'duplicate-check': duplicateCheck,
   search,
   'mirror-consistency': mirrorConsistency,
+  'cache-semantics': cacheSemantics,
+  'tally-state': tallyState,
   cleanup,
 };
 
