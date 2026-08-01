@@ -11,6 +11,7 @@ import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { IncompleteProfileList } from '@/features/dashboard/IncompleteProfileList';
+import { ParentContactHost } from '@/features/students/ParentContactHost';
 import { makeStudent } from '../../../tests/factories';
 import type { Student } from '@/types';
 
@@ -32,7 +33,11 @@ function show(
 ) {
   render(
     <MemoryRouter>
-      <IncompleteProfileList students={students} now={NOW} {...props} />
+      {/* The write form lives above the list rather than in a row — see
+          `ParentContactHost`. */}
+      <ParentContactHost>
+        <IncompleteProfileList students={students} now={NOW} {...props} />
+      </ParentContactHost>
     </MemoryRouter>,
   );
   return screen.queryAllByRole('listitem')[0];

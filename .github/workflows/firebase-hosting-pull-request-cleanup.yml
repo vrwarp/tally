@@ -1,6 +1,6 @@
 name: Clean up preview sign-in domains
 
-# A preview channel expires on its own after a week, but the authorized domain
+# A preview channel expires on its own within the day, but the authorized domain
 # the preview deploy registered for it does not — Firebase Auth keeps whatever
 # it is told until something takes it away. Left alone the list grows by one
 # entry per pull request forever, and every stale entry is a host that is still

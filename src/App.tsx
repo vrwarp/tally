@@ -6,6 +6,7 @@ import { ThemeProvider } from '@/context/ThemeProvider';
 import { ToastProvider } from '@/context/ToastProvider';
 import { AuthGate, RequireRole } from '@/features/auth/AuthGate';
 import { LoginPage } from '@/features/auth/LoginPage';
+import { ParentContactHost } from '@/features/students/ParentContactHost';
 import { AppShell } from '@/components/AppShell';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { CheckInPage } from '@/features/checkin/CheckInPage';
@@ -66,6 +67,11 @@ export default function App() {
                 element={
                   <AuthGate>
                     <DataProvider>
+                      {/* Inside the roster, because the form refreshes it once
+                          a write lands; outside every screen, because the lists
+                          that open the form rewrite themselves underneath it as
+                          their background reads settle. */}
+                      <ParentContactHost>
                       <AppShell>
                         {/* Scoped per route: a lazy chunk that fails to load must
                           not take the app shell down with it. */}
@@ -137,6 +143,7 @@ export default function App() {
                         </Suspense>
                       </ErrorBoundary>
                     </AppShell>
+                    </ParentContactHost>
                   </DataProvider>
                 </AuthGate>
               }
