@@ -888,13 +888,18 @@ describe('computeNewVisitors', () => {
     ]);
   });
 
-  it('resolves the first event to the earliest snapshot containing the student', () => {
+  it('resolves the first event from the night `firstAttendedAt` names', () => {
     const student = makeStudent({
-      id: 'returner',
+      id: 'arrival',
       firstAttendedAt: new Date(NOW.getTime() - 3 * 86_400_000),
     });
-    const firstNight = makeEvent({ ...events[1]!, title: 'Friday Fellowship: Pizza Night' });
-    // Deliberately out of order, and the student appears in two of them.
+    const firstNight = makeEvent({
+      id: `${FRIDAY}-pizza`,
+      title: 'Friday Fellowship: Pizza Night',
+      seriesId: FRIDAY,
+      startAt: student.firstAttendedAt!,
+    });
+    // Deliberately out of order, and one of them is a night they missed.
     const snapshots: EventAttendanceSnapshot[] = [
       makeSnapshot(events[2]!, [student.id]),
       makeSnapshot(firstNight, [student.id]),
@@ -908,17 +913,52 @@ describe('computeNewVisitors', () => {
     expect(visitor!.firstAttendedAt).toEqual(student.firstAttendedAt);
   });
 
-  it('attributes a first-timer to the gathering they walked into', () => {
-    const student = makeStudent({
-      id: 'friday-arrival',
-      firstAttendedAt: new Date(NOW.getTime() - 3 * 86_400_000),
+  /*
+   * The bug this rule exists for. `firstAttendedAt` is written exactly once, so
+   * that back-filling an older night does not churn this list — which means the
+   * loaded history can hold sightings *older* than the first check-in Tally
+   * recorded. Reading the oldest of them as "the night they arrived" showed the
+   * date of the real arrival under the title of a gathering they went to months
+   * before, and filed the row under that gathering's tab.
+   */
+  it('ignores a back-filled sighting older than the first check-in', () => {
+    const arrival = makeOneOff({
+      id: 'summer-trip',
+      title: 'Summer Trip',
+      startAt: new Date(NOW.getTime() - 3 * 86_400_000),
     });
+    const student = makeStudent({ id: 'back-filled', firstAttendedAt: arrival.startAt });
+
+    const [visitor] = computeNewVisitors(
+      [student],
+      // Fridays entered after the fact, all of them before that trip.
+      [
+        ...events.map((event) => makeSnapshot(event, [student.id])),
+        makeSnapshot(arrival, [student.id]),
+      ],
+      settings,
+      NOW,
+    );
+
+    expect(visitor!.firstEventId).toBe(arrival.id);
+    expect(visitor!.firstEventTitle).toBe('Summer Trip');
+    expect(visitor!.viaOneOff).toBe(true);
+    expect(visitor!.gatheringKey).toBeNull();
+  });
+
+  it('attributes a first-timer to the gathering they walked into', () => {
+    const friday = makeEvent({
+      id: `${FRIDAY}-arrival`,
+      seriesId: FRIDAY,
+      startAt: new Date(NOW.getTime() - 3 * 86_400_000),
+    });
+    const student = makeStudent({ id: 'friday-arrival', firstAttendedAt: friday.startAt });
     const sundays = makeWeeklyEvents({ count: 2, seriesId: SUNDAY, title: 'Sunday School' });
 
     const [visitor] = computeNewVisitors(
       [student],
       [
-        makeSnapshot(events[1]!, [student.id]),
+        makeSnapshot(friday, [student.id]),
         ...sundays.map((event) => makeSnapshot(event, ['someone-else'])),
       ],
       settings,
@@ -1073,6 +1113,29 @@ describe('computeNewVisitors', () => {
     expect(visitor!.firstEventTitle).toBe('Unknown event');
     expect(visitor!.gatheringKey).toBeNull();
     expect(visitor!.viaOneOff).toBe(false);
+  });
+
+  // The same rule on the attendance side: being in the room for both leaves the
+  // instant just as contested as the calendar does.
+  it('keeps the placeholder when they were checked into two gatherings at once', () => {
+    const friday = makeEvent({ id: `${FRIDAY}-tonight`, seriesId: FRIDAY });
+    const alsoTonight = makeOneOff({
+      id: 'winter-retreat',
+      title: 'Winter Retreat',
+      startAt: friday.startAt,
+    });
+    const student = makeStudent({ id: 'double-booked', firstAttendedAt: friday.startAt });
+
+    const [visitor] = computeNewVisitors(
+      [student],
+      [makeSnapshot(friday, [student.id]), makeSnapshot(alsoTonight, [student.id])],
+      settings,
+      NOW,
+    );
+
+    expect(visitor!.firstEventId).toBe('');
+    expect(visitor!.firstEventTitle).toBe('Unknown event');
+    expect(visitor!.gatheringKey).toBeNull();
   });
 });
 
