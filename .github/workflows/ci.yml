@@ -87,7 +87,7 @@ jobs:
           distribution: temurin
           java-version: '21'
       - name: Cache the emulator jars
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/firebase/emulators
           key: firebase-emulators-${{ runner.os }}
@@ -130,7 +130,7 @@ jobs:
 
       - name: Cache the browsers
         id: browser-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
@@ -141,7 +141,7 @@ jobs:
         run: npm run e2e:install
 
       - name: Cache the emulator jars
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/firebase/emulators
           key: firebase-emulators-${{ runner.os }}
