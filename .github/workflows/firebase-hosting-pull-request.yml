@@ -55,6 +55,14 @@ jobs:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_TALLY }}'
           projectId: tally-76406
+          # A site holds a limited number of preview channels at once, and the
+          # default week-long life meant every pull request opened in a week was
+          # still holding one — until a deploy came back
+          # `429 RESOURCE_EXHAUSTED: channel quota reached` and no pull request
+          # could be previewed at all. Half a day is longer than a review of one
+          # of these takes, and a channel outlived by its pull request is
+          # re-made by the next push to it.
+          expires: 12h
 
       # Firebase Auth refuses to start a sign-in from a host that is not on the
       # project's authorized domains list, and a preview channel's host is
