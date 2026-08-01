@@ -250,12 +250,14 @@ interface RosterScan {
    * from then on Tally knows exactly which upstream person they are while the
    * scan above, which reads the id and nothing else, does not.
    *
-   * Kept apart from `personIds` rather than folded into it. The roster is a
-   * list of rows the check-in screen draws, and these students are already on
-   * it as their own documents; returning them a second time under a Planning
-   * Center id would put the same child on the door list twice. What they are
-   * missing is not a row — it is an *answer*, about whether anybody can be
-   * reached for them, and that is the one question below that asks for both.
+   * Kept apart from `personIds` because the two halves answer differently on
+   * the client. A `personIds` student *is* their roster row; a linked student
+   * is already a row of their own, and the roster read answers for their
+   * Planning Center fields — the name, the grade, the allergy flag, the
+   * birthday — which `mergeRoster` lays onto the document's row. It used to
+   * not ask about them at all, on the reasoning that they needed no row; the
+   * fields came from nowhere instead, and a birthday saved upstream stayed
+   * "No birthday" on the roster for ever.
    *
    * Trusted for the same reason `personIds` is: the field is written by the
    * push, server-side. A browser cannot set it.
@@ -310,10 +312,12 @@ async function scanRoster(database: FirestoreLike): Promise<RosterScan> {
  * contact and allergies come from `getPersonDetails`, one person at a time, to
  * somebody with a reason to look.
  *
- * Students Tally created itself — a visitor quick-added at the door who has not
- * been pushed upstream yet — are not here at all. They live entirely in
- * Firestore, which the app already reads live, and merging the two is the
- * client's job (`mergeRoster`).
+ * Students Tally created itself and has not pushed yet live entirely in
+ * Firestore, which the app already reads live; merging the two is the client's
+ * job (`mergeRoster`). Once the push has linked them, their Planning Center
+ * person is read here like everybody else's — their *row* stays the document,
+ * but the fields Planning Center owns have to come from Planning Center, or a
+ * birthday saved upstream goes on reading "No birthday" for ever.
  */
 export const getRoster = onCall<{ force?: boolean } | undefined, Promise<RosterResponse>>(
   { secrets: PCO_SECRETS, timeoutSeconds: 120, memory: '512MiB' },
@@ -325,11 +329,20 @@ export const getRoster = onCall<{ force?: boolean } | undefined, Promise<RosterR
     if (!client) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
 
     try {
+      const scan = await scanRoster(db());
       const result = await fetchRoster({
         client,
         config,
         cache: sharedCache(config),
-        personIds: (await scanRoster(db())).personIds,
+        /*
+         * Both halves, like `getParentContactStatus` below and for the same
+         * reason. A pushed visitor's row is their document, but the document
+         * deliberately holds none of what Planning Center owns — so without
+         * asking upstream about them, their name was whatever was typed at the
+         * door, their allergy flag was permanently off, and a birthday added
+         * through the very editor this app provides never appeared.
+         */
+        personIds: [...scan.personIds, ...scan.linkedPersonIds],
         force: request.data?.force === true,
       });
       return { ...result, cacheTtlSeconds: config.cacheTtlSeconds };

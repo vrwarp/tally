@@ -51,6 +51,9 @@ export function makeStudent(overrides: Partial<Student> = {}): Student {
     profileComplete: pick(overrides, 'profileComplete', true),
     hasAllergies: pick(overrides, 'hasAllergies', false),
     birthday: pick(overrides, 'birthday', '03-14'),
+    // Optional on `Student`: present on roster-sourced rows, absent on
+    // documents. Only carried through when a test says so.
+    ...(overrides.gradeOnFile === undefined ? {} : { gradeOnFile: overrides.gradeOnFile }),
     searchName: pick(overrides, 'searchName', buildSearchName(firstName, lastName)),
     firstAttendedAt: pick(overrides, 'firstAttendedAt', null),
     lastAttendedAt: pick(overrides, 'lastAttendedAt', null),

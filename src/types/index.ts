@@ -187,6 +187,13 @@ export interface Student
    * Planning Center holds no birthdate. Never the year — see `PcoRosterPerson`.
    */
   birthday: string | null;
+  /**
+   * Whether Planning Center holds a grade of its own for this person, or the
+   * `grade` above is only the clamp's landing spot. Present on roster-sourced
+   * rows; absent on documents, where the grade was typed by a human and is
+   * always real. `mergeRoster` is the one reader — see the note there.
+   */
+  gradeOnFile?: boolean;
 }
 
 /**
@@ -607,6 +614,13 @@ export interface PcoRosterPerson {
    * roster. Null means Planning Center has no birthdate on file.
    */
   birthday: string | null;
+  /**
+   * Whether Planning Center itself holds a grade (or graduation year), or the
+   * number in `grade` is only the clamp's landing spot. The merge prefers the
+   * grade a human typed at quick-add over a clamp on a person upstream holds
+   * nothing for.
+   */
+  gradeOnFile: boolean;
 }
 
 /**

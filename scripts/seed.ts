@@ -185,10 +185,27 @@ function isoDay(date: Date): string {
   return `${date.getFullYear()}-${month}-${dayOfMonth}`;
 }
 
-/** September 1st of the school year `now` falls in — when the roster was set up. */
+/**
+ * The most recent September 1st that is comfortably behind `now` — when the
+ * roster was set up.
+ *
+ * This used to anchor on the *calendar* school year, treating August as
+ * already belonging to the next one — so for the whole of August (and the
+ * first days of each September) it returned a date in the future. The two
+ * fallbacks built on it then poisoned every derivation at once: `createdAt`
+ * said no regular could have attended anything (MIA count 0), and
+ * `firstAttendedAt` put the entire roster inside the New Visitors window
+ * (42 "new faces"). The dashboard e2e suite failed for a month each year,
+ * starting at midnight UTC on August 1st.
+ *
+ * A week's margin, not a day's: the `firstAttendedAt` fallback sits five days
+ * after this date and must itself stay in the past.
+ */
 function schoolYearStart(now: Date): Date {
-  const year = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
-  return new Date(year, 8, 1, 9, 0, 0, 0);
+  const candidate = new Date(now.getFullYear(), 8, 1, 9, 0, 0, 0);
+  return addDays(candidate, 7) <= now
+    ? candidate
+    : new Date(now.getFullYear() - 1, 8, 1, 9, 0, 0, 0);
 }
 
 /* -------------------------------------------------------------------------- */
