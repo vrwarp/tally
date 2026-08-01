@@ -17,6 +17,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FollowUpActions } from '@/features/dashboard/FollowUpActions';
+import { ParentContactHost } from '@/features/students/ParentContactHost';
 import { invalidatePersonDetails } from '@/hooks/usePersonDetails';
 import { makeStudent } from '../../../tests/factories';
 import type { PcoPersonDetails, Student } from '@/types';
@@ -34,7 +35,11 @@ vi.mock('@/context/dataContext', () => ({ useData: () => ({ refreshRoster: vi.fn
 function mount(student: Student) {
   return render(
     <MemoryRouter>
-      <FollowUpActions student={student} />
+      {/* The row offers the write form; it does not hold it — see
+          `ParentContactHost`. */}
+      <ParentContactHost>
+        <FollowUpActions student={student} />
+      </ParentContactHost>
     </MemoryRouter>,
   );
 }

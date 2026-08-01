@@ -14,10 +14,14 @@
  * on an install with write-back turned down the same modal is where the link to
  * Planning Center now lives. One press either way, and the list is still
  * underneath when it closes.
+ *
+ * The dialog itself is not this button's to hold — see `ParentContactHost`.
+ * These rows sit on lists that are still settling while somebody reads them,
+ * and a row that owned its own dialog closed it the moment a background read
+ * rewrote the list under it.
  */
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ParentContactModal } from '@/features/students/ParentContactModal';
+import { useParentContactHost } from '@/features/students/parentContactHostContext';
 import { cn } from '@/lib/utils';
 import { studentFullName, type Student } from '@/types';
 
@@ -42,7 +46,7 @@ export function AddParentContactButton({
   onAdded,
   className,
 }: AddParentContactButtonProps) {
-  const [open, setOpen] = useState(false);
+  const host = useParentContactHost();
   const name = studentFullName(student);
 
   /*
@@ -65,24 +69,14 @@ export function AddParentContactButton({
   }
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label={`Add parent contact for ${name}`}
-        className={cn(PILL, className)}
-      >
-        <span aria-hidden="true">＋</span>
-        Add parent contact
-      </button>
-
-      {open ? (
-        <ParentContactModal
-          student={student}
-          onClose={() => setOpen(false)}
-          onAdded={onAdded}
-        />
-      ) : null}
-    </>
+    <button
+      type="button"
+      onClick={() => host.open(student, onAdded)}
+      aria-label={`Add parent contact for ${name}`}
+      className={cn(PILL, className)}
+    >
+      <span aria-hidden="true">＋</span>
+      Add parent contact
+    </button>
   );
 }

@@ -15,6 +15,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NewVisitorList } from '@/features/dashboard/NewVisitorList';
+import { ParentContactHost } from '@/features/students/ParentContactHost';
 import { invalidatePersonDetails } from '@/hooks/usePersonDetails';
 import { makeStudent } from '../../../tests/factories';
 import type { NewVisitor, Student } from '@/types';
@@ -63,11 +64,19 @@ function fromRoster() {
 }
 
 function show(students: Student[], reachable?: ReadonlyMap<string, boolean>) {
-  render(
+  const list = (map?: ReadonlyMap<string, boolean>) => (
     <MemoryRouter>
-      <NewVisitorList items={students.map(visitor)} windowDays={7} reachable={reachable} />
-    </MemoryRouter>,
+      {/* The form these rows open is hosted above the list on purpose — see
+          `ParentContactHost`, and the test at the bottom of this file. */}
+      <ParentContactHost>
+        <NewVisitorList items={students.map(visitor)} windowDays={7} reachable={map} />
+      </ParentContactHost>
+    </MemoryRouter>
   );
+
+  const { rerender } = render(list(reachable));
+  /** Re-renders with Planning Center's answer, as the real screen does. */
+  return (next: ReadonlyMap<string, boolean>) => rerender(list(next));
 }
 
 describe('NewVisitorList', () => {
@@ -211,5 +220,49 @@ describe('NewVisitorList', () => {
     expect(
       screen.getByRole('link', { name: 'Add parent contact for Kylie Novak' }),
     ).toBeInTheDocument();
+  });
+
+  it('keeps a half-typed form open when the contact read lands underneath it', async () => {
+    /*
+     * The row has two ways to offer the same form, and it changes its mind
+     * between them the moment Planning Center answers.
+     *
+     * Before the answer, nobody can be called unreachable, so the row falls
+     * through to `FollowUpActions`, which looks the student up itself, finds no
+     * number, and offers the form. After it, the row knows, and swaps to its own
+     * pill. A leader who pressed the first one during that second was typing
+     * into a dialog owned by the branch that was about to be replaced — and the
+     * form closed under them, with whatever they had entered, at the moment a
+     * background read they never asked for finished.
+     */
+    getPersonDetails.mockResolvedValue({
+      data: {
+        pcoPersonId: '4200014',
+        parentName: 'Wen Lee',
+        parentPhone: null,
+        parentEmail: null,
+        allergies: null,
+        householdAdult: true,
+        contactWritable: true,
+        profileWritable: true,
+        parentCreatable: false,
+      },
+    });
+
+    // No map at all: the session-wide read is still out.
+    const answer = show([fromRoster()]);
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Add parent contact for Janet Lee' }),
+    );
+    await userEvent.type(await screen.findByLabelText('Parent email'), 'wen@example.com');
+
+    // Planning Center answers what the screen already suspected, and the row
+    // swaps branches.
+    answer(new Map([['pco_4200014', false]]));
+
+    expect(screen.getByText('Incomplete')).toBeInTheDocument();
+    expect(screen.getByLabelText('Parent email')).toHaveValue('wen@example.com');
+    expect(screen.getByRole('button', { name: 'Save to Planning Center' })).toBeInTheDocument();
   });
 });
