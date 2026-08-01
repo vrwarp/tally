@@ -450,6 +450,28 @@ function calendarByStart(events: readonly TallyEvent[]): Map<number, TallyEvent 
 }
 
 /**
+ * The loaded sighting of one student on one instant.
+ *
+ * The attendance side of the same lookup, and the better half of it: where the
+ * calendar can only say "something began then", this says "they were at it",
+ * which is what tells two gatherings sharing an hour apart. A contested instant
+ * — both of them with this student checked in — still resolves to null, for the
+ * reason `calendarByStart` does: a wrong title is worse than none.
+ */
+function sightingAtStart(
+  snapshots: readonly EventAttendanceSnapshot[],
+  studentId: string,
+  startAt: Date,
+): EventAttendanceSnapshot | null {
+  const instant = startAt.getTime();
+  const matches = snapshots.filter(
+    (snapshot) =>
+      snapshot.event.startAt.getTime() === instant && snapshot.presentStudentIds.has(studentId),
+  );
+  return matches.length === 1 ? matches[0]! : null;
+}
+
+/**
  * First-time attendees inside the recent window.
  *
  * `firstAttendedAt` is written exactly once, on a student's first ever
@@ -481,9 +503,24 @@ function calendarByStart(events: readonly TallyEvent[]): Map<number, TallyEvent 
  *    never heals on its own, because the old id is not recoverable from the
  *    merged row.
  *
- * The snapshot stays the primary answer — it is evidence of the check-in
- * itself, and it survives a gathering being moved afterwards. The calendar is
- * consulted only when that evidence is not loaded.
+ * Both answers are keyed on the same instant, and that is what stops the row
+ * naming the wrong night. The event used to be resolved as "the oldest loaded
+ * snapshot this student appears in", which is only the same thing while
+ * `firstAttendedAt` agrees with the history behind it — and that field is
+ * written exactly once on purpose, so that back-filling an older night does not
+ * churn this list. Back-fill one and the two disagree: the row went on showing
+ * the date of the first check-in Tally recorded, under the title of an older
+ * night at a different gathering, and `gatheringKey` filed it under that
+ * gathering's tab as well. A leader reading it was told a visitor first came to
+ * Friday Fellowship six days ago when the visit six days ago was a one-off.
+ *
+ * So a row may only name an event that began on the instant it is displaying.
+ * The attendance record stays the primary answer — it is evidence of the
+ * check-in itself, and it is the half that can tell two gatherings on the same
+ * hour apart, because it knows who was in the room. The calendar stands in when
+ * no such record is loaded, and when neither can name that instant the row keeps
+ * its placeholder: naming no gathering is better advice than naming the wrong
+ * one.
  */
 export function computeNewVisitors(
   students: readonly Student[],
@@ -493,7 +530,6 @@ export function computeNewVisitors(
   calendar: readonly TallyEvent[] = [],
 ): NewVisitor[] {
   const windowStart = new Date(now.getTime() - settings.newVisitorWindowDays * 86_400_000);
-  const oldestFirst = orderSnapshotsNewestFirst(snapshots).reverse();
   const byStart = calendarByStart(calendar);
 
   const results: NewVisitor[] = [];
@@ -507,7 +543,7 @@ export function computeNewVisitors(
     if (firstAttendedAt < windowStart) continue;
 
     const firstEvent =
-      oldestFirst.find((snapshot) => snapshot.presentStudentIds.has(student.id))?.event ??
+      sightingAtStart(snapshots, student.id, firstAttendedAt)?.event ??
       byStart.get(firstAttendedAt.getTime()) ??
       null;
 
