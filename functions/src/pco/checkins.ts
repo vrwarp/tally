@@ -805,15 +805,52 @@ export async function executeImport(args: {
       patch.pcoPersonId = student.personId;
     }
 
+    /*
+     * `firstAttendedAt` never moves *later*, which is not the same rule as
+     * never moving at all.
+     *
+     * The invariant exists so that back-filling one missed night cannot
+     * retroactively unmake somebody a new visitor — a counselor recording last
+     * Friday late must not push a first-timer's arrival backwards past the
+     * window that names them. A history import is the other direction
+     * entirely: it is the one thing that can *discover* a student was here
+     * long before the date on file, and holding the later date then produces a
+     * profile that reads "first seen 25 July" above a row saying they were
+     * present in May, and puts a two-year regular on the New Visitors list as
+     * a new face.
+     *
+     * Moving it earlier is safe in the direction that matters. It can only
+     * ever remove somebody from New Visitors, never add one, because the list
+     * asks who arrived *recently* — so the worst case of getting this wrong is
+     * a face nobody needed to be told about, against a fabricated newcomer.
+     */
     const existingFirst = toDateOrNull(data.firstAttendedAt);
-    if (existingFirst === null) {
-      // Written once and never moved — this is the once.
+    if (existingFirst === null || student.firstAttendedAt < existingFirst) {
       patch.firstAttendedAt = student.firstAttendedAt;
       effectiveFirst.set(student.studentId, student.firstAttendedAt.getTime());
     } else {
       effectiveFirst.set(student.studentId, existingFirst.getTime());
     }
 
+    /*
+     * The same correction, for the field that decides what they can be
+     * measured against.
+     *
+     * `createdAt` is how every derivation over history asks "could this
+     * student plausibly have been at that gathering" — `predictiveRoster` and
+     * the MIA list both filter the window to nights at or after it. A student
+     * whose document was created by a live check-in last week carries that
+     * date, so their whole imported history sits *before* it and is silently
+     * excluded from their own Recent filter and standing: the import would
+     * land two years of attendance that no screen would count.
+     */
+    const existingCreated = toDateOrNull(data.createdAt);
+    if (existingCreated === null || student.firstAttendedAt < existingCreated) {
+      patch.createdAt = student.firstAttendedAt;
+    }
+
+    // Forward only, unlike the two above: a night from the archive is not news
+    // about when this student was last seen.
     const existingLast = toDateOrNull(data.lastAttendedAt);
     if (existingLast === null || existingLast < student.lastAttendedAt) {
       patch.lastAttendedAt = student.lastAttendedAt;
