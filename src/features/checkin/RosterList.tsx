@@ -14,7 +14,7 @@
  * as custom properties; see `useHeightVar`.
  */
 import { memo } from 'react';
-import { StudentRow } from '@/features/checkin/StudentRow';
+import { StudentRow, type StudentRowMode } from '@/features/checkin/StudentRow';
 import { cn } from '@/lib/utils';
 import type { RosterEntry } from '@/types';
 
@@ -29,6 +29,21 @@ export interface RosterListProps {
   /** Show the "2 of 3" prediction hint on the rows the prediction picked out. */
   showRecentHint?: boolean;
   onPress: (entry: RosterEntry) => void;
+  /** The check mark on a checked-in row, and `Undo` in its action strip. */
+  onUndo?: (entry: RosterEntry) => void;
+  /** `Wrong person` — hands this check-in to the picker. */
+  onSwap?: (entry: RosterEntry) => void;
+  /** What a tap means right now. See `StudentRowMode`. */
+  mode?: StudentRowMode;
+  /** In `swap` mode, the student whose check-in is being moved. */
+  swapSourceId?: string | null;
+  /**
+   * The one row whose action strip is open, if any. One at a time screen-wide:
+   * a column of open strips would push the queue off the bottom of the phone.
+   */
+  expandedId?: string | null;
+  /** Whether rows may offer `Profile`. Core team only — see `StudentRow`. */
+  canOpenProfile?: boolean;
   flashing: ReadonlySet<string>;
   busy: ReadonlySet<string>;
   /**
@@ -57,6 +72,12 @@ export const RosterList = memo(function RosterList({
   tone = 'default',
   showRecentHint = false,
   onPress,
+  onUndo,
+  onSwap,
+  mode = 'checkin',
+  swapSourceId = null,
+  expandedId = null,
+  canOpenProfile = false,
   flashing,
   busy,
   allergyNotes = NO_NOTES,
@@ -95,6 +116,12 @@ export const RosterList = memo(function RosterList({
               key={entry.student.id}
               entry={entry}
               onPress={onPress}
+              onUndo={onUndo}
+              onSwap={onSwap}
+              mode={mode}
+              isSwapSource={entry.student.id === swapSourceId}
+              expanded={entry.student.id === expandedId}
+              canOpenProfile={canOpenProfile}
               flashing={flashing.has(entry.student.id)}
               busy={busy.has(entry.student.id)}
               showRecentHint={showRecentHint}

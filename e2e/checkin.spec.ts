@@ -73,17 +73,23 @@ async function rosterSettled(page: Page): Promise<void> {
 /**
  * Every student on the list, in the order they are painted.
  *
+ * The row itself, not every button on it: a checked-in student has two targets
+ * — the row, which opens the corrections, and the check mark, which undoes —
+ * and counting both would report the roster as twice as long as it looks.
+ *
  * The suite shares one emulator, so by the time a test runs some of these rows
  * are already checked in from an earlier one — hence both label shapes.
  */
 async function rosterRows(page: Page): Promise<{ name: string; here: boolean }[]> {
   const labels = await rosterList(page)
-    .getByRole('button')
-    .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('aria-label') ?? ''));
+    .locator('li')
+    .evaluateAll((nodes) =>
+      nodes.map((node) => node.querySelector('button')?.getAttribute('aria-label') ?? ''),
+    );
 
   return labels.map((label) => ({
-    name: /^(?:Check in|Undo check-in for) ([^,]+),/.exec(label)?.[1] ?? '',
-    here: label.startsWith('Undo'),
+    name: /^(?:Check in|More actions for) ([^,]+),/.exec(label)?.[1] ?? '',
+    here: label.startsWith('More actions'),
   }));
 }
 
@@ -393,10 +399,130 @@ test.describe('check-in', () => {
     const checkedIn = page.getByRole('button', { name: new RegExp(`^Undo check-in for ${name}`) });
     await expect(checkedIn).toBeVisible();
 
+    // The check mark, and it undoes on its own — no confirmation dialog and no
+    // menu in front of it. Speed matters more, and it is reversible.
     await checkedIn.click();
 
-    // No confirmation dialog on purpose: speed matters more, and it is reversible.
     await expect(page.getByRole('button', { name: new RegExp(`^Check in ${name},`) })).toBeVisible();
+  });
+
+  /**
+   * What the row itself now does, once a student is here.
+   *
+   * It used to be a second undo, which meant a check-in had exactly one verb
+   * and every other correction — the wrong Jordan, a profile that needs a
+   * parent's number — lived on a screen counselors cannot reach. The check mark
+   * kept the undo; the row picked up the rest.
+   */
+  test('a second tap on the row offers the corrections rather than undoing', async ({ page }) => {
+    const name = await tapFirstRoster(page);
+    const row = page.getByRole('button', { name: new RegExp(`^More actions for ${name},`) });
+    await expect(row).toBeVisible();
+    await expect(row).toHaveAttribute('aria-expanded', 'false');
+
+    await row.click();
+
+    await expect(row).toHaveAttribute('aria-expanded', 'true');
+    // Still checked in: the tap opened something, it did not undo anything.
+    await expect(
+      page.getByRole('button', { name: new RegExp(`^Undo check-in for ${name}`) }),
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Wrong person/ })).toBeVisible();
+    // Counselors have no student pages to be sent to — see `RequireRole`.
+    await expect(page.getByRole('link', { name: `Open the profile for ${name}` })).toHaveCount(0);
+
+    await page.getByRole('button', { name: `Undo the check-in for ${name}` }).click();
+    await expect(page.getByRole('button', { name: new RegExp(`^Check in ${name},`) })).toBeVisible();
+  });
+
+  /**
+   * The correction this whole strip exists for.
+   *
+   * Two students whose names look the same at arm's length, and the tap went to
+   * the wrong one. Undo-and-check-in-again reaches the same roster but not the
+   * same record: the replacement is stamped with the server clock, minutes
+   * after the student actually walked in. So the check-in *moves*, and the
+   * assertion that matters is on the timestamp in Firestore rather than on the
+   * clock printed in the row, which only resolves to the minute.
+   */
+  test('wrong person hands the check-in over without restamping it', async ({
+    page,
+    firestore,
+  }) => {
+    const eventId = new URL(page.url()).pathname.split('/').pop() ?? '';
+    expect(eventId, 'check-in did not open on a named event').toBeTruthy();
+    const attendancePath = `events/${eventId}/attendance`;
+
+    const before = new Set((await firestore.collection(attendancePath)).map((doc) => doc.id));
+    const wrong = await tapFirstRoster(page);
+    const written = await firestore.until(
+      attendancePath,
+      (docs) => docs.some((doc) => !before.has(doc.id)),
+      `the check-in for ${wrong}`,
+    );
+    const source = written.find((doc) => !before.has(doc.id));
+    const arrivedAt = source?.data.checkedInAt;
+    expect(arrivedAt, 'the check-in was written without a time on it').toBeTruthy();
+
+    await page.getByRole('button', { name: new RegExp(`^More actions for ${wrong},`) }).click();
+    await page.getByRole('button', { name: /^Wrong person/ }).click();
+
+    // The screen says what a tap means now, and keeps saying it while the
+    // counselor hunts.
+    await expect(page.getByText('Who should this be?')).toBeVisible();
+
+    const candidate = page.getByRole('button', { name: /^Move the check-in to / }).first();
+    // The grade clause is absent for anybody Planning Center holds no grade
+    // for, so the name runs to a comma or to the end of the label.
+    const right = /^Move the check-in to ([^,]+?)(?:,|$)/.exec(
+      (await candidate.getAttribute('aria-label')) ?? '',
+    )?.[1];
+    expect(right, 'nobody on this roster was available to take the check-in').toBeTruthy();
+
+    // The picker is the search box that was already there, so typing narrows to
+    // the right person exactly as it does on the way in.
+    await page.getByLabel(/search students by name/i).fill(right!.split(' ')[0]!);
+    await page
+      .getByRole('button', { name: new RegExp(`^Move the check-in to ${right}(,|$)`) })
+      .first()
+      .click();
+
+    // The other student holds it now...
+    await expect(
+      page.getByRole('button', { name: new RegExp(`^Undo check-in for ${right},`) }),
+    ).toBeVisible();
+    // ...and the one it was taken off is back on the roster, where a counselor
+    // can check them in properly if they were here after all.
+    await expect(page.getByText('Who should this be?')).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: new RegExp(`^Check in ${wrong},`) }),
+    ).toBeVisible();
+
+    const after = await firestore.until(
+      attendancePath,
+      (docs) => !docs.some((doc) => doc.id === source?.id),
+      `the check-in to leave ${wrong}`,
+    );
+    const moved = after.find((doc) => !before.has(doc.id) && doc.id !== source?.id);
+    expect(moved, 'the check-in did not land on anybody').toBeTruthy();
+    // The whole point: same moment, different student.
+    expect(moved?.data.checkedInAt).toBe(arrivedAt);
+  });
+
+  test('leaves the check-in alone when the swap is called off', async ({ page }) => {
+    const name = await tapFirstRoster(page);
+
+    await page.getByRole('button', { name: new RegExp(`^More actions for ${name},`) }).click();
+    await page.getByRole('button', { name: /^Wrong person/ }).click();
+    await expect(page.getByText('Who should this be?')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Cancel' }).click();
+
+    await expect(page.getByText('Who should this be?')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /^Move the check-in to / })).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: new RegExp(`^Undo check-in for ${name}`) }),
+    ).toBeVisible();
   });
 
   /**
@@ -490,6 +616,28 @@ test.describe('check-in', () => {
   });
 });
 
+/**
+ * The third correction, and the only one that leaves the screen.
+ *
+ * A student whose profile needs finishing is usually noticed at the door, by
+ * whoever is checking them in — so the route to the profile starts on the row
+ * rather than on a search through Students. Core team only, because that is
+ * whose page it is.
+ */
+test.describe('the profile route off the roster', () => {
+  test('opens the student the row is about', async ({ page, signedInAs }) => {
+    await signedInAs('core');
+    await openCheckIn(page);
+
+    const name = await tapFirstRoster(page);
+    await page.getByRole('button', { name: new RegExp(`^More actions for ${name},`) }).click();
+
+    await page.getByRole('link', { name: `Open the profile for ${name}` }).click();
+
+    await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
+  });
+});
+
 test.describe('on a phone', () => {
   /** The desktop projects have room to spare; these only mean something at 390px. */
   const mobileOnly = () =>
@@ -521,5 +669,25 @@ test.describe('on a phone', () => {
     const row = page.getByRole('button', { name: /^Check in / }).first();
     const box = await row.boundingBox();
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+  });
+
+  /**
+   * Undo is now a target *inside* a row rather than the whole of one, and it is
+   * the correction people make most. A check mark small enough to miss would
+   * put the action strip under a thumb that meant to undo — one extra tap, and
+   * a moment spent reading a screen instead of the queue.
+   */
+  test('the check mark is its own tap target, not a glyph', async ({ page, signedInAs }) => {
+    mobileOnly();
+    await signedInAs('counselor');
+    await openCheckIn(page);
+
+    const name = await tapFirstRoster(page);
+    const box = await page
+      .getByRole('button', { name: new RegExp(`^Undo check-in for ${name}`) })
+      .boundingBox();
+
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+    expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
   });
 });

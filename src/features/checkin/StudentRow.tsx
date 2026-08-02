@@ -1,19 +1,56 @@
 /**
  * One tappable student on the check-in roster.
  *
- * The entire row is a single button because this is operated one-handed while
- * looking at a queue of students, not at the screen. Nothing inside it competes
- * for the tap — secondary actions belong on the student detail screen.
+ * The first tap is still the whole row and still costs nothing to think about:
+ * a student who is not here becomes a student who is. What changed is what a
+ * *second* tap does. Undo used to be it, which meant the row had exactly one
+ * verb and everything else about a student — their profile, a mis-identified
+ * check-in — was somewhere else entirely, on a screen counselors do not have.
+ *
+ * So a checked-in row now splits in two. The check mark on the right is undo,
+ * unconditionally and with no dialog, because that is the correction people
+ * make most and it must stay a single tap. The rest of the row opens a small
+ * strip of the rarer things underneath it: undo again (for a thumb that went
+ * to the row rather than the mark), the student's profile, and "Wrong person",
+ * which hands the check-in to somebody else without losing the minute it
+ * happened.
+ *
+ * Nothing inside the row competes for the *first* tap: until a student is
+ * checked in there is one button and one outcome.
  */
 import { memo } from 'react';
+import { Link } from 'react-router-dom';
 import { WarningBadge } from '@/components/ui';
 import { formatClock } from '@/lib/time';
 import { cn, gradeLabel, initials, NO_GRADE, sameItems } from '@/lib/utils';
 import { studentFullName, type RosterEntry } from '@/types';
 
+/**
+ * What the row is being used for.
+ *
+ * `swap` is the check-in screen turned into a person picker — see
+ * `CheckInPage`. The list, the search box and the filters are all the ones a
+ * counselor already knows; only the meaning of a tap changes, so the rows say
+ * so rather than looking identical and doing something else.
+ */
+export type StudentRowMode = 'checkin' | 'swap';
+
 export interface StudentRowProps {
   entry: RosterEntry;
+  /**
+   * The row itself. Checks the student in, opens the action strip, or takes the
+   * check-in being moved — whichever the row currently means.
+   */
   onPress: (entry: RosterEntry) => void;
+  /** The check mark, and the `Undo` action under it. */
+  onUndo?: (entry: RosterEntry) => void;
+  /** `Wrong person` — starts the swap. */
+  onSwap?: (entry: RosterEntry) => void;
+  mode?: StudentRowMode;
+  /** In `swap` mode: this row is the check-in being moved. */
+  isSwapSource?: boolean;
+  /** Whether the action strip is open. Only one row's is, screen-wide. */
+  expanded?: boolean;
   /** Drives the optimistic green flash; set the instant the row is tapped. */
   flashing?: boolean;
   /** True while this row's own write is in flight, so a double-tap cannot fire twice. */
@@ -24,6 +61,12 @@ export interface StudentRowProps {
    * the unfiltered list now that they no longer sit in a block of their own.
    */
   showRecentHint?: boolean;
+  /**
+   * Whether to offer `Profile` at all. The student pages are core-team only —
+   * see `RequireRole` — and a button that lands a counselor on "Core team only"
+   * is worse than no button.
+   */
+  canOpenProfile?: boolean;
   /**
    * What the allergy is, when Planning Center has been asked and answered.
    *
@@ -54,12 +97,29 @@ function sameEntry(a: RosterEntry, b: RosterEntry): boolean {
   );
 }
 
+/**
+ * Shared by the buttons in the action strip.
+ *
+ * `basis-0` with `flex-1` so two of them and three of them both fill the row —
+ * a counselor without the student pages does not get "Profile" at all, and the
+ * strip must not leave a hole where it would have been.
+ */
+const ACTION =
+  'flex min-h-11 flex-1 basis-0 items-center justify-center rounded-lg px-2 text-[13px] ' +
+  'font-semibold whitespace-nowrap ring-1 transition-colors disabled:opacity-60';
+
 export const StudentRow = memo(function StudentRow({
   entry,
   onPress,
+  onUndo,
+  onSwap,
+  mode = 'checkin',
+  isSwapSource = false,
+  expanded = false,
   flashing = false,
   busy = false,
   showRecentHint = false,
+  canOpenProfile = false,
   allergyNote,
 }: StudentRowProps) {
   const { student, attendance, warnings, isRecent, recentHits, recentWindow } = entry;
@@ -67,116 +127,265 @@ export const StudentRow = memo(function StudentRow({
   const grade = gradeLabel(student);
   const showHint = showRecentHint && isRecent && recentWindow > 0;
 
+  const swapping = mode === 'swap';
+  const here = attendance !== null;
+  // The action strip belongs to a check-in. While the screen is picking a
+  // person it would be a second, contradictory meaning for the same row.
+  const open = expanded && here && !swapping;
+
+  /*
+   * A row that cannot take the check-in being moved.
+   *
+   * The source is inert because handing a check-in to the student it is already
+   * on is not a correction, and anybody else who is already here would have
+   * their own check-in silently overwritten — that is two students at the door
+   * and one record, which is worse than the mistake being fixed.
+   */
+  const unavailable = swapping && (isSwapSource || here);
+
   // Null for somebody Planning Center holds no grade for — an adult on a
   // hand-picked roster. The clause goes rather than announcing a grade Tally
   // invented, which on this screen is read aloud beside a name.
   const gradeClause = grade ? `, ${grade} grade` : '';
-  const action = attendance
-    ? `Undo check-in for ${name}${gradeClause}, checked in at ${formatClock(attendance.checkedInAt)}`
-    : `Check in ${name}${gradeClause}`;
-  // The row is one button with one label, so nothing inside it is announced on
-  // its own — the note has to be part of the label or it is not read out at all.
-  // Last, after the action: the verb is what a screen reader user is scanning
-  // for, and hearing "allergy" first on every flagged row would bury it.
+  const action = swapping
+    ? isSwapSource
+      ? `${name}${gradeClause} — the check-in being moved`
+      : here
+        ? `${name}${gradeClause} — already checked in`
+        : `Move the check-in to ${name}${gradeClause}`
+    : here
+      ? `More actions for ${name}${gradeClause}, checked in at ${formatClock(attendance.checkedInAt)}`
+      : `Check in ${name}${gradeClause}`;
+  /*
+   * Nothing inside the row is announced on its own, so the note has to be part
+   * of a label or it is not read out at all — and this is the label it belongs
+   * on: the row is the target that names the student, while the check mark
+   * beside it is one verb about a check-in. Saying it on both would read the
+   * allergy out twice per row.
+   *
+   * Last, after the action: the verb is what a screen reader user is scanning
+   * for, and hearing "allergy" first on every flagged row would bury it.
+   */
   const label = allergyNote ? `${action}. Allergy: ${allergyNote}` : action;
+
+  const actionsId = `row-actions-${student.id}`;
 
   return (
     <li>
-      <button
-        type="button"
-        onClick={() => onPress(entry)}
-        disabled={busy}
-        aria-busy={busy || undefined}
-        aria-label={label}
+      {/*
+        The card is the container now, not the button.
+
+        A checked-in row holds two independent targets — the row and the check
+        mark — and a button cannot live inside a button. So the surface, the
+        ring and the flash sit out here, and the buttons on top of it are
+        transparent until they are hovered or pressed.
+      */}
+      <div
         className={cn(
-          'flex min-h-16 w-full items-center gap-3 rounded-xl px-3 py-2 text-left ring-1 transition-colors',
-          'disabled:opacity-60',
-          // Hover is the pointer's version of the press state. Without it the
-          // roster was the one list in the app that gave a mouse nothing back —
-          // the student directory, the MIA list and the calendar all respond —
-          // on the screen where the tap has the largest consequence.
-          attendance
-            ? 'bg-present-500/10 ring-present-500/30 hover:bg-present-500/20 active:bg-present-500/20'
-            : 'bg-ink-900 ring-ink-800 hover:bg-ink-800 active:bg-ink-800',
+          'overflow-hidden rounded-xl ring-1 transition-colors',
+          here
+            ? 'bg-present-500/10 ring-present-500/30'
+            : swapping
+              ? 'bg-ink-900 ring-brand-500/30'
+              : 'bg-ink-900 ring-ink-800',
+          unavailable && 'opacity-60',
           flashing && 'animate-flash',
         )}
       >
-        <span
-          aria-hidden="true"
-          className={cn(
-            'flex size-11 shrink-0 items-center justify-center rounded-full text-sm font-bold',
-            attendance ? 'bg-present-500/20 text-present-400' : 'bg-ink-800 text-ink-300',
-          )}
-        >
-          {initials(student.firstName, student.lastName)}
-        </span>
-
-        <span className="min-w-0 flex-1">
-          {/*
-            The given name leads and carries the weight, because it is the key
-            the list is sorted on and therefore the word a thumb-scrolling eye
-            is travelling down. Printed at one weight, "Maya Adebayo" gave the
-            scan nothing to land on: the leading word ran Maya, Andre, Chloe,
-            Ruby with no order in it, and a counselor either read all
-            twenty-four rows or gave up and typed.
-          */}
-          <span className="flex items-baseline gap-2">
-            <span className="min-w-0 truncate text-base text-ink-50">
-              <span className="font-semibold">{student.firstName}</span>{' '}
-              <span className="font-normal text-ink-300">{student.lastName}</span>
+        <div className="flex items-stretch">
+          <button
+            type="button"
+            onClick={() => onPress(entry)}
+            disabled={busy || unavailable}
+            aria-busy={busy || undefined}
+            aria-label={label}
+            aria-expanded={here && !swapping ? open : undefined}
+            aria-controls={open ? actionsId : undefined}
+            className={cn(
+              'flex min-h-16 min-w-0 flex-1 items-center gap-3 px-3 py-2 text-left',
+              'disabled:cursor-default',
+              // Hover is the pointer's version of the press state. Without it the
+              // roster was the one list in the app that gave a mouse nothing back —
+              // the student directory, the MIA list and the calendar all respond —
+              // on the screen where the tap has the largest consequence.
+              !unavailable &&
+                (here
+                  ? 'hover:bg-present-500/10 active:bg-present-500/10'
+                  : 'hover:bg-ink-800 active:bg-ink-800'),
+            )}
+          >
+            <span
+              aria-hidden="true"
+              className={cn(
+                'flex size-11 shrink-0 items-center justify-center rounded-full text-sm font-bold',
+                here ? 'bg-present-500/20 text-present-400' : 'bg-ink-800 text-ink-300',
+              )}
+            >
+              {initials(student.firstName, student.lastName)}
             </span>
-            <span className="shrink-0 text-xs font-medium text-ink-500">{grade ?? NO_GRADE}</span>
-          </span>
 
-          {warnings.length > 0 || showHint ? (
-            // `items-start`, because the allergy badge is allowed to be several
-            // lines tall when the note is long: everything beside it should sit
-            // at its first line rather than halfway down it.
-            <span className="mt-1 flex flex-wrap items-start gap-1">
+            <span className="min-w-0 flex-1">
               {/*
-                The ratio leads, badges trail. It is set in tabular numerals —
-                somebody wanted it to line up — and a badge laid out ahead of it
-                moved its column 75px to the right on the four rows that carry
-                one, so the number a counselor compares down the list never
-                appeared twice in the same place.
+                The given name leads and carries the weight, because it is the key
+                the list is sorted on and therefore the word a thumb-scrolling eye
+                is travelling down. Printed at one weight, "Maya Adebayo" gave the
+                scan nothing to land on: the leading word ran Maya, Andre, Chloe,
+                Ruby with no order in it, and a counselor either read all
+                twenty-four rows or gave up and typed.
               */}
-              {showHint ? (
-                <span
-                  className="text-[11px] font-medium tabular-nums text-ink-500"
-                  title={`Attended ${recentHits} of the last ${recentWindow}`}
-                >
-                  {recentHits} of {recentWindow}
+              <span className="flex items-baseline gap-2">
+                <span className="min-w-0 truncate text-base text-ink-50">
+                  <span className="font-semibold">{student.firstName}</span>{' '}
+                  <span className="font-normal text-ink-300">{student.lastName}</span>
+                </span>
+                <span className="shrink-0 text-xs font-medium text-ink-500">
+                  {grade ?? NO_GRADE}
+                </span>
+              </span>
+
+              {warnings.length > 0 || showHint || unavailable ? (
+                // `items-start`, because the allergy badge is allowed to be
+                // several lines tall when the note is long: everything beside it
+                // should sit at its first line rather than halfway down it.
+                <span className="mt-1 flex flex-wrap items-start gap-1">
+                  {/*
+                    The ratio leads, badges trail. It is set in tabular numerals —
+                    somebody wanted it to line up — and a badge laid out ahead of it
+                    moved its column 75px to the right on the four rows that carry
+                    one, so the number a counselor compares down the list never
+                    appeared twice in the same place.
+                  */}
+                  {unavailable ? (
+                    <span className="text-[11px] font-medium text-ink-400">
+                      {isSwapSource ? 'The check-in being moved' : 'Already checked in'}
+                    </span>
+                  ) : null}
+                  {showHint && !unavailable ? (
+                    <span
+                      className="text-[11px] font-medium tabular-nums text-ink-500"
+                      title={`Attended ${recentHits} of the last ${recentWindow}`}
+                    >
+                      {recentHits} of {recentWindow}
+                    </span>
+                  ) : null}
+                  {warnings.map((warning) => (
+                    <WarningBadge
+                      key={warning}
+                      warning={warning}
+                      detail={warning === 'allergy' ? allergyNote : undefined}
+                    />
+                  ))}
                 </span>
               ) : null}
-              {warnings.map((warning) => (
-                <WarningBadge
-                  key={warning}
-                  warning={warning}
-                  detail={warning === 'allergy' ? allergyNote : undefined}
-                />
-              ))}
             </span>
-          ) : null}
-        </span>
 
-        {attendance ? (
-          <span className="flex shrink-0 flex-col items-end gap-0.5" aria-hidden="true">
-            <span className="text-xl leading-none text-present-400">✓</span>
-            <span className="text-[11px] tabular-nums text-ink-500">
-              {formatClock(attendance.checkedInAt)}
-            </span>
-          </span>
-        ) : (
-          <span aria-hidden="true" className="size-6 shrink-0 rounded-full ring-2 ring-ink-700" />
-        )}
-      </button>
+            {/* The trailing slot, for every row whose check mark is not its own
+                button: an empty ring while they are absent, and in swap mode an
+                arrow that says where a tap sends the check-in. */}
+            {!here ? (
+              <span
+                aria-hidden="true"
+                className={cn(
+                  'flex size-6 shrink-0 items-center justify-center rounded-full',
+                  swapping
+                    ? 'text-lg leading-none font-semibold text-brand-300'
+                    : 'ring-2 ring-ink-700',
+                )}
+              >
+                {swapping ? '→' : null}
+              </span>
+            ) : null}
+            {here && swapping ? (
+              <span aria-hidden="true" className="text-xl leading-none text-present-400">
+                ✓
+              </span>
+            ) : null}
+          </button>
+
+          {/*
+            Undo, always one tap.
+
+            The check mark is the thing a counselor points at when they say
+            "that one is wrong", so it undoes rather than opening a menu about
+            undoing. It keeps the label the whole row used to carry — the row's
+            promise has not changed, only its geography.
+          */}
+          {here && !swapping ? (
+            <button
+              type="button"
+              onClick={() => onUndo?.(entry)}
+              disabled={busy}
+              aria-busy={busy || undefined}
+              aria-label={`Undo check-in for ${name}${gradeClause}, checked in at ${formatClock(attendance.checkedInAt)}`}
+              className={cn(
+                'flex w-16 shrink-0 flex-col items-center justify-center gap-0.5 px-2',
+                'border-l border-present-500/20 text-present-400',
+                'hover:bg-present-500/15 active:bg-present-500/15 disabled:opacity-60',
+              )}
+            >
+              <span aria-hidden="true" className="text-xl leading-none">
+                ✓
+              </span>
+              <span aria-hidden="true" className="text-[11px] tabular-nums text-ink-500">
+                {formatClock(attendance.checkedInAt)}
+              </span>
+            </button>
+          ) : null}
+        </div>
+
+        {open ? (
+          <div
+            id={actionsId}
+            className="flex gap-2 border-t border-present-500/20 px-3 py-2"
+          >
+            <button
+              type="button"
+              onClick={() => onUndo?.(entry)}
+              disabled={busy}
+              aria-label={`Undo the check-in for ${name}`}
+              className={cn(ACTION, 'bg-ink-900 text-ink-100 ring-ink-700 hover:bg-ink-800')}
+            >
+              Undo
+            </button>
+
+            {canOpenProfile ? (
+              <Link
+                to={`/students/${student.id}`}
+                aria-label={`Open the profile for ${name}`}
+                className={cn(ACTION, 'bg-ink-900 text-ink-100 ring-ink-700 hover:bg-ink-800')}
+              >
+                Profile
+              </Link>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={() => onSwap?.(entry)}
+              disabled={busy}
+              aria-label={`Wrong person — move ${name}’s check-in to somebody else`}
+              className={cn(
+                ACTION,
+                'bg-brand-500/10 text-brand-300 ring-brand-500/30 hover:bg-brand-500/20',
+              )}
+            >
+              Wrong person
+            </button>
+          </div>
+        ) : null}
+      </div>
     </li>
   );
 },
 (prev, next) =>
   prev.onPress === next.onPress &&
+  prev.onUndo === next.onUndo &&
+  prev.onSwap === next.onSwap &&
+  prev.mode === next.mode &&
+  prev.isSwapSource === next.isSwapSource &&
+  prev.expanded === next.expanded &&
   prev.flashing === next.flashing &&
   prev.busy === next.busy &&
   prev.showRecentHint === next.showRecentHint &&
+  prev.canOpenProfile === next.canOpenProfile &&
   prev.allergyNote === next.allergyNote &&
   sameEntry(prev.entry, next.entry));

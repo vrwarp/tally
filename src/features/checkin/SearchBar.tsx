@@ -10,6 +10,7 @@
  * desktop that had shrunk every other field, and it never picked up the icon
  * the shared search fields draw.
  */
+import type { RefObject } from 'react';
 import { TextField } from '@/components/ui/Field';
 
 export interface SearchBarProps {
@@ -18,6 +19,12 @@ export interface SearchBarProps {
   placeholder?: string;
   /** Opens quick-add. Rendered beside the field — see the note below. */
   onQuickAdd?: () => void;
+  /**
+   * A handle on the input, so the screen can put the caret here when it has
+   * just asked a question this field answers — picking the right person for a
+   * check-in filed against the wrong one.
+   */
+  inputRef?: RefObject<HTMLInputElement | null>;
 }
 
 export function SearchBar({
@@ -25,6 +32,7 @@ export function SearchBar({
   onChange,
   placeholder = 'Search students…',
   onQuickAdd,
+  inputRef,
 }: SearchBarProps) {
   /*
     Quick-add lives in the search band rather than floating over the list.
@@ -78,6 +86,7 @@ export function SearchBar({
           spellCheck={false}
           placeholder={placeholder}
           value={value}
+          inputRef={inputRef}
           onChange={(event) => onChange(event.target.value)}
           onClear={() => onChange('')}
         />

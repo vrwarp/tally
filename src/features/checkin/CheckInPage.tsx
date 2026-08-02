@@ -12,6 +12,13 @@
  * also what keeps two counselors' phones agreeing with each other. The one piece
  * of local state, `flashing`, exists purely to drive an animation.
  *
+ * The corrections live here too, because they are what the tap budget is really
+ * protecting: a mis-tap that costs a trip to another screen is a mis-tap nobody
+ * fixes. Undo is the check mark, one tap, no dialog. The rest of the row opens
+ * a strip holding the two rarer ones — the student's profile, and "Wrong
+ * person", which turns this whole screen into the person picker rather than
+ * inventing a second search box on top of it. See `swapForId`.
+ *
  * The event is never chosen here. `/` is a question — see `ChooseEvent` — and
  * this screen only renders once `/event/:eventId` names an answer. That is a
  * deliberate reversal: Tally used to pick from the clock and open straight into
@@ -39,8 +46,8 @@ import { useAttendance, useRsvps } from '@/hooks/useAttendance';
 import { useHeightVar } from '@/hooks/useHeightVar';
 import { invalidateSnapshotCache, useEventSnapshots } from '@/hooks/useEventSnapshots';
 import { cn, haptic } from '@/lib/utils';
-import { checkIn, undoCheckIn } from '@/services/attendance';
-import { isCheckInOpen } from '@/lib/time';
+import { checkIn, swapCheckIn, undoCheckIn } from '@/services/attendance';
+import { formatClock, isCheckInOpen } from '@/lib/time';
 import { ensureMaterialized } from '@/services/events';
 import { studentFullName, type Grade, type RosterEntry } from '@/types';
 
@@ -93,7 +100,7 @@ export function CheckInPage() {
   const { event, now, selectableEvents } = useActiveEvent(eventId ?? null);
 
   const { students, settings, loading: dataLoading, rosterError } = useData();
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const { show } = useToast();
 
   const { attendance, error: attendanceError } = useAttendance(
@@ -112,6 +119,29 @@ export function CheckInPage() {
   const [focus, setFocus] = useState<RosterFocus>("recent");
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [announcement, setAnnouncement] = useState("");
+
+  /**
+   * The one row with its action strip open, if any.
+   *
+   * One at a time, screen-wide: a column of open strips would push the queue
+   * off the bottom of a phone, and the strip is a detour from the queue rather
+   * than part of working it.
+   */
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  /**
+   * The check-in being handed to somebody else, by student id.
+   *
+   * "Wrong person" is not a modal with a second search box in it. It puts *this
+   * screen* into the picking mood: the same search field, the same fuzzy
+   * matching, the same grade chips, the same rows — which is the entire point,
+   * because the counselor is looking for the student they have just failed to
+   * find once already, and a different search box would behave differently at
+   * exactly the wrong moment. Only what a tap means changes, and every row says
+   * so while it is true.
+   */
+  const [swapForId, setSwapForId] = useState<string | null>(null);
+  const searchInput = useRef<HTMLInputElement | null>(null);
 
   /*
    * The gathering in front of the counselor becomes a document, if it was not
@@ -172,6 +202,10 @@ export function CheckInPage() {
     if (pinnedFor.current === id) return;
     pinnedFor.current = id;
     setPinned(new Set());
+    // Both are statements about one row of one gathering, and neither survives
+    // being pointed at a different night.
+    setExpandedId(null);
+    setSwapForId(null);
   }, [event?.id]);
 
   useEffect(() => {
@@ -183,6 +217,36 @@ export function CheckInPage() {
       return next;
     });
   }, [attendance]);
+
+  /**
+   * The check-in being moved, read live rather than captured on the tap.
+   *
+   * Two phones are on this queue. If the other counselor undoes the check-in
+   * while this one is still looking for the right name, the thing being
+   * corrected no longer exists — and moving a record that has been deleted
+   * would quietly *create* one, at a timestamp copied from a screen. So the
+   * source is looked up on every render and the mode closes itself when it goes.
+   */
+  const swapSource = useMemo(() => {
+    if (!swapForId) return null;
+    const record = attendance.find((item) => item.studentId === swapForId);
+    const student = students.find((item) => item.id === swapForId);
+    if (!record || !student) return null;
+    return { record, student };
+  }, [swapForId, attendance, students]);
+
+  useEffect(() => {
+    if (!swapForId || swapSource) return;
+    setSwapForId(null);
+    show("That check-in is gone — there is nothing left to move.", { tone: "info" });
+  }, [swapForId, swapSource, show]);
+
+  // The action strip is a check-in's own, so an undo — this counselor's or the
+  // other phone's — takes it away with the check mark it was hanging off.
+  useEffect(() => {
+    if (!expandedId) return;
+    if (!attendance.some((record) => record.studentId === expandedId)) setExpandedId(null);
+  }, [attendance, expandedId]);
 
   const [flashing, setFlashing] = useState<ReadonlySet<string>>(
     () => new Set(),
@@ -294,70 +358,210 @@ export function CheckInPage() {
     if (event && event.checkInClosesAt < new Date()) invalidateSnapshotCache(event.id);
   }, [event]);
 
-  const handlePress = useCallback(
-    async (entry: RosterEntry) => {
-      if (!event || !user) return;
-      const studentId = entry.student.id;
-      if (inFlight.current.has(studentId)) return;
+  /**
+   * Whether this student can be given a check-in at all, and a reason if not.
+   *
+   * A frozen student — their Planning Center record deleted or merged away —
+   * cannot: the rules would refuse the write, and saying why beats a generic
+   * failure toast landing after an optimistic green flash. It guards the two
+   * writes that *create* attendance for somebody, a check-in and the receiving
+   * end of a swap. Undo is deliberately not guarded: a delete is allowed, and a
+   * student who was frozen after being checked in must not be stranded present.
+   */
+  const refuseFrozen = useCallback(
+    (entry: RosterEntry): boolean => {
+      if (entry.student.pcoRecordMissing !== true) return false;
+      const frozen = `${studentFullName(entry.student)} is frozen — their Planning Center record was deleted or merged away. Fix it from their student page first.`;
+      setAnnouncement(frozen);
+      show(frozen, { tone: 'error' });
+      return true;
+    },
+    [show],
+  );
 
-      const name = studentFullName(entry.student);
-      if (entry.student.pcoRecordMissing === true) {
-        // The rules would refuse the write anyway; saying why beats a generic
-        // failure toast after an optimistic green flash.
-        const frozen = `${name} is frozen — their Planning Center record was deleted or merged away. Fix it from their student page first.`;
-        setAnnouncement(frozen);
-        show(frozen, { tone: 'error' });
-        return;
+  /**
+   * The bookkeeping every attendance write shares.
+   *
+   * `ids` is what the write touches — one student for a check-in or an undo,
+   * two for a swap, and both of those have to be locked out for the duration.
+   * The guard is a ref rather than `pending` so a second tap is rejected before
+   * React has re-rendered anything.
+   */
+  const write = useCallback(
+    async (ids: readonly string[], failure: string, work: () => Promise<void>) => {
+      if (ids.some((id) => inFlight.current.has(id))) return;
+      for (const id of ids) {
+        inFlight.current.add(id);
+        setBusy(id, true);
       }
-      inFlight.current.add(studentId);
-      setBusy(studentId, true);
 
       try {
-        if (entry.attendance) {
-          // No confirm dialog: a mistaken undo costs one more tap, whereas a
-          // modal costs every counselor a beat on every correction.
-          await undoCheckIn(event.id, studentId);
-          setAnnouncement(`${name} removed`);
-          show(`Undid ${name}`, { tone: "info" });
-        } else {
-          // Paint and buzz first — the confirmation must land on the tap, not on
-          // the round trip.
-          haptic();
-          flash(studentId);
-          setAnnouncement(`${name} checked in`);
-          // Attendance hangs off the event document, so the gathering has to be
-          // one. Almost always already done by the effect above; this is what
-          // makes it true for a counselor getting a head start on a gathering
-          // whose check-in has not opened yet.
-          await ensureMaterialized(event);
-          await checkIn({
-            event,
-            student: entry.student,
-            uid: user.uid,
-            method: query.trim() ? "search" : "tap",
-          });
-        }
+        await work();
       } catch {
-        const failure = entry.attendance
-          ? `Could not undo ${name}. Try again.`
-          : `Could not check in ${name}. Try again.`;
         setAnnouncement(failure);
         show(failure, { tone: "error" });
       } finally {
         forgetCachedHistory();
-        inFlight.current.delete(studentId);
-        setBusy(studentId, false);
+        for (const id of ids) {
+          inFlight.current.delete(id);
+          setBusy(id, false);
+        }
       }
     },
-    [event, user, query, flash, setBusy, show, forgetCachedHistory],
+    [setBusy, show, forgetCachedHistory],
   );
 
+  const handleCheckIn = useCallback(
+    async (entry: RosterEntry) => {
+      if (!event || !user) return;
+      if (refuseFrozen(entry)) return;
+      const name = studentFullName(entry.student);
+
+      await write([entry.student.id], `Could not check in ${name}. Try again.`, async () => {
+        // Paint and buzz first — the confirmation must land on the tap, not on
+        // the round trip.
+        haptic();
+        flash(entry.student.id);
+        setAnnouncement(`${name} checked in`);
+        // Attendance hangs off the event document, so the gathering has to be
+        // one. Almost always already done by the effect above; this is what
+        // makes it true for a counselor getting a head start on a gathering
+        // whose check-in has not opened yet.
+        await ensureMaterialized(event);
+        await checkIn({
+          event,
+          student: entry.student,
+          uid: user.uid,
+          method: query.trim() ? "search" : "tap",
+        });
+      });
+    },
+    [event, user, query, flash, write, refuseFrozen],
+  );
+
+  const handleUndo = useCallback(
+    async (entry: RosterEntry) => {
+      if (!event) return;
+      const name = studentFullName(entry.student);
+
+      // No confirm dialog: a mistaken undo costs one more tap, whereas a modal
+      // costs every counselor a beat on every correction.
+      setExpandedId(null);
+      await write([entry.student.id], `Could not undo ${name}. Try again.`, async () => {
+        await undoCheckIn(event.id, entry.student.id);
+        setAnnouncement(`${name} removed`);
+        show(`Undid ${name}`, { tone: "info" });
+      });
+    },
+    [event, show, write],
+  );
+
+  /**
+   * Hands one check-in to the student it should have been.
+   *
+   * The mode is dropped before the write rather than after it: the source
+   * record disappears out of the local cache the instant the batch is queued,
+   * and a picker still on screen looking for a record that is already gone
+   * would announce that the thing it is holding no longer exists.
+   */
+  const handleSwapPick = useCallback(
+    async (entry: RosterEntry) => {
+      if (!event || !user || !swapSource) return;
+      if (refuseFrozen(entry)) return;
+      const from = swapSource;
+      const wrong = studentFullName(from.student);
+      const right = studentFullName(entry.student);
+      const when = formatClock(from.record.checkedInAt);
+
+      setSwapForId(null);
+      setQuery("");
+
+      await write(
+        [from.student.id, entry.student.id],
+        `Could not move the check-in to ${right}. Try again.`,
+        async () => {
+          haptic();
+          flash(entry.student.id);
+          setAnnouncement(`${when} check-in moved from ${wrong} to ${right}`);
+          await swapCheckIn({
+            event,
+            from: from.record,
+            to: entry.student,
+            uid: user.uid,
+          });
+          show(`${wrong} → ${right}, still ${when}`, { tone: "success" });
+        },
+      );
+    },
+    [event, user, swapSource, flash, show, write, refuseFrozen],
+  );
+
+  /**
+   * The one entry point the rows have, because a row is one target.
+   *
+   * What it means depends on the screen's mood and on whether the student is
+   * already here — and that ordering matters: while a check-in is being moved,
+   * *every* row is a candidate for it, including one a counselor might
+   * otherwise have been about to check in.
+   */
   const onPress = useCallback(
     (entry: RosterEntry) => {
-      void handlePress(entry);
+      if (swapForId) {
+        void handleSwapPick(entry);
+        return;
+      }
+      if (entry.attendance) {
+        setExpandedId((current) => (current === entry.student.id ? null : entry.student.id));
+        return;
+      }
+      void handleCheckIn(entry);
     },
-    [handlePress],
+    [swapForId, handleSwapPick, handleCheckIn],
   );
+
+  const onUndo = useCallback(
+    (entry: RosterEntry) => {
+      void handleUndo(entry);
+    },
+    [handleUndo],
+  );
+
+  /**
+   * "Wrong person" — the roster becomes a picker.
+   *
+   * The query is cleared and the caret put in the search box, because the next
+   * thing that happens is always typing: the two names that get confused for
+   * each other are the ones that look alike, and finding the right one is the
+   * job the search box already does.
+   */
+  const onSwap = useCallback((entry: RosterEntry) => {
+    setSwapForId(entry.student.id);
+    setExpandedId(null);
+    setQuery("");
+    searchInput.current?.focus();
+  }, []);
+
+  const cancelSwap = useCallback(() => {
+    setSwapForId(null);
+    setQuery("");
+  }, []);
+
+  /*
+   * Escape leaves the picker — on the second press, if something has been typed.
+   *
+   * The search field clears itself on the first one (see `TextField`), and that
+   * is the right order: a counselor who mistyped a name wants their query back,
+   * not the whole correction abandoned.
+   */
+  useEffect(() => {
+    if (!swapForId) return;
+    const onKeyDown = (keyEvent: KeyboardEvent) => {
+      if (keyEvent.key !== "Escape" || query !== "") return;
+      setSwapForId(null);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [swapForId, query]);
 
   /* ---- Render ------------------------------------------------------------ */
 
@@ -452,7 +656,47 @@ export function CheckInPage() {
         ref={searchBar}
       >
         <div className={BAND}>
-          <SearchBar value={query} onChange={setQuery} onQuickAdd={() => setQuickAddOpen(true)} />
+          {/* Rides the sticky band rather than sitting above the list, so the
+              question stays on screen for the whole hunt. A counselor who
+              scrolls past it and forgets what a tap now does is the one way
+              this mode can do harm. */}
+          {swapSource ? (
+            <div
+              role="status"
+              className="mb-2 flex items-center gap-3 rounded-xl bg-brand-500/10 px-3 py-2 ring-1 ring-brand-500/30"
+            >
+              {/* Wraps rather than truncating: the half a counselor needs is
+                  the half that was falling off the end — that the correction
+                  keeps the minute the student actually arrived. */}
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-brand-200">
+                  Who should this be?
+                </span>
+                <span className="block text-xs leading-snug text-ink-300">
+                  Tap the right student. {studentFullName(swapSource.student)}’s check-in moves
+                  across, still {formatClock(swapSource.record.checkedInAt)}.
+                </span>
+              </span>
+              <button
+                type="button"
+                onClick={cancelSwap}
+                className="min-h-11 shrink-0 rounded-xl px-3 text-sm font-semibold text-ink-300 ring-1 ring-ink-700 hover:bg-ink-800 active:bg-ink-800"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : null}
+
+          <SearchBar
+            value={query}
+            onChange={setQuery}
+            inputRef={searchInput}
+            placeholder={swapSource ? 'Search for the right student…' : undefined}
+            /* Quick-add is stood down while a check-in is being moved: it
+               creates a *new* student and checks them in on the server clock,
+               which is the one thing this correction exists to avoid. */
+            onQuickAdd={swapSource ? undefined : () => setQuickAddOpen(true)}
+          />
         </div>
       </div>
 
@@ -520,15 +764,33 @@ export function CheckInPage() {
             className="pt-10"
             icon="🔍"
             title={`No match for “${query.trim()}”`}
-            description="First time here? Add them as a visitor — it takes three fields."
+            description={
+              swapSource
+                ? "Nobody by that name to move this check-in to. Leave it and add them as a visitor instead."
+                : "First time here? Add them as a visitor — it takes three fields."
+            }
             action={
-              <button
-                type="button"
-                onClick={() => setQuickAddOpen(true)}
-                className="min-h-11 rounded-xl bg-brand-500 px-4 text-sm font-semibold text-white hover:bg-brand-400 active:bg-brand-600"
-              >
-                Add as visitor
-              </button>
+              /* A brand-new student is not somewhere a check-in can be *moved*
+                 to — quick-add writes its own, on the server clock — so the way
+                 out of the picker is offered rather than a button that would
+                 quietly do something else. */
+              swapSource ? (
+                <button
+                  type="button"
+                  onClick={cancelSwap}
+                  className="min-h-11 rounded-xl bg-ink-900 px-4 text-sm font-semibold text-ink-300 ring-1 ring-ink-800 hover:bg-ink-800 active:bg-ink-800"
+                >
+                  Leave it where it is
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setQuickAddOpen(true)}
+                  className="min-h-11 rounded-xl bg-brand-500 px-4 text-sm font-semibold text-white hover:bg-brand-400 active:bg-brand-600"
+                >
+                  Add as visitor
+                </button>
+              )
             }
           />
         ) : (
@@ -538,24 +800,35 @@ export function CheckInPage() {
               title={roster.isFiltered ? "Results" : FOCUS_TITLE[appliedFocus]}
               entries={roster.entries}
               description={
-                appliedFocus === "recent" && counts.historyWindow > 0
-                  ? `from the last ${counts.historyWindow} ${counts.historyWindow === 1 ? "gathering" : "gatherings"}`
-                  : appliedFocus === "participated"
-                    // Says which window, because "participated" is only ever
-                    // true of what the app loaded — and says which *question*,
-                    // because an event with no history of its own is answering
-                    // a weaker one. See `ParticipationSource`.
-                    ? roster.participationSource === "gathering"
-                      ? `been here in the last ${counts.participationWindow} ${counts.participationWindow === 1 ? "gathering" : "gatherings"}`
-                      : "checked in at least once before"
-                    : appliedFocus === "checkedIn"
-                      ? "tap to undo"
-                      : undefined
+                // While a check-in is being moved the list is a picker, and
+                // what it is filtered to matters less than what a tap now does.
+                swapSource
+                  ? "tap the right student"
+                  : appliedFocus === "recent" && counts.historyWindow > 0
+                    ? `from the last ${counts.historyWindow} ${counts.historyWindow === 1 ? "gathering" : "gatherings"}`
+                    : appliedFocus === "participated"
+                      ? // Says which window, because "participated" is only ever
+                        // true of what the app loaded — and says which
+                        // *question*, because an event with no history of its
+                        // own is answering a weaker one. See
+                        // `ParticipationSource`.
+                        roster.participationSource === "gathering"
+                        ? `been here in the last ${counts.participationWindow} ${counts.participationWindow === 1 ? "gathering" : "gatherings"}`
+                        : "checked in at least once before"
+                      : appliedFocus === "checkedIn"
+                        ? "tap the check mark to undo"
+                        : undefined
               }
               emptyLabel={FOCUS_EMPTY[appliedFocus]}
               tone={appliedFocus === "checkedIn" ? "present" : "default"}
               showRecentHint={event.mode === "recurring"}
               onPress={onPress}
+              onUndo={onUndo}
+              onSwap={onSwap}
+              mode={swapSource ? "swap" : "checkin"}
+              swapSourceId={swapSource?.student.id ?? null}
+              expandedId={expandedId}
+              canOpenProfile={can("core")}
               flashing={flashing}
               busy={pending}
               allergyNotes={allergyNotes}
