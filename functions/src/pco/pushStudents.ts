@@ -56,6 +56,22 @@ function readString(data: Record<string, unknown>, key: string): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 }
 
+/**
+ * The grade on a student document, or null when it holds none.
+ *
+ * Null is a real case rather than a malformed document: `students/pco_…` is a
+ * membership, and Tally deliberately writes no grade onto one for somebody
+ * Planning Center holds no grade for — the number on their roster row is where
+ * the clamp landed, not a fact. This used to read `Number(data.grade ?? 0)`,
+ * which turned "no grade" into grade zero — a number finite enough to satisfy
+ * the guard that was supposed to catch a missing grade, and to be sent to
+ * Planning Center as the grade of a person it was about to create.
+ */
+function readGrade(data: Record<string, unknown>): number | null {
+  const value = data.grade;
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Matching                                                                    */
 /* -------------------------------------------------------------------------- */
@@ -114,6 +130,7 @@ async function findExistingPerson(
 
 function createAttributes(data: Record<string, unknown>): Record<string, unknown> {
   const allergies = readString(data, 'allergies');
+  const grade = readGrade(data);
   // Tally holds Planning Center's *display* name, `Benson “蔡秉洲”`. Planning
   // Center holds the two halves separately and composes them itself, so they go
   // back the way they came.
@@ -122,7 +139,10 @@ function createAttributes(data: Record<string, unknown>): Record<string, unknown
     first_name: name.firstName,
     ...(name.nickname ? { nickname: name.nickname } : {}),
     last_name: readString(data, 'lastName') ?? '',
-    grade: Number(data.grade ?? 0),
+    // Omitted rather than sent as a zero when the document holds none. A person
+    // created upstream with `grade: 0` is a claim about a real child that
+    // nobody made, and it is the church's database that keeps it.
+    ...(grade === null ? {} : { grade }),
     // Every student on the roster is a minor; the flag is what puts them in the
     // church's children/students views rather than the adult directory.
     child: true,
@@ -144,7 +164,7 @@ function driftedAttributes(
 
   const firstName = readString(data, 'firstName');
   const lastName = readString(data, 'lastName');
-  const grade = Number(data.grade ?? 0);
+  const grade = readGrade(data);
 
   // Both sides are compared as display names — `mapped.firstName` is composed
   // the same way Planning Center composes it — and only then split apart again
@@ -169,9 +189,13 @@ function driftedAttributes(
    *  - A *different* number upstream is left alone unless the clamped views
    *    disagree, exactly as before: Planning Center owns the field, and a
    *    correction made there must not be stomped by an old copy here.
+   *
+   * A document holding no grade says nothing about the grade and patches
+   * nothing — which is the whole of Tally's opinion about somebody Planning
+   * Center holds no grade for.
    */
   const heldGrade = (person.attributes ?? {}).grade;
-  if (Number.isFinite(grade) && grade > 0) {
+  if (grade !== null && grade > 0) {
     if (heldGrade === null || heldGrade === undefined) {
       attributes.grade = grade;
       /*
@@ -237,9 +261,9 @@ export async function pushStudent(options: PushStudentOptions): Promise<PushStud
 
   const firstName = readString(data, 'firstName');
   const lastName = readString(data, 'lastName');
-  const grade = Number(data.grade ?? 0);
-  if (!firstName || !lastName || !Number.isFinite(grade)) {
-    return { status: 'skipped', pcoPersonId, message: 'Student is missing a name or grade.' };
+  const grade = readGrade(data);
+  if (!firstName || !lastName) {
+    return { status: 'skipped', pcoPersonId, message: 'Student is missing a name.' };
   }
 
   /* ---- Already linked ---------------------------------------------------- */
@@ -300,6 +324,21 @@ export async function pushStudent(options: PushStudentOptions): Promise<PushStud
   /* ---- Not linked yet ---------------------------------------------------- */
   if (data.pcoPushPending !== true) {
     return { status: 'skipped', pcoPersonId: null, message: 'Student is not queued for Planning Center.' };
+  }
+
+  /*
+   * A create needs a real grade; an update does not.
+   *
+   * The duplicate check below matches on first name, last name *and* grade, and
+   * the person this is about to add is filed as a child of that grade in the
+   * church's permanent database. Neither can be done from a number nobody
+   * supplied. Every student queued for a create has one — it is typed at
+   * quick-add — so this is a refusal rather than a fallback: it is the linked
+   * path above that has to cope with a document holding no grade, and it does,
+   * by patching nothing.
+   */
+  if (grade === null) {
+    return { status: 'skipped', pcoPersonId: null, message: 'Student is missing a grade.' };
   }
 
   const existing = await findExistingPerson(client, config, firstName, lastName, grade);

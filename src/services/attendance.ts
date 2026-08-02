@@ -75,7 +75,14 @@ export async function checkIn(args: {
    */
   student: Pick<
     Student,
-    'id' | 'firstName' | 'lastName' | 'grade' | 'searchName' | 'firstAttendedAt' | 'lastAttendedAt'
+    | 'id'
+    | 'firstName'
+    | 'lastName'
+    | 'grade'
+    | 'gradeOnFile'
+    | 'searchName'
+    | 'firstAttendedAt'
+    | 'lastAttendedAt'
   >;
   uid: string;
   method: CheckInMethod;
@@ -106,7 +113,18 @@ export async function checkIn(args: {
         ...studentPatch,
         firstName: student.firstName,
         lastName: student.lastName,
-        grade: student.grade,
+        /*
+         * Left out for somebody Planning Center holds no grade for, where
+         * `grade` is where the sync's clamp landed rather than a fact — see
+         * `gradeOnFile`.
+         *
+         * This is the write that reaches most people: a tap at a door is how
+         * the majority of these documents come into existence at all. Stamping
+         * the clamp here would put an invented 6th grade on the permanent
+         * record of every adult a leader ever checked in, in the one place that
+         * outlives the roster row it was copied from.
+         */
+        ...(student.gradeOnFile === false ? {} : { grade: student.grade }),
         searchName: student.searchName,
         updatedAt: serverTimestamp(),
         updatedBy: uid,
