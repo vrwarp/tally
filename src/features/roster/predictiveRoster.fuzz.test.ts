@@ -90,6 +90,7 @@ describe('buildRoster properties', () => {
       expect(filtered.counts.present).toBe(unfiltered.counts.present);
       expect(filtered.counts.eligible).toBe(unfiltered.counts.eligible);
       expect(filtered.counts.recent).toBe(unfiltered.counts.recent);
+      expect(filtered.counts.participated).toBe(unfiltered.counts.participated);
     },
   );
 
@@ -105,15 +106,23 @@ describe('buildRoster properties', () => {
       const all = buildRoster({ ...input, filters: { ...input.filters, focus: 'all' } });
       const universe = new Set(ids(all.entries));
 
-      for (const focus of ['recent', 'checkedIn'] as const) {
+      for (const focus of ['recent', 'participated', 'checkedIn'] as const) {
         const view = buildRoster({ ...input, filters: { ...input.filters, focus } });
         for (const id of ids(view.entries)) expect(universe.has(id)).toBe(true);
       }
     },
   );
 
+  /**
+   * The ladder, as a property.
+   *
+   * Recent narrows hardest, Participated sits one rung wider, and `all` is the
+   * whole roster. A focus that cannot be honoured has to fall *down* that ladder
+   * rather than off it — a stood-down Recent landing straight on four hundred
+   * synced names is the thing this ordering exists to prevent.
+   */
   forAll(
-    'stands the Recent focus down rather than applying it to nothing',
+    'stands the Recent focus down one rung at a time',
     arbitraryRosterInput,
     (input) => {
       const view = buildRoster({ ...input, filters: { ...input.filters, focus: 'recent' } });
@@ -124,9 +133,54 @@ describe('buildRoster properties', () => {
         for (const entry of view.entries) {
           expect(entry.isRecent || entry.attendance !== null).toBe(true);
         }
+      } else if (view.focus === 'participated') {
+        // Only ever reached because Recent had nothing to say.
+        expect(view.counts.recent).toBe(0);
       } else {
         expect(view.focus).toBe('all');
       }
+    },
+  );
+
+  forAll(
+    'stands Participated down unless it actually narrows the roster',
+    arbitraryRosterInput,
+    (input) => {
+      const view = buildRoster({ ...input, filters: { ...input.filters, focus: 'participated' } });
+
+      if (view.focus === 'participated') {
+        expect(view.counts.participated).toBeGreaterThan(0);
+        expect(view.counts.participated).toBeLessThan(view.counts.eligible);
+        // Nobody on the list is a stranger to the gathering.
+        for (const entry of view.entries) expect(entry.hasParticipated).toBe(true);
+      } else {
+        expect(view.focus).toBe('all');
+      }
+    },
+  );
+
+  /**
+   * Recent ⊆ Participated ⊆ eligible, at the level of the counts the chips
+   * print. A "Recent 40 / Participated 12" row would be nonsense a counselor
+   * could read straight off the screen.
+   */
+  forAll(
+    'never counts more regulars than participants',
+    arbitraryRosterInput,
+    (input) => {
+      const { counts, participationSource } = buildRoster(input);
+
+      expect(counts.participated).toBeGreaterThanOrEqual(0);
+      expect(counts.participated).toBeLessThanOrEqual(counts.eligible);
+      expect(counts.participationWindow).toBeGreaterThanOrEqual(0);
+
+      // A regular is by definition somebody who has been here — unless there is
+      // no history to have been in, in which case nothing is claimed at all.
+      if (participationSource === 'gathering') {
+        expect(counts.recent).toBeLessThanOrEqual(counts.participated);
+        expect(counts.participationWindow).toBeGreaterThanOrEqual(counts.historyWindow);
+      }
+      if (participationSource === 'none') expect(counts.participated).toBe(0);
     },
   );
 

@@ -73,9 +73,34 @@ export function useActiveEvent(eventId?: string | null): ActiveEventResult {
 const CANCELLED_ALLOWANCE = 2;
 
 /**
+ * How far back "has been to this gathering" reaches.
+ *
+ * The prediction only wants the last few nights — that is the point of it. The
+ * roster's other question, "who belongs to this gathering at all", wants as much
+ * as it can get: a student who came every week until Christmas is still one of
+ * this gathering's students in February, and lumping them in with the four
+ * hundred names a Planning Center sync brought along is exactly the uselessness
+ * this window exists to fix.
+ *
+ * Twelve is a term of weekly gatherings, and it is bounded on both sides: it
+ * costs twelve small parallel reads from a cache the dashboard already shares,
+ * and the events themselves are already in memory (`DataProvider` holds 120
+ * days), so nothing here reaches for a page of calendar that is not loaded.
+ *
+ * This is the read budget, not the rule. How far back participation *counts* is
+ * `PARTICIPATION_MAX_AGE_DAYS`, enforced in `buildChainHistory` where it can be
+ * stated once for every screen; whichever bound is tighter wins.
+ */
+const PARTICIPATION_WINDOW = 12;
+
+/**
  * The past instances of an event's series that feed its predictive roster.
  * Returns event records only — attendance for them is loaded by
  * `useEventSnapshots`.
+ *
+ * Two windows are read out of the one list: the prediction takes the most recent
+ * `predictiveOfLastN` of them, and the roster's "has been here before" filter
+ * takes all of them. See `PARTICIPATION_WINDOW`.
  *
  * "Series" here means the repeat chain the event predicts from — its own for a
  * recurring gathering, and for a one-off the gathering a leader pointed it at.
@@ -106,7 +131,7 @@ export function useSeriesHistoryEvents(event: TallyEvent | null): TallyEvent[] {
       events,
       chain,
       now,
-      settings.predictiveOfLastN + CANCELLED_ALLOWANCE,
+      Math.max(settings.predictiveOfLastN + CANCELLED_ALLOWANCE, PARTICIPATION_WINDOW),
     ).filter((instance) => instance.id !== event.id);
 
     if (!sameItems(last.current, instances)) last.current = instances;

@@ -73,12 +73,14 @@ const PREDICTION_GRACE_MS = 1500;
 const FOCUS_TITLE: Record<RosterFocus, string> = {
   all: "Roster",
   recent: "Recent",
+  participated: "Participated",
   checkedIn: "Checked in",
 };
 
 const FOCUS_EMPTY: Record<RosterFocus, string> = {
   all: "Nobody matches these filters.",
   recent: "No regulars on this roster yet.",
+  participated: "Nobody has been to this gathering yet.",
   checkedIn: "Nobody is checked in yet.",
 };
 
@@ -354,6 +356,48 @@ export function CheckInPage() {
   // regulars has none to show.
   const canFocusRecent = !roster.isFiltered && counts.recent > 0;
 
+  // Same test one rung wider, plus one of its own: a filter that selects every
+  // eligible student is not a filter. These mirror `resolveFocus`, which is what
+  // actually decides — the chips only have to agree with it.
+  const canFocusParticipated =
+    !roster.isFiltered && counts.participated > 0 && counts.participated < counts.eligible;
+
+  /*
+   * Two focus chips is what a phone holds, so the third has to earn its slot.
+   *
+   * At 412px the filter row has ~258px for chips before the grade dropdown, and
+   * three of them come to 392 — which does not crowd anything, it pushes
+   * "Checked in" clean off the edge of a scroller with no visible overflow. That
+   * chip is how a counselor reviews the queue mid-shift; losing it to a filter
+   * that is one tap away underneath the list is a bad trade.
+   *
+   * So Participated appears only when it is doing something a chip has to do:
+   * standing in for Recent when the prediction has nothing to say, or being the
+   * filter currently applied, which must always be possible to turn off. When
+   * the counselor is on Recent, the button under the roster is the way to it —
+   * and that button says so in words.
+   */
+  const showParticipatedChip =
+    canFocusParticipated && (!canFocusRecent || appliedFocus === 'participated');
+
+  /*
+   * The way back out, one rung at a time.
+   *
+   * This used to be a single jump to "Show all 129 students", which on a roster
+   * synced from Planning Center is every teenager the church has a record of —
+   * a list nobody wants and which buries the forty students who actually come.
+   * So a counselor widening out of Recent lands on the gathering's own people
+   * first, and only reaches the whole ministry from there.
+   *
+   * The rung is skipped when it would reveal nobody new, so the button is never
+   * an invitation to press it and watch nothing happen.
+   */
+  const shownCount = appliedFocus === 'recent' ? counts.recent : counts.present;
+  const widenTo: RosterFocus =
+    appliedFocus !== 'participated' && canFocusParticipated && counts.participated > shownCount
+      ? 'participated'
+      : 'all';
+
   return (
     <div className="flex flex-col">
       {/* Scrolls away, and is meant to. Which event, what time, how many are
@@ -401,6 +445,8 @@ export function CheckInPage() {
           onFocusChange={setFocus}
           showRecent={canFocusRecent}
           recentCount={counts.recent}
+          showParticipated={showParticipatedChip}
+          participatedCount={counts.participated}
           present={counts.present}
         />
       </div>
@@ -471,9 +517,17 @@ export function CheckInPage() {
               description={
                 appliedFocus === "recent" && counts.historyWindow > 0
                   ? `from the last ${counts.historyWindow} ${counts.historyWindow === 1 ? "gathering" : "gatherings"}`
-                  : appliedFocus === "checkedIn"
-                    ? "tap to undo"
-                    : undefined
+                  : appliedFocus === "participated"
+                    // Says which window, because "participated" is only ever
+                    // true of what the app loaded — and says which *question*,
+                    // because an event with no history of its own is answering
+                    // a weaker one. See `ParticipationSource`.
+                    ? roster.participationSource === "gathering"
+                      ? `been here in the last ${counts.participationWindow} ${counts.participationWindow === 1 ? "gathering" : "gatherings"}`
+                      : "checked in at least once before"
+                    : appliedFocus === "checkedIn"
+                      ? "tap to undo"
+                      : undefined
               }
               emptyLabel={FOCUS_EMPTY[appliedFocus]}
               tone={appliedFocus === "checkedIn" ? "present" : "default"}
@@ -491,10 +545,12 @@ export function CheckInPage() {
               <div className="pb-3">
                 <button
                   type="button"
-                  onClick={() => setFocus("all")}
+                  onClick={() => setFocus(widenTo)}
                   className="min-h-11 w-full rounded-xl bg-ink-900 px-4 text-sm font-semibold text-ink-300 ring-1 ring-ink-800 hover:bg-ink-800 active:bg-ink-800"
                 >
-                  Show all {counts.eligible} students
+                  {widenTo === "participated"
+                    ? `Show all ${counts.participated} who have participated`
+                    : `Show all ${counts.eligible} students`}
                 </button>
               </div>
             ) : null}

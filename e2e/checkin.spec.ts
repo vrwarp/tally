@@ -15,7 +15,26 @@ const countsLine = (page: Page) => page.getByText(/^\d+ of \d+ students checked 
 
 /** The one roster list, whichever filter it is currently showing. */
 const rosterList = (page: Page) =>
-  page.getByRole('region', { name: /^(Recent|Roster|Checked in|Results),/ });
+  page.getByRole('region', { name: /^(Recent|Participated|Roster|Checked in|Results),/ });
+
+/**
+ * Presses the widen button until the list is the whole ministry.
+ *
+ * It takes more than one press now. The way out of Recent is a ladder — the
+ * gathering's own students first, everybody the church has a record of only
+ * after that — because a roster synced from Planning Center answers "show all"
+ * with four hundred names, most of whom have never walked in. Tests that want
+ * the far end of it have to walk the rungs a counselor walks.
+ */
+async function widenToWholeRoster(page: Page): Promise<void> {
+  const whole = page.getByRole('region', { name: /^Roster,/ });
+  for (let rung = 0; rung < 3; rung += 1) {
+    if (await whole.isVisible()) return;
+    await page.getByRole('button', { name: /^Show all \d+ (students|who have participated)$/ }).click();
+    await expect(rosterList(page)).toBeVisible();
+  }
+  await expect(whole).toBeVisible();
+}
 
 /**
  * Waits for the roster to stop changing under the test.
@@ -218,13 +237,49 @@ test.describe('check-in', () => {
 
     // A pre-selected filter that cannot be undone is a roster with students
     // missing from it, so the way out is a button and not a guess.
-    await page.getByRole('button', { name: /^Show all \d+ students$/ }).click();
+    await widenToWholeRoster(page);
 
     const everyone = page.getByRole('region', { name: /^Roster,/ });
     await expect(everyone).toBeVisible();
 
     // The whole point of prediction is that it saves scrolling.
     expect(recentCount).toBeLessThan(await everyone.getByRole('button').count());
+  });
+
+  /**
+   * The middle rung.
+   *
+   * "Show all" used to mean every student in the database, which on a roster
+   * synced from Planning Center is every teenager the church has a record of —
+   * most of whom have never walked in. A counselor widening out of Recent wants
+   * the gathering's own people first, and only then the rest of the ministry.
+   */
+  test('widens through the gathering’s own students before the whole ministry', async ({
+    page,
+  }) => {
+    await settledOnRecent(page);
+    const recent = page.getByRole('region', { name: /^Recent,/ });
+    await expect(recent).toBeVisible();
+    const recentCount = await recent.getByRole('button').count();
+
+    const widen = page.getByRole('button', { name: /^Show all \d+ who have participated$/ });
+    await expect(widen).toBeVisible();
+    await widen.click();
+
+    // Says what it is measuring, because "participated" is only ever true of
+    // the window the app loaded.
+    const participated = page.getByRole('region', { name: /^Participated,/ });
+    await expect(participated).toBeVisible();
+    await expect(page.getByText(/been here in the last \d+ gatherings?/)).toBeVisible();
+
+    const participatedCount = await participated.getByRole('button').count();
+    expect(participatedCount).toBeGreaterThan(recentCount);
+
+    // ...and the whole ministry is still one tap further, wider again.
+    await page.getByRole('button', { name: /^Show all \d+ students$/ }).click();
+    const everyone = page.getByRole('region', { name: /^Roster,/ });
+    await expect(everyone).toBeVisible();
+    expect(await everyone.getByRole('button').count()).toBeGreaterThan(participatedCount);
   });
 
   /**
@@ -359,8 +414,7 @@ test.describe('check-in', () => {
     await expect(recent).toBeVisible();
     const regulars = new Set((await rosterRows(page)).map((row) => row.name));
 
-    await page.getByRole('button', { name: /^Show all \d+ students$/ }).click();
-    await expect(page.getByRole('region', { name: /^Roster,/ })).toBeVisible();
+    await widenToWholeRoster(page);
     const outsider = (await rosterRows(page)).find(
       (row) => !row.here && !regulars.has(row.name),
     )?.name;
