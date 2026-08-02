@@ -41,7 +41,7 @@ export function EarlierAttendance({ studentId }: EarlierAttendanceProps) {
       <div className="flex flex-col gap-3 px-4 pb-4">
         <p className="text-xs text-ink-500">
           Read from this student&rsquo;s own check-in records, so it reaches back as far as Tally
-          has them — further than the few months the screens above keep loaded. Only nights they
+          has them — further than the year the screens above keep loaded. Only nights they
           were here; nothing is claimed about the ones in between.
         </p>
 

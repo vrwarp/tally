@@ -295,22 +295,55 @@ export async function markPresentOnly(args: {
 }
 
 /**
+ * How many of those reads are allowed to be in flight at once.
+ *
+ * Callers used to ask for a couple of dozen nights, and firing all of them
+ * together was the right thing. A student's profile now asks for every finished
+ * night of the last year, which on a ministry running several weekly gatherings
+ * is a few hundred — and a few hundred simultaneous reads over whatever signal a
+ * church hall has means they all contend and none of them lands early.
+ *
+ * The pool does not reduce the work or the number of reads; it changes the shape
+ * of the wait. On a fast connection the total time is unchanged. On a slow one
+ * the first nights arrive while the rest are still queued, which is the
+ * difference between a page that fills in and a page that hangs.
+ */
+const ATTENDANCE_READ_CONCURRENCY = 12;
+
+/**
  * One-shot read of who attended each of the given events.
  *
  * Used by the predictive roster and the dashboard, which need history rather
  * than a live feed — a Friday from three weeks ago is not going to change while
  * a counselor stands at the door, so paying for a listener would be waste.
+ *
+ * The returned map is keyed by event id and carries one entry per id asked for;
+ * its iteration order is completion order, not the order given, and no caller
+ * reads it as a sequence.
  */
 export async function fetchAttendanceByEvent(
   eventIds: readonly string[],
 ): Promise<Map<string, Set<string>>> {
-  const results = await Promise.all(
-    eventIds.map(async (eventId) => {
+  const results = new Map<string, Set<string>>();
+  let next = 0;
+
+  // Each worker takes the next id and reads it, until there are none left. The
+  // increment is synchronous with the read of `next`, so two workers can never
+  // claim the same event.
+  const worker = async (): Promise<void> => {
+    for (let index = next++; index < eventIds.length; index = next++) {
+      const eventId = eventIds[index];
+      if (eventId === undefined) continue;
       const snapshot = await getDocs(collection(db, paths.attendanceCollection(eventId)));
-      return [eventId, new Set(snapshot.docs.map((d) => d.id))] as const;
-    }),
+      results.set(eventId, new Set(snapshot.docs.map((d) => d.id)));
+    }
+  };
+
+  await Promise.all(
+    Array.from({ length: Math.min(ATTENDANCE_READ_CONCURRENCY, eventIds.length) }, worker),
   );
-  return new Map(results);
+
+  return results;
 }
 
 /** Full attendance records (not just ids) for one event. */
