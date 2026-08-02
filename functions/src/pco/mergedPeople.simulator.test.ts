@@ -25,6 +25,7 @@ import { FakeFirestore } from '../testing/fakeFirestore.js';
 import { followPersonLink, isPersonGoneError, mergedForwardOf } from './personLink.js';
 import { graftMergedStudent, readThroughMerges } from './studentPerson.js';
 import { updateStudentProfile } from './profile.js';
+import { pushStudent } from './pushStudents.js';
 import { setParentContact } from './parentContact.js';
 import { fetchPersonDetails, fetchRoster, pcoStudentId } from './roster.js';
 import { PcoApiError } from './client.js';
@@ -296,6 +297,51 @@ describe('adding a parent contact after the student was merged', () => {
 
     expect(result.status).toBe('updated');
     expect(h.store.phonesFor(parent.id)).toHaveLength(1);
+  });
+});
+
+describe('pushing a linked visitor whose person was merged', () => {
+  let h: Harness;
+  beforeEach(() => { h = harness(); });
+
+  it('follows the merge, repoints the document, and syncs against the keeper', async () => {
+    const { dupId, keptId } = seedDuplicatePair(h);
+    h.db.seed('students/tally-v1', {
+      status: 'active', pcoPersonId: dupId, pcoPushPending: false,
+      firstName: 'Rowan', lastName: 'Vasquez', grade: 9,
+    });
+    h.store.buryPerson(dupId, keptId);
+
+    const result = await pushStudent({
+      db: h.db, client: h.client, config: config(), studentId: 'tally-v1',
+    });
+
+    // grade 9 differs from the keeper's 8, so the push has something to write
+    expect(result.status).toBe('updated');
+    expect(result.pcoPersonId).toBe(keptId);
+    expect(h.store.personById(keptId)?.grade).toBe(9);
+    const doc = (await h.db.doc('students/tally-v1').get()).data();
+    expect(doc?.pcoPersonId).toBe(keptId);
+  });
+
+  it('reports a dead-ended link as a skip a leader can act on', async () => {
+    const { dupId, keptId } = seedDuplicatePair(h);
+    h.db.seed('students/tally-v2', {
+      status: 'active', pcoPersonId: dupId, pcoPushPending: false,
+      firstName: 'Rowan', lastName: 'Vasquez', grade: 9,
+    });
+    h.store.buryPerson(dupId, keptId);
+    h.store.buryPerson(keptId, null);
+
+    const result = await pushStudent({
+      db: h.db, client: h.client, config: config(), studentId: 'tally-v2',
+    });
+
+    expect(result.status).toBe('skipped');
+    expect(result.message).toMatch(/deleted or merged away/);
+    // the link stays for a human to decide about; nothing was invented
+    const doc = (await h.db.doc('students/tally-v2').get()).data();
+    expect(doc?.pcoPersonId).toBe(dupId);
   });
 });
 

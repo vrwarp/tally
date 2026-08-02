@@ -16,6 +16,7 @@
 import { Timestamp } from 'firebase-admin/firestore';
 import type { PcoConfig } from '../config.js';
 import { PcoApiError, type PcoClient } from '../pco/client.js';
+import { followPersonLink, isPersonGoneError } from './personLink.js';
 import {
   compareIds,
   mapPersonToStudent,
@@ -247,19 +248,51 @@ export async function pushStudent(options: PushStudentOptions): Promise<PushStud
       return { status: 'skipped', pcoPersonId, message: 'Already linked to Planning Center.' };
     }
 
-    const person = await client.get<PcoPerson>(`/people/${encodeURIComponent(pcoPersonId)}`);
+    /*
+     * The linked person may have been merged away since the push linked them —
+     * an admin tidying duplicates is exactly who generates pushed visitors
+     * with stale links. The mirror's 410 names the survivor; follow it, keep
+     * the document pointed at somebody real, and sync against them. A trail
+     * that ends dead is reported as a skip a leader can act on, not a push
+     * that fails identically for ever.
+     */
+    let linkedId = pcoPersonId;
+    let person;
+    try {
+      person = await client.get<PcoPerson>(`/people/${encodeURIComponent(linkedId)}`);
+    } catch (error) {
+      if (!isPersonGoneError(error)) throw error;
+      const link = await followPersonLink(client, linkedId, error);
+      if (link.outcome === 'gone') {
+        return {
+          status: 'skipped',
+          pcoPersonId,
+          message:
+            'Planning Center no longer has this person — deleted or merged away there. ' +
+            'Take the student off the roster, or clear the link to push them as new.',
+        };
+      }
+      linkedId = link.personId;
+      person = { data: link.person };
+      await ref.update({ pcoPersonId: linkedId, updatedAt: nowTs });
+      logger.info('Followed a Planning Center merge while pushing', {
+        studentId,
+        pcoPersonId: linkedId,
+        mergedFrom: pcoPersonId,
+      });
+    }
     const attributes = driftedAttributes(data, person.data, config);
     if (Object.keys(attributes).length === 0) {
-      return { status: 'skipped', pcoPersonId, message: 'Planning Center is already up to date.' };
+      return { status: 'skipped', pcoPersonId: linkedId, message: 'Planning Center is already up to date.' };
     }
 
-    await client.patch(`/people/${encodeURIComponent(pcoPersonId)}`, {
-      data: { type: 'Person', id: pcoPersonId, attributes },
+    await client.patch(`/people/${encodeURIComponent(linkedId)}`, {
+      data: { type: 'Person', id: linkedId, attributes },
     });
     await ref.update({ pcoSyncedAt: nowTs, pcoPushPending: false, updatedAt: nowTs });
     return {
       status: 'updated',
-      pcoPersonId,
+      pcoPersonId: linkedId,
       message: `Updated ${Object.keys(attributes).join(', ')} in Planning Center.`,
     };
   }
