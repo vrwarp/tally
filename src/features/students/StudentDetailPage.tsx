@@ -48,7 +48,7 @@ import { chainKey } from '@/lib/materialize';
 import { pcoPersonUrl } from '@/lib/planningCenter';
 import { sessionOutcome, type SessionOutcome } from '@/lib/sessionHistory';
 import { formatRelative, formatShortDate } from '@/lib/time';
-import { cn, formatPhone, initials, ordinalGrade } from '@/lib/utils';
+import { cn, formatPhone, gradeLabel, initials } from '@/lib/utils';
 import {
   addRosterMember,
   pushStudentToPlanningCenter,
@@ -284,6 +284,7 @@ export function StudentDetailPage() {
   }
 
   const name = studentFullName(student);
+  const grade = gradeLabel(student);
   const phone = details?.parentPhone?.trim() ?? '';
   const email = details?.parentEmail?.trim() ?? '';
   const parentLabel = details?.parentName?.trim() || `${name}'s parent`;
@@ -424,8 +425,17 @@ export function StudentDetailPage() {
         </span>
         <div className="min-w-0 flex-1">
           <h1 className="text-xl font-bold text-ink-50">{name}</h1>
+          {/*
+            The one screen with room to say *why* there is no grade.
+
+            A row in a list can only afford "No grade", which reads as an
+            omission somebody ought to fix in Tally. Here the sentence can name
+            where the answer would have to come from, because for a person whose
+            grade is not on file this is always a Planning Center record — a
+            grade typed into Tally is a grade Tally has.
+          */}
           <p className="mt-0.5 text-sm text-ink-500">
-            {ordinalGrade(student.grade)} grade
+            {grade ? `${grade} grade` : 'No grade in Planning Center'}
           </p>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {student.isVisitor ? <Badge tone="brand">Visitor</Badge> : null}

@@ -298,7 +298,12 @@ export function buildRoster(input: BuildRosterInput): RosterView {
     // Scope filters narrow *who is on this counselor's roster*; they apply
     // before search so the counts below describe the slice being taken, not
     // the whole ministry.
-    if (grades.length > 0 && !grades.includes(student.grade)) continue;
+    // A person Planning Center holds no grade for is in no grade, not in the
+    // one the sync's clamp landed on — narrowing to 6th must not hand a
+    // counselor the adults on the roster.
+    if (grades.length > 0 && (student.gradeOnFile === false || !grades.includes(student.grade))) {
+      continue;
+    }
     if (filters.incompleteOnly && student.profileComplete !== false) continue;
 
     const recentHits = countRecentHits(student.id, history);

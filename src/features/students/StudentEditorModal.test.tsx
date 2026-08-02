@@ -342,6 +342,73 @@ describe('when write-back is full', () => {
   });
 });
 
+/**
+ * A student Planning Center holds no grade for — the adults a hand-picked
+ * roster carries on purpose.
+ *
+ * The number on their row is where the sync's clamp landed, and this form used
+ * to open on it. That put a 6th grade in front of a leader who had come to fix
+ * something else, and under `full` Save agreed with it and wrote the 6 onto a
+ * grown adult's record in Planning Center.
+ */
+describe('a student with no grade on file', () => {
+  const gradeless = () => linked({ grade: 6, gradeOnFile: false });
+
+  it('opens on nothing selected rather than on the bottom of the range', () => {
+    personDetails.current = details();
+    open(gradeless());
+
+    expect(screen.getByLabelText(/Grade/)).toHaveValue('');
+    expect(screen.getByRole('option', { name: 'No grade' })).toBeInTheDocument();
+  });
+
+  it('carries no grade upstream when nobody picked one', async () => {
+    personDetails.current = details();
+    open(gradeless());
+
+    const first = screen.getByLabelText(/First name/);
+    await userEvent.clear(first);
+    await userEvent.type(first, 'Alan');
+    await save();
+
+    await waitFor(() => expect(updateStudentProfile).toHaveBeenCalled());
+    expect(updateStudentProfile.mock.calls[0]?.[0]).not.toHaveProperty('grade');
+  });
+
+  it('writes no grade onto the annotation document either', async () => {
+    // `updateStudent` backfills identity onto `students/pco_…`, and a document
+    // outlives the roster row: take this person off the roster and a grade
+    // stamped here is all that would be left of them.
+    personDetails.current = details({ profileWritable: false, contactWritable: false });
+    open(gradeless());
+
+    await userEvent.type(screen.getByLabelText(/Notes/), 'Drives the van');
+    await save();
+
+    await waitFor(() => expect(updateStudent).toHaveBeenCalled());
+    expect(updateStudent.mock.calls[0]?.[3]).toMatchObject({ gradeOnFile: false });
+  });
+
+  it('takes a grade from a leader who knows it', async () => {
+    personDetails.current = details();
+    open(gradeless());
+
+    await userEvent.selectOptions(screen.getByLabelText(/Grade/), '8');
+    await save();
+
+    await waitFor(() => expect(updateStudentProfile).toHaveBeenCalled());
+    expect(updateStudentProfile.mock.calls[0]?.[0]).toMatchObject({ grade: 8 });
+  });
+
+  it('offers no blank option to a student whose grade is genuinely on file', () => {
+    personDetails.current = details();
+    open(linked({ grade: 11, gradeOnFile: true }));
+
+    expect(screen.getByLabelText(/Grade/)).toHaveValue('11');
+    expect(screen.queryByRole('option', { name: 'No grade' })).not.toBeInTheDocument();
+  });
+});
+
 describe('parent contact', () => {
   it('offers the form in place of a link when Tally may write one', () => {
     personDetails.current = details();

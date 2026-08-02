@@ -426,6 +426,50 @@ describe('pushStudent against the simulator', () => {
     });
   });
 
+  /**
+   * A membership document holding no grade at all.
+   *
+   * That is what Tally writes for somebody Planning Center holds no grade for —
+   * the adults a hand-picked roster carries. The number on their roster row is
+   * where the sync's clamp landed, so nothing writes it down, and this side has
+   * to read the absence as an absence. It used to read `data.grade ?? 0`.
+   */
+  describe('a student document with no grade', () => {
+    it('patches nothing about the grade of a linked person', async () => {
+      h.db.seed(
+        'students/s1',
+        tallyOnlyStudent({
+          firstName: 'Amara',
+          lastName: 'Okonkwo',
+          grade: undefined,
+          pcoPersonId: FIXTURE_IDS.amara,
+          pcoPushPending: false,
+        }),
+      );
+      const held = h.store.personById(FIXTURE_IDS.amara)?.grade;
+
+      const result = await push('s1', 'full');
+
+      expect(result.status).toBe('skipped');
+      expect(h.store.personById(FIXTURE_IDS.amara)?.grade).toBe(held);
+    });
+
+    it('refuses to create a person rather than filing one as grade zero', async () => {
+      // A create claims a grade twice over: the duplicate check matches on it,
+      // and the person is filed as a child of it in the church's permanent
+      // database. Neither can be done from a number nobody supplied.
+      h.db.seed('students/s1', tallyOnlyStudent({ grade: undefined }));
+      const before = h.store.people.length;
+
+      const result = await push('s1', 'create');
+
+      expect(result).toMatchObject({ status: 'skipped', pcoPersonId: null });
+      expect(result.message).toMatch(/missing a grade/);
+      expect(h.store.people).toHaveLength(before);
+      expect(h.store.requestLog.some((entry) => entry.method === 'POST')).toBe(false);
+    });
+  });
+
   describe('pushPendingStudents', () => {
     it('catches up everything the immediate push missed', async () => {
       h.db.seed('students/s1', tallyOnlyStudent({ firstName: 'Nia', searchName: 'nia fontaine' }));

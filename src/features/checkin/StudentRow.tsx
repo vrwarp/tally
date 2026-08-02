@@ -8,7 +8,7 @@
 import { memo } from 'react';
 import { WarningBadge } from '@/components/ui';
 import { formatClock } from '@/lib/time';
-import { cn, initials, ordinalGrade, sameItems } from '@/lib/utils';
+import { cn, gradeLabel, initials, NO_GRADE, sameItems } from '@/lib/utils';
 import { studentFullName, type RosterEntry } from '@/types';
 
 export interface StudentRowProps {
@@ -64,12 +64,16 @@ export const StudentRow = memo(function StudentRow({
 }: StudentRowProps) {
   const { student, attendance, warnings, isRecent, recentHits, recentWindow } = entry;
   const name = studentFullName(student);
-  const grade = ordinalGrade(student.grade);
+  const grade = gradeLabel(student);
   const showHint = showRecentHint && isRecent && recentWindow > 0;
 
+  // Null for somebody Planning Center holds no grade for — an adult on a
+  // hand-picked roster. The clause goes rather than announcing a grade Tally
+  // invented, which on this screen is read aloud beside a name.
+  const gradeClause = grade ? `, ${grade} grade` : '';
   const action = attendance
-    ? `Undo check-in for ${name}, ${grade} grade, checked in at ${formatClock(attendance.checkedInAt)}`
-    : `Check in ${name}, ${grade} grade`;
+    ? `Undo check-in for ${name}${gradeClause}, checked in at ${formatClock(attendance.checkedInAt)}`
+    : `Check in ${name}${gradeClause}`;
   // The row is one button with one label, so nothing inside it is announced on
   // its own — the note has to be part of the label or it is not read out at all.
   // Last, after the action: the verb is what a screen reader user is scanning
@@ -121,7 +125,7 @@ export const StudentRow = memo(function StudentRow({
               <span className="font-semibold">{student.firstName}</span>{' '}
               <span className="font-normal text-ink-300">{student.lastName}</span>
             </span>
-            <span className="shrink-0 text-xs font-medium text-ink-500">{grade}</span>
+            <span className="shrink-0 text-xs font-medium text-ink-500">{grade ?? NO_GRADE}</span>
           </span>
 
           {warnings.length > 0 || showHint ? (

@@ -175,6 +175,62 @@ describe('StudentsPage roster rows', () => {
   });
 });
 
+describe('StudentsPage grade', () => {
+  /**
+   * An adult on a hand-picked roster.
+   *
+   * Planning Center holds neither a grade nor a graduation year for them, so
+   * the sync's clamp parks them on `minGrade` and flags it. Every screen used
+   * to read that clamp as a fact and print "6th grade" beside a grown man's
+   * name and initials.
+   */
+  const volunteer = () =>
+    makeStudent({
+      id: 'pco_41',
+      firstName: 'Alan',
+      lastName: 'Wan',
+      grade: 6,
+      gradeOnFile: false,
+    });
+
+  it('will not call somebody a 6th grader on a clamp', () => {
+    renderRoster([volunteer()]);
+
+    expect(within(row(/Alan/)).queryByText(/6th/)).not.toBeInTheDocument();
+    expect(within(row(/Alan/)).getByText('No grade')).toBeInTheDocument();
+  });
+
+  it('says so in the accessible name of the row too', () => {
+    renderRoster([volunteer()]);
+
+    expect(screen.getByRole('link', { name: 'Alan Wan, no grade on file' })).toBeInTheDocument();
+  });
+
+  it('still prints a grade Planning Center genuinely holds', () => {
+    renderRoster([
+      makeStudent({ id: 'pco_9', firstName: 'Alena', lastName: 'Ruiz', grade: 6, gradeOnFile: true }),
+    ]);
+
+    expect(within(row(/Alena/)).getByText('6th grade')).toBeInTheDocument();
+  });
+
+  it('keeps them out of a grade the filter asked for', async () => {
+    const user = userEvent.setup();
+    renderRoster([
+      volunteer(),
+      makeStudent({ id: 'pco_9', firstName: 'Alena', lastName: 'Ruiz', grade: 6, gradeOnFile: true }),
+    ]);
+
+    // Found through its "All grades" option: the student editor sits mounted
+    // and closed on this page, and its own grade select answers to the label.
+    const filter = screen.getByRole('option', { name: 'All grades' }).closest('select')!;
+    await user.selectOptions(filter, '6');
+
+    expect(screen.getByRole('link', { name: /Alena/ })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Alan Wan/ })).not.toBeInTheDocument();
+  });
+});
+
 describe('StudentsPage last-seen column', () => {
   it('says when a student was last around, compactly enough to be a column', () => {
     renderRoster([

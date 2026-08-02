@@ -95,8 +95,16 @@ export function mergeRoster(
          * The one field where the document can out-rank Planning Center: a
          * grade the clamp invented for a person upstream holds nothing for
          * loses to the grade a human typed at quick-add. See `gradeOnFile`.
+         *
+         * The flag follows whichever of the two the row took, because it
+         * describes the number on the row rather than where the row came from.
+         * Leaving the roster's `false` sitting over a grade somebody typed
+         * themselves would print "No grade" on every screen; stamping a bare
+         * `true` when neither side holds one would print the invented 6.
          */
-        grade: target.gradeOnFile === false ? document.grade : target.grade,
+        ...(target.gradeOnFile === false
+          ? { grade: document.grade, gradeOnFile: document.gradeOnFile !== false }
+          : { grade: target.grade, gradeOnFile: true }),
         // Everything Planning Center has no opinion about, exactly as in the
         // annotation merge below.
         notes: document.notes,

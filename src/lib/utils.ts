@@ -239,6 +239,29 @@ export function ordinalGrade(grade: number): string {
   return `${grade}${suffix}`;
 }
 
+/** What a grade slot says when there is no grade to put in it. */
+export const NO_GRADE = 'No grade';
+
+/**
+ * The ordinal to print for somebody's grade, or null when nobody has one.
+ *
+ * `gradeOnFile: false` means the number in `grade` is not a grade: it is where
+ * the sync's clamp landed for a person Planning Center holds neither a grade
+ * nor a graduation year for. That is every adult on a hand-picked roster — the
+ * leaders and volunteers a list-mode roster deliberately carries — and printing
+ * the clamp turned each of them into a 6th grader on every screen that names a
+ * grade — printed beside their name, where it reads as a fact about them.
+ *
+ * Callers with a slot to fill fall back to `NO_GRADE`; callers where the grade
+ * is one clause of a longer line drop the clause instead, because "No grade ·"
+ * spends the width that line needs on the thing it is least about.
+ */
+export function gradeLabel(student: { grade: number; gradeOnFile?: boolean }): string | null {
+  // `undefined` is a Tally document, where the grade was typed by a human and
+  // is always real. Only an explicit `false` is the clamp's landing spot.
+  return student.gradeOnFile === false ? null : ordinalGrade(student.grade);
+}
+
 /** Stable "AB" avatar initials. */
 export function initials(firstName: string, lastName: string): string {
   return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
