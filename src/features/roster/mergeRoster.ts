@@ -97,6 +97,14 @@ export function mergeRoster(
          * loses to the grade a human typed at quick-add. See `gradeOnFile`.
          */
         grade: target.gradeOnFile === false ? document.grade : target.grade,
+        /*
+         * True either way, and that is the point: the grade this row ends up
+         * printing is a real one — Planning Center's when it has one, and
+         * otherwise the one a human chose at quick-add. Leaving the roster's
+         * `false` on the row would have every screen render "No grade" over a
+         * grade somebody typed themselves.
+         */
+        gradeOnFile: true,
         // Everything Planning Center has no opinion about, exactly as in the
         // annotation merge below.
         notes: document.notes,

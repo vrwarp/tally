@@ -18,7 +18,7 @@ import { Link } from 'react-router-dom';
 import { Badge, Card, CardHeader, EmptyState, Spinner } from '@/components/ui';
 import { AddParentContactButton } from '@/features/dashboard/AddParentContactButton';
 import { formatShortDate } from '@/lib/time';
-import { initials, ordinalGrade } from '@/lib/utils';
+import { gradeLabel, initials } from '@/lib/utils';
 import { studentFullName, type Student } from '@/types';
 
 /** Past this many days an unfinished profile stops being a fresh to-do. */
@@ -128,6 +128,7 @@ function IncompleteRow({
   onContactAdded?: () => void;
 }) {
   const days = waitingDays(student, now);
+  const grade = gradeLabel(student);
   const tone =
     days === null ? 'warn' : days >= VERY_STALE_DAYS ? 'danger' : days >= STALE_DAYS ? 'warn' : 'neutral';
   const badge =
@@ -168,7 +169,10 @@ function IncompleteRow({
           </span>
           <span className="flex items-baseline gap-2">
             <span className="truncate text-xs text-ink-500">
-              {ordinalGrade(student.grade)} grade ·{' '}
+              {/* Silent rather than "No grade" for a person Planning Center
+                  holds no grade for — this line is about the wait, and a grade
+                  Tally invented is not a fact worth the width. */}
+              {grade ? `${grade} grade · ` : ''}
               {days === null
                 ? 'no parent contact in Planning Center'
                 : `added ${formatShortDate(student.createdAt)}`}

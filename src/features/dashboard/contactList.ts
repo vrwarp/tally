@@ -1,4 +1,4 @@
-import { ordinalGrade } from '@/lib/utils';
+import { gradeLabel } from '@/lib/utils';
 import { studentFullName, type Student } from '@/types';
 import type { PcoPersonDetails } from '@/types';
 
@@ -23,7 +23,11 @@ export function buildContactList(
     const details = contacts.get(student.id);
     const contact =
       details?.parentPhone?.trim() || details?.parentEmail?.trim() || 'contact in Planning Center';
-    return `- ${studentFullName(student)} (${ordinalGrade(student.grade)}) ${contact}`;
+    // The bracket goes rather than filling with a grade nobody holds: this
+    // paste lands in a group chat, where "(6th)" beside an adult's name is a
+    // claim about them that whoever reads it has no way to check.
+    const grade = gradeLabel(student);
+    return `- ${studentFullName(student)}${grade ? ` (${grade})` : ''} ${contact}`;
   });
   return [title, ...lines].join('\n');
 }

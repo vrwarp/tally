@@ -14,7 +14,7 @@ import { Card, CardHeader, EmptyState, EventIcon } from '@/components/ui';
 import { CopyContactsButton, FollowUpActions } from '@/features/dashboard/FollowUpActions';
 import type { OneOffOnlyStudent, OneOffRecap } from '@/features/dashboard/insights';
 import { formatRelative, formatShortDate } from '@/lib/time';
-import { initials, ordinalGrade } from '@/lib/utils';
+import { gradeLabel, initials } from '@/lib/utils';
 import { studentFullName } from '@/types';
 
 export interface OneOffRecapListProps {
@@ -109,52 +109,59 @@ export function OneOffOnlyList({ items, className }: OneOffOnlyListProps & { cla
       />
 
       <ul className="divide-y divide-ink-800">
-        {items.map((item) => (
-          <li key={item.student.id} className="px-3 py-2">
-            <div className="flex items-center gap-3">
-              <span
-                aria-hidden="true"
-                className="flex size-11 shrink-0 items-center justify-center rounded-full bg-ink-800 text-sm font-bold text-ink-300"
-              >
-                {initials(item.student.firstName, item.student.lastName)}
-              </span>
+        {items.map((item) => {
+          const grade = gradeLabel(item.student);
 
-              <Link
-                to={`/students/${item.student.id}`}
-                className="flex min-h-11 min-w-0 flex-1 flex-col justify-center hover:text-brand-300"
-              >
-                <span className="truncate text-base font-semibold text-ink-50">
-                  {studentFullName(item.student)}
-                </span>
-                <span className="truncate text-xs text-ink-500">
-                  {ordinalGrade(item.student.grade)} grade · met at {item.events[0]?.title} ·{' '}
-                  {formatShortDate(item.metAt)}, {formatRelative(item.metAt)}
-                </span>
-              </Link>
-
-              <span className="shrink-0 rounded-xl bg-warn-500/10 px-2.5 py-1 text-center ring-1 ring-warn-500/25">
-                <span className="sr-only">
-                  {item.missedSince} regular {item.missedSince === 1 ? 'gathering' : 'gatherings'}{' '}
-                  since, none of them with this student in it.
-                </span>
+          return (
+            <li key={item.student.id} className="px-3 py-2">
+              <div className="flex items-center gap-3">
                 <span
                   aria-hidden="true"
-                  className="block text-lg font-bold leading-tight tabular-nums text-warn-400"
+                  className="flex size-11 shrink-0 items-center justify-center rounded-full bg-ink-800 text-sm font-bold text-ink-300"
                 >
-                  {item.missedSince}
+                  {initials(item.student.firstName, item.student.lastName)}
                 </span>
-                <span
-                  aria-hidden="true"
-                  className="block text-[10px] uppercase tracking-wide text-ink-400"
-                >
-                  since
-                </span>
-              </span>
-            </div>
 
-            <FollowUpActions student={item.student} className="mt-1 pb-1 pl-14" />
-          </li>
-        ))}
+                <Link
+                  to={`/students/${item.student.id}`}
+                  className="flex min-h-11 min-w-0 flex-1 flex-col justify-center hover:text-brand-300"
+                >
+                  <span className="truncate text-base font-semibold text-ink-50">
+                    {studentFullName(item.student)}
+                  </span>
+                  <span className="truncate text-xs text-ink-500">
+                    {/* Dropped, not replaced, when Planning Center holds no grade
+                        for them: where and when they were met is the line. */}
+                    {grade ? `${grade} grade · ` : ''}
+                    met at {item.events[0]?.title} · {formatShortDate(item.metAt)},{' '}
+                    {formatRelative(item.metAt)}
+                  </span>
+                </Link>
+
+                <span className="shrink-0 rounded-xl bg-warn-500/10 px-2.5 py-1 text-center ring-1 ring-warn-500/25">
+                  <span className="sr-only">
+                    {item.missedSince} regular {item.missedSince === 1 ? 'gathering' : 'gatherings'}{' '}
+                    since, none of them with this student in it.
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    className="block text-lg font-bold leading-tight tabular-nums text-warn-400"
+                  >
+                    {item.missedSince}
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    className="block text-[10px] uppercase tracking-wide text-ink-400"
+                  >
+                    since
+                  </span>
+                </span>
+              </div>
+
+              <FollowUpActions student={item.student} className="mt-1 pb-1 pl-14" />
+            </li>
+          );
+        })}
       </ul>
     </Card>
   );

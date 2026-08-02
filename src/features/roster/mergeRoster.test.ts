@@ -121,6 +121,16 @@ describe('mergeRoster', () => {
     expect(mergeRoster(roster, [linked])[0]?.grade).toBe(9);
   });
 
+  it('marks the grafted grade as real, so the row prints it', () => {
+    // The row takes the 9 a human typed. Carrying the roster's `false` along
+    // with it would have every screen render "No grade" over that 9 — the flag
+    // describes the grade on the row, not where the row came from.
+    const roster = [rosterEntry('900', { grade: 6, gradeOnFile: false })];
+    const linked = tallyDocument('tally-abc', { pcoPersonId: '900', grade: 9 });
+
+    expect(mergeRoster(roster, [linked])[0]?.gradeOnFile).toBe(true);
+  });
+
   it('lets Planning Center keep a grade it genuinely holds for a linked visitor', () => {
     const roster = [rosterEntry('900', { grade: 8, gradeOnFile: true })];
     const linked = tallyDocument('tally-abc', { pcoPersonId: '900', grade: 9 });

@@ -199,7 +199,12 @@ export interface Student
    * Whether Planning Center holds a grade of its own for this person, or the
    * `grade` above is only the clamp's landing spot. Present on roster-sourced
    * rows; absent on documents, where the grade was typed by a human and is
-   * always real. `mergeRoster` is the one reader — see the note there.
+   * always real.
+   *
+   * Read in two places. `mergeRoster` uses it to let a grade a human typed at
+   * quick-add out-rank the clamp — see the note there — and `gradeLabel` uses
+   * it to keep every screen from printing the clamp as a fact, which is what
+   * turned the adults on a hand-picked roster into 6th graders.
    */
   gradeOnFile?: boolean;
 }

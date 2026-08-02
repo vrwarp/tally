@@ -45,7 +45,7 @@ import {
   type BirthdayState,
 } from '@/lib/birthday';
 import { formatSeenShort } from '@/lib/time';
-import { cn, createSearchMatcher, initials, ordinalGrade } from '@/lib/utils';
+import { cn, createSearchMatcher, gradeLabel, initials, NO_GRADE, ordinalGrade } from '@/lib/utils';
 import { GRADES, type Grade, type Student } from '@/types';
 
 type StatusFilter = 'active' | 'inactive' | 'all';
@@ -100,7 +100,13 @@ export function StudentsPage() {
     const matcher = createSearchMatcher(query);
     return students.filter((student) => {
       if (status !== 'all' && student.status !== status) return false;
-      if (grade !== null && student.grade !== grade) return false;
+      // Somebody Planning Center holds no grade for is in no grade, rather than
+      // in whichever one the sync's clamp landed on. Asking for 6th graders and
+      // getting the ministry's adult volunteers back is the same bug as
+      // printing "6th grade" under their name.
+      if (grade !== null && (student.gradeOnFile === false || student.grade !== grade)) {
+        return false;
+      }
       if (quick === 'incomplete' && !isUnreachable(student, reachable)) return false;
       if (quick === 'visitors' && !student.isVisitor) return false;
       if (!matcher.matches(student.searchName)) return false;
@@ -379,6 +385,7 @@ const StudentListRow = memo(function StudentListRow({
 }) {
   const name = `${student.firstName} ${student.lastName}`;
   const birthday = birthdayState(student.birthday, now);
+  const grade = gradeLabel(student);
 
   return (
     /*
@@ -408,7 +415,7 @@ const StudentListRow = memo(function StudentListRow({
     <li className="relative flex min-h-16 items-center gap-3 px-3 py-2 hover:bg-ink-800/40 lg:min-h-11 lg:py-1">
       <Link
         to={`/students/${student.id}`}
-        aria-label={`${name}, ${ordinalGrade(student.grade)} grade`}
+        aria-label={grade ? `${name}, ${grade} grade` : `${name}, no grade on file`}
         className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-400"
       />
 
@@ -477,7 +484,7 @@ const StudentListRow = memo(function StudentListRow({
             only below `lg`; the wide layout has a lane for this.
           */}
           <span className="shrink-0 lg:w-20 lg:text-right">
-            {ordinalGrade(student.grade)} grade
+            {grade ? `${grade} grade` : NO_GRADE}
           </span>
           <span className="hidden lg:block lg:flex-1" />
 

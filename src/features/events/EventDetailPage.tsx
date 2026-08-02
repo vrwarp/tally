@@ -32,7 +32,7 @@ import { useNow } from '@/hooks/useNow';
 import { gatheringOptions } from '@/lib/gatherings';
 import { describeRecurrence } from '@/lib/recurrence';
 import { formatClock, formatEventDay, formatEventWindow, isCheckInOpen } from '@/lib/time';
-import { cn, ordinalGrade } from '@/lib/utils';
+import { cn, gradeLabel, NO_GRADE } from '@/lib/utils';
 import { ensureMaterialized, setEventStatus } from '@/services/events';
 import { studentFullName } from '@/types';
 
@@ -295,7 +295,7 @@ export function EventDetailPage() {
                   </span>
                   {student ? (
                     <span className="shrink-0 text-xs text-ink-500">
-                      {ordinalGrade(student.grade)}
+                      {gradeLabel(student) ?? NO_GRADE}
                     </span>
                   ) : null}
                   <span className="shrink-0 text-xs tabular-nums text-ink-500">
