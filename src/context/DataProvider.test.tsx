@@ -13,8 +13,9 @@
  */
 import { act, render, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DataProvider } from '@/context/DataProvider';
+import { DataProvider, EVENT_WINDOW_DAYS } from '@/context/DataProvider';
 import { useData, type DataContextValue } from '@/context/dataContext';
+import { PARTICIPATION_MAX_AGE_DAYS } from '@/features/roster/predictiveRoster';
 import { makeStudent } from '../../tests/factories';
 
 const fetchRoster = vi.hoisted(() => vi.fn());
@@ -255,5 +256,25 @@ describe('DataProvider, on coming back to the tab', () => {
     await act(async () => {
       land(reply());
     });
+  });
+});
+
+/**
+ * The loader must not be tighter than the rule it feeds.
+ *
+ * `PARTICIPATION_MAX_AGE_DAYS` decides how far back attendance counts as
+ * belonging to a gathering, but it can only ever see the events the provider
+ * holds. When the window was four months the rule was quietly truncated to four
+ * months as well — and worse for anything not meeting weekly, because "has been
+ * here before" reads a fixed *number* of past instances out of this list, so a
+ * fortnightly chain lost half of its twelve and a monthly one lost most of them.
+ *
+ * Nothing about that failure is visible: the roster just returns fewer names,
+ * confidently. This pins the ordering so a future trim of the window has to be a
+ * decision about the rule too.
+ */
+describe('the calendar window', () => {
+  it('reaches at least as far back as participation counts', () => {
+    expect(EVENT_WINDOW_DAYS).toBeGreaterThanOrEqual(PARTICIPATION_MAX_AGE_DAYS);
   });
 });

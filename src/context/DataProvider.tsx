@@ -15,8 +15,27 @@ import {
 } from '@/types';
 import { DataContext, type DataContextValue } from '@/context/dataContext';
 
-/** How much event history to keep in memory for prediction and the dashboard. */
-const EVENT_WINDOW_DAYS = 120;
+/**
+ * How much event history to keep in memory for prediction and the dashboard.
+ *
+ * A year, because that is what the roster's own rule already says: nothing older
+ * than `PARTICIPATION_MAX_AGE_DAYS` counts as participation, and holding less
+ * than that made the loader — rather than the rule — the thing deciding who
+ * belongs to a gathering. The gap showed on any chain that does not meet weekly.
+ * "Has been here before" reads the last `PARTICIPATION_WINDOW` instances of the
+ * chain out of this list, and twelve fortnightly gatherings are 168 days while
+ * twelve monthly ones are the whole year; both were silently cut down to
+ * whatever happened to fall inside four months.
+ *
+ * The cost is counted in gatherings, not in students: four chains a week is a
+ * couple of hundred small documents, and the per-minute re-projection over them
+ * is already collapsed by `calendarSignature` on every tick that moves nothing.
+ *
+ * Anything older is still reachable — the Events tab pages the whole past with a
+ * cursor, and `useEvent` resolves a single night by id — so this bounds what is
+ * held live, not what can be opened.
+ */
+export const EVENT_WINDOW_DAYS = 365;
 
 /**
  * How often the roster is re-read while the app is open.

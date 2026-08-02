@@ -94,8 +94,10 @@ const CANCELLED_ALLOWANCE = 2;
  *
  * Twelve is a term of weekly gatherings, and it is bounded on both sides: it
  * costs twelve small parallel reads from a cache the dashboard already shares,
- * and the events themselves are already in memory (`DataProvider` holds 120
- * days), so nothing here reaches for a page of calendar that is not loaded.
+ * and the events themselves are already in memory (`DataProvider` holds a
+ * year), so nothing here reaches for a page of calendar that is not loaded.
+ * That last clause is only true because the provider's window covers the same
+ * year: at four months it did not, and a fortnightly chain lost half its twelve.
  *
  * This is the read budget, not the rule. How far back participation *counts* is
  * `PARTICIPATION_MAX_AGE_DAYS`, enforced in `buildChainHistory` where it can be
