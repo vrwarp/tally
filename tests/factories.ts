@@ -141,12 +141,20 @@ export function makeSettings(overrides: Partial<AppSettings> = {}): AppSettings 
   return { ...DEFAULT_SETTINGS, ...overrides };
 }
 
-/** Builds a past-instance snapshot from an event and the ids that attended it. */
+/**
+ * Builds a past-instance snapshot from an event and the ids that attended it.
+ *
+ * `held` follows the ids, which is what reading a whole register gives you. A
+ * test about the profile's projections — one student's own records, where an
+ * empty set means "they were absent" rather than "nobody came" — passes it
+ * explicitly.
+ */
 export function makeSnapshot(
   event: TallyEvent,
   presentStudentIds: readonly string[],
+  held: boolean = presentStudentIds.length > 0,
 ): EventAttendanceSnapshot {
-  return { event, presentStudentIds: new Set(presentStudentIds) };
+  return { event, presentStudentIds: new Set(presentStudentIds), held };
 }
 
 /**

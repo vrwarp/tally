@@ -33,7 +33,10 @@ export type SessionOutcome = 'held' | 'cancelled' | 'presumed-cancelled';
 
 export function sessionOutcome(snapshot: EventAttendanceSnapshot): SessionOutcome {
   if (snapshot.event.status === 'cancelled') return 'cancelled';
-  return snapshot.presentStudentIds.size > 0 ? 'held' : 'presumed-cancelled';
+  // `held`, never `presentStudentIds.size` — see the note on the type. Where the
+  // set is one student's own records, an empty one means "they were not there",
+  // which is the opposite of what this function is being asked.
+  return snapshot.held ? 'held' : 'presumed-cancelled';
 }
 
 /** True only for a gathering there is evidence for. The gate every window uses. */

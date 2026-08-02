@@ -288,6 +288,7 @@ describe('buildRoster properties', () => {
         history: input.history.map((snapshot) => ({
           ...snapshot,
           presentStudentIds: new Set<string>(),
+          held: false,
         })),
         filters: { ...input.filters, query: '' },
       };

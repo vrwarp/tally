@@ -1014,8 +1014,26 @@ export interface NewVisitor {
   viaOneOff: boolean;
 }
 
-/** One past instance of a series, with the set of students who attended it. */
+/**
+ * One past instance of a series, with what is known about who attended it.
+ *
+ * `presentStudentIds` is usually the whole register, but it is not promised to
+ * be. A screen that only cares about one student — the profile, which answers
+ * "was *this* student here?" for a year of nights — is allowed to build these
+ * from that student's own attendance records, in which case the set holds at
+ * most them and says nothing about anybody else.
+ *
+ * `held` exists because of that. "Did this gathering happen?" cannot be answered
+ * by asking whether the set is empty once the set might be a projection: a night
+ * the student missed and a night nobody came to both look like `{}`, and the
+ * difference between them is a phone call to a family that has missed nothing.
+ * Build it from the register when reading the whole register, and from the
+ * skipped-nights registry when reading one student's own. `wasHeld` reads this
+ * and never the set.
+ */
 export interface EventAttendanceSnapshot {
   event: TallyEvent;
   presentStudentIds: ReadonlySet<string>;
+  /** Whether anybody at all was checked in. Never inferred from the set above. */
+  held: boolean;
 }

@@ -292,6 +292,41 @@ Reference data. Series carry `title`, `dayOfWeek`, `startTime` / `endTime` as lo
 
 **Who writes:** core and up. Readable by anyone active.
 
+### `skippedNights/{chainKey}`
+
+Derived data, and the only collection here that is not a record of something. It answers, for one
+repeat chain, "which of its nights did nobody come to" — the question decision 3 above turns into a
+rule, and the one a student's profile has to ask of every night in a year.
+
+Asking it per night meant reading every night's attendance subcollection: a year across four
+gatherings is a couple of hundred reads, on every profile, on every device, to re-derive a handful of
+dates that never change. Here it is one document per gathering.
+
+| Field | Meaning |
+| --- | --- |
+| `chainKey` | The chain this answers for. Matches the document id — the rules enforce it, because a document disagreeing with its path would answer for a gathering it is not about. |
+| `skipped` | Event ids examined and found with nobody checked in. |
+| `examinedFrom` | Every finished night of this chain starting at or after this instant has been examined. Before it, the document claims nothing. |
+
+`examinedFrom` is what makes the rest safe. A night's absence from `skipped` means "somebody came"
+*or* "nobody has ever looked", and those lead opposite places — read as held, an unexamined night
+becomes an absence, and absences are what the MIA list phones families about. `outcomeOf` in
+`src/services/skippedNights.ts` returns three answers rather than two, and callers read the register
+directly for the third.
+
+Nothing here is authoritative: every claim can be re-derived from the registers it summarises, which
+is why a counselor may write it where they may not write an event, and why a wrong entry costs only
+the reads it was meant to save. Two paths correct it, both cheap. A night that gains its first
+check-in is removed at the moment of the tap, for the first few taps — that is the back-fill case. An
+examination that finds a night held which the list calls skipped removes it too, which catches
+attendance arriving by any route that never taps a phone, an import included.
+
+Adds and removes are `arrayUnion` / `arrayRemove`, never a rewritten array, so a device examining a
+year cannot undo a correction another device made while it was reading.
+
+**Who writes:** counselor and up. Readable by anyone active. Deletes are refused — forgetting the
+document silently un-examines a year, and the way to correct one night is to remove one night.
+
 ### `config/settings`
 
 A single document holding the four thresholds the core team can tune:

@@ -46,6 +46,8 @@ import { useAllergyNotes } from '@/hooks/useAllergyNotes';
 import { useAttendance, useRsvps } from '@/hooks/useAttendance';
 import { useHeightVar } from '@/hooks/useHeightVar';
 import { invalidateSnapshotCache, useEventSnapshots } from '@/hooks/useEventSnapshots';
+import { chainKey } from '@/lib/materialize';
+import { clearSkippedNight } from '@/services/skippedNights';
 import { cn, haptic } from '@/lib/utils';
 import { checkIn, swapCheckIn, undoCheckIn } from '@/services/attendance';
 import { formatClock, isCheckInOpen } from '@/lib/time';
@@ -358,8 +360,32 @@ export function CheckInPage() {
    * reload. Live events are untouched — their attendance comes from a listener.
    */
   const forgetCachedHistory = useCallback(() => {
-    if (event && event.checkInClosesAt < new Date()) invalidateSnapshotCache(event.id);
-  }, [event]);
+    if (!event || event.checkInClosesAt >= new Date()) return;
+    invalidateSnapshotCache(event.id);
+
+    /*
+     * The same correction, told to everybody else.
+     *
+     * A finished night with nobody in it gets written down as skipped, and every
+     * profile then reads it from that one document instead of re-deriving it. So
+     * the moment somebody back-fills a register, that entry has to go — a night
+     * this leader just proved happened must stop being reported as one that did
+     * not.
+     *
+     * Only while the register is nearly empty. The entry is gone after the first
+     * tap; the next couple are insurance against a lost write, and after that a
+     * back-fill of forty students would be forty writes to one document to
+     * remove something already removed.
+     *
+     * Fire and forget, deliberately. The check-in is committed and correct, and
+     * a derived summary that failed to update is not worth a red toast over a
+     * tap that worked — the next examination that finds this night held will
+     * clear the entry anyway.
+     */
+    if (attendance.length <= 3) {
+      void clearSkippedNight(chainKey(event), event.id).catch(() => {});
+    }
+  }, [attendance.length, event]);
 
   /**
    * Whether this student can be given a check-in at all, and a reason if not.

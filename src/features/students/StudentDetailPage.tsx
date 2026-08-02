@@ -13,8 +13,12 @@
  * same function — and one-off events sit in a group of their own at the bottom,
  * where "missed" is not a word that applies.
  *
- * History is derived from the events already in memory, read once through
- * `useEventSnapshots` — past attendance does not change while this page is open.
+ * History covers a year, over the events already in memory, and is read once —
+ * past attendance does not change while this page is open. What it costs is the
+ * interesting part: see `useProfileHistory`, which answers "was this student
+ * here?" from the student's own records and "did this gathering happen?" from
+ * the skipped-nights registry, rather than reading a year of registers to
+ * derive both.
  */
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -33,6 +37,8 @@ import { RosterErrorBanner } from '@/components/RosterErrorBanner';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { EarlierAttendance } from '@/features/students/EarlierAttendance';
+import { historyWindow, historyWindowStart } from '@/features/students/historyWindow';
+import { useProfileHistory } from '@/features/students/useProfileHistory';
 import { useToast } from '@/context/toastContext';
 import {
   groupByGathering,
@@ -42,7 +48,6 @@ import {
 } from '@/features/dashboard/insights';
 import { AddParentContact } from '@/features/students/AddParentContact';
 import { StudentEditorModal } from '@/features/students/StudentEditorModal';
-import { useEventSnapshots } from '@/hooks/useEventSnapshots';
 import { useNow } from '@/hooks/useNow';
 import { usePersonDetails } from '@/hooks/usePersonDetails';
 import { chainKey } from '@/lib/materialize';
@@ -58,21 +63,6 @@ import {
 } from '@/services/functions';
 import { setStudentStatus } from '@/services/students';
 import { studentFullName, type TallyEvent } from '@/types';
-
-/**
- * How many finished nights of *each* gathering the history reaches back over.
- *
- * Per gathering rather than across the calendar: a pooled twelve split between
- * two weekly gatherings left six of each, and a student's Sunday history ran
- * out halfway down a page that claimed to be showing their attendance.
- */
-const PER_GATHERING_WINDOW = 8;
-
-/** Recent one-off events to show alongside them. */
-const ONE_OFF_WINDOW = 4;
-
-/** Ceiling on the attendance reads one student page costs. */
-const MAX_EVENTS = 24;
 
 /** The group one-off events go in. Not a `chainKey`, and cannot collide with one. */
 const ONE_OFF_GROUP = 'one-off';
@@ -127,37 +117,20 @@ export function StudentDetailPage() {
     refresh: refreshDetails,
   } = usePersonDetails(student);
 
-  // Only finished gatherings: a night still in progress is not an absence.
-  // Taken per gathering, so a fortnight of Fridays cannot crowd out Sunday.
-  const recentEvents = useMemo(() => {
-    const finished = events
-      .filter((event) => event.status !== 'cancelled' && event.checkInClosesAt < now)
-      .sort((a, b) => b.startAt.getTime() - a.startAt.getTime());
+  const recentEvents = useMemo(() => historyWindow(events, now), [events, now]);
 
-    const takenPerGathering = new Map<string, number>();
-    let oneOffs = 0;
-    const picked: TallyEvent[] = [];
-
-    for (const event of finished) {
-      if (picked.length >= MAX_EVENTS) break;
-
-      if (event.mode === 'oneoff') {
-        if (oneOffs >= ONE_OFF_WINDOW) continue;
-        oneOffs += 1;
-      } else {
-        const key = chainKey(event);
-        const taken = takenPerGathering.get(key) ?? 0;
-        if (taken >= PER_GATHERING_WINDOW) continue;
-        takenPerGathering.set(key, taken + 1);
-      }
-
-      picked.push(event);
-    }
-
-    return picked;
-  }, [events, now]);
-
-  const { snapshots, loading: historyLoading, error: historyError } = useEventSnapshots(recentEvents);
+  /*
+   * Not `useEventSnapshots`. That reads every night's whole register, which is
+   * what a year of history cannot afford — see `useProfileHistory`, which asks
+   * the student's own records who was where and the skipped-nights registry
+   * which gatherings happened, and only falls back to reading registers for
+   * nights nobody has examined yet.
+   */
+  const {
+    snapshots,
+    loading: historyLoading,
+    error: historyError,
+  } = useProfileHistory(student, recentEvents, historyWindowStart(now));
 
   /**
    * The history, split into the gatherings it belongs to, with each gathering's
@@ -662,9 +635,9 @@ export function StudentDetailPage() {
       <Card>
         <CardHeader
           title="Attendance"
-          description={`The last ${recentEvents.length} finished ${
+          description={`The last year, by gathering — ${recentEvents.length} finished ${
             recentEvents.length === 1 ? 'night' : 'nights'
-          }, by gathering.`}
+          }.`}
         />
 
         <div className="grid grid-cols-2 gap-2 px-4 py-3">

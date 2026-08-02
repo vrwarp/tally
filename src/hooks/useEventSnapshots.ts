@@ -103,8 +103,12 @@ export function useEventSnapshots(events: readonly TallyEvent[]): EventSnapshots
     const next = events
       .map((event) => ({ event, presentStudentIds: cache.get(event.id) }))
       .filter(
-        (entry): entry is EventAttendanceSnapshot => entry.presentStudentIds !== undefined,
-      );
+        (entry): entry is { event: TallyEvent; presentStudentIds: ReadonlySet<string> } =>
+          entry.presentStudentIds !== undefined,
+      )
+      // This hook reads whole registers, so the set is the register and an empty
+      // one really does mean nobody came.
+      .map<EventAttendanceSnapshot>((entry) => ({ ...entry, held: entry.presentStudentIds.size > 0 }));
 
     const unchanged =
       next.length === last.current.length &&
