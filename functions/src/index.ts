@@ -61,6 +61,7 @@ import {
 } from './pco/roster.js';
 import { resetSharedCache, sharedCache } from './pco/sharedCache.js';
 import { followPersonLink, isPersonGoneError } from './pco/personLink.js';
+import { recreateStudent, type RecreateStudentResult } from './pco/recreate.js';
 import { graftMergedStudent } from './pco/studentPerson.js';
 import {
   pushPendingStudents,
@@ -228,6 +229,9 @@ interface RosterResponse {
   /** Merges the read followed and wrote back; the student rides under the
    *  survivor's row already. Ids only — nothing personal. */
   relinks: Array<{ fromPersonId: string; toPersonId: string }>;
+  /** `unresolved` entries that are known gone — deleted, or a merge trail
+   *  that ends dead. Their membership documents are frozen for check-ins. */
+  missing: string[];
   cached: boolean;
   fetchedAt: string;
   /** Echoed so the app can say how stale what it is showing might be. */
@@ -275,6 +279,12 @@ interface RosterScan {
    */
   studentIdByLinkedPersonId: Record<string, string>;
   /**
+   * Which active documents currently carry `pcoRecordMissing: true`, so the
+   * roster read writes the flag only when the answer *changed* — four hundred
+   * students must not cost four hundred writes per read.
+   */
+  recordMissing: Record<string, boolean>;
+  /**
    * Active students with no Planning Center person yet — the same rows the
    * Students screen marks "Queued". Counted on this pass rather than its own
    * because the collection has already been read.
@@ -288,6 +298,7 @@ async function scanRoster(database: FirestoreLike): Promise<RosterScan> {
   const personIds: string[] = [];
   const linkedPersonIds: string[] = [];
   const studentIdByLinkedPersonId: Record<string, string> = {};
+  const recordMissing: Record<string, boolean> = {};
   let queued = 0;
 
   for (const document of snapshot.docs) {
@@ -312,9 +323,10 @@ async function scanRoster(database: FirestoreLike): Promise<RosterScan> {
       linkedPersonIds.push(data.pcoPersonId);
       studentIdByLinkedPersonId[data.pcoPersonId] = document.id;
     } else queued += 1;
+    if (data.pcoRecordMissing === true) recordMissing[document.id] = true;
   }
 
-  return { personIds, linkedPersonIds, studentIdByLinkedPersonId, queued };
+  return { personIds, linkedPersonIds, studentIdByLinkedPersonId, recordMissing, queued };
 }
 
 /**
@@ -370,6 +382,38 @@ export const getRoster = onCall<{ force?: boolean } | undefined, Promise<RosterR
           ? pcoStudentId(relink.fromPersonId)
           : scan.studentIdByLinkedPersonId[relink.fromPersonId];
         if (fromDoc) await graftMergedStudent(db(), fromDoc, relink.toPersonId);
+      }
+      /*
+       * Known-gone students are frozen; resolved ones thaw. The flag on the
+       * membership document is what the check-in rules read, so a student
+       * whose Planning Center record died cannot quietly accumulate history
+       * under a dead id — past events included — until somebody removes them
+       * or re-creates the record. Only `missing` (confirmed gone) freezes:
+       * `unresolved` also holds students a busy pass could not look at, and
+       * being unlucky must not read as being deleted. Written only on change,
+       * so a settled roster costs no writes.
+       */
+      const docFor = (personId: string): string | undefined =>
+        scan.personIds.includes(personId)
+          ? pcoStudentId(personId)
+          : scan.studentIdByLinkedPersonId[personId];
+      for (const personId of result.missing) {
+        const studentDoc = docFor(personId);
+        if (studentDoc && !scan.recordMissing[studentDoc]) {
+          await db().doc(`${PATHS.students}/${studentDoc}`).set(
+            { pcoRecordMissing: true }, { merge: true });
+        }
+      }
+      const resolved = new Set(result.people.map((person) => person.pcoPersonId));
+      for (const [studentDoc, flagged] of Object.entries(scan.recordMissing)) {
+        if (!flagged) continue;
+        const personId = personIdFromStudentId(studentDoc)
+          ?? Object.entries(scan.studentIdByLinkedPersonId)
+            .find(([, id]) => id === studentDoc)?.[0];
+        if (personId && resolved.has(personId)) {
+          await db().doc(`${PATHS.students}/${studentDoc}`).set(
+            { pcoRecordMissing: false }, { merge: true });
+        }
       }
       return { ...result, cacheTtlSeconds: config.cacheTtlSeconds };
     } catch (error) {
@@ -1239,6 +1283,55 @@ export const addParent = onCall<
    * right price for a family that did not exist a second ago.
    */
   if (result.status === 'added') resetSharedCache();
+
+  return result;
+});
+
+/**
+ * Puts a person back in Planning Center for a student whose record died there.
+ *
+ * The other half of the check-in freeze: a student flagged `pcoRecordMissing`
+ * cannot accumulate attendance under a dead id, and this is the sanctioned way
+ * to thaw them without taking them off the roster. The flow itself lives in
+ * ./pco/recreate.ts and refuses to create where creating would be wrong — a
+ * record that still exists clears the flag, a merge with a living survivor
+ * relinks instead.
+ */
+export const recreatePlanningCenterPerson = onCall<
+  { studentId: string; firstName?: string | null; lastName?: string | null; grade?: number | null },
+  Promise<RecreateStudentResult>
+>({ secrets: PCO_SECRETS, timeoutSeconds: 120, memory: '256MiB' }, async (request) => {
+  await requireCoreTeam(request.auth?.uid);
+
+  const studentId = request.data?.studentId;
+  if (typeof studentId !== 'string' || studentId.trim().length === 0) {
+    throw new HttpsError('invalid-argument', 'studentId is required.');
+  }
+
+  const config = await resolveConfig(db());
+  const client = clientFor(config);
+  if (!client) {
+    throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
+  }
+
+  let result: RecreateStudentResult;
+  try {
+    result = await recreateStudent({
+      db: db(),
+      client,
+      config,
+      studentId,
+      firstName: request.data?.firstName ?? undefined,
+      lastName: request.data?.lastName ?? undefined,
+      grade: typeof request.data?.grade === 'number' ? request.data.grade : undefined,
+      logger,
+    });
+  } catch (error) {
+    return reportPcoFailure(error, 're-create this student in Planning Center');
+  }
+
+  // A new (or newly pointed-at) person changes what every cached read answers.
+  if (result.status === 'recreated' || result.status === 'relinked') resetSharedCache();
 
   return result;
 });

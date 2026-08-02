@@ -31,6 +31,12 @@ export interface WarningMeta {
 export const WARNING_META: Record<RosterWarning, WarningMeta> = {
   'incomplete-profile': { label: 'Missing parent contact', short: 'No contact', tone: 'neutral' },
   allergy: { label: 'Has allergies on file', short: 'Allergy', tone: 'warn' },
+  /*
+   * Amber like the allergy, because it has a consequence at the door: this
+   * student cannot be checked in — the database itself refuses — until their
+   * dead Planning Center record is dealt with on their detail page.
+   */
+  'record-missing': { label: 'Planning Center record missing — check-in frozen', short: 'Frozen', tone: 'warn' },
 };
 
 export function warningLabel(warning: RosterWarning): string {
