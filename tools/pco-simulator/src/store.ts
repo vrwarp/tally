@@ -262,6 +262,28 @@ export class SimulatorStore {
   /* ---- writes ---------------------------------------------------------- */
 
   /**
+   * Buries a person the way pcomirror answers for one afterwards: the record
+   * stops being served, and when the burial was a merge the stone names the
+   * survivor. `handler.ts` turns this into the mirror's `410` with
+   * `meta.merged_into` — the shape Tally actually faces in production, where
+   * its Planning Center endpoint is the mirror. A person the simulator never
+   * held stays a plain `404`, which is what raw Planning Center says about
+   * deleted and merged records alike.
+   */
+  buryPerson(id: string, mergedInto: string | null = null): void {
+    const index = this.org.people.findIndex((person) => person.id === id);
+    if (index >= 0) this.org.people.splice(index, 1);
+    this.tombstones.set(id, mergedInto);
+  }
+
+  tombstoneFor(id: string): { mergedInto: string | null } | undefined {
+    const stone = this.tombstones.get(id);
+    return stone === undefined ? undefined : { mergedInto: stone };
+  }
+
+  private readonly tombstones = new Map<string, string | null>();
+
+  /**
    * Creates a person, mirroring the subset of attributes the real API accepts
    * on `POST /people`. Unknown attributes are ignored rather than rejected,
    * which is what the real API does.

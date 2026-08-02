@@ -76,6 +76,12 @@ export interface RosterResponse {
    * somebody put on the roster on purpose.
    */
   unresolved: string[];
+  /**
+   * Merges the server followed while reading: each student now rides under the
+   * surviving record's row, and the membership document has been repointed.
+   * Optional so an older server answering without it still parses.
+   */
+  relinks?: Array<{ fromPersonId: string; toPersonId: string }>;
   /** True when Planning Center was not asked, because a recent answer was reused. */
   cached: boolean;
   fetchedAt: string;

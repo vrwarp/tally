@@ -562,10 +562,16 @@ describe('fetchPersonDetails', () => {
   });
 
   it('returns null for somebody who is not there', async () => {
+    // What the name always promised. It used to reject instead — the 404
+    // escaped — and the detail screen for a deleted student wore a generic
+    // failure rather than saying the student is gone.
     const world = harness();
-    await expect(
-      fetchPersonDetails({ ...world, config: baseConfig(), personId: '999999999' }),
-    ).rejects.toThrow();
+    const details = await fetchPersonDetails({
+      ...world,
+      config: baseConfig(),
+      personId: '999999999',
+    });
+    expect(details).toBeNull();
   });
 
   it('is cached per person, not per roster', async () => {

@@ -19,6 +19,7 @@
 import type { PcoConfig } from '../config.js';
 import type { PcoClient } from './client.js';
 import { cacheKey, type TtlCache } from './cache.js';
+import { followPersonLink, isPersonGoneError } from './personLink.js';
 import {
   addToIncludedIndex,
   buildIncludedIndex,
@@ -140,6 +141,12 @@ export interface RosterResult {
    * fewer students.
    */
   unresolved: string[];
+  /**
+   * Merges the hydration followed: the student is already in `people` under
+   * the survivor's id, and the caller owns making the move permanent in the
+   * membership documents (`graftMergedStudent`).
+   */
+  relinks: Array<{ fromPersonId: string; toPersonId: string }>;
   /** True when the answer came from cache rather than from Planning Center. */
   cached: boolean;
   fetchedAt: string;
@@ -180,11 +187,22 @@ export interface RosterHydration {
   /**
    * Planning Center ids Tally has on its roster but could not read.
    *
-   * Deleted upstream, merged into another record, or simply more stragglers
-   * than `MAX_INDIVIDUAL_LOOKUPS` allows. Either way the caller has to be able
-   * to say so — these are students somebody added on purpose.
+   * Deleted upstream — or merged into another record whose trail also went
+   * dead — or simply more stragglers than `MAX_INDIVIDUAL_LOOKUPS` allows.
+   * Either way the caller has to be able to say so — these are students
+   * somebody added on purpose.
    */
   unresolved: string[];
+  /**
+   * Roster ids whose person was merged into somebody the church kept.
+   *
+   * The mirror answers a merged id with `410` and the survivor's id, and the
+   * survivor is hydrated *in this same result* — so the roster already shows
+   * the student under the record that now holds them. What this module cannot
+   * do is move the membership document; it has no Firestore. The caller does,
+   * and applies these with `graftMergedStudent`.
+   */
+  relinks: Array<{ fromPersonId: string; toPersonId: string }>;
   /**
    * Which households each of them belongs to, keyed by Planning Center person
    * id. Free — a roster read already side-loads `households` — and deliberately
@@ -217,7 +235,7 @@ async function hydratePeople(
   now: Date,
 ): Promise<RosterHydration> {
   const wanted = new Set(personIds);
-  if (wanted.size === 0) return { people: [], unresolved: [], households: {} };
+  if (wanted.size === 0) return { people: [], unresolved: [], households: {}, relinks: [] };
 
   const found = new Map<string, PcoPerson>();
 
@@ -235,6 +253,7 @@ async function hydratePeople(
 
   const stragglers = [...wanted].filter((id) => !found.has(id));
   const unresolved: string[] = [];
+  const relinks: Array<{ fromPersonId: string; toPersonId: string }> = [];
 
   for (const personId of stragglers.slice(0, MAX_INDIVIDUAL_LOOKUPS)) {
     try {
@@ -244,11 +263,40 @@ async function hydratePeople(
       const person = Array.isArray(body.data) ? body.data[0] : body.data;
       if (person) found.set(personId, person);
       else unresolved.push(personId);
-    } catch {
-      // A 404 is the ordinary case here: somebody deleted or merged the person
-      // upstream while Tally still has them on the roster. That is a thing to
-      // report, not a thing to fail the whole roster over.
-      unresolved.push(personId);
+    } catch (error) {
+      /*
+       * A deleted person is the ordinary case here — a thing to report, not a
+       * thing to fail the whole roster over. A *merged* one is better than
+       * ordinary: the mirror's 410 names the record the church kept, so the
+       * student is hydrated under the survivor and reported as a relink for
+       * the caller to make permanent. Only a trail that ends dead — the
+       * production log showed a keeper deleted minutes after absorbing seven
+       * people — falls through to unresolved.
+       */
+      if (!isPersonGoneError(error)) {
+        unresolved.push(personId);
+        continue;
+      }
+      const link = await followPersonLink(client, personId, error);
+      if (link.outcome === 'gone') {
+        unresolved.push(personId);
+        continue;
+      }
+      try {
+        const keeper = await client.get<PcoPerson>(
+          `/people/${encodeURIComponent(link.personId)}`,
+          { include: [...ROSTER_INCLUDES] },
+        );
+        const person = Array.isArray(keeper.data) ? keeper.data[0] : keeper.data;
+        if (person) {
+          found.set(person.id, person);
+          relinks.push({ fromPersonId: personId, toPersonId: person.id });
+        } else {
+          unresolved.push(personId);
+        }
+      } catch {
+        unresolved.push(personId);
+      }
     }
   }
   unresolved.push(...stragglers.slice(MAX_INDIVIDUAL_LOOKUPS));
@@ -282,7 +330,7 @@ async function hydratePeople(
   }
 
   people.sort((a, b) => (a.searchName < b.searchName ? -1 : a.searchName > b.searchName ? 1 : 0));
-  return { people, unresolved, households };
+  return { people, unresolved, households, relinks };
 }
 
 export interface RosterOptions {
@@ -315,6 +363,7 @@ export async function fetchRoster(
   return {
     people: hydrated.people,
     unresolved: hydrated.unresolved,
+    relinks: hydrated.relinks,
     cached: cache.stats.misses === before,
     fetchedAt: now.toISOString(),
   };
@@ -608,7 +657,21 @@ export async function fetchPersonDetails(
   return cache.get(
     personDetailsCacheKey(config.baseUrl, personId),
     async () => {
-      const loaded = await loadPersonWithHousehold(client, personId);
+      /*
+       * A merged student's details are the survivor's details — the family did
+       * not stop existing because an admin folded two records together. This
+       * read follows the trail and answers; the roster read is what makes the
+       * move permanent in the membership documents.
+       */
+      let loaded;
+      try {
+        loaded = await loadPersonWithHousehold(client, personId);
+      } catch (error) {
+        if (!isPersonGoneError(error)) throw error;
+        const link = await followPersonLink(client, personId, error);
+        if (link.outcome === 'gone') return null;
+        loaded = await loadPersonWithHousehold(client, link.personId);
+      }
       if (!loaded) return null;
       const { person, index } = loaded;
 
