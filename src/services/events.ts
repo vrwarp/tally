@@ -70,6 +70,10 @@ export interface EventDraft {
  * enough history to run the predictive roster (a handful of past instances per
  * series) plus anything upcoming, so `sinceDaysAgo` keeps the payload small as
  * the ministry accumulates years of Fridays.
+ *
+ * The default is the year the roster counts participation over, matching
+ * `EVENT_WINDOW_DAYS` in `DataProvider` — the one caller that sets it — so a
+ * caller that says nothing gets the same calendar every screen is reading.
  */
 export function subscribeEvents(
   onChange: (events: TallyEvent[]) => void,
@@ -77,7 +81,7 @@ export function subscribeEvents(
   onError?: (error: Error) => void,
 ): Unsubscribe {
   const since = new Date();
-  since.setDate(since.getDate() - (options.sinceDaysAgo ?? 120));
+  since.setDate(since.getDate() - (options.sinceDaysAgo ?? 365));
   since.setHours(0, 0, 0, 0);
 
   const q = query(
