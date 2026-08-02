@@ -30,7 +30,7 @@
  */
 import { ABSOLUTE_MAX_GRADE, ABSOLUTE_MIN_GRADE, type PcoConfig } from '../config.js';
 import type { PcoClient } from './client.js';
-import { resolveStudentPerson } from './studentPerson.js';
+import { readThroughMerges, resolveStudentPerson } from './studentPerson.js';
 import type { PcoPerson } from './types.js';
 import { PCO_TYPES } from './types.js';
 import { SILENT_LOGGER, type FirestoreLike, type FunctionLogger } from '../firestore.js';
@@ -379,13 +379,26 @@ export async function updateStudentProfile(
     );
   }
 
-  const person = await client.get<PcoPerson>(`/people/${encodeURIComponent(target.personId)}`);
-  if (!person.data?.id) {
+  /*
+   * `readThroughMerges`, not a bare get: a merged student answers 410 with a
+   * forwarding address, and the right response to "this record is now that
+   * one" is to follow it, repoint the roster document, and save the edit onto
+   * the person the church actually kept.
+   */
+  const read = await readThroughMerges(
+    { db, client },
+    studentId,
+    target.personId,
+    (personId) => client.get<PcoPerson>(`/people/${encodeURIComponent(personId)}`),
+  );
+  if (read.outcome === 'gone' || !read.value.data?.id) {
     return result(
       'no-student',
       'Planning Center no longer has a record for this student — deleted or merged there.',
     );
   }
+  const person = read.value;
+  const personId = read.personId;
 
   const attributes = changedAttributes(options, person.data);
 
@@ -408,8 +421,8 @@ export async function updateStudentProfile(
     return result('unchanged', 'Planning Center already matches. Nothing was changed there.');
   }
 
-  await client.patch(`/people/${encodeURIComponent(target.personId)}`, {
-    data: { type: PCO_TYPES.person, id: target.personId, attributes },
+  await client.patch(`/people/${encodeURIComponent(personId)}`, {
+    data: { type: PCO_TYPES.person, id: personId, attributes },
   });
 
   // The field names, never the values: this line lands in a log a church admin
@@ -417,7 +430,8 @@ export async function updateStudentProfile(
   // business being in one.
   logger.info('Updated a Planning Center profile from Tally', {
     studentId,
-    pcoPersonId: target.personId,
+    pcoPersonId: personId,
+    ...(read.grafted ? { mergedFrom: target.personId } : {}),
     wrote,
   });
 

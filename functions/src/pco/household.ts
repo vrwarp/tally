@@ -50,7 +50,8 @@ import {
   type ContactField,
 } from './parentContact.js';
 import { loadPersonWithHousehold } from './roster.js';
-import { resolveStudentPerson } from './studentPerson.js';
+import { followPersonLink, isPersonGoneError } from './personLink.js';
+import { readThroughMerges, resolveStudentPerson } from './studentPerson.js';
 import { PCO_TYPES, type PcoHousehold, type PcoPerson } from './types.js';
 import { SILENT_LOGGER, type FirestoreLike, type FunctionLogger } from '../firestore.js';
 
@@ -248,13 +249,20 @@ export async function addParent(options: AddParentOptions): Promise<AddParentRes
     );
   }
 
-  const loaded = await loadPersonWithHousehold(client, target.personId);
-  if (!loaded) {
+  const read = await readThroughMerges(
+    { db, client },
+    studentId,
+    target.personId,
+    (personId) => loadPersonWithHousehold(client, personId),
+  );
+  if (read.outcome === 'gone' || !read.value) {
     return result(
       'no-student',
       'Planning Center no longer has a record for this student — deleted or merged there.',
     );
   }
+  const loaded = read.value;
+  const studentPersonId = read.personId;
 
   /*
    * Re-checked against a live read, not against what the screen believed. This
@@ -292,9 +300,27 @@ export async function addParent(options: AddParentOptions): Promise<AddParentRes
   let parentContacts = buildIncludedIndex([]);
 
   if (chosenId) {
-    const found = await client.get<PcoPerson>(`/people/${encodeURIComponent(chosenId)}`, {
-      include: ['emails', 'phone_numbers'],
-    });
+    /*
+     * The adult was chosen from a candidate list that may be minutes old, and
+     * an admin merging duplicates is exactly who generates candidates — so a
+     * 410 here follows the merge to the person the church kept, and a dead end
+     * gets the same words a vanished record always got.
+     */
+    let found;
+    try {
+      found = await client.get<PcoPerson>(`/people/${encodeURIComponent(chosenId)}`, {
+        include: ['emails', 'phone_numbers'],
+      });
+    } catch (error) {
+      if (!isPersonGoneError(error)) throw error;
+      const link = await followPersonLink(client, chosenId, error);
+      if (link.outcome === 'gone') {
+        return result('not-an-adult', 'Planning Center no longer has that person.');
+      }
+      found = await client.get<PcoPerson>(`/people/${encodeURIComponent(link.personId)}`, {
+        include: ['emails', 'phone_numbers'],
+      });
+    }
     parentPerson = found.data ?? null;
     parentContacts = buildIncludedIndex(found.included);
     if (!parentPerson?.id) {
@@ -366,7 +392,7 @@ export async function addParent(options: AddParentOptions): Promise<AddParentRes
           people: {
             data: [
               { type: PCO_TYPES.person, id: parentId },
-              { type: PCO_TYPES.person, id: target.personId },
+              { type: PCO_TYPES.person, id: studentPersonId },
             ],
           },
         },

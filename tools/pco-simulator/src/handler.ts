@@ -499,8 +499,22 @@ function route(request: SimRequest, store: SimulatorStore): SimResponse {
 
   const personMatch = PERSON_PATH.exec(request.path);
   if (method === 'GET' && personMatch) {
-    const person = store.personById(decodeURIComponent(personMatch[1]!));
-    if (!person) return error(404, 'Not Found', `No person with id "${personMatch[1]}".`);
+    const personId = decodeURIComponent(personMatch[1]!);
+    const person = store.personById(personId);
+    if (!person) {
+      // A buried person answers the way pcomirror does: 410, with the merge
+      // trail on the stone. Never-held ids stay raw Planning Center's 404.
+      const stone = store.tombstoneFor(personId);
+      if (stone) {
+        return json(410, {
+          errors: [{
+            status: '410', code: '410', title: 'Gone', detail: 'resource deleted',
+            ...(stone.mergedInto ? { meta: { merged_into: stone.mergedInto } } : {}),
+          }],
+        });
+      }
+      return error(404, 'Not Found', `No person with id "${personMatch[1]}".`);
+    }
     return json(200, {
       data: personResource(person, store),
       included: buildIncluded([person], csv(query.include), store),

@@ -22,7 +22,7 @@ import type { PcoConfig } from '../config.js';
 import type { PcoClient } from './client.js';
 import { contactFieldsOnFile, findParentCandidate } from './mapping.js';
 import { loadPersonWithHousehold } from './roster.js';
-import { resolveStudentPerson } from './studentPerson.js';
+import { readThroughMerges, resolveStudentPerson } from './studentPerson.js';
 import { SILENT_LOGGER, type FirestoreLike, type FunctionLogger } from '../firestore.js';
 import { PCO_TYPES } from './types.js';
 
@@ -211,13 +211,19 @@ export async function setParentContact(
     );
   }
 
-  const loaded = await loadPersonWithHousehold(client, target.personId);
-  if (!loaded) {
+  const read = await readThroughMerges(
+    { db, client },
+    studentId,
+    target.personId,
+    (personId) => loadPersonWithHousehold(client, personId),
+  );
+  if (read.outcome === 'gone' || !read.value) {
     return result(
       'no-student',
       'Planning Center no longer has a record for this student — deleted or merged there.',
     );
   }
+  const loaded = read.value;
 
   const parent = findParentCandidate(loaded.person, loaded.index);
   if (!parent) {

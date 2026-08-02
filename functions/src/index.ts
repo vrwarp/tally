@@ -60,6 +60,8 @@ import {
   type RosterPerson,
 } from './pco/roster.js';
 import { resetSharedCache, sharedCache } from './pco/sharedCache.js';
+import { followPersonLink, isPersonGoneError } from './pco/personLink.js';
+import { graftMergedStudent } from './pco/studentPerson.js';
 import {
   pushPendingStudents,
   pushStudent,
@@ -223,6 +225,9 @@ interface RosterResponse {
   people: RosterPerson[];
   /** Roster entries whose Planning Center person could not be read. */
   unresolved: string[];
+  /** Merges the read followed and wrote back; the student rides under the
+   *  survivor's row already. Ids only — nothing personal. */
+  relinks: Array<{ fromPersonId: string; toPersonId: string }>;
   cached: boolean;
   fetchedAt: string;
   /** Echoed so the app can say how stale what it is showing might be. */
@@ -264,6 +269,12 @@ interface RosterScan {
    */
   linkedPersonIds: string[];
   /**
+   * Which student document each linked person id came from, so a merge the
+   * roster read follows can be written back to the right visitor document —
+   * their doc id is Tally's own and says nothing about the person.
+   */
+  studentIdByLinkedPersonId: Record<string, string>;
+  /**
    * Active students with no Planning Center person yet — the same rows the
    * Students screen marks "Queued". Counted on this pass rather than its own
    * because the collection has already been read.
@@ -276,6 +287,7 @@ async function scanRoster(database: FirestoreLike): Promise<RosterScan> {
   const snapshot = await database.collection(PATHS.students).get();
   const personIds: string[] = [];
   const linkedPersonIds: string[] = [];
+  const studentIdByLinkedPersonId: Record<string, string> = {};
   let queued = 0;
 
   for (const document of snapshot.docs) {
@@ -298,10 +310,11 @@ async function scanRoster(database: FirestoreLike): Promise<RosterScan> {
       // Pushed, so not queued — and not on the roster read either, which is
       // what left them with no answer at all to the question below.
       linkedPersonIds.push(data.pcoPersonId);
+      studentIdByLinkedPersonId[data.pcoPersonId] = document.id;
     } else queued += 1;
   }
 
-  return { personIds, linkedPersonIds, queued };
+  return { personIds, linkedPersonIds, studentIdByLinkedPersonId, queued };
 }
 
 /**
@@ -345,6 +358,19 @@ export const getRoster = onCall<{ force?: boolean } | undefined, Promise<RosterR
         personIds: [...scan.personIds, ...scan.linkedPersonIds],
         force: request.data?.force === true,
       });
+      /*
+       * Merges the hydration followed become membership moves here, where the
+       * database is. The result already shows each student under the record
+       * the church kept; this is what makes that stick, so the next roster
+       * read stops tripping over the buried id. Idempotent, so replaying a
+       * cached answer's relinks is harmless.
+       */
+      for (const relink of result.relinks) {
+        const fromDoc = scan.personIds.includes(relink.fromPersonId)
+          ? pcoStudentId(relink.fromPersonId)
+          : scan.studentIdByLinkedPersonId[relink.fromPersonId];
+        if (fromDoc) await graftMergedStudent(db(), fromDoc, relink.toPersonId);
+      }
       return { ...result, cacheTtlSeconds: config.cacheTtlSeconds };
     } catch (error) {
       return reportPcoFailure(error, 'load the roster');
@@ -754,16 +780,24 @@ export const addRosterMember = onCall<
 
   // Confirm the person is real before recording that they are on the roster: a
   // typo'd id would otherwise become a permanent row that renders as nothing.
+  // A merged id is followed to the record the church kept — whoever pasted it
+  // meant that person — and only a trail that ends dead is refused.
+  let rosterPersonId = personId;
   try {
     await client.get(`/people/${encodeURIComponent(personId)}`);
   } catch (error) {
-    if (error instanceof PcoApiError && error.status === 404) {
-      throw new HttpsError('not-found', 'Planning Center has no person with that id.');
+    if (isPersonGoneError(error)) {
+      const link = await followPersonLink(client, personId, error);
+      if (link.outcome === 'gone') {
+        throw new HttpsError('not-found', 'Planning Center has no person with that id.');
+      }
+      rosterPersonId = link.personId;
+    } else {
+      return reportPcoFailure(error, 'check that person in Planning Center');
     }
-    return reportPcoFailure(error, 'check that person in Planning Center');
   }
 
-  const studentId = pcoStudentId(personId);
+  const studentId = pcoStudentId(rosterPersonId);
   const ref = db().doc(`${PATHS.students}/${studentId}`);
   const snapshot = await ref.get();
   const existing = snapshot.exists ? (snapshot.data() ?? {}) : {};
@@ -771,7 +805,7 @@ export const addRosterMember = onCall<
 
   await ref.set(
     {
-      pcoPersonId: personId,
+      pcoPersonId: rosterPersonId,
       status: 'active',
       addedToRosterAt: Timestamp.now(),
       addedToRosterBy: request.auth?.uid ?? null,
