@@ -13,8 +13,12 @@
  * same function — and one-off events sit in a group of their own at the bottom,
  * where "missed" is not a word that applies.
  *
- * History is derived from the events already in memory, read once through
- * `useEventSnapshots` — past attendance does not change while this page is open.
+ * History covers a year, over the events already in memory, and is read once —
+ * past attendance does not change while this page is open. What it costs is the
+ * interesting part: see `useProfileHistory`, which answers "was this student
+ * here?" from the student's own records and "did this gathering happen?" from
+ * the skipped-nights registry, rather than reading a year of registers to
+ * derive both.
  */
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -33,7 +37,8 @@ import { RosterErrorBanner } from '@/components/RosterErrorBanner';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { EarlierAttendance } from '@/features/students/EarlierAttendance';
-import { historyWindow } from '@/features/students/historyWindow';
+import { historyWindow, historyWindowStart } from '@/features/students/historyWindow';
+import { useProfileHistory } from '@/features/students/useProfileHistory';
 import { useToast } from '@/context/toastContext';
 import {
   groupByGathering,
@@ -43,7 +48,6 @@ import {
 } from '@/features/dashboard/insights';
 import { AddParentContact } from '@/features/students/AddParentContact';
 import { StudentEditorModal } from '@/features/students/StudentEditorModal';
-import { useEventSnapshots } from '@/hooks/useEventSnapshots';
 import { useNow } from '@/hooks/useNow';
 import { usePersonDetails } from '@/hooks/usePersonDetails';
 import { chainKey } from '@/lib/materialize';
@@ -115,7 +119,18 @@ export function StudentDetailPage() {
 
   const recentEvents = useMemo(() => historyWindow(events, now), [events, now]);
 
-  const { snapshots, loading: historyLoading, error: historyError } = useEventSnapshots(recentEvents);
+  /*
+   * Not `useEventSnapshots`. That reads every night's whole register, which is
+   * what a year of history cannot afford — see `useProfileHistory`, which asks
+   * the student's own records who was where and the skipped-nights registry
+   * which gatherings happened, and only falls back to reading registers for
+   * nights nobody has examined yet.
+   */
+  const {
+    snapshots,
+    loading: historyLoading,
+    error: historyError,
+  } = useProfileHistory(student, recentEvents, historyWindowStart(now));
 
   /**
    * The history, split into the gatherings it belongs to, with each gathering's

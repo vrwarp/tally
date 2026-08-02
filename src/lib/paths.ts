@@ -40,6 +40,14 @@ export const COLLECTIONS = {
   students: 'students',
   events: 'events',
   config: 'config',
+  /**
+   * One document per repeat chain, recording the nights nobody came to.
+   *
+   * Top-level rather than under `events` because it answers about a chain, not
+   * about an instance — and because the whole point is reading one document
+   * instead of one per night.
+   */
+  skippedNights: 'skippedNights',
   /** Subcollection names. */
   attendance: 'attendance',
   rsvps: 'rsvps',
@@ -72,6 +80,8 @@ export const paths = {
 
   events: () => COLLECTIONS.events,
   event: (eventId: string) => `${COLLECTIONS.events}/${eventId}`,
+
+  skippedNights: (chainKey: string) => `${COLLECTIONS.skippedNights}/${chainKey}`,
 
   attendanceCollection: (eventId: string) =>
     `${COLLECTIONS.events}/${eventId}/${COLLECTIONS.attendance}`,

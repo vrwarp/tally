@@ -10,6 +10,8 @@
 import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
 import { assertFails, assertSucceeds, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import {
+  Timestamp,
+  arrayRemove,
   collection,
   collectionGroup,
   deleteDoc,
@@ -18,6 +20,7 @@ import {
   getDocs,
   orderBy,
   query,
+  serverTimestamp,
   setDoc,
   updateDoc,
   where,
@@ -850,6 +853,96 @@ describe('config/planningCenter', () => {
  * "default deny" suite below is what now covers them — an attempt to write
  * either path is an unmodelled collection, which is exactly the right answer.
  */
+
+/**
+ * Which nights nobody came to.
+ *
+ * Derived data with a counselor's name on the writes, which is unusual enough in
+ * this ruleset to be worth pinning. The justification is that every claim in the
+ * document can be re-derived from registers the same counselor may already read,
+ * so the worst a forged entry can do is cost the reads it was meant to save — but
+ * that only holds while the document stays derived, so the shape is checked and
+ * wholesale deletion is refused.
+ */
+describe('skippedNights', () => {
+  const chain = ID.series;
+  const registry = (over: Record<string, unknown> = {}) => ({
+    chainKey: chain,
+    skipped: [],
+    examinedFrom: Timestamp.fromDate(new Date('2025-08-02T00:00:00Z')),
+    updatedAt: serverTimestamp(),
+    ...over,
+  });
+
+  it('lets a counselor write down a chain it has just examined', async () => {
+    const db = asUser(env, UID.counselor);
+    await assertSucceeds(
+      setDoc(doc(db, paths.skippedNights(chain)), registry({ skipped: ['event-1'] })),
+    );
+  });
+
+  it('lets a counselor clear one night without touching the rest', async () => {
+    const db = asUser(env, UID.counselor);
+    await assertSucceeds(
+      setDoc(doc(db, paths.skippedNights(chain)), registry({ skipped: ['event-1'] })),
+    );
+    await assertSucceeds(
+      setDoc(
+        doc(db, paths.skippedNights(chain)),
+        { chainKey: chain, skipped: arrayRemove('event-1'), updatedAt: serverTimestamp() },
+        { merge: true },
+      ),
+    );
+  });
+
+  it('lets any active member read it', async () => {
+    await assertSucceeds(getDoc(doc(asUser(env, UID.counselor), paths.skippedNights(chain))));
+    await assertSucceeds(getDoc(doc(asUser(env, UID.core), paths.skippedNights(chain))));
+  });
+
+  it('refuses somebody with no active membership', async () => {
+    await assertFails(getDoc(doc(asUser(env, UID.inactive), paths.skippedNights(chain))));
+    await assertFails(
+      setDoc(doc(asUser(env, UID.inactive), paths.skippedNights(chain)), registry()),
+    );
+    await assertFails(setDoc(doc(asAnonymous(env), paths.skippedNights(chain)), registry()));
+  });
+
+  it('refuses a document filed under the wrong chain', async () => {
+    // The id is the chain. A document whose body disagrees with its path would
+    // answer for a gathering it is not about.
+    const db = asUser(env, UID.counselor);
+    await assertFails(
+      setDoc(doc(db, paths.skippedNights(chain)), registry({ chainKey: 'some-other-chain' })),
+    );
+  });
+
+  it('refuses a skipped list that is not a list', async () => {
+    const db = asUser(env, UID.counselor);
+    await assertFails(
+      setDoc(doc(db, paths.skippedNights(chain)), registry({ skipped: 'event-1' })),
+    );
+  });
+
+  it('refuses a watermark that is not a timestamp', async () => {
+    // The watermark is what separates "nobody came" from "nobody has looked".
+    // A string there would be read as no coverage at best and misread at worst.
+    const db = asUser(env, UID.counselor);
+    await assertFails(
+      setDoc(doc(db, paths.skippedNights(chain)), registry({ examinedFrom: 'last August' })),
+    );
+  });
+
+  it('refuses deleting the whole chain, even for an admin', async () => {
+    // Forgetting the document silently un-examines a year. Correcting one night
+    // is removing one night.
+    await assertSucceeds(
+      setDoc(doc(asUser(env, UID.counselor), paths.skippedNights(chain)), registry()),
+    );
+    await assertFails(deleteDoc(doc(asUser(env, UID.admin), paths.skippedNights(chain))));
+  });
+});
+
 
 describe('default deny', () => {
   it('denies an unmodelled collection to every role', async () => {

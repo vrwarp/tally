@@ -59,10 +59,10 @@ function arbitraryDashboard(rng: Rng): DashboardInput {
       mode: rng.bool(0.85) ? 'recurring' : 'oneoff',
       status: rng.bool(0.9) ? 'scheduled' : 'cancelled',
     });
-    return {
-      event,
-      presentStudentIds: new Set(students.filter(() => rng.bool(0.5)).map((s) => s.id)),
-    };
+    const present = new Set(students.filter(() => rng.bool(0.5)).map((s) => s.id));
+    // A whole register, so an empty one is a gathering nobody came to — which is
+    // exactly the case several of these properties are about.
+    return { event, presentStudentIds: present, held: present.size > 0 };
   });
 
   return { students, snapshots, settings: arbitrarySettings(rng), reachable };
@@ -315,6 +315,7 @@ describe('dashboard insight properties', () => {
     const nobodyCame = input.snapshots.map((snapshot) => ({
       ...snapshot,
       presentStudentIds: new Set<string>(),
+      held: false,
     }));
 
     expect(computeMia(input.students, nobodyCame, input.settings)).toEqual([]);

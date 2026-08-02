@@ -346,6 +346,44 @@ export async function fetchAttendanceByEvent(
   return results;
 }
 
+/**
+ * The nights one student was checked into, since `since`, as event ids.
+ *
+ * The cheap half of a profile's history. "Was this student here?" is a fact
+ * about the student, and their own attendance documents are where it is written
+ * — so a year of it is one indexed query against the collection group rather
+ * than a read of every night that happened. The other half, "did the gathering
+ * happen at all", is not about them and comes from `skippedNights`.
+ *
+ * Ids come from the document path rather than the `eventId` field, for the
+ * reason `fetchStudentHistory` gives: the two agree because the rules require
+ * it, but the path is the one that cannot have been written wrong, and this is
+ * the read that would otherwise attribute a night to the wrong gathering.
+ *
+ * Unpaged deliberately. A year of one student is at most a few hundred small
+ * documents, and the profile needs all of them before it can draw anything —
+ * paging would be latency spent to arrive at the same place.
+ */
+export async function fetchStudentAttendanceSince(
+  studentId: string,
+  since: Date,
+): Promise<Set<string>> {
+  const snapshot = await getDocs(
+    query(
+      collectionGroup(db, COLLECTIONS.attendance),
+      where('studentId', '==', studentId),
+      where('checkedInAt', '>=', since),
+      orderBy('checkedInAt', 'desc'),
+    ),
+  );
+
+  return new Set(
+    snapshot.docs
+      .map((document) => document.ref.parent.parent?.id)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0),
+  );
+}
+
 /** Full attendance records (not just ids) for one event. */
 export async function fetchAttendance(eventId: string): Promise<AttendanceRecord[]> {
   const snapshot = await getDocs(collection(db, paths.attendanceCollection(eventId)));

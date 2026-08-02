@@ -371,6 +371,44 @@ service cloud.firestore {
       allow write: if isCore();
     }
 
+    /**
+     * Which nights of a repeat chain nobody came to.
+     *
+     * Derived data, not a record: every claim in here can be re-derived by
+     * reading the registers it summarises, and the app does exactly that for any
+     * night the document does not cover. That is why a counselor may write it
+     * where they may not write an event — nothing is entrusted to this document
+     * that is not already theirs to see, and the worst a wrong entry can do is
+     * cost the reads it was meant to save.
+     *
+     * Counselor rather than core because the writes happen where the work does:
+     * at the door, when a night gains its first check-in and has to stop reading
+     * as empty, and on a student's profile, when a year of nights is examined
+     * for the first time. Both are counselor screens.
+     *
+     * `skipped` is only ever moved by `arrayUnion`/`arrayRemove`, never
+     * rewritten, so two people examining and correcting at once cannot undo each
+     * other. Rules cannot express "transform only", so this checks the shape and
+     * leaves the atomicity to the callers — a client that rewrote the array
+     * wholesale would still be writing something it is allowed to derive.
+     *
+     * Deletes are refused: forgetting the whole chain silently un-examines a
+     * year, and the way to correct one night is to remove one night.
+     */
+    match /skippedNights/{chainKey} {
+      function validSkippedNights() {
+        let d = request.resource.data;
+        return d.chainKey == chainKey
+          && d.get('skipped', []) is list
+          && d.updatedAt is timestamp
+          && (!('examinedFrom' in d) || d.examinedFrom is timestamp);
+      }
+
+      allow get, list: if isActive();
+      allow create, update: if isCounselor() && validSkippedNights();
+      allow delete: if false;
+    }
+
     /* ---------------------------------------------------------------- */
     /* config                                                            */
     /* ---------------------------------------------------------------- */
