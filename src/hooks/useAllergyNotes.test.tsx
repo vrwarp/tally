@@ -24,6 +24,7 @@ function entry(student: Student): RosterEntry {
   return {
     student,
     isRecent: false,
+    hasParticipated: false,
     attendance: null,
     rsvp: null,
     warnings: student.hasAllergies ? ['allergy'] : [],

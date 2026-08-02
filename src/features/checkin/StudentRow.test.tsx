@@ -28,6 +28,7 @@ function entry(overrides: Partial<RosterEntry> = {}): RosterEntry {
       pcoPersonId: '4200003',
     }),
     isRecent: false,
+    hasParticipated: false,
     attendance: null,
     rsvp: null,
     warnings: ['allergy'],

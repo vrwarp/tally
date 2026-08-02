@@ -26,6 +26,14 @@ export interface FilterBarProps {
   showRecent: boolean;
   /** How many students the prediction expects, for the Recent chip's count. */
   recentCount: number;
+  /**
+   * False when nobody has been here before, when everybody has, and — because
+   * only two chips fit on a phone — whenever Recent is holding the slot and the
+   * roster is not currently focused here. See `CheckInPage`.
+   */
+  showParticipated: boolean;
+  /** How many students have been to this gathering before. */
+  participatedCount: number;
   present: number;
 }
 
@@ -82,10 +90,15 @@ export function FilterBar({
   onFocusChange,
   showRecent,
   recentCount,
+  showParticipated,
+  participatedCount,
   present,
 }: FilterBarProps) {
   // Pressing the chip that is already on means "stop filtering", the same way
-  // the grade checklist clears back to All grades.
+  // the grade checklist clears back to All grades. Deliberately all the way to
+  // the whole roster rather than one rung down the Recent → Participated → all
+  // ladder: a chip that is on says what it is hiding, and turning it off should
+  // show that, not something else it was also hiding.
   const setFocus = (next: RosterFocus) => onFocusChange(focus === next ? 'all' : next);
 
   return (
@@ -104,6 +117,20 @@ export function FilterBar({
               >
                 Recent
                 <Tally active={focus === 'recent'}>{recentCount}</Tally>
+              </Chip>
+            ) : null}
+            {/* One rung wider than Recent: everyone this gathering has seen,
+                rather than only the ones tonight is expecting. It is what the
+                roster falls back to when the prediction stands down, so the
+                chip has to be here to be turned off again. */}
+            {showParticipated ? (
+              <Chip
+                active={focus === 'participated'}
+                label="Show only students who have been here before"
+                onPress={() => setFocus('participated')}
+              >
+                Participated
+                <Tally active={focus === 'participated'}>{participatedCount}</Tally>
               </Chip>
             ) : null}
             <Chip

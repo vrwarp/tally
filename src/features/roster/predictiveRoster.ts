@@ -38,14 +38,38 @@ import type {
  * layout's worst habit, and with two counselors checking the same queue in at
  * once the list reshuffled under whichever thumb was slower.
  *
- * `recent` therefore includes anyone already checked in, regardless of what the
- * prediction thought of them: a visitor quick-added mid-queue has to be visible
- * without the counselor changing filters, and an accidental tap has to stay
- * reachable so it can be undone.
+ * `recent` and `participated` are nested rather than parallel: the regulars the
+ * prediction expects tonight are a subset of everyone who has ever walked into
+ * this gathering, which is itself a subset of the ministry's whole roster. That
+ * is the ladder the check-in screen widens along — see `resolveFocus`.
+ *
+ * Both therefore include anyone already checked in, regardless of what the
+ * prediction or the history thought of them: a visitor quick-added mid-queue
+ * has to be visible without the counselor changing filters, and an accidental
+ * tap has to stay reachable so it can be undone.
  *
  * Undoing that tap must not take the row away either — see `pinned`.
  */
-export type RosterFocus = 'all' | 'recent' | 'checkedIn';
+export type RosterFocus = 'all' | 'recent' | 'participated' | 'checkedIn';
+
+/**
+ * What "has participated" is being measured against, for the screen that has to
+ * say so out loud.
+ *
+ * `gathering` — attended one of this chain's loaded past instances. The answer
+ * a counselor means by "who comes to this".
+ *
+ * `ever` — attended anything in the last year, read off the student's own
+ * `lastAttendedAt`. The fallback for an event with no history to read: a retreat
+ * that borrows from nothing, or the very first night of a new gathering. It is
+ * a weaker claim, so the roster heading says which one it is rather than letting
+ * the two look alike. Same year as everything else — a student last seen in the
+ * spring of the year before last belongs to no roster this app draws.
+ *
+ * `none` — nothing worth filtering by. An RSVP trip is already a curated list;
+ * narrowing it again could only hide somebody who said yes.
+ */
+export type ParticipationSource = 'gathering' | 'ever' | 'none';
 
 export interface RosterFilters {
   /** Free text from the persistent search bar. */
@@ -69,6 +93,8 @@ export interface RosterView {
   focus: RosterFocus;
   /** True when a search query is narrowing the list. */
   isFiltered: boolean;
+  /** What `counts.participated` counted, so the screen can say which it means. */
+  participationSource: ParticipationSource;
   counts: {
     present: number;
     /** Students eligible for this event, before search filtering. */
@@ -79,6 +105,17 @@ export interface RosterView {
     historyWindow: number;
     /** Eligible students the prediction expects, before search filtering. */
     recent: number;
+    /**
+     * Eligible students who have been to this gathering before (or, under the
+     * `ever` source, to anything), before search filtering. Zero when there is
+     * nothing to measure against.
+     */
+    participated: number;
+    /**
+     * How many past instances `participated` was drawn from — always at least
+     * `historyWindow`, and zero unless the source is `gathering`.
+     */
+    participationWindow: number;
   };
 }
 
@@ -136,6 +173,11 @@ export function effectiveThreshold(settings: AppSettings, historyWindow: number)
  * What is never borrowed *from* is another one-off: a retreat is not evidence
  * about who turns up to a retreat, whichever chain either of them names.
  *
+ * Nothing older than `PARTICIPATION_MAX_AGE_DAYS` counts, here or anywhere else
+ * the roster reads history. A prediction drawn from gatherings a year gone is
+ * not a prediction, and one rule for how far back the roster looks is easier to
+ * keep true than two.
+ *
  * A gathering that never happened is excluded too, whether it was marked
  * cancelled or merely has nobody checked in (see `wasHeld`). That filter runs
  * *before* the slice on purpose: a snowed-out Friday must cost the window
@@ -143,22 +185,101 @@ export function effectiveThreshold(settings: AppSettings, historyWindow: number)
  * regular in the ministry to "not recent".
  */
 export function buildSeriesHistory(
-  event: Pick<TallyEvent, 'id' | 'mode' | 'seriesId' | 'recurrenceRootId' | 'predictFromChain'>,
+  event: Pick<
+    TallyEvent,
+    'id' | 'mode' | 'seriesId' | 'recurrenceRootId' | 'predictFromChain' | 'startAt'
+  >,
   snapshots: readonly EventAttendanceSnapshot[],
   settings: AppSettings,
 ): EventAttendanceSnapshot[] {
+  return buildChainHistory(event, snapshots).slice(0, settings.predictiveOfLastN);
+}
+
+/**
+ * How far back a roster is willing to call somebody one of its own.
+ *
+ * A ministry turns over: the students who filled the room two years ago have
+ * graduated, and a roster that still counts them is back to being a list of
+ * everybody the church has ever met — which is the thing the participation
+ * filter exists to stop being. A year is the natural unit because a youth
+ * ministry's year is one: somebody who came at all last autumn is plausibly
+ * coming back this autumn, and somebody who did not is a name, not a student.
+ *
+ * Measured from the gathering being checked into rather than from the wall
+ * clock, so back-filling last month's register asks who belonged to the room
+ * *that* night, and so the same inputs always give the same roster.
+ */
+export const PARTICIPATION_MAX_AGE_DAYS = 365;
+
+const DAY_MS = 86_400_000;
+
+/** The oldest attendance `event` will count as participation. */
+function participationCutoff(event: Pick<TallyEvent, 'startAt'>): Date {
+  return new Date(event.startAt.getTime() - PARTICIPATION_MAX_AGE_DAYS * DAY_MS);
+}
+
+/**
+ * Every past instance of the chain from the last year, newest first, unsliced.
+ *
+ * The same selection `buildSeriesHistory` makes, minus the prediction's window.
+ * The prediction asks a narrow question — "is this student a regular *now*" —
+ * and three Fridays is the right amount of evidence for it. "Does this student
+ * belong to this gathering" is a different question and wants every Friday the
+ * app has, so the two windows are taken separately from one load rather than
+ * the wider one being inferred from the narrower.
+ *
+ * Bounded twice over: by the year above, and by what the caller passed, which is
+ * bounded in turn by how far back the check-in screen reads
+ * (`useSeriesHistoryEvents`). Whichever is tighter wins, and neither claims to
+ * be all of history — which is why the screen prints the window it actually got
+ * alongside the count.
+ */
+export function buildChainHistory(
+  event: Pick<
+    TallyEvent,
+    'id' | 'mode' | 'seriesId' | 'recurrenceRootId' | 'predictFromChain' | 'startAt'
+  >,
+  snapshots: readonly EventAttendanceSnapshot[],
+): EventAttendanceSnapshot[] {
   const chain = predictionChain(event);
   if (!chain) return [];
+  const cutoff = participationCutoff(event);
   return snapshots
     .filter(
       (snapshot) =>
         snapshot.event.id !== event.id &&
         snapshot.event.mode !== 'oneoff' &&
         chainKey(snapshot.event) === chain &&
+        // Bounded at both ends. The check-in screen only ever loads finished
+        // instances, but back-filling last month's register would otherwise
+        // count the Fridays since as evidence about who belonged to the room
+        // that night — history running backwards.
+        snapshot.event.startAt < event.startAt &&
+        snapshot.event.startAt >= cutoff &&
         wasHeld(snapshot),
     )
-    .sort((a, b) => b.event.startAt.getTime() - a.event.startAt.getTime())
-    .slice(0, settings.predictiveOfLastN);
+    .sort((a, b) => b.event.startAt.getTime() - a.event.startAt.getTime());
+}
+
+/**
+ * What this event can honestly measure participation against.
+ *
+ * An RSVP trip opts out entirely: `isEligible` has already narrowed the roster
+ * to the students who said yes, and a second filter over that list could only
+ * take away somebody who is getting on the bus.
+ *
+ * Everything else prefers the gathering's own history and falls back to the
+ * student's `lastAttendedAt` when there is none — a retreat pointed at no
+ * chain, or a gathering meeting for the first time. That fallback is worth
+ * having because the alternative is the whole ministry: on a roster synced from
+ * Planning Center, most of the names have never walked into anything.
+ */
+export function participationSource(
+  event: Pick<TallyEvent, 'requiresRsvp'>,
+  historyWindow: number,
+): ParticipationSource {
+  if (event.requiresRsvp) return 'none';
+  return historyWindow > 0 ? 'gathering' : 'ever';
 }
 
 /* -------------------------------------------------------------------------- */
@@ -245,20 +366,40 @@ export interface BuildRosterInput {
 const EMPTY_PINNED: ReadonlySet<string> = new Set();
 
 /**
- * Whether a requested focus can actually be honoured.
+ * Whether a requested focus can actually be honoured, and what to show instead.
  *
  * `recent` is the default the check-in screen opens on, so it has to fail
- * gracefully rather than present an empty list. A search is a direct lookup and
- * must reach the whole roster; and with no regulars to show there is no filter
- * to apply.
+ * gracefully rather than present an empty list. It used to fail all the way to
+ * the whole roster, which on a Planning Center sync is every teenager the church
+ * has a record of — a hundred and twenty-nine names, most of whom have never
+ * come to anything. So a stood-down `recent` lands on `participated` first and
+ * only reaches `all` when that has nothing to offer either.
+ *
+ * A search is a direct lookup and stands *both* of them down: the student in
+ * front of the counselor may well be somebody this gathering has never seen, and
+ * a search box that cannot find them is worse than a long list.
+ *
+ * `participated` is also stood down when it would not narrow anything. A filter
+ * that selects the entire roster is a chip that lies about what it is doing.
  */
 function resolveFocus(
   requested: RosterFocus,
-  context: { isFiltered: boolean; recent: number },
+  context: { isFiltered: boolean; recent: number; participated: number; eligible: number },
 ): RosterFocus {
-  if (requested !== 'recent') return requested;
-  if (context.isFiltered || context.recent === 0) return 'all';
-  return 'recent';
+  let wanted = requested;
+
+  if (wanted === 'recent') {
+    if (!context.isFiltered && context.recent > 0) return 'recent';
+    wanted = 'participated';
+  }
+
+  if (wanted === 'participated') {
+    if (!context.isFiltered && context.participated > 0 && context.participated < context.eligible)
+      return 'participated';
+    return 'all';
+  }
+
+  return wanted;
 }
 
 export function buildRoster(input: BuildRosterInput): RosterView {
@@ -269,9 +410,16 @@ export function buildRoster(input: BuildRosterInput): RosterView {
   const attendanceByStudent = new Map(attendance.map((record) => [record.studentId, record]));
   const rsvpByStudent = new Map(rsvps.map((record) => [record.studentId, record]));
 
-  const history = buildSeriesHistory(event, input.history, settings);
+  // One selection, two windows. The prediction reads the most recent few of
+  // these; "has been here before" reads all of them.
+  const chainHistory = buildChainHistory(event, input.history);
+  const history = chainHistory.slice(0, settings.predictiveOfLastN);
   const historyWindow = history.length;
   const threshold = effectiveThreshold(settings, historyWindow);
+
+  const source = participationSource(event, chainHistory.length);
+  const participationWindow = source === 'gathering' ? chainHistory.length : 0;
+  const participationSince = participationCutoff(event);
 
   // Built once for the whole pass: the matcher does the query-side work up
   // front, and knows better than a `trim()` whether anything searchable was
@@ -286,6 +434,7 @@ export function buildRoster(input: BuildRosterInput): RosterView {
   let eligible = 0;
   let presentTotal = 0;
   let recentTotal = 0;
+  let participatedTotal = 0;
 
   for (const student of students) {
     const record = attendanceByStudent.get(student.id) ?? null;
@@ -309,15 +458,36 @@ export function buildRoster(input: BuildRosterInput): RosterView {
     const recentHits = countRecentHits(student.id, history);
     const isRecent = recentHits >= threshold;
 
+    /*
+     * Being here counts as having been here.
+     *
+     * Unlike `isRecent`, which is a claim about the past and must not move when
+     * a row is tapped, this is a claim about whether the student belongs to the
+     * gathering at all — and a visitor quick-added at the door plainly does, as
+     * of tonight. Counting them keeps the filter's number and its list saying
+     * the same thing while the queue moves.
+     */
+    const participationHits =
+      source === 'gathering' ? countRecentHits(student.id, chainHistory) : 0;
+    const hasParticipated =
+      source === 'none'
+        ? false
+        : record !== null ||
+          (source === 'gathering'
+            ? participationHits > 0
+            : student.lastAttendedAt !== null && student.lastAttendedAt >= participationSince);
+
     eligible += 1;
     if (record) presentTotal += 1;
     if (isRecent) recentTotal += 1;
+    if (hasParticipated) participatedTotal += 1;
 
     if (!matcher.matches(student.searchName)) continue;
 
     matched.push({
       student,
       isRecent,
+      hasParticipated,
       attendance: record,
       rsvp: rsvp ?? null,
       warnings: computeWarnings(student),
@@ -326,7 +496,12 @@ export function buildRoster(input: BuildRosterInput): RosterView {
     });
   }
 
-  const focus = resolveFocus(filters.focus ?? 'all', { isFiltered, recent: recentTotal });
+  const focus = resolveFocus(filters.focus ?? 'all', {
+    isFiltered,
+    recent: recentTotal,
+    participated: participatedTotal,
+    eligible,
+  });
 
   const entries = matched.filter((entry) => {
     // `checkedIn` is a statement about right now and stays literal: a pinned
@@ -334,6 +509,8 @@ export function buildRoster(input: BuildRosterInput): RosterView {
     if (focus === 'checkedIn') return entry.attendance !== null;
     if (focus === 'recent')
       return entry.isRecent || entry.attendance !== null || pinned.has(entry.student.id);
+    if (focus === 'participated')
+      return entry.hasParticipated || pinned.has(entry.student.id);
     return true;
   });
 
@@ -359,12 +536,15 @@ export function buildRoster(input: BuildRosterInput): RosterView {
     entries,
     focus,
     isFiltered,
+    participationSource: source,
     counts: {
       present: presentTotal,
       eligible,
       absent: Math.max(0, eligible - presentTotal),
       historyWindow,
       recent: recentTotal,
+      participated: participatedTotal,
+      participationWindow,
     },
   };
 }

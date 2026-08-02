@@ -1111,6 +1111,296 @@ describe('buildRoster: focus', () => {
 });
 
 /* -------------------------------------------------------------------------- */
+/* buildRoster — participation                                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * "Show all 129 students" is the whole church's teenagers, not this gathering's.
+ *
+ * On a roster synced from Planning Center the eligible count is every young
+ * person the church has a record of, and most of them have never walked into
+ * anything. Participation is the middle rung that makes the way out of a filter
+ * useful: the forty who come, rather than the four hundred who could.
+ *
+ * The window is wider than the prediction's on purpose — a student who came
+ * every week until Christmas is still one of this gathering's students in
+ * February, even though nothing would call them recent.
+ */
+describe('buildRoster: participation', () => {
+  const fridays = pastFridays(6);
+  const regular = makeStudent({ id: 'regular', lastName: 'Ames' });
+  const lapsed = makeStudent({ id: 'lapsed', lastName: 'Brook' });
+  const stranger = makeStudent({ id: 'stranger', lastName: 'Crane' });
+  const students = [regular, lapsed, stranger];
+
+  /** Six Fridays: the regular at all of them, the lapsed student at the first. */
+  const history = fridays.map((friday, index) =>
+    held(friday, index === 0 ? [regular.id, lapsed.id] : [regular.id]),
+  );
+
+  it('counts everyone the gathering has seen, not only the regulars', () => {
+    const view = roster({ students, history });
+
+    expect(view.participationSource).toBe('gathering');
+    expect(view.counts).toMatchObject({
+      eligible: 3,
+      recent: 1,
+      participated: 2,
+      // The prediction reads three Fridays; participation reads all six.
+      historyWindow: 3,
+      participationWindow: 6,
+    });
+  });
+
+  it('narrows to the students who have been here before', () => {
+    const view = roster({ students, history, filters: { focus: 'participated' } });
+
+    expect(view.focus).toBe('participated');
+    expect(ids(view.entries)).toEqual([regular.id, lapsed.id]);
+  });
+
+  /**
+   * The middle rung of the ladder. A stood-down Recent used to land on the whole
+   * ministry, which is the list this feature exists to stop showing.
+   */
+  it('stands Recent down onto Participated rather than onto everybody', () => {
+    // Nobody clears the threshold: one Friday each, out of a window of three.
+    const sparse = [
+      held(fridays[3]!, [regular.id]),
+      held(fridays[4]!, [lapsed.id]),
+      held(fridays[5]!, []),
+    ];
+    const view = roster({ students, history: sparse, filters: { focus: 'recent' } });
+
+    expect(view.counts).toMatchObject({ recent: 0, participated: 2 });
+    expect(view.focus).toBe('participated');
+    expect(ids(view.entries)).toEqual([regular.id, lapsed.id]);
+  });
+
+  it('reaches the whole roster from Participated, and no sooner', () => {
+    const view = roster({ students, history, filters: { focus: 'all' } });
+
+    expect(ids(view.entries)).toEqual([regular.id, lapsed.id, stranger.id]);
+  });
+
+  /**
+   * A search is a direct lookup: the student at the door may well be one this
+   * gathering has never seen, and a search box that cannot find them is worse
+   * than a long list.
+   */
+  it('stands the filter down while a search is running', () => {
+    const view = roster({ students, history, filters: { focus: 'participated', query: 'crane' } });
+
+    expect(view.focus).toBe('all');
+    expect(ids(view.entries)).toEqual([stranger.id]);
+  });
+
+  /** A filter that selects the whole roster is a chip that lies about itself. */
+  it('stands the filter down when everybody has been here', () => {
+    const view = roster({
+      students: [regular, lapsed],
+      history,
+      filters: { focus: 'participated' },
+    });
+
+    expect(view.counts).toMatchObject({ eligible: 2, participated: 2 });
+    expect(view.focus).toBe('all');
+  });
+
+  /**
+   * Same reasoning as the Recent focus: a visitor quick-added at the door is one
+   * of this gathering's students as of tonight, and hiding them behind a filter
+   * a counselor did not touch would make the quick-add look like it failed.
+   */
+  it('treats being here as having been here', () => {
+    const view = roster({
+      students,
+      history,
+      attendance: [makeAttendance({ studentId: stranger.id, eventId: tonight.id })],
+      filters: { focus: 'participated' },
+    });
+
+    expect(view.counts.participated).toBe(3);
+    // ...which is now everybody, so the filter stands itself down.
+    expect(view.focus).toBe('all');
+    expect(view.entries.map((entry) => entry.hasParticipated)).toEqual([true, true, true]);
+  });
+
+  it('keeps a pinned student on the list once the check-in is undone', () => {
+    const view = roster({
+      students,
+      history,
+      pinned: new Set([stranger.id]),
+      filters: { focus: 'participated' },
+    });
+
+    expect(ids(view.entries)).toEqual([regular.id, lapsed.id, stranger.id]);
+    // On screen, but never counted as one of the gathering's own.
+    expect(view.counts.participated).toBe(2);
+  });
+
+  /**
+   * Series isolation, again. Sunday's crowd are strangers to Friday however
+   * faithfully they turn up on Sundays.
+   */
+  it('never borrows participation from another gathering', () => {
+    const sundays = pastSundays(4).map((sunday) => held(sunday, [stranger.id]));
+    const view = roster({ students, history: [...history, ...sundays] });
+
+    expect(view.counts.participated).toBe(2);
+    expect(view.counts.participationWindow).toBe(6);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* buildRoster — participation ages out                                        */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A ministry turns over.
+ *
+ * "Everyone who has ever been here" is, after a few years, everyone the church
+ * has ever met — the same useless list the filter exists to replace, arrived at
+ * the long way round. The students who filled the room two years ago have
+ * graduated; a roster that still counts them is not describing tonight.
+ */
+describe('buildRoster: participation ages out', () => {
+  const graduated = makeStudent({ id: 'graduated', lastName: 'Ames' });
+  const current = makeStudent({ id: 'current', lastName: 'Brook' });
+  const students = [graduated, current];
+
+  /** A Friday from two years ago, and one from last month. */
+  const longAgo = makeWeeklyEvents({
+    count: 1,
+    seriesId: FRIDAY,
+    endingBefore: new Date(NOW.getTime() - 730 * 86_400_000),
+  })[0]!;
+  const lastMonth = makeWeeklyEvents({
+    count: 1,
+    seriesId: FRIDAY,
+    endingBefore: new Date(NOW.getTime() - 30 * 86_400_000),
+  })[0]!;
+
+  it('ignores gatherings more than a year before this one', () => {
+    const view = roster({
+      students,
+      history: [held(longAgo, [graduated.id]), held(lastMonth, [current.id])],
+      filters: { focus: 'participated' },
+    });
+
+    // One Friday in the window, not two.
+    expect(view.counts).toMatchObject({ participated: 1, participationWindow: 1 });
+    expect(ids(view.entries)).toEqual([current.id]);
+  });
+
+  /**
+   * Measured from the gathering, not from the clock: back-filling a register
+   * asks who belonged to the room *that* night.
+   */
+  it('measures the year from the event being checked into', () => {
+    const backfill = makeEvent({
+      id: 'backfill',
+      seriesId: FRIDAY,
+      startAt: new Date(longAgo.startAt.getTime() + 7 * 86_400_000),
+    });
+    const view = roster({
+      event: backfill,
+      students,
+      history: [held(longAgo, [graduated.id]), held(lastMonth, [current.id])],
+      filters: { focus: 'participated' },
+    });
+
+    // The old Friday is a week back from this one; last month's is in the future.
+    expect(view.counts.participationWindow).toBe(1);
+    expect(ids(view.entries)).toEqual([graduated.id]);
+  });
+
+  /** The fallback ages out on the same year, off the student's own record. */
+  it('ignores a student last seen more than a year ago', () => {
+    const trip = makeOneOff({ id: 'retreat' });
+    const view = roster({
+      event: trip,
+      students: [
+        makeStudent({ id: 'lapsed', lastAttendedAt: new Date(NOW.getTime() - 400 * 86_400_000) }),
+        makeStudent({ id: 'recent', lastAttendedAt: new Date(NOW.getTime() - 60 * 86_400_000) }),
+      ],
+      filters: { focus: 'participated' },
+    });
+
+    expect(view.counts.participated).toBe(1);
+    expect(ids(view.entries)).toEqual(['recent']);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* buildRoster — participation on events with no history to read               */
+/* -------------------------------------------------------------------------- */
+
+describe('buildRoster: participation without a gathering', () => {
+  const been = makeStudent({ id: 'been', lastName: 'Ames', lastAttendedAt: NOW });
+  const never = makeStudent({ id: 'never', lastName: 'Brook' });
+  const students = [been, never];
+
+  /**
+   * A retreat is not the latest instance of anything, so there is no gathering
+   * history to read. The whole ministry is still the wrong answer, and the
+   * student's own record is a weaker but honest one — which is why the source is
+   * published rather than left for the screen to guess.
+   */
+  it('falls back to whether the student has ever checked in', () => {
+    const trip = makeOneOff({ id: 'retreat' });
+    const view = roster({ event: trip, students, filters: { focus: 'participated' } });
+
+    expect(view.participationSource).toBe('ever');
+    expect(view.counts).toMatchObject({ participated: 1, participationWindow: 0 });
+    expect(ids(view.entries)).toEqual([been.id]);
+  });
+
+  /** Same fallback the first time a new weekly gathering meets. */
+  it('uses it for a gathering with no instances behind it yet', () => {
+    const view = roster({ students, filters: { focus: 'participated' } });
+
+    expect(view.participationSource).toBe('ever');
+    expect(ids(view.entries)).toEqual([been.id]);
+  });
+
+  /**
+   * An RSVP roster is already the curated list. Filtering it again could only
+   * hide a student who said yes, so the filter opts out entirely.
+   */
+  it('says nothing at all about an RSVP trip', () => {
+    const trip = makeOneOff({ id: 'retreat', requiresRsvp: true });
+    const view = roster({
+      event: trip,
+      students,
+      rsvps: students.map((student) =>
+        makeRsvp({ studentId: student.id, eventId: trip.id, status: 'yes' }),
+      ),
+      filters: { focus: 'participated' },
+    });
+
+    expect(view.participationSource).toBe('none');
+    expect(view.counts).toMatchObject({ eligible: 2, participated: 0 });
+    expect(view.focus).toBe('all');
+    expect(ids(view.entries)).toEqual([been.id, never.id]);
+  });
+
+  /**
+   * A trip that names the gathering it borrows from reads that gathering's
+   * history, exactly as the prediction does.
+   */
+  it('reads the gathering a one-off points at', () => {
+    const trip = makeOneOff({ id: 'retreat', predictFromChain: FRIDAY });
+    const history = pastFridays(4).map((friday) => held(friday, [never.id]));
+    const view = roster({ event: trip, students, history, filters: { focus: 'participated' } });
+
+    expect(view.participationSource).toBe('gathering');
+    // The student Tally has never seen elsewhere is the one who comes to this.
+    expect(ids(view.entries)).toEqual([never.id]);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
 /* buildRoster — degenerate inputs                                             */
 /* -------------------------------------------------------------------------- */
 

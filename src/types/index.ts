@@ -959,6 +959,15 @@ export interface RosterEntry {
    * must not change which slice of the roster they belong to.
    */
   isRecent: boolean;
+  /**
+   * True when this student has been to this gathering before — or, for an event
+   * with no history of its own to read, to anything Tally has counted. Unlike
+   * `isRecent` this *does* include being checked in right now: it answers "does
+   * this student belong to this gathering at all", and a visitor at the door
+   * does as of tonight. Always false when there is nothing to measure against;
+   * see `ParticipationSource`.
+   */
+  hasParticipated: boolean;
   /** Present when the student is already checked in to this event. */
   attendance: AttendanceRecord | null;
   /** Present for one-off events with an RSVP roster. */
