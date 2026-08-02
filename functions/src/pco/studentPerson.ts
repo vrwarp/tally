@@ -69,7 +69,10 @@ export async function graftMergedStudent(
 ): Promise<{ studentId: string }> {
   const derived = personIdFromStudentId(studentId);
   if (!derived) {
-    await db.doc(`${PATHS.students}/${studentId}`).set({ pcoPersonId: keeperPersonId }, { merge: true });
+    // `pcoRecordMissing: false` alongside the new link: a graft is exactly how
+    // a frozen student thaws, and the flag is what the check-in rules read.
+    await db.doc(`${PATHS.students}/${studentId}`).set(
+      { pcoPersonId: keeperPersonId, pcoRecordMissing: false }, { merge: true });
     return { studentId };
   }
 
@@ -85,6 +88,7 @@ export async function graftMergedStudent(
     {
       pcoPersonId: keeperPersonId,
       status: 'active',
+      pcoRecordMissing: false,
       mergedFromStudentId: studentId,
       ...(keeperSnapshot.exists ? {} : {
         ...(old.addedToRosterAt !== undefined ? { addedToRosterAt: old.addedToRosterAt } : {}),

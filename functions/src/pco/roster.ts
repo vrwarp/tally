@@ -147,6 +147,8 @@ export interface RosterResult {
    * membership documents (`graftMergedStudent`).
    */
   relinks: Array<{ fromPersonId: string; toPersonId: string }>;
+  /** `unresolved` entries that are known gone (see `RosterHydration.missing`). */
+  missing: string[];
   /** True when the answer came from cache rather than from Planning Center. */
   cached: boolean;
   fetchedAt: string;
@@ -204,6 +206,14 @@ export interface RosterHydration {
    */
   relinks: Array<{ fromPersonId: string; toPersonId: string }>;
   /**
+   * The subset of `unresolved` that is *known gone*: the mirror answered the
+   * person's id with 410/404 and any merge trail ended dead. Distinct from
+   * could-not-look (past the lookup cap, a transient failure), because the
+   * caller freezes check-ins on this list and a student must never be frozen
+   * for being unlucky in a busy pass.
+   */
+  missing: string[];
+  /**
    * Which households each of them belongs to, keyed by Planning Center person
    * id. Free — a roster read already side-loads `households` — and deliberately
    * kept out of `RosterPerson`, because a counselor at a door has no use for it
@@ -235,7 +245,7 @@ async function hydratePeople(
   now: Date,
 ): Promise<RosterHydration> {
   const wanted = new Set(personIds);
-  if (wanted.size === 0) return { people: [], unresolved: [], households: {}, relinks: [] };
+  if (wanted.size === 0) return { people: [], unresolved: [], households: {}, relinks: [], missing: [] };
 
   const found = new Map<string, PcoPerson>();
 
@@ -253,6 +263,7 @@ async function hydratePeople(
 
   const stragglers = [...wanted].filter((id) => !found.has(id));
   const unresolved: string[] = [];
+  const missing: string[] = [];
   const relinks: Array<{ fromPersonId: string; toPersonId: string }> = [];
 
   for (const personId of stragglers.slice(0, MAX_INDIVIDUAL_LOOKUPS)) {
@@ -280,6 +291,7 @@ async function hydratePeople(
       const link = await followPersonLink(client, personId, error);
       if (link.outcome === 'gone') {
         unresolved.push(personId);
+        missing.push(personId);
         continue;
       }
       try {
@@ -330,7 +342,7 @@ async function hydratePeople(
   }
 
   people.sort((a, b) => (a.searchName < b.searchName ? -1 : a.searchName > b.searchName ? 1 : 0));
-  return { people, unresolved, households, relinks };
+  return { people, unresolved, households, relinks, missing };
 }
 
 export interface RosterOptions {
@@ -364,6 +376,7 @@ export async function fetchRoster(
     people: hydrated.people,
     unresolved: hydrated.unresolved,
     relinks: hydrated.relinks,
+    missing: hydrated.missing,
     cached: cache.stats.misses === before,
     fetchedAt: now.toISOString(),
   };

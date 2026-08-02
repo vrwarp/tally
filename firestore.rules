@@ -211,6 +211,20 @@ service cloud.firestore {
         return after.get('pcoPersonId', null) == before.get('pcoPersonId', null);
       }
 
+      /**
+       * `pcoRecordMissing` is what freezes a student's check-ins when their
+       * Planning Center record dies, and it is set and cleared server-side
+       * from what Planning Center actually answers. A client that could flip
+       * it would be a client that can thaw a frozen student by asserting the
+       * record came back — so, like the linkage it rides on, it is not a
+       * client's to write.
+       */
+      function pcoRecordFlagUnchanged() {
+        let after = request.resource.data;
+        let before = resource == null ? {} : resource.data;
+        return after.get('pcoRecordMissing', false) == before.get('pcoRecordMissing', false);
+      }
+
       allow get, list: if isActive();
 
       // Quick-add happens at the door, and check-in itself writes
@@ -218,11 +232,13 @@ service cloud.firestore {
       allow create: if isCounselor()
                     && validStudent()
                     && noMirroredPersonalData()
-                    && pcoLinkageUnclaimed();
+                    && pcoLinkageUnclaimed()
+                    && request.resource.data.get('pcoRecordMissing', false) == false;
       allow update: if isCounselor()
                     && validStudent()
                     && noMirroredPersonalData()
-                    && pcoLinkageUnchanged();
+                    && pcoLinkageUnchanged()
+                    && pcoRecordFlagUnchanged();
 
       // Never. Attendance documents reference students by id; deleting one
       // would silently orphan history. Set `status: 'inactive'` instead.
@@ -306,9 +322,25 @@ service cloud.firestore {
             && d.checkedInBy == request.auth.uid;
         }
 
+        /**
+         * A student whose Planning Center record died is frozen: no check-in,
+         * no un-check-in, past events included, until somebody removes them
+         * from the roster or re-creates the record. The flag lives on the
+         * membership document and only the server writes it, so this is not a
+         * client honour system — a stale tab back-filling a deleted student
+         * into last month's gathering is refused by the database. The
+         * `exists()` guard keeps the historical behaviour for a student with
+         * no document yet: check-in is frequently what creates it.
+         */
+        function checkInFrozen() {
+          return exists(/databases/$(database)/documents/students/$(studentId))
+            && get(/databases/$(database)/documents/students/$(studentId))
+                 .data.get('pcoRecordMissing', false) == true;
+        }
+
         allow get, list: if isActive();
-        allow create, update: if isCounselor() && validAttendance();
-        allow delete: if isCounselor();
+        allow create, update: if isCounselor() && validAttendance() && !checkInFrozen();
+        allow delete: if isCounselor() && !checkInFrozen();
       }
 
       /**

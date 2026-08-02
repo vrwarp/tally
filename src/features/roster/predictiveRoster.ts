@@ -202,6 +202,9 @@ export function computeWarnings(student: Student): RosterWarning[] {
   // `=== false` deliberately, not falsy: `null` means nobody has checked, and a
   // badge on every row is a badge nobody reads.
   if (student.profileComplete === false) warnings.push('incomplete-profile');
+  // Their Planning Center record is known dead, so the rules will refuse the
+  // check-in; the row has to say so before the tap, not after it fails.
+  if (student.pcoRecordMissing === true) warnings.push('record-missing');
   return warnings;
 }
 

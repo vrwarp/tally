@@ -130,6 +130,7 @@ export function toStudent(snapshot: DocumentSnapshot<DocumentData>): Student {
     isVisitor: bool(data.isVisitor),
     pcoPersonId,
     pcoPushPending: bool(data.pcoPushPending),
+    pcoRecordMissing: bool(data.pcoRecordMissing),
     // A Tally document describes somebody Planning Center has not told us
     // about, so this is false by construction. When Planning Center *does* know
     // them, the roster entry wins and carries the real value.

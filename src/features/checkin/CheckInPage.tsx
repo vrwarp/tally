@@ -284,6 +284,14 @@ export function CheckInPage() {
       if (inFlight.current.has(studentId)) return;
 
       const name = studentFullName(entry.student);
+      if (entry.student.pcoRecordMissing === true) {
+        // The rules would refuse the write anyway; saying why beats a generic
+        // failure toast after an optimistic green flash.
+        const frozen = `${name} is frozen — their Planning Center record was deleted or merged away. Fix it from their student page first.`;
+        setAnnouncement(frozen);
+        show(frozen, { tone: 'error' });
+        return;
+      }
       inFlight.current.add(studentId);
       setBusy(studentId, true);
 

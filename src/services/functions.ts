@@ -82,6 +82,13 @@ export interface RosterResponse {
    * Optional so an older server answering without it still parses.
    */
   relinks?: Array<{ fromPersonId: string; toPersonId: string }>;
+  /**
+   * `unresolved` entries that are known gone — deleted upstream, or merged
+   * with the trail ending dead. Their membership documents are frozen for
+   * check-ins until somebody removes or re-creates them. Optional so an older
+   * server answering without it still parses.
+   */
+  missing?: string[];
   /** True when Planning Center was not asked, because a recent answer was reused. */
   cached: boolean;
   fetchedAt: string;
@@ -279,6 +286,34 @@ export const pushStudentToPlanningCenter = httpsCallable<
   { studentId: string },
   PushStudentResult
 >(functions, 'pushStudentToPlanningCenter');
+
+export interface RecreateStudentResult {
+  status:
+    | 'no-student'
+    | 'not-linked'
+    | 'disabled'
+    | 'still-there'
+    | 'relinked'
+    | 'needs-details'
+    | 'recreated';
+  message: string;
+  pcoPersonId?: string;
+  /** The student id to carry on with — changes when the membership migrated. */
+  studentId?: string;
+}
+
+/**
+ * Puts a person back in Planning Center for a student whose record died there
+ * — the sanctioned thaw for a check-in freeze. Careful by design: a record
+ * that still exists only clears the flag, and a merge with a living survivor
+ * relinks instead of creating the duplicate the admin just cleaned up. A
+ * `pco_…` student's document holds no name, so `needs-details` asks the
+ * caller to supply one.
+ */
+export const recreatePlanningCenterPerson = httpsCallable<
+  { studentId: string; firstName?: string; lastName?: string; grade?: number },
+  RecreateStudentResult
+>(functions, 'recreatePlanningCenterPerson');
 
 export interface SetParentContactResult {
   status:

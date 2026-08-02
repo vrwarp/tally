@@ -127,6 +127,14 @@ export interface StudentDoc {
   pcoPersonId: string | null;
   /** A Tally-created student still waiting to be pushed to Planning Center. */
   pcoPushPending: boolean;
+  /**
+   * True while the linked Planning Center record is known gone — deleted, or
+   * merged with the trail ending dead. Written only by the server, from what
+   * Planning Center actually answered; the rules refuse it from a client and
+   * refuse check-ins while it stands. A leader thaws the student by removing
+   * them from the roster or re-creating the record.
+   */
+  pcoRecordMissing?: boolean;
 
   /** Lowercased "first last", used for the substring search fallback. */
   searchName: string;
@@ -929,7 +937,7 @@ export function personIdFromStudentId(studentId: string): string | null {
  * All of them are "worth knowing", none of them stops a check-in: nothing in
  * Tally decides whether a student may be marked present.
  */
-export type RosterWarning = 'incomplete-profile' | 'allergy';
+export type RosterWarning = 'incomplete-profile' | 'allergy' | 'record-missing';
 
 export interface RosterEntry {
   student: Student;
