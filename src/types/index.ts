@@ -127,6 +127,14 @@ export interface StudentDoc {
   pcoPersonId: string | null;
   /** A Tally-created student still waiting to be pushed to Planning Center. */
   pcoPushPending: boolean;
+  /**
+   * True while the linked Planning Center record is known gone — deleted, or
+   * merged with the trail ending dead. Written only by the server, from what
+   * Planning Center actually answered; the rules refuse it from a client and
+   * refuse check-ins while it stands. A leader thaws the student by removing
+   * them from the roster or re-creating the record.
+   */
+  pcoRecordMissing?: boolean;
 
   /** Lowercased "first last", used for the substring search fallback. */
   searchName: string;
@@ -188,10 +196,19 @@ export interface Student
    */
   birthday: string | null;
   /**
-   * Whether Planning Center holds a grade of its own for this person, or the
-   * `grade` above is only the clamp's landing spot. Present on roster-sourced
-   * rows; absent on documents, where the grade was typed by a human and is
-   * always real. `mergeRoster` is the one reader — see the note there.
+   * Whether anybody holds a grade of their own for this person, or the `grade`
+   * above is only where a fallback landed.
+   *
+   * Present on roster-sourced rows, where Planning Center answers it. Absent on
+   * a document that carries a grade — one typed by a human at quick-add, always
+   * real — and `false` on one that carries none, which is an annotation written
+   * against somebody Planning Center holds no grade for.
+   *
+   * Three readers. `gradeLabel` keeps every screen from printing the fallback
+   * as a fact, which is what turned the adults on a hand-picked roster into 6th
+   * graders; `mergeRoster` lets a grade a human typed at quick-add out-rank one
+   * — see the note there; and `updateStudent` declines to write one down, so a
+   * document that outlives its roster row is not left asserting it.
    */
   gradeOnFile?: boolean;
 }
@@ -599,9 +616,11 @@ export interface PcoRosterPerson {
   /**
    * *That* there is an allergy, never what it is.
    *
-   * A counselor at a door needs to know to check; the note itself is medical
-   * information about a minor and stays behind `getPersonDetails`. A boolean is
-   * enough to render the badge that makes somebody look.
+   * A roster is read for everybody at once, and the note is medical information
+   * about a minor — so it is not carried here for four hundred students on the
+   * chance that four of them are looked at. The flag is what a badge needs; the
+   * note behind it is asked for separately, for the flagged rows only, through
+   * `getAllergyNotes`.
    */
   hasAllergies: boolean;
   /**
@@ -929,7 +948,7 @@ export function personIdFromStudentId(studentId: string): string | null {
  * All of them are "worth knowing", none of them stops a check-in: nothing in
  * Tally decides whether a student may be marked present.
  */
-export type RosterWarning = 'incomplete-profile' | 'allergy';
+export type RosterWarning = 'incomplete-profile' | 'allergy' | 'record-missing';
 
 export interface RosterEntry {
   student: Student;

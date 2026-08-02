@@ -113,6 +113,23 @@ describe('toStudent', () => {
     expect(own.profileComplete).toBe(false);
   });
 
+  it('flags a document that holds no grade, rather than letting the 6 pass as one', () => {
+    // An annotation written against somebody Planning Center holds no grade
+    // for. `grade` still answers a number because the filters downstream want
+    // one; the flag is what stops it being printed as a fact.
+    const annotated = toStudent(fakeSnapshot({ data: { pcoPersonId: '4200099', notes: 'Drives' } }));
+
+    expect(annotated.grade).toBe(6);
+    expect(annotated.gradeOnFile).toBe(false);
+  });
+
+  it('says nothing about a grade a human typed, because there is nothing to say', () => {
+    const visitor = toStudent(fakeSnapshot({ data: { grade: 9 } }));
+
+    expect(visitor.grade).toBe(9);
+    expect(visitor.gradeOnFile).toBeUndefined();
+  });
+
   it('leaves attendance markers null until the student has been checked in', () => {
     const student = toStudent(fakeSnapshot({ data: {} }));
     expect(student.firstAttendedAt).toBeNull();

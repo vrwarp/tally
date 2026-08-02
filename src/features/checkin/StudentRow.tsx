@@ -8,7 +8,7 @@
 import { memo } from 'react';
 import { WarningBadge } from '@/components/ui';
 import { formatClock } from '@/lib/time';
-import { cn, initials, ordinalGrade, sameItems } from '@/lib/utils';
+import { cn, gradeLabel, initials, NO_GRADE, sameItems } from '@/lib/utils';
 import { studentFullName, type RosterEntry } from '@/types';
 
 export interface StudentRowProps {
@@ -24,6 +24,14 @@ export interface StudentRowProps {
    * the unfiltered list now that they no longer sit in a block of their own.
    */
   showRecentHint?: boolean;
+  /**
+   * What the allergy is, when Planning Center has been asked and answered.
+   *
+   * Absent — no answer yet, no note on file, or a read that failed — leaves the
+   * badge saying `Allergy` on its own, which is what it always said. See
+   * `useAllergyNotes`.
+   */
+  allergyNote?: string;
 }
 
 /**
@@ -52,15 +60,25 @@ export const StudentRow = memo(function StudentRow({
   flashing = false,
   busy = false,
   showRecentHint = false,
+  allergyNote,
 }: StudentRowProps) {
   const { student, attendance, warnings, isRecent, recentHits, recentWindow } = entry;
   const name = studentFullName(student);
-  const grade = ordinalGrade(student.grade);
+  const grade = gradeLabel(student);
   const showHint = showRecentHint && isRecent && recentWindow > 0;
 
-  const label = attendance
-    ? `Undo check-in for ${name}, ${grade} grade, checked in at ${formatClock(attendance.checkedInAt)}`
-    : `Check in ${name}, ${grade} grade`;
+  // Null for somebody Planning Center holds no grade for — an adult on a
+  // hand-picked roster. The clause goes rather than announcing a grade Tally
+  // invented, which on this screen is read aloud beside a name.
+  const gradeClause = grade ? `, ${grade} grade` : '';
+  const action = attendance
+    ? `Undo check-in for ${name}${gradeClause}, checked in at ${formatClock(attendance.checkedInAt)}`
+    : `Check in ${name}${gradeClause}`;
+  // The row is one button with one label, so nothing inside it is announced on
+  // its own — the note has to be part of the label or it is not read out at all.
+  // Last, after the action: the verb is what a screen reader user is scanning
+  // for, and hearing "allergy" first on every flagged row would bury it.
+  const label = allergyNote ? `${action}. Allergy: ${allergyNote}` : action;
 
   return (
     <li>
@@ -107,11 +125,14 @@ export const StudentRow = memo(function StudentRow({
               <span className="font-semibold">{student.firstName}</span>{' '}
               <span className="font-normal text-ink-300">{student.lastName}</span>
             </span>
-            <span className="shrink-0 text-xs font-medium text-ink-500">{grade}</span>
+            <span className="shrink-0 text-xs font-medium text-ink-500">{grade ?? NO_GRADE}</span>
           </span>
 
           {warnings.length > 0 || showHint ? (
-            <span className="mt-1 flex flex-wrap items-center gap-1">
+            // `items-start`, because the allergy badge is allowed to be several
+            // lines tall when the note is long: everything beside it should sit
+            // at its first line rather than halfway down it.
+            <span className="mt-1 flex flex-wrap items-start gap-1">
               {/*
                 The ratio leads, badges trail. It is set in tabular numerals —
                 somebody wanted it to line up — and a badge laid out ahead of it
@@ -128,7 +149,11 @@ export const StudentRow = memo(function StudentRow({
                 </span>
               ) : null}
               {warnings.map((warning) => (
-                <WarningBadge key={warning} warning={warning} />
+                <WarningBadge
+                  key={warning}
+                  warning={warning}
+                  detail={warning === 'allergy' ? allergyNote : undefined}
+                />
               ))}
             </span>
           ) : null}
@@ -153,4 +178,5 @@ export const StudentRow = memo(function StudentRow({
   prev.flashing === next.flashing &&
   prev.busy === next.busy &&
   prev.showRecentHint === next.showRecentHint &&
+  prev.allergyNote === next.allergyNote &&
   sameEntry(prev.entry, next.entry));

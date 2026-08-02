@@ -167,6 +167,21 @@ describe('DataProvider, when a read comes back different', () => {
     expect(latest?.students[0]?.birthday).toBe('12-14');
   });
 
+  it('publishes a roster whose only change is whether the grade is real', async () => {
+    // The same trap as the birthday, one field along. `grade` alone cannot see
+    // this: somebody whose grade upstream is filled in *as* the number the
+    // clamp had already parked them on changes only the flag — and the row
+    // would go on saying "No grade" over a grade the church office just typed.
+    mount();
+    await waitFor(() => expect(latest?.rosterLoading).toBe(false));
+    const before = latest?.students;
+
+    await readAgainWith([makeStudent({ id: 'pco_1', grade: 8, gradeOnFile: false })]);
+
+    await waitFor(() => expect(latest?.students).not.toBe(before));
+    expect(latest?.students[0]?.gradeOnFile).toBe(false);
+  });
+
   it('still drops one that changed nothing at all', async () => {
     mount();
     await waitFor(() => expect(latest?.rosterLoading).toBe(false));

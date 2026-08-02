@@ -61,7 +61,11 @@ function rosterSignature(students: readonly Student[]): string {
   return students
     .map(
       (s) =>
-        `${s.id}|${s.firstName}|${s.lastName}|${s.grade}|${s.status}|${s.profileComplete}|${s.hasAllergies}|${s.birthday}`,
+        // `gradeOnFile` rides alongside `grade` because the pair is what gets
+        // drawn: a person whose grade upstream was filled in *as* the number
+        // the clamp had already parked them on changes only this flag, and the
+        // row would go on saying "No grade" until somebody reloaded.
+        `${s.id}|${s.firstName}|${s.lastName}|${s.grade}|${s.gradeOnFile}|${s.status}|${s.profileComplete}|${s.hasAllergies}|${s.birthday}`,
     )
     .join('\n');
 }

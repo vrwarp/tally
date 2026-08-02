@@ -185,7 +185,7 @@ because a student can exist in Tally before they exist in Planning Center.
 | Field | Type | Notes |
 | --- | --- | --- |
 | `firstName`, `lastName` | string | Managed by Planning Center once linked. |
-| `grade` | 6–12 | Managed by Planning Center. The `Grade` type admits nothing else. |
+| `grade` | 6–12, or absent | Managed by Planning Center. The `Grade` type admits nothing else — and *absent* is a real state, not a malformed document: for somebody Planning Center holds neither a grade nor a graduation year for, the number on their roster row is only where the sync's clamp landed, and nothing writes it down. See `gradeOnFile`. |
 | `parentName`, `parentPhone`, `parentEmail` | string \| null | One guardian contact. Written by the sync only when Planning Center actually knows a value — blanking a number a counselor collected at a retreat would be unrecoverable data loss. |
 | `allergies` | string \| null | Managed by Planning Center (`medical_notes`). Raises a badge on the roster row. |
 | `notes` | string \| null | Tally's own, free text. |

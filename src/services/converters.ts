@@ -125,11 +125,25 @@ export function toStudent(snapshot: DocumentSnapshot<DocumentData>): Student {
     firstName,
     lastName,
     grade: grade(data.grade),
+    /*
+     * A document that holds no grade at all.
+     *
+     * That is an annotation written against somebody Planning Center holds no
+     * grade for — `updateStudent` deliberately declines to invent one. `grade`
+     * above still answers 6, because `Student.grade` is a number and the
+     * filters and counters downstream want one; this flag is what stops that 6
+     * being *printed* as a fact. See `gradeLabel`.
+     *
+     * Absent rather than `true` for a document that does carry a grade: a
+     * quick-added visitor's grade was typed by a human and needs no flag.
+     */
+    ...(isGrade(data.grade) ? {} : { gradeOnFile: false }),
     notes: strOrNull(data.notes),
     status: data.status === 'inactive' ? 'inactive' : 'active',
     isVisitor: bool(data.isVisitor),
     pcoPersonId,
     pcoPushPending: bool(data.pcoPushPending),
+    pcoRecordMissing: bool(data.pcoRecordMissing),
     // A Tally document describes somebody Planning Center has not told us
     // about, so this is false by construction. When Planning Center *does* know
     // them, the roster entry wins and carries the real value.

@@ -16,7 +16,7 @@ import { Link } from 'react-router-dom';
 import { Card, CardHeader, EmptyState } from '@/components/ui';
 import { CopyContactsButton, FollowUpActions } from '@/features/dashboard/FollowUpActions';
 import { formatRelative, formatShortDate } from '@/lib/time';
-import { initials, ordinalGrade } from '@/lib/utils';
+import { gradeLabel, initials } from '@/lib/utils';
 import { studentFullName, type MiaStudent } from '@/types';
 
 export interface MiaListProps {
@@ -95,6 +95,7 @@ function MiaRow({
 }) {
   const { student, consecutiveMisses, lastAttendedAt, lastAttendedEventTitle } = item;
   const name = studentFullName(student);
+  const grade = gradeLabel(student);
 
   /*
    * The gathering is named once per row, not twice.
@@ -151,8 +152,10 @@ function MiaRow({
           <span className="truncate text-xs text-ink-500">
             {/* The grade is the least load-bearing of the three facts on this
                 line and it leads it, so at 390px it is what pushes the last-seen
-                date — the reason the row exists — into an ellipsis. */}
-            <span className="hidden lg:inline">{ordinalGrade(student.grade)} grade · </span>
+                date — the reason the row exists — into an ellipsis. An adult
+                Planning Center holds no grade for says nothing here at all
+                rather than "No grade", for the same reason. */}
+            {grade ? <span className="hidden lg:inline">{grade} grade · </span> : null}
             {lastSeen}
           </span>
           {showGathering ? (

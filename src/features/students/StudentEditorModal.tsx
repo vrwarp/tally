@@ -35,6 +35,7 @@ import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { AddParentContact } from '@/features/students/AddParentContact';
 import { BirthdayField } from '@/features/students/EditBirthday';
+import { invalidateAllergyNotes } from '@/hooks/useAllergyNotes';
 import { invalidatePersonDetails, usePersonDetails } from '@/hooks/usePersonDetails';
 import {
   BLANK_BIRTHDAY_FIELD,
@@ -73,7 +74,18 @@ interface FormState {
   firstName: string;
   nickname: string;
   lastName: string;
-  grade: Grade;
+  /**
+   * Null for a linked student Planning Center holds no grade for — nothing
+   * selected, rather than the bottom of the range.
+   *
+   * The number on their row is where the sync's clamp landed, not a grade
+   * anybody holds (see `gradeLabel`). Opening the form on it would have a
+   * leader press Save on a 6th grade they never chose, and under
+   * `PCO_WRITE_BACK=full` that writes the 6 onto a grown adult upstream. Null
+   * means "not part of this edit", exactly as `undefined` does on the patch
+   * `updateStudentProfile` takes.
+   */
+  grade: Grade | null;
   /** Planning Center's `medical_notes`. Only ever editable on a linked student. */
   allergies: string;
   /**
@@ -103,7 +115,7 @@ function fromStudent(student: Student | null): FormState {
     firstName: name.firstName,
     nickname: name.nickname ?? '',
     lastName: student.lastName,
-    grade: student.grade,
+    grade: student.gradeOnFile === false ? null : student.grade,
     // Not on the student at all — it is read one person at a time and seeded
     // below, once the details land.
     allergies: '',
@@ -135,6 +147,7 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
   const [errors, setErrors] = useState<{
     firstName?: string;
     lastName?: string;
+    grade?: string;
     birthday?: string;
   }>({});
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -174,6 +187,22 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
   const managedHint = 'Managed in Planning Center';
   const upstreamHint = 'Saved in Planning Center';
 
+  /**
+   * Whether Planning Center holds no grade for this student.
+   *
+   * Only ever true for a linked one: the flag rides on roster rows, and a
+   * student Tally created holds the grade a human typed. That is what lets the
+   * two paths below store a grade without ever having to invent one.
+   */
+  const gradeUnknown = student?.gradeOnFile === false;
+  const gradeHint = locked('grade')
+    ? managedHint
+    : !writable
+      ? undefined
+      : gradeUnknown
+        ? 'Planning Center holds no grade for them. Choosing one adds it there.'
+        : upstreamHint;
+
   const update = <K extends keyof FormState>(field: K, value: FormState[K]) =>
     setForm((current) => ({ ...current, [field]: value }));
 
@@ -197,7 +226,14 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
       firstName: form.firstName.trim(),
       nickname: form.nickname.trim() || null,
       lastName,
-      grade: form.grade,
+      /*
+       * Omitted when the form showed no grade, on the same terms as the
+       * birthday below: `undefined` is how this patch says "not part of the
+       * edit", and a student Planning Center holds no grade for opened on
+       * nothing selected. Sending the clamp instead would write a 6th grade
+       * nobody chose onto a person upstream.
+       */
+      ...(form.grade === null ? {} : { grade: form.grade }),
       /*
        * Omitted unless it changed, unlike every other managed field here.
        *
@@ -276,7 +312,10 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
         if (!linked) {
           patch.firstName = firstName;
           patch.lastName = lastName;
-          patch.grade = form.grade;
+          // Never null here — the blank option is only rendered for a linked
+          // student — and left out rather than defaulted if it somehow were,
+          // because the one thing that must not be written is an invented one.
+          if (form.grade !== null) patch.grade = form.grade;
           patch.status = form.status;
         }
         /*
@@ -288,12 +327,24 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
          * directly — and `updateStudent` refreshes it from here. Handing it the
          * pre-edit name would leave `students/pco_…` asserting a spelling
          * Planning Center no longer holds.
+         *
+         * The grade is flagged rather than just passed, because `updateStudent`
+         * backfills it onto that document: a blank one must not be written down
+         * as the clamp's 6, which would put the invented number somewhere the
+         * roster no longer governs.
          */
         await updateStudent(
           student.id,
           patch,
           user.uid,
-          writable ? { firstName, lastName, grade: form.grade } : student,
+          writable
+            ? {
+                firstName,
+                lastName,
+                grade: form.grade ?? student.grade,
+                gradeOnFile: form.grade !== null,
+              }
+            : student,
         );
 
         if (writable) {
@@ -303,10 +354,21 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
           // about to close — whoever opened it asks again.
           await refreshRoster(true);
           invalidatePersonDetails(student.id);
+          // And the notes the check-in badges print, which are held separately
+          // and would otherwise go on showing the allergy as it was typed
+          // before this edit — on the screen that acts on it.
+          invalidateAllergyNotes();
           onSaved?.();
         }
         show(message, { tone: 'success' });
       } else {
+        // Create mode never shows the blank option — there is no student to
+        // hold no grade — so this refuses nothing anybody can reach. It is here
+        // so the one grade Tally stores itself can never be an invented one.
+        if (form.grade === null) {
+          setErrors({ grade: 'Pick a grade' });
+          return;
+        }
         await createStudent(
           {
             firstName,
@@ -431,11 +493,29 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
 
         <SelectField
           label="Grade"
-          value={form.grade}
-          onChange={(changed) => update('grade', Number(changed.target.value) as Grade)}
-          hint={locked('grade') ? managedHint : writable ? upstreamHint : undefined}
+          value={form.grade ?? ''}
+          onChange={(changed) =>
+            update('grade', changed.target.value ? (Number(changed.target.value) as Grade) : null)
+          }
+          hint={gradeHint}
+          error={errors.grade ?? null}
           disabled={locked('grade')}
         >
+          {/*
+            Nothing selected for a student Planning Center holds no grade for.
+
+            The alternative was what this form used to do: open on the sync's
+            clamp, so an adult volunteer's edit form said "6th grade" and Save
+            agreed with it — silently under `create`, and straight onto their
+            Planning Center record under `full`. A leader who knows the answer
+            can still pick one, which is the whole point of offering the box;
+            what they cannot do any more is supply one by not looking.
+
+            Kept selectable rather than removed once they pick, so choosing a
+            grade in this form stays undoable without closing it. Going back to
+            it means the save carries no grade at all, not a grade cleared.
+          */}
+          {gradeUnknown ? <option value="">No grade</option> : null}
           {GRADES.map((value) => (
             <option key={value} value={value}>
               {ordinalGrade(value)} grade

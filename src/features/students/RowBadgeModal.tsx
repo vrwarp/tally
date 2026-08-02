@@ -92,6 +92,11 @@ export function RowBadgeModal({ student, action, onClose, now }: RowBadgeModalPr
  * children's medical notes are not sent to a phone at a door. The badge says
  * *that* there is one; this is the screen where somebody with a reason asks
  * what it is, and it is one read for one student.
+ *
+ * The check-in screen asks too now — see `useAllergyNotes` — but only about the
+ * handful of rows already wearing the flag, and through a call that returns the
+ * allergy line and nothing else. This panel stays the wide read, because a
+ * profile is where somebody is *reading* rather than counting.
  */
 function AllergyPanel({ student }: { student: Student }) {
   const { details, loading, loaded, error, unavailable, retry } = usePersonDetails(student);

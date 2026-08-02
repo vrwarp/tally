@@ -516,6 +516,70 @@ describe('attendance', () => {
   });
 });
 
+describe('the check-in freeze (pcoRecordMissing)', () => {
+  /** Server-writes a student whose Planning Center record is known gone. */
+  async function seedFrozenStudent(studentId: string): Promise<void> {
+    await env.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), paths.student(studentId)),
+        studentDoc({ pcoPersonId: '77001', pcoPushPending: false, pcoRecordMissing: true }),
+      );
+    });
+  }
+
+  it('refuses to check a frozen student in — past events included', async () => {
+    await seedFrozenStudent(ID.otherStudent);
+    const db = asUser(env, UID.counselor);
+    await assertFails(
+      setDoc(
+        doc(db, paths.attendance(ID.event, ID.otherStudent)),
+        attendanceDoc({ studentId: ID.otherStudent, checkedInBy: UID.counselor }),
+      ),
+    );
+  });
+
+  it('refuses to undo a frozen student’s existing check-in', async () => {
+    await seedFrozenStudent(ID.student);
+    const db = asUser(env, UID.counselor);
+    await assertFails(deleteDoc(doc(db, paths.attendance(ID.event, ID.student))));
+  });
+
+  it('still lets a student with no document be checked in (quick-add creates it)', async () => {
+    const db = asUser(env, UID.counselor);
+    await assertSucceeds(
+      setDoc(
+        doc(db, paths.attendance(ID.event, 'brand-new-student')),
+        attendanceDoc({ studentId: 'brand-new-student', checkedInBy: UID.counselor }),
+      ),
+    );
+  });
+
+  it('rejects a client asserting the flag on create', async () => {
+    const db = asUser(env, UID.counselor);
+    await assertFails(
+      setDoc(
+        doc(db, paths.student('forged-frozen')),
+        studentDoc({ pcoRecordMissing: true }),
+      ),
+    );
+  });
+
+  it('rejects a client thawing the flag by update', async () => {
+    await seedFrozenStudent(ID.otherStudent);
+    const db = asUser(env, UID.counselor);
+    await assertFails(
+      updateDoc(doc(db, paths.student(ID.otherStudent)), { pcoRecordMissing: false }),
+    );
+  });
+
+  it('rejects a client freezing somebody else by update', async () => {
+    const db = asUser(env, UID.counselor);
+    await assertFails(
+      updateDoc(doc(db, paths.student(ID.student)), { pcoRecordMissing: true }),
+    );
+  });
+});
+
 describe('rsvps', () => {
   it('rejects a counselor changing the RSVP status', async () => {
     const db = asUser(env, UID.counselor);

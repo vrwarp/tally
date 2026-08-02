@@ -34,6 +34,7 @@ import { RosterList } from '@/features/checkin/RosterList';
 import { SearchBar } from '@/features/checkin/SearchBar';
 import { buildRoster, type RosterFocus } from '@/features/roster/predictiveRoster';
 import { useActiveEvent, useSeriesHistoryEvents } from '@/hooks/useActiveEvent';
+import { useAllergyNotes } from '@/hooks/useAllergyNotes';
 import { useAttendance, useRsvps } from '@/hooks/useAttendance';
 import { useHeightVar } from '@/hooks/useHeightVar';
 import { invalidateSnapshotCache, useEventSnapshots } from '@/hooks/useEventSnapshots';
@@ -59,6 +60,9 @@ const BAND = pageFrameWidth({ width: '3xl', widen: false });
 
 /** Long enough to register as confirmation, short enough not to lag the queue. */
 const FLASH_MS = 700;
+
+/** A stable empty list, for the renders before an event has been chosen. */
+const NO_ENTRIES: readonly RosterEntry[] = [];
 
 /**
  * How long the screen waits for the prediction before giving up on it.
@@ -213,6 +217,17 @@ export function CheckInPage() {
     });
   }, [event, students, attendance, rsvps, snapshots, settings, query, grades, focus, pinned]);
 
+  /*
+   * What the flagged rows are actually allergic to.
+   *
+   * Asked for the rows on screen rather than for the whole ministry, and only
+   * for the ones the roster read already flagged — the point of the read is that
+   * a counselor can act on the badge without leaving the queue, not that the
+   * device ends up holding four hundred children's medical notes. A row whose
+   * note has not landed, or could not be read, keeps the badge it always had.
+   */
+  const allergyNotes = useAllergyNotes(roster?.entries ?? NO_ENTRIES);
+
   /* ---- Waiting for the prediction ---------------------------------------- */
 
   /**
@@ -286,6 +301,14 @@ export function CheckInPage() {
       if (inFlight.current.has(studentId)) return;
 
       const name = studentFullName(entry.student);
+      if (entry.student.pcoRecordMissing === true) {
+        // The rules would refuse the write anyway; saying why beats a generic
+        // failure toast after an optimistic green flash.
+        const frozen = `${name} is frozen — their Planning Center record was deleted or merged away. Fix it from their student page first.`;
+        setAnnouncement(frozen);
+        show(frozen, { tone: 'error' });
+        return;
+      }
       inFlight.current.add(studentId);
       setBusy(studentId, true);
 
@@ -535,6 +558,7 @@ export function CheckInPage() {
               onPress={onPress}
               flashing={flashing}
               busy={pending}
+              allergyNotes={allergyNotes}
             />
 
             {/* The way back out. A filtered list looks exactly like a short

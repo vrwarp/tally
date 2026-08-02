@@ -23,7 +23,7 @@ import { AddParentContactButton } from '@/features/dashboard/AddParentContactBut
 import { FollowUpActions } from '@/features/dashboard/FollowUpActions';
 import { hasNoParentContact, reachableFor } from '@/features/dashboard/insights';
 import { formatRelative, formatShortDate } from '@/lib/time';
-import { initials, ordinalGrade } from '@/lib/utils';
+import { gradeLabel, initials, NO_GRADE } from '@/lib/utils';
 import { studentFullName, type NewVisitor } from '@/types';
 
 export interface NewVisitorListProps {
@@ -137,7 +137,7 @@ function NewVisitorRow({
               {studentFullName(student)}
             </span>
             <span className="shrink-0 text-xs text-ink-500">
-              {ordinalGrade(student.grade)}
+              {gradeLabel(student) ?? NO_GRADE}
             </span>
           </span>
           <span className="truncate text-xs text-ink-500">

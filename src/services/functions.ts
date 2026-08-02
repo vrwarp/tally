@@ -82,6 +82,13 @@ export interface RosterResponse {
    * Optional so an older server answering without it still parses.
    */
   relinks?: Array<{ fromPersonId: string; toPersonId: string }>;
+  /**
+   * `unresolved` entries that are known gone — deleted upstream, or merged
+   * with the trail ending dead. Their membership documents are frozen for
+   * check-ins until somebody removes or re-creates them. Optional so an older
+   * server answering without it still parses.
+   */
+  missing?: string[];
   /** True when Planning Center was not asked, because a recent answer was reused. */
   cached: boolean;
   fetchedAt: string;
@@ -106,7 +113,9 @@ export const getRoster = httpsCallable<{ force?: boolean } | void, RosterRespons
  * Parent contact and allergies for one student, for a screen that shows them.
  *
  * Split from the roster so a door volunteer's device never receives a minor's
- * medical notes: the screen they are on does not ask.
+ * parent's phone number: the screen they are on does not ask. The allergy line
+ * it *does* ask for comes from `getAllergyNotes`, which carries that and
+ * nothing else.
  */
 export const getPersonDetails = httpsCallable<
   {
@@ -124,6 +133,30 @@ export const getPersonDetails = httpsCallable<
   },
   PcoPersonDetails | null
 >(functions, 'getPersonDetails');
+
+export interface AllergyNotesResponse {
+  /**
+   * Planning Center person id -> the allergy line on file. Only people who have
+   * one are present, and a person Planning Center could not be asked about is
+   * absent rather than empty — which the badge reads the same way, by saying
+   * `Allergy` on its own.
+   */
+  notes: Record<string, string>;
+}
+
+/**
+ * The allergy line for the students a roster row has already flagged.
+ *
+ * The one detail read a door volunteer's device is allowed to make, and the
+ * narrowest one in the app: a line of text per person, for people the caller
+ * names, and nothing else about them — no parent, no number, no household. That
+ * is what lets it sit behind `requireMember` rather than the core-team gate, and
+ * a `counselor` who only ever sees the check-in screen is exactly who it is for.
+ */
+export const getAllergyNotes = httpsCallable<
+  { pcoPersonIds: readonly string[] },
+  AllergyNotesResponse
+>(functions, 'getAllergyNotes');
 
 export interface ParentContactStatusResponse {
   /**
@@ -279,6 +312,34 @@ export const pushStudentToPlanningCenter = httpsCallable<
   { studentId: string },
   PushStudentResult
 >(functions, 'pushStudentToPlanningCenter');
+
+export interface RecreateStudentResult {
+  status:
+    | 'no-student'
+    | 'not-linked'
+    | 'disabled'
+    | 'still-there'
+    | 'relinked'
+    | 'needs-details'
+    | 'recreated';
+  message: string;
+  pcoPersonId?: string;
+  /** The student id to carry on with — changes when the membership migrated. */
+  studentId?: string;
+}
+
+/**
+ * Puts a person back in Planning Center for a student whose record died there
+ * — the sanctioned thaw for a check-in freeze. Careful by design: a record
+ * that still exists only clears the flag, and a merge with a living survivor
+ * relinks instead of creating the duplicate the admin just cleaned up. A
+ * `pco_…` student's document holds no name, so `needs-details` asks the
+ * caller to supply one.
+ */
+export const recreatePlanningCenterPerson = httpsCallable<
+  { studentId: string; firstName?: string; lastName?: string; grade?: number },
+  RecreateStudentResult
+>(functions, 'recreatePlanningCenterPerson');
 
 export interface SetParentContactResult {
   status:

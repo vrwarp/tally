@@ -87,7 +87,8 @@ export interface RosterPerson {
   profileComplete: boolean | null;
   /**
    * *That* there is an allergy, never what it is. Enough to render the badge
-   * that makes a counselor look; the note itself stays behind a detail read.
+   * that makes a counselor look; the note itself is asked for separately, for
+   * the flagged rows only — see `fetchAllergyNotes`.
    */
   hasAllergies: boolean;
   /**
@@ -147,6 +148,8 @@ export interface RosterResult {
    * membership documents (`graftMergedStudent`).
    */
   relinks: Array<{ fromPersonId: string; toPersonId: string }>;
+  /** `unresolved` entries that are known gone (see `RosterHydration.missing`). */
+  missing: string[];
   /** True when the answer came from cache rather than from Planning Center. */
   cached: boolean;
   fetchedAt: string;
@@ -204,6 +207,14 @@ export interface RosterHydration {
    */
   relinks: Array<{ fromPersonId: string; toPersonId: string }>;
   /**
+   * The subset of `unresolved` that is *known gone*: the mirror answered the
+   * person's id with 410/404 and any merge trail ended dead. Distinct from
+   * could-not-look (past the lookup cap, a transient failure), because the
+   * caller freezes check-ins on this list and a student must never be frozen
+   * for being unlucky in a busy pass.
+   */
+  missing: string[];
+  /**
    * Which households each of them belongs to, keyed by Planning Center person
    * id. Free — a roster read already side-loads `households` — and deliberately
    * kept out of `RosterPerson`, because a counselor at a door has no use for it
@@ -235,7 +246,7 @@ async function hydratePeople(
   now: Date,
 ): Promise<RosterHydration> {
   const wanted = new Set(personIds);
-  if (wanted.size === 0) return { people: [], unresolved: [], households: {}, relinks: [] };
+  if (wanted.size === 0) return { people: [], unresolved: [], households: {}, relinks: [], missing: [] };
 
   const found = new Map<string, PcoPerson>();
 
@@ -253,6 +264,7 @@ async function hydratePeople(
 
   const stragglers = [...wanted].filter((id) => !found.has(id));
   const unresolved: string[] = [];
+  const missing: string[] = [];
   const relinks: Array<{ fromPersonId: string; toPersonId: string }> = [];
 
   for (const personId of stragglers.slice(0, MAX_INDIVIDUAL_LOOKUPS)) {
@@ -280,6 +292,7 @@ async function hydratePeople(
       const link = await followPersonLink(client, personId, error);
       if (link.outcome === 'gone') {
         unresolved.push(personId);
+        missing.push(personId);
         continue;
       }
       try {
@@ -330,7 +343,7 @@ async function hydratePeople(
   }
 
   people.sort((a, b) => (a.searchName < b.searchName ? -1 : a.searchName > b.searchName ? 1 : 0));
-  return { people, unresolved, households, relinks };
+  return { people, unresolved, households, relinks, missing };
 }
 
 export interface RosterOptions {
@@ -364,6 +377,7 @@ export async function fetchRoster(
     people: hydrated.people,
     unresolved: hydrated.unresolved,
     relinks: hydrated.relinks,
+    missing: hydrated.missing,
     cached: cache.stats.misses === before,
     fetchedAt: now.toISOString(),
   };
@@ -693,6 +707,95 @@ export async function fetchPersonDetails(
     },
     options.force,
   );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Allergy notes                                                               */
+/* -------------------------------------------------------------------------- */
+
+/** The cache entry one student's allergy line lives in. */
+export function allergyNoteCacheKey(baseUrl: string, personId: string): string {
+  return cacheKey({ kind: 'allergy', base: baseUrl, id: personId });
+}
+
+/**
+ * How many people one call may ask about.
+ *
+ * The caller sends the students whose roster row already carries the flag,
+ * which on a ministry of four hundred is a handful. The cap is a backstop
+ * against a caller that has misunderstood and sent the whole roster: a request
+ * each is the wrong shape for that, and truncating is better than spending
+ * four hundred round trips finding out.
+ */
+const MAX_ALLERGY_LOOKUPS = 100;
+
+/** Enough to make a handful of reads feel like one; gentle on a rate limit. */
+const ALLERGY_CONCURRENCY = 4;
+
+/**
+ * The allergy line for each of a few students, and nothing else about them.
+ *
+ * Deliberately not `fetchPersonDetails` for each. That read hydrates the
+ * household to find a parent, which is a request per family and hands back a
+ * phone number and an email — on the check-in screen, for a question that is
+ * only ever "what is the note". One request per person, no includes, one field
+ * out of the answer.
+ *
+ * A person who cannot be read is simply absent from the result. The row it
+ * belongs to still says `Allergy`, which is what it said before any of this
+ * existed, and that is the right way for a Planning Center outage to land on a
+ * counselor at a door: the flag is the part that matters, and it comes from the
+ * roster read they are already looking at.
+ */
+export async function fetchAllergyNotes(
+  options: RosterOptions & { personIds: readonly string[] },
+): Promise<Record<string, string>> {
+  const { client, config, cache } = options;
+  const now = options.now ?? new Date();
+  const wanted = [...new Set(options.personIds)].slice(0, MAX_ALLERGY_LOOKUPS);
+
+  const notes: Record<string, string> = {};
+  let next = 0;
+
+  const read = async (): Promise<void> => {
+    while (next < wanted.length) {
+      const personId = wanted[next];
+      next += 1;
+
+      const note = await cache
+        .get(
+          allergyNoteCacheKey(config.baseUrl, personId),
+          () => readAllergyNote(client, config, personId, now),
+          options.force,
+        )
+        .catch(() => null);
+
+      if (note !== null) notes[personId] = note;
+    }
+  };
+
+  await Promise.all(Array.from({ length: Math.min(ALLERGY_CONCURRENCY, wanted.length) }, read));
+  return notes;
+}
+
+async function readAllergyNote(
+  client: PcoClient,
+  config: PcoConfig,
+  personId: string,
+  now: Date,
+): Promise<string | null> {
+  const body = await client.get<PcoPerson>(`/people/${encodeURIComponent(personId)}`);
+  const person = Array.isArray(body.data) ? body.data[0] : body.data;
+  if (!person) return null;
+
+  // Through the mapper rather than off the attribute, so "what the allergy line
+  // says" is one piece of code — the roster's flag and this note must never
+  // disagree about whether an empty string counts.
+  return mapPersonToStudent(person, {
+    minGrade: config.minGrade,
+    maxGrade: config.maxGrade,
+    now,
+  }).allergies;
 }
 
 /**

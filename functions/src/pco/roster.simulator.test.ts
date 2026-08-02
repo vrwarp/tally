@@ -25,6 +25,7 @@ import type { PcoConfig } from '../config.js';
 import { createTtlCache, type TtlCache } from './cache.js';
 import { createPcoClient, type PcoClient } from './client.js';
 import {
+  fetchAllergyNotes,
   fetchParentContactStatus,
   fetchPersonDetails,
   fetchRoster,
@@ -605,5 +606,97 @@ describe('fetchPersonDetails', () => {
 
     await fetchPersonDetails({ ...world, config, personId: FIXTURE_IDS.amara, force: true });
     expect(world.requests.length).toBeGreaterThan(cached);
+  });
+});
+
+/**
+ * The one detail a check-in screen is allowed to read.
+ *
+ * Everything worth asserting here is about *narrowness*: the right line, for
+ * the people asked about and nobody else, without the parent contact the wide
+ * read would have brought along with it.
+ */
+describe('fetchAllergyNotes', () => {
+  const flagged = [FIXTURE_IDS.sofiaWithAllergy, FIXTURE_IDS.elijahWithAllergy];
+
+  it('returns the line a badge can print', async () => {
+    const world = harness();
+    const notes = await fetchAllergyNotes({ ...world, config: baseConfig(), personIds: flagged });
+
+    expect(notes[FIXTURE_IDS.sofiaWithAllergy]).toBe('Severe peanut allergy — EpiPen in her bag');
+    expect(notes[FIXTURE_IDS.elijahWithAllergy]).toBe('Lactose intolerant');
+  });
+
+  it('says nothing about anybody who was not asked about', async () => {
+    const world = harness();
+    const notes = await fetchAllergyNotes({
+      ...world,
+      config: baseConfig(),
+      personIds: [FIXTURE_IDS.sofiaWithAllergy],
+    });
+
+    expect(Object.keys(notes)).toEqual([FIXTURE_IDS.sofiaWithAllergy]);
+  });
+
+  it('omits a student with no note rather than sending an empty one', async () => {
+    // The caller sends who the roster flagged; a person whose note was cleared
+    // upstream between the two reads must not come back as a badge saying
+    // "Allergy:" with nothing after it.
+    const world = harness();
+    const notes = await fetchAllergyNotes({
+      ...world,
+      config: baseConfig(),
+      personIds: [FIXTURE_IDS.amara],
+    });
+
+    expect(notes).toEqual({});
+  });
+
+  it('carries no parent contact at all', async () => {
+    /*
+     * The reason this exists rather than the check-in screen calling
+     * `fetchPersonDetails`. That read hands back a parent's name, phone and
+     * email — to a door volunteer, for a question about a peanut.
+     */
+    const world = harness();
+    const notes = await fetchAllergyNotes({ ...world, config: baseConfig(), personIds: flagged });
+
+    for (const value of Object.values(notes)) expect(typeof value).toBe('string');
+    expect(JSON.stringify(notes)).not.toContain('@');
+  });
+
+  it('leaves the rest of the answer standing when one person cannot be read', async () => {
+    // A deleted or merged-away person is one row that keeps the plain badge,
+    // not a screen with no notes on it.
+    const world = harness();
+    const notes = await fetchAllergyNotes({
+      ...world,
+      config: baseConfig(),
+      personIds: [FIXTURE_IDS.sofiaWithAllergy, '4209999'],
+    });
+
+    expect(notes[FIXTURE_IDS.sofiaWithAllergy]).toBeTruthy();
+    expect(notes).not.toHaveProperty('4209999');
+  });
+
+  it('costs one request per person, then none', async () => {
+    const world = harness();
+    const config = baseConfig();
+
+    await fetchAllergyNotes({ ...world, config, personIds: flagged });
+    const asked = world.requests.length;
+    expect(asked).toBe(flagged.length);
+
+    // A roster rebuilt on every check-in must not re-read the church.
+    await fetchAllergyNotes({ ...world, config, personIds: flagged });
+    expect(world.requests.length).toBe(asked);
+  });
+
+  it('asks Planning Center nothing when nobody is flagged', async () => {
+    const world = harness();
+    const notes = await fetchAllergyNotes({ ...world, config: baseConfig(), personIds: [] });
+
+    expect(notes).toEqual({});
+    expect(world.requests).toHaveLength(0);
   });
 });

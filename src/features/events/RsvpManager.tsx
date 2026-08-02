@@ -26,7 +26,7 @@ import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { useRsvps } from '@/hooks/useAttendance';
-import { cn, createSearchMatcher, ordinalGrade, sortByName } from '@/lib/utils';
+import { cn, createSearchMatcher, gradeLabel, NO_GRADE, sortByName } from '@/lib/utils';
 import { addRsvps, removeRsvp, setRsvpStatus } from '@/services/rsvps';
 import { studentFullName, type Rsvp, type RsvpStatus, type Student, type TallyEvent } from '@/types';
 
@@ -166,7 +166,7 @@ function AddStudentsModal({
                       {studentFullName(student)}
                     </span>
                     <span className="shrink-0 text-xs text-ink-500">
-                      {ordinalGrade(student.grade)}
+                      {gradeLabel(student) ?? NO_GRADE}
                     </span>
                   </button>
                 </li>
@@ -329,7 +329,7 @@ export function RsvpManager({ event }: RsvpManagerProps) {
                         <span className="truncate font-semibold text-ink-50">{row.name}</span>
                         {row.student ? (
                           <span className="shrink-0 text-xs text-ink-500">
-                            {ordinalGrade(row.student.grade)}
+                            {gradeLabel(row.student) ?? NO_GRADE}
                           </span>
                         ) : null}
                       </p>

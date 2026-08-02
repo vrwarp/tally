@@ -118,7 +118,7 @@ export async function updateStudent(
   studentId: string,
   patch: Partial<StudentDraft>,
   uid: string,
-  current?: Pick<Student, 'firstName' | 'lastName' | 'grade'>,
+  current?: Pick<Student, 'firstName' | 'lastName' | 'grade' | 'gradeOnFile'>,
 ): Promise<void> {
   const payload: Record<string, unknown> = { updatedAt: serverTimestamp(), updatedBy: uid };
 
@@ -139,7 +139,20 @@ export async function updateStudent(
     payload.lastName ??= lastName;
     payload.searchName = buildSearchName(firstName, lastName);
   }
-  if (payload.grade === undefined && current?.grade !== undefined) payload.grade = current.grade;
+  /*
+   * The grade goes down with the name, for the same reason — except when there
+   * is no grade to write.
+   *
+   * `Student.grade` is always a number, so for somebody Planning Center holds
+   * no grade for it is the sync's clamp rather than a fact (see `gradeOnFile`).
+   * Backfilling it stamped "6th" onto a real document, and unlike the roster
+   * row it came from, a document outlives the roster: take that person off it
+   * and the invented 6 is all that is left, with nothing beside it to say so.
+   * The rules allow a student document with no grade at all.
+   */
+  if (payload.grade === undefined && current?.grade !== undefined && current.gradeOnFile !== false) {
+    payload.grade = current.grade;
+  }
 
   // Deliberately *not* writing `pcoPersonId`. For a Planning Center student the
   // document id already is the link (`pco_{personId}`), and the rules forbid a
@@ -154,7 +167,7 @@ export async function setStudentStatus(
   studentId: string,
   status: StudentStatus,
   uid: string,
-  current?: Pick<Student, 'firstName' | 'lastName' | 'grade'>,
+  current?: Pick<Student, 'firstName' | 'lastName' | 'grade' | 'gradeOnFile'>,
 ): Promise<void> {
   await updateStudent(studentId, { status }, uid, current);
 }

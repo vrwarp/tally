@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import {
   formatPhone,
   formatPhoneInput,
+  gradeLabel,
   initials,
   matchesQuery,
   normalizeForSearch,
@@ -171,6 +172,25 @@ describe('ordinalGrade', () => {
     expect(ordinalGrade(21)).toBe('21st');
     expect(ordinalGrade(22)).toBe('22nd');
     expect(ordinalGrade(23)).toBe('23rd');
+  });
+});
+
+describe('gradeLabel', () => {
+  it('prints the grade Planning Center holds', () => {
+    expect(gradeLabel({ grade: 9, gradeOnFile: true })).toBe('9th');
+  });
+
+  it('says nothing for a person Planning Center holds no grade for', () => {
+    // The bug: an adult volunteer on a hand-picked roster has no grade and no
+    // graduation year upstream, so the sync's clamp parks them on `minGrade`
+    // and every screen printed "6th grade" under their name.
+    expect(gradeLabel({ grade: 6, gradeOnFile: false })).toBeNull();
+  });
+
+  it('trusts a grade with no flag beside it', () => {
+    // A Tally document: the grade was typed by a human at quick-add, and the
+    // field only exists on roster-sourced rows.
+    expect(gradeLabel({ grade: 7 })).toBe('7th');
   });
 });
 

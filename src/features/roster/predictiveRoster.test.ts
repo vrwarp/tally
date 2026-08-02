@@ -884,6 +884,22 @@ describe('buildRoster: scoping filters', () => {
     expect(roster({ students: roll, filters: { grades: [] } }).counts.eligible).toBe(4);
   });
 
+  it('leaves out somebody Planning Center holds no grade for', () => {
+    // An adult on a hand-picked roster: no grade and no graduation year
+    // upstream, so the sync's clamp parked them on 6. Narrowing to 6th graders
+    // must not hand a counselor the ministry's volunteers.
+    const volunteer = makeStudent({
+      id: 'volunteer',
+      lastName: 'Wan',
+      grade: 6,
+      gradeOnFile: false,
+    });
+    const sixth = makeStudent({ id: 'sixth', lastName: 'Abara', grade: 6, gradeOnFile: true });
+    const view = roster({ students: [volunteer, sixth], filters: { grades: [6] } });
+
+    expect(ids(waiting(view))).toEqual([sixth.id]);
+  });
+
   it('filters to incomplete profiles only', () => {
     const missing = makeStudent({ id: 'missing', lastName: 'Nolan', profileComplete: false });
     const view = roster({ students: [...students, missing], filters: { incompleteOnly: true } });

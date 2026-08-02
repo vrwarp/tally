@@ -48,10 +48,11 @@ import { chainKey } from '@/lib/materialize';
 import { pcoPersonUrl } from '@/lib/planningCenter';
 import { sessionOutcome, type SessionOutcome } from '@/lib/sessionHistory';
 import { formatRelative, formatShortDate } from '@/lib/time';
-import { cn, formatPhone, initials, ordinalGrade } from '@/lib/utils';
+import { cn, formatPhone, gradeLabel, initials } from '@/lib/utils';
 import {
   addRosterMember,
   pushStudentToPlanningCenter,
+  recreatePlanningCenterPerson,
   removeRosterMember,
 } from '@/services/functions';
 import { setStudentStatus } from '@/services/students';
@@ -109,12 +110,19 @@ export function StudentDetailPage() {
     state: 'idle',
     message: '',
   });
+  const [recreateBusy, setRecreateBusy] = useState(false);
+  const [recreateForm, setRecreateForm] = useState<{
+    open: boolean;
+    firstName: string;
+    lastName: string;
+  }>({ open: false, firstName: '', lastName: '' });
 
   const student = students.find((candidate) => candidate.id === studentId) ?? null;
   const {
     details,
     loading: detailsLoading,
     error: detailsError,
+    loaded: detailsLoaded,
     refresh: refreshDetails,
   } = usePersonDetails(student);
 
@@ -276,6 +284,7 @@ export function StudentDetailPage() {
   }
 
   const name = studentFullName(student);
+  const grade = gradeLabel(student);
   const phone = details?.parentPhone?.trim() ?? '';
   const email = details?.parentEmail?.trim() ?? '';
   const parentLabel = details?.parentName?.trim() || `${name}'s parent`;
@@ -290,6 +299,52 @@ export function StudentDetailPage() {
    * number. Until the lookup lands, nobody is accused of anything.
    */
   const unreachable = details ? !phone && !email : student.profileComplete === false;
+
+  /*
+   * The linked Planning Center record is known dead: the server flagged the
+   * membership (which also froze check-ins at the rules), or this screen's own
+   * read settled on "no such person". Either signal alone is enough — the
+   * flag survives while this page is offline, and the read catches a deletion
+   * the roster has not swept yet.
+   */
+  const recordGone = Boolean(
+    student.pcoPersonId &&
+      (student.pcoRecordMissing === true || (detailsLoaded && !details && !detailsError)),
+  );
+
+  const recreate = async () => {
+    if (recreateBusy) return;
+    setRecreateBusy(true);
+    try {
+      const needsTypedName = recreateForm.open;
+      const result = await recreatePlanningCenterPerson({
+        studentId: student.id,
+        ...(needsTypedName
+          ? {
+              firstName: recreateForm.firstName.trim(),
+              lastName: recreateForm.lastName.trim(),
+              grade: student.grade,
+            }
+          : {}),
+      });
+      const { status, message, studentId: continueAs } = result.data;
+      if (status === 'needs-details') {
+        setRecreateForm((form) => ({ ...form, open: true }));
+        show(message, { tone: 'info' });
+        return;
+      }
+      show(message, { tone: status === 'recreated' || status === 'relinked' || status === 'still-there' ? 'success' : 'info' });
+      await refreshRoster(true);
+      refreshDetails();
+      if (continueAs && continueAs !== student.id) navigate(`/students/${continueAs}`);
+    } catch (cause) {
+      show(cause instanceof Error ? cause.message : 'Could not re-create them in Planning Center.', {
+        tone: 'error',
+      });
+    } finally {
+      setRecreateBusy(false);
+    }
+  };
 
   /**
    * On or off the roster.
@@ -370,12 +425,22 @@ export function StudentDetailPage() {
         </span>
         <div className="min-w-0 flex-1">
           <h1 className="text-xl font-bold text-ink-50">{name}</h1>
+          {/*
+            The one screen with room to say *why* there is no grade.
+
+            A row in a list can only afford "No grade", which reads as an
+            omission somebody ought to fix in Tally. Here the sentence can name
+            where the answer would have to come from, because for a person whose
+            grade is not on file this is always a Planning Center record — a
+            grade typed into Tally is a grade Tally has.
+          */}
           <p className="mt-0.5 text-sm text-ink-500">
-            {ordinalGrade(student.grade)} grade
+            {grade ? `${grade} grade` : 'No grade in Planning Center'}
           </p>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {student.isVisitor ? <Badge tone="brand">Visitor</Badge> : null}
-            {unreachable ? <Badge tone="warn">Missing parent contact</Badge> : null}
+            {recordGone ? <Badge tone="danger">Planning Center record missing</Badge> : null}
+            {unreachable && !recordGone ? <Badge tone="warn">Missing parent contact</Badge> : null}
             {student.status === 'inactive' ? <Badge tone="neutral">Inactive</Badge> : null}
             {student.hasAllergies ? <Badge tone="warn">Allergies</Badge> : null}
           </div>
@@ -405,7 +470,13 @@ export function StudentDetailPage() {
             <h3 className="text-xs font-medium uppercase tracking-wide text-ink-400">
               Parent contact
             </h3>
-            {detailsError ? (
+            {recordGone ? (
+              <p className="mt-1 text-sm text-warn-400">
+                Planning Center no longer has a record for {name} — deleted or merged there.
+                Parent contact lives on that record, so there is nothing to show until it is
+                sorted out below.
+              </p>
+            ) : detailsError ? (
               // A Planning Center outage must not read as "this family has no
               // phone number" — those look identical and mean opposite things.
               <p className="mt-1 text-sm text-danger-400">{detailsError}</p>
@@ -488,7 +559,58 @@ export function StudentDetailPage() {
             <h3 className="text-xs font-medium uppercase tracking-wide text-ink-400">
               Planning Center
             </h3>
-            {student.pcoPersonId ? (
+            {recordGone ? (
+              <div className="mt-1 flex flex-col gap-2 rounded-xl bg-warn-500/10 px-3 py-2 ring-1 ring-warn-500/25">
+                <p className="text-sm text-warn-300">
+                  Planning Center no longer has a record for {name} — deleted or merged there.
+                  Check-ins are frozen, past nights included, until this is sorted out: take
+                  them off the roster, or put a record back.
+                </p>
+                {recreateForm.open ? (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-xs text-ink-400">
+                      Tally never stored their name — it lived on the deleted record. Enter it
+                      to re-create them.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <input
+                        className="min-h-11 flex-1 rounded-lg border border-ink-700 bg-ink-900 px-3 text-sm text-ink-100"
+                        placeholder="First name"
+                        value={recreateForm.firstName}
+                        onChange={(event) =>
+                          setRecreateForm((form) => ({ ...form, firstName: event.target.value }))
+                        }
+                      />
+                      <input
+                        className="min-h-11 flex-1 rounded-lg border border-ink-700 bg-ink-900 px-3 text-sm text-ink-100"
+                        placeholder="Last name"
+                        value={recreateForm.lastName}
+                        onChange={(event) =>
+                          setRecreateForm((form) => ({ ...form, lastName: event.target.value }))
+                        }
+                      />
+                    </div>
+                  </div>
+                ) : null}
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    onClick={() => void recreate()}
+                    loading={recreateBusy}
+                    disabled={
+                      recreateForm.open &&
+                      (!recreateForm.firstName.trim() || !recreateForm.lastName.trim())
+                    }
+                  >
+                    Re-create in Planning Center
+                  </Button>
+                  <span className="text-xs text-ink-500">
+                    If they were merged into another record, this relinks instead of creating a
+                    duplicate.
+                  </span>
+                </div>
+              </div>
+            ) : student.pcoPersonId ? (
               <p className="mt-1 text-sm text-ink-300">
                 {/* Not "synced": nothing was copied. This screen read Planning
                     Center a moment ago and is showing what it said. */}

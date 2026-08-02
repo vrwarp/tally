@@ -46,6 +46,7 @@ import {
 } from './pco/profile.js';
 import { addParent as addParentUpstream, type AddParentResult } from './pco/household.js';
 import {
+  fetchAllergyNotes,
   fetchParentContactStatus,
   fetchPersonDetails,
   fetchRoster,
@@ -61,6 +62,7 @@ import {
 } from './pco/roster.js';
 import { resetSharedCache, sharedCache } from './pco/sharedCache.js';
 import { followPersonLink, isPersonGoneError } from './pco/personLink.js';
+import { recreateStudent, type RecreateStudentResult } from './pco/recreate.js';
 import { graftMergedStudent } from './pco/studentPerson.js';
 import {
   pushPendingStudents,
@@ -228,6 +230,9 @@ interface RosterResponse {
   /** Merges the read followed and wrote back; the student rides under the
    *  survivor's row already. Ids only — nothing personal. */
   relinks: Array<{ fromPersonId: string; toPersonId: string }>;
+  /** `unresolved` entries that are known gone — deleted, or a merge trail
+   *  that ends dead. Their membership documents are frozen for check-ins. */
+  missing: string[];
   cached: boolean;
   fetchedAt: string;
   /** Echoed so the app can say how stale what it is showing might be. */
@@ -275,6 +280,12 @@ interface RosterScan {
    */
   studentIdByLinkedPersonId: Record<string, string>;
   /**
+   * Which active documents currently carry `pcoRecordMissing: true`, so the
+   * roster read writes the flag only when the answer *changed* — four hundred
+   * students must not cost four hundred writes per read.
+   */
+  recordMissing: Record<string, boolean>;
+  /**
    * Active students with no Planning Center person yet — the same rows the
    * Students screen marks "Queued". Counted on this pass rather than its own
    * because the collection has already been read.
@@ -288,6 +299,7 @@ async function scanRoster(database: FirestoreLike): Promise<RosterScan> {
   const personIds: string[] = [];
   const linkedPersonIds: string[] = [];
   const studentIdByLinkedPersonId: Record<string, string> = {};
+  const recordMissing: Record<string, boolean> = {};
   let queued = 0;
 
   for (const document of snapshot.docs) {
@@ -312,9 +324,10 @@ async function scanRoster(database: FirestoreLike): Promise<RosterScan> {
       linkedPersonIds.push(data.pcoPersonId);
       studentIdByLinkedPersonId[data.pcoPersonId] = document.id;
     } else queued += 1;
+    if (data.pcoRecordMissing === true) recordMissing[document.id] = true;
   }
 
-  return { personIds, linkedPersonIds, studentIdByLinkedPersonId, queued };
+  return { personIds, linkedPersonIds, studentIdByLinkedPersonId, recordMissing, queued };
 }
 
 /**
@@ -322,8 +335,9 @@ async function scanRoster(database: FirestoreLike): Promise<RosterScan> {
  *
  * Open to any active member of the team, not just the core: a door volunteer
  * cannot check anybody in without it. It returns names and grades only — parent
- * contact and allergies come from `getPersonDetails`, one person at a time, to
- * somebody with a reason to look.
+ * contact comes from `getPersonDetails`, one person at a time, to somebody with
+ * a reason to look, and the allergy *note* from `getAllergyNotes` for the few
+ * students whose row is already flagged.
  *
  * Students Tally created itself and has not pushed yet live entirely in
  * Firestore, which the app already reads live; merging the two is the client's
@@ -370,6 +384,38 @@ export const getRoster = onCall<{ force?: boolean } | undefined, Promise<RosterR
           ? pcoStudentId(relink.fromPersonId)
           : scan.studentIdByLinkedPersonId[relink.fromPersonId];
         if (fromDoc) await graftMergedStudent(db(), fromDoc, relink.toPersonId);
+      }
+      /*
+       * Known-gone students are frozen; resolved ones thaw. The flag on the
+       * membership document is what the check-in rules read, so a student
+       * whose Planning Center record died cannot quietly accumulate history
+       * under a dead id — past events included — until somebody removes them
+       * or re-creates the record. Only `missing` (confirmed gone) freezes:
+       * `unresolved` also holds students a busy pass could not look at, and
+       * being unlucky must not read as being deleted. Written only on change,
+       * so a settled roster costs no writes.
+       */
+      const docFor = (personId: string): string | undefined =>
+        scan.personIds.includes(personId)
+          ? pcoStudentId(personId)
+          : scan.studentIdByLinkedPersonId[personId];
+      for (const personId of result.missing) {
+        const studentDoc = docFor(personId);
+        if (studentDoc && !scan.recordMissing[studentDoc]) {
+          await db().doc(`${PATHS.students}/${studentDoc}`).set(
+            { pcoRecordMissing: true }, { merge: true });
+        }
+      }
+      const resolved = new Set(result.people.map((person) => person.pcoPersonId));
+      for (const [studentDoc, flagged] of Object.entries(scan.recordMissing)) {
+        if (!flagged) continue;
+        const personId = personIdFromStudentId(studentDoc)
+          ?? Object.entries(scan.studentIdByLinkedPersonId)
+            .find(([, id]) => id === studentDoc)?.[0];
+        if (personId && resolved.has(personId)) {
+          await db().doc(`${PATHS.students}/${studentDoc}`).set(
+            { pcoRecordMissing: false }, { merge: true });
+        }
       }
       return { ...result, cacheTtlSeconds: config.cacheTtlSeconds };
     } catch (error) {
@@ -493,6 +539,74 @@ export const getPersonDetails = onCall<
       };
     } catch (error) {
       return reportPcoFailure(error, 'load this student');
+    }
+  },
+);
+
+export interface AllergyNotesResponse {
+  /**
+   * Planning Center person id -> the allergy line on file.
+   *
+   * Only people who have one appear. A person who could not be read is absent
+   * rather than empty-stringed, and the two are the same thing to the badge
+   * that reads this: it falls back to the word `Allergy` on its own.
+   */
+  notes: Record<string, string>;
+}
+
+/**
+ * The allergy line for the students a check-in roster has already flagged.
+ *
+ * The one piece of medical information that reaches the door, and it is here
+ * because withholding it made the flag worse than useless: a counselor looking
+ * at `⚠ Allergy` on a row they are about to check in cannot act on it without
+ * leaving the screen, so on a Friday nobody does. A badge that says *peanuts*
+ * is read in the half second the row is already being looked at.
+ *
+ * Deliberately not `getPersonDetails`, on two counts. That one is core team
+ * only, and the people this is for are the door volunteers — `counselor` is a
+ * role that never sees the dashboard and must still see the allergy. And it
+ * returns a parent's name, phone and email, none of which a check-in screen has
+ * any business receiving; this returns one line per person and nothing else.
+ *
+ * The ids come from the caller — the students whose roster row carries the flag
+ * — rather than from the whole roster, so the request is a handful of people on
+ * a ministry of four hundred.
+ */
+export const getAllergyNotes = onCall<
+  { pcoPersonIds?: readonly string[] },
+  Promise<AllergyNotesResponse>
+>(
+  { secrets: PCO_SECRETS, timeoutSeconds: 60, memory: '256MiB' },
+  async (request): Promise<AllergyNotesResponse> => {
+    await requireMember(request.auth?.uid);
+
+    const asked = request.data?.pcoPersonIds;
+    if (!Array.isArray(asked)) {
+      throw new HttpsError('invalid-argument', 'pcoPersonIds is required.');
+    }
+
+    const personIds = asked.filter(
+      (id): id is string => typeof id === 'string' && id.length > 0,
+    );
+    // Nothing to ask about is a perfectly ordinary answer — a roster where
+    // nobody is flagged — and must not cost a Planning Center client.
+    if (personIds.length === 0) return { notes: {} };
+
+    const config = await resolveConfig(db());
+    const client = clientFor(config);
+    if (!client) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
+
+    try {
+      const notes = await fetchAllergyNotes({
+        client,
+        config,
+        cache: sharedCache(config),
+        personIds,
+      });
+      return { notes };
+    } catch (error) {
+      return reportPcoFailure(error, 'read the allergy notes');
     }
   },
 );
@@ -1239,6 +1353,55 @@ export const addParent = onCall<
    * right price for a family that did not exist a second ago.
    */
   if (result.status === 'added') resetSharedCache();
+
+  return result;
+});
+
+/**
+ * Puts a person back in Planning Center for a student whose record died there.
+ *
+ * The other half of the check-in freeze: a student flagged `pcoRecordMissing`
+ * cannot accumulate attendance under a dead id, and this is the sanctioned way
+ * to thaw them without taking them off the roster. The flow itself lives in
+ * ./pco/recreate.ts and refuses to create where creating would be wrong — a
+ * record that still exists clears the flag, a merge with a living survivor
+ * relinks instead.
+ */
+export const recreatePlanningCenterPerson = onCall<
+  { studentId: string; firstName?: string | null; lastName?: string | null; grade?: number | null },
+  Promise<RecreateStudentResult>
+>({ secrets: PCO_SECRETS, timeoutSeconds: 120, memory: '256MiB' }, async (request) => {
+  await requireCoreTeam(request.auth?.uid);
+
+  const studentId = request.data?.studentId;
+  if (typeof studentId !== 'string' || studentId.trim().length === 0) {
+    throw new HttpsError('invalid-argument', 'studentId is required.');
+  }
+
+  const config = await resolveConfig(db());
+  const client = clientFor(config);
+  if (!client) {
+    throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
+  }
+
+  let result: RecreateStudentResult;
+  try {
+    result = await recreateStudent({
+      db: db(),
+      client,
+      config,
+      studentId,
+      firstName: request.data?.firstName ?? undefined,
+      lastName: request.data?.lastName ?? undefined,
+      grade: typeof request.data?.grade === 'number' ? request.data.grade : undefined,
+      logger,
+    });
+  } catch (error) {
+    return reportPcoFailure(error, 're-create this student in Planning Center');
+  }
+
+  // A new (or newly pointed-at) person changes what every cached read answers.
+  if (result.status === 'recreated' || result.status === 'relinked') resetSharedCache();
 
   return result;
 });

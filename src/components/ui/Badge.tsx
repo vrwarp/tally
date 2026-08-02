@@ -85,6 +85,16 @@ export function Badge({ tone = 'neutral', children, className, title, onPress, p
 
 export interface WarningBadgeProps {
   warning: RosterWarning;
+  /**
+   * What the warning actually says, spelled out on the badge: `Allergy:
+   * peanuts` rather than `Allergy`.
+   *
+   * Only worth passing where the badge is the last thing somebody will read
+   * before acting — the check-in row, where the alternative is leaving the
+   * screen mid-queue. A badge given a detail stops being a fixed-width chip and
+   * wraps to as many lines as the text needs; see below.
+   */
+  detail?: string | null;
   /** See `BadgeProps.onPress`. Without it this is a plain, unpressable chip. */
   onPress?: () => void;
   /** The verb, for a screen reader: "Add a parent contact for Aaron Mensah". */
@@ -96,22 +106,56 @@ export interface WarningBadgeProps {
  * Renders a roster warning as its badge. All warnings are advisory, and the ⚠
  * belongs only to the one with a consequence at the door — see `warnings.ts`.
  */
-export function WarningBadge({ warning, onPress, pressLabel, className }: WarningBadgeProps) {
+export function WarningBadge({
+  warning,
+  detail,
+  onPress,
+  pressLabel,
+  className,
+}: WarningBadgeProps) {
   const meta = WARNING_META[warning];
+  const note = detail?.trim() ? detail.trim() : null;
+  const spoken = note ? `${meta.label}: ${note}` : meta.label;
+
   return (
     <Badge
       tone={meta.tone}
-      title={meta.label}
+      title={spoken}
       onPress={onPress}
       pressLabel={pressLabel}
-      className={className}
+      className={cn(
+        /*
+         * The deliberate exception to `SHAPE`.
+         *
+         * Everything that keeps a badge one line — no shrinking, no wrapping —
+         * exists so a lane of fixed-width chips cannot change a row's height as
+         * the data changes. A medical note has the opposite requirement: it is
+         * the content, it is as long as somebody upstream typed, and a clipped
+         * one is worse than none because a counselor cannot tell it was cut.
+         * So this badge shrinks, wraps, and takes the row height with it.
+         */
+        note && 'min-w-0 shrink items-start whitespace-normal px-2 py-1 text-left',
+        className,
+      )}
     >
-      {meta.tone === 'warn' ? <span aria-hidden="true">⚠</span> : null}
+      {meta.tone === 'warn' ? (
+        // Held on the first line by `items-start` above, so a wrapped note reads
+        // as one block of text rather than around a centred glyph.
+        <span aria-hidden="true" className="leading-snug">
+          ⚠
+        </span>
+      ) : null}
       {/* The full sentence for a screen reader, the short form for the eye —
           unless the button already carries its own label, in which case a
           second one inside it would be read out twice. */}
-      {pressLabel ? null : <span className="sr-only">{meta.label}</span>}
-      <span aria-hidden="true">{meta.short}</span>
+      {pressLabel ? null : <span className="sr-only">{spoken}</span>}
+      {note ? (
+        <span aria-hidden="true" className="min-w-0 break-words text-xs leading-snug">
+          {meta.short}: <span className="font-medium">{note}</span>
+        </span>
+      ) : (
+        <span aria-hidden="true">{meta.short}</span>
+      )}
     </Badge>
   );
 }
