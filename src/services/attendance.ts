@@ -7,18 +7,27 @@
  */
 import {
   collection,
+  collectionGroup,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
+  limit,
   onSnapshot,
+  orderBy,
+  query,
   serverTimestamp,
   setDoc,
+  startAfter,
+  where,
   writeBatch,
+  type DocumentData,
+  type QueryDocumentSnapshot,
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { paths } from '@/lib/paths';
-import { toAttendance } from '@/services/converters';
+import { COLLECTIONS, paths } from '@/lib/paths';
+import { toAttendance, toEvent } from '@/services/converters';
 import { buildStudentPayload, newStudentRef, type StudentDraft } from '@/services/students';
 import type { AttendanceRecord, CheckInMethod, Student, TallyEvent } from '@/types';
 
@@ -308,4 +317,122 @@ export async function fetchAttendanceByEvent(
 export async function fetchAttendance(eventId: string): Promise<AttendanceRecord[]> {
   const snapshot = await getDocs(collection(db, paths.attendanceCollection(eventId)));
   return snapshot.docs.map((d) => toAttendance(d, eventId));
+}
+
+/* -------------------------------------------------------------------------- */
+/* One student's whole history                                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * How many nights one page of a student's history holds.
+ *
+ * Each row costs a document read for the night it belongs to, so a page is a
+ * page of reads. Twenty is roughly two terms of a weekly gathering — enough
+ * that the first press usually answers the question somebody opened the
+ * profile with.
+ */
+export const STUDENT_HISTORY_PAGE_SIZE = 20;
+
+/** One night a student was checked in to, with the gathering it belonged to. */
+export interface StudentHistoryEntry {
+  record: AttendanceRecord;
+  /** Null when the event document is gone — the record still stands. */
+  event: TallyEvent | null;
+}
+
+/** Opaque cursor for the next page. Nothing outside this module reads it. */
+export type StudentHistoryCursor = QueryDocumentSnapshot<DocumentData>;
+
+export interface StudentHistoryPage {
+  entries: StudentHistoryEntry[];
+  cursor: StudentHistoryCursor | null;
+  hasMore: boolean;
+}
+
+/**
+ * A page of the nights one student was checked in to, newest first — reaching
+ * as far back as the ministry has records, not as far back as the calendar the
+ * app keeps loaded.
+ *
+ * A collection-group query rather than a walk over `events`, and that choice is
+ * the whole point: the student's own attendance documents *are* the answer, and
+ * asking for them directly is one indexed query for any depth of history. The
+ * index has been declared for this since before anything used it
+ * (`firestore.indexes.json`, `attendance` by `studentId` + `checkedInAt desc`),
+ * and `firestore.rules` carries the wildcard `list` a collection-group query
+ * needs.
+ *
+ * What it deliberately cannot answer is which nights the student *missed*: an
+ * absence is a fact about the gathering's calendar, not about this student, and
+ * proving one this far back would mean paging every instance of every chain.
+ * The profile says as much where it shows these.
+ */
+export async function fetchStudentHistory(
+  studentId: string,
+  cursor: StudentHistoryCursor | null = null,
+  pageSize: number = STUDENT_HISTORY_PAGE_SIZE,
+): Promise<StudentHistoryPage> {
+  const snapshot = await getDocs(
+    query(
+      collectionGroup(db, COLLECTIONS.attendance),
+      where('studentId', '==', studentId),
+      orderBy('checkedInAt', 'desc'),
+      ...(cursor ? [startAfter(cursor)] : []),
+      limit(pageSize),
+    ),
+  );
+
+  /*
+   * The event id comes from the document's own path rather than from its
+   * `eventId` field. The two agree — the security rules require it on every
+   * write — but the path is the one that cannot have been written wrong, and
+   * this is the read that would silently attribute a night to the wrong
+   * gathering if it were.
+   */
+  const eventIds = [
+    ...new Set(
+      snapshot.docs
+        .map((document) => document.ref.parent.parent?.id)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0),
+    ),
+  ];
+
+  const events = new Map<string, TallyEvent>();
+  await Promise.all(
+    eventIds.map(async (eventId) => {
+      const document = await getDoc(doc(db, paths.event(eventId)));
+      if (document.exists()) events.set(eventId, toEvent(document));
+    }),
+  );
+
+  const entries = snapshot.docs.flatMap<StudentHistoryEntry>((document) => {
+    const eventId = document.ref.parent.parent?.id;
+    if (!eventId) return [];
+    return [{ record: toAttendance(document, eventId), event: events.get(eventId) ?? null }];
+  });
+
+  /*
+   * Ordered by the night, not by when the kiosk recorded it.
+   *
+   * The query has to sort on `checkedInAt` — that is the indexed field, and it
+   * is what pages — but an imported record carries the instant Planning Center
+   * wrote it, which for a register taken late is a day or two after the
+   * gathering. Sorting the page by the gathering's own start puts the rows in
+   * the order a reader expects; the page *boundaries* still follow the cursor,
+   * which is invisible unless a single page straddles such a record.
+   */
+  entries.sort(
+    (a, b) =>
+      (b.event?.startAt ?? b.record.checkedInAt).getTime() -
+      (a.event?.startAt ?? a.record.checkedInAt).getTime(),
+  );
+
+  const last = snapshot.docs.at(-1) ?? null;
+  return {
+    entries,
+    // A short page is the end of the history, and a cursor for it could only
+    // buy a request that comes back empty.
+    cursor: snapshot.docs.length === pageSize ? last : null,
+    hasMore: snapshot.docs.length === pageSize,
+  };
 }

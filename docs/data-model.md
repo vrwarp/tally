@@ -381,4 +381,10 @@ a retreat is not evidence about who turns up to a retreat — so the chains them
 - `students` by `status` + `profileComplete` + `createdAt desc` — the Incomplete Profiles list, which
   is the whole reason `profileComplete` is denormalised.
 - Collection-group indexes on `attendance` by `studentId`, `seriesId` and `isFirstEver`, each with
-  `checkedInAt desc` — one student's history, one series' history, and first-ever check-ins.
+  `checkedInAt desc` — one student's history, one series' history, and first-ever check-ins. The
+  first of these is what "Every night they came" on a student's page pages through
+  (`fetchStudentHistory`), which is how that list reaches years further back than the calendar the
+  app keeps loaded. A collection-group query is only authorised by a rule at a wildcard path, so
+  `firestore.rules` carries a `match /{path=**}/attendance/{studentId}` granting `list` to any
+  active member — the same people the nested rule already lets read the same documents one event at
+  a time.

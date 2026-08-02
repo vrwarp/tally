@@ -35,6 +35,7 @@ import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { EventHeader } from '@/features/checkin/EventHeader';
 import { FilterBar } from '@/features/checkin/FilterBar';
+import { ArchivedNight } from '@/features/checkin/ArchivedNight';
 import { ChooseEvent } from '@/features/checkin/ChooseEvent';
 import { QuickAddVisitorModal } from '@/features/checkin/QuickAddVisitorModal';
 import { RosterList } from '@/features/checkin/RosterList';
@@ -97,7 +98,9 @@ const FOCUS_EMPTY: Record<RosterFocus, string> = {
 
 export function CheckInPage() {
   const { eventId } = useParams();
-  const { event, now, selectableEvents } = useActiveEvent(eventId ?? null);
+  const { event, eventLoading, fromArchive, now, selectableEvents } = useActiveEvent(
+    eventId ?? null,
+  );
 
   const { students, settings, loading: dataLoading, rosterError } = useData();
   const { user, can } = useAuth();
@@ -565,8 +568,19 @@ export function CheckInPage() {
 
   /* ---- Render ------------------------------------------------------------ */
 
+  /*
+   * A night from before the loaded calendar: a record, not a roster.
+   *
+   * This is checked before the roster branch below, because `roster` is built
+   * from history that is not loaded for a night this old and would otherwise
+   * describe the wrong term. See `ArchivedNight`.
+   */
+  if (event && fromArchive) {
+    return <ArchivedNight event={event} attendance={attendance} students={students} now={now} />;
+  }
+
   if (!event || !roster) {
-    if (dataLoading) {
+    if (dataLoading || eventLoading) {
       return (
         <div className={cn(BAND, 'pt-4 lg:pt-6')}>
           <SkeletonRows />

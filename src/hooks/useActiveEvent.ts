@@ -1,5 +1,6 @@
 import { useMemo, useRef } from 'react';
 import { useData } from '@/context/dataContext';
+import { useEvent } from '@/hooks/useEvent';
 import { useNow } from '@/hooks/useNow';
 import { predictionChain } from '@/lib/gatherings';
 import { pickActiveEvent, recentChainInstances } from '@/lib/time';
@@ -9,6 +10,14 @@ import type { TallyEvent } from '@/types';
 export interface ActiveEventResult {
   /** The event named in the URL, or null when nobody has chosen one yet. */
   event: TallyEvent | null;
+  /** True while the named event is still being looked for. See `useEvent`. */
+  eventLoading: boolean;
+  /**
+   * True when the named event is older than the loaded calendar and had to be
+   * read by name. Nothing around it is loaded, so nothing about it can be
+   * predicted — the screen shows it as a record instead of a roster.
+   */
+  fromArchive: boolean;
   /**
    * The gathering whose check-in window covers this instant, if any.
    *
@@ -41,23 +50,24 @@ export function useActiveEvent(eventId?: string | null): ActiveEventResult {
   const { events } = useData();
   const now = useNow();
 
-  return useMemo(() => {
-    const chosen = eventId ? (events.find((event) => event.id === eventId) ?? null) : null;
+  // The calendar first, then the document itself. A gathering older than the
+  // loaded window is still a gathering somebody has named in a URL.
+  const { event: chosen, loading: eventLoading, fromArchive } = useEvent(eventId);
 
+  const { liveEvent, selectableEvents } = useMemo(() => {
     // Anything from the last month plus everything still ahead: enough to
     // back-fill a missed Sunday without scrolling through a year.
     const monthAgo = new Date(now.getTime() - 31 * 86_400_000);
-    const selectableEvents = events
-      .filter((event) => event.status !== 'cancelled' && event.startAt >= monthAgo)
-      .sort((a, b) => b.startAt.getTime() - a.startAt.getTime());
 
     return {
-      event: chosen,
       liveEvent: pickActiveEvent(events, now),
-      now,
-      selectableEvents,
+      selectableEvents: events
+        .filter((event) => event.status !== 'cancelled' && event.startAt >= monthAgo)
+        .sort((a, b) => b.startAt.getTime() - a.startAt.getTime()),
     };
-  }, [events, now, eventId]);
+  }, [events, now]);
+
+  return { event: chosen, eventLoading, fromArchive, liveEvent, now, selectableEvents };
 }
 
 /**

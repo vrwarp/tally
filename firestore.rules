@@ -467,6 +467,35 @@ service cloud.firestore {
      */
 
     /* ---------------------------------------------------------------- */
+    /* One student's attendance, across every event                      */
+    /* ---------------------------------------------------------------- */
+
+    /**
+     * A collection-group query over `attendance`, which is how a student's
+     * page shows history older than the calendar the app keeps loaded.
+     *
+     * A collection-group query is only ever authorised by a rule at a wildcard
+     * path — the nested `events/{eventId}/attendance/{studentId}` rule above
+     * cannot grant it, however permissive it is — so this exists to make that
+     * one query shape possible.
+     *
+     * It widens no data. Every document this can reach is already readable to
+     * the same people through the nested rule, one event at a time; an active
+     * member could already enumerate the lot by walking `events`. What changes
+     * is the number of round trips it takes to ask "when did this student come",
+     * which is the difference between a profile that can show two years of
+     * history and one that stops at the loaded window.
+     *
+     * `list` only. A single document is fetched through its own path, and
+     * writes stay where they are checked against the event they belong to —
+     * `studentId == the document id`, `checkedInBy == the caller` — none of
+     * which this wildcard could enforce.
+     */
+    match /{path=**}/attendance/{studentId} {
+      allow list: if isActive();
+    }
+
+    /* ---------------------------------------------------------------- */
     /* Default deny                                                      */
     /* ---------------------------------------------------------------- */
 

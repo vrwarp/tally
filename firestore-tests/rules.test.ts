@@ -11,14 +11,18 @@ import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
 import { assertFails, assertSucceeds, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import {
   collection,
+  collectionGroup,
   deleteDoc,
   doc,
   getDoc,
   getDocs,
+  orderBy,
+  query,
   setDoc,
   updateDoc,
+  where,
 } from 'firebase/firestore';
-import { paths } from '@/lib/paths';
+import { COLLECTIONS, paths } from '@/lib/paths';
 import {
   ID,
   UID,
@@ -513,6 +517,40 @@ describe('attendance', () => {
     await assertFails(
       getDocs(collection(asUser(env, UID.stranger), paths.attendanceCollection(ID.event))),
     );
+  });
+
+  /*
+   * The collection-group read behind a student's full history.
+   *
+   * It needs a rule at a wildcard path — the nested rule above cannot authorise
+   * a collection-group query however permissive it is — so this is the test
+   * that the wildcard exists and is scoped to the same people.
+   */
+  it('lets an active member read one student\u2019s attendance across every event', async () => {
+    const db = asUser(env, UID.counselor);
+    await assertSucceeds(
+      getDocs(
+        query(
+          collectionGroup(db, COLLECTIONS.attendance),
+          where('studentId', '==', ID.student),
+          orderBy('checkedInAt', 'desc'),
+        ),
+      ),
+    );
+  });
+
+  it('denies that same sweep to everyone else', async () => {
+    for (const db of [asAnonymous(env), asUser(env, UID.stranger)]) {
+      await assertFails(
+        getDocs(
+          query(
+            collectionGroup(db, COLLECTIONS.attendance),
+            where('studentId', '==', ID.student),
+            orderBy('checkedInAt', 'desc'),
+          ),
+        ),
+      );
+    }
   });
 });
 

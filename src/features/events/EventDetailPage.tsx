@@ -23,6 +23,7 @@ import {
 } from '@/components/ui';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
+import { useEvent } from '@/hooks/useEvent';
 import { useToast } from '@/context/toastContext';
 import { EventDangerZone } from '@/features/events/EventDangerZone';
 import { EventEditorModal } from '@/features/events/EventEditorModal';
@@ -53,7 +54,9 @@ export function EventDetailPage() {
   const navigate = useNavigate();
   const now = useNow(60_000);
 
-  const event = events.find((candidate) => candidate.id === eventId) ?? null;
+  // The calendar holds a fixed window; a leader paging the past can reach well
+  // past it, and every row down there names a real night. See `useEvent`.
+  const { event, loading: eventLoading } = useEvent(eventId);
   const { attendance, error: attendanceError } = useAttendance(event?.id ?? null);
 
   const [editorOpen, setEditorOpen] = useState(false);
@@ -61,7 +64,7 @@ export function EventDetailPage() {
   const [busy, setBusy] = useState(false);
 
   if (!event) {
-    if (loading) {
+    if (loading || eventLoading) {
       return (
         <div className="mx-auto max-w-lg px-4 py-4">
           <SkeletonRows count={3} />

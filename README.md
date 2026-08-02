@@ -330,6 +330,18 @@ two gatherings sharing a start time cannot duplicate or skip one. Each row carri
 the same session cache the predictive roster fills, so scrolling back over a window the roster has
 already loaded costs nothing.
 
+Everything those rows *link to* has to cross the same boundary, and for a while nothing did:
+following a two-year-old gathering resolved its id by scanning the window, missed, and landed on the
+check-in chooser as though the tap had been swallowed. Importing years of Check-Ins history turned
+that from unreachable into the ordinary case. `useEvent` closes it — the calendar first, then the
+document by name — and a night that had to be read by name is shown as a *record* rather than a
+roster (`ArchivedNight`), because none of the chain around it is loaded and a roster drawn anyway
+would order itself from this term's attendance while claiming to describe that night. A student's
+page reaches the same distance from the other end: "Every night they came" pages the student's own
+attendance documents through a collection-group query (`fetchStudentHistory`), and says plainly that
+it lists only nights they were present — an absence is a fact about the gathering's calendar, and
+proving one that far back would mean paging every instance of every chain.
+
 **Deleting an event runs on a server, even though the rules already allow it.** The core team may
 delete an `events/{eventId}` document directly — but deleting a document does not delete its
 subcollections, and the attendance left underneath is unreachable from every screen while still
