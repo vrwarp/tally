@@ -539,6 +539,8 @@ export const FIXTURE_IDS = {
   benjiWithNickname: '4200002',
   bensonWithScriptNickname: '4200019',
   sofiaWithAllergy: '4200003',
+  /** The second flagged student, so a batch read has more than one to carry. */
+  elijahWithAllergy: '4200008',
   ivyNoGrade: '4200015',
   oliverFifthGrader: '4200016',
   ruthInactive: '4200017',

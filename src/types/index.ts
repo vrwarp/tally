@@ -607,9 +607,11 @@ export interface PcoRosterPerson {
   /**
    * *That* there is an allergy, never what it is.
    *
-   * A counselor at a door needs to know to check; the note itself is medical
-   * information about a minor and stays behind `getPersonDetails`. A boolean is
-   * enough to render the badge that makes somebody look.
+   * A roster is read for everybody at once, and the note is medical information
+   * about a minor — so it is not carried here for four hundred students on the
+   * chance that four of them are looked at. The flag is what a badge needs; the
+   * note behind it is asked for separately, for the flagged rows only, through
+   * `getAllergyNotes`.
    */
   hasAllergies: boolean;
   /**

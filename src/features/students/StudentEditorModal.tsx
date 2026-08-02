@@ -35,6 +35,7 @@ import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { AddParentContact } from '@/features/students/AddParentContact';
 import { BirthdayField } from '@/features/students/EditBirthday';
+import { invalidateAllergyNotes } from '@/hooks/useAllergyNotes';
 import { invalidatePersonDetails, usePersonDetails } from '@/hooks/usePersonDetails';
 import {
   BLANK_BIRTHDAY_FIELD,
@@ -303,6 +304,10 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
           // about to close — whoever opened it asks again.
           await refreshRoster(true);
           invalidatePersonDetails(student.id);
+          // And the notes the check-in badges print, which are held separately
+          // and would otherwise go on showing the allergy as it was typed
+          // before this edit — on the screen that acts on it.
+          invalidateAllergyNotes();
           onSaved?.();
         }
         show(message, { tone: 'success' });

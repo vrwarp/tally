@@ -46,6 +46,7 @@ import {
 } from './pco/profile.js';
 import { addParent as addParentUpstream, type AddParentResult } from './pco/household.js';
 import {
+  fetchAllergyNotes,
   fetchParentContactStatus,
   fetchPersonDetails,
   fetchRoster,
@@ -334,8 +335,9 @@ async function scanRoster(database: FirestoreLike): Promise<RosterScan> {
  *
  * Open to any active member of the team, not just the core: a door volunteer
  * cannot check anybody in without it. It returns names and grades only — parent
- * contact and allergies come from `getPersonDetails`, one person at a time, to
- * somebody with a reason to look.
+ * contact comes from `getPersonDetails`, one person at a time, to somebody with
+ * a reason to look, and the allergy *note* from `getAllergyNotes` for the few
+ * students whose row is already flagged.
  *
  * Students Tally created itself and has not pushed yet live entirely in
  * Firestore, which the app already reads live; merging the two is the client's
@@ -537,6 +539,74 @@ export const getPersonDetails = onCall<
       };
     } catch (error) {
       return reportPcoFailure(error, 'load this student');
+    }
+  },
+);
+
+export interface AllergyNotesResponse {
+  /**
+   * Planning Center person id -> the allergy line on file.
+   *
+   * Only people who have one appear. A person who could not be read is absent
+   * rather than empty-stringed, and the two are the same thing to the badge
+   * that reads this: it falls back to the word `Allergy` on its own.
+   */
+  notes: Record<string, string>;
+}
+
+/**
+ * The allergy line for the students a check-in roster has already flagged.
+ *
+ * The one piece of medical information that reaches the door, and it is here
+ * because withholding it made the flag worse than useless: a counselor looking
+ * at `⚠ Allergy` on a row they are about to check in cannot act on it without
+ * leaving the screen, so on a Friday nobody does. A badge that says *peanuts*
+ * is read in the half second the row is already being looked at.
+ *
+ * Deliberately not `getPersonDetails`, on two counts. That one is core team
+ * only, and the people this is for are the door volunteers — `counselor` is a
+ * role that never sees the dashboard and must still see the allergy. And it
+ * returns a parent's name, phone and email, none of which a check-in screen has
+ * any business receiving; this returns one line per person and nothing else.
+ *
+ * The ids come from the caller — the students whose roster row carries the flag
+ * — rather than from the whole roster, so the request is a handful of people on
+ * a ministry of four hundred.
+ */
+export const getAllergyNotes = onCall<
+  { pcoPersonIds?: readonly string[] },
+  Promise<AllergyNotesResponse>
+>(
+  { secrets: PCO_SECRETS, timeoutSeconds: 60, memory: '256MiB' },
+  async (request): Promise<AllergyNotesResponse> => {
+    await requireMember(request.auth?.uid);
+
+    const asked = request.data?.pcoPersonIds;
+    if (!Array.isArray(asked)) {
+      throw new HttpsError('invalid-argument', 'pcoPersonIds is required.');
+    }
+
+    const personIds = asked.filter(
+      (id): id is string => typeof id === 'string' && id.length > 0,
+    );
+    // Nothing to ask about is a perfectly ordinary answer — a roster where
+    // nobody is flagged — and must not cost a Planning Center client.
+    if (personIds.length === 0) return { notes: {} };
+
+    const config = await resolveConfig(db());
+    const client = clientFor(config);
+    if (!client) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
+
+    try {
+      const notes = await fetchAllergyNotes({
+        client,
+        config,
+        cache: sharedCache(config),
+        personIds,
+      });
+      return { notes };
+    } catch (error) {
+      return reportPcoFailure(error, 'read the allergy notes');
     }
   },
 );

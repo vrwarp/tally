@@ -87,7 +87,8 @@ export interface RosterPerson {
   profileComplete: boolean | null;
   /**
    * *That* there is an allergy, never what it is. Enough to render the badge
-   * that makes a counselor look; the note itself stays behind a detail read.
+   * that makes a counselor look; the note itself is asked for separately, for
+   * the flagged rows only — see `fetchAllergyNotes`.
    */
   hasAllergies: boolean;
   /**
@@ -706,6 +707,95 @@ export async function fetchPersonDetails(
     },
     options.force,
   );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Allergy notes                                                               */
+/* -------------------------------------------------------------------------- */
+
+/** The cache entry one student's allergy line lives in. */
+export function allergyNoteCacheKey(baseUrl: string, personId: string): string {
+  return cacheKey({ kind: 'allergy', base: baseUrl, id: personId });
+}
+
+/**
+ * How many people one call may ask about.
+ *
+ * The caller sends the students whose roster row already carries the flag,
+ * which on a ministry of four hundred is a handful. The cap is a backstop
+ * against a caller that has misunderstood and sent the whole roster: a request
+ * each is the wrong shape for that, and truncating is better than spending
+ * four hundred round trips finding out.
+ */
+const MAX_ALLERGY_LOOKUPS = 100;
+
+/** Enough to make a handful of reads feel like one; gentle on a rate limit. */
+const ALLERGY_CONCURRENCY = 4;
+
+/**
+ * The allergy line for each of a few students, and nothing else about them.
+ *
+ * Deliberately not `fetchPersonDetails` for each. That read hydrates the
+ * household to find a parent, which is a request per family and hands back a
+ * phone number and an email — on the check-in screen, for a question that is
+ * only ever "what is the note". One request per person, no includes, one field
+ * out of the answer.
+ *
+ * A person who cannot be read is simply absent from the result. The row it
+ * belongs to still says `Allergy`, which is what it said before any of this
+ * existed, and that is the right way for a Planning Center outage to land on a
+ * counselor at a door: the flag is the part that matters, and it comes from the
+ * roster read they are already looking at.
+ */
+export async function fetchAllergyNotes(
+  options: RosterOptions & { personIds: readonly string[] },
+): Promise<Record<string, string>> {
+  const { client, config, cache } = options;
+  const now = options.now ?? new Date();
+  const wanted = [...new Set(options.personIds)].slice(0, MAX_ALLERGY_LOOKUPS);
+
+  const notes: Record<string, string> = {};
+  let next = 0;
+
+  const read = async (): Promise<void> => {
+    while (next < wanted.length) {
+      const personId = wanted[next];
+      next += 1;
+
+      const note = await cache
+        .get(
+          allergyNoteCacheKey(config.baseUrl, personId),
+          () => readAllergyNote(client, config, personId, now),
+          options.force,
+        )
+        .catch(() => null);
+
+      if (note !== null) notes[personId] = note;
+    }
+  };
+
+  await Promise.all(Array.from({ length: Math.min(ALLERGY_CONCURRENCY, wanted.length) }, read));
+  return notes;
+}
+
+async function readAllergyNote(
+  client: PcoClient,
+  config: PcoConfig,
+  personId: string,
+  now: Date,
+): Promise<string | null> {
+  const body = await client.get<PcoPerson>(`/people/${encodeURIComponent(personId)}`);
+  const person = Array.isArray(body.data) ? body.data[0] : body.data;
+  if (!person) return null;
+
+  // Through the mapper rather than off the attribute, so "what the allergy line
+  // says" is one piece of code — the roster's flag and this note must never
+  // disagree about whether an empty string counts.
+  return mapPersonToStudent(person, {
+    minGrade: config.minGrade,
+    maxGrade: config.maxGrade,
+    now,
+  }).allergies;
 }
 
 /**

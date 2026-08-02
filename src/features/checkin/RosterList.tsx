@@ -31,7 +31,14 @@ export interface RosterListProps {
   onPress: (entry: RosterEntry) => void;
   flashing: ReadonlySet<string>;
   busy: ReadonlySet<string>;
+  /**
+   * Student id -> what their allergy actually is, for the rows that have one.
+   * Fills in a beat after the names do; see `useAllergyNotes`.
+   */
+  allergyNotes?: ReadonlyMap<string, string>;
 }
+
+const NO_NOTES: ReadonlyMap<string, string> = new Map();
 
 /*
  * Memoised because the screen above it re-renders on a 30-second clock (the
@@ -52,6 +59,7 @@ export const RosterList = memo(function RosterList({
   onPress,
   flashing,
   busy,
+  allergyNotes = NO_NOTES,
 }: RosterListProps) {
   return (
     <section className="pb-3" aria-label={`${title}, ${entries.length}`}>
@@ -90,6 +98,7 @@ export const RosterList = memo(function RosterList({
               flashing={flashing.has(entry.student.id)}
               busy={busy.has(entry.student.id)}
               showRecentHint={showRecentHint}
+              allergyNote={allergyNotes.get(entry.student.id)}
             />
           ))}
         </ul>
