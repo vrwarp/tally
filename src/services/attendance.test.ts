@@ -1,5 +1,5 @@
 /**
- * What a tap at the door writes onto a student document.
+ * What a tap at the door writes, and what a correction is allowed to change.
  *
  * Check-in is the write that reaches the most people: most students have no
  * Firestore document until somebody checks them in, so this batch is where
@@ -7,20 +7,31 @@
  * therefore the permanent record of that person, and it outlives the roster row
  * it was copied from — take somebody off the roster and this document is all
  * that is left of them.
+ *
+ * The other half is `swapCheckIn`, and there only one thing may change: who the
+ * check-in is for. Two names that look alike at arm's length get confused a few
+ * times a term, and the fix cannot go through undo-and-check-in-again, because
+ * that stamps the replacement with the server clock and quietly moves a 7:04
+ * arrival to 7:11.
+ *
+ * Firestore is mocked at the SDK boundary: these are claims about the batch the
+ * service builds, and the emulator suite (`firestore-tests`) is where the rules
+ * that batch has to satisfy are checked.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { checkIn } from '@/services/attendance';
-import { makeEvent, makeStudent } from '../../tests/factories';
+import { checkIn, swapCheckIn } from '@/services/attendance';
+import { makeAttendance, makeEvent, makeStudent } from '../../tests/factories';
 
 const set = vi.hoisted(() => vi.fn());
+const remove = vi.hoisted(() => vi.fn());
 const commit = vi.hoisted(() => vi.fn(async () => {}));
 
 vi.mock('@/lib/firebase', () => ({ db: {} }));
 vi.mock('firebase/firestore', () => ({
   doc: (_db: unknown, path: string) => ({ path }),
   serverTimestamp: () => 'server-timestamp',
-  writeBatch: () => ({ set, commit }),
-  // Imported by the module but not reached by `checkIn`.
+  writeBatch: () => ({ set, delete: remove, commit }),
+  // Imported by the module but not reached by either write.
   collection: vi.fn(),
   deleteDoc: vi.fn(),
   getDocs: vi.fn(),
@@ -28,22 +39,31 @@ vi.mock('firebase/firestore', () => ({
   setDoc: vi.fn(),
 }));
 
-/** The student half of the batch — the second `set`, keyed by the student path. */
+const EVENT = makeEvent({ id: 'event-1', startAt: new Date('2026-02-13T19:00:00') });
+
+/** The student half of the batch — the `set` keyed by the student path. */
 function studentWrite(): Record<string, unknown> | null {
   const call = set.mock.calls.find(([ref]) => (ref as { path: string }).path.startsWith('students/'));
   return (call?.[1] as Record<string, unknown>) ?? null;
 }
 
+/** The attendance document the batch wrote, and where it wrote it. */
+function attendanceWrite() {
+  const call = set.mock.calls.find(([ref]) =>
+    (ref as { path: string }).path.includes('/attendance/'),
+  );
+  return {
+    path: (call?.[0] as { path: string } | undefined)?.path ?? null,
+    data: (call?.[1] as Record<string, unknown>) ?? null,
+  };
+}
+
 const tap = (student: Parameters<typeof checkIn>[0]['student']) =>
-  checkIn({
-    event: makeEvent({ id: 'event-1', startAt: new Date('2026-02-13T19:00:00') }),
-    student,
-    uid: 'counselor-1',
-    method: 'tap',
-  });
+  checkIn({ event: EVENT, student, uid: 'counselor-1', method: 'tap' });
 
 beforeEach(() => {
   set.mockClear();
+  remove.mockClear();
   commit.mockClear();
 });
 
@@ -72,5 +92,91 @@ describe('checkIn', () => {
     const written = studentWrite();
     expect(written).toMatchObject({ firstName: 'Alan', lastName: 'Wan' });
     expect(written).not.toHaveProperty('grade');
+  });
+});
+
+/** Ten past seven, and it has to still say ten past seven afterwards. */
+const ARRIVED = new Date('2026-02-13T19:10:00');
+
+const WRONG = makeStudent({ id: 'jordan-reyes', firstName: 'Jordan', lastName: 'Reyes' });
+const RIGHT = makeStudent({ id: 'jordan-rees', firstName: 'Jordan', lastName: 'Rees' });
+
+const RECORD = makeAttendance({
+  studentId: WRONG.id,
+  eventId: EVENT.id,
+  checkedInAt: ARRIVED,
+  checkedInBy: 'counselor-1',
+  method: 'search',
+});
+
+describe('swapCheckIn', () => {
+  it('carries the moment across rather than restamping it', async () => {
+    await swapCheckIn({ event: EVENT, from: RECORD, to: RIGHT, uid: 'counselor-2' });
+
+    const { path, data } = attendanceWrite();
+    expect(path).toBe(`events/${EVENT.id}/attendance/${RIGHT.id}`);
+    expect(data?.checkedInAt).toBe(ARRIVED);
+    // How the check-in happened is a fact about the check-in, not about who it
+    // turned out to be for.
+    expect(data?.method).toBe('search');
+  });
+
+  it('moves the one record instead of leaving two behind', async () => {
+    await swapCheckIn({ event: EVENT, from: RECORD, to: RIGHT, uid: 'counselor-2' });
+
+    expect(remove).toHaveBeenCalledWith(
+      expect.objectContaining({ path: `events/${EVENT.id}/attendance/${WRONG.id}` }),
+    );
+    // One commit: there is never an instant where the event has both students
+    // present, or neither.
+    expect(commit).toHaveBeenCalledTimes(1);
+  });
+
+  it('files the correction under whoever made it', async () => {
+    await swapCheckIn({ event: EVENT, from: RECORD, to: RIGHT, uid: 'counselor-2' });
+
+    // Rules require a counselor to own what they write, and it is honest
+    // anyway — the correction is theirs, the original was not.
+    expect(attendanceWrite().data?.checkedInBy).toBe('counselor-2');
+  });
+
+  it('recomputes "first ever" for whoever is receiving it', async () => {
+    await swapCheckIn({
+      event: EVENT,
+      from: makeAttendance({ ...RECORD, isFirstEver: true }),
+      to: makeStudent({ ...RIGHT, firstAttendedAt: new Date('2025-09-05T19:00:00') }),
+      uid: 'counselor-2',
+    });
+
+    expect(attendanceWrite().data?.isFirstEver).toBe(false);
+  });
+
+  it('back-fills the receiving student’s dates, and only forward', async () => {
+    await swapCheckIn({
+      event: EVENT,
+      from: RECORD,
+      to: makeStudent({
+        ...RIGHT,
+        firstAttendedAt: new Date('2025-09-05T19:00:00'),
+        lastAttendedAt: new Date('2026-03-06T19:00:00'),
+      }),
+      uid: 'counselor-2',
+    });
+
+    // Their last-seen is already later than this Friday, and their first ever
+    // is fixed for good — so there is nothing to say about them.
+    expect(studentWrite()).toBeNull();
+  });
+
+  /*
+   * The same student on both ends is not a correction — and the batch would
+   * delete and recreate one document, which every other phone in the room sees
+   * as a check-in blinking out of existence.
+   */
+  it('does nothing at all when the student is already the right one', async () => {
+    await swapCheckIn({ event: EVENT, from: RECORD, to: WRONG, uid: 'counselor-2' });
+
+    expect(commit).not.toHaveBeenCalled();
+    expect(remove).not.toHaveBeenCalled();
   });
 });

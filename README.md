@@ -22,7 +22,11 @@ students who attended at least two of the last three Friday Fellowships — with
 and a "Checked in" chip beside it. Tapping a row flashes green and buzzes before the write reaches
 the server, and the row stays exactly where it was: with two counselors working one queue, a list
 that re-sorted on every check-in slid the next name out from under a thumb already moving toward it.
-Undo is a second tap on the same row, and the row holds its place on Recent for the rest of the
+Undo is the check mark, one tap and no dialog. A second tap on the row itself opens the corrections
+that are rarer than a mis-tap but have nowhere else to live: the student's profile, and "Wrong
+person", which hands the check-in to somebody else through the search box that is already there —
+the two names that get confused are the ones that look alike — and carries the original minute
+across, because only *who* was wrong. The row holds its place on Recent for the rest of the
 visit even when nothing predicted the student: an undo is usually a mis-tap, and the row wanted next
 is the one that just disappeared. Nothing is written to keep it there — reload and the list is the
 prediction's again. The list will not narrow under a reader either — the prediction is a one-shot read, so the rows wait

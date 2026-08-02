@@ -41,97 +41,180 @@ function attendancePayload(args: {
   uid: string;
   method: CheckInMethod;
   isFirstEver: boolean;
+  /**
+   * When they arrived, if that is already known.
+   *
+   * Only `swapCheckIn` passes it: a correction is not a new arrival, so the
+   * moment has to survive being moved to another student. Everything else takes
+   * the server clock, which is the one clock every device agrees on.
+   */
+  checkedInAt?: Date;
 }) {
   return {
     studentId: args.studentId,
     eventId: args.event.id,
     seriesId: args.event.seriesId,
-    checkedInAt: serverTimestamp(),
+    checkedInAt: args.checkedInAt ?? serverTimestamp(),
     checkedInBy: args.uid,
     method: args.method,
     isFirstEver: args.isFirstEver,
   };
 }
 
+/** The subset of a student the attendance writes need. */
+type CheckInStudent = Pick<
+  Student,
+  | 'id'
+  | 'firstName'
+  | 'lastName'
+  | 'grade'
+  | 'gradeOnFile'
+  | 'searchName'
+  | 'firstAttendedAt'
+  | 'lastAttendedAt'
+>;
+
+/**
+ * The patch a check-in makes to the student document, or `null` for nothing to do.
+ *
+ * `firstAttendedAt` is written once and never moved, so "New Visitors" stays
+ * stable even if someone back-fills an older event later. `lastAttendedAt` only
+ * moves forward, so checking a student into a historical event does not rewrite
+ * their "last seen" to the past.
+ *
+ * The name and grade ride along even though a check-in does not change them.
+ * Most students have no Firestore document at all — the roster comes from
+ * Planning Center, and Tally writes one only when it has something of its own to
+ * record. Being checked in *is* that something, so this write frequently creates
+ * the document, and a document with nothing in it but two timestamps is
+ * unreadable in the console and fails the rules' identity check.
+ */
+function studentDatePatch(
+  student: CheckInStudent,
+  event: Pick<TallyEvent, 'startAt'>,
+  uid: string,
+): Record<string, unknown> | null {
+  const dates: Record<string, unknown> = {};
+  if (student.firstAttendedAt === null) dates.firstAttendedAt = event.startAt;
+  if (!student.lastAttendedAt || student.lastAttendedAt < event.startAt) {
+    dates.lastAttendedAt = event.startAt;
+  }
+  if (Object.keys(dates).length === 0) return null;
+
+  return {
+    ...dates,
+    firstName: student.firstName,
+    lastName: student.lastName,
+    /*
+     * Left out for somebody Planning Center holds no grade for, where `grade`
+     * is where the sync's clamp landed rather than a fact — see `gradeOnFile`.
+     *
+     * This is the write that reaches most people: a tap at a door is how the
+     * majority of these documents come into existence at all. Stamping the
+     * clamp here would put an invented 6th grade on the permanent record of
+     * every adult a leader ever checked in, in the one place that outlives the
+     * roster row it was copied from.
+     */
+    ...(student.gradeOnFile === false ? {} : { grade: student.grade }),
+    searchName: student.searchName,
+    updatedAt: serverTimestamp(),
+    updatedBy: uid,
+  };
+}
+
 /**
  * Marks a student present.
  *
- * Also maintains the two denormalised dates on the student document:
- *  - `firstAttendedAt` is written once and never moved, so "New Visitors"
- *    stays stable even if someone back-fills an older event later.
- *  - `lastAttendedAt` only moves forward, so checking a student into a
- *    historical event does not rewrite their "last seen" to the past.
+ * Also maintains the two denormalised dates on the student document — see
+ * `studentDatePatch`.
  */
 export async function checkIn(args: {
   event: Pick<TallyEvent, 'id' | 'seriesId' | 'startAt'>;
-  /*
-   * The name and grade are needed even though check-in does not change them.
-   *
-   * Most students have no Firestore document at all — the roster comes from
-   * Planning Center, and Tally writes one only when it has something of its own
-   * to record. Being checked in *is* that something, so this write frequently
-   * creates the document, and a document with nothing in it but two timestamps
-   * is unreadable in the console and fails the rules' identity check.
-   */
-  student: Pick<
-    Student,
-    | 'id'
-    | 'firstName'
-    | 'lastName'
-    | 'grade'
-    | 'gradeOnFile'
-    | 'searchName'
-    | 'firstAttendedAt'
-    | 'lastAttendedAt'
-  >;
+  student: CheckInStudent;
   uid: string;
   method: CheckInMethod;
 }): Promise<void> {
   const { event, student, uid, method } = args;
-  const isFirstEver = student.firstAttendedAt === null;
 
   const batch = writeBatch(db);
 
   batch.set(
     doc(db, paths.attendance(event.id, student.id)),
-    attendancePayload({ event, studentId: student.id, uid, method, isFirstEver }),
+    attendancePayload({
+      event,
+      studentId: student.id,
+      uid,
+      method,
+      isFirstEver: student.firstAttendedAt === null,
+    }),
   );
 
-  const studentPatch: Record<string, unknown> = {};
-  if (isFirstEver) studentPatch.firstAttendedAt = event.startAt;
-  if (!student.lastAttendedAt || student.lastAttendedAt < event.startAt) {
-    studentPatch.lastAttendedAt = event.startAt;
-  }
-  if (Object.keys(studentPatch).length > 0) {
+  const patch = studentDatePatch(student, event, uid);
+  if (patch) {
     // `set(..., { merge: true })` rather than `update`, which requires the
     // document to already exist. For a Planning Center student it usually does
     // not, and an `update` that fails takes the *attendance* write down with it
     // — the tap would flash green and then quietly not have happened.
-    batch.set(
-      doc(db, paths.student(student.id)),
-      {
-        ...studentPatch,
-        firstName: student.firstName,
-        lastName: student.lastName,
-        /*
-         * Left out for somebody Planning Center holds no grade for, where
-         * `grade` is where the sync's clamp landed rather than a fact — see
-         * `gradeOnFile`.
-         *
-         * This is the write that reaches most people: a tap at a door is how
-         * the majority of these documents come into existence at all. Stamping
-         * the clamp here would put an invented 6th grade on the permanent
-         * record of every adult a leader ever checked in, in the one place that
-         * outlives the roster row it was copied from.
-         */
-        ...(student.gradeOnFile === false ? {} : { grade: student.grade }),
-        searchName: student.searchName,
-        updatedAt: serverTimestamp(),
-        updatedBy: uid,
-      },
-      { merge: true },
-    );
+    batch.set(doc(db, paths.student(student.id)), patch, { merge: true });
   }
+
+  await batch.commit();
+}
+
+/**
+ * Moves one check-in from the student it was filed against to the right one.
+ *
+ * This exists for the two names that look the same at arm's length in a noisy
+ * hallway — the Jordan Reyes / Jordan Rees problem. Undo-then-check-in reaches
+ * the same end state, but it costs the moment: the replacement is stamped with
+ * the server clock, which by then is a minute or two after the student actually
+ * walked through the door. The whole point of a correction is that only *who*
+ * was wrong, so `checkedInAt` and the method that recorded it come across
+ * untouched and the record still says the student arrived at 7:04.
+ *
+ * `checkedInBy` becomes whoever is fixing it, because rules require a
+ * counselor to own the documents they write. That is honest anyway: the
+ * correction is theirs.
+ *
+ * The wrongly-tapped student's own `firstAttendedAt` / `lastAttendedAt` are
+ * left alone, exactly as `undoCheckIn` leaves them — those fields are display
+ * conveniences, and the attendance documents are the ledger.
+ *
+ * One write, so there is never an instant where the event has both students
+ * present or neither.
+ */
+export async function swapCheckIn(args: {
+  event: Pick<TallyEvent, 'id' | 'seriesId' | 'startAt'>;
+  /** The check-in as it stands — the record being moved, not a new one. */
+  from: Pick<AttendanceRecord, 'studentId' | 'checkedInAt' | 'method'>;
+  /** Who was actually at the door. */
+  to: CheckInStudent;
+  uid: string;
+}): Promise<void> {
+  const { event, from, to, uid } = args;
+  // Nothing to move, and writing it anyway would delete and recreate the same
+  // document — a check-in that blinks out of existence on every other device.
+  if (from.studentId === to.id) return;
+
+  const batch = writeBatch(db);
+
+  batch.delete(doc(db, paths.attendance(event.id, from.studentId)));
+  batch.set(
+    doc(db, paths.attendance(event.id, to.id)),
+    attendancePayload({
+      event,
+      studentId: to.id,
+      uid,
+      method: from.method,
+      // Recomputed for whoever is receiving it: "first time ever" is a fact
+      // about the student, not about the check-in being moved.
+      isFirstEver: to.firstAttendedAt === null,
+      checkedInAt: from.checkedInAt,
+    }),
+  );
+
+  const patch = studentDatePatch(to, event, uid);
+  if (patch) batch.set(doc(db, paths.student(to.id)), patch, { merge: true });
 
   await batch.commit();
 }

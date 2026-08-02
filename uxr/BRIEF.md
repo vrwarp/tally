@@ -47,7 +47,9 @@ proposes undoing them is out of scope:
   a student in recolours their row where it stands. Re-sorting slid the next
   name out from under a thumb already moving toward it.
 - **The event is chosen by a person, not by the clock.** `/` is a question.
-- **Undo is a second tap, never a dialog.**
+- **Undo is one tap on the check mark, never a dialog.** The second tap on the
+  row body opens the corrections strip — undo, profile, wrong person — and
+  undo itself must never become a confirmation.
 - **No RSVP counts on calendar rows** — that data is not subscribed to, and a
   plausible wrong number is worse than none.
 - **The dashboard is split by gathering.** Friday and Sunday are different
