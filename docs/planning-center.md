@@ -464,12 +464,13 @@ roster of minors.
 
 ## 7. What Tally reads, and when
 
-There is no scheduled anything. Four reads, and each one is somebody looking at a screen:
+There is no scheduled anything. Five reads, and each one is somebody looking at a screen:
 
 | Read | Triggered by | Cost |
 | --- | --- | --- |
 | The roster | Opening check-in, the students list, or a refresh | One sweep of `where[child]=true`, plus one request per roster member the sweep did not cover |
 | One person's details | Opening a student's page | One request, plus one per household |
+| The allergy notes | Check-in, for the rows the roster already flagged | One request per flagged student, once per session |
 | Who has a parent contact | Opening Insights | One sweep of `where[child]=false`, on top of the roster read it reuses |
 | A directory search | Typing in "Add from Planning Center" | One request per keystroke burst |
 
@@ -481,6 +482,16 @@ the failure nobody notices. Settings shows the count.
 
 Every answer is held for `PCO_CACHE_TTL_SECONDS`, keyed by the roster itself. Adding a student
 changes the key, so they appear on the next read rather than whenever the previous answer expires.
+
+The allergy read (`getAllergyNotes`) is the narrowest call in the app, and the only detail read a
+door volunteer's device makes. The roster carries `hasAllergies` and never the note, which is what
+keeps four hundred children's medical notes off every phone that opens Tally — but a badge saying
+`Allergy` with no way to see what it is on the screen where somebody is about to hand out pizza is a
+warning nobody can act on. So check-in asks about the students its own rows have flagged, gets one
+line of text each and nothing else — no parent, no number, no household — and prints it on the badge.
+It sits behind `requireMember` rather than the core-team gate for the same reason: `counselor` is the
+role that stands at the door, and it is the role that needs the answer. A student whose note cannot
+be read is simply absent from the reply, and their row keeps the plain badge.
 
 The parent-contact read (`getParentContactStatus`) is the one that is deliberately *not* part of the
 roster. A roster row reports `profileComplete: null` — "we did not look" — because a parent's phone
