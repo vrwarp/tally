@@ -316,9 +316,10 @@ describe('importCheckInsEvent', () => {
     expect(world.db.get(path)?.status).toBe('inactive');
   });
 
-  it('respects an existing first-attended date rather than moving it', async () => {
+  it('never pushes an existing first-attended date later', async () => {
     const world = harness();
-    // She was first seen at a live Tally gathering, before any import.
+    // She was first seen at a live Tally gathering earlier than anything the
+    // kiosk holds, so the import has nothing earlier to contribute.
     world.db.seed(`students/pco_${FIXTURE_IDS.amara}`, {
       pcoPersonId: FIXTURE_IDS.amara,
       status: 'active',
@@ -330,8 +331,8 @@ describe('importCheckInsEvent', () => {
     await runImport(world, CHECKINS_WEEKLY_EVENT_ID);
 
     const student = world.db.get(`students/pco_${FIXTURE_IDS.amara}`)!;
-    // Written once and never moved — the documented invariant, which keeps
-    // the New Visitors list stable against back-fills.
+    // The half of the invariant that protects New Visitors from a back-fill:
+    // a later date discovered in the archive is not news about their arrival.
     expect((student.firstAttendedAt as Date).toISOString()).toBe('2026-05-01T02:30:00.000Z');
     // But "last seen" does move forward.
     expect((student.lastAttendedAt as Date).toISOString()).toBe('2026-06-27T02:30:00.000Z');
@@ -339,6 +340,40 @@ describe('importCheckInsEvent', () => {
     expect(
       world.db.get(`events/${ROOT}/attendance/pco_${FIXTURE_IDS.amara}`)?.isFirstEver,
     ).toBe(false);
+  });
+
+  it('corrects a first-attended date the archive proves is too late', async () => {
+    const world = harness();
+    /*
+     * The ordinary case after adopting Tally and importing afterwards: she was
+     * checked in live last week, so her document says she arrived last week —
+     * and the kiosk has been recording her since June.
+     */
+    world.db.seed(`students/pco_${FIXTURE_IDS.amara}`, {
+      pcoPersonId: FIXTURE_IDS.amara,
+      status: 'active',
+      firstAttendedAt: new Date('2026-06-30T02:30:00Z'),
+      lastAttendedAt: new Date('2026-06-30T02:30:00Z'),
+      createdAt: new Date('2026-06-30T02:30:00Z'),
+    });
+
+    await runImport(world, CHECKINS_WEEKLY_EVENT_ID);
+
+    const student = world.db.get(`students/pco_${FIXTURE_IDS.amara}`)!;
+    // Otherwise her profile reads "first seen 30 June" above a row saying she
+    // was present on the 6th, and the dashboard calls a regular a new face.
+    expect((student.firstAttendedAt as Date).toISOString()).toBe('2026-06-06T02:30:00.000Z');
+    /*
+     * And the date every derivation measures her against moves with it.
+     * `predictiveRoster` and the MIA list both drop history from before
+     * `createdAt`, so leaving it at 30 June would land her whole imported
+     * attendance somewhere no screen would count it.
+     */
+    expect((student.createdAt as Date).toISOString()).toBe('2026-06-06T02:30:00.000Z');
+    // Her earliest imported night is now, truthfully, her first ever.
+    expect(
+      world.db.get(`events/${ROOT}/attendance/pco_${FIXTURE_IDS.amara}`)?.isFirstEver,
+    ).toBe(true);
   });
 
   it('imports a frequency-less event as history with nothing projected ahead', async () => {

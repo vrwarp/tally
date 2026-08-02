@@ -82,7 +82,7 @@ and each one is stored for a specific reason:
 | --- | --- | --- |
 | `profileComplete` | `true` exactly when `parentPhone` or `parentEmail` is non-empty. Always written via `computeProfileComplete`. | "Incomplete Profiles" must be an indexed query (`status` + `profileComplete` + `createdAt`), not a scan of the whole collection. The converter recomputes it on read as well, so a profile edited through the Firebase console cannot leave a stale flag behind. |
 | `searchName` | Lowercased, single-spaced `"first last"`. Always written via `buildSearchName`. | Firestore has no substring search. This is the key the roster's search bar matches against, without loading a secondary index. Recomputed on read if missing. Stored raw apart from case and spacing: accents, punctuation and typos are all folded at match time by `createSearchMatcher`, so the matching rules can change without a migration. |
-| `firstAttendedAt` | Written exactly once, on a student's first ever check-in, and never moved. | "New Visitors" asks "who arrived in the last seven days". Deriving that from attendance would need history older than the loaded window to prove it is really a *first*. Because the field never moves, back-filling an older event later does not retroactively unmake somebody a visitor. |
+| `firstAttendedAt` | Written on a student's first ever check-in, and never moved *later*. | "New Visitors" asks "who arrived in the last seven days". Deriving that from attendance would need history older than the loaded window to prove it is really a *first*. Because the field never moves later, back-filling an older event does not retroactively unmake somebody a visitor. It does move *earlier*, and only the Check-Ins history import moves it: that import is the one thing that can discover a student was here long before the date on file, and keeping the later date would read as "first seen in July" above a row saying they were present in May — and put a two-year regular on the New Visitors list. Earlier is safe in the direction that matters, since it can only ever remove somebody from that list, never invent one. The import moves `createdAt` with it, for the reason in the row below. |
 
 `lastAttendedAt` is a fourth, weaker case: a display convenience that only ever moves forward, so
 checking a student into a historical event does not rewrite their "last seen" into the past. Undoing
@@ -196,7 +196,7 @@ because a student can exist in Tally before they exist in Planning Center.
 | `pcoUpdatedAt` | Timestamp \| null | Planning Center's own `updated_at` at the last successful pull. The max of these is the incremental cursor. |
 | `pcoSyncedAt` | Timestamp \| null | When Tally last wrote from Planning Center. |
 | `pcoPushPending` | boolean | A Tally-created student still waiting to be pushed. |
-| `createdAt`, `updatedAt`, `createdBy` | — | `createdBy` is a uid, or `'planning-center'` for synced records. For a student created by the Check-Ins history import, `createdAt` is their earliest attended gathering rather than the moment of import — the MIA derivation reads this field to decide which past nights a student could plausibly have been at, and "created today" would excuse them from all of them. |
+| `createdAt`, `updatedAt`, `createdBy` | — | `createdBy` is a uid, or `'planning-center'` for synced records. For a student the Check-Ins history import touches, `createdAt` is their earliest attended gathering rather than the moment of import — `predictiveRoster` and the MIA derivation both drop history from before this date, so "created today" would excuse a student from every past night *and* leave their whole imported attendance somewhere no screen counts it. The import moves an existing `createdAt` earlier for the same reason: a student first checked in through Tally last week carries last week's date, and their two years of kiosk history sit before it. |
 
 **A document here *is* the roster membership.** No document, not on the roster. For a student
 Planning Center knows, that document holds the membership and Tally's own annotations only — the
@@ -381,4 +381,10 @@ a retreat is not evidence about who turns up to a retreat — so the chains them
 - `students` by `status` + `profileComplete` + `createdAt desc` — the Incomplete Profiles list, which
   is the whole reason `profileComplete` is denormalised.
 - Collection-group indexes on `attendance` by `studentId`, `seriesId` and `isFirstEver`, each with
-  `checkedInAt desc` — one student's history, one series' history, and first-ever check-ins.
+  `checkedInAt desc` — one student's history, one series' history, and first-ever check-ins. The
+  first of these is what "Every night they came" on a student's page pages through
+  (`fetchStudentHistory`), which is how that list reaches years further back than the calendar the
+  app keeps loaded. A collection-group query is only authorised by a rule at a wildcard path, so
+  `firestore.rules` carries a `match /{path=**}/attendance/{studentId}` granting `list` to any
+  active member — the same people the nested rule already lets read the same documents one event at
+  a time.

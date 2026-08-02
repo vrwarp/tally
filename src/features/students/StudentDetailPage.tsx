@@ -32,6 +32,7 @@ import {
 import { RosterErrorBanner } from '@/components/RosterErrorBanner';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
+import { EarlierAttendance } from '@/features/students/EarlierAttendance';
 import { useToast } from '@/context/toastContext';
 import {
   groupByGathering,
@@ -754,6 +755,10 @@ export function StudentDetailPage() {
           ))
         )}
       </Card>
+
+      {/* The record under the analysis: every night on file, reaching past the
+          window the card above is derived from. See `EarlierAttendance`. */}
+      <EarlierAttendance studentId={student.id} />
 
       <StudentEditorModal
         open={editorOpen}

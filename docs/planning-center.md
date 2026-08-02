@@ -395,9 +395,14 @@ guests** (a name typed at the kiosk with no person record behind it — nothing 
 door duty from the kiosk to Tally. Every id is derived, so a re-run converges on the same
 documents; an event a leader has since renamed, moved or cancelled in Tally is left exactly as they
 left it; attendance rows are only ever rewritten when the import itself wrote them; and a student
-somebody removed from the roster stays removed. Students who exist in Tally already keep their
-`firstAttendedAt` — the field is written once and never moved, so a back-filled history cannot
-reshuffle the "New Visitors" list.
+somebody removed from the roster stays removed. Students who already exist in Tally keep the parts of their
+record the import cannot improve on, and have two dates corrected where it can. `firstAttendedAt`
+and `createdAt` are moved *earlier* when the imported history proves the student was here before
+the date on file — the ordinary case for a church that adopted Tally first and imported afterwards,
+where a student checked in live last week carries last week's date above two years of kiosk
+attendance. Neither is ever moved later, so a back-filled night cannot reshuffle the "New Visitors"
+list; earlier can only ever take a long-standing regular *off* it. `lastAttendedAt` moves forward
+only, because a night from the archive is not news about when somebody was last seen.
 
 Grades outside 6–12 (the elementary and preschool ministries) are clamped for display, exactly as
 they are for any other out-of-band roster member — see §3, "What the grade band is still for".
