@@ -196,15 +196,19 @@ export interface Student
    */
   birthday: string | null;
   /**
-   * Whether Planning Center holds a grade of its own for this person, or the
-   * `grade` above is only the clamp's landing spot. Present on roster-sourced
-   * rows; absent on documents, where the grade was typed by a human and is
-   * always real.
+   * Whether anybody holds a grade of their own for this person, or the `grade`
+   * above is only where a fallback landed.
    *
-   * Read in two places. `mergeRoster` uses it to let a grade a human typed at
-   * quick-add out-rank the clamp — see the note there — and `gradeLabel` uses
-   * it to keep every screen from printing the clamp as a fact, which is what
-   * turned the adults on a hand-picked roster into 6th graders.
+   * Present on roster-sourced rows, where Planning Center answers it. Absent on
+   * a document that carries a grade — one typed by a human at quick-add, always
+   * real — and `false` on one that carries none, which is an annotation written
+   * against somebody Planning Center holds no grade for.
+   *
+   * Three readers. `gradeLabel` keeps every screen from printing the fallback
+   * as a fact, which is what turned the adults on a hand-picked roster into 6th
+   * graders; `mergeRoster` lets a grade a human typed at quick-add out-rank one
+   * — see the note there; and `updateStudent` declines to write one down, so a
+   * document that outlives its roster row is not left asserting it.
    */
   gradeOnFile?: boolean;
 }

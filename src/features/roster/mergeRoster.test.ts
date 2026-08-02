@@ -131,6 +131,15 @@ describe('mergeRoster', () => {
     expect(mergeRoster(roster, [linked])[0]?.gradeOnFile).toBe(true);
   });
 
+  it('does not claim a grade when neither side holds one', () => {
+    // Both numbers are fallbacks — the sync's clamp on one side, the
+    // converter's on the other — so the row has nothing real to print.
+    const roster = [rosterEntry('900', { grade: 6, gradeOnFile: false })];
+    const linked = tallyDocument('tally-abc', { pcoPersonId: '900', grade: 6, gradeOnFile: false });
+
+    expect(mergeRoster(roster, [linked])[0]?.gradeOnFile).toBe(false);
+  });
+
   it('lets Planning Center keep a grade it genuinely holds for a linked visitor', () => {
     const roster = [rosterEntry('900', { grade: 8, gradeOnFile: true })];
     const linked = tallyDocument('tally-abc', { pcoPersonId: '900', grade: 9 });
