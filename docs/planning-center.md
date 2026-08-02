@@ -271,10 +271,13 @@ one.)
 birthdate it asks for the year, and against a year on file that has no 29 February it is refused
 rather than rounded to 1 March by the far end.
 
-The form is **one box** — on the student editor and behind the roster's birthday badge, which is
-where somebody usually notices, with the student in front of them having just said when it is.
-Behind the badge it is open on arrival: there is no "Add a birthday" press between a leader and the
-one thing that panel is for.
+The form is **one box** — on the student editor, behind the roster's birthday badge, and on the
+student's own page, which are the three places somebody notices, usually with the student in front
+of them having just said when it is. Behind the badge it is open on arrival: there is no "Add a
+birthday" press between a leader and the one thing that panel is for. On the profile it sits under
+the date itself, which that page states whether or not the day is near — the badge is a fortnight
+wide by design, and a birthday in August read in March is exactly the case only the profile can
+answer.
 
 The box takes digits and punctuates itself, drawing the rest of `MM / DD / YYYY` faded after what
 has been typed. Slots fill greedily and forwards — a slot takes a second digit only when a second

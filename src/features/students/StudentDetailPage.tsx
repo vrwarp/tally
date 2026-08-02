@@ -48,9 +48,11 @@ import {
   type GatheringStanding,
 } from '@/features/dashboard/insights';
 import { AddParentContact } from '@/features/students/AddParentContact';
+import { EditBirthday } from '@/features/students/EditBirthday';
 import { StudentEditorModal } from '@/features/students/StudentEditorModal';
 import { useNow } from '@/hooks/useNow';
 import { usePersonDetails } from '@/hooks/usePersonDetails';
+import { birthdayState, formatBirthdayLong, type BirthdayState } from '@/lib/birthday';
 import { chainKey } from '@/lib/materialize';
 import { pcoPersonUrl } from '@/lib/planningCenter';
 import { sessionOutcome, type SessionOutcome } from '@/lib/sessionHistory';
@@ -63,7 +65,7 @@ import {
   removeRosterMember,
 } from '@/services/functions';
 import { setStudentStatus } from '@/services/students';
-import { studentFullName, type TallyEvent } from '@/types';
+import { studentFullName, type Student, type TallyEvent } from '@/types';
 
 /** The group one-off events go in. Not a `chainKey`, and cannot collide with one. */
 const ONE_OFF_GROUP = 'one-off';
@@ -529,6 +531,20 @@ export function StudentDetailPage() {
             </div>
           ) : null}
 
+          <BirthdaySection
+            student={student}
+            /*
+             * The same gate every other write to Planning Center is behind, and
+             * for the same reason: the browser cannot see `PCO_WRITE_BACK`, so
+             * the server's answer on the person details is the only honest one.
+             * Offering a box the write path then refuses is worse than a link.
+             */
+            writable={Boolean(student.pcoPersonId) && details?.profileWritable === true}
+            gateLoading={detailsLoading && !detailsLoaded}
+            recordGone={recordGone}
+            now={now}
+          />
+
           <dl className="grid grid-cols-2 gap-3 text-sm">
             <Detail label="Status" value={student.status === 'active' ? 'Active' : 'Inactive'} />
             <Detail
@@ -863,6 +879,116 @@ function NightChip({ entry, theirs }: { entry: HistoryEntry; theirs: boolean }) 
         {label}
       </span>
     </li>
+  );
+}
+
+/**
+ * The birthday, on the one screen that is about this student.
+ *
+ * Until now it was only ever said on the roster, by a badge that speaks in the
+ * fortnight either side of the day — and, for a blank one, only on a wide
+ * screen. So for forty-nine weeks of the year the profile of a student whose
+ * birthday the ministry cares about said nothing about it at all, and a leader
+ * standing in front of the student who has just told them the date had to know
+ * that "Edit profile" hides a box for it.
+ *
+ * The edit is `EditBirthday` — the same component, the same save and the same
+ * refresh as the roster badge opens — rather than a second form that could
+ * drift from it. Opened in place rather than in the editor modal because this
+ * is one field with one answer, and the modal is a form about everything else.
+ *
+ * What can be offered is decided by `writable`, never guessed at here; without
+ * it this points at Planning Center, which owns the field either way.
+ */
+function BirthdaySection({
+  student,
+  writable,
+  gateLoading,
+  recordGone,
+  now,
+}: {
+  student: Student;
+  /** True only under `PCO_WRITE_BACK=full`, and only for a linked student. */
+  writable: boolean;
+  /** The details read that answers `writable` is still in flight. */
+  gateLoading: boolean;
+  /** Planning Center has no record to write to — the block below is the repair. */
+  recordGone: boolean;
+  now: Date;
+}) {
+  const [editing, setEditing] = useState(false);
+
+  const day = formatBirthdayLong(student.birthday);
+  const state = birthdayState(student.birthday, now);
+  const upstream = student.pcoPersonId ? pcoPersonUrl(student.pcoPersonId) : null;
+
+  // Only the three faces worth interrupting a read for. "Quiet" is a birthday
+  // in August being looked at in March, and it has nothing to add to the date.
+  const NEAR: Record<Exclude<BirthdayState, 'missing' | 'quiet'>, string> = {
+    today: 'Today',
+    soon: 'This week',
+    recent: 'This past week',
+  };
+
+  return (
+    <div>
+      <h3 className="text-xs font-medium uppercase tracking-wide text-ink-400">Birthday</h3>
+
+      {editing ? (
+        <div className="mt-2">
+          <EditBirthday student={student} onDone={() => setEditing(false)} />
+        </div>
+      ) : (
+        <>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <p className={cn('text-sm', day ? 'text-ink-100' : 'text-ink-400')}>
+              {day ?? 'Not on file'}
+            </p>
+            {state !== 'missing' && state !== 'quiet' ? (
+              <Badge tone={state === 'today' ? 'success' : state === 'soon' ? 'brand' : 'neutral'}>
+                <span aria-hidden="true">🎂</span>
+                {NEAR[state]}
+              </Badge>
+            ) : null}
+            {writable && !recordGone ? (
+              <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
+                {day ? 'Change' : 'Add a birthday'}
+              </Button>
+            ) : null}
+          </div>
+
+          {recordGone ? null : upstream === null ? (
+            <p className="mt-1 text-xs text-ink-500">
+              Tally keeps no birthday of its own. Once {student.firstName} reaches Planning Center,
+              theirs can be filled in there.
+            </p>
+          ) : writable ? (
+            <p className="mt-1 text-xs text-ink-500">
+              {day
+                ? // Said here rather than left as a puzzle: a profile that shows
+                  // a date and no age looks like a field somebody forgot.
+                  'Saved in Planning Center. The day only — Tally is never sent the year, so it does not know how old they are.'
+                : 'Saved in Planning Center. The year is optional.'}
+            </p>
+          ) : gateLoading ? (
+            <p className="mt-1 text-xs text-ink-500">Reading what Planning Center allows…</p>
+          ) : (
+            <p className="mt-1 text-xs text-ink-500">
+              Kept in Planning Center.{' '}
+              <a
+                href={upstream}
+                target="_blank"
+                rel="noreferrer"
+                className="font-semibold text-brand-300 underline"
+              >
+                {day ? 'Change it there' : 'Add one there'}
+              </a>
+              .
+            </p>
+          )}
+        </>
+      )}
+    </div>
   );
 }
 
