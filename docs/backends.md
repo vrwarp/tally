@@ -133,7 +133,9 @@ The checklist, in the order that keeps every step shippable:
 2. **Config**: a secret + params in `functions/src/config.ts`, a `config/<backend>` overlay document
    with a closed key set in `firestore.rules` (clone the attendees32 block — keep `baseUrl`
    admin-only if requests carry a credential), and the four-file convention: `config.ts`,
-   `.env.demo-tally`, `.secret.local.example`, docs.
+   `.env.demo-tally`, `.secret.local.example`, docs. Declare the secret behind an opt-in deploy-env
+   flag, the way `A32_TOKEN` sits behind `A32_BIND_TOKEN` — a declared secret is one every deploy
+   must have, and deployments that never connect the backend must keep deploying cleanly.
 3. **Adapter**: a `functions/src/<backend>/` directory owning its client, mapping, roster, writes
    and history; a `createXBackend()` factory returning `PeopleBackend`; register it with the
    registry at module load. Truthful `capabilities` matter more than breadth — every gap is handled

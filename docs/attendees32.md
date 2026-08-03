@@ -30,11 +30,16 @@ Its own documentation lives in the Attendees repo at `docs/tally_integration.md`
 
 ### Credentials and configuration
 
-The DRF token is the one secret:
+The DRF token is the one secret, and it is **opt-in**: the `A32_TOKEN` secret param is only
+declared when the deploy environment says so, because a declared secret is one every deploy must
+have — a deployment that never connects Attendees should not need to mint one just to deploy.
+Connecting is two steps:
 
-```bash
-firebase functions:secrets:set A32_TOKEN
-```
+1. Set `A32_BIND_TOKEN=true` in the deploy environment — the `FUNCTIONS_ENV` repository secret
+   that CI writes to `functions/.env.<projectId>`, or that file directly for hand deploys.
+2. ```bash
+   firebase functions:secrets:set A32_TOKEN
+   ```
 
 Everything else is non-secret and follows the same two layers as Planning Center: deploy-time
 parameters as defaults, overridden by the browser-writable document `config/attendees32`

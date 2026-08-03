@@ -121,10 +121,26 @@ export const PCO_SECRETS = [PCO_APP_ID, PCO_SECRET];
 
 /**
  * The DRF token the Attendees integration user authenticates with. The same
- * posture as the Planning Center pair: Secret Manager only, never in
- * Firestore, never sent to a browser.
+ * posture as the Planning Center pair — Secret Manager only, never in
+ * Firestore, never sent to a browser — with one difference: the declaration
+ * itself is opt-in.
+ *
+ * A declared secret is a secret every deploy must *have*: the CLI resolves
+ * all declared params before deploying, and in non-interactive mode a missing
+ * one aborts the whole deploy — including the CI dry-run — with "have no
+ * value for the secret: A32_TOKEN". Most deployments never connect Attendees
+ * and should not be made to mint a placeholder secret to deploy at all, so
+ * the secret only exists as a param when the deploy environment says
+ * `A32_BIND_TOKEN=true` (in `.env.<project>`, which the CLI loads before
+ * analyzing this module). Connecting Attendees is then two steps: set the
+ * flag, and `firebase functions:secrets:set A32_TOKEN`.
+ *
+ * The emulator does not need the flag: `readValue` falls back to
+ * `process.env.A32_TOKEN`, which `.env.demo-tally` provides — and that
+ * fallback path is exactly what the end-to-end suite exercises.
  */
-export const A32_TOKEN = defineSecret('A32_TOKEN');
+export const A32_TOKEN =
+  process.env.A32_BIND_TOKEN === 'true' ? defineSecret('A32_TOKEN') : null;
 
 /**
  * Where the Attendees server lives — the host root, e.g.
@@ -153,7 +169,7 @@ const A32_MIN_GRADE = defineString('A32_MIN_GRADE', { default: '6' });
 const A32_MAX_GRADE = defineString('A32_MAX_GRADE', { default: '12' });
 const A32_CACHE_TTL_SECONDS = defineString('A32_CACHE_TTL_SECONDS', { default: '30' });
 
-export const A32_SECRETS = [A32_TOKEN];
+export const A32_SECRETS = A32_TOKEN ? [A32_TOKEN] : [];
 
 /** Attach to every function that may talk to any people-backend. */
 export const BACKEND_SECRETS = [...PCO_SECRETS, ...A32_SECRETS];
@@ -236,9 +252,11 @@ interface RawConfig extends Required<PcoConfigOverrides> {
  * back to `process.env` themselves, but secrets do not, so every read goes
  * through here and degrades to the environment.
  */
-function readValue(param: { value: () => string }, envKey: string): string {
+function readValue(param: { value: () => string } | null, envKey: string): string {
   try {
-    const value = param.value();
+    // Null is a param whose declaration was opted out of (see `A32_TOKEN`) —
+    // the environment is then the only place a value could live.
+    const value = param?.value();
     if (value) return value.trim();
   } catch {
     // Not bound in this context — fall through to the environment.
@@ -553,7 +571,11 @@ function normalizeA32Config(
   );
 
   const problems: string[] = [];
-  if (!raw.token) problems.push('A32_TOKEN is not set');
+  if (!raw.token) {
+    problems.push(
+      'A32_TOKEN is not set (set A32_BIND_TOKEN=true in the deploy environment, then create the secret)',
+    );
+  }
   if (!rawBase) problems.push('A32_API_BASE_URL is not set');
   if (baseUrlProblem) problems.push(baseUrlProblem);
   if (!raw.divisionId.trim()) problems.push('A32_DIVISION_ID is not set');

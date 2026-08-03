@@ -31,9 +31,10 @@ is in [docs/ci.md](ci.md#what-ci-deploys).
    npx firebase functions:secrets:set PCO_APP_ID
    npx firebase functions:secrets:set PCO_SECRET
    ```
-   Connecting the Attendees backend adds one more, on the same terms — `A32_TOKEN`
-   (see [attendees32.md](./attendees32.md)); a deployment without Attendees can leave it unset as an
-   empty value when the deploy prompts.
+   Connecting the Attendees backend adds one more, on the same terms — `A32_TOKEN` — but only for
+   deployments that opt in with `A32_BIND_TOKEN=true` in the deploy environment. A deployment
+   without Attendees declares no such secret and deploys with just the two above; see
+   [attendees32.md](./attendees32.md).
 5. **Generate the PWA icons** — see [public/icons/README.md](../public/icons/README.md).
 
 ---
