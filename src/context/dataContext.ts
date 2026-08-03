@@ -1,4 +1,5 @@
 import { createContext, useContext } from 'react';
+import type { RosterBackendStatus } from '@/services/functions';
 import type {
   AppSettings,
   EventSeries,
@@ -59,8 +60,16 @@ export interface DataContextValue {
   rosterError: PcoErrorReport | null;
   /** True when what is on screen came from this device, not from the network. */
   rosterOffline: boolean;
-  /** When Planning Center was last successfully read. */
+  /** When the backends were last successfully read. */
   rosterFetchedAt: Date | null;
+  /**
+   * Each connected backend's own outcome of the last successful read. A read
+   * can land with one backend down — its people carried from this device's
+   * saved copy — and that is a different, smaller warning than `rosterError`,
+   * which means the read as a whole failed. Empty until a read reports it,
+   * and always empty against a server from before backends could fail apart.
+   */
+  rosterBackends: RosterBackendStatus[];
   /**
    * Asks for the roster again. `force` skips whatever the server is holding —
    * needed because that cache lives in one function instance, so clearing it

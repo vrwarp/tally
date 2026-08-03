@@ -20,9 +20,14 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getAllergyNotes } from '@/services/functions';
-import { personIdFromStudentId, type RosterEntry } from '@/types';
+import {
+  backendOfStudent,
+  personIdFromStudentId,
+  type BackendId,
+  type RosterEntry,
+} from '@/types';
 
-/** Planning Center person id -> the note, for as long as the tab is open. */
+/** Backend person id -> the note, for as long as the tab is open. */
 const held = new Map<string, string>();
 
 /** Person ids already asked about, answered or not. */
@@ -37,9 +42,16 @@ export function invalidateAllergyNotes(): void {
   asked.clear();
 }
 
-/** The person whose Planning Center record a roster row's note would come from. */
+/** The person whose upstream record a roster row's note would come from. */
 function personIdOf(entry: RosterEntry): string | null {
   return entry.student.pcoPersonId ?? personIdFromStudentId(entry.student.id);
+}
+
+/** The same person, named with their backend — the mixed-roster request shape. */
+function personKeyOf(entry: RosterEntry): { backendId: BackendId; personId: string } | null {
+  const personId = personIdOf(entry);
+  if (!personId) return null;
+  return { backendId: backendOfStudent(entry.student) ?? 'pco', personId };
 }
 
 /**
@@ -73,19 +85,28 @@ export function useAllergyNotes(entries: readonly RosterEntry[]): ReadonlyMap<st
   }, []);
 
   useEffect(() => {
-    const wanted: string[] = [];
+    const wanted: Array<{ backendId: BackendId; personId: string }> = [];
     for (const entry of entries) {
       if (!entry.student.hasAllergies) continue;
-      const personId = personIdOf(entry);
+      const key = personKeyOf(entry);
       // A visitor who exists only in Tally has nothing upstream to read — and
       // never carries the flag anyway, since it comes from the roster read.
-      if (!personId || asked.has(personId)) continue;
-      asked.add(personId);
-      wanted.push(personId);
+      if (!key || asked.has(key.personId)) continue;
+      asked.add(key.personId);
+      wanted.push(key);
     }
     if (wanted.length === 0) return;
 
-    void getAllergyNotes({ pcoPersonIds: wanted })
+    /*
+     * Two request shapes at once, split by backend rather than duplicated:
+     * bare ids for the Planning Center people — the only field a server from
+     * before the second backend reads — and backend-named keys for everybody
+     * else. A new server folds both into one per-backend ask.
+     */
+    void getAllergyNotes({
+      pcoPersonIds: wanted.filter((key) => key.backendId === 'pco').map((key) => key.personId),
+      personKeys: wanted.filter((key) => key.backendId !== 'pco'),
+    })
       .then((response) => {
         let added = false;
         for (const [personId, note] of Object.entries(response.data.notes)) {
@@ -105,7 +126,7 @@ export function useAllergyNotes(entries: readonly RosterEntry[]): ReadonlyMap<st
          * needs. Forgetting the ids is what lets the next roster rebuild try
          * again, which on a flaky hallway connection is the recovery.
          */
-        for (const personId of wanted) asked.delete(personId);
+        for (const key of wanted) asked.delete(key.personId);
       });
   }, [entries]);
 

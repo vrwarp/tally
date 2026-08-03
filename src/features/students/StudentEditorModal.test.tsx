@@ -130,6 +130,7 @@ function open(student: Student | null, onSaved = vi.fn()) {
     rosterError: null,
     rosterOffline: false,
     rosterFetchedAt: null,
+    rosterBackends: [],
     refreshRoster,
     applyRosterPerson,
   } as unknown as DataContextValue;

@@ -35,7 +35,7 @@ import { pcoPersonUrl } from '@/lib/planningCenter';
 import { formatShortDate } from '@/lib/time';
 import { pushStudentToPlanningCenter } from '@/services/functions';
 import { setStudentStatus, updateStudent } from '@/services/students';
-import { studentFullName, type Student } from '@/types';
+import { backendLabelOf, backendOfStudent, studentFullName, type Student } from '@/types';
 
 /** Which fact was pressed. One per badge the roster can render. */
 export type RowBadgeAction =
@@ -54,20 +54,21 @@ export interface RowBadgeModalProps {
   now: Date;
 }
 
-const TITLES: Record<RowBadgeAction, string> = {
+const TITLES: Record<Exclude<RowBadgeAction, 'queued'>, string> = {
   allergy: 'Allergies',
   contact: 'Parent contact',
   visitor: 'Still a visitor?',
   birthday: 'Birthday',
   inactive: 'No longer on the roster',
-  queued: 'Waiting for Planning Center',
 };
 
 export function RowBadgeModal({ student, action, onClose, now }: RowBadgeModalProps) {
   const name = studentFullName(student);
+  // Queued names where the push is going, which depends on the student.
+  const title = action === 'queued' ? `Waiting for ${backendLabelOf(student)}` : TITLES[action];
 
   return (
-    <Modal open onClose={onClose} title={TITLES[action]} description={name} size="sm">
+    <Modal open onClose={onClose} title={title} description={name} size="sm">
       {action === 'allergy' ? <AllergyPanel student={student} /> : null}
       {action === 'contact' ? <ParentContactPanel student={student} onDone={onClose} /> : null}
       {action === 'visitor' ? <VisitorPanel student={student} onDone={onClose} /> : null}
@@ -105,12 +106,13 @@ export function RowBadgeModal({ student, action, onClose, now }: RowBadgeModalPr
  */
 function AllergyPanel({ student }: { student: Student }) {
   const { details, loading, loaded, error, unavailable, retry } = usePersonDetails(student);
+  const label = backendLabelOf(student);
 
   if (unavailable) {
     return (
       <p className="text-sm text-ink-300">
-        {student.firstName} was added here and has not reached Planning Center yet, so there is no
-        medical note to read — whatever somebody typed at the door is on their profile.
+        {student.firstName} was added here and has not reached {label} yet, so there is no medical
+        note to read — whatever somebody typed at the door is on their profile.
       </p>
     );
   }
@@ -131,7 +133,7 @@ function AllergyPanel({ student }: { student: Student }) {
   if (loading || !loaded) {
     return (
       <p className="flex items-center gap-2 text-sm text-ink-400">
-        <Spinner /> Reading Planning Center…
+        <Spinner /> Reading {label}…
       </p>
     );
   }
@@ -141,7 +143,7 @@ function AllergyPanel({ student }: { student: Student }) {
       <p className="text-xs font-semibold uppercase tracking-wide text-warn-400">On file</p>
       <p className="mt-0.5 whitespace-pre-line text-sm text-ink-100">
         {details?.allergies ??
-          'Planning Center has the flag set but no note against it. Somebody upstream knows why.'}
+          `${label} has the flag set but no note against it. Somebody upstream knows why.`}
       </p>
     </div>
   );
@@ -245,9 +247,14 @@ function BirthdayPanel({
   onDone: () => void;
 }) {
   const state = birthdayState(student.birthday, now);
-  const upstream = student.pcoPersonId ? pcoPersonUrl(student.pcoPersonId) : null;
+  const backend = backendOfStudent(student);
+  const label = backendLabelOf(student);
+  // Only Planning Center has a product page to link out to; an Attendees
+  // student's record has no stable public URL to offer.
+  const upstream =
+    backend === 'pco' && student.pcoPersonId ? pcoPersonUrl(student.pcoPersonId) : null;
   const { details, loading, loaded } = usePersonDetails(student);
-  const writable = Boolean(student.pcoPersonId) && details?.profileWritable === true;
+  const writable = backend !== null && details?.profileWritable === true;
   /*
    * The whole date once the read lands, the roster's day until then. The badge
    * that opened this knows only `MM-DD`, so the year appears a moment later
@@ -270,8 +277,8 @@ function BirthdayPanel({
     <div className="flex flex-col gap-3">
       {state === 'missing' ? (
         <p className="text-sm text-ink-300">
-          Planning Center holds no birthdate for {student.firstName}, so Tally cannot tell you when
-          to say something.
+          {label} holds no birthdate for {student.firstName}, so Tally cannot tell you when to say
+          something.
         </p>
       ) : (
         <div className="flex flex-col gap-1">
@@ -285,8 +292,7 @@ function BirthdayPanel({
           */}
           {details && birthdayYear(onFile) === null ? (
             <p className="text-sm text-ink-500">
-              The day only — Planning Center holds no year for {student.firstName}, so it shows no
-              age.
+              The day only — {label} holds no year for {student.firstName}, so it shows no age.
             </p>
           ) : null}
         </div>
@@ -295,7 +301,7 @@ function BirthdayPanel({
       {writable ? (
         <EditBirthday student={student} onFile={onFile} onDone={onDone} />
       ) : loading && !loaded ? (
-        <p className="text-sm text-ink-500">Reading what Planning Center allows…</p>
+        <p className="text-sm text-ink-500">Reading what {label} allows…</p>
       ) : upstream ? (
         <a
           href={upstream}
@@ -305,10 +311,15 @@ function BirthdayPanel({
         >
           {state === 'missing' ? 'Add one in Planning Center' : 'Change it in Planning Center'}
         </a>
+      ) : backend !== null ? (
+        <p className="text-sm text-ink-400">
+          Birthdays are {label}'s field, and write-back is not on — add or correct it in {label}{' '}
+          itself.
+        </p>
       ) : (
         <p className="text-sm text-ink-400">
-          {student.firstName} does not exist in Planning Center yet, so there is nowhere to put one
-          until their push lands.
+          {student.firstName} does not exist in {label} yet, so there is nowhere to put one until
+          their push lands.
         </p>
       )}
     </div>
@@ -346,7 +357,7 @@ function InactivePanel({ student, onDone }: { student: Student; onDone: () => vo
         Inactive students are history rather than roster: they are hidden from the default view and
         from check-in, and every attendance record they are in is kept.
         {student.fromPlanningCenter
-          ? ' Planning Center may say inactive too, in which case the next roster read will set it back.'
+          ? ` ${backendLabelOf(student)} may say inactive too, in which case the next roster read will set it back.`
           : ''}
       </p>
       {problem ? <ErrorBanner message={problem} /> : null}
@@ -393,11 +404,13 @@ function QueuedPanel({ student, onDone }: { student: Student; onDone: () => void
 
       invalidatePersonDetails(student.id);
       invalidateParentContact();
-      show(`${student.firstName} is in Planning Center.`);
+      // The server's sentence, because only the server knows which backend a
+      // queued student was just sent to.
+      show(result.data.message || `${student.firstName} is in ${backendLabelOf(student)}.`);
       void refreshRoster(true);
       onDone();
     } catch {
-      setProblem('Planning Center could not be reached. Nothing was changed.');
+      setProblem('The push did not go through. Nothing was changed.');
     } finally {
       setBusy(false);
     }

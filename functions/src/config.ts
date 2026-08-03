@@ -115,6 +115,51 @@ export const MAX_CACHE_TTL_SECONDS = 300;
 /** Attach to every function that talks to Planning Center. */
 export const PCO_SECRETS = [PCO_APP_ID, PCO_SECRET];
 
+/* -------------------------------------------------------------------------- */
+/* Attendees (attendees32)                                                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The DRF token the Attendees integration user authenticates with. The same
+ * posture as the Planning Center pair — Secret Manager only, never in
+ * Firestore, never sent to a browser — with one difference: the declaration
+ * itself is opt-in.
+ *
+ * A declared secret is a secret every deploy must *have*: the CLI resolves
+ * all declared params before deploying, and in non-interactive mode a missing
+ * one aborts the whole deploy — including the CI dry-run — with "have no
+ * value for the secret: A32_TOKEN". Most deployments never connect Attendees
+ * and should not be made to mint a placeholder secret to deploy at all, so
+ * the secret only exists as a param when the deploy environment says
+ * `A32_BIND_TOKEN=true` (in `.env.<project>`, which the CLI loads before
+ * analyzing this module). Connecting Attendees is then two steps: set the
+ * flag, and `firebase functions:secrets:set A32_TOKEN`.
+ *
+ * The emulator does not need the flag: `readValue` falls back to
+ * `process.env.A32_TOKEN`, which `.env.demo-tally` provides — and that
+ * fallback path is exactly what the end-to-end suite exercises.
+ */
+export const A32_TOKEN =
+  process.env.A32_BIND_TOKEN === 'true' ? defineSecret('A32_TOKEN') : null;
+
+/**
+ * Every other Attendees value is a plain environment variable, deliberately
+ * NOT a declared param. The CLI holds declared params to the same
+ * non-interactive rule as the secret above — each one must have a value in
+ * `.env.<project>`, defaults notwithstanding — so nine `defineString`s here
+ * would force an Attendees block into every deployment's deploy env just to
+ * deploy at all. Plain `.env.<project>` lines still reach the runtime as
+ * `process.env`, which `readValue(null, …)` reads; empty-means-unset and the
+ * effective defaults live in `normalizeA32Config`. Per-value documentation is
+ * in `.secret.local.example` — though most deployments configure Attendees
+ * from Settings (`config/attendees32`) and never set these at all.
+ */
+
+export const A32_SECRETS = A32_TOKEN ? [A32_TOKEN] : [];
+
+/** Attach to every function that may talk to any people-backend. */
+export const BACKEND_SECRETS = [...PCO_SECRETS, ...A32_SECRETS];
+
 /**
  * Grades Tally understands at all (`Grade` in src/types is 6..12). The
  * configured band is clamped into this, so a typo cannot produce a student the
@@ -193,9 +238,11 @@ interface RawConfig extends Required<PcoConfigOverrides> {
  * back to `process.env` themselves, but secrets do not, so every read goes
  * through here and degrades to the environment.
  */
-function readValue(param: { value: () => string }, envKey: string): string {
+function readValue(param: { value: () => string } | null, envKey: string): string {
   try {
-    const value = param.value();
+    // Null is a param whose declaration was opted out of (see `A32_TOKEN`) —
+    // the environment is then the only place a value could live.
+    const value = param?.value();
     if (value) return value.trim();
   } catch {
     // Not bound in this context — fall through to the environment.
@@ -388,4 +435,219 @@ export async function resolveConfig(db: FirestoreLike): Promise<PcoConfig> {
 
   if (!data) return normalizeConfig(params, false);
   return normalizeConfig({ ...params, ...overridesFromDocument(data) }, true);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Attendees configuration                                                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The Attendees (attendees32) backend's resolved configuration — the same
+ * philosophy as `PcoConfig`, per field: raw text from params or the
+ * `config/attendees32` document, parsed and clamped in one place, never a
+ * throw. `configError` names every missing value at once, because the person
+ * reading it is setting the connection up and should not discover the fields
+ * one failure at a time.
+ */
+export interface A32Config {
+  token: string;
+  /** Host root without a trailing slash; '' when unconfigured. */
+  baseUrl: string;
+  /** The division a created attendee is filed under (numeric id, as text). */
+  divisionId: string;
+  /** The meet a created student is enrolled in. */
+  meetSlug: string;
+  /** The character (role) that enrollment carries. */
+  characterSlug: string;
+  /** The assembly whose meets the history import offers. */
+  assemblySlug: string;
+  writeBack: PcoWriteBackMode;
+  minGrade: number;
+  maxGrade: number;
+  cacheTtlSeconds: number;
+  /**
+   * The overlay's on/off switch. Distinct from `configError` — a leader may
+   * switch a fully-configured backend off, and an unconfigured one is not
+   * "off", it is unfinished. `isA32Enabled` is the conjunction callers want.
+   */
+  enabled: boolean;
+  managedInApp: boolean;
+  configError: string | null;
+}
+
+export interface A32ConfigOverrides {
+  enabled?: boolean;
+  baseUrl?: string;
+  divisionId?: string;
+  meetSlug?: string;
+  characterSlug?: string;
+  assemblySlug?: string;
+  writeBack?: string;
+  minGrade?: string;
+  maxGrade?: string;
+  cacheTtlSeconds?: string;
+}
+
+/** Every key a leader may set from Settings. The rules mirror this list. */
+export const A32_CONFIG_KEYS = [
+  'baseUrl',
+  'divisionId',
+  'meetSlug',
+  'characterSlug',
+  'assemblySlug',
+  'writeBack',
+  'minGrade',
+  'maxGrade',
+  'cacheTtlSeconds',
+] as const satisfies readonly (keyof Omit<A32ConfigOverrides, 'enabled'>)[];
+
+function readA32Params(): Required<Omit<A32ConfigOverrides, 'enabled'>> & { token: string } {
+  return {
+    token: readValue(A32_TOKEN, 'A32_TOKEN'),
+    baseUrl: readValue(null, 'A32_API_BASE_URL'),
+    divisionId: readValue(null, 'A32_DIVISION_ID'),
+    meetSlug: readValue(null, 'A32_MEET_SLUG'),
+    characterSlug: readValue(null, 'A32_CHARACTER_SLUG'),
+    assemblySlug: readValue(null, 'A32_ASSEMBLY_SLUG'),
+    writeBack: readValue(null, 'A32_WRITE_BACK'),
+    minGrade: readValue(null, 'A32_MIN_GRADE'),
+    maxGrade: readValue(null, 'A32_MAX_GRADE'),
+    cacheTtlSeconds: readValue(null, 'A32_CACHE_TTL_SECONDS'),
+  };
+}
+
+function normalizeA32Config(
+  raw: ReturnType<typeof readA32Params>,
+  enabled: boolean,
+  managedInApp: boolean,
+): A32Config {
+  // Attendees has no well-known host, so unlike the Planning Center parser
+  // there is nothing to fall back to: a bad URL is a configuration error and
+  // an empty one is "not set up".
+  let baseUrl = '';
+  let baseUrlProblem: string | null = null;
+  const rawBase = raw.baseUrl.trim();
+  if (rawBase) {
+    try {
+      const parsed = new URL(rawBase);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        baseUrlProblem = `A32_API_BASE_URL="${rawBase}" must be http or https`;
+      } else {
+        baseUrl = rawBase.replace(/\/+$/, '');
+      }
+    } catch {
+      baseUrlProblem = `A32_API_BASE_URL="${rawBase}" is not a valid URL`;
+    }
+  }
+
+  const rawWriteBack = raw.writeBack.trim().toLowerCase();
+  const writeBack: PcoWriteBackMode =
+    rawWriteBack === 'off' || rawWriteBack === 'full' ? rawWriteBack : 'create';
+
+  const minGrade = clamp(
+    parseInteger(raw.minGrade, ABSOLUTE_MIN_GRADE),
+    ABSOLUTE_MIN_GRADE,
+    ABSOLUTE_MAX_GRADE,
+  );
+  const maxGrade = clamp(parseInteger(raw.maxGrade, ABSOLUTE_MAX_GRADE), minGrade, ABSOLUTE_MAX_GRADE);
+  const cacheTtlSeconds = clamp(
+    parseInteger(raw.cacheTtlSeconds, DEFAULT_CACHE_TTL_SECONDS),
+    0,
+    MAX_CACHE_TTL_SECONDS,
+  );
+
+  const problems: string[] = [];
+  if (!raw.token) {
+    problems.push(
+      'A32_TOKEN is not set (set A32_BIND_TOKEN=true in the deploy environment, then create the secret)',
+    );
+  }
+  if (!rawBase) problems.push('A32_API_BASE_URL is not set');
+  if (baseUrlProblem) problems.push(baseUrlProblem);
+  if (!raw.divisionId.trim()) problems.push('A32_DIVISION_ID is not set');
+  if (!raw.meetSlug.trim()) problems.push('A32_MEET_SLUG is not set');
+  if (!raw.characterSlug.trim()) problems.push('A32_CHARACTER_SLUG is not set');
+
+  return {
+    token: raw.token,
+    baseUrl,
+    divisionId: raw.divisionId.trim(),
+    meetSlug: raw.meetSlug.trim(),
+    characterSlug: raw.characterSlug.trim(),
+    // Optional: without it only the history-import picker has nothing to
+    // offer, which is not a reason to keep the roster off.
+    assemblySlug: raw.assemblySlug.trim(),
+    writeBack,
+    minGrade,
+    maxGrade,
+    cacheTtlSeconds,
+    enabled,
+    managedInApp,
+    configError:
+      problems.length > 0 ? `Attendees is not configured: ${problems.join('; ')}.` : null,
+  };
+}
+
+export function a32OverridesFromDocument(
+  data: Record<string, unknown> | undefined,
+): Partial<Record<(typeof A32_CONFIG_KEYS)[number], string>> {
+  const overrides: Partial<Record<(typeof A32_CONFIG_KEYS)[number], string>> = {};
+  if (!data) return overrides;
+  for (const key of A32_CONFIG_KEYS) {
+    const value = readOverride(data[key]);
+    if (value === undefined) continue;
+    // Same reasoning as the Planning Center `baseUrl` carve-out: clearing the
+    // URL cannot mean "somewhere else", so an empty override defers to the
+    // deploy. The rest of the fields have no meaningful "cleared" state either
+    // — an empty meet slug is not a different meet — so empties defer across
+    // the board, which also keeps a half-filled Settings form harmless.
+    if (value === '') continue;
+    overrides[key] = value;
+  }
+  return overrides;
+}
+
+/** The effective Attendees configuration: params overlaid by `config/attendees32`. */
+export async function resolveA32Config(db: FirestoreLike): Promise<A32Config> {
+  const params = readA32Params();
+
+  let data: Record<string, unknown> | undefined;
+  try {
+    const snapshot = await db.doc(PATHS.a32Config).get();
+    data = snapshot.exists ? snapshot.data() : undefined;
+  } catch {
+    return normalizeA32Config(params, true, false);
+  }
+
+  const enabled = data?.enabled !== false;
+  if (!data) return normalizeA32Config(params, enabled, false);
+  return normalizeA32Config({ ...params, ...a32OverridesFromDocument(data) }, enabled, true);
+}
+
+/** Ready to serve: switched on and with nothing left to configure. */
+export function isA32Enabled(config: A32Config): boolean {
+  return config.enabled && config.configError === null;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Cross-backend configuration                                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Which backend receives students Tally creates — the quick-added visitors.
+ *
+ * A per-deployment decision, not a per-student one: the queue flag on a
+ * student document says only "not pushed yet", and the server decides where
+ * "pushed" means at push time. Defaults to Planning Center, which is what
+ * makes an existing deployment behave identically with none of this
+ * configured.
+ */
+export async function resolveDefaultPushBackend(db: FirestoreLike): Promise<'pco' | 'a32'> {
+  try {
+    const snapshot = await db.doc(PATHS.backendsConfig).get();
+    const value = snapshot.exists ? snapshot.data()?.defaultPushBackend : undefined;
+    return value === 'a32' ? 'a32' : 'pco';
+  } catch {
+    return 'pco';
+  }
 }

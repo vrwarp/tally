@@ -11,6 +11,7 @@ import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { RosterErrorBanner } from '@/components/RosterErrorBanner';
 import { DataContext, type DataContextValue } from '@/context/dataContext';
+import type { RosterBackendStatus } from '@/services/functions';
 import { makeSettings, makeStudent } from '../../tests/factories';
 import type { PcoErrorReport } from '@/types';
 
@@ -34,6 +35,21 @@ const FAILURE: PcoErrorReport = {
   },
 };
 
+function backendReport(overrides: Partial<RosterBackendStatus>): RosterBackendStatus {
+  return {
+    backendId: 'pco',
+    displayName: 'Planning Center',
+    ok: true,
+    error: null,
+    people: 12,
+    unresolved: 0,
+    missing: 0,
+    cached: false,
+    fetchedAt: '2026-08-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
 function harness(overrides: Partial<DataContextValue> = {}) {
   const refreshRoster = vi.fn(async () => {});
   const value: DataContextValue = {
@@ -48,6 +64,7 @@ function harness(overrides: Partial<DataContextValue> = {}) {
     rosterError: null,
     rosterOffline: false,
     rosterFetchedAt: null,
+    rosterBackends: [],
     refreshRoster,
     applyRosterPerson: () => {},
     ...overrides,
@@ -100,6 +117,41 @@ describe('RosterErrorBanner', () => {
     render(wrap(<RosterErrorBanner />));
 
     expect(screen.getByRole('alert')).toHaveTextContent(/saved earlier/i);
+  });
+
+  /**
+   * One backend down while another answered is not the red banner: the roster
+   * on screen is real, one slice of it is just older. It is also not nothing —
+   * a leader wondering where the Attendees kids went deserves the sentence.
+   */
+  it('says when one backend of several did not answer, as a warning', () => {
+    const { refreshRoster, wrap } = harness({
+      rosterBackends: [
+        backendReport({}),
+        backendReport({
+          backendId: 'a32',
+          displayName: 'Attendees',
+          ok: false,
+          error: 'HTTP 503',
+          people: 0,
+        }),
+      ],
+    });
+    render(wrap(<RosterErrorBanner />));
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent(/Attendees could not be reached/);
+
+    screen.getByRole('button', { name: 'Try again' }).click();
+    expect(refreshRoster).toHaveBeenCalledWith(true);
+  });
+
+  it('stays silent when every backend answered', () => {
+    const { wrap } = harness({
+      rosterBackends: [backendReport({}), backendReport({ backendId: 'a32', displayName: 'Attendees' })],
+    });
+    const { container } = render(wrap(<RosterErrorBanner />));
+    expect(container).toBeEmptyDOMElement();
   });
 
   /** The whole point of carrying the report rather than a sentence. */

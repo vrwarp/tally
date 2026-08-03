@@ -26,9 +26,45 @@ export interface RosterErrorBannerProps {
 }
 
 export function RosterErrorBanner({ className }: RosterErrorBannerProps) {
-  const { students, rosterError, rosterLoading, refreshRoster } = useData();
+  const { students, rosterError, rosterBackends, rosterLoading, refreshRoster } = useData();
 
-  if (!rosterError) return null;
+  if (!rosterError) {
+    /*
+     * The read as a whole landed, but one backend did not answer. A smaller
+     * thing than the failure below — the rest of the roster is fresh, and the
+     * missing backend's students are still drawn from this device's saved
+     * copy — so it gets a warning, not the red banner. With one backend
+     * connected this can never render: its failure is the whole read's.
+     */
+    const down = (rosterBackends ?? []).filter((entry) => !entry.ok);
+    if (down.length === 0) return null;
+
+    const names = down.map((entry) => entry.displayName).join(' and ');
+    return (
+      <div
+        role="status"
+        className={cn(
+          'flex flex-col gap-2 rounded-xl bg-warn-500/10 px-4 py-3 text-sm text-warn-400 ring-1 ring-warn-500/25',
+          className,
+        )}
+      >
+        <p>
+          {names} could not be reached. Students from there may be missing or out of date until it
+          answers again; everything else on this roster is current.
+        </p>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="secondary"
+            loading={rosterLoading}
+            onClick={() => void refreshRoster(true)}
+          >
+            Try again
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   // Whether anything is on screen changes what this banner *is*: a warning that
   // the names being tapped may be out of date, or the explanation for a screen
@@ -43,8 +79,8 @@ export function RosterErrorBanner({ className }: RosterErrorBannerProps) {
         <>
           <p className="text-ink-400">
             {showingSomething
-              ? 'These names are the roster this device saved earlier. Check-in still works, and anyone added since will be missing until Planning Center is reachable again.'
-              : 'Nobody can be shown until Planning Center answers. Students already on the roster have not been lost — Tally simply cannot read their names right now.'}
+              ? 'These names are the roster this device saved earlier. Check-in still works, and anyone added since will be missing until the connection comes back.'
+              : 'Nobody can be shown until the roster source answers. Students already on the roster have not been lost — Tally simply cannot read their names right now.'}
           </p>
           <div className="flex items-center gap-2">
             <Button

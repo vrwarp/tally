@@ -46,13 +46,16 @@ import {
 } from '@/lib/birthday';
 import { formatSeenShort } from '@/lib/time';
 import { cn, createSearchMatcher, gradeLabel, initials, NO_GRADE, ordinalGrade } from '@/lib/utils';
-import { GRADES, type Grade, type Student } from '@/types';
+import { GRADES, backendLabelOf, backendOfStudent, type Grade, type Student } from '@/types';
 
 type StatusFilter = 'active' | 'inactive' | 'all';
 type QuickFilter = 'none' | 'incomplete' | 'visitors';
 
 export function StudentsPage() {
-  const { students, loading, rosterError, refreshRoster } = useData();
+  const { students, loading, rosterError, refreshRoster, rosterBackends } = useData();
+  // With a second backend connected, "Planning Center" stops being the name
+  // for where students come from — the buttons say the neutral thing instead.
+  const multiBackend = rosterBackends.length >= 2;
   const { user } = useAuth();
 
   const [query, setQuery] = useState('');
@@ -158,7 +161,7 @@ export function StudentsPage() {
             New visitor
           </Button>
           <Button variant="secondary" onClick={() => setAddFromPcoOpen(true)}>
-            Add from Planning Center
+            {multiBackend ? 'Add from directory' : 'Add from Planning Center'}
           </Button>
         </div>
       </header>
@@ -253,7 +256,7 @@ export function StudentsPage() {
             <EmptyState
               icon="⚠️"
               title="The roster could not be read."
-              description="Whoever is on it is still on it — Tally needs Planning Center to put names to them. The banner above has the details."
+              description="Whoever is on it is still on it — Tally needs their backend to put names to them. The banner above has the details."
               action={
                 <Button variant="secondary" onClick={() => void refreshRoster(true)}>
                   Try again
@@ -267,7 +270,7 @@ export function StudentsPage() {
               description={
                 isFiltered
                   ? 'Widen the search, or add the student if this is their first time.'
-                  : 'Students arrive from the Planning Center sync, or you can add one by hand.'
+                  : 'Add students from your church directory, or add one by hand.'
               }
               action={
                 isFiltered ? (
@@ -275,7 +278,9 @@ export function StudentsPage() {
                     Clear filters
                   </Button>
                 ) : (
-                  <Button onClick={() => setAddFromPcoOpen(true)}>Add from Planning Center</Button>
+                  <Button onClick={() => setAddFromPcoOpen(true)}>
+                    {multiBackend ? 'Add from directory' : 'Add from Planning Center'}
+                  </Button>
                 )
               }
             />
@@ -549,7 +554,7 @@ const StudentListRow = memo(function StudentListRow({
             </Badge>
           ) : null}
           <QueuedBadge
-            pcoPersonId={student.pcoPersonId}
+            student={student}
             onPress={() => onBadge(student, 'queued')}
             name={name}
           />
@@ -667,7 +672,7 @@ function BirthdayBadge({
 
   if (state === 'missing') {
     /*
-     * Not on a student Planning Center has never heard of.
+     * Not on a student no backend has heard of.
      *
      * A quick-added visitor has no birthday for the same reason they have no
      * anything: their push has not landed. "Queued" already says that, and it
@@ -675,7 +680,7 @@ function BirthdayBadge({
      * saying the same sentence, on precisely the rows that are already carrying
      * the most badges.
      */
-    if (!student.pcoPersonId) return null;
+    if (backendOfStudent(student) === null) return null;
 
     /*
      * Desk work, so: the wide layout only.
@@ -683,14 +688,14 @@ function BirthdayBadge({
      * The other three faces are about a person — there is cake this week, or
      * there was and nobody said anything — and they belong wherever the roster
      * is being read. This one is about a record, and filling it in means being
-     * in Planning Center with a keyboard. On a phone it would be the most
-     * common badge in the list and the least actionable thing in it, crowding
-     * the two that a counselor actually stops for.
+     * upstream with a keyboard. On a phone it would be the most common badge
+     * in the list and the least actionable thing in it, crowding the two that
+     * a counselor actually stops for.
      */
     return (
       <Badge
         tone="neutral"
-        title="Planning Center holds no birthdate for this student"
+        title={`${backendLabelOf(student)} holds no birthdate for this student`}
         onPress={onPress}
         pressLabel={`No birthday on file for ${name}`}
         className="hidden lg:inline-flex"
@@ -735,22 +740,23 @@ function BirthdayBadge({
  * visitor added ninety seconds ago is not a problem.
  */
 function QueuedBadge({
-  pcoPersonId,
+  student,
   onPress,
   name,
 }: {
-  pcoPersonId: string | null;
+  student: Student;
   onPress: () => void;
   name: string;
 }) {
-  if (pcoPersonId) return null;
+  if (backendOfStudent(student) !== null) return null;
 
+  const label = backendLabelOf(student);
   return (
     <Badge
       tone="neutral"
-      title="Waiting to be created in Planning Center"
+      title={`Waiting to be created in ${label}`}
       onPress={onPress}
-      pressLabel={`${name} is not in Planning Center yet — push them now`}
+      pressLabel={`${name} is not in ${label} yet — push them now`}
     >
       Queued
     </Badge>

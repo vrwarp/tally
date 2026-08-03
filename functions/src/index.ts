@@ -17,59 +17,71 @@ import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { logger, setGlobalOptions } from 'firebase-functions/v2';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
-import { PCO_SECRETS, resolveConfig, type PcoConfig } from './config.js';
+import { backendFailureStatus, describeBackendFailure } from './backends/errors.js';
+import {
+  a32AliasPairs,
+  collapseAliasPair,
+  existingStudentIdByA32Uuid,
+} from './backends/aliases.js';
+import {
+  createRegistry,
+  type BackendRegistry,
+} from './backends/registry.js';
+import {
+  mergeBackendRosters,
+  type PerBackendRoster,
+} from './backends/roster.js';
+import {
+  linkageOfData,
+  linkageOfStudentDoc,
+  scanIdsFor,
+  scanRoster,
+  studentDocFor,
+} from './backends/scan.js';
+import {
+  BackendPreconditionError,
+  type AddParentResult,
+  type BackendCapabilities,
+  type CheckInsEventSummary,
+  type CheckInsImportSummary,
+  type ParentContactStatus,
+  type PcoListSummary,
+  type PeopleBackend,
+  type PersonDetails,
+  type PersonSearchResult,
+  type PushPendingResult,
+  type PushStudentResult,
+  type RecreateStudentResult,
+  type RosterPerson,
+  type SetParentContactResult,
+  type StudentProfilePatch,
+  type UpdateStudentProfileResult,
+} from './backends/types.js';
+import { BACKEND_SECRETS, resolveConfig, type PcoConfig } from './config.js';
 import { asFirestoreLike, PATHS, type FirestoreLike } from './firestore.js';
 import {
   deleteEvents as removeEvents,
   type DeletionSummary,
   type DeletionTarget,
 } from './eventDeletion.js';
-import { materializeOccurrence as materializeOne, MINISTRY_TIME_ZONE } from './occurrences.js';
 import {
-  checkInsBaseUrl,
-  importCheckInsEvent as importCheckInsEventUpstream,
-  listCheckInsEvents as listCheckInsEventsUpstream,
-  type CheckInsEventSummary,
-  type CheckInsImportSummary,
-} from './pco/checkins.js';
-import { createPcoClient, PcoApiError, type PcoClient } from './pco/client.js';
-import { describePcoFailure } from './pco/debug.js';
-import { fetchListMemberIds, fetchLists, type PcoListSummary } from './pco/lists.js';
-import {
-  setParentContact as setParentContactUpstream,
-  type SetParentContactResult,
-} from './pco/parentContact.js';
-import {
-  updateStudentProfile as updateStudentProfileUpstream,
-  type StudentProfilePatch,
-  type UpdateStudentProfileResult,
-} from './pco/profile.js';
-import { addParent as addParentUpstream, type AddParentResult } from './pco/household.js';
-import {
-  fetchAllergyNotes,
-  fetchParentContactStatus,
-  fetchPersonDetails,
-  fetchRoster,
+  BACKEND_IDS,
+  isBackendId,
+  parseStudentId,
   pcoStudentId,
-  personDetailsCacheKey,
   personIdFromStudentId,
-  reachableAdultsCacheKey,
-  searchPeople,
-  type ParentContactStatus,
-  type PersonDetails,
-  type PersonSearchResult,
-  type RosterPerson,
-} from './pco/roster.js';
-import { resetSharedCache, sharedCache } from './pco/sharedCache.js';
-import { followPersonLink, isPersonGoneError } from './pco/personLink.js';
-import { recreateStudent, type RecreateStudentResult } from './pco/recreate.js';
+  studentIdFor,
+  type BackendId,
+} from './generated/backendIds.js';
+import { materializeOccurrence as materializeOne, MINISTRY_TIME_ZONE } from './occurrences.js';
+// Imported for its registration side effect and nothing else: pulling the
+// adapter package in is what makes the Attendees backend available to the
+// registry, and the entry point is the one place that decides what ships.
+import './attendees32/backend.js';
+import { createPcoBackend } from './pco/backend.js';
+import { createPcoClient } from './pco/client.js';
+import { fetchLists } from './pco/lists.js';
 import { graftMergedStudent } from './pco/studentPerson.js';
-import {
-  pushPendingStudents,
-  pushStudent,
-  type PushPendingResult,
-  type PushStudentResult,
-} from './pco/pushStudents.js';
 
 export { provisionAccess } from './access.js';
 
@@ -84,17 +96,108 @@ function db(): FirestoreLike {
 }
 
 /**
- * Builds a client, or returns the reason it cannot be built. Missing credentials
- * are reported to the caller rather than thrown, so the Settings screen can name
- * the missing value instead of showing "internal error".
+ * The Planning Center backend, or the reason there cannot be one. Missing
+ * credentials are reported to the caller rather than thrown, so the Settings
+ * screen can name the missing value instead of showing "internal error".
+ *
+ * One backend, resolved per request like the configuration it is built from.
+ * The multi-backend registry replaces this as other backends arrive; every
+ * entry point already speaks only `PeopleBackend`, which is the point of the
+ * seam.
  */
-function clientFor(config: PcoConfig): PcoClient | null {
-  if (config.configError) return null;
-  return createPcoClient({
-    appId: config.appId,
-    secret: config.secret,
-    baseUrl: config.baseUrl,
-  });
+async function pcoBackendFor(
+  database: FirestoreLike,
+): Promise<{ backend: PeopleBackend | null; config: PcoConfig }> {
+  const config = await resolveConfig(database);
+  if (config.configError) return { backend: null, config };
+  return { backend: createPcoBackend({ db: database, config }), config };
+}
+
+/**
+ * Which backend answers for one student.
+ *
+ * The claim is read from Tally's own record, never from the caller: the id
+ * prefix when the id is the claim, the server-written linkage fields when a
+ * pushed visitor's document carries it. A student linked to nobody belongs to
+ * whichever backend new students go to — the write paths that land here for
+ * an unlinked student are exactly the ones about to create them somewhere.
+ */
+async function backendForStudent(
+  registry: BackendRegistry,
+  database: FirestoreLike,
+  studentId: string,
+): Promise<{ backend: PeopleBackend } | { error: string }> {
+  let backendId = parseStudentId(studentId)?.backendId ?? null;
+  if (!backendId) {
+    const snapshot = await database.doc(`${PATHS.students}/${studentId}`).get();
+    const linkage = snapshot.exists ? linkageOfData(snapshot.data() ?? {}) : null;
+    backendId = linkage?.backendId ?? null;
+  }
+  if (!backendId) return registry.defaultPush();
+
+  const backend = registry.get(backendId);
+  if (!backend) {
+    return {
+      error:
+        registry.configErrorOf(backendId) ??
+        `${registry.displayNameOf(backendId)} is not connected.`,
+    };
+  }
+  return { backend };
+}
+
+/** The read-reuse window a backend's answers live under. */
+function cacheTtlOf(registry: BackendRegistry, backendId: BackendId): number {
+  return backendId === 'pco'
+    ? registry.configs.pco.cacheTtlSeconds
+    : registry.configs.a32.cacheTtlSeconds;
+}
+
+/**
+ * Which person `getPersonDetails` is being asked about, and of which backend.
+ *
+ * Two request shapes, one older than the other. A `studentId` names the
+ * student and the linkage decides the backend — the shape every screen should
+ * send. A bare `pcoPersonId` has always meant Planning Center and still does;
+ * a deployed client from before the second backend existed sends only that,
+ * and must keep working.
+ */
+async function resolveDetailsTarget(
+  registry: BackendRegistry,
+  database: FirestoreLike,
+  data: { pcoPersonId?: string; studentId?: string } | undefined,
+): Promise<{ backend: PeopleBackend; personId: string }> {
+  const studentId = typeof data?.studentId === 'string' ? data.studentId.trim() : '';
+  if (studentId) {
+    const parsed = parseStudentId(studentId);
+    let linkage = parsed;
+    if (!linkage) {
+      const snapshot = await database.doc(`${PATHS.students}/${studentId}`).get();
+      linkage = snapshot.exists ? linkageOfData(snapshot.data() ?? {}) : null;
+    }
+    if (!linkage) {
+      // An unlinked visitor has no upstream record to have details.
+      throw new HttpsError('not-found', 'That student is not linked to a people backend.');
+    }
+    const backend = registry.get(linkage.backendId);
+    if (!backend) {
+      throw new HttpsError(
+        'failed-precondition',
+        registry.configErrorOf(linkage.backendId) ?? 'Not configured.',
+      );
+    }
+    return { backend, personId: linkage.personId };
+  }
+
+  const personId = data?.pcoPersonId;
+  if (typeof personId !== 'string' || personId.length === 0) {
+    throw new HttpsError('invalid-argument', 'pcoPersonId is required.');
+  }
+  const backend = registry.get('pco');
+  if (!backend) {
+    throw new HttpsError('failed-precondition', registry.configErrorOf('pco') ?? 'Not configured.');
+  }
+  return { backend, personId };
 }
 
 /**
@@ -181,51 +284,74 @@ async function requireCoreTeam(uid: string | undefined): Promise<void> {
 }
 
 /**
- * Turns a Planning Center failure into something a counselor can act on.
+ * Turns a backend failure into something a counselor can act on.
  *
- * The distinction that matters is "Tally is broken" versus "Planning Center is
+ * The distinction that matters is "Tally is broken" versus "the backend is
  * having a minute" — the second is a reason to try again, and saying so stops a
- * volunteer hunting for a problem on their end.
+ * volunteer hunting for a problem on their end. The sentence names whichever
+ * backend actually failed, because "Planning Center is rate-limiting us" is a
+ * lie when it was Attendees.
  *
  * The sentence is the whole answer for the person reading it at a door. The
  * request and response behind it ride along as the error's `details`, for the
  * screen's "Details" panel and the person they forward it to — see
  * ./pco/debug.ts for what that payload may and may not contain.
  */
-function reportPcoFailure(error: unknown, what: string): never {
+function reportBackendFailure(displayName: string, error: unknown, what: string): never {
   if (error instanceof HttpsError) throw error;
-
-  const debug = describePcoFailure(error, what);
-  logger.error(`Failed to ${what}`, { error: String(error), pco: debug });
-
-  if (error instanceof PcoApiError) {
-    if (error.status === 429) {
-      throw new HttpsError(
-        'resource-exhausted',
-        'Planning Center is rate-limiting us. Try again in a moment.',
-        debug,
-      );
-    }
-    if (error.status === 401 || error.status === 403) {
-      throw new HttpsError(
-        'permission-denied',
-        "Planning Center rejected Tally's credentials. A leader needs to check the connection in Settings.",
-        debug,
-      );
-    }
+  // A configuration problem an adapter could only discover mid-flight. The
+  // message already says which value is wrong; the code says whose fault it is.
+  if (error instanceof BackendPreconditionError) {
+    throw new HttpsError('failed-precondition', error.message);
   }
 
-  throw new HttpsError('unavailable', `Could not reach Planning Center to ${what}.`, debug);
+  const debug = describeBackendFailure(error, what);
+  logger.error(`Failed to ${what}`, { error: String(error), backend: debug });
+
+  const status = backendFailureStatus(error);
+  if (status === 429) {
+    throw new HttpsError(
+      'resource-exhausted',
+      `${displayName} is rate-limiting us. Try again in a moment.`,
+      debug,
+    );
+  }
+  if (status === 401 || status === 403) {
+    throw new HttpsError(
+      'permission-denied',
+      `${displayName} rejected Tally's credentials. A leader needs to check the connection in Settings.`,
+      debug,
+    );
+  }
+
+  throw new HttpsError('unavailable', `Could not reach ${displayName} to ${what}.`, debug);
 }
 
 /* -------------------------------------------------------------------------- */
 /* Reading people                                                              */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * One backend's slice of a fanned-out read, sized for the wire: counts and a
+ * sentence, never a second copy of the people.
+ */
+interface RosterBackendStatus {
+  backendId: BackendId;
+  displayName: string;
+  ok: boolean;
+  /** Why it failed, in plain language. Null when `ok`. */
+  error: string | null;
+  people: number;
+  unresolved: number;
+  missing: number;
+  cached: boolean;
+  fetchedAt: string;
+}
+
 /** Mirrors `RosterResponse` in src/services/functions.ts. */
 interface RosterResponse {
   people: RosterPerson[];
-  /** Roster entries whose Planning Center person could not be read. */
+  /** Roster entries whose backend person could not be read. */
   unresolved: string[];
   /** Merges the read followed and wrote back; the student rides under the
    *  survivor's row already. Ids only — nothing personal. */
@@ -237,97 +363,11 @@ interface RosterResponse {
   fetchedAt: string;
   /** Echoed so the app can say how stale what it is showing might be. */
   cacheTtlSeconds: number;
-}
-
-interface RosterScan {
   /**
-   * Every Planning Center person Tally has on its roster.
-   *
-   * The membership is Tally's own: a `students/{id}` document whose id is
-   * `pco_{personId}`. Read here rather than trusted from the caller, because the
-   * whole point of the id prefix is that it says which upstream person a row
-   * refers to — a browser that could name the ids would be choosing whose
-   * personal details the server fetches.
+   * Each connected backend's own outcome, so one being down can be one banner
+   * instead of a blank roster. Exactly one entry per enabled backend.
    */
-  personIds: string[];
-  /**
-   * The people Tally itself put into Planning Center, whose documents still
-   * carry the id Tally gave them.
-   *
-   * A visitor quick-added at a door is `students/{tally-id}` with no person
-   * behind them. The push writes `pcoPersonId` onto that document — it does not
-   * rename it, because every attendance record already points at the id — so
-   * from then on Tally knows exactly which upstream person they are while the
-   * scan above, which reads the id and nothing else, does not.
-   *
-   * Kept apart from `personIds` because the two halves answer differently on
-   * the client. A `personIds` student *is* their roster row; a linked student
-   * is already a row of their own, and the roster read answers for their
-   * Planning Center fields — the name, the grade, the allergy flag, the
-   * birthday — which `mergeRoster` lays onto the document's row. It used to
-   * not ask about them at all, on the reasoning that they needed no row; the
-   * fields came from nowhere instead, and a birthday saved upstream stayed
-   * "No birthday" on the roster for ever.
-   *
-   * Trusted for the same reason `personIds` is: the field is written by the
-   * push, server-side. A browser cannot set it.
-   */
-  linkedPersonIds: string[];
-  /**
-   * Which student document each linked person id came from, so a merge the
-   * roster read follows can be written back to the right visitor document —
-   * their doc id is Tally's own and says nothing about the person.
-   */
-  studentIdByLinkedPersonId: Record<string, string>;
-  /**
-   * Which active documents currently carry `pcoRecordMissing: true`, so the
-   * roster read writes the flag only when the answer *changed* — four hundred
-   * students must not cost four hundred writes per read.
-   */
-  recordMissing: Record<string, boolean>;
-  /**
-   * Active students with no Planning Center person yet — the same rows the
-   * Students screen marks "Queued". Counted on this pass rather than its own
-   * because the collection has already been read.
-   */
-  queued: number;
-}
-
-/** One scan of the students collection, for the two things anybody asks it. */
-async function scanRoster(database: FirestoreLike): Promise<RosterScan> {
-  const snapshot = await database.collection(PATHS.students).get();
-  const personIds: string[] = [];
-  const linkedPersonIds: string[] = [];
-  const studentIdByLinkedPersonId: Record<string, string> = {};
-  const recordMissing: Record<string, boolean> = {};
-  let queued = 0;
-
-  for (const document of snapshot.docs) {
-    const data = document.data() ?? {};
-
-    /*
-     * A student taken off the roster keeps their document — every attendance
-     * record points at it, so deleting the row would drop past head counts —
-     * but stops being somebody Tally asks Planning Center about. Skipping them
-     * here is what makes "remove" mean anything, and it also means Tally reads
-     * no personal data at all about a child who has left the ministry. Somebody
-     * who has left is not waiting to be created upstream either, so the same
-     * skip is what keeps them out of the queued count.
-     */
-    if (data.status === 'inactive') continue;
-
-    const personId = personIdFromStudentId(document.id);
-    if (personId) personIds.push(personId);
-    else if (typeof data.pcoPersonId === 'string' && data.pcoPersonId) {
-      // Pushed, so not queued — and not on the roster read either, which is
-      // what left them with no answer at all to the question below.
-      linkedPersonIds.push(data.pcoPersonId);
-      studentIdByLinkedPersonId[data.pcoPersonId] = document.id;
-    } else queued += 1;
-    if (data.pcoRecordMissing === true) recordMissing[document.id] = true;
-  }
-
-  return { personIds, linkedPersonIds, studentIdByLinkedPersonId, recordMissing, queued };
+  perBackend: RosterBackendStatus[];
 }
 
 /**
@@ -347,31 +387,97 @@ async function scanRoster(database: FirestoreLike): Promise<RosterScan> {
  * birthday saved upstream goes on reading "No birthday" for ever.
  */
 export const getRoster = onCall<{ force?: boolean } | undefined, Promise<RosterResponse>>(
-  { secrets: PCO_SECRETS, timeoutSeconds: 120, memory: '512MiB' },
+  { secrets: BACKEND_SECRETS, timeoutSeconds: 120, memory: '512MiB' },
   async (request): Promise<RosterResponse> => {
     await requireMember(request.auth?.uid);
 
-    const config = await resolveConfig(db());
-    const client = clientFor(config);
-    if (!client) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
+    const database = db();
+    const registry = await createRegistry(database);
+    const enabled = registry.ids();
+    if (enabled.length === 0) {
+      throw new HttpsError(
+        'failed-precondition',
+        registry.configErrorOf('pco') ?? 'Not configured.',
+      );
+    }
 
-    try {
-      const scan = await scanRoster(db());
-      const result = await fetchRoster({
-        client,
-        config,
-        cache: sharedCache(config),
-        /*
-         * Both halves, like `getParentContactStatus` below and for the same
-         * reason. A pushed visitor's row is their document, but the document
-         * deliberately holds none of what Planning Center owns — so without
-         * asking upstream about them, their name was whatever was typed at the
-         * door, their allergy flag was permanently off, and a birthday added
-         * through the very editor this app provides never appeared.
-         */
-        personIds: [...scan.personIds, ...scan.linkedPersonIds],
-        force: request.data?.force === true,
-      });
+    const scan = await scanRoster(database);
+    const force = request.data?.force === true;
+
+    /*
+     * Every connected backend is asked about exactly its own students — both
+     * halves of each membership, the prefixed documents and the pushed
+     * visitors, and for the same reason as ever: a pushed visitor's row is
+     * their document, but the document deliberately holds none of what the
+     * backend owns, so without asking upstream their name was whatever was
+     * typed at the door and a birthday saved upstream never appeared.
+     *
+     * `Promise.all` over per-backend try/catch rather than failing together:
+     * one backend down must not blank the other's roster. A deployment with a
+     * single backend keeps today's behavior exactly — its failure is the whole
+     * read's failure, reported below.
+     */
+    const results: PerBackendRoster[] = await Promise.all(
+      enabled.map(async (backendId): Promise<PerBackendRoster> => {
+        const backend = registry.get(backendId)!;
+        try {
+          const result = await backend.fetchRoster({ personIds: scanIdsFor(scan, backendId), force });
+          return { backendId, displayName: backend.displayName, ok: true, error: null, ...result };
+        } catch (error) {
+          logger.warn('Roster read failed for one backend', {
+            backend: backendId,
+            error: String(error),
+          });
+          return {
+            backendId,
+            displayName: backend.displayName,
+            ok: false,
+            error: error instanceof Error ? error.message : String(error),
+            thrown: error,
+            people: [],
+            unresolved: [],
+            relinks: [],
+            missing: [],
+            cached: false,
+            fetchedAt: new Date().toISOString(),
+          };
+        }
+      }),
+    );
+
+    if (!results.some((result) => result.ok)) {
+      const first = results[0]!;
+      return reportBackendFailure(first.displayName, first.thrown, 'load the roster');
+    }
+
+    /*
+     * The same human on the roster through both backends is one student, and
+     * the Planning Center read just said which pairs there are — its people
+     * carry the church's `attendees_uuid` pointers. Folding follows the merge
+     * precedent: the Planning Center side keeps the row, the Attendees-side
+     * document goes inactive with a pointer, and this response already shows
+     * the single student. Idempotent, because an inactive document leaves the
+     * next scan.
+     */
+    const pcoResult = results.find((result) => result.backendId === 'pco');
+    const aliasPairs = pcoResult?.ok ? a32AliasPairs(scan, pcoResult.a32Aliases) : [];
+    if (aliasPairs.length > 0) {
+      const folded = new Set(aliasPairs.map((pair) => pair.a32PersonId));
+      for (const pair of aliasPairs) {
+        await collapseAliasPair(database, pair);
+        logger.info('Folded one student held by both backends', {
+          keeper: pair.keeperDoc,
+          folded: pair.foldDoc,
+        });
+      }
+      for (const result of results) {
+        if (result.backendId !== 'a32' || !result.ok) continue;
+        result.people = result.people.filter((person) => !folded.has(person.pcoPersonId));
+      }
+    }
+
+    for (const result of results) {
+      if (!result.ok) continue;
       /*
        * Merges the hydration followed become membership moves here, where the
        * database is. The result already shows each student under the record
@@ -380,47 +486,53 @@ export const getRoster = onCall<{ force?: boolean } | undefined, Promise<RosterR
        * cached answer's relinks is harmless.
        */
       for (const relink of result.relinks) {
-        const fromDoc = scan.personIds.includes(relink.fromPersonId)
-          ? pcoStudentId(relink.fromPersonId)
-          : scan.studentIdByLinkedPersonId[relink.fromPersonId];
-        if (fromDoc) await graftMergedStudent(db(), fromDoc, relink.toPersonId);
+        const fromDoc = studentDocFor(scan, result.backendId, relink.fromPersonId);
+        if (fromDoc) await graftMergedStudent(database, fromDoc, relink.toPersonId);
       }
       /*
        * Known-gone students are frozen; resolved ones thaw. The flag on the
        * membership document is what the check-in rules read, so a student
-       * whose Planning Center record died cannot quietly accumulate history
-       * under a dead id — past events included — until somebody removes them
-       * or re-creates the record. Only `missing` (confirmed gone) freezes:
+       * whose backend record died cannot quietly accumulate history under a
+       * dead id — past events included — until somebody removes them or
+       * re-creates the record. Only `missing` (confirmed gone) freezes:
        * `unresolved` also holds students a busy pass could not look at, and
        * being unlucky must not read as being deleted. Written only on change,
        * so a settled roster costs no writes.
        */
-      const docFor = (personId: string): string | undefined =>
-        scan.personIds.includes(personId)
-          ? pcoStudentId(personId)
-          : scan.studentIdByLinkedPersonId[personId];
       for (const personId of result.missing) {
-        const studentDoc = docFor(personId);
+        const studentDoc = studentDocFor(scan, result.backendId, personId);
         if (studentDoc && !scan.recordMissing[studentDoc]) {
-          await db().doc(`${PATHS.students}/${studentDoc}`).set(
+          await database.doc(`${PATHS.students}/${studentDoc}`).set(
             { pcoRecordMissing: true }, { merge: true });
         }
       }
       const resolved = new Set(result.people.map((person) => person.pcoPersonId));
       for (const [studentDoc, flagged] of Object.entries(scan.recordMissing)) {
         if (!flagged) continue;
-        const personId = personIdFromStudentId(studentDoc)
-          ?? Object.entries(scan.studentIdByLinkedPersonId)
-            .find(([, id]) => id === studentDoc)?.[0];
-        if (personId && resolved.has(personId)) {
-          await db().doc(`${PATHS.students}/${studentDoc}`).set(
+        const linkage = linkageOfStudentDoc(scan, studentDoc);
+        if (linkage?.backendId === result.backendId && resolved.has(linkage.personId)) {
+          await database.doc(`${PATHS.students}/${studentDoc}`).set(
             { pcoRecordMissing: false }, { merge: true });
         }
       }
-      return { ...result, cacheTtlSeconds: config.cacheTtlSeconds };
-    } catch (error) {
-      return reportPcoFailure(error, 'load the roster');
     }
+
+    const merged = mergeBackendRosters(results);
+    return {
+      ...merged,
+      cacheTtlSeconds: Math.max(...enabled.map((id) => cacheTtlOf(registry, id))),
+      perBackend: results.map((result) => ({
+        backendId: result.backendId,
+        displayName: result.displayName,
+        ok: result.ok,
+        error: result.error,
+        people: result.people.length,
+        unresolved: result.unresolved.length,
+        missing: result.missing.length,
+        cached: result.cached,
+        fetchedAt: result.fetchedAt,
+      })),
+    };
   },
 );
 
@@ -431,27 +543,85 @@ export const getRoster = onCall<{ force?: boolean } | undefined, Promise<RosterR
  * view of the congregation than a door volunteer has any reason to hold.
  */
 export const searchPlanningCenterPeople = onCall<
-  { query: string },
-  Promise<{ people: PersonSearchResult[] }>
->({ secrets: PCO_SECRETS, timeoutSeconds: 60, memory: '256MiB' }, async (request) => {
+  { query: string; backendId?: string },
+  Promise<{
+    people: PersonSearchResult[];
+    perBackend: Array<{ backendId: BackendId; displayName: string; ok: boolean; error: string | null }>;
+  }>
+>({ secrets: BACKEND_SECRETS, timeoutSeconds: 60, memory: '256MiB' }, async (request) => {
   await requireCoreTeam(request.auth?.uid);
 
   const query = typeof request.data?.query === 'string' ? request.data.query.trim() : '';
-  if (!query) return { people: [] };
+  if (!query) return { people: [], perBackend: [] };
 
-  const config = await resolveConfig(db());
-  const client = clientFor(config);
-  if (!client) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
-
-  try {
-    return { people: await searchPeople({ client, config, query }) };
-  } catch (error) {
-    return reportPcoFailure(error, 'search Planning Center');
+  const registry = await createRegistry(db());
+  const asked = request.data?.backendId;
+  const targets = isBackendId(asked) ? [asked] : registry.ids();
+  const reachable = targets.filter((id) => registry.get(id) !== null);
+  if (reachable.length === 0) {
+    throw new HttpsError(
+      'failed-precondition',
+      registry.configErrorOf(targets[0] ?? 'pco') ?? 'Not configured.',
+    );
   }
+
+  const settled = await Promise.all(
+    reachable.map(async (backendId) => {
+      const backend = registry.get(backendId)!;
+      try {
+        return { backendId, backend, ok: true as const, error: null, people: await backend.searchPeople({ query }) };
+      } catch (error) {
+        return { backendId, backend, ok: false as const, error, people: [] as PersonSearchResult[] };
+      }
+    }),
+  );
+
+  const failed = settled.filter((entry) => !entry.ok);
+  if (failed.length === settled.length) {
+    const first = failed[0]!;
+    return reportBackendFailure(
+      first.backend.displayName,
+      first.error,
+      `search ${first.backend.displayName}`,
+    );
+  }
+
+  /*
+   * A person both directories hold is one row, not two. The Planning Center
+   * hits carry the church's `attendees_uuid` pointers, so the Attendees hit
+   * for the same human is recognisable — and it is the one dropped, because
+   * an add from the surviving row lands on (or folds into) the Planning
+   * Center membership either way.
+   */
+  const aliased = new Set(
+    settled.flatMap((entry) =>
+      entry.people
+        .map((person) => person.a32PersonId)
+        .filter((uuid): uuid is string => typeof uuid === 'string'),
+    ),
+  );
+
+  return {
+    // Registry order — Planning Center first — with each backend's own
+    // relevance order intact inside its run.
+    people: settled.flatMap((entry) =>
+      entry.backendId === 'a32'
+        ? entry.people.filter((person) => !aliased.has(person.pcoPersonId))
+        : entry.people,
+    ),
+    perBackend: settled.map((entry) => ({
+      backendId: entry.backendId,
+      displayName: entry.backend.displayName,
+      ok: entry.ok,
+      error: entry.ok ? null : entry.error instanceof Error ? entry.error.message : String(entry.error),
+    })),
+  };
 });
 
 /** Mirrors `PcoPersonDetails` in src/types. */
 interface PersonDetailsResponse extends PersonDetails {
+  /** Which backend answered — and so which one the writable flags are about. */
+  backendId: BackendId;
   /**
    * Whether Tally can add a parent contact for this student right now — an
    * adult in the household to hang it off, *and* write-back turned up to
@@ -488,27 +658,19 @@ interface PersonDetailsResponse extends PersonDetails {
  * never asks for it.
  */
 export const getPersonDetails = onCall<
-  { pcoPersonId: string; force?: boolean },
+  { pcoPersonId?: string; studentId?: string; force?: boolean },
   Promise<PersonDetailsResponse | null>
 >(
-  { secrets: PCO_SECRETS, timeoutSeconds: 60, memory: '256MiB' },
+  { secrets: BACKEND_SECRETS, timeoutSeconds: 60, memory: '256MiB' },
   async (request): Promise<PersonDetailsResponse | null> => {
     await requireCoreTeam(request.auth?.uid);
 
-    const personId = request.data?.pcoPersonId;
-    if (typeof personId !== 'string' || personId.length === 0) {
-      throw new HttpsError('invalid-argument', 'pcoPersonId is required.');
-    }
-
-    const config = await resolveConfig(db());
-    const client = clientFor(config);
-    if (!client) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
+    const registry = await createRegistry(db());
+    const resolved = await resolveDetailsTarget(registry, db(), request.data);
+    const { backend, personId } = resolved;
 
     try {
-      const details = await fetchPersonDetails({
-        client,
-        config,
-        cache: sharedCache(config),
+      const details = await backend.fetchPersonDetails({
         personId,
         /*
          * Asked for by a screen that has just written, and honoured because the
@@ -525,20 +687,22 @@ export const getPersonDetails = onCall<
       /*
        * Added here rather than inside the cached read, because the two halves
        * of this answer expire on completely different schedules. Whether the
-       * household has an adult is a fact about Planning Center and is worth
+       * household has an adult is a fact about the backend and is worth
        * holding for the TTL; whether Tally is allowed to write is a setting a
        * leader may have changed a second ago, and serving that from a cache
        * would leave a form on screen that the write path then refuses.
        */
-      const writeBackFull = config.writeBack === 'full';
+      const writeBackFull = backend.capabilities.writeBack === 'full';
       return {
         ...details,
+        backendId: backend.id,
         contactWritable: details.householdAdult && writeBackFull,
         profileWritable: writeBackFull,
-        parentCreatable: writeBackFull && !details.householdAdult,
+        parentCreatable:
+          writeBackFull && !details.householdAdult && backend.capabilities.parentCreatable,
       };
     } catch (error) {
-      return reportPcoFailure(error, 'load this student');
+      return reportBackendFailure(backend.displayName, error, 'load this student');
     }
   },
 );
@@ -574,40 +738,71 @@ export interface AllergyNotesResponse {
  * a ministry of four hundred.
  */
 export const getAllergyNotes = onCall<
-  { pcoPersonIds?: readonly string[] },
+  {
+    pcoPersonIds?: readonly string[];
+    personKeys?: ReadonlyArray<{ backendId: string; personId: string }>;
+  },
   Promise<AllergyNotesResponse>
 >(
-  { secrets: PCO_SECRETS, timeoutSeconds: 60, memory: '256MiB' },
+  { secrets: BACKEND_SECRETS, timeoutSeconds: 60, memory: '256MiB' },
   async (request): Promise<AllergyNotesResponse> => {
     await requireMember(request.auth?.uid);
 
     const asked = request.data?.pcoPersonIds;
-    if (!Array.isArray(asked)) {
+    const keys = request.data?.personKeys;
+    if (!Array.isArray(asked) && !Array.isArray(keys)) {
       throw new HttpsError('invalid-argument', 'pcoPersonIds is required.');
     }
 
-    const personIds = asked.filter(
-      (id): id is string => typeof id === 'string' && id.length > 0,
-    );
-    // Nothing to ask about is a perfectly ordinary answer — a roster where
-    // nobody is flagged — and must not cost a Planning Center client.
-    if (personIds.length === 0) return { notes: {} };
-
-    const config = await resolveConfig(db());
-    const client = clientFor(config);
-    if (!client) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
-
-    try {
-      const notes = await fetchAllergyNotes({
-        client,
-        config,
-        cache: sharedCache(config),
-        personIds,
-      });
-      return { notes };
-    } catch (error) {
-      return reportPcoFailure(error, 'read the allergy notes');
+    // Two request shapes: bare ids have always meant Planning Center and
+    // still do; `personKeys` names the backend per person, which is the shape
+    // a mixed roster sends.
+    const byBackend = new Map<BackendId, string[]>();
+    const put = (backendId: BackendId, personId: unknown): void => {
+      if (typeof personId !== 'string' || personId.length === 0) return;
+      const list = byBackend.get(backendId);
+      if (list) list.push(personId);
+      else byBackend.set(backendId, [personId]);
+    };
+    for (const id of asked ?? []) put('pco', id);
+    for (const key of keys ?? []) {
+      if (key && isBackendId(key.backendId)) put(key.backendId, key.personId);
     }
+
+    // Nothing to ask about is a perfectly ordinary answer — a roster where
+    // nobody is flagged — and must not cost a backend client.
+    if (byBackend.size === 0) return { notes: {} };
+
+    const registry = await createRegistry(db());
+    const targets = [...byBackend.entries()].filter(([backendId]) => registry.get(backendId));
+    if (targets.length === 0) {
+      const [firstAsked] = byBackend.keys();
+      throw new HttpsError(
+        'failed-precondition',
+        registry.configErrorOf(firstAsked ?? 'pco') ?? 'Not configured.',
+      );
+    }
+
+    const settled = await Promise.all(
+      targets.map(async ([backendId, personIds]) => {
+        const backend = registry.get(backendId)!;
+        try {
+          return { backend, ok: true as const, error: null, notes: await backend.fetchAllergyNotes({ personIds }) };
+        } catch (error) {
+          return { backend, ok: false as const, error, notes: {} as Record<string, string> };
+        }
+      }),
+    );
+
+    const failed = settled.filter((entry) => !entry.ok);
+    if (failed.length === settled.length) {
+      const first = failed[0]!;
+      return reportBackendFailure(first.backend.displayName, first.error, 'read the allergy notes');
+    }
+
+    // Person ids do not collide across backends (numeric vs UUID), so one map
+    // keyed by bare id keeps the client's existing lookup working unchanged.
+    return { notes: Object.assign({}, ...settled.map((entry) => entry.notes)) };
   },
 );
 
@@ -626,39 +821,70 @@ export const getParentContactStatus = onCall<
   { force?: boolean } | undefined,
   Promise<ParentContactStatus>
 >(
-  { secrets: PCO_SECRETS, timeoutSeconds: 120, memory: '512MiB' },
+  { secrets: BACKEND_SECRETS, timeoutSeconds: 120, memory: '512MiB' },
   async (request): Promise<ParentContactStatus> => {
     await requireCoreTeam(request.auth?.uid);
 
-    const config = await resolveConfig(db());
-    const client = clientFor(config);
-    if (!client) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
-
-    try {
-      const scan = await scanRoster(db());
-      return await fetchParentContactStatus({
-        client,
-        config,
-        cache: sharedCache(config),
-        /*
-         * Both halves of the membership, which is what makes this different
-         * from every other read of the scan.
-         *
-         * A visitor Tally pushed upstream keeps their own document id, so the
-         * roster read does not carry them and this question had no answer for
-         * them — and "no answer" is not "no parent", so the dashboard could
-         * only fall back to the flag on their document, which says `false` for
-         * ever. A contact added through Tally, written into Planning Center and
-         * confirmed by the very next read left them on the "incomplete
-         * profiles" list anyway. Asking about them here is what lets Planning
-         * Center answer for the students Tally itself put there.
-         */
-        personIds: [...scan.personIds, ...scan.linkedPersonIds],
-        force: request.data?.force === true,
-      });
-    } catch (error) {
-      return reportPcoFailure(error, 'check which students have a parent contact');
+    const registry = await createRegistry(db());
+    const enabled = registry.ids();
+    if (enabled.length === 0) {
+      throw new HttpsError(
+        'failed-precondition',
+        registry.configErrorOf('pco') ?? 'Not configured.',
+      );
     }
+
+    const scan = await scanRoster(db());
+    const force = request.data?.force === true;
+
+    /*
+     * Both halves of each backend's membership, which is what makes this
+     * different from every other read of the scan.
+     *
+     * A visitor Tally pushed upstream keeps their own document id, so the
+     * roster read does not carry them and this question had no answer for
+     * them — and "no answer" is not "no parent", so the dashboard could only
+     * fall back to the flag on their document, which says `false` for ever. A
+     * contact added through Tally, written upstream and confirmed by the very
+     * next read left them on the "incomplete profiles" list anyway. Asking
+     * about them here is what lets the backend answer for the students Tally
+     * itself put there.
+     */
+    const settled = await Promise.all(
+      enabled.map(async (backendId) => {
+        const backend = registry.get(backendId)!;
+        try {
+          const status = await backend.fetchParentContactStatus({
+            personIds: scanIdsFor(scan, backendId),
+            force,
+          });
+          return { backend, ok: true as const, error: null, status };
+        } catch (error) {
+          return { backend, ok: false as const, error, status: null };
+        }
+      }),
+    );
+
+    const answered = settled.filter(
+      (entry): entry is typeof entry & { status: ParentContactStatus } => entry.status !== null,
+    );
+    if (answered.length === 0) {
+      const first = settled[0]!;
+      return reportBackendFailure(
+        first.backend.displayName,
+        first.error,
+        'check which students have a parent contact',
+      );
+    }
+
+    return {
+      reachable: Object.assign({}, ...answered.map((entry) => entry.status.reachable)),
+      unresolved: answered.flatMap((entry) => entry.status.unresolved),
+      cached: answered.every((entry) => entry.status.cached),
+      fetchedAt: answered
+        .map((entry) => entry.status.fetchedAt)
+        .reduce((latest, at) => (at > latest ? at : latest), ''),
+    };
   },
 );
 
@@ -712,17 +938,17 @@ export const getPlanningCenterStatus = onCall<
   { force?: boolean } | undefined,
   Promise<PcoStatusResult>
 >(
-  { secrets: PCO_SECRETS, timeoutSeconds: 120, memory: '512MiB' },
+  { secrets: BACKEND_SECRETS, timeoutSeconds: 120, memory: '512MiB' },
   async (request): Promise<PcoStatusResult> => {
     await requireCoreTeam(request.auth?.uid);
 
-    const config = await resolveConfig(db());
+    const { backend, config } = await pcoBackendFor(db());
 
     /*
      * Read before the configuration is judged, because "how many students have
      * not reached Planning Center" is most worth knowing in exactly the states
      * that return early below — write-back off, or the connection broken. The
-     * roster ids from the same scan are only usable once there is a client.
+     * roster ids from the same scan are only usable once there is a backend.
      */
     const scan = await scanRoster(db());
 
@@ -755,8 +981,7 @@ export const getPlanningCenterStatus = onCall<
       };
     }
 
-    const client = clientFor(config);
-    if (!client) {
+    if (!backend) {
       return { ...base, configured: false, reachable: false, problem: 'Not configured.', peopleVisible: null };
     }
 
@@ -764,11 +989,8 @@ export const getPlanningCenterStatus = onCall<
       // Deliberately the real roster query rather than a cheap ping: "we can
       // reach the API" and "we can see your students" are different claims, and
       // only the second is worth showing a leader.
-      const personIds = scan.personIds;
-      const result = await fetchRoster({
-        client,
-        config,
-        cache: sharedCache(config),
+      const personIds = scan.personIds.pco;
+      const result = await backend.fetchRoster({
         personIds,
         force: request.data?.force === true,
       });
@@ -800,6 +1022,151 @@ export const getPlanningCenterStatus = onCall<
   },
 );
 
+/** One backend's connection report, plus what it is and what it can do. */
+interface BackendStatus {
+  backendId: BackendId;
+  displayName: string;
+  /** Switched on and fully configured — the registry's own judgement. */
+  enabled: boolean;
+  configured: boolean;
+  reachable: boolean;
+  problem: string | null;
+  writeBack: 'off' | 'create' | 'full';
+  cacheTtlSeconds: number;
+  peopleVisible: number | null;
+  unresolved: number;
+  /** Present only on an enabled backend — capabilities are an adapter's. */
+  capabilities: BackendCapabilities | null;
+  /** The effective settings, shaped per backend. */
+  settings: Record<string, unknown>;
+}
+
+interface BackendStatusesResponse {
+  backends: BackendStatus[];
+  defaultPushBackend: BackendId;
+  /** Active students no backend holds yet — a deployment-wide count. */
+  queued: number;
+}
+
+/**
+ * Every backend Tally knows, connected or not, in one answer.
+ *
+ * The Settings screen's read. Disabled backends are here on purpose — the
+ * screen where somebody sets Attendees up needs to show Attendees before it is
+ * configured, with the problem named. The probe for enabled backends is the
+ * real roster query, same reasoning as `getPlanningCenterStatus`: "we can
+ * reach the API" and "we can see your students" are different claims, and only
+ * the second is worth showing a leader.
+ */
+export const getBackendStatuses = onCall<
+  { force?: boolean } | undefined,
+  Promise<BackendStatusesResponse>
+>(
+  { secrets: BACKEND_SECRETS, timeoutSeconds: 120, memory: '512MiB' },
+  async (request): Promise<BackendStatusesResponse> => {
+    await requireCoreTeam(request.auth?.uid);
+
+    const database = db();
+    const registry = await createRegistry(database);
+    const scan = await scanRoster(database);
+    const force = request.data?.force === true;
+
+    const backends = await Promise.all(
+      BACKEND_IDS.map(async (backendId): Promise<BackendStatus> => {
+        const backend = registry.get(backendId);
+        const base = {
+          backendId,
+          displayName: registry.displayNameOf(backendId),
+          writeBack:
+            backendId === 'pco' ? registry.configs.pco.writeBack : registry.configs.a32.writeBack,
+          cacheTtlSeconds: cacheTtlOf(registry, backendId),
+          settings: backendSettingsOf(registry, backendId),
+          unresolved: 0,
+        };
+
+        if (!backend) {
+          const problem = registry.configErrorOf(backendId);
+          return {
+            ...base,
+            enabled: false,
+            // Not serving for one of two reasons, and the card says different
+            // things for them: unfinished configuration (the problem names
+            // what is missing) versus a configured backend a leader switched
+            // off (no problem to report — it is doing as asked).
+            configured: problem === null,
+            reachable: false,
+            problem,
+            peopleVisible: null,
+            capabilities: null,
+          };
+        }
+
+        try {
+          const result = await backend.fetchRoster({
+            personIds: scan.personIds[backendId],
+            force,
+          });
+          const total = scan.personIds[backendId].length;
+          return {
+            ...base,
+            enabled: true,
+            configured: true,
+            reachable: true,
+            problem:
+              result.unresolved.length > 0
+                ? `${result.unresolved.length} of ${total} students on the roster could not be read from ${backend.displayName}. They may have been deleted or merged upstream.`
+                : null,
+            peopleVisible: result.people.length,
+            unresolved: result.unresolved.length,
+            capabilities: backend.capabilities,
+          };
+        } catch (error) {
+          return {
+            ...base,
+            enabled: true,
+            configured: true,
+            reachable: false,
+            problem: error instanceof Error ? error.message : String(error),
+            peopleVisible: null,
+            capabilities: backend.capabilities,
+          };
+        }
+      }),
+    );
+
+    return { backends, defaultPushBackend: registry.defaultPushBackendId, queued: scan.queued };
+  },
+);
+
+/** The non-secret settings echo, shaped for each backend's editor. */
+function backendSettingsOf(registry: BackendRegistry, backendId: BackendId): Record<string, unknown> {
+  if (backendId === 'pco') {
+    const config = registry.configs.pco;
+    return {
+      minGrade: config.minGrade,
+      maxGrade: config.maxGrade,
+      writeBack: config.writeBack,
+      cacheTtlSeconds: config.cacheTtlSeconds,
+      baseUrl: config.baseUrl,
+      managedInApp: config.managedInApp,
+    };
+  }
+  const config = registry.configs.a32;
+  return {
+    enabled: config.enabled,
+    baseUrl: config.baseUrl,
+    divisionId: config.divisionId,
+    meetSlug: config.meetSlug,
+    characterSlug: config.characterSlug,
+    assemblySlug: config.assemblySlug,
+    minGrade: config.minGrade,
+    maxGrade: config.maxGrade,
+    writeBack: config.writeBack,
+    cacheTtlSeconds: config.cacheTtlSeconds,
+    managedInApp: config.managedInApp,
+  };
+}
+
 /**
  * The Planning Center lists this token can see, for the roster picker.
  *
@@ -811,7 +1178,7 @@ export const listPlanningCenterLists = onCall<
   { search?: string; limit?: number } | undefined,
   Promise<{ lists: PcoListSummary[] }>
 >(
-  { secrets: PCO_SECRETS, timeoutSeconds: 60, memory: '256MiB' },
+  { secrets: BACKEND_SECRETS, timeoutSeconds: 60, memory: '256MiB' },
   async (request): Promise<{ lists: PcoListSummary[] }> => {
     await requireCoreTeam(request.auth?.uid);
 
@@ -836,7 +1203,7 @@ export const listPlanningCenterLists = onCall<
       const limit = typeof request.data?.limit === 'number' ? request.data.limit : undefined;
       return { lists: await fetchLists({ client, search, limit }) };
     } catch (error) {
-      return reportPcoFailure(error, 'load your Planning Center lists');
+      return reportBackendFailure('Planning Center', error, 'load your Planning Center lists');
     }
   },
 );
@@ -854,7 +1221,8 @@ export const refreshPlanningCenter = onCall<void, Promise<{ status: 'ok' }>>(
   { timeoutSeconds: 30, memory: '256MiB' },
   async (request) => {
     await requireCoreTeam(request.auth?.uid);
-    resetSharedCache();
+    const registry = await createRegistry(db());
+    for (const backendId of registry.ids()) registry.get(backendId)?.resetCache();
     return { status: 'ok' };
   },
 );
@@ -878,9 +1246,9 @@ export const refreshPlanningCenter = onCall<void, Promise<{ status: 'ok' }>>(
  * than a mistake.
  */
 export const addRosterMember = onCall<
-  { pcoPersonId: string },
+  { pcoPersonId: string; backendId?: string },
   Promise<{ status: 'added' | 'restored' | 'already-on-roster'; studentId: string }>
->({ secrets: PCO_SECRETS, timeoutSeconds: 60, memory: '256MiB' }, async (request) => {
+>({ secrets: BACKEND_SECRETS, timeoutSeconds: 60, memory: '256MiB' }, async (request) => {
   await requireCoreTeam(request.auth?.uid);
 
   const personId = request.data?.pcoPersonId;
@@ -888,30 +1256,68 @@ export const addRosterMember = onCall<
     throw new HttpsError('invalid-argument', 'pcoPersonId is required.');
   }
 
-  const config = await resolveConfig(db());
-  const client = clientFor(config);
-  if (!client) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
+  // A bare person id has always meant Planning Center; a search result from
+  // another backend says which one it came from.
+  const backendId: BackendId = isBackendId(request.data?.backendId)
+    ? request.data.backendId
+    : 'pco';
+  const registry = await createRegistry(db());
+  const backend = registry.get(backendId);
+  if (!backend) {
+    throw new HttpsError(
+      'failed-precondition',
+      registry.configErrorOf(backendId) ?? 'Not configured.',
+    );
+  }
 
   // Confirm the person is real before recording that they are on the roster: a
   // typo'd id would otherwise become a permanent row that renders as nothing.
   // A merged id is followed to the record the church kept — whoever pasted it
   // meant that person — and only a trail that ends dead is refused.
-  let rosterPersonId = personId;
+  let rosterPersonId: string;
+  let checkedA32Alias: string | undefined;
   try {
-    await client.get(`/people/${encodeURIComponent(personId)}`);
+    const check = await backend.checkPerson({ personId });
+    if (check.outcome === 'gone') {
+      throw new HttpsError('not-found', `${backend.displayName} has no person with that id.`);
+    }
+    rosterPersonId = check.personId;
+    checkedA32Alias = check.a32PersonId;
   } catch (error) {
-    if (isPersonGoneError(error)) {
-      const link = await followPersonLink(client, personId, error);
-      if (link.outcome === 'gone') {
-        throw new HttpsError('not-found', 'Planning Center has no person with that id.');
+    return reportBackendFailure(
+      backend.displayName,
+      error,
+      `check that person in ${backend.displayName}`,
+    );
+  }
+
+  /*
+   * The same human may already be on the roster through the other backend —
+   * the church's `attendees_uuid` field says so. Adding an Attendees person a
+   * Planning Center membership already answers for would put one child on the
+   * roster twice, so the add lands on the membership the roster has. Best
+   * effort on purpose: the aliases live upstream, and not being able to read
+   * them must not break an add.
+   */
+  if (backendId === 'a32') {
+    const pco = registry.get('pco');
+    if (pco) {
+      try {
+        const scan = await scanRoster(db());
+        const aliases =
+          (await pco.fetchRoster({ personIds: scanIdsFor(scan, 'pco') })).a32Aliases ?? {};
+        const holder = Object.entries(aliases).find(([, uuid]) => uuid === rosterPersonId);
+        const keeperDoc = holder ? studentDocFor(scan, 'pco', holder[0]) : undefined;
+        if (keeperDoc) return { status: 'already-on-roster', studentId: keeperDoc };
+      } catch (error) {
+        logger.warn('Could not check the Attendees person against Planning Center aliases', {
+          error: String(error),
+        });
       }
-      rosterPersonId = link.personId;
-    } else {
-      return reportPcoFailure(error, 'check that person in Planning Center');
     }
   }
 
-  const studentId = pcoStudentId(rosterPersonId);
+  const studentId = studentIdFor(backendId, rosterPersonId);
   const ref = db().doc(`${PATHS.students}/${studentId}`);
   const snapshot = await ref.get();
   const existing = snapshot.exists ? (snapshot.data() ?? {}) : {};
@@ -919,7 +1325,11 @@ export const addRosterMember = onCall<
 
   await ref.set(
     {
-      pcoPersonId: rosterPersonId,
+      // The legacy field keeps meaning Planning Center; the generic pair is
+      // the one every backend writes.
+      ...(backendId === 'pco' ? { pcoPersonId: rosterPersonId } : {}),
+      upstreamBackend: backendId,
+      upstreamPersonId: rosterPersonId,
       status: 'active',
       addedToRosterAt: Timestamp.now(),
       addedToRosterBy: request.auth?.uid ?? null,
@@ -927,6 +1337,36 @@ export const addRosterMember = onCall<
     },
     { merge: true },
   );
+
+  /*
+   * The other direction of the same rule: this Planning Center person's alias
+   * may name an Attendees membership already on the roster. The new document
+   * is the keeper — the Planning Center side is canonical for a linked pair —
+   * and the Attendees-side document folds into it at once, rather than on the
+   * next roster read.
+   */
+  if (backendId === 'pco' && checkedA32Alias) {
+    try {
+      const scan = await scanRoster(db());
+      const foldDoc = studentDocFor(scan, 'a32', checkedA32Alias);
+      if (foldDoc && foldDoc !== studentId) {
+        await collapseAliasPair(db(), {
+          keeperDoc: studentId,
+          foldDoc,
+          pcoPersonId: rosterPersonId,
+          a32PersonId: checkedA32Alias,
+        });
+        logger.info('Folded one student held by both backends', {
+          keeper: studentId,
+          folded: foldDoc,
+        });
+      }
+    } catch (error) {
+      logger.warn('Could not fold the Attendees membership for an added person', {
+        error: String(error),
+      });
+    }
+  }
 
   return {
     status: !snapshot.exists ? 'added' : wasActive ? 'already-on-roster' : 'restored',
@@ -979,7 +1419,7 @@ export const removeRosterMember = onCall<{ studentId: string }, Promise<{ status
 export const importPlanningCenterList = onCall<
   { listId: string },
   Promise<{ added: number; alreadyOnRoster: number; restored: number; total: number }>
->({ secrets: PCO_SECRETS, timeoutSeconds: 300, memory: '512MiB' }, async (request) => {
+>({ secrets: BACKEND_SECRETS, timeoutSeconds: 300, memory: '512MiB' }, async (request) => {
   await requireCoreTeam(request.auth?.uid);
 
   const listId = request.data?.listId;
@@ -987,15 +1427,17 @@ export const importPlanningCenterList = onCall<
     throw new HttpsError('invalid-argument', 'listId is required.');
   }
 
-  const config = await resolveConfig(db());
-  const client = clientFor(config);
-  if (!client) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
+  const { backend, config } = await pcoBackendFor(db());
+  if (!backend) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
+  if (!backend.fetchListMemberIds) {
+    throw new HttpsError('failed-precondition', `${backend.displayName} does not have lists.`);
+  }
 
   let personIds: string[];
   try {
-    personIds = await fetchListMemberIds(client, listId);
+    personIds = await backend.fetchListMemberIds(listId);
   } catch (error) {
-    return reportPcoFailure(error, 'read that Planning Center list');
+    return reportBackendFailure(backend.displayName, error, 'read that Planning Center list');
   }
 
   const database = db();
@@ -1021,6 +1463,8 @@ export const importPlanningCenterList = onCall<
       ref,
       {
         pcoPersonId: personId,
+        upstreamBackend: 'pco',
+        upstreamPersonId: personId,
         status: 'active',
         addedToRosterAt: now,
         addedToRosterBy: request.auth?.uid ?? null,
@@ -1039,46 +1483,44 @@ export const importPlanningCenterList = onCall<
 /* -------------------------------------------------------------------------- */
 
 /**
- * A client for the Check-Ins product, or the reason there cannot be one.
- *
- * Check-Ins lives beside People on the same host, so its root is derived from
- * the configured People root rather than being a second setting — pointing one
- * at the simulator points both. The same Personal Access Token authenticates
- * either product; whether it is *allowed* to read Check-Ins is Planning
- * Center's call, and comes back as an ordinary 403 the error path explains.
- */
-function checkInsClientFor(config: PcoConfig): PcoClient | { error: string } {
-  if (config.configError) return { error: config.configError };
-  const baseUrl = checkInsBaseUrl(config.baseUrl);
-  if (!baseUrl) {
-    return {
-      error: `The configured Planning Center URL ("${config.baseUrl}") does not end in /people/v2, so the Check-Ins API root cannot be derived from it.`,
-    };
-  }
-  return createPcoClient({ appId: config.appId, secret: config.secret, baseUrl });
-}
-
-/**
  * The Check-Ins events a leader could import — Footprints, Sunday school, the
  * preschool room — each with enough history attached to recognise the right
  * one before anything is written.
  *
+ * The Check-Ins client — its root derived from the People root, and everything
+ * else Planning Center about it — lives inside the adapter now; a backend that
+ * cannot derive one reports it as the `failed-precondition` it is.
+ *
  * Core team only: this is a view over the whole church's check-in system, not
  * something a door volunteer needs.
  */
-export const listCheckInsEvents = onCall<void, Promise<{ events: CheckInsEventSummary[] }>>(
-  { secrets: PCO_SECRETS, timeoutSeconds: 120, memory: '256MiB' },
+export const listCheckInsEvents = onCall<
+  { backendId?: string } | undefined,
+  Promise<{ events: CheckInsEventSummary[] }>
+>(
+  { secrets: BACKEND_SECRETS, timeoutSeconds: 120, memory: '256MiB' },
   async (request) => {
     await requireCoreTeam(request.auth?.uid);
 
-    const config = await resolveConfig(db());
-    const client = checkInsClientFor(config);
-    if ('error' in client) throw new HttpsError('failed-precondition', client.error);
+    const backendId: BackendId = isBackendId(request.data?.backendId)
+      ? request.data.backendId
+      : 'pco';
+    const registry = await createRegistry(db());
+    const backend = registry.get(backendId);
+    if (!backend) {
+      throw new HttpsError(
+        'failed-precondition',
+        registry.configErrorOf(backendId) ?? 'Not configured.',
+      );
+    }
+    if (!backend.listImportableEvents) {
+      throw new HttpsError('failed-precondition', `${backend.displayName} has no history to import.`);
+    }
 
     try {
-      return { events: await listCheckInsEventsUpstream({ client, db: db() }) };
+      return { events: await backend.listImportableEvents() };
     } catch (error) {
-      return reportPcoFailure(error, 'list your Check-Ins events');
+      return reportBackendFailure(backend.displayName, error, 'list your Check-Ins events');
     }
   },
 );
@@ -1098,9 +1540,9 @@ export const listCheckInsEvents = onCall<void, Promise<{ events: CheckInsEventSu
  * Core team only, like every other write that reshapes the roster.
  */
 export const importCheckInsEvent = onCall<
-  { pcoEventId: string },
+  { pcoEventId: string; backendId?: string },
   Promise<CheckInsImportSummary>
->({ secrets: PCO_SECRETS, timeoutSeconds: 540, memory: '512MiB' }, async (request) => {
+>({ secrets: BACKEND_SECRETS, timeoutSeconds: 540, memory: '512MiB' }, async (request) => {
   await requireCoreTeam(request.auth?.uid);
 
   const pcoEventId = request.data?.pcoEventId;
@@ -1108,25 +1550,61 @@ export const importCheckInsEvent = onCall<
     throw new HttpsError('invalid-argument', 'pcoEventId is required.');
   }
 
-  const config = await resolveConfig(db());
-  const client = checkInsClientFor(config);
-  if ('error' in client) throw new HttpsError('failed-precondition', client.error);
+  const backendId: BackendId = isBackendId(request.data?.backendId)
+    ? request.data.backendId
+    : 'pco';
+  const registry = await createRegistry(db());
+  const backend = registry.get(backendId);
+  if (!backend) {
+    throw new HttpsError(
+      'failed-precondition',
+      registry.configErrorOf(backendId) ?? 'Not configured.',
+    );
+  }
+  if (!backend.importHistory) {
+    throw new HttpsError('failed-precondition', `${backend.displayName} has no history to import.`);
+  }
 
   // Occurrence ids embed the ministry-local calendar day, and this container
   // runs in UTC — same reasoning, same fix as `materializeOccurrence`.
   process.env.TZ = MINISTRY_TIME_ZONE;
 
+  /*
+   * Before an Attendees import, ask Planning Center which of the roster's
+   * students *are* Attendees people — the `attendees_uuid` aliases — so an
+   * attendee the roster already holds files their history under the
+   * membership the church already has, not under a second one. Best effort:
+   * an unreadable alias list means an import that behaves as before, never a
+   * failed import.
+   */
+  let existingStudentIds: Record<string, string> | undefined;
+  if (backendId === 'a32') {
+    const pco = registry.get('pco');
+    if (pco) {
+      try {
+        const scan = await scanRoster(db());
+        const aliases =
+          (await pco.fetchRoster({ personIds: scanIdsFor(scan, 'pco') })).a32Aliases ?? {};
+        const byUuid = existingStudentIdByA32Uuid(scan, aliases);
+        if (Object.keys(byUuid).length > 0) existingStudentIds = byUuid;
+      } catch (error) {
+        logger.warn('Could not resolve Planning Center aliases before an Attendees import', {
+          error: String(error),
+        });
+      }
+    }
+  }
+
   try {
-    return await importCheckInsEventUpstream({
-      db: db(),
-      client,
-      pcoEventId: pcoEventId.trim(),
+    return await backend.importHistory({
+      upstreamEventId: pcoEventId.trim(),
       uid: request.auth!.uid,
       now: new Date(),
       logger,
+      existingStudentIds,
     });
   } catch (error) {
-    return reportPcoFailure(error, 'import that Check-Ins event');
+    return reportBackendFailure(backend.displayName, error, 'import that Check-Ins event');
   }
 });
 
@@ -1135,9 +1613,9 @@ export const importCheckInsEvent = onCall<
 /* -------------------------------------------------------------------------- */
 
 export const pushStudentToPlanningCenter = onCall<
-  { studentId: string },
+  { studentId: string; backendId?: string },
   Promise<PushStudentResult>
->({ secrets: PCO_SECRETS, timeoutSeconds: 120, memory: '256MiB' }, async (request) => {
+>({ secrets: BACKEND_SECRETS, timeoutSeconds: 120, memory: '256MiB' }, async (request) => {
   await requireCoreTeam(request.auth?.uid);
 
   const studentId = request.data?.studentId;
@@ -1145,20 +1623,31 @@ export const pushStudentToPlanningCenter = onCall<
     throw new HttpsError('invalid-argument', 'studentId is required.');
   }
 
-  const config = await resolveConfig(db());
-  const client = clientFor(config);
-  if (!client) {
-    return {
-      status: 'skipped',
-      pcoPersonId: null,
-      message: config.configError ?? 'Planning Center is not configured.',
-    };
+  /*
+   * A linked student is pushed to the backend that holds them; an unlinked
+   * one to wherever new students go. The explicit override is for the button
+   * that says which — pushing a visitor to a named backend rather than the
+   * default.
+   */
+  const registry = await createRegistry(db());
+  let resolution: { backend: PeopleBackend } | { error: string };
+  if (isBackendId(request.data?.backendId)) {
+    const chosen = registry.get(request.data.backendId);
+    resolution = chosen
+      ? { backend: chosen }
+      : { error: registry.configErrorOf(request.data.backendId) ?? 'Not configured.' };
+  } else {
+    resolution = await backendForStudent(registry, db(), studentId);
+  }
+  if ('error' in resolution) {
+    return { status: 'skipped', pcoPersonId: null, message: resolution.error };
   }
 
-  const result = await pushStudent({ db: db(), client, config, studentId, logger });
-  // A student who is now in Planning Center must not be missing from the next
+  const backend = resolution.backend;
+  const result = await backend.pushStudent({ studentId, logger });
+  // A student who is now in the backend must not be missing from the next
   // roster read because a cached copy predates them.
-  if (result.status !== 'skipped') resetSharedCache();
+  if (result.status !== 'skipped') backend.resetCache();
   return result;
 });
 
@@ -1178,7 +1667,7 @@ export const pushStudentToPlanningCenter = onCall<
 export const setParentContact = onCall<
   { studentId: string; phone?: string | null; email?: string | null },
   Promise<SetParentContactResult>
->({ secrets: PCO_SECRETS, timeoutSeconds: 120, memory: '256MiB' }, async (request) => {
+>({ secrets: BACKEND_SECRETS, timeoutSeconds: 120, memory: '256MiB' }, async (request) => {
   await requireCoreTeam(request.auth?.uid);
 
   const studentId = request.data?.studentId;
@@ -1186,25 +1675,27 @@ export const setParentContact = onCall<
     throw new HttpsError('invalid-argument', 'studentId is required.');
   }
 
-  const config = await resolveConfig(db());
-  const client = clientFor(config);
-  if (!client) {
-    throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
+  const registry = await createRegistry(db());
+  const resolution = await backendForStudent(registry, db(), studentId);
+  if ('error' in resolution) {
+    throw new HttpsError('failed-precondition', resolution.error);
   }
+  const backend = resolution.backend;
 
   let result: SetParentContactResult;
   try {
-    result = await setParentContactUpstream({
-      db: db(),
-      client,
-      config,
+    result = await backend.setParentContact({
       studentId,
       phone: request.data?.phone ?? null,
       email: request.data?.email ?? null,
       logger,
     });
   } catch (error) {
-    return reportPcoFailure(error, 'add a parent contact in Planning Center');
+    return reportBackendFailure(
+      backend.displayName,
+      error,
+      `add a parent contact in ${backend.displayName}`,
+    );
   }
 
   /*
@@ -1215,12 +1706,11 @@ export const setParentContact = onCall<
    * next read pay for one edit.
    */
   if (result.status === 'updated') {
-    const cache = sharedCache(config);
     const personId = personIdFromStudentId(studentId);
-    if (personId) cache.invalidate(personDetailsCacheKey(config.baseUrl, personId));
+    if (personId) backend.invalidatePersonDetails(personId);
     // And the sweep behind "incomplete profiles", which has just stopped being
     // true about this household.
-    cache.invalidate(reachableAdultsCacheKey(config.baseUrl));
+    backend.invalidateReachability();
   }
 
   return result;
@@ -1243,7 +1733,7 @@ export const setParentContact = onCall<
 export const updateStudentProfile = onCall<
   { studentId: string } & StudentProfilePatch,
   Promise<UpdateStudentProfileResult>
->({ secrets: PCO_SECRETS, timeoutSeconds: 120, memory: '256MiB' }, async (request) => {
+>({ secrets: BACKEND_SECRETS, timeoutSeconds: 120, memory: '256MiB' }, async (request) => {
   await requireCoreTeam(request.auth?.uid);
 
   const studentId = request.data?.studentId;
@@ -1251,18 +1741,16 @@ export const updateStudentProfile = onCall<
     throw new HttpsError('invalid-argument', 'studentId is required.');
   }
 
-  const config = await resolveConfig(db());
-  const client = clientFor(config);
-  if (!client) {
-    throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
+  const registry = await createRegistry(db());
+  const resolution = await backendForStudent(registry, db(), studentId);
+  if ('error' in resolution) {
+    throw new HttpsError('failed-precondition', resolution.error);
   }
+  const backend = resolution.backend;
 
   let result: UpdateStudentProfileResult;
   try {
-    result = await updateStudentProfileUpstream({
-      db: db(),
-      client,
-      config,
+    result = await backend.updateStudentProfile({
       studentId,
       firstName: request.data?.firstName,
       nickname: request.data?.nickname,
@@ -1273,7 +1761,11 @@ export const updateStudentProfile = onCall<
       logger,
     });
   } catch (error) {
-    return reportPcoFailure(error, 'save this profile to Planning Center');
+    return reportBackendFailure(
+      backend.displayName,
+      error,
+      `save this profile to ${backend.displayName}`,
+    );
   }
 
   /*
@@ -1282,7 +1774,7 @@ export const updateStudentProfile = onCall<
    * includes them — and that answer is held under a different key on every
    * device that asks. One edit is a fine price for one cold read.
    */
-  if (result.status === 'updated') resetSharedCache();
+  if (result.status === 'updated') backend.resetCache();
 
   return result;
 });
@@ -1312,7 +1804,7 @@ export const addParent = onCall<
     createNew?: boolean;
   },
   Promise<AddParentResult>
->({ secrets: PCO_SECRETS, timeoutSeconds: 120, memory: '256MiB' }, async (request) => {
+>({ secrets: BACKEND_SECRETS, timeoutSeconds: 120, memory: '256MiB' }, async (request) => {
   await requireCoreTeam(request.auth?.uid);
 
   const studentId = request.data?.studentId;
@@ -1320,18 +1812,16 @@ export const addParent = onCall<
     throw new HttpsError('invalid-argument', 'studentId is required.');
   }
 
-  const config = await resolveConfig(db());
-  const client = clientFor(config);
-  if (!client) {
-    throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
+  const registry = await createRegistry(db());
+  const resolution = await backendForStudent(registry, db(), studentId);
+  if ('error' in resolution) {
+    throw new HttpsError('failed-precondition', resolution.error);
   }
+  const backend = resolution.backend;
 
   let result: AddParentResult;
   try {
-    result = await addParentUpstream({
-      db: db(),
-      client,
-      config,
+    result = await backend.addParent({
       studentId,
       personId: request.data?.personId ?? null,
       firstName: request.data?.firstName ?? null,
@@ -1342,7 +1832,11 @@ export const addParent = onCall<
       logger,
     });
   } catch (error) {
-    return reportPcoFailure(error, 'add a parent in Planning Center');
+    return reportBackendFailure(
+      backend.displayName,
+      error,
+      `add a parent in ${backend.displayName}`,
+    );
   }
 
   /*
@@ -1352,7 +1846,7 @@ export const addParent = onCall<
    * household, and the roster's own view of this family. One cold read is the
    * right price for a family that did not exist a second ago.
    */
-  if (result.status === 'added') resetSharedCache();
+  if (result.status === 'added') backend.resetCache();
 
   return result;
 });
@@ -1370,7 +1864,7 @@ export const addParent = onCall<
 export const recreatePlanningCenterPerson = onCall<
   { studentId: string; firstName?: string | null; lastName?: string | null; grade?: number | null },
   Promise<RecreateStudentResult>
->({ secrets: PCO_SECRETS, timeoutSeconds: 120, memory: '256MiB' }, async (request) => {
+>({ secrets: BACKEND_SECRETS, timeoutSeconds: 120, memory: '256MiB' }, async (request) => {
   await requireCoreTeam(request.auth?.uid);
 
   const studentId = request.data?.studentId;
@@ -1378,18 +1872,16 @@ export const recreatePlanningCenterPerson = onCall<
     throw new HttpsError('invalid-argument', 'studentId is required.');
   }
 
-  const config = await resolveConfig(db());
-  const client = clientFor(config);
-  if (!client) {
-    throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
+  const registry = await createRegistry(db());
+  const resolution = await backendForStudent(registry, db(), studentId);
+  if ('error' in resolution) {
+    throw new HttpsError('failed-precondition', resolution.error);
   }
+  const backend = resolution.backend;
 
   let result: RecreateStudentResult;
   try {
-    result = await recreateStudent({
-      db: db(),
-      client,
-      config,
+    result = await backend.recreateStudent({
       studentId,
       firstName: request.data?.firstName ?? undefined,
       lastName: request.data?.lastName ?? undefined,
@@ -1397,11 +1889,15 @@ export const recreatePlanningCenterPerson = onCall<
       logger,
     });
   } catch (error) {
-    return reportPcoFailure(error, 're-create this student in Planning Center');
+    return reportBackendFailure(
+      backend.displayName,
+      error,
+      `re-create this student in ${backend.displayName}`,
+    );
   }
 
   // A new (or newly pointed-at) person changes what every cached read answers.
-  if (result.status === 'recreated' || result.status === 'relinked') resetSharedCache();
+  if (result.status === 'recreated' || result.status === 'relinked') backend.resetCache();
 
   return result;
 });
@@ -1415,16 +1911,16 @@ export const recreatePlanningCenterPerson = onCall<
  * things a person notices and fixes.
  */
 export const pushPendingVisitors = onCall<void, Promise<PushPendingResult>>(
-  { secrets: PCO_SECRETS, timeoutSeconds: 300, memory: '256MiB' },
+  { secrets: BACKEND_SECRETS, timeoutSeconds: 300, memory: '256MiB' },
   async (request): Promise<PushPendingResult> => {
     await requireCoreTeam(request.auth?.uid);
 
-    const config = await resolveConfig(db());
-    const client = clientFor(config);
-    if (!client) return { pushed: 0, skipped: 0, errors: 0 };
+    const registry = await createRegistry(db());
+    const target = registry.defaultPush();
+    if ('error' in target) return { pushed: 0, skipped: 0, errors: 0 };
 
-    const result = await pushPendingStudents({ db: db(), client, config, logger });
-    if (result.pushed > 0) resetSharedCache();
+    const result = await target.backend.pushPendingStudents({ logger });
+    if (result.pushed > 0) target.backend.resetCache();
     return result;
   },
 );
@@ -1437,32 +1933,36 @@ export const pushPendingVisitors = onCall<void, Promise<PushPendingResult>>(
 export const onStudentCreated = onDocumentCreated(
   {
     document: 'students/{studentId}',
-    secrets: PCO_SECRETS,
+    secrets: BACKEND_SECRETS,
     timeoutSeconds: 120,
     memory: '256MiB',
     retry: false,
   },
   async (event) => {
     const data = event.data?.data();
-    if (!data || data.pcoPushPending !== true || typeof data.pcoPersonId === 'string') return;
+    if (
+      !data ||
+      data.pcoPushPending !== true ||
+      typeof data.pcoPersonId === 'string' ||
+      typeof data.upstreamPersonId === 'string'
+    ) {
+      return;
+    }
 
-    const config = await resolveConfig(db());
-    const client = clientFor(config);
-    if (!client || config.writeBack === 'off') return;
+    const registry = await createRegistry(db());
+    const target = registry.defaultPush();
+    if ('error' in target) return;
+    const backend = target.backend;
+    if (backend.capabilities.writeBack === 'off') return;
 
     try {
-      const result = await pushStudent({
-        db: db(),
-        client,
-        config,
-        studentId: event.params.studentId,
-        logger,
-      });
+      const result = await backend.pushStudent({ studentId: event.params.studentId, logger });
       // The roster cache predates this person; without the drop they would be
       // missing from the next read for up to the TTL.
-      if (result.status !== 'skipped') resetSharedCache();
-      logger.info('Pushed a new student to Planning Center', {
+      if (result.status !== 'skipped') backend.resetCache();
+      logger.info('Pushed a new student to the people backend', {
         studentId: event.params.studentId,
+        backend: backend.id,
         ...result,
       });
     } catch (error) {

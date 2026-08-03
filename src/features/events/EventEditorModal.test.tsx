@@ -75,6 +75,7 @@ function show(event: TallyEvent | null = null) {
     rosterError: null,
     rosterOffline: false,
     rosterFetchedAt: null,
+    rosterBackends: [],
     refreshRoster: async () => {},
     applyRosterPerson: () => {},
   };

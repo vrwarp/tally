@@ -16,6 +16,8 @@ import {
   normalizeRecurrence,
 } from '@/lib/recurrence';
 import {
+  isBackendId,
+  parseStudentId,
   DEFAULT_SETTINGS,
   buildSearchName,
   isGrade,
@@ -144,6 +146,9 @@ export function toStudent(snapshot: DocumentSnapshot<DocumentData>): Student {
     pcoPersonId,
     pcoPushPending: bool(data.pcoPushPending),
     pcoRecordMissing: bool(data.pcoRecordMissing),
+    // The generic linkage pair, server-written; `backendOfStudent` reads it.
+    upstreamBackend: isBackendId(data.upstreamBackend) ? data.upstreamBackend : null,
+    upstreamPersonId: strOrNull(data.upstreamPersonId),
     // A Tally document describes somebody Planning Center has not told us
     // about, so this is false by construction. When Planning Center *does* know
     // them, the roster entry wins and carries the real value.
@@ -405,6 +410,15 @@ export function fromRosterPerson(person: PcoRosterPerson, now: Date): Student {
     isVisitor: false,
     pcoPersonId: person.pcoPersonId,
     pcoPushPending: false,
+    /*
+     * The linkage travels on the row itself, so screens can name the right
+     * backend even after `mergeRoster` moves this row under a visitor
+     * document's id — where the prefix stops answering. An older stored
+     * roster without `backendId` is Planning Center's: it predates anything
+     * else existing.
+     */
+    upstreamBackend: person.backendId ?? parseStudentId(person.id)?.backendId ?? 'pco',
+    upstreamPersonId: person.pcoPersonId,
     fromPlanningCenter: true,
     profileComplete: person.profileComplete,
     hasAllergies: person.hasAllergies,
@@ -433,7 +447,8 @@ export function fromRosterPerson(person: PcoRosterPerson, now: Date): Student {
      */
     createdAt: EPOCH,
     updatedAt: now,
-    createdBy: 'planning-center',
+    // The same sentinels the server's imports write: the row's true source.
+    createdBy: person.backendId === 'a32' ? 'attendees32' : 'planning-center',
     updatedBy: null,
   };
 }

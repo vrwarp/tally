@@ -32,7 +32,13 @@ import { useToast } from '@/context/toastContext';
 import { pcoPersonUrl } from '@/lib/planningCenter';
 import { cn, initials } from '@/lib/utils';
 import { addParent, setParentContact, type ExistingPerson } from '@/services/functions';
-import { studentFullName, type PcoPersonDetails, type Student } from '@/types';
+import {
+  backendLabelOf,
+  backendOfStudent,
+  studentFullName,
+  type PcoPersonDetails,
+  type Student,
+} from '@/types';
 
 export interface AddParentContactProps {
   student: Student;
@@ -69,11 +75,13 @@ function usableEmail(raw: string): boolean {
   return /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(raw.trim());
 }
 
-const MISSING = (
-  <p className="mt-1 text-sm text-warn-400">
-    Nothing in Planning Center — nobody can reach this family in an emergency.
-  </p>
-);
+function Missing({ label }: { label: string }) {
+  return (
+    <p className="mt-1 text-sm text-warn-400">
+      Nothing in {label} — nobody can reach this family in an emergency.
+    </p>
+  );
+}
 
 export function AddParentContact({
   student,
@@ -83,14 +91,16 @@ export function AddParentContact({
   onCancel,
 }: AddParentContactProps) {
   const [open, setOpen] = useState(defaultOpen);
+  const backend = backendOfStudent(student);
+  const label = backendLabelOf(student);
 
   /* ---- No upstream record at all ----------------------------------------- */
-  if (!student.pcoPersonId) {
+  if (backend === null) {
     return (
       <>
-        {MISSING}
+        <Missing label={label} />
         <p className="mt-1 text-xs text-ink-500">
-          Tally holds no parent contact of its own. Once this student reaches Planning Center, their
+          Tally holds no parent contact of its own. Once this student reaches {label}, their
           contact details are added there.
         </p>
       </>
@@ -104,22 +114,29 @@ export function AddParentContact({
   if (!writable && !creatable) {
     return (
       <>
-        {MISSING}
+        <Missing label={label} />
         <p className="mt-1 text-xs text-ink-500">
           {details && !details.householdAdult
-            ? // Write-back is turned down: the family still has to be built, and
-              // Planning Center is the only place that can do it.
-              'Planning Center has no adult in this household yet, so there is nobody to put a number on.'
-            : 'Parent contact is kept in Planning Center.'}{' '}
-          <a
-            href={pcoPersonUrl(student.pcoPersonId)}
-            target="_blank"
-            rel="noreferrer"
-            className="font-semibold text-brand-300 underline"
-          >
-            Add it there
-          </a>
-          .
+            ? // Write-back is turned down: the family still has to be built,
+              // and the backend is the only place that can do it.
+              `${label} has no adult in this household yet, so there is nobody to put a number on.`
+            : `Parent contact is kept in ${label}.`}{' '}
+          {backend === 'pco' && student.pcoPersonId ? (
+            // Only Planning Center has a product page to link to.
+            <>
+              <a
+                href={pcoPersonUrl(student.pcoPersonId)}
+                target="_blank"
+                rel="noreferrer"
+                className="font-semibold text-brand-300 underline"
+              >
+                Add it there
+              </a>
+              .
+            </>
+          ) : (
+            'Add it there.'
+          )}
         </p>
       </>
     );
@@ -128,10 +145,10 @@ export function AddParentContact({
   if (!open) {
     return (
       <>
-        {MISSING}
+        <Missing label={label} />
         {creatable ? (
           <p className="mt-1 text-xs text-ink-500">
-            Planning Center has no adult in this household yet. Tally can add one.
+            {label} has no adult in this household yet. Tally can add one.
           </p>
         ) : null}
         <Button variant="secondary" size="sm" className="mt-2" onClick={() => setOpen(true)}>
@@ -215,7 +232,7 @@ function ContactForm({
       // meant for the person reading it.
       setProblem(response.data.message);
     } catch {
-      setProblem('Could not reach Planning Center to add this. Try again in a moment.');
+      setProblem(`Could not reach ${backendLabelOf(student)} to add this. Try again in a moment.`);
     } finally {
       setBusy(false);
     }
@@ -224,8 +241,8 @@ function ContactForm({
   return (
     <form onSubmit={(event) => void submit(event)} className="mt-2 flex flex-col gap-3">
       <p className="text-xs text-ink-500">
-        Saved onto {details?.parentName ?? `${name}'s parent`} in Planning Center. Either field is
-        enough.
+        Saved onto {details?.parentName ?? `${name}'s parent`} in {backendLabelOf(student)}. Either
+        field is enough.
       </p>
 
       <PhoneField
@@ -249,7 +266,7 @@ function ContactForm({
 
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" loading={busy} disabled={!valid}>
-          Save to Planning Center
+          Save to {backendLabelOf(student)}
         </Button>
         <Button
           type="button"
@@ -346,7 +363,7 @@ function ParentForm({
 
       setProblem(response.data.message);
     } catch {
-      setProblem('Could not reach Planning Center to add this. Try again in a moment.');
+      setProblem(`Could not reach ${backendLabelOf(student)} to add this. Try again in a moment.`);
     } finally {
       setBusy(false);
       setPending(null);
@@ -404,7 +421,7 @@ function ParentForm({
                     </span>
                     <span className="block truncate text-xs text-ink-500">
                       {candidate.reachable
-                        ? 'Has contact details in Planning Center'
+                        ? `Has contact details in ${backendLabelOf(student)}`
                         : 'No contact details on file yet'}
                     </span>
                   </span>
@@ -511,9 +528,9 @@ function ParentForm({
       className="mt-2 flex flex-col gap-3"
     >
       <p className="text-xs text-ink-500">
-        Added to Planning Center as an adult in {student.firstName}&rsquo;s household, and the
-        household itself if there is not one yet. A phone number or email is optional now and can be
-        added later.
+        Added to {backendLabelOf(student)} as an adult in {student.firstName}&rsquo;s household, and
+        the household itself if there is not one yet. A phone number or email is optional now and
+        can be added later.
       </p>
 
       <div className="grid grid-cols-2 gap-3">
@@ -555,7 +572,7 @@ function ParentForm({
 
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" loading={busy} disabled={!valid}>
-          Save to Planning Center
+          Save to {backendLabelOf(student)}
         </Button>
         <Button
           type="button"

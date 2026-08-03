@@ -32,6 +32,7 @@
     "verify:seed": "tsx scripts/verify-seed.ts",
     "dev:emulated": "npm run functions:build && concurrently -k -n emulators,vite -c magenta,cyan \"firebase emulators:start --project demo-tally\" \"vite --mode emulated\"",
     "pco-sim": "tsx tools/pco-simulator/src/server.ts",
+    "a32-sim": "tsx tools/a32-simulator/src/server.ts",
     "e2e": "playwright test",
     "e2e:chromium": "playwright test --project=chromium-desktop --project=chromium-mobile",
     "e2e:install": "playwright install --with-deps chromium webkit",

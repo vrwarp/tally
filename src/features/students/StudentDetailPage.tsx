@@ -70,7 +70,13 @@ import {
   removeRosterMember,
 } from '@/services/functions';
 import { setStudentStatus } from '@/services/students';
-import { studentFullName, type Student, type TallyEvent } from '@/types';
+import {
+  backendLabelOf,
+  backendOfStudent,
+  studentFullName,
+  type Student,
+  type TallyEvent,
+} from '@/types';
 
 /** The group one-off events go in. Not a `chainKey`, and cannot collide with one. */
 const ONE_OFF_GROUP = 'one-off';
@@ -266,7 +272,7 @@ export function StudentDetailPage() {
             title={rosterError ? 'This student cannot be read right now.' : 'No student with that link.'}
             description={
               rosterError
-                ? 'Their name and grade come from Planning Center, which Tally cannot reach.'
+                ? 'Their name and grade come from the connected directory, which Tally cannot reach.'
                 : 'They may have been removed, or the link is stale.'
             }
             action={
@@ -285,6 +291,8 @@ export function StudentDetailPage() {
 
   const name = studentFullName(student);
   const grade = gradeLabel(student);
+  const backend = backendOfStudent(student);
+  const backendName = backendLabelOf(student);
   const phone = details?.parentPhone?.trim() ?? '';
   const email = details?.parentEmail?.trim() ?? '';
   const parentLabel = details?.parentName?.trim() || `${name}'s parent`;
@@ -301,14 +309,14 @@ export function StudentDetailPage() {
   const unreachable = details ? !phone && !email : student.profileComplete === false;
 
   /*
-   * The linked Planning Center record is known dead: the server flagged the
+   * The linked upstream record is known dead: the server flagged the
    * membership (which also froze check-ins at the rules), or this screen's own
    * read settled on "no such person". Either signal alone is enough — the
    * flag survives while this page is offline, and the read catches a deletion
    * the roster has not swept yet.
    */
   const recordGone = Boolean(
-    student.pcoPersonId &&
+    backend !== null &&
       (student.pcoRecordMissing === true || (detailsLoaded && !details && !detailsError)),
   );
 
@@ -338,7 +346,7 @@ export function StudentDetailPage() {
       refreshDetails();
       if (continueAs && continueAs !== student.id) navigate(`/students/${continueAs}`);
     } catch (cause) {
-      show(cause instanceof Error ? cause.message : 'Could not re-create them in Planning Center.', {
+      show(cause instanceof Error ? cause.message : `Could not re-create them in ${backendName}.`, {
         tone: 'error',
       });
     } finally {
@@ -362,11 +370,12 @@ export function StudentDetailPage() {
   const toggleStatus = async () => {
     if (!user || statusBusy) return;
     const next = student.status === 'active' ? 'inactive' : 'active';
+    const upstreamPersonId = student.upstreamPersonId ?? student.pcoPersonId;
     setStatusBusy(true);
     try {
-      if (student.pcoPersonId) {
+      if (backend !== null && upstreamPersonId) {
         if (next === 'inactive') await removeRosterMember({ studentId: student.id });
-        else await addRosterMember({ pcoPersonId: student.pcoPersonId });
+        else await addRosterMember({ pcoPersonId: upstreamPersonId, backendId: backend });
         await refreshRoster(true);
       } else {
         await setStudentStatus(student.id, next, user.uid);
@@ -378,12 +387,12 @@ export function StudentDetailPage() {
       /*
        * Somebody taken off the roster has no screen left to be on.
        *
-       * Their name lives in Planning Center and is only read for people the
-       * roster asked about, so once they are off it there is nothing to render
+       * Their name lives upstream and is only read for people the roster
+       * asked about, so once they are off it there is nothing to render
        * here — the alternative is a detail page with a blank name on it. The
        * list is where they were, so that is where this goes.
        */
-      if (next === 'inactive' && student.pcoPersonId) navigate('/students');
+      if (next === 'inactive' && backend !== null) navigate('/students');
     } catch {
       show(`Could not change ${name}'s status.`, { tone: 'error' });
     } finally {
@@ -399,7 +408,7 @@ export function StudentDetailPage() {
       show(result.data.message, { tone: result.data.status === 'skipped' ? 'info' : 'success' });
     } catch (cause) {
       const message =
-        cause instanceof Error ? cause.message : 'Planning Center did not accept the push.';
+        cause instanceof Error ? cause.message : `${backendName} did not accept the push.`;
       setPush({ state: 'error', message });
       show(message, { tone: 'error' });
     }
@@ -431,15 +440,15 @@ export function StudentDetailPage() {
             A row in a list can only afford "No grade", which reads as an
             omission somebody ought to fix in Tally. Here the sentence can name
             where the answer would have to come from, because for a person whose
-            grade is not on file this is always a Planning Center record — a
-            grade typed into Tally is a grade Tally has.
+            grade is not on file this is always an upstream record — a grade
+            typed into Tally is a grade Tally has.
           */}
           <p className="mt-0.5 text-sm text-ink-500">
-            {grade ? `${grade} grade` : 'No grade in Planning Center'}
+            {grade ? `${grade} grade` : `No grade in ${backendName}`}
           </p>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {student.isVisitor ? <Badge tone="brand">Visitor</Badge> : null}
-            {recordGone ? <Badge tone="danger">Planning Center record missing</Badge> : null}
+            {recordGone ? <Badge tone="danger">{backendName} record missing</Badge> : null}
             {unreachable && !recordGone ? <Badge tone="warn">Missing parent contact</Badge> : null}
             {student.status === 'inactive' ? <Badge tone="neutral">Inactive</Badge> : null}
             {student.hasAllergies ? <Badge tone="warn">Allergies</Badge> : null}
@@ -457,8 +466,8 @@ export function StudentDetailPage() {
           {student.status === 'active' ? 'Remove from roster' : 'Add back to roster'}
         </Button>
         <span className="text-xs text-ink-500">
-          {student.pcoPersonId
-            ? 'Removing them here leaves their Planning Center record alone, and keeps every night they attended.'
+          {backend !== null
+            ? `Removing them here leaves their ${backendName} record alone, and keeps every night they attended.`
             : 'Keeps every night they attended; they just stop appearing at the door.'}
         </span>
       </div>
@@ -472,16 +481,16 @@ export function StudentDetailPage() {
             </h3>
             {recordGone ? (
               <p className="mt-1 text-sm text-warn-400">
-                Planning Center no longer has a record for {name} — deleted or merged there.
+                {backendName} no longer has a record for {name} — deleted or merged there.
                 Parent contact lives on that record, so there is nothing to show until it is
                 sorted out below.
               </p>
             ) : detailsError ? (
-              // A Planning Center outage must not read as "this family has no
-              // phone number" — those look identical and mean opposite things.
+              // A backend outage must not read as "this family has no phone
+              // number" — those look identical and mean opposite things.
               <p className="mt-1 text-sm text-danger-400">{detailsError}</p>
             ) : detailsLoading ? (
-              <p className="mt-1 text-sm text-ink-500">Looking this up in Planning Center…</p>
+              <p className="mt-1 text-sm text-ink-500">Looking this up in {backendName}…</p>
             ) : phone || email ? (
               <>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -531,7 +540,7 @@ export function StudentDetailPage() {
                 Allergies
               </p>
               <p className="mt-0.5 text-sm text-ink-100">
-                {details?.allergies ?? (detailsLoading ? 'Loading…' : 'Recorded in Planning Center.')}
+                {details?.allergies ?? (detailsLoading ? 'Loading…' : `Recorded in ${backendName}.`)}
               </p>
             </div>
           ) : null}
@@ -588,12 +597,12 @@ export function StudentDetailPage() {
 
           <div className="border-t border-ink-800 pt-3">
             <h3 className="text-xs font-medium uppercase tracking-wide text-ink-400">
-              Planning Center
+              {backendName}
             </h3>
             {recordGone ? (
               <div className="mt-1 flex flex-col gap-2 rounded-xl bg-warn-500/10 px-3 py-2 ring-1 ring-warn-500/25">
                 <p className="text-sm text-warn-300">
-                  Planning Center no longer has a record for {name} — deleted or merged there.
+                  {backendName} no longer has a record for {name} — deleted or merged there.
                   Check-ins are frozen, past nights included, until this is sorted out: take
                   them off the roster, or put a record back.
                 </p>
@@ -633,7 +642,7 @@ export function StudentDetailPage() {
                       (!recreateForm.firstName.trim() || !recreateForm.lastName.trim())
                     }
                   >
-                    Re-create in Planning Center
+                    Re-create in {backendName}
                   </Button>
                   <span className="text-xs text-ink-500">
                     If they were merged into another record, this relinks instead of creating a
@@ -641,26 +650,32 @@ export function StudentDetailPage() {
                   </span>
                 </div>
               </div>
-            ) : student.pcoPersonId ? (
+            ) : backend !== null ? (
               <p className="mt-1 text-sm text-ink-300">
-                {/* Not "synced": nothing was copied. This screen read Planning
-                    Center a moment ago and is showing what it said. */}
-                Read from Planning Center.{' '}
-                <a
-                  href={pcoPersonUrl(student.pcoPersonId)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-semibold text-brand-300 underline"
-                >
-                  Open their profile
-                </a>
+                {/* Not "synced": nothing was copied. This screen read the
+                    backend a moment ago and is showing what it said. */}
+                Read from {backendName}.
+                {backend === 'pco' && student.pcoPersonId ? (
+                  // Only Planning Center has a product page to link out to.
+                  <>
+                    {' '}
+                    <a
+                      href={pcoPersonUrl(student.pcoPersonId)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-semibold text-brand-300 underline"
+                    >
+                      Open their profile
+                    </a>
+                  </>
+                ) : null}
               </p>
             ) : (
               <div className="mt-1 flex flex-col gap-2">
                 <p className="text-sm text-ink-300">
                   {student.pcoPushPending
-                    ? 'Created in Tally. Waiting to be pushed to Planning Center — the scheduled sync will do it, or you can send them now.'
-                    : 'Created in Tally and not linked to a Planning Center person.'}
+                    ? `Created in Tally. Waiting to be pushed to ${backendName} — send them now, or the next push retry will.`
+                    : `Created in Tally and not linked to a ${backendName} person.`}
                 </p>
                 {student.pcoPushPending ? (
                   <div className="flex flex-wrap items-center gap-2">
@@ -670,7 +685,7 @@ export function StudentDetailPage() {
                       loading={push.state === 'busy'}
                       disabled={push.state === 'done'}
                     >
-                      {push.state === 'done' ? 'Pushed' : 'Push to Planning Center'}
+                      {push.state === 'done' ? 'Pushed' : `Push to ${backendName}`}
                     </Button>
                     <span
                       role="status"

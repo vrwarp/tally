@@ -669,6 +669,44 @@ export interface CheckInsImportSummary {
   warnings: string[];
 }
 
+/**
+ * What stamps an import as coming from a particular upstream — the actor on
+ * every written row, the provenance fields on event documents, and the
+ * linkage fields on student documents. Parameterized so the Attendees
+ * backend's history import can reuse this writer verbatim; the default is
+ * this module's own Planning Center stamping, bit-for-bit.
+ */
+export interface ImportProvenance {
+  /** `createdBy`/`checkedInBy` on written rows, and what a re-import may overwrite. */
+  actor: string;
+  /** Provenance fields on each event document. */
+  eventFields(event: PlannedEvent): Record<string, unknown>;
+  /** Linkage fields on a student document the import creates. */
+  studentFields(student: PlannedStudent): Record<string, unknown>;
+  /** Linkage patch for an existing document that carries none. */
+  studentLinkPatch(student: PlannedStudent, data: Record<string, unknown>): Record<string, unknown>;
+}
+
+function pcoProvenance(pcoEventId: string): ImportProvenance {
+  return {
+    actor: IMPORT_ACTOR,
+    eventFields: (event) => ({
+      // Provenance: which upstream record this night is. What a re-import and
+      // a person reading the console both need.
+      pcoCheckInsEventId: pcoEventId,
+      pcoCheckInsPeriodId: event.pcoPeriodId,
+    }),
+    studentFields: (student) => ({ pcoPersonId: student.personId }),
+    studentLinkPatch: (student, data) =>
+      // A document a live check-in created carries dates and no linkage; the
+      // id itself is the claim, so restating it server-side is safe and makes
+      // the row a full member of the sync.
+      typeof data.pcoPersonId !== 'string' || data.pcoPersonId.length === 0
+        ? { pcoPersonId: student.personId }
+        : {},
+  };
+}
+
 /** Admin batches cap at 500 operations; headroom keeps the arithmetic honest. */
 const MAX_BATCH_OPS = 450;
 
@@ -700,7 +738,7 @@ class BatchWriter {
 function eventPayload(
   plan: ImportPlan,
   event: PlannedEvent,
-  pcoEventId: string,
+  provenance: ImportProvenance,
   now: Date,
 ): Record<string, unknown> {
   return {
@@ -723,11 +761,8 @@ function eventPayload(
     status: 'scheduled',
     createdAt: now,
     updatedAt: now,
-    createdBy: IMPORT_ACTOR,
-    // Provenance: which upstream record this night is. What a re-import and a
-    // person reading the console both need.
-    pcoCheckInsEventId: pcoEventId,
-    pcoCheckInsPeriodId: event.pcoPeriodId,
+    createdBy: provenance.actor,
+    ...provenance.eventFields(event),
   };
 }
 
@@ -739,12 +774,16 @@ function eventPayload(
 export async function executeImport(args: {
   db: FirestoreLike;
   plan: ImportPlan;
+  /** The upstream event's own id — a Check-Ins event id, an Attendees meet slug. */
   pcoEventId: string;
   uid: string;
   now: Date;
   logger: FunctionLogger;
+  /** Defaults to Planning Center's own stamping. */
+  provenance?: ImportProvenance;
 }): Promise<CheckInsImportSummary> {
   const { db, plan, pcoEventId, uid, now, logger } = args;
+  const provenance = args.provenance ?? pcoProvenance(pcoEventId);
   const writer = new BatchWriter(db);
 
   /* ---- events ------------------------------------------------------------ */
@@ -759,7 +798,7 @@ export async function executeImport(args: {
       eventsExisting += 1;
       continue;
     }
-    writer.set(`events/${event.id}`, eventPayload(plan, event, pcoEventId, now));
+    writer.set(`events/${event.id}`, eventPayload(plan, event, provenance, now));
     eventsCreated += 1;
   }
 
@@ -776,7 +815,7 @@ export async function executeImport(args: {
 
     if (!snapshot.exists) {
       writer.set(path, {
-        pcoPersonId: student.personId,
+        ...provenance.studentFields(student),
         status: 'active',
         // Their earliest attended gathering, not the moment of import: the
         // dashboard reads this to decide which past nights they could have
@@ -787,7 +826,7 @@ export async function executeImport(args: {
         lastAttendedAt: student.lastAttendedAt,
         addedToRosterAt: now,
         addedToRosterBy: uid,
-        createdBy: IMPORT_ACTOR,
+        createdBy: provenance.actor,
       });
       studentsAdded += 1;
       effectiveFirst.set(student.studentId, student.firstAttendedAt.getTime());
@@ -798,12 +837,7 @@ export async function executeImport(args: {
     const data = snapshot.data() ?? {};
     const patch: Record<string, unknown> = {};
 
-    // A document a live check-in created carries dates and no linkage; the id
-    // itself is the claim, so restating it server-side is safe and makes the
-    // row a full member of the sync.
-    if (typeof data.pcoPersonId !== 'string' || data.pcoPersonId.length === 0) {
-      patch.pcoPersonId = student.personId;
-    }
+    Object.assign(patch, provenance.studentLinkPatch(student, data));
 
     /*
      * `firstAttendedAt` never moves *later*, which is not the same rule as
@@ -878,7 +912,7 @@ export async function executeImport(args: {
 
     for (const row of rows) {
       const held = byStudent.get(row.studentId);
-      if (held && held.checkedInBy !== IMPORT_ACTOR) {
+      if (held && held.checkedInBy !== provenance.actor) {
         // A counselor checked this student in through Tally itself — on an
         // imported night that can happen the moment a chain goes live. Their
         // record is the app's own and outranks the kiosk's.
@@ -903,7 +937,7 @@ export async function executeImport(args: {
         eventId: eventDocId,
         seriesId: null,
         checkedInAt: row.checkedInAt,
-        checkedInBy: IMPORT_ACTOR,
+        checkedInBy: provenance.actor,
         method: IMPORT_METHOD,
         isFirstEver,
       });

@@ -98,6 +98,10 @@ export const PATHS = {
    * under the security rules.
    */
   pcoConfig: 'config/planningCenter',
+  /** The Attendees (attendees32) counterpart, same ownership and posture. */
+  a32Config: 'config/attendees32',
+  /** Cross-backend settings: which backend receives students Tally creates. */
+  backendsConfig: 'config/backends',
 } as const;
 
 /** Accepts an admin `Timestamp`, a `Date` or epoch millis — whatever a test double stored. */

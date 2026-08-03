@@ -13,6 +13,15 @@
  * types are written against the browser SDK's `Timestamp`.
  */
 import {
+  buildSearchName,
+  clampGrade,
+  compareIds,
+  composeFirstName,
+  firstNonEmpty,
+  trimmed,
+  type GradeRange,
+} from '../backends/mappingShared.js';
+import {
   HOUSEHOLD_ADULT_ROLES,
   PCO_TYPES,
   type JsonApiIdentifier,
@@ -24,6 +33,24 @@ import {
   type PcoPersonAttributes,
   type PcoPhoneNumber,
 } from './types.js';
+
+/**
+ * The backend-independent halves of this mapping moved to
+ * ../backends/mappingShared.ts when the Attendees backend arrived — the same
+ * names, the same behavior, one copy. Re-exported here because this module is
+ * where the Planning Center flows (and their tests) have always found them.
+ */
+export {
+  buildSearchName,
+  clampGrade,
+  compareIds,
+  composeFirstName,
+  computeProfileComplete,
+  emailKey,
+  nameGradeKey,
+  splitFirstName,
+  type GradeRange,
+} from '../backends/mappingShared.js';
 
 /* -------------------------------------------------------------------------- */
 /* Tally-side shapes                                                           */
@@ -74,11 +101,6 @@ export interface ParentCandidate {
   name: string | null;
 }
 
-export interface GradeRange {
-  minGrade: number;
-  maxGrade: number;
-}
-
 export interface StudentMappingContext extends GradeRange {
   /**
    * Anchor for deriving a grade from `graduation_year`. Omit it and a person
@@ -86,88 +108,6 @@ export interface StudentMappingContext extends GradeRange {
    * would be worse than admitting we do not know.
    */
   now?: Date;
-}
-
-/* -------------------------------------------------------------------------- */
-/* Small helpers, mirrored from src/types                                      */
-/* -------------------------------------------------------------------------- */
-
-function trimmed(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const result = value.trim();
-  return result.length > 0 ? result : null;
-}
-
-/** First non-empty string in the list, already trimmed. */
-function firstNonEmpty(...values: unknown[]): string | null {
-  for (const value of values) {
-    const result = trimmed(value);
-    if (result !== null) return result;
-  }
-  return null;
-}
-
-/** Must stay identical to `buildSearchName` in src/types/index.ts. */
-export function buildSearchName(firstName: string, lastName: string): string {
-  return `${firstName} ${lastName}`.trim().toLowerCase().replace(/\s+/g, ' ');
-}
-
-/* -------------------------------------------------------------------------- */
-/* Names                                                                       */
-/* -------------------------------------------------------------------------- */
-
-/**
- * Planning Center writes a person with both a first name and a nickname as
- * `Benson “蔡秉洲” Tsai` — the nickname is an *addition* to the first name, not a
- * replacement for it. Tally used to keep only the nickname, which meant a
- * profile the church office reads as "Benson" showed up here as "蔡秉洲" and the
- * two were impossible to line up by eye.
- *
- * Matching Planning Center's own format costs nothing and buys a lot: the name
- * on screen is the name on the profile page, and because `searchName` is built
- * from it, either spelling finds the student.
- */
-const NICKNAME_OPEN = '“';
-const NICKNAME_CLOSE = '”';
-
-/**
- * The two halves, joined. A nickname equal to the first name is dropped rather
- * than repeated — `Ben “Ben”` is noise.
- *
- * Must stay identical to `composeFirstName` in src/types/index.ts.
- */
-export function composeFirstName(firstName: unknown, nickname: unknown): string {
-  const legal = trimmed(firstName);
-  const nick = trimmed(nickname);
-
-  if (nick === null) return legal ?? '';
-  if (legal === null) return nick;
-  // The first name is the canonical spelling of the two.
-  if (legal.toLowerCase() === nick.toLowerCase()) return legal;
-  return `${legal} ${NICKNAME_OPEN}${nick}${NICKNAME_CLOSE}`;
-}
-
-/**
- * The composite pulled apart again.
- *
- * Planning Center stores the halves in separate fields, so pushing the whole
- * string into `first_name` would render as `Benson “蔡秉洲” “蔡秉洲” Tsai` on the
- * next read — and a moment later as a duplicate person, because the matcher
- * would stop recognising them. Anything without the quoted section comes back
- * unchanged, which covers every hand-typed visitor name.
- *
- * Must stay identical to `splitFirstName` in src/types/index.ts.
- */
-export function splitFirstName(value: string): { firstName: string; nickname: string | null } {
-  const match = /^(.*?)\s*[“"]([^”"]*)[”"]\s*$/.exec(value.trim());
-  if (!match) return { firstName: value.trim(), nickname: null };
-
-  const legal = match[1]?.trim() ?? '';
-  const nickname = match[2]?.trim() ?? '';
-  if (nickname.length === 0) return { firstName: legal, nickname: null };
-  // `“Benji”` with nothing in front of it is just a name in quotes.
-  if (legal.length === 0) return { firstName: nickname, nickname: null };
-  return { firstName: legal, nickname };
 }
 
 /**
@@ -181,52 +121,6 @@ export function displayFirstName(attributes: PcoPersonAttributes): string {
     firstNonEmpty(attributes.first_name, attributes.given_name),
     attributes.nickname,
   );
-}
-
-/** Must stay identical to `emailKey` in src/types/index.ts. */
-export function emailKey(email: string): string {
-  return email.trim().toLowerCase().replace(/\./g, ',');
-}
-
-/** Must stay identical to `computeProfileComplete` in src/types/index.ts. */
-export function computeProfileComplete(input: {
-  parentPhone?: string | null;
-  parentEmail?: string | null;
-}): boolean {
-  return Boolean(input.parentPhone?.trim() || input.parentEmail?.trim());
-}
-
-/**
- * Identity key for collapsing a quick-added visitor onto the Planning Center
- * person the church office typed in later. Accents and punctuation are dropped
- * because a counselor thumb-typing "Jose" at the door and the office entering
- * "José" are the same child.
- */
-export function nameGradeKey(firstName: string, lastName: string, grade: number): string {
-  const normalise = (value: string): string => {
-    const folded = value
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase();
-    const latin = folded.replace(/[^a-z0-9]+/g, ' ').trim();
-    // A name with no Latin letters at all \u2014 \u8521\u79c9\u6d32 \u2014 would otherwise normalise to
-    // the empty string, and every such child in a grade would share one key and
-    // be merged into whichever came first. Keep the characters instead.
-    return latin.length > 0 ? latin : folded.replace(/\s+/g, ' ').trim();
-  };
-  return `${normalise(firstName)}|${normalise(lastName)}|${grade}`;
-}
-
-/**
- * Deterministic ordering for Planning Center ids. Numeric where possible so
- * "9" sorts before "10", falling back to string order for anything else. The
- * point is only that repeated syncs pick the same record every time.
- */
-export function compareIds(a: string, b: string): number {
-  const left = Number(a);
-  const right = Number(b);
-  if (Number.isFinite(left) && Number.isFinite(right) && left !== right) return left - right;
-  return a < b ? -1 : a > b ? 1 : 0;
 }
 
 function toIdentifierArray(data: JsonApiIdentifier | JsonApiIdentifier[] | null | undefined) {
@@ -423,7 +317,7 @@ export function mapPersonToStudent(person: PcoPerson, ctx: StudentMappingContext
   return {
     firstName,
     lastName,
-    grade: Math.min(ctx.maxGrade, Math.max(ctx.minGrade, grade ?? ctx.minGrade)),
+    grade: clampGrade(grade, ctx).grade,
     allergies: trimmed(attributes.medical_notes),
     birthday: birthdayOf(person),
     status: normaliseStatus(person),

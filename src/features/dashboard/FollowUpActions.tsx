@@ -14,7 +14,7 @@ import { usePersonDetails } from '@/hooks/usePersonDetails';
 import { cn, formatPhone } from '@/lib/utils';
 import { AddParentContactButton } from '@/features/dashboard/AddParentContactButton';
 import { buildContactList } from '@/features/dashboard/contactList';
-import { studentFullName, type Student } from '@/types';
+import { backendLabelOf, studentFullName, type Student } from '@/types';
 
 /** `tel:`/`sms:` want a dialable string, not "(555) 010-0100". */
 function dialable(phone: string): string {
@@ -88,6 +88,7 @@ export function FollowUpActions({ student, className, onContactAdded }: FollowUp
   const { details, error, loaded, unavailable, retry, refresh } = usePersonDetails(student);
 
   const name = studentFullName(student);
+  const label = backendLabelOf(student);
   const phone = details?.parentPhone?.trim() ?? '';
   const email = details?.parentEmail?.trim() ?? '';
   const parent = details?.parentName?.trim() || `${name}'s parent`;
@@ -97,7 +98,7 @@ export function FollowUpActions({ student, className, onContactAdded }: FollowUp
   if (unavailable) {
     body = (
       <p className="text-xs text-warn-400">
-        Not in Planning Center yet, so there is nobody to call. Add them there to follow up.
+        Not in {label} yet, so there is nobody to call. Add them there to follow up.
       </p>
     );
   } else if (error) {
@@ -124,8 +125,8 @@ export function FollowUpActions({ student, className, onContactAdded }: FollowUp
     // fixed in a different place.
     body = (
       <p className="text-xs text-warn-400">
-        Planning Center no longer has a record for {name} — deleted or merged there. Nobody can
-        follow up until that is sorted out.
+        {label} no longer has a record for {name} — deleted or merged there. Nobody can follow up
+        until that is sorted out.
       </p>
     );
   } else if (!phone && !email) {
@@ -140,7 +141,7 @@ export function FollowUpActions({ student, className, onContactAdded }: FollowUp
      */
     body = (
       <div className="flex flex-col items-start gap-1.5">
-        <p className="text-xs text-warn-400">Planning Center has no parent contact for {name}.</p>
+        <p className="text-xs text-warn-400">{label} has no parent contact for {name}.</p>
         <AddParentContactButton
           student={student}
           onAdded={() => {

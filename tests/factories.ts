@@ -54,6 +54,15 @@ export function makeStudent(overrides: Partial<Student> = {}): Student {
     // Optional on `Student`: present on roster-sourced rows, absent on
     // documents. Only carried through when a test says so.
     ...(overrides.gradeOnFile === undefined ? {} : { gradeOnFile: overrides.gradeOnFile }),
+    ...(overrides.upstreamBackend === undefined
+      ? {}
+      : { upstreamBackend: overrides.upstreamBackend }),
+    ...(overrides.upstreamPersonId === undefined
+      ? {}
+      : { upstreamPersonId: overrides.upstreamPersonId }),
+    ...(overrides.pcoRecordMissing === undefined
+      ? {}
+      : { pcoRecordMissing: overrides.pcoRecordMissing }),
     searchName: pick(overrides, 'searchName', buildSearchName(firstName, lastName)),
     firstAttendedAt: pick(overrides, 'firstAttendedAt', null),
     lastAttendedAt: pick(overrides, 'lastAttendedAt', null),

@@ -16,9 +16,11 @@
  *   name, a grade or a parent's phone number — that is the entire point, and it
  *   is worth keeping true.
  */
+import { pcoStudentId } from '../generated/backendIds.js';
 import type { PcoConfig } from '../config.js';
 import type { PcoClient } from './client.js';
 import { cacheKey, type TtlCache } from './cache.js';
+import { a32AliasesFromIncluded, resolveA32UuidFieldId } from './fieldData.js';
 import { followPersonLink, isPersonGoneError } from './personLink.js';
 import {
   addToIncludedIndex,
@@ -35,6 +37,7 @@ import {
 import {
   PCO_TYPES,
   type JsonApiIdentifier,
+  type JsonApiResource,
   type PcoHouseholdMembership,
   type PcoPerson,
 } from './types.js';
@@ -47,15 +50,10 @@ import {
  * The Planning Center id, in the form Tally uses as a student id everywhere
  * else. Prefixed so it can never collide with the id of a visitor Tally created
  * itself, and so a bare Planning Center id is never mistaken for a Tally one.
+ * The scheme itself lives in the shared module — both packages must agree on
+ * these prefixes, so there is exactly one copy to agree with.
  */
-export function pcoStudentId(personId: string): string {
-  return `pco_${personId}`;
-}
-
-/** Inverse of `pcoStudentId`, or null for a Tally-owned id. */
-export function personIdFromStudentId(studentId: string): string | null {
-  return studentId.startsWith('pco_') ? studentId.slice(4) : null;
-}
+export { pcoStudentId, personIdFromStudentId } from '../generated/backendIds.js';
 
 /**
  * What a counselor standing at a door needs, and nothing else.
@@ -66,7 +64,13 @@ export function personIdFromStudentId(studentId: string): string | null {
  */
 export interface RosterPerson {
   id: string;
+  /**
+   * The backend's own id for this person — named for the first backend Tally
+   * had, kept because the field is on the wire and in every roster cache.
+   */
   pcoPersonId: string;
+  /** Which backend `pcoPersonId` belongs to. */
+  backendId: 'pco' | 'a32';
   firstName: string;
   lastName: string;
   grade: number;
@@ -167,6 +171,14 @@ export interface RosterResult {
   /** True when the answer came from cache rather than from Planning Center. */
   cached: boolean;
   fetchedAt: string;
+  /**
+   * Person id -> the same person's Attendees UUID, for everyone hydrated whose
+   * record carries the church's `attendees_uuid` custom field. Server-internal:
+   * the roster callable strips it before answering, and only the cross-backend
+   * dedup reads it. Absent for backends that hold no pointers (Attendees) and
+   * for orgs without the field. See ./fieldData.ts.
+   */
+  a32Aliases?: Record<string, string>;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -237,6 +249,13 @@ export interface RosterHydration {
    * `fetchParentContactStatus` is the one thing that reads it.
    */
   households: Record<string, string[]>;
+  /**
+   * Person id -> Attendees UUID, from the `attendees_uuid` custom field, for
+   * the people hydrated here. Same free ride as `households` — the read
+   * side-loads `field_data` once the org is known to keep the field — and the
+   * same boundary: server-internal, never on a roster row.
+   */
+  a32Aliases: Record<string, string>;
 }
 
 /**
@@ -263,6 +282,7 @@ export function rosterPersonFrom(
   return {
     id: pcoStudentId(person.id),
     pcoPersonId: person.id,
+    backendId: 'pco',
     firstName: mapped.firstName,
     lastName: mapped.lastName,
     grade: mapped.grade,
@@ -297,20 +317,33 @@ async function hydratePeople(
   config: PcoConfig,
   personIds: readonly string[],
   now: Date,
+  a32FieldId: string | null,
 ): Promise<RosterHydration> {
   const wanted = new Set(personIds);
-  if (wanted.size === 0) return { people: [], unresolved: [], households: {}, relinks: [], missing: [] };
+  if (wanted.size === 0) {
+    return { people: [], unresolved: [], households: {}, relinks: [], missing: [], a32Aliases: {} };
+  }
+
+  // Only once the org is known to keep the field: an include the server does
+  // not recognise is a risk with nothing behind it.
+  const includes = a32FieldId ? [...ROSTER_INCLUDES, 'field_data'] : [...ROSTER_INCLUDES];
+  const rawAliases: Record<string, string> = {};
+  const collectAliases = (included: readonly JsonApiResource[] | undefined) => {
+    if (!a32FieldId || !included) return;
+    Object.assign(rawAliases, a32AliasesFromIncluded(included, a32FieldId));
+  };
 
   const found = new Map<string, PcoPerson>();
 
   for await (const page of client.paginate<PcoPerson>('/people', {
-    include: [...ROSTER_INCLUDES],
+    include: includes,
     order: 'last_name',
     where: { child: true },
   })) {
     for (const person of page.data) {
       if (wanted.has(person.id)) found.set(person.id, person);
     }
+    collectAliases(page.included);
     // Nothing left to look for. The rest of the church is not our business.
     if (found.size === wanted.size) break;
   }
@@ -323,9 +356,10 @@ async function hydratePeople(
   for (const personId of stragglers.slice(0, MAX_INDIVIDUAL_LOOKUPS)) {
     try {
       const body = await client.get<PcoPerson>(`/people/${encodeURIComponent(personId)}`, {
-        include: [...ROSTER_INCLUDES],
+        include: includes,
       });
       const person = Array.isArray(body.data) ? body.data[0] : body.data;
+      collectAliases(body.included);
       if (person) found.set(personId, person);
       else unresolved.push(personId);
     } catch (error) {
@@ -351,9 +385,10 @@ async function hydratePeople(
       try {
         const keeper = await client.get<PcoPerson>(
           `/people/${encodeURIComponent(link.personId)}`,
-          { include: [...ROSTER_INCLUDES] },
+          { include: includes },
         );
         const person = Array.isArray(keeper.data) ? keeper.data[0] : keeper.data;
+        collectAliases(keeper.included);
         if (person) {
           found.set(person.id, person);
           relinks.push({ fromPersonId: personId, toPersonId: person.id });
@@ -369,13 +404,18 @@ async function hydratePeople(
 
   const people: RosterPerson[] = [];
   const households: Record<string, string[]> = {};
+  // Only for the people this read is about: the child sweep pages past the
+  // whole congregation, and their pointers are not this roster's business.
+  const a32Aliases: Record<string, string> = {};
   for (const person of found.values()) {
     households[person.id] = householdIdsOf(person);
     people.push(rosterPersonFrom(person, config, now));
+    const alias = rawAliases[person.id];
+    if (alias) a32Aliases[person.id] = alias;
   }
 
   people.sort((a, b) => (a.searchName < b.searchName ? -1 : a.searchName > b.searchName ? 1 : 0));
-  return { people, unresolved, households, relinks, missing };
+  return { people, unresolved, households, relinks, missing, a32Aliases };
 }
 
 export interface RosterOptions {
@@ -412,6 +452,7 @@ export async function fetchRoster(
     missing: hydrated.missing,
     cached: cache.stats.misses === before,
     fetchedAt: now.toISOString(),
+    a32Aliases: hydrated.a32Aliases,
   };
 }
 
@@ -419,22 +460,35 @@ export async function fetchRoster(
  * The cached hydration behind both the roster and the parent-contact status, so
  * asking the second question a moment after the first costs nothing.
  */
-function hydratedRoster(
+async function hydratedRoster(
   options: RosterOptions & { personIds: readonly string[] },
   now: Date,
 ): Promise<RosterHydration> {
   const { client, config, cache } = options;
 
   const ids = [...new Set(options.personIds)].sort();
+  // Nobody to hydrate, nothing to ask — not even the field-definition probe.
+  const a32FieldId =
+    ids.length === 0
+      ? null
+      : await resolveA32UuidFieldId({
+          client,
+          cache,
+          baseUrl: config.baseUrl,
+          force: options.force,
+        });
   const key = cacheKey({
     kind: 'roster',
     base: config.baseUrl,
     min: config.minGrade,
     max: config.maxGrade,
+    // The field's presence changes what a hydration contains, so it changes
+    // which hydration this is.
+    fd: a32FieldId ?? '',
     ids,
   });
 
-  return cache.get(key, () => hydratePeople(client, config, ids, now), options.force);
+  return cache.get(key, () => hydratePeople(client, config, ids, now, a32FieldId), options.force);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -560,6 +614,8 @@ export async function fetchParentContactStatus(
 /** One candidate for the "add a student" flow. */
 export interface PersonSearchResult {
   pcoPersonId: string;
+  /** Which backend found them — the search fans out once two are connected. */
+  backendId: 'pco' | 'a32';
   /** Tally student id, so the caller can tell whether they are already on the roster. */
   id: string;
   firstName: string;
@@ -575,6 +631,13 @@ export interface PersonSearchResult {
   /** What Planning Center thinks: a child, or an adult. Shown, never enforced. */
   child: boolean;
   status: 'active' | 'inactive';
+  /**
+   * The same person's Attendees UUID, when this backend knows it — Planning
+   * Center's `attendees_uuid` custom field. What lets a fanned-out search
+   * show one row for a human both directories hold. Ids only, no personal
+   * data; absent for orgs without the field and for Attendees' own results.
+   */
+  a32PersonId?: string;
 }
 
 /** Enough to choose from, few enough to render as a list on a phone. */
@@ -595,6 +658,13 @@ export async function searchPeople(options: {
   query: string;
   now?: Date;
   limit?: number;
+  /**
+   * Lets the search carry each hit's Attendees identity (see
+   * `PersonSearchResult.a32PersonId`), which needs the cached field-definition
+   * probe. Optional so a caller without a cache simply searches without
+   * aliases.
+   */
+  cache?: TtlCache;
 }): Promise<PersonSearchResult[]> {
   const query = options.query.trim();
   if (!query) return [];
@@ -603,10 +673,20 @@ export async function searchPeople(options: {
   const limit = Math.max(1, Math.min(MAX_SEARCH_RESULTS, options.limit ?? MAX_SEARCH_RESULTS));
   const results: PersonSearchResult[] = [];
 
+  const a32FieldId = options.cache
+    ? await resolveA32UuidFieldId({
+        client: options.client,
+        cache: options.cache,
+        baseUrl: options.config.baseUrl,
+      })
+    : null;
+
   for await (const page of options.client.paginate<PcoPerson>('/people', {
     where: { search_name_or_email: query },
     order: 'last_name',
+    ...(a32FieldId ? { include: ['field_data'] } : {}),
   })) {
+    const aliases = a32FieldId ? a32AliasesFromIncluded(page.included, a32FieldId) : {};
     for (const person of page.data) {
       const mapped = mapPersonToStudent(person, {
         minGrade: options.config.minGrade,
@@ -615,12 +695,14 @@ export async function searchPeople(options: {
       });
       results.push({
         pcoPersonId: person.id,
+        backendId: 'pco',
         id: pcoStudentId(person.id),
         firstName: mapped.firstName,
         lastName: mapped.lastName,
         grade: pcoGrade(person, now),
         child: person.attributes?.child === true,
         status: mapped.status,
+        ...(aliases[person.id] ? { a32PersonId: aliases[person.id] } : {}),
       });
       if (results.length >= limit) return results;
     }

@@ -196,10 +196,16 @@ service cloud.firestore {
       }
 
       /**
-       * Planning Center owns the linkage. A client may declare a student as
+       * The backend owns the linkage. A client may declare a student as
        * "mine, not yet pushed" (`pcoPersonId: null`, `pcoPushPending: true`)
        * but may never assert an id — forging one would let a browser rebind a
-       * Tally student onto an arbitrary Planning Center person.
+       * Tally student onto an arbitrary person in the church's database.
+       *
+       * Two shapes of the same claim, both server-written only: `pcoPersonId`
+       * is the legacy Planning Center field and keeps meaning exactly that,
+       * while `upstreamBackend`/`upstreamPersonId` are the pair every backend
+       * writes — Planning Center writes both, so documents from before the
+       * pair existed need no migration.
        */
       function pcoLinkageUnclaimed() {
         return request.resource.data.get('pcoPersonId', null) == null;
@@ -211,13 +217,26 @@ service cloud.firestore {
         return after.get('pcoPersonId', null) == before.get('pcoPersonId', null);
       }
 
+      function upstreamLinkageUnclaimed() {
+        return request.resource.data.get('upstreamBackend', null) == null
+          && request.resource.data.get('upstreamPersonId', null) == null;
+      }
+
+      function upstreamLinkageUnchanged() {
+        let after = request.resource.data;
+        let before = resource == null ? {} : resource.data;
+        return after.get('upstreamBackend', null) == before.get('upstreamBackend', null)
+          && after.get('upstreamPersonId', null) == before.get('upstreamPersonId', null);
+      }
+
       /**
        * `pcoRecordMissing` is what freezes a student's check-ins when their
-       * Planning Center record dies, and it is set and cleared server-side
-       * from what Planning Center actually answers. A client that could flip
-       * it would be a client that can thaw a frozen student by asserting the
-       * record came back — so, like the linkage it rides on, it is not a
-       * client's to write.
+       * backend record dies — whichever backend holds them; the name predates
+       * the second one — and it is set and cleared server-side from what the
+       * backend actually answers. A client that could flip it would be a
+       * client that can thaw a frozen student by asserting the record came
+       * back — so, like the linkage it rides on, it is not a client's to
+       * write.
        */
       function pcoRecordFlagUnchanged() {
         let after = request.resource.data;
@@ -233,11 +252,13 @@ service cloud.firestore {
                     && validStudent()
                     && noMirroredPersonalData()
                     && pcoLinkageUnclaimed()
+                    && upstreamLinkageUnclaimed()
                     && request.resource.data.get('pcoRecordMissing', false) == false;
       allow update: if isCounselor()
                     && validStudent()
                     && noMirroredPersonalData()
                     && pcoLinkageUnchanged()
+                    && upstreamLinkageUnchanged()
                     && pcoRecordFlagUnchanged();
 
       // Never. Attendance documents reference students by id; deleting one
@@ -493,6 +514,68 @@ service cloud.firestore {
 
       allow get: if isCore();
       allow write: if isCore() && validPcoConfig() && (isAdmin() || baseUrlUnchanged());
+    }
+
+    /**
+     * The non-secret half of the Attendees (attendees32) configuration — the
+     * `config/planningCenter` reasoning, applied to the second backend. The
+     * DRF token is deliberately not here and never will be; the closed key
+     * set is what makes stashing it a write the database refuses.
+     */
+    match /config/attendees32 {
+      function validA32Config() {
+        let d = request.resource.data;
+        return d.keys().hasOnly([
+              'enabled', 'baseUrl', 'divisionId', 'meetSlug', 'characterSlug',
+              'assemblySlug', 'minGrade', 'maxGrade', 'writeBack',
+              'cacheTtlSeconds', 'updatedAt', 'updatedBy',
+            ])
+          && (!('enabled' in d.keys()) || d.enabled is bool)
+          && (!('divisionId' in d.keys()) || d.divisionId is string)
+          && (!('meetSlug' in d.keys()) || d.meetSlug is string)
+          && (!('characterSlug' in d.keys()) || d.characterSlug is string)
+          && (!('assemblySlug' in d.keys()) || d.assemblySlug is string)
+          && (!('writeBack' in d.keys()) || d.writeBack in ['off', 'create', 'full'])
+          && (!('minGrade' in d.keys()) || (d.minGrade is int && d.minGrade >= 6 && d.minGrade <= 12))
+          && (!('maxGrade' in d.keys()) || (d.maxGrade is int && d.maxGrade >= 6 && d.maxGrade <= 12))
+          && (!('minGrade' in d.keys()) || !('maxGrade' in d.keys()) || d.maxGrade >= d.minGrade)
+          && (!('cacheTtlSeconds' in d.keys())
+              || (d.cacheTtlSeconds is int && d.cacheTtlSeconds >= 0 && d.cacheTtlSeconds <= 300))
+          && (!('baseUrl' in d.keys())
+              || (d.baseUrl is string
+                  && (d.baseUrl == '' || d.baseUrl.matches('https?://.*'))));
+      }
+
+      /**
+       * Same reasoning as the Planning Center `baseUrl`, with a sharper edge:
+       * every Attendees request carries the integration token, so whoever
+       * sets this address chooses where that credential gets sent. Admin
+       * only.
+       */
+      function a32BaseUrlUnchanged() {
+        return resource == null
+          ? request.resource.data.get('baseUrl', '') == ''
+          : request.resource.data.get('baseUrl', '') == resource.data.get('baseUrl', '');
+      }
+
+      allow get: if isCore();
+      allow write: if isCore() && validA32Config() && (isAdmin() || a32BaseUrlUnchanged());
+    }
+
+    /**
+     * Cross-backend settings — today, only which backend receives the
+     * students Tally creates. Closed shape for the same reason as the
+     * per-backend documents.
+     */
+    match /config/backends {
+      function validBackendsConfig() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['defaultPushBackend', 'updatedAt', 'updatedBy'])
+          && (!('defaultPushBackend' in d.keys()) || d.defaultPushBackend in ['pco', 'a32']);
+      }
+
+      allow get: if isCore();
+      allow write: if isCore() && validBackendsConfig();
     }
 
     /*

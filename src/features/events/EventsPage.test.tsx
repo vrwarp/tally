@@ -83,6 +83,7 @@ function show(events: readonly TallyEvent[]) {
     rosterError: null,
     rosterOffline: false,
     rosterFetchedAt: null,
+    rosterBackends: [],
     refreshRoster: async () => {},
     applyRosterPerson: () => {},
   };

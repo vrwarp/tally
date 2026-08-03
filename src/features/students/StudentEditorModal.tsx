@@ -49,6 +49,8 @@ import { createStudent, updateStudent, type StudentDraft } from '@/services/stud
 import {
   GRADES,
   PCO_MANAGED_STUDENT_FIELDS,
+  backendLabelOf,
+  backendOfStudent,
   composeFirstName,
   splitFirstName,
   studentFullName,
@@ -188,7 +190,7 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
    * The birthday is seeded twice for the same reason, and the second time is
    * the interesting one. The form opens on the roster's day — no year, because
    * a roster has none — and the details read arrives with the whole date. Left
-   * unseeded, the box would show `03 / 14 /` on a student Planning Center holds
+   * unseeded, the box would show `03 / 14 /` on a student the backend holds
    * a 2011 for, which reads as a year nobody ever filled in and makes every
    * correction of the day look like it is about to remove one.
    *
@@ -203,15 +205,18 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
     }));
   }, [open, details, birthdayEdited, student]);
 
-  const linked = Boolean(student?.pcoPersonId);
-  /** True only under `PCO_WRITE_BACK=full`; false while the details load. */
+  const backend = student ? backendOfStudent(student) : null;
+  const linked = backend !== null;
+  /** What the sentences on this form call the student's backend. */
+  const label = student ? backendLabelOf(student) : 'Planning Center';
+  /** True only under full write-back; false while the details load. */
   const writable = linked && details?.profileWritable === true;
   const locked = (field: keyof Student) => linked && isPcoManaged(field) && !writable;
-  const managedHint = 'Managed in Planning Center';
-  const upstreamHint = 'Saved in Planning Center';
+  const managedHint = `Managed in ${label}`;
+  const upstreamHint = `Saved in ${label}`;
 
   /**
-   * Whether Planning Center holds no grade for this student.
+   * Whether the backend holds no grade for this student.
    *
    * Only ever true for a linked one: the flag rides on roster rows, and a
    * student Tally created holds the grade a human typed. That is what lets the
@@ -223,7 +228,7 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
     : !writable
       ? undefined
       : gradeUnknown
-        ? 'Planning Center holds no grade for them. Choosing one adds it there.'
+        ? `${label} holds no grade for them. Choosing one adds it there.`
         : upstreamHint;
 
   const update = <K extends keyof FormState>(field: K, value: FormState[K]) =>
@@ -438,7 +443,7 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
       description={
         student
           ? undefined
-          : 'Created in Tally and pushed to Planning Center on the next sync.'
+          : 'Created in Tally, and pushed to your people system automatically when write-back allows it.'
       }
       footer={
         <>
@@ -458,35 +463,50 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
       >
         {saveError ? <ErrorBanner message={saveError} /> : null}
 
-        {linked && student?.pcoPersonId ? (
+        {linked && student ? (
           <p className="rounded-xl bg-brand-500/10 px-3 py-2 text-xs text-brand-200 ring-1 ring-brand-500/25">
             {writable ? (
               <>
-                Name, grade, birthday and allergies are Planning Center's, and Save writes
-                them there — Tally keeps no copy.{' '}
-                <a
-                  href={pcoPersonUrl(student.pcoPersonId)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-semibold underline"
-                >
-                  Open in Planning Center
-                </a>
-                . Notes live in Tally.
+                Name, grade, birthday and allergies are {label}'s, and Save writes them there —
+                Tally keeps no copy.
+                {backend === 'pco' && student.pcoPersonId ? (
+                  // Only Planning Center has a product page to link out to.
+                  <>
+                    {' '}
+                    <a
+                      href={pcoPersonUrl(student.pcoPersonId)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-semibold underline"
+                    >
+                      Open in {label}
+                    </a>
+                    .
+                  </>
+                ) : null}{' '}
+                Notes live in Tally.
               </>
             ) : (
               <>
-                Name, grade, birthday, allergies and status come from Planning Center and
-                would be overwritten by the next sync.{' '}
-                <a
-                  href={pcoPersonUrl(student.pcoPersonId)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-semibold underline"
-                >
-                  Edit them in Planning Center
-                </a>
-                . Notes live in Tally.
+                Name, grade, birthday, allergies and status come from {label} and would be
+                overwritten by the next sync.
+                {backend === 'pco' && student.pcoPersonId ? (
+                  <>
+                    {' '}
+                    <a
+                      href={pcoPersonUrl(student.pcoPersonId)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-semibold underline"
+                    >
+                      Edit them in {label}
+                    </a>
+                    .
+                  </>
+                ) : (
+                  <> Edit them in {label} itself, or turn write-back on.</>
+                )}{' '}
+                Notes live in Tally.
               </>
             )}
           </p>
@@ -600,8 +620,8 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
             }}
             hint={
               detailsLoading
-                ? 'Reading what Planning Center has…'
-                : 'Saved in Planning Center as medical notes. Clearing this deletes it there.'
+                ? `Reading what ${label} has…`
+                : `Saved in ${label} as medical notes. Clearing this deletes it there.`
             }
           />
         ) : null}
@@ -670,17 +690,19 @@ function ParentContactSection({
   onAdded: () => void;
 }) {
   const onFile = details?.parentPhone || details?.parentEmail ? details : null;
+  const backend = student ? backendOfStudent(student) : null;
+  const label = student ? backendLabelOf(student) : 'Planning Center';
 
   return (
     <div className="mt-4 rounded-xl bg-ink-900 px-3 py-2.5 ring-1 ring-ink-800">
       <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Parent contact</p>
 
-      {!student?.pcoPersonId ? (
+      {!student || backend === null ? (
         <p className="mt-1 text-sm text-ink-300">
-          Once this student reaches Planning Center, their parent contact is added there.
+          Once this student reaches {label}, their parent contact is added there.
         </p>
       ) : loading && !details ? (
-        <p className="mt-1 text-sm text-ink-500">Reading what Planning Center has…</p>
+        <p className="mt-1 text-sm text-ink-500">Reading what {label} has…</p>
       ) : onFile ? (
         // Already reachable, so there is nothing for Tally to add: the write
         // path only ever fills a gap, and never overwrites what is on file.
@@ -694,16 +716,22 @@ function ParentContactSection({
             {onFile.parentEmail ? <span className="break-all">{onFile.parentEmail}</span> : null}
           </p>
           <p className="mt-1 text-xs text-ink-500">
-            Kept in Planning Center.{' '}
-            <a
-              href={pcoPersonUrl(student.pcoPersonId)}
-              target="_blank"
-              rel="noreferrer"
-              className="font-semibold text-brand-300 underline"
-            >
-              Change it there
-            </a>
-            .
+            Kept in {label}.
+            {backend === 'pco' && student.pcoPersonId ? (
+              // Only Planning Center has a product page to link out to.
+              <>
+                {' '}
+                <a
+                  href={pcoPersonUrl(student.pcoPersonId)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-semibold text-brand-300 underline"
+                >
+                  Change it there
+                </a>
+                .
+              </>
+            ) : null}
           </p>
         </>
       ) : (

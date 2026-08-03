@@ -29,6 +29,7 @@ import { COLLECTIONS, paths } from '@/lib/paths';
 import {
   ID,
   UID,
+  a32ConfigDoc,
   asAnonymous,
   asUser,
   attendanceDoc,
@@ -291,6 +292,35 @@ describe('students', () => {
   it('rejects claiming a pcoPersonId on update', async () => {
     const db = asUser(env, UID.counselor);
     await assertFails(updateDoc(doc(db, paths.student(ID.student)), { pcoPersonId: 'pco-999' }));
+  });
+
+  /*
+   * The generic linkage pair is the same claim in its backend-agnostic shape
+   * — `upstreamBackend: 'a32'` binds a Tally row onto a person in the
+   * Attendees database exactly the way a forged `pcoPersonId` would bind one
+   * onto a Planning Center person. Server-written only, both halves.
+   */
+  it('rejects a forged upstream linkage on create', async () => {
+    const db = asUser(env, UID.counselor);
+    await assertFails(
+      setDoc(
+        doc(db, paths.student('student-forged-upstream')),
+        { ...studentDoc({ pcoPersonId: null }), upstreamBackend: 'a32', upstreamPersonId: '9f0c' },
+      ),
+    );
+  });
+
+  it('rejects claiming an upstream linkage on update', async () => {
+    const db = asUser(env, UID.counselor);
+    await assertFails(
+      updateDoc(doc(db, paths.student(ID.student)), {
+        upstreamBackend: 'a32',
+        upstreamPersonId: '9f0c',
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(db, paths.student(ID.student)), { upstreamPersonId: '9f0c' }),
+    );
   });
 
   /*
@@ -842,6 +872,108 @@ describe('config/planningCenter', () => {
         secret: 'secret',
       }),
     );
+  });
+});
+
+/**
+ * The Attendees configuration document — the `config/planningCenter`
+ * reasoning applied to the second backend, with the same sharp edge: the
+ * base URL decides where the integration token gets sent.
+ */
+describe('config/attendees32', () => {
+  it('lets core read and write the settings', async () => {
+    const db = asUser(env, UID.core);
+    await assertSucceeds(setDoc(doc(db, paths.attendees32()), a32ConfigDoc()));
+    await assertSucceeds(getDoc(doc(db, paths.attendees32())));
+  });
+
+  it('keeps it away from counselors entirely', async () => {
+    const db = asUser(env, UID.counselor);
+    await assertFails(getDoc(doc(db, paths.attendees32())));
+    await assertFails(setDoc(doc(db, paths.attendees32()), a32ConfigDoc()));
+  });
+
+  it('rejects a write-back mode nobody wrote code for', async () => {
+    await assertFails(
+      setDoc(doc(asUser(env, UID.core), paths.attendees32()), a32ConfigDoc({ writeBack: 'everything' })),
+    );
+  });
+
+  it('rejects a grade band outside the grades the app understands', async () => {
+    const db = asUser(env, UID.core);
+    await assertFails(setDoc(doc(db, paths.attendees32()), a32ConfigDoc({ minGrade: 1 })));
+    await assertFails(setDoc(doc(db, paths.attendees32()), a32ConfigDoc({ maxGrade: 13 })));
+  });
+
+  it('refuses to let a cache become a mirror', async () => {
+    await assertFails(
+      setDoc(
+        doc(asUser(env, UID.core), paths.attendees32()),
+        a32ConfigDoc({ cacheTtlSeconds: 86_400 }),
+      ),
+    );
+  });
+
+  it('stops the core team pointing Tally at another host', async () => {
+    // Every Attendees request carries the integration token; the address it
+    // travels to is an admin decision, exactly like the Planning Center root.
+    await assertFails(
+      setDoc(
+        doc(asUser(env, UID.core), paths.attendees32()),
+        a32ConfigDoc({ baseUrl: 'https://attendees.example.org' }),
+      ),
+    );
+  });
+
+  it('lets an admin set the host, and only to an http(s) address', async () => {
+    const db = asUser(env, UID.admin);
+    await assertSucceeds(
+      setDoc(doc(db, paths.attendees32()), a32ConfigDoc({ baseUrl: 'https://attendees.example.org' })),
+    );
+    await assertFails(
+      setDoc(doc(db, paths.attendees32()), a32ConfigDoc({ baseUrl: 'ftp://files.example.org' })),
+    );
+  });
+
+  it('never lets the token into the document, whoever is asking', async () => {
+    await assertFails(
+      setDoc(doc(asUser(env, UID.admin), paths.attendees32()), {
+        ...a32ConfigDoc(),
+        token: 'drf-token',
+      }),
+    );
+  });
+});
+
+/** Cross-backend settings: one enum, closed shape, core-owned. */
+describe('config/backends', () => {
+  it('lets core choose where new students get pushed', async () => {
+    const db = asUser(env, UID.core);
+    await assertSucceeds(
+      setDoc(doc(db, paths.backends()), { defaultPushBackend: 'a32', updatedAt: serverTimestamp(), updatedBy: UID.core }),
+    );
+    await assertSucceeds(getDoc(doc(db, paths.backends())));
+  });
+
+  it('rejects a backend nobody wrote code for', async () => {
+    await assertFails(
+      setDoc(doc(asUser(env, UID.core), paths.backends()), { defaultPushBackend: 'other' }),
+    );
+  });
+
+  it('keeps the shape closed', async () => {
+    await assertFails(
+      setDoc(doc(asUser(env, UID.core), paths.backends()), {
+        defaultPushBackend: 'pco',
+        token: 'stashed',
+      }),
+    );
+  });
+
+  it('keeps it away from counselors', async () => {
+    const db = asUser(env, UID.counselor);
+    await assertFails(getDoc(doc(db, paths.backends())));
+    await assertFails(setDoc(doc(db, paths.backends()), { defaultPushBackend: 'pco' }));
   });
 });
 

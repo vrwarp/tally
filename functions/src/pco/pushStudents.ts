@@ -298,7 +298,12 @@ export async function pushStudent(options: PushStudentOptions): Promise<PushStud
       }
       linkedId = link.personId;
       person = { data: link.person };
-      await ref.update({ pcoPersonId: linkedId, updatedAt: nowTs });
+      await ref.update({
+        pcoPersonId: linkedId,
+        upstreamBackend: 'pco',
+        upstreamPersonId: linkedId,
+        updatedAt: nowTs,
+      });
       logger.info('Followed a Planning Center merge while pushing', {
         studentId,
         pcoPersonId: linkedId,
@@ -345,6 +350,8 @@ export async function pushStudent(options: PushStudentOptions): Promise<PushStud
   if (existing) {
     await ref.update({
       pcoPersonId: existing.id,
+      upstreamBackend: 'pco',
+      upstreamPersonId: existing.id,
       pcoPushPending: false,
       pcoSyncedAt: nowTs,
       updatedAt: nowTs,
@@ -373,6 +380,8 @@ export async function pushStudent(options: PushStudentOptions): Promise<PushStud
 
   await ref.update({
     pcoPersonId: createdId,
+    upstreamBackend: 'pco',
+    upstreamPersonId: createdId,
     pcoPushPending: false,
     pcoSyncedAt: nowTs,
     updatedAt: nowTs,

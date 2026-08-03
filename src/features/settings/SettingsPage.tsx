@@ -1,6 +1,6 @@
 /**
- * The core team's control panel: prediction thresholds, the Planning Center
- * connection, and who is on the team.
+ * The core team's control panel: prediction thresholds, the people-backend
+ * connections, and who is on the team.
  *
  * The thresholds are the only genuinely dangerous controls here — they silently
  * reshape what every counselor sees at the door — so each one is followed by a
@@ -20,6 +20,7 @@ import { PageFrame } from '@/components/PageFrame';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
+import { BackendsSection } from '@/features/settings/BackendsSection';
 import { PlanningCenterCard } from '@/features/settings/PlanningCenterCard';
 import { TeamList } from '@/features/settings/TeamList';
 import { ThemeCard } from '@/features/settings/ThemeCard';
@@ -220,6 +221,8 @@ export function SettingsPage() {
       <ThemeCard />
 
       <PlanningCenterCard />
+
+      <BackendsSection />
 
       <TeamList />
     </PageFrame>

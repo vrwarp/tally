@@ -70,6 +70,7 @@ function renderModal() {
     rosterError: null,
     rosterOffline: false,
     rosterFetchedAt: null,
+    rosterBackends: [],
     refreshRoster,
   } as unknown as DataContextValue;
 
@@ -104,7 +105,9 @@ describe('ImportCheckInsModal', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Import' }));
 
-    await waitFor(() => expect(importCheckInsEvent).toHaveBeenCalledWith({ pcoEventId: '698430' }));
+    await waitFor(() =>
+      expect(importCheckInsEvent).toHaveBeenCalledWith({ pcoEventId: '698430', backendId: 'pco' }),
+    );
     expect(await screen.findByText('Footprints is in Tally')).toBeInTheDocument();
     // The skipped weeks are said out loud: "94 of 131" with no explanation
     // reads as an import that lost a quarter of the history.

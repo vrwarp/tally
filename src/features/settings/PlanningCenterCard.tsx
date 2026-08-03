@@ -219,7 +219,7 @@ export function PlanningCenterCard() {
                       Planning Center person yet
                       {status.settings.writeBack === 'off'
                         ? ' — and none will be created while write-back is off.'
-                        : '. The scheduled sync creates them.'}
+                        : '. Push them from the Queued badge on their roster row.'}
                     </span>
                   ) : null}
                 </dd>

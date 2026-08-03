@@ -209,8 +209,9 @@ is therefore 7.x and `tsc6` is 6.x.
 | `src/features/` | One folder per screen: `auth`, `checkin`, `dashboard`, `events`, `students`, `settings`, `roster`. |
 | `src/components/ui/` | The design system: buttons, fields, modals, badges, cards, empty and loading states. |
 | `functions/` | The Cloud Functions package — **its own npm package**, see below. |
-| `functions/src/` | The Planning Center integration: API client, mapping, on-demand reads, write-back, access provisioning. |
+| `functions/src/` | The people-backend integrations: the `PeopleBackend` seam (`backends/`), the Planning Center adapter (`pco/`), the Attendees adapter (`attendees32/`), on-demand reads, write-back, access provisioning. |
 | `tools/pco-simulator/` | An in-memory stand-in for the Planning Center API, shared by the functions' unit tests and the e2e suite. |
+| `tools/a32-simulator/` | The same idea for the Attendees API. |
 | `tests/` | Unit tests and shared factories. |
 | `firestore-tests/` | Security-rules tests, run against the emulator. |
 | `scripts/` | `seed.ts`, the emulator data set. |
@@ -415,6 +416,11 @@ anything a leader has edited in Tally.
 Setup, configuration parameters, role mapping and troubleshooting live in
 **[docs/planning-center.md](docs/planning-center.md)**.
 
+Planning Center is one *people backend*, not a hardwired dependency. Tally can also read people
+from [Attendees (attendees32)](docs/attendees32.md) — the same roles, through the same seam — and
+both can be connected at once, with the roster merged across them and each student belonging to
+exactly one. The abstraction itself is documented in **[docs/backends.md](docs/backends.md)**.
+
 ---
 
 ## Deployment
@@ -541,7 +547,9 @@ buttons that would fail.
 | Document | What it covers |
 | --- | --- |
 | [docs/walkthrough](docs/walkthrough/README.md) | A guided tour of every feature, screenshotted from the running app |
+| [docs/backends.md](docs/backends.md) | The people-backend abstraction: ids, capabilities, partial failure, adding one |
 | [docs/planning-center.md](docs/planning-center.md) | Tokens, configuration, roster modes, write-back, troubleshooting |
+| [docs/attendees32.md](docs/attendees32.md) | The Attendees backend: setup command, field mapping, caveats |
 | [docs/data-model.md](docs/data-model.md) | Every collection, who may write it, and why it is shaped that way |
 | [docs/error-handling.md](docs/error-handling.md) | What happens when things fail, what was fixed, and what is still open |
 | [docs/fuzzing.md](docs/fuzzing.md) | The property suite, its invariants, and how to replay a failure |
