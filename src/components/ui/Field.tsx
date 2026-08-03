@@ -469,6 +469,7 @@ export function NumberStepperField({
           <StepButton
             label={`Decrease ${label}`}
             glyph="−"
+            side="left"
             disabled={disabled || value <= min}
             onClick={() => step(-1)}
           />
@@ -498,6 +499,7 @@ export function NumberStepperField({
           <StepButton
             label={`Increase ${label}`}
             glyph="+"
+            side="right"
             disabled={disabled || value >= max}
             onClick={() => step(1)}
           />
@@ -510,11 +512,21 @@ export function NumberStepperField({
 function StepButton({
   label,
   glyph,
+  side,
   disabled,
   onClick,
 }: {
   label: string;
   glyph: string;
+  /**
+   * Which end of the stepper this is.
+   *
+   * It buys the button the shell's own corner radius, which it needs because
+   * it sits flush in the end of a `rounded-xl overflow-hidden` box: a focus
+   * ring traces the *button's* radius, and a square one has its corners cut
+   * off by the shell's curve.
+   */
+  side: 'left' | 'right';
   disabled?: boolean;
   onClick: () => void;
 }) {
@@ -528,7 +540,8 @@ function StepButton({
         'flex min-h-12 w-12 shrink-0 items-center justify-center text-xl leading-none ' +
         'text-ink-300 select-none hover:bg-ink-800 active:bg-ink-700 ' +
         'disabled:pointer-events-none disabled:text-ink-600 ' +
-        'pointer-fine:min-h-9 pointer-fine:w-9 pointer-fine:text-base'
+        'pointer-fine:min-h-9 pointer-fine:w-9 pointer-fine:text-base ' +
+        (side === 'left' ? 'rounded-l-xl' : 'rounded-r-xl')
       }
     >
       <span aria-hidden="true">{glyph}</span>
