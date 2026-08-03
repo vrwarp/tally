@@ -30,6 +30,7 @@
  */
 import { ABSOLUTE_MAX_GRADE, ABSOLUTE_MIN_GRADE, type PcoConfig } from '../config.js';
 import type { PcoClient } from './client.js';
+import { UNKNOWN_BIRTH_YEAR } from './mapping.js';
 import { rosterPersonFrom, type RosterPerson } from './roster.js';
 import { readThroughMerges, resolveStudentPerson } from './studentPerson.js';
 import type { PcoPerson, PcoPersonAttributes } from './types.js';
@@ -172,19 +173,11 @@ function isLeapYear(year: number): boolean {
 /** The earliest year of birth this will accept from a caller. */
 const EARLIEST_BIRTH_YEAR = 1900;
 
-/**
- * The year Planning Center keeps for a birthday nobody knows the year of.
- *
- * Its own help says so — "use 1885 as the birth year, which will show no age" —
- * and a person entered that way in Planning Center's own form comes back from
- * the API as `1885-12-14`. So this is not a sentinel Tally invented; it is the
- * one already in the data, and writing it is how a day-only birthday is stored
- * without claiming an age for a child.
- *
- * Below `EARLIEST_BIRTH_YEAR` on purpose: a caller cannot type it, because a
- * leader typing 1885 in the year box means a mistake rather than this.
+/*
+ * `UNKNOWN_BIRTH_YEAR` — Planning Center's 1885 — lives in `mapping.js` with
+ * the rest of the birthday vocabulary, because both directions need it: this
+ * file writes it, and the one-person read refuses to show it.
  */
-export const UNKNOWN_BIRTH_YEAR = 1885;
 
 /**
  * Whether a date somebody typed is a date that exists.

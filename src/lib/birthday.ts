@@ -37,18 +37,50 @@ export type BirthdayState =
 export const BIRTHDAY_WINDOW_DAYS = 7;
 
 const PATTERN = /^(\d{2})-(\d{2})$/;
+const DATED_PATTERN = /^(?:(\d{4})-)?(\d{2})-(\d{2})$/;
 
 export interface MonthDay {
   month: number;
   day: number;
 }
 
+export interface DatedBirthday extends MonthDay {
+  /** Null for a roster row's `MM-DD`, and for a year nobody upstream knows. */
+  year: number | null;
+}
+
+/**
+ * A birthday as it was handed over, in numbers — `MM-DD` from the roster, or
+ * the `YYYY-MM-DD` the one-person details read carries. Null when there is
+ * none, or when the string is not one.
+ *
+ * Both shapes rather than the roster's alone, because the year is not a
+ * different field: it is the same date, known to a screen that asked for one
+ * student. Everything that only wants the day goes on calling `birthdayParts`
+ * and cannot accidentally print a year it did not ask for.
+ */
+export function parseBirthday(birthday: string | null | undefined): DatedBirthday | null {
+  if (!birthday) return null;
+
+  const match = DATED_PATTERN.exec(birthday);
+  if (!match) return null;
+
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+
+  return { month, day, year: match[1] === undefined ? null : Number(match[1]) };
+}
+
 /**
  * The two numbers out of an `MM-DD`, or null when there is no birthday on file
  * or the string is not one.
  *
- * Exported because the edit form has to put the day and the month into two
- * separate boxes, and `MM-DD` is the only form it is ever handed.
+ * Strict about the shape, and deliberately still so: this is what reads a
+ * *roster* row, a roster row never carries a year, and a value that has one did
+ * not come from where this thinks it did. Anything holding the fuller date —
+ * the profile, the edit box — asks `parseBirthday` instead, which is the reader
+ * that knows what a year means.
  */
 export function birthdayParts(birthday: string | null | undefined): MonthDay | null {
   if (!birthday) return null;
@@ -61,6 +93,11 @@ export function birthdayParts(birthday: string | null | undefined): MonthDay | n
   if (month < 1 || month > 12 || day < 1 || day > 31) return null;
 
   return { month, day };
+}
+
+/** The year on file, or null when nobody upstream holds one. */
+export function birthdayYear(birthday: string | null | undefined): number | null {
+  return parseBirthday(birthday)?.year ?? null;
 }
 
 /** Days in each month, taking February at its leap-year length. */
@@ -174,10 +211,19 @@ export function formatBirthdayShort(birthday: string | null | undefined, now: Da
   return format(nearestOccurrence(parsed, now), 'd MMM');
 }
 
-/** "14 March" — for a sentence, where there is room to say it properly. */
+/**
+ * "14 March" — for a sentence, where there is room to say it properly. With the
+ * year, when the caller was given one: "14 March 2011".
+ *
+ * The year is never invented and never dropped. A roster row has none to print,
+ * and the details read only carries one where Planning Center holds a real one
+ * — its 1885 for "nobody knows" arrives here as a bare `MM-DD`, so an unknown
+ * year cannot come out of this as a date of birth.
+ */
 export function formatBirthdayLong(birthday: string | null | undefined): string | null {
-  const parsed = birthdayParts(birthday);
+  const parsed = parseBirthday(birthday);
   if (!parsed) return null;
   // Any leap year, so 29 February is a real date to format rather than 1 March.
-  return format(new Date(2024, parsed.month - 1, parsed.day), 'd MMMM');
+  const on = new Date(parsed.year ?? 2024, parsed.month - 1, parsed.day);
+  return format(on, parsed.year === null ? 'd MMMM' : 'd MMMM yyyy');
 }

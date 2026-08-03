@@ -108,6 +108,7 @@ function details(overrides: Partial<PcoPersonDetails> = {}): PcoPersonDetails {
     parentPhone: null,
     parentEmail: null,
     allergies: 'Severe peanut allergy — EpiPen in her bag',
+    birthdate: null,
     householdAdult: true,
     contactWritable: true,
     profileWritable: true,
@@ -295,15 +296,58 @@ describe('when write-back is full', () => {
   });
 
   /**
-   * The birthday is the one managed field Tally can write more of than it is
-   * shown — the roster carries the day and never the year — so these are about
-   * the year staying out of the way rather than about the day.
+   * The birthday arrives in two pieces: the roster's day, which this form opens
+   * with, and the year, which only the one-person details read carries. So these
+   * are as much about where each half comes from as about the date.
    */
   describe('the birthday', () => {
-    it('opens on the day Planning Center holds, and never on a year', () => {
+    it('opens on the day the roster carries when that is all anybody has', () => {
       open(linked({ birthday: '06-28' }));
 
       expect(screen.getByLabelText('Birthday')).toHaveValue('06 / 28 / ');
+    });
+
+    /**
+     * The year, once Planning Center has been read. A box showing `06 / 28 /`
+     * beside a student it holds a 2008 for reads as a year nobody filled in,
+     * and every correction of the day looks like it is about to delete one.
+     */
+    it('fills the year in when the details read lands with one', async () => {
+      personDetails.current = details({ birthdate: '2008-06-28' });
+      open(linked({ birthday: '06-28' }));
+
+      await waitFor(() =>
+        expect(screen.getByLabelText('Birthday')).toHaveValue('06 / 28 / 2008'),
+      );
+    });
+
+    /** An untouched box is not an edit, whatever it is showing. */
+    it('is left out of a save that did not touch the date it opened on', async () => {
+      personDetails.current = details({ birthdate: '2008-06-28' });
+      open(linked({ birthday: '06-28' }));
+
+      await waitFor(() =>
+        expect(screen.getByLabelText('Birthday')).toHaveValue('06 / 28 / 2008'),
+      );
+      await save();
+
+      await waitFor(() => expect(updateStudentProfile).toHaveBeenCalled());
+      expect(updateStudentProfile.mock.calls[0]?.[0]).not.toHaveProperty('birthday');
+    });
+
+    /** And the correction that was impossible before: the year itself. */
+    it('sends the whole date when the year on screen is corrected', async () => {
+      personDetails.current = details({ birthdate: '2008-06-28' });
+      open(linked({ birthday: '06-28' }));
+
+      const box = screen.getByLabelText('Birthday');
+      await waitFor(() => expect(box).toHaveValue('06 / 28 / 2008'));
+      await userEvent.clear(box);
+      await userEvent.type(box, '6/28/2009');
+      await save();
+
+      await waitFor(() => expect(updateStudentProfile).toHaveBeenCalled());
+      expect(updateStudentProfile.mock.calls[0]?.[0]).toMatchObject({ birthday: '2009-06-28' });
     });
 
     it('sends the corrected day on its own, so the year upstream is kept', async () => {

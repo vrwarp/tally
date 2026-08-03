@@ -48,9 +48,16 @@ import {
   type GatheringStanding,
 } from '@/features/dashboard/insights';
 import { AddParentContact } from '@/features/students/AddParentContact';
+import { EditBirthday } from '@/features/students/EditBirthday';
 import { StudentEditorModal } from '@/features/students/StudentEditorModal';
 import { useNow } from '@/hooks/useNow';
 import { usePersonDetails } from '@/hooks/usePersonDetails';
+import {
+  birthdayState,
+  birthdayYear,
+  formatBirthdayLong,
+  type BirthdayState,
+} from '@/lib/birthday';
 import { chainKey } from '@/lib/materialize';
 import { pcoPersonUrl } from '@/lib/planningCenter';
 import { sessionOutcome, type SessionOutcome } from '@/lib/sessionHistory';
@@ -63,7 +70,7 @@ import {
   removeRosterMember,
 } from '@/services/functions';
 import { setStudentStatus } from '@/services/students';
-import { studentFullName, type TallyEvent } from '@/types';
+import { studentFullName, type Student, type TallyEvent } from '@/types';
 
 /** The group one-off events go in. Not a `chainKey`, and cannot collide with one. */
 const ONE_OFF_GROUP = 'one-off';
@@ -529,6 +536,29 @@ export function StudentDetailPage() {
             </div>
           ) : null}
 
+          <BirthdaySection
+            student={student}
+            // The whole date once Planning Center has been read, the roster's
+            // day until then — so the year appears a moment after the page
+            // does, rather than never. The roster is the fallback rather than
+            // the loser of a disagreement: a read that came back with nothing
+            // must not blank a day this page was already showing.
+            onFile={details?.birthdate ?? student.birthday}
+            /*
+             * The same gate every other write to Planning Center is behind, and
+             * for the same reason: the browser cannot see `PCO_WRITE_BACK`, so
+             * the server's answer on the person details is the only honest one.
+             * Offering a box the write path then refuses is worse than a link.
+             */
+            writable={Boolean(student.pcoPersonId) && details?.profileWritable === true}
+            gateLoading={detailsLoading && !detailsLoaded}
+            recordGone={recordGone}
+            now={now}
+            // The year on this page comes from the details, and the edit has
+            // just changed it upstream.
+            onSaved={refreshDetails}
+          />
+
           <dl className="grid grid-cols-2 gap-3 text-sm">
             <Detail label="Status" value={student.status === 'active' ? 'Active' : 'Inactive'} />
             <Detail
@@ -863,6 +893,139 @@ function NightChip({ entry, theirs }: { entry: HistoryEntry; theirs: boolean }) 
         {label}
       </span>
     </li>
+  );
+}
+
+/**
+ * The birthday, on the one screen that is about this student.
+ *
+ * Until now it was only ever said on the roster, by a badge that speaks in the
+ * fortnight either side of the day — and, for a blank one, only on a wide
+ * screen. So for forty-nine weeks of the year the profile of a student whose
+ * birthday the ministry cares about said nothing about it at all, and a leader
+ * standing in front of the student who has just told them the date had to know
+ * that "Edit profile" hides a box for it.
+ *
+ * The edit is `EditBirthday` — the same component, the same save and the same
+ * refresh as the roster badge opens — rather than a second form that could
+ * drift from it. Opened in place rather than in the editor modal because this
+ * is one field with one answer, and the modal is a form about everything else.
+ *
+ * What can be offered is decided by `writable`, never guessed at here; without
+ * it this points at Planning Center, which owns the field either way.
+ */
+function BirthdaySection({
+  student,
+  onFile,
+  writable,
+  gateLoading,
+  recordGone,
+  now,
+  onSaved,
+}: {
+  student: Student;
+  /**
+   * What Planning Center holds — `YYYY-MM-DD` once the details read has landed,
+   * the roster's `MM-DD` until then, null for no birthdate at all.
+   */
+  onFile: string | null;
+  /** True only under `PCO_WRITE_BACK=full`, and only for a linked student. */
+  writable: boolean;
+  /** The details read that answers `writable` is still in flight. */
+  gateLoading: boolean;
+  /** Planning Center has no record to write to — the block below is the repair. */
+  recordGone: boolean;
+  now: Date;
+  /** Re-reads the details, which are where the year on this page comes from. */
+  onSaved: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+
+  // The date as it will be printed, with the year where there is one to print.
+  const day = formatBirthdayLong(onFile);
+  // The window is a fact about the day of the year, so the roster's is enough
+  // and it does not wait for a read: cake this week is not a detail lookup.
+  const state = birthdayState(student.birthday, now);
+  const upstream = student.pcoPersonId ? pcoPersonUrl(student.pcoPersonId) : null;
+
+  // Only the three faces worth interrupting a read for. "Quiet" is a birthday
+  // in August being looked at in March, and it has nothing to add to the date.
+  const NEAR: Record<Exclude<BirthdayState, 'missing' | 'quiet'>, string> = {
+    today: 'Today',
+    soon: 'This week',
+    recent: 'This past week',
+  };
+
+  return (
+    <div>
+      <h3 className="text-xs font-medium uppercase tracking-wide text-ink-400">Birthday</h3>
+
+      {editing ? (
+        <div className="mt-2">
+          <EditBirthday
+            student={student}
+            onFile={onFile}
+            onSaved={onSaved}
+            onDone={() => setEditing(false)}
+          />
+        </div>
+      ) : (
+        <>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <p className={cn('text-sm', day ? 'text-ink-100' : 'text-ink-400')}>
+              {day ?? 'Not on file'}
+            </p>
+            {state !== 'missing' && state !== 'quiet' ? (
+              <Badge tone={state === 'today' ? 'success' : state === 'soon' ? 'brand' : 'neutral'}>
+                <span aria-hidden="true">🎂</span>
+                {NEAR[state]}
+              </Badge>
+            ) : null}
+            {writable && !recordGone ? (
+              <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
+                {day ? 'Change' : 'Add a birthday'}
+              </Button>
+            ) : null}
+          </div>
+
+          {recordGone ? null : upstream === null ? (
+            <p className="mt-1 text-xs text-ink-500">
+              Tally keeps no birthday of its own. Once {student.firstName} reaches Planning Center,
+              theirs can be filled in there.
+            </p>
+          ) : writable ? (
+            <p className="mt-1 text-xs text-ink-500">
+              {/*
+                Only the missing year is worth a sentence, and only where it is
+                really missing. A date printed with its year explains itself;
+                one printed without needs to say whose gap that is, or it reads
+                as something Tally is holding back.
+              */}
+              {!day
+                ? 'Saved in Planning Center. The year is optional.'
+                : birthdayYear(onFile) === null
+                  ? 'Saved in Planning Center, which holds no year for them — so it shows no age.'
+                  : 'Saved in Planning Center.'}
+            </p>
+          ) : gateLoading ? (
+            <p className="mt-1 text-xs text-ink-500">Reading what Planning Center allows…</p>
+          ) : (
+            <p className="mt-1 text-xs text-ink-500">
+              Kept in Planning Center.{' '}
+              <a
+                href={upstream}
+                target="_blank"
+                rel="noreferrer"
+                className="font-semibold text-brand-300 underline"
+              >
+                {day ? 'Change it there' : 'Add one there'}
+              </a>
+              .
+            </p>
+          )}
+        </>
+      )}
+    </div>
   );
 }
 

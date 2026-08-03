@@ -245,18 +245,30 @@ roster is Tally's own list, and the control for it is Remove from roster on the 
 will only ever *add* a `medical_notes` value, never blank one: a linked student's document holds no
 allergy note at all, and reading that absence as "there are none" would erase a real one.
 
-### The birthday, and the year Tally is not sent (`full` only)
+### The birthday, and where its year comes from (`full` only)
 
-`birthdate` is the one field Tally can write more of than it is ever shown. The roster carries
-`MM-DD` and never the year — see §3 — because the year is the identifying half of a date of birth and
-a phone at a door holding eighty-five students has no use for it. That makes the edit asymmetric: a
-leader can see the day and correct it, and cannot see the year to retype it.
+`birthdate` reaches a browser in two different shapes, and which one depends on who asked.
 
-So the callable takes two shapes, and the difference is the whole design:
+The **roster** carries `MM-DD` and never the year — see §3 — because the year is the identifying half
+of a date of birth and a phone at a door holding eighty-five students has no use for it. The
+**one-person read**, `getPersonDetails`, carries the whole date: `PcoPersonDetails.birthdate`,
+`YYYY-MM-DD`. That is the same read that hands over a child's allergy note and a parent's phone
+number, it is core team only, and it happens because somebody is looking at that one student — so
+withholding the year there bought no privacy that the rest of the payload had not already spent, and
+cost the edit form the one thing it could not work around: a leader could see the day, could type a
+year, and could never see the year already on file to correct it.
+
+`fullBirthdayOf` is the mapping, and it refuses one year: **1885**, Planning Center's own "nobody
+knows" (below), comes back as a bare `MM-DD` rather than as a date of birth in the nineteenth
+century. So a `MM-DD` from that read means "no year upstream", and a form can say so.
+
+The callable takes the same two shapes, and the difference is the whole design:
 
 - **`MM-DD`** — "this day, keeping the year Planning Center holds". Resolved against a fresh read of
-  the person, like every other field here.
-- **`YYYY-MM-DD`** — the whole date, for a leader who knows the year.
+  the person, like every other field here. This is what a box whose year was left out or rubbed out
+  sends, and it is never read as a request to delete the year.
+- **`YYYY-MM-DD`** — the whole date, for a leader who knows the year or is correcting the one they
+  have just been shown.
 
 On a person with no `birthdate` at all there is no year to keep, and none is invented: an age is
 displayed from this field, and a guessed year is a wrong age on a child's permanent record that
@@ -271,10 +283,13 @@ one.)
 birthdate it asks for the year, and against a year on file that has no 29 February it is refused
 rather than rounded to 1 March by the far end.
 
-The form is **one box** — on the student editor and behind the roster's birthday badge, which is
-where somebody usually notices, with the student in front of them having just said when it is.
-Behind the badge it is open on arrival: there is no "Add a birthday" press between a leader and the
-one thing that panel is for.
+The form is **one box** — on the student editor, behind the roster's birthday badge, and on the
+student's own page, which are the three places somebody notices, usually with the student in front
+of them having just said when it is. Behind the badge it is open on arrival: there is no "Add a
+birthday" press between a leader and the one thing that panel is for. On the profile it sits under
+the date itself, which that page states whether or not the day is near — the badge is a fortnight
+wide by design, and a birthday in August read in March is exactly the case only the profile can
+answer.
 
 The box takes digits and punctuates itself, drawing the rest of `MM / DD / YYYY` faded after what
 has been typed. Slots fill greedily and forwards — a slot takes a second digit only when a second
@@ -283,12 +298,18 @@ digit would still leave a value it can hold — so `1214` is 14 December, `112` 
 follows, which is how `4/2/2013` says the second where `422013` says the twenty-second. The date is
 printed back in words under the box as it is typed, because a reading made in silence is one nobody
 can correct. See `src/lib/birthdayInput.ts` for the slot rules and `src/lib/birthdayField.ts` for
-what the box means. Under anything other than `full` both places say where the field lives and link
-to it, as they always did.
+what the box means. Under anything other than `full` every one of those places says where the field
+lives and links to it, as they always did.
 
-A birthday cannot be **deleted** from Tally, unlike allergies. Every screen that shows one has only
-ever been shown the day, so an empty box has never been evidence that somebody decided to empty the
-field — and deleting a date of birth is not a correction anybody makes from a roster badge.
+Each box **opens on what Planning Center holds**, year included where it holds one — the details read
+above is what supplies it, so the form seeds from the roster's day and fills the year in a moment
+later, without disturbing anything already typed. A box opened on `03 / 14 / 2011` and pressed
+untouched sends nothing at all, where it used to carry the day upstream for the server to find
+identical.
+
+A birthday cannot be **deleted** from Tally, unlike allergies. An empty box means "leave it alone" —
+including an empty *year* on a box that was showing one, which is a day-only edit and keeps whatever
+is upstream. Deleting a date of birth is not a correction anybody makes from a roster badge.
 
 `PcoPersonDetails.profileWritable` carries the gate, for the same reason `contactWritable` does — the
 browser cannot see the setting, and offering an editable box that the write path then refuses is

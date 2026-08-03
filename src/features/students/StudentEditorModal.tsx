@@ -89,8 +89,9 @@ interface FormState {
   /** Planning Center's `medical_notes`. Only ever editable on a linked student. */
   allergies: string;
   /**
-   * Planning Center's `birthdate`, as one box of text — and never with a year in
-   * it, because Tally is never sent one. See `lib/birthdayField.ts`.
+   * Planning Center's `birthdate`, as one box of text. Seeded from the roster's
+   * day and re-seeded with the year when the details read lands, since that is
+   * the only thing that carries one. See `lib/birthdayField.ts`.
    */
   birthday: string;
   notes: string;
@@ -153,8 +154,9 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
   }>({});
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  /** Stops the seeding effect below from overwriting what somebody has typed. */
+  /** Stop the seeding effects below from overwriting what somebody has typed. */
   const [allergiesEdited, setAllergiesEdited] = useState(false);
+  const [birthdayEdited, setBirthdayEdited] = useState(false);
 
   // Free while the modal is open on a student whose page already asked: the
   // hook memoises the answer for the session.
@@ -168,6 +170,7 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
     setErrors({});
     setSaveError(null);
     setAllergiesEdited(false);
+    setBirthdayEdited(false);
   }, [open, student]);
 
   /*
@@ -180,6 +183,25 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
     if (!open || allergiesEdited || !details) return;
     setForm((current) => ({ ...current, allergies: details.allergies ?? '' }));
   }, [open, details, allergiesEdited]);
+
+  /*
+   * The birthday is seeded twice for the same reason, and the second time is
+   * the interesting one. The form opens on the roster's day — no year, because
+   * a roster has none — and the details read arrives with the whole date. Left
+   * unseeded, the box would show `03 / 14 /` on a student Planning Center holds
+   * a 2011 for, which reads as a year nobody ever filled in and makes every
+   * correction of the day look like it is about to remove one.
+   *
+   * Same guard as above, and the same reason for it: a leader who has already
+   * typed must not have it undone by a late answer.
+   */
+  useEffect(() => {
+    if (!open || birthdayEdited || !details) return;
+    setForm((current) => ({
+      ...current,
+      birthday: birthdayFieldFrom(details.birthdate ?? student?.birthday ?? null),
+    }));
+  }, [open, details, birthdayEdited, student]);
 
   const linked = Boolean(student?.pcoPersonId);
   /** True only under `PCO_WRITE_BACK=full`; false while the details load. */
@@ -291,7 +313,12 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
      */
     let birthday: string | undefined;
     if (writable) {
-      const read = readBirthdayField(form.birthday, { onFile: student?.birthday ?? null });
+      // The whole date, not the roster's day: `writable` is only ever true once
+      // the details have landed, so the year on file is known here — and
+      // comparing against the day alone would send a birthday nobody changed.
+      const read = readBirthdayField(form.birthday, {
+        onFile: details?.birthdate ?? student?.birthday ?? null,
+      });
       if (!read.ok) {
         setErrors({ birthday: read.error });
         return;
@@ -539,18 +566,20 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
 
         {/*
           The birthday, on the same terms as the name: Planning Center's field,
-          editable here only under `full`. The box opens on the day the roster
-          carries and never on a year, because Tally is never sent one — the
-          whole argument is in `lib/birthdayField.ts`.
+          editable here only under `full`. The box opens on the whole date the
+          details read carries — year included, where Planning Center holds a
+          real one — and a year left out still means "keep what is upstream".
+          The whole argument is in `lib/birthdayField.ts`.
         */}
         {writable ? (
           <BirthdayField
             value={form.birthday}
             onChange={(changed) => {
+              setBirthdayEdited(true);
               setErrors((current) => ({ ...current, birthday: undefined }));
               update('birthday', changed);
             }}
-            onFile={student?.birthday ?? null}
+            onFile={details?.birthdate ?? student?.birthday ?? null}
             error={errors.birthday ?? null}
           />
         ) : null}

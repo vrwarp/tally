@@ -25,6 +25,7 @@ import {
   buildIncludedIndex,
   extractParentContact,
   findParentCandidate,
+  fullBirthdayOf,
   hasContactDetails,
   mapPersonToStudent,
   pcoGrade,
@@ -120,6 +121,19 @@ export interface RosterPerson {
 export interface PersonDetails extends ParentContact {
   pcoPersonId: string;
   allergies: string | null;
+  /**
+   * The birthday Planning Center holds, year and all — `YYYY-MM-DD`, or
+   * `MM-DD` when the year on file is its "nobody knows" 1885, or null when
+   * there is no birthdate. See `fullBirthdayOf`.
+   *
+   * The roster's `birthday` is the same day with the year cut off, and that is
+   * not a contradiction: eighty-five dates of birth on a phone at a door is the
+   * thing being avoided, and one student's, on the screen that is showing that
+   * student to a core team member, is the thing being asked for. Without it the
+   * edit form was asymmetric in the one direction that annoys — a leader could
+   * see the day, could type a year, and could never see the year already there.
+   */
+  birthdate: string | null;
   /**
    * Whether the student's household holds an adult at all — irrespective of
    * whether anybody has put a phone number on them.
@@ -717,6 +731,7 @@ export async function fetchPersonDetails(
       return {
         pcoPersonId: person.id,
         allergies: mapped.allergies,
+        birthdate: fullBirthdayOf(person),
         parentName: contact.parentName,
         parentPhone: contact.parentPhone,
         parentEmail: contact.parentEmail,
