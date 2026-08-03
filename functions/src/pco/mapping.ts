@@ -359,6 +359,52 @@ export function birthdayOf(person: PcoPerson): string | null {
   return `${match[1]}-${match[2]}`;
 }
 
+/**
+ * The year Planning Center keeps for a birthday nobody knows the year of.
+ *
+ * Its own help says so — "use 1885 as the birth year, which will show no age" —
+ * and a person entered that way in Planning Center's own form comes back from
+ * the API as `1885-12-14`. So this is not a sentinel Tally invented; it is the
+ * one already in the data, and writing it is how a day-only birthday is stored
+ * without claiming an age for a child.
+ *
+ * Read in two directions. `resolveBirthdate` writes it for a day typed against
+ * a person with no birthdate at all, and `fullBirthdayOf` refuses to *show* it,
+ * because 1885 on a profile is not a year of birth — it is the absence of one,
+ * and printing it would be the one thing this convention exists to avoid.
+ *
+ * Below `EARLIEST_BIRTH_YEAR` on purpose: a caller cannot type it, because a
+ * leader typing 1885 in the year box means a mistake rather than this.
+ */
+export const UNKNOWN_BIRTH_YEAR = 1885;
+
+/**
+ * The whole birthday, for the one-person read — `YYYY-MM-DD`, or `MM-DD` when
+ * the year on file is Planning Center's "nobody knows" 1885. Null when there is
+ * no birthdate.
+ *
+ * The two shapes are exactly the two Tally *sends* (see `parseBirthdayPatch`),
+ * which is the point: what an edit form opens on and what it saves are then the
+ * same vocabulary, and a leader who can see the year can retype it.
+ *
+ * Deliberately not what the roster carries. `birthdayOf` drops the year for
+ * every row of it, because a browser holding eighty-five children must not hold
+ * eighty-five dates of birth. This is the other half of that rule rather than an
+ * exception to it: one student, asked for by a core team member on the screen
+ * that is showing that student, alongside their allergies and their parent's
+ * phone number.
+ */
+export function fullBirthdayOf(person: PcoPerson): string | null {
+  const monthDay = birthdayOf(person);
+  if (monthDay === null) return null;
+
+  const raw = trimmed((person.attributes ?? {}).birthdate) ?? '';
+  const year = Number(/^(\d{4})-/.exec(raw)?.[1]);
+  if (!Number.isFinite(year) || year === UNKNOWN_BIRTH_YEAR) return monthDay;
+
+  return `${year}-${monthDay}`;
+}
+
 export function normaliseStatus(person: PcoPerson): StudentStatus {
   const attributes: PcoPersonAttributes = person.attributes ?? {};
   if (trimmed(attributes.inactivated_at) !== null) return 'inactive';

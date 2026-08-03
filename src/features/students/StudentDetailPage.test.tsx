@@ -77,6 +77,7 @@ vi.mock('@/hooks/usePersonDetails', () => ({
 const NOW = new Date(2026, 2, 14, 10, 0);
 
 const refreshRoster = vi.fn(async () => {});
+const applyRosterPerson = vi.fn();
 const show = vi.fn();
 
 function details(overrides: Partial<PcoPersonDetails> = {}): PcoPersonDetails {
@@ -86,6 +87,7 @@ function details(overrides: Partial<PcoPersonDetails> = {}): PcoPersonDetails {
     parentPhone: '5550100100',
     parentEmail: null,
     allergies: null,
+    birthdate: null,
     householdAdult: true,
     contactWritable: true,
     profileWritable: true,
@@ -120,6 +122,7 @@ function openProfile(student: Student) {
     rosterOffline: false,
     rosterFetchedAt: null,
     refreshRoster,
+    applyRosterPerson,
   } as unknown as DataContextValue;
 
   const auth = { user: { uid: 'core-1' }, can: () => true } as unknown as AuthContextValue;
@@ -147,6 +150,7 @@ function openProfile(student: Student) {
 beforeEach(() => {
   updateStudentProfile.mockClear();
   refreshRoster.mockClear();
+  applyRosterPerson.mockClear();
   show.mockClear();
   personDetails.current = details();
   personDetails.loading = false;
@@ -169,6 +173,27 @@ describe('the birthday on a student profile', () => {
 
     expect(screen.getByText('14 March')).toBeInTheDocument();
     expect(screen.getByText('Today')).toBeInTheDocument();
+  });
+
+  /**
+   * The year. The roster's row cannot carry one — eighty-five children on a
+   * phone must not be eighty-five dates of birth — but this page has read
+   * Planning Center for this one student, and a profile is where a date of
+   * birth is a date of birth rather than a day to buy a cake on.
+   */
+  it('shows the year once Planning Center has been read for this student', async () => {
+    personDetails.current = details({ birthdate: '2011-08-22' });
+    openProfile(linked({ birthday: '08-22' }));
+
+    expect(await screen.findByText('22 August 2011')).toBeInTheDocument();
+  });
+
+  /** And says whose gap it is when there is genuinely no year upstream. */
+  it('says Planning Center holds no year when it holds none', async () => {
+    personDetails.current = details({ birthdate: '08-22' });
+    openProfile(linked({ birthday: '08-22' }));
+
+    expect(await screen.findByText(/holds no year for them/)).toBeInTheDocument();
   });
 
   it('names the gap rather than leaving a blank', () => {
@@ -201,8 +226,10 @@ describe('the birthday on a student profile', () => {
       }),
     );
     // The roster is where every screen's copy of a linked student's birthday
-    // comes from, this page included.
-    await waitFor(() => expect(refreshRoster).toHaveBeenCalledWith(true));
+    // comes from, this page included — and the corrected row comes back from
+    // the write, so the page is put right without re-reading the church.
+    await waitFor(() => expect(applyRosterPerson).toHaveBeenCalled());
+    expect(refreshRoster).not.toHaveBeenCalled();
     // And the box closes, rather than leaving a form open over the value it
     // just changed.
     await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Birthday' })).toBeNull());

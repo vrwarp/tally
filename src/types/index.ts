@@ -669,6 +669,21 @@ export interface PcoPersonDetails {
   parentEmail: string | null;
   allergies: string | null;
   /**
+   * The birthday with its year — `YYYY-MM-DD` — or `MM-DD` when Planning
+   * Center's year for them is the 1885 it keeps for a birthday nobody knows the
+   * year of. Null when there is no birthdate at all.
+   *
+   * The one field here that `Student.birthday` also carries, in a shorter form:
+   * the roster drops the year for every row, and this read restores it for one
+   * student at a time — which is the same bargain as the allergy note and the
+   * parent's phone number, both of which are far more than a year of birth.
+   *
+   * The two shapes are the two Tally *writes* (`composeBirthday`), so a form
+   * opens on exactly what it would send back, and a leader who can see the year
+   * can correct it.
+   */
+  birthdate: string | null;
+  /**
    * Whether Planning Center has an adult in this student's household at all,
    * irrespective of whether anybody has put a number on them.
    *

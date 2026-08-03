@@ -18,6 +18,7 @@ import { useState } from 'react';
 import { Button, MaskedField } from '@/components/ui';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
+import { invalidatePersonDetails } from '@/hooks/usePersonDetails';
 import { birthdayFieldFrom, describeBirthdayField, readBirthdayField } from '@/lib/birthdayField';
 import { birthdayMaskGhost, formatBirthdayInput } from '@/lib/birthdayInput';
 import { updateStudentProfile } from '@/services/functions';
@@ -26,7 +27,11 @@ import type { Student } from '@/types';
 export interface BirthdayFieldProps {
   value: string;
   onChange: (value: string) => void;
-  /** Null when Planning Center holds no birthdate for them. */
+  /**
+   * What Planning Center holds: `YYYY-MM-DD` where the details read has been
+   * given a year, `MM-DD` where only the roster's day is known, and null when
+   * there is no birthdate at all.
+   */
   onFile: string | null;
   /** A refusal from a save attempt, which outranks the live reading below. */
   error?: string | null;
@@ -86,6 +91,24 @@ export function BirthdayField({
 
 export interface EditBirthdayProps {
   student: Student;
+  /**
+   * The whole date Planning Center holds, from the host's person details —
+   * `YYYY-MM-DD`, or `MM-DD` when nobody upstream knows the year, or null for
+   * no birthdate at all.
+   *
+   * Passed in rather than read here because every host of this already has the
+   * details in hand: the gate that decides whether to render this at all is on
+   * the same object. Omitted, this falls back to the roster's day, which is the
+   * most any screen without them knows.
+   */
+  onFile?: string | null;
+  /**
+   * Called after a write lands, for a host that stays on screen and is showing
+   * the year — which only the memoised details hold, and which this has just
+   * dropped. Not `onDone`: that one is Cancel too, and a cancelled edit has
+   * nothing to re-read.
+   */
+  onSaved?: () => void;
   /** Closes whatever is hosting this, once the write has landed. */
   onDone: () => void;
 }
@@ -95,15 +118,18 @@ export interface EditBirthdayProps {
  * notices a birthday is wrong or missing, and where there is no other form to
  * hang this off.
  */
-export function EditBirthday({ student, onDone }: EditBirthdayProps) {
+export function EditBirthday({ student, onFile, onSaved, onDone }: EditBirthdayProps) {
   const { show } = useToast();
   const { applyRosterPerson } = useData();
-  const [text, setText] = useState<string>(() => birthdayFieldFrom(student.birthday));
+  // `undefined` is "the host has no details", not "no birthdate": a host that
+  // has read Planning Center and found none passes null, and both open blank.
+  const held = onFile === undefined ? student.birthday : onFile;
+  const [text, setText] = useState<string>(() => birthdayFieldFrom(held));
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const save = async () => {
-    const read = readBirthdayField(text, { onFile: student.birthday });
+    const read = readBirthdayField(text, { onFile: held });
     if (!read.ok) {
       setProblem(read.error);
       return;
@@ -124,20 +150,26 @@ export function EditBirthday({ student, onDone }: EditBirthdayProps) {
         return;
       }
       /*
-       * The roster is where every screen's copy of a linked student's birthday
-       * comes from — including the row behind this panel — so correcting the
-       * row is all that is needed to make the screen agree with itself. Nothing
-       * in the memoised person details holds a birthday.
+       * Two copies of what just changed, and they are corrected differently.
        *
-       * The row comes back from the write, so this costs nothing and waits for
-       * nothing. It used to be `refreshRoster(true)`, awaited before the toast
-       * and the close, which is what put a leader standing at a door in front
-       * of a spinner while a Cloud Function paged through every child in the
-       * church to fetch back the date they had just typed. The Save still
-       * blocks on Planning Center confirming the write — that is the part
-       * somebody is entitled to wait for — and nothing beyond it.
+       * The roster is where every screen's day comes from — including the row
+       * behind this panel — and the row comes back from the write, so putting
+       * it straight in costs nothing and waits for nothing. It used to be
+       * `refreshRoster(true)`, awaited before the toast and the close, which is
+       * what put a leader standing at a door in front of a spinner while a
+       * Cloud Function paged through every child in the church to fetch back
+       * the date they had just typed. The Save still blocks on Planning Center
+       * confirming the write — that is the part somebody is entitled to wait
+       * for — and nothing beyond it.
+       *
+       * The memoised person details are where the *year* comes from, and they
+       * hold no fresher answer than the one just replaced; dropping them is
+       * what stops this box re-opening on the year it has overwritten. The host
+       * re-reads if it is still on screen showing one.
        */
       applyRosterPerson(response.data.person);
+      invalidatePersonDetails(student.id);
+      onSaved?.();
       show(response.data.status === 'updated' ? response.data.message : 'Already up to date.');
       onDone();
     } catch {
@@ -155,7 +187,7 @@ export function EditBirthday({ student, onDone }: EditBirthdayProps) {
           setProblem(null);
           setText(changed);
         }}
-        onFile={student.birthday}
+        onFile={held}
         error={problem}
         disabled={busy}
       />

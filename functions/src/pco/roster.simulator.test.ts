@@ -549,6 +549,10 @@ describe('fetchPersonDetails', () => {
 
     expect(details?.allergies).toBeTruthy();
     expect(details?.parentPhone ?? details?.parentEmail).toBeTruthy();
+    // The year among them. The roster row for this same student carries
+    // `06-28` and nothing more; this read is the one a screen showing her
+    // profile makes, and it is where an edit form gets the date it opens on.
+    expect(details?.birthdate).toBe('2008-06-28');
   });
 
   it('finds the parent in a household rather than the other child', async () => {

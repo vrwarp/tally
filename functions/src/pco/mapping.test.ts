@@ -6,12 +6,14 @@ import {
   displayFirstName,
   emailKey,
   extractParentContact,
+  fullBirthdayOf,
   hasContactDetails,
   isYouth,
   mapPersonToStudent,
   nameGradeKey,
   pcoGrade,
   splitFirstName,
+  UNKNOWN_BIRTH_YEAR,
 } from './mapping.js';
 import type {
   JsonApiResource,
@@ -187,6 +189,29 @@ describe('mapPersonToStudent', () => {
     // it, so it does not leave the server. See `birthdayOf`.
     expect(mapPersonToStudent(person('1', { birthdate: '2011-03-14' }), RANGE).birthday).toBe('03-14');
     expect(birthdayOf(person('1', { birthdate: '2011-03-14T00:00:00Z' }))).toBe('03-14');
+  });
+
+  /**
+   * The other half of the same rule. A roster carries the day for everybody, so
+   * it drops the year; the one-person read is asked for by somebody looking at
+   * that one student, and hiding the year there only meant an edit form that
+   * could not show what it was about to keep.
+   */
+  it('keeps the year for the one-person read', () => {
+    expect(fullBirthdayOf(person('1', { birthdate: '2011-03-14' }))).toBe('2011-03-14');
+    expect(fullBirthdayOf(person('1', { birthdate: '2011-03-14T00:00:00Z' }))).toBe('2011-03-14');
+    expect(fullBirthdayOf(person('1', {}))).toBeNull();
+    expect(fullBirthdayOf(person('1', { birthdate: '2011-13-40' }))).toBeNull();
+  });
+
+  /**
+   * 1885 is Planning Center's own "nobody knows the year", and it shows no age
+   * against it. Handing it to a screen as a year of birth would print a
+   * hundred-and-forty-year-old child; handing back the day alone says exactly
+   * what is known, in the same shape a day-only edit is written in.
+   */
+  it('hands back the day alone when the year on file is the unknown one', () => {
+    expect(fullBirthdayOf(person('1', { birthdate: `${UNKNOWN_BIRTH_YEAR}-12-14` }))).toBe('12-14');
   });
 
   it('treats an unfilled or unparseable birthdate as no birthday at all', () => {

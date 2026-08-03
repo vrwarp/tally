@@ -6,11 +6,13 @@ import { describe, expect, it } from 'vitest';
 import {
   birthdayParts,
   birthdayState,
+  birthdayYear,
   composeBirthday,
   daysToBirthday,
   formatBirthdayLong,
   formatBirthdayShort,
   isRealBirthday,
+  parseBirthday,
 } from '@/lib/birthday';
 
 /** Sat 14 March 2026. */
@@ -94,10 +96,34 @@ describe('taking a birthday apart', () => {
     expect(birthdayParts(null)).toBeNull();
     expect(birthdayParts(undefined)).toBeNull();
     expect(birthdayParts('')).toBeNull();
-    // The year is never sent to a browser, so a date carrying one is not a
-    // roster value and reads as absent rather than being trusted.
+    // A roster row never carries a year, so a date that has one did not come
+    // from where this reader thinks it did, and reads as absent rather than
+    // being trusted. `parseBirthday` is the one that knows what a year means.
     expect(birthdayParts('2011-03-14')).toBeNull();
     expect(birthdayParts('13-40')).toBeNull();
+  });
+
+  /**
+   * The other reader, for the screens that have asked Planning Center about one
+   * student and been given the whole date. Both shapes, because which one
+   * arrives depends on whether that read has landed — and on whether anybody
+   * upstream knows the year at all.
+   */
+  it('reads the whole date where one was handed over', () => {
+    expect(parseBirthday('2011-03-14')).toEqual({ month: 3, day: 14, year: 2011 });
+    expect(parseBirthday('03-14')).toEqual({ month: 3, day: 14, year: null });
+    expect(parseBirthday('2011-13-40')).toBeNull();
+    expect(parseBirthday(null)).toBeNull();
+
+    expect(birthdayYear('2011-03-14')).toBe(2011);
+    expect(birthdayYear('03-14')).toBeNull();
+    expect(birthdayYear(null)).toBeNull();
+  });
+
+  it('says a date with its year, and a day without one', () => {
+    expect(formatBirthdayLong('2011-03-14')).toBe('14 March 2011');
+    expect(formatBirthdayLong('03-14')).toBe('14 March');
+    expect(formatBirthdayLong(null)).toBeNull();
   });
 });
 

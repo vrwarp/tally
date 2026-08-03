@@ -110,6 +110,7 @@ function details(overrides: Partial<PcoPersonDetails> = {}): PcoPersonDetails {
     parentPhone: null,
     parentEmail: null,
     allergies: null,
+    birthdate: null,
     householdAdult: true,
     contactWritable: true,
     profileWritable: true,
@@ -266,6 +267,33 @@ describe('the birthday badge', () => {
     await userEvent.click(screen.getByRole('button', { name: /Save to Planning Center/ }));
 
     await waitFor(() => expect(applyRosterPerson).toHaveBeenCalledWith(undefined));
+  });
+
+  /**
+   * The year the roster does not carry and this read does. Without it the panel
+   * printed "14 March" over a box opened on `03 / 14 /`, which reads as a year
+   * nobody has ever filled in — on a student Planning Center holds one for.
+   */
+  it('shows the year Planning Center holds, and opens the box on it', () => {
+    personDetails.current = details({ birthdate: '2011-03-14' });
+    openBadge(linked({ birthday: '03-14' }));
+
+    expect(screen.getByText('14 March 2011')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Birthday' })).toHaveValue('03 / 14 / 2011');
+    expect(screen.queryByText(/holds no year/)).toBeNull();
+  });
+
+  /**
+   * 1885 upstream — Planning Center's own "nobody knows" — arrives as the day
+   * alone, and the sentence names whose gap it is. It used to say "Tally is not
+   * sent the year", which is no longer true of anybody.
+   */
+  it('says the year is missing upstream when Planning Center has none', () => {
+    personDetails.current = details({ birthdate: '03-14' });
+    openBadge(linked({ birthday: '03-14' }));
+
+    expect(screen.getByText('14 March')).toBeInTheDocument();
+    expect(screen.getByText(/Planning Center holds no year for Sofia/)).toBeInTheDocument();
   });
 
   it('keeps the form open and says why when Planning Center refuses', async () => {

@@ -25,7 +25,12 @@ import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { invalidateParentContact } from '@/hooks/useParentContact';
 import { invalidatePersonDetails, usePersonDetails } from '@/hooks/usePersonDetails';
-import { birthdayState, formatBirthdayLong, type BirthdayState } from '@/lib/birthday';
+import {
+  birthdayState,
+  birthdayYear,
+  formatBirthdayLong,
+  type BirthdayState,
+} from '@/lib/birthday';
 import { pcoPersonUrl } from '@/lib/planningCenter';
 import { formatShortDate } from '@/lib/time';
 import { pushStudentToPlanningCenter } from '@/services/functions';
@@ -243,6 +248,16 @@ function BirthdayPanel({
   const upstream = student.pcoPersonId ? pcoPersonUrl(student.pcoPersonId) : null;
   const { details, loading, loaded } = usePersonDetails(student);
   const writable = Boolean(student.pcoPersonId) && details?.profileWritable === true;
+  /*
+   * The whole date once the read lands, the roster's day until then. The badge
+   * that opened this knows only `MM-DD`, so the year appears a moment later
+   * rather than not at all — and the day it is appearing next to does not move.
+   *
+   * The roster is the fallback rather than the loser of a disagreement: a
+   * details read that came back with nothing must not blank a day the badge is
+   * already showing, and the two can only differ while one of them is stale.
+   */
+  const onFile = details?.birthdate ?? student.birthday;
 
   const said: Record<Exclude<BirthdayState, 'missing'>, string> = {
     today: 'Today.',
@@ -260,19 +275,25 @@ function BirthdayPanel({
         </p>
       ) : (
         <div className="flex flex-col gap-1">
-          <p className="text-2xl font-bold text-ink-50">{formatBirthdayLong(student.birthday)}</p>
+          <p className="text-2xl font-bold text-ink-50">{formatBirthdayLong(onFile)}</p>
           <p className="text-sm text-ink-400">{said[state]}</p>
-          {writable ? null : (
+          {/*
+            Only where the year is genuinely unknown, and it now says whose gap
+            it is. This used to read "Tally is not sent the year", which was
+            true of every student and is true of none: the year is on the
+            details read, so a blank one is Planning Center's blank.
+          */}
+          {details && birthdayYear(onFile) === null ? (
             <p className="text-sm text-ink-500">
-              The day only. Tally is not sent the year, so it does not know how old{' '}
-              {student.firstName} is.
+              The day only — Planning Center holds no year for {student.firstName}, so it shows no
+              age.
             </p>
-          )}
+          ) : null}
         </div>
       )}
 
       {writable ? (
-        <EditBirthday student={student} onDone={onDone} />
+        <EditBirthday student={student} onFile={onFile} onDone={onDone} />
       ) : loading && !loaded ? (
         <p className="text-sm text-ink-500">Reading what Planning Center allows…</p>
       ) : upstream ? (
