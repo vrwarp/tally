@@ -8,6 +8,6 @@
     "rootDir": "..",
     "types": ["node"]
   },
-  "include": ["src", "../tools/pco-simulator/src"],
+  "include": ["src", "../tools/pco-simulator/src", "../tools/a32-simulator/src"],
   "exclude": ["lib", "node_modules"]
 }

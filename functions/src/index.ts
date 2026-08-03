@@ -69,6 +69,10 @@ import {
   type BackendId,
 } from './generated/backendIds.js';
 import { materializeOccurrence as materializeOne, MINISTRY_TIME_ZONE } from './occurrences.js';
+// Imported for its registration side effect and nothing else: pulling the
+// adapter package in is what makes the Attendees backend available to the
+// registry, and the entry point is the one place that decides what ships.
+import './attendees32/backend.js';
 import { createPcoBackend } from './pco/backend.js';
 import { createPcoClient } from './pco/client.js';
 import { fetchLists } from './pco/lists.js';
