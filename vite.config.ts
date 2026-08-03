@@ -72,10 +72,25 @@ export default defineConfig({
          * Tally ships as a PWA that counselors keep installed for months, so an
          * app-code deploy should not invalidate the ~450 kB of Firebase SDK
          * sitting in their cache.
+         *
+         * Rolldown replaced the `manualChunks` map with `advancedChunks`, which
+         * matches on the module's path rather than on a list of entry points.
+         * The map form named the packages Tally imports and swept their
+         * dependencies along; matching by path has to name those dependencies
+         * too, or the SDK's transitive weight (protobuf, gRPC, idb) lands back
+         * in the app chunk and every deploy invalidates it again.
          */
-        manualChunks: {
-          firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/functions'],
-          react: ['react', 'react-dom', 'react-router-dom'],
+        advancedChunks: {
+          groups: [
+            {
+              name: 'firebase',
+              test: /[\\/]node_modules[\\/](firebase|@firebase|@grpc|protobufjs|idb|@protobufjs|long)[\\/]/,
+            },
+            {
+              name: 'react',
+              test: /[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/,
+            },
+          ],
         },
       },
     },
