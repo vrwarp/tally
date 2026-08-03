@@ -84,6 +84,7 @@ function show(events: readonly TallyEvent[]) {
     rosterOffline: false,
     rosterFetchedAt: null,
     refreshRoster: async () => {},
+    applyRosterPerson: () => {},
   };
 
   const auth = {

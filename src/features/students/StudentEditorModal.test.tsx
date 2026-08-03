@@ -23,11 +23,37 @@ import type { PcoPersonDetails, Student } from '@/types';
 import { makeSettings, makeStudent } from '../../../tests/factories';
 
 const updateStudentProfile = vi.hoisted(() =>
-  vi.fn<(...args: unknown[]) => Promise<{ data: { status: string; wrote: string[]; message: string } }>>(
-    async () => ({
-      data: { status: 'updated', wrote: ['first_name'], message: 'Saved first name in Planning Center.' },
-    }),
-  ),
+  vi.fn<
+    (...args: unknown[]) => Promise<{
+      data: {
+        status: string;
+        wrote: string[];
+        message: string;
+        person?: Record<string, unknown> | null;
+      };
+    }>
+  >(async () => ({
+    data: {
+      status: 'updated',
+      wrote: ['first_name'],
+      message: 'Saved first name in Planning Center.',
+      // The row the write hands back, which is what the roster is corrected
+      // from — see `applyRosterPerson`.
+      person: {
+        id: 'pco_4200003',
+        pcoPersonId: '4200003',
+        firstName: 'Sofía',
+        lastName: 'Delgado',
+        grade: 11,
+        status: 'active',
+        searchName: 'sofia delgado',
+        profileComplete: null,
+        hasAllergies: true,
+        birthday: null,
+        gradeOnFile: true,
+      },
+    },
+  })),
 );
 const setParentContact = vi.hoisted(() => vi.fn());
 const addParent = vi.hoisted(() => vi.fn());
@@ -60,6 +86,7 @@ vi.mock('@/hooks/usePersonDetails', () => ({
 }));
 
 const refreshRoster = vi.fn(async () => {});
+const applyRosterPerson = vi.fn();
 const show = vi.fn();
 
 function linked(overrides: Partial<Student> = {}): Student {
@@ -103,6 +130,7 @@ function open(student: Student | null, onSaved = vi.fn()) {
     rosterOffline: false,
     rosterFetchedAt: null,
     refreshRoster,
+    applyRosterPerson,
   } as unknown as DataContextValue;
 
   const auth = { user: { uid: 'core-1' }, can: () => true } as unknown as AuthContextValue;
@@ -129,6 +157,7 @@ beforeEach(() => {
   updateStudent.mockClear();
   createStudent.mockClear();
   refreshRoster.mockClear();
+  applyRosterPerson.mockClear();
   refreshDetails.mockClear();
   show.mockClear();
   personDetails.current = null;
@@ -197,7 +226,18 @@ describe('when write-back is full', () => {
     });
     // Notes and nothing else: the name went where the name lives.
     expect(updateStudent.mock.calls[0]?.[1]).toEqual({ notes: '' });
-    expect(refreshRoster).toHaveBeenCalledWith(true);
+    /*
+     * And the roster takes the row the write handed back rather than being read
+     * again. A forced refresh here was a paged sweep of every child in the
+     * church, waited on with the modal still open, to be told the name that had
+     * just been sent.
+     */
+    await waitFor(() =>
+      expect(applyRosterPerson).toHaveBeenCalledWith(
+        expect.objectContaining({ pcoPersonId: '4200003', firstName: 'Sofía' }),
+      ),
+    );
+    expect(refreshRoster).not.toHaveBeenCalled();
   });
 
   it('shows the allergy Planning Center holds, and saves an edit to it', async () => {

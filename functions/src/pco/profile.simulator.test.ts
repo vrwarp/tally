@@ -22,7 +22,9 @@ import {
   createSimulatorFetch,
 } from '../../../tools/pco-simulator/src/index.js';
 import type { PcoConfig, PcoWriteBackMode } from '../config.js';
+import { createTtlCache } from './cache.js';
 import { createPcoClient, type PcoClient } from './client.js';
+import { fetchRoster } from './roster.js';
 import { FakeFirestore } from '../testing/fakeFirestore.js';
 import { updateStudentProfile, type StudentProfilePatch } from './profile.js';
 
@@ -178,6 +180,64 @@ describe('updateStudentProfile against the simulator', () => {
 
       expect(result.status).toBe('updated');
       expect(result.message).toMatch(/drop off the roster/);
+    });
+  });
+
+  /**
+   * The row the write hands back, which is what a browser corrects its roster
+   * from instead of reading the whole thing again.
+   *
+   * The assertion that matters is not the field — it is that the row a *write*
+   * describes and the row a *read* describes are the same row. If those two
+   * ever drift, a save reports something the next refresh silently contradicts,
+   * which is the exact failure the old forced refresh could not have.
+   */
+  describe('the row it hands back', () => {
+    const rosterRow = async (personId: string) => {
+      const { people } = await fetchRoster({
+        client: h.client,
+        config: config('full'),
+        cache: createTtlCache({ ttlMs: 0 }),
+        personIds: [personId],
+      });
+      return people[0];
+    };
+
+    it('says what the roster would say once the write has landed', async () => {
+      const id = FIXTURE_IDS.amara;
+      h.db.seed(`students/pco_${id}`, annotation());
+
+      const result = await save(`pco_${id}`, { firstName: 'Amarachi', birthday: '07-19' });
+
+      expect(result.status).toBe('updated');
+      expect(result.person).toEqual(await rosterRow(id));
+      expect(result.person?.firstName).toBe('Amarachi');
+      expect(result.person?.birthday).toBe('07-19');
+    });
+
+    /**
+     * "Planning Center already matches" is often a browser discovering it is
+     * the stale one — somebody else filled the field in — so the row is carried
+     * on `unchanged` too, and that is the case where it does real work.
+     */
+    it('carries the row when there was nothing to write', async () => {
+      const id = FIXTURE_IDS.amara;
+      h.db.seed(`students/pco_${id}`, annotation());
+      await save(`pco_${id}`, { birthday: '07-19' });
+
+      const result = await save(`pco_${id}`, { birthday: '07-19' });
+
+      expect(result.status).toBe('unchanged');
+      expect(result.person?.birthday).toBe('07-19');
+    });
+
+    it('has no row to give when the edit never reached a person', async () => {
+      h.db.seed(`students/pco_${FIXTURE_IDS.amara}`, annotation());
+
+      const refused = await save(`pco_${FIXTURE_IDS.amara}`, { firstName: '  ' });
+
+      expect(refused.status).toBe('invalid');
+      expect(refused.person).toBeNull();
     });
   });
 

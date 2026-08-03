@@ -447,6 +447,15 @@ export interface UpdateStudentProfileResult {
   /** Planning Center attribute names this call wrote. Empty unless `updated`. */
   wrote: string[];
   message: string;
+  /**
+   * The student's roster row as Planning Center now holds it — the same shape
+   * `getRoster` returns, and the reason a save no longer waits for one.
+   *
+   * Hand it to `applyRosterPerson` from `useData`; that is the whole update.
+   * Optional so an older server answering without it still parses, and null
+   * when the write never reached a person.
+   */
+  person?: PcoRosterPerson | null;
 }
 
 /**

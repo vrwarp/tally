@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { subscribeEventSeries, subscribeEvents, subscribeSettings } from '@/services/events';
 import { subscribeStudents } from '@/services/students';
-import { cachedRoster, fetchRoster, mergeRoster } from '@/services/roster';
+import { cachedRoster, fetchRoster, mergeRoster, rememberRosterPerson } from '@/services/roster';
+import { fromRosterPerson } from '@/services/converters';
 import { useNow } from '@/hooks/useNow';
 import { calendarSignature, projectEvents } from '@/lib/eventProjection';
 import { pcoErrorReport } from '@/lib/pcoErrors';
@@ -10,6 +11,7 @@ import {
   type AppSettings,
   type EventSeries,
   type PcoErrorReport,
+  type PcoRosterPerson,
   type Student,
   type TallyEvent,
 } from '@/types';
@@ -256,6 +258,36 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /**
+   * The roster as last committed, for `applyRosterPerson` to look somebody up
+   * in without the callback having to be rebuilt — and every consumer of the
+   * context re-rendered — on every read that lands.
+   */
+  const held = useRef<Student[]>(roster);
+  useEffect(() => {
+    held.current = roster;
+  }, [roster]);
+
+  const applyRosterPerson = useCallback(
+    (person?: PcoRosterPerson | null) => {
+      if (!person || !held.current.some((student) => student.pcoPersonId === person.pcoPersonId)) {
+        // Nothing here answers to them, so there is nothing to correct in
+        // place. Not awaited: the caller has its confirmation already, and the
+        // point of this whole path is that a write does not wait on a read.
+        void refreshRoster(true);
+        return;
+      }
+
+      const row = fromRosterPerson(person, new Date());
+      setRoster((current) =>
+        current.map((student) => (student.pcoPersonId === person.pcoPersonId ? row : student)),
+      );
+      // And on this device, so a reload does not paint the row as it was.
+      rememberRosterPerson(person);
+    },
+    [refreshRoster],
+  );
+
   useEffect(() => {
     void refreshRoster();
 
@@ -322,6 +354,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       rosterOffline,
       rosterFetchedAt,
       refreshRoster,
+      applyRosterPerson,
     }),
     [
       students,
@@ -336,6 +369,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       rosterOffline,
       rosterFetchedAt,
       refreshRoster,
+      applyRosterPerson,
     ],
   );
 

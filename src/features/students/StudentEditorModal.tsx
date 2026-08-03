@@ -132,14 +132,15 @@ export interface StudentEditorModalProps {
   student?: Student | null;
   /**
    * Called after a save that changed something in Planning Center, so a screen
-   * holding person details can re-read them. The roster refreshes itself.
+   * holding person details can re-read them. The roster corrects itself, from
+   * the row the write hands back.
    */
   onSaved?: () => void;
 }
 
 export function StudentEditorModal({ open, onClose, student, onSaved }: StudentEditorModalProps) {
   const { user } = useAuth();
-  const { refreshRoster } = useData();
+  const { applyRosterPerson } = useData();
   const { show } = useToast();
   const formId = useId();
 
@@ -207,8 +208,9 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
     setForm((current) => ({ ...current, [field]: value }));
 
   /**
-   * Carries the managed half of the form upstream. Returns the message to show,
-   * or throws so the caller can report a refusal without closing.
+   * Carries the managed half of the form upstream. Returns the message to show
+   * and the student's roster row as Planning Center now holds it, or throws so
+   * the caller can report a refusal without closing.
    *
    * Every managed field is sent on every save rather than only the changed
    * ones. The server compares against a fresh read of the person and patches
@@ -254,9 +256,13 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
     });
 
     if (response.data.status === 'updated' || response.data.status === 'unchanged') {
-      return response.data.status === 'updated'
-        ? response.data.message
-        : `${studentFullName({ firstName, lastName })} saved`;
+      return {
+        message:
+          response.data.status === 'updated'
+            ? response.data.message
+            : `${studentFullName({ firstName, lastName })} saved`,
+        person: response.data.person,
+      };
     }
     throw new Error(response.data.message);
   };
@@ -301,9 +307,9 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
         // The upstream half first: it is the half that can be refused, and a
         // note saved against a name Planning Center rejected is a half-done
         // save nobody asked for.
-        const message = writable
+        const saved = writable
           ? await saveUpstream(student, firstName, lastName, birthday)
-          : `${studentFullName(student)} saved`;
+          : { message: `${studentFullName(student)} saved`, person: null };
 
         const patch: Partial<StudentDraft> = { notes: form.notes };
         // Managed fields are left out of the Firestore patch in both modes, and
@@ -348,11 +354,19 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
         );
 
         if (writable) {
-          // The roster is where the name and grade on every other screen come
-          // from; the memoised details are where the allergies are. Dropping
-          // the memo rather than re-reading it here, because this modal is
-          // about to close — whoever opened it asks again.
-          await refreshRoster(true);
+          /*
+           * The roster is where the name and grade on every other screen come
+           * from; the memoised details are where the allergies are. Dropping
+           * the memo rather than re-reading it here, because this modal is
+           * about to close — whoever opened it asks again.
+           *
+           * The roster row is corrected from the write's own answer rather than
+           * by asking for the whole roster again with `force`, which is a sweep
+           * of every child in the church for a name somebody just typed. Save
+           * still blocks on Planning Center accepting the edit; it no longer
+           * blocks on being told back what it wrote.
+           */
+          applyRosterPerson(saved.person);
           invalidatePersonDetails(student.id);
           // And the notes the check-in badges print, which are held separately
           // and would otherwise go on showing the allergy as it was typed
@@ -360,7 +374,7 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
           invalidateAllergyNotes();
           onSaved?.();
         }
-        show(message, { tone: 'success' });
+        show(saved.message, { tone: 'success' });
       } else {
         // Create mode never shows the blank option — there is no student to
         // hold no grade — so this refuses nothing anybody can reach. It is here

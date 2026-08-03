@@ -97,7 +97,7 @@ export interface EditBirthdayProps {
  */
 export function EditBirthday({ student, onDone }: EditBirthdayProps) {
   const { show } = useToast();
-  const { refreshRoster } = useData();
+  const { applyRosterPerson } = useData();
   const [text, setText] = useState<string>(() => birthdayFieldFrom(student.birthday));
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -125,11 +125,19 @@ export function EditBirthday({ student, onDone }: EditBirthdayProps) {
       }
       /*
        * The roster is where every screen's copy of a linked student's birthday
-       * comes from — including the row behind this panel — so refreshing it is
-       * all that is needed to make the screen agree with itself. Nothing in the
-       * memoised person details holds a birthday.
+       * comes from — including the row behind this panel — so correcting the
+       * row is all that is needed to make the screen agree with itself. Nothing
+       * in the memoised person details holds a birthday.
+       *
+       * The row comes back from the write, so this costs nothing and waits for
+       * nothing. It used to be `refreshRoster(true)`, awaited before the toast
+       * and the close, which is what put a leader standing at a door in front
+       * of a spinner while a Cloud Function paged through every child in the
+       * church to fetch back the date they had just typed. The Save still
+       * blocks on Planning Center confirming the write — that is the part
+       * somebody is entitled to wait for — and nothing beyond it.
        */
-      await refreshRoster(true);
+      applyRosterPerson(response.data.person);
       show(response.data.status === 'updated' ? response.data.message : 'Already up to date.');
       onDone();
     } catch {

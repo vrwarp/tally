@@ -1,0 +1,92 @@
+/**
+ * The roster parked on this device, and the one row a write is allowed to
+ * correct in it.
+ *
+ * `rememberRosterPerson` exists because a profile save no longer re-reads the
+ * roster — it applies the row Planning Center handed back. That fixes what is
+ * on screen; this is what stops a reload undoing it, since a cold start paints
+ * from storage before the first read lands.
+ */
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { cachedRoster, forgetRoster, rememberRosterPerson } from '@/services/roster';
+import type { PcoRosterPerson } from '@/types';
+
+// Only so the module graph stops short of Firebase: nothing here reads.
+vi.mock('@/services/functions', () => ({ getRoster: vi.fn() }));
+
+const CACHE_KEY = 'tally:roster';
+
+function person(overrides: Partial<PcoRosterPerson> = {}): PcoRosterPerson {
+  return {
+    id: 'pco_1',
+    pcoPersonId: '1',
+    firstName: 'Jamie',
+    lastName: 'Rivera',
+    grade: 8,
+    status: 'active',
+    searchName: 'jamie rivera',
+    profileComplete: null,
+    hasAllergies: false,
+    birthday: null,
+    gradeOnFile: true,
+    ...overrides,
+  };
+}
+
+function park(people: PcoRosterPerson[], storedAt: number): void {
+  window.localStorage.setItem(CACHE_KEY, JSON.stringify({ people, storedAt }));
+}
+
+function parked(): { people: PcoRosterPerson[]; storedAt: number } {
+  return JSON.parse(window.localStorage.getItem(CACHE_KEY) ?? 'null') as {
+    people: PcoRosterPerson[];
+    storedAt: number;
+  };
+}
+
+beforeEach(() => {
+  forgetRoster();
+});
+
+describe('remembering one corrected row', () => {
+  it('replaces that person and leaves the rest of the roster alone', () => {
+    park([person(), person({ id: 'pco_2', pcoPersonId: '2', firstName: 'Sofia' })], Date.now());
+
+    rememberRosterPerson(person({ birthday: '03-16' }));
+
+    const held = parked().people;
+    expect(held).toHaveLength(2);
+    expect(held[0]?.birthday).toBe('03-16');
+    expect(held[1]?.firstName).toBe('Sofia');
+    expect(cachedRoster()?.students[0]?.birthday).toBe('03-16');
+  });
+
+  /**
+   * Correcting one row does not make the other four hundred any fresher.
+   * Restamping the whole roster with the time of a birthday edit would keep a
+   * week-old copy alive past the point the staleness floor is there to end it.
+   */
+  it('does not pass the stored roster off as newly read', () => {
+    const storedAt = Date.now() - 60_000;
+    park([person()], storedAt);
+
+    rememberRosterPerson(person({ birthday: '03-16' }));
+
+    expect(parked().storedAt).toBe(storedAt);
+  });
+
+  /** Storage mirrors the last read; a row that read never returned is not ours to invent. */
+  it('adds nobody the stored roster does not already hold', () => {
+    park([person()], Date.now());
+
+    rememberRosterPerson(person({ id: 'pco_9', pcoPersonId: '9' }));
+
+    expect(parked().people.map((held) => held.pcoPersonId)).toEqual(['1']);
+  });
+
+  it('does nothing when this device has no roster parked', () => {
+    rememberRosterPerson(person());
+
+    expect(window.localStorage.getItem(CACHE_KEY)).toBeNull();
+  });
+});

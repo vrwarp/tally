@@ -16,12 +16,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DataProvider, EVENT_WINDOW_DAYS } from '@/context/DataProvider';
 import { useData, type DataContextValue } from '@/context/dataContext';
 import { PARTICIPATION_MAX_AGE_DAYS } from '@/features/roster/predictiveRoster';
+import type { PcoRosterPerson } from '@/types';
 import { makeStudent } from '../../tests/factories';
 
 const fetchRoster = vi.hoisted(() => vi.fn());
 
+const rememberRosterPerson = vi.hoisted(() => vi.fn());
+
 vi.mock('@/services/roster', () => ({
   fetchRoster,
+  rememberRosterPerson,
   cachedRoster: () => null,
   // The merge has its own tests; here it only has to preserve identity, so that
   // what these assert about `roster` is what a screen would see in `students`.
@@ -61,7 +65,7 @@ const FETCHED_AT = '2026-02-13T19:30:00.000Z';
  */
 function reply() {
   return {
-    students: [makeStudent({ id: 'pco_1' })],
+    students: [makeStudent({ id: 'pco_1', pcoPersonId: '1', birthday: null })],
     fetchedAt: new Date(FETCHED_AT),
     offline: false,
   };
@@ -98,6 +102,7 @@ beforeEach(() => {
   latest = null;
   fetchRoster.mockReset();
   fetchRoster.mockImplementation(() => Promise.resolve(reply()));
+  rememberRosterPerson.mockClear();
   vi.spyOn(Date, 'now').mockImplementation(() => realNow() + offset);
 });
 
@@ -256,6 +261,70 @@ describe('DataProvider, on coming back to the tab', () => {
     await act(async () => {
       land(reply());
     });
+  });
+});
+
+/**
+ * Correcting one row from a write's own answer, rather than re-reading four
+ * hundred to find out what one of them now says.
+ *
+ * This is the whole reason saving a birthday stopped taking as long as it did:
+ * `refreshRoster(true)` is a forced, uncached, paged sweep of every child in
+ * the church, and a leader stood in front of a spinner through it to see the
+ * date they had just typed appear.
+ */
+describe('applying one row a write handed back', () => {
+  /** The shape `getRoster` returns, and the shape a write now returns too. */
+  function row(overrides: Partial<PcoRosterPerson> = {}): PcoRosterPerson {
+    return {
+      id: 'pco_1',
+      pcoPersonId: '1',
+      firstName: 'Jamie',
+      lastName: 'Rivera',
+      grade: 8,
+      status: 'active',
+      searchName: 'jamie rivera',
+      profileComplete: null,
+      hasAllergies: false,
+      birthday: '03-16',
+      gradeOnFile: true,
+      ...overrides,
+    };
+  }
+
+  it('puts it into the roster without asking Planning Center again', async () => {
+    mount();
+    await waitFor(() => expect(latest?.rosterSettled).toBe(true));
+    expect(latest?.students[0]?.birthday).toBeNull();
+    const reads = fetchRoster.mock.calls.length;
+
+    act(() => latest?.applyRosterPerson(row()));
+
+    await waitFor(() => expect(latest?.students[0]?.birthday).toBe('03-16'));
+    expect(fetchRoster.mock.calls.length).toBe(reads);
+    // And on this device, or a reload would paint the row as it was.
+    expect(rememberRosterPerson).toHaveBeenCalledWith(row());
+  });
+
+  /**
+   * A write that answered without a row — an older server — or one about
+   * somebody this roster does not hold, which is what a person merged upstream
+   * mid-edit looks like: the row comes back under the surviving id and there is
+   * nothing here to match it to. Correctness falls back to a read; the point is
+   * only that the caller does not wait on it.
+   */
+  it('falls back to a read when there is nobody here to correct', async () => {
+    mount();
+    await waitFor(() => expect(latest?.rosterSettled).toBe(true));
+    const reads = fetchRoster.mock.calls.length;
+
+    act(() => latest?.applyRosterPerson(undefined));
+    await waitFor(() => expect(fetchRoster.mock.calls.length).toBe(reads + 1));
+    expect(fetchRoster).toHaveBeenLastCalledWith(expect.any(Date), true);
+
+    act(() => latest?.applyRosterPerson(row({ pcoPersonId: '99' })));
+    await waitFor(() => expect(fetchRoster.mock.calls.length).toBe(reads + 2));
+    expect(rememberRosterPerson).not.toHaveBeenCalled();
   });
 });
 

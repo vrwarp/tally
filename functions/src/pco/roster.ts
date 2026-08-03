@@ -226,6 +226,45 @@ export interface RosterHydration {
 }
 
 /**
+ * One Planning Center person, as a row of the roster.
+ *
+ * Exported because a *write* has to be able to produce one. A profile edit
+ * already holds the person it just patched, and handing the finished row back
+ * to the browser is what saves it re-reading the whole roster to see one
+ * changed field — so the row a write describes has to be built by the same code
+ * that builds the row a read describes, or the two would drift and a save would
+ * start reporting something a refresh then contradicted.
+ */
+export function rosterPersonFrom(
+  person: PcoPerson,
+  config: Pick<PcoConfig, 'minGrade' | 'maxGrade'>,
+  now: Date,
+): RosterPerson {
+  const mapped = mapPersonToStudent(person, {
+    minGrade: config.minGrade,
+    maxGrade: config.maxGrade,
+    now,
+  });
+
+  return {
+    id: pcoStudentId(person.id),
+    pcoPersonId: person.id,
+    firstName: mapped.firstName,
+    lastName: mapped.lastName,
+    grade: mapped.grade,
+    status: mapped.status,
+    searchName: mapped.searchName,
+    // Not looked up — see the note on the field. Hydrating households here
+    // would be one request per family on the path a counselor waits for at a
+    // door.
+    profileComplete: null,
+    hasAllergies: mapped.allergies !== null && mapped.allergies.length > 0,
+    birthday: mapped.birthday,
+    gradeOnFile: pcoGrade(person, now) !== null,
+  };
+}
+
+/**
  * Turns the Planning Center ids on Tally's roster into people.
  *
  * The membership itself is Tally's — a `students/{id}` document exists for
@@ -318,28 +357,7 @@ async function hydratePeople(
   const households: Record<string, string[]> = {};
   for (const person of found.values()) {
     households[person.id] = householdIdsOf(person);
-    const mapped = mapPersonToStudent(person, {
-      minGrade: config.minGrade,
-      maxGrade: config.maxGrade,
-      now,
-    });
-
-    people.push({
-      id: pcoStudentId(person.id),
-      pcoPersonId: person.id,
-      firstName: mapped.firstName,
-      lastName: mapped.lastName,
-      grade: mapped.grade,
-      status: mapped.status,
-      searchName: mapped.searchName,
-      // Not looked up — see the note on the field. Hydrating households here
-      // would be one request per family on the path a counselor waits for at a
-      // door.
-      profileComplete: null,
-      hasAllergies: mapped.allergies !== null && mapped.allergies.length > 0,
-      birthday: mapped.birthday,
-      gradeOnFile: pcoGrade(person, now) !== null,
-    });
+    people.push(rosterPersonFrom(person, config, now));
   }
 
   people.sort((a, b) => (a.searchName < b.searchName ? -1 : a.searchName > b.searchName ? 1 : 0));
