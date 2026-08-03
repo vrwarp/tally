@@ -674,7 +674,7 @@ export function StudentDetailPage() {
               <div className="mt-1 flex flex-col gap-2">
                 <p className="text-sm text-ink-300">
                   {student.pcoPushPending
-                    ? `Created in Tally. Waiting to be pushed to ${backendName} — the scheduled sync will do it, or you can send them now.`
+                    ? `Created in Tally. Waiting to be pushed to ${backendName} — send them now, or the next push retry will.`
                     : `Created in Tally and not linked to a ${backendName} person.`}
                 </p>
                 {student.pcoPushPending ? (

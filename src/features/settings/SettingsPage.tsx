@@ -1,6 +1,6 @@
 /**
- * The core team's control panel: prediction thresholds, the Planning Center
- * connection, and who is on the team.
+ * The core team's control panel: prediction thresholds, the people-backend
+ * connections, and who is on the team.
  *
  * The thresholds are the only genuinely dangerous controls here — they silently
  * reshape what every counselor sees at the door — so each one is followed by a

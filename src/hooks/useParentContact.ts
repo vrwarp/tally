@@ -77,7 +77,7 @@ export function useParentContact(): ParentContactResult {
         setError(
           code.includes('permission-denied')
             ? 'Only the core team can see which profiles are incomplete.'
-            : 'Could not reach Planning Center to check which profiles are incomplete.',
+            : 'Could not check which profiles are incomplete — the people system did not answer.',
         );
       })
       .finally(() => {

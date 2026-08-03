@@ -443,7 +443,7 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
       description={
         student
           ? undefined
-          : 'Created in Tally and pushed to Planning Center on the next sync.'
+          : 'Created in Tally, and pushed to your people system automatically when write-back allows it.'
       }
       footer={
         <>
