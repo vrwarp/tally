@@ -123,8 +123,17 @@ export function createA32Backend(args: BackendContext & { config: A32Config }): 
       recreateStudent({ db, client, config, cache, studentId, firstName, lastName, grade, logger }),
 
     listImportableEvents: () => listImportableMeets({ client, db }),
-    importHistory: ({ upstreamEventId, uid, now, logger }) =>
-      importMeetHistory({ db, client, config, meetSlug: upstreamEventId, uid, now, logger }),
+    importHistory: ({ upstreamEventId, uid, now, logger, existingStudentIds }) =>
+      importMeetHistory({
+        db,
+        client,
+        config,
+        meetSlug: upstreamEventId,
+        uid,
+        now,
+        logger,
+        existingStudentIds,
+      }),
 
     invalidatePersonDetails: (personId) =>
       cache.invalidate(personDetailsCacheKey(config.baseUrl, personId)),

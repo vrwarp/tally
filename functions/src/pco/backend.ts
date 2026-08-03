@@ -21,6 +21,7 @@ import { SILENT_LOGGER } from '../firestore.js';
 import { BACKEND_PREFIXES } from '../generated/backendIds.js';
 import { checkInsBaseUrl, importCheckInsEvent, listCheckInsEvents } from './checkins.js';
 import { createPcoClient, type PcoClient } from './client.js';
+import { a32AliasesFromIncluded, resolveA32UuidFieldId } from './fieldData.js';
 import { addParent } from './household.js';
 import { fetchListMemberIds, fetchLists } from './lists.js';
 import { setParentContact } from './parentContact.js';
@@ -92,7 +93,7 @@ export function createPcoBackend(args: BackendContext & { config: PcoConfig }): 
 
     fetchRoster: ({ personIds, force }) =>
       fetchRoster({ client, config, cache, personIds, force }),
-    searchPeople: ({ query, limit }) => searchPeople({ client, config, query, limit }),
+    searchPeople: ({ query, limit }) => searchPeople({ client, config, query, limit, cache }),
     fetchPersonDetails: ({ personId, force }) =>
       fetchPersonDetails({ client, config, cache, personId, force }),
     fetchAllergyNotes: ({ personIds, force }) =>
@@ -106,14 +107,33 @@ export function createPcoBackend(args: BackendContext & { config: PcoConfig }): 
      * meant that person — and only a trail that ends dead is reported gone.
      */
     checkPerson: async ({ personId }): Promise<PersonCheck> => {
+      // Their Attendees identity rides along on the same request, so an add
+      // can recognise a person the roster already holds through the other
+      // backend. Resolved from cache; null when the org keeps no such field.
+      const a32FieldId = await resolveA32UuidFieldId({ client, cache, baseUrl: config.baseUrl });
+      const fetchOne = async (id: string): Promise<{ a32PersonId?: string }> => {
+        const body = await client.get(`/people/${encodeURIComponent(id)}`, {
+          ...(a32FieldId ? { include: ['field_data'] } : {}),
+        });
+        const alias = a32FieldId
+          ? a32AliasesFromIncluded(body.included ?? [], a32FieldId)[id]
+          : undefined;
+        return alias ? { a32PersonId: alias } : {};
+      };
+
       try {
-        await client.get(`/people/${encodeURIComponent(personId)}`);
-        return { outcome: 'exists', personId };
+        const extra = await fetchOne(personId);
+        return { outcome: 'exists', personId, ...extra };
       } catch (error) {
         if (!isPersonGoneError(error)) throw error;
         const link = await followPersonLink(client, personId, error);
         if (link.outcome === 'gone') return { outcome: 'gone' };
-        return { outcome: 'relinked', personId: link.personId };
+        try {
+          const extra = await fetchOne(link.personId);
+          return { outcome: 'relinked', personId: link.personId, ...extra };
+        } catch {
+          return { outcome: 'relinked', personId: link.personId };
+        }
       }
     },
 

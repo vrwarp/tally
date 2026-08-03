@@ -352,6 +352,9 @@ function buildIncluded(
           id: datum.id,
           attributes: { value: datum.value },
           relationships: {
+            // `customizable` is what the real API calls the owning person;
+            // `person` is kept alongside for any older reader of this shape.
+            customizable: { data: { type: 'Person', id: datum.person_id } },
             person: { data: { type: 'Person', id: datum.person_id } },
             field_definition: {
               data: { type: 'FieldDefinition', id: datum.field_definition_id },
@@ -478,6 +481,30 @@ function route(request: SimRequest, store: SimulatorStore): SimResponse {
 
   if (method === 'GET' && request.path === '/lists') {
     return serveLists(query, store, request.path, request.query);
+  }
+
+  /*
+   * The org's custom-field vocabulary. Tally reads it once per cache window to
+   * learn whether this church keeps an `attendees_uuid` field — the pointer
+   * that says which Attendees person a Planning Center person is. Small enough
+   * that one page is always the whole answer.
+   */
+  if (method === 'GET' && request.path === '/field_definitions') {
+    const definitions = store.fieldDefinitions;
+    return json(200, {
+      data: definitions.map((definition) => ({
+        type: 'FieldDefinition',
+        id: definition.id,
+        attributes: {
+          name: definition.name,
+          slug: definition.slug,
+          data_type: definition.data_type,
+          deleted_at: null,
+        },
+      })),
+      included: [],
+      meta: { total_count: definitions.length, count: definitions.length },
+    });
   }
 
   const listMatch = LIST_PEOPLE_PATH.exec(request.path);

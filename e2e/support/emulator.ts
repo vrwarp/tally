@@ -208,6 +208,8 @@ export async function createSimulatorStudent(input: {
   parentPhone?: string;
   parentEmail?: string;
   allergies?: string;
+  /** The same person's Attendees UUID, recorded as the `attendees_uuid` field. */
+  attendeesUuid?: string;
 }): Promise<void> {
   const response = await fetch(`${E2E.simulatorUrl}/_sim/seed`, {
     method: 'POST',
@@ -269,6 +271,23 @@ export async function resetA32Simulator(): Promise<void> {
   if (!response.ok) {
     throw new Error(`Could not reset the Attendees simulator: HTTP ${response.status}.`);
   }
+}
+
+/**
+ * An Attendees person's UUID, looked up by name through the simulator's own
+ * API — the ids are minted at boot, so a spec that links a Planning Center
+ * person to one has to ask.
+ */
+export async function a32PersonIdOf(name: string): Promise<string> {
+  const url = `${E2E.a32SimulatorUrl}/persons/api/datagrid_data_attendee/?searchValue=${encodeURIComponent(name)}&take=5&skip=0`;
+  const response = await fetch(url, { headers: { Authorization: 'Token a32-sim-token' } });
+  if (!response.ok) {
+    throw new Error(`Could not search the Attendees simulator: HTTP ${response.status}.`);
+  }
+  const body = (await response.json()) as { data: Array<{ id: string }> };
+  const first = body.data[0];
+  if (!first) throw new Error(`The Attendees simulator holds nobody called "${name}".`);
+  return first.id;
 }
 
 /** Takes the whole Attendees server down (503s) — or brings it back. */

@@ -95,6 +95,12 @@ costs no extra requests.
 - **Auth is a DRF token**, sent as `Authorization: Token …` — no OAuth, no Basic pair. The
   token-auth support itself (DRF-level permission guards replacing the Django login redirects) is
   part of the Attendees branch this integration ships with.
+- **The same people can live in both systems.** If the Planning Center org keeps an
+  `attendees_uuid` custom field naming each person's Attendees UUID, Tally treats a linked pair as
+  one student: one search row, one membership, and an Attendees history import that files under
+  the Planning Center membership. The whole mechanism is described in
+  [backends.md](./backends.md#when-both-backends-hold-the-same-person); nothing on the Attendees
+  side needs configuring for it.
 
 ## 4. Local development and testing
 

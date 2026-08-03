@@ -8,6 +8,11 @@ The abstraction that makes it one-of-N lives in [backends.md](./backends.md), an
 backend has its own page ([attendees32.md](./attendees32.md)); everything below is about Planning
 Center specifically, and none of it changes when another backend is connected alongside.
 
+One People custom field is special when both backends are connected: a field with slug
+`attendees_uuid` holding a person's Attendees UUID marks the two records as the same human, and
+Tally reads it to keep them one student. See
+[backends.md](./backends.md#when-both-backends-hold-the-same-person).
+
 **Tally owns the two memberships.** Who is a student, and who may sign in to Tally, are
 Tally's own lists. They used to be Planning Center Lists, and that was a mistake worth explaining,
 because it is the reason this page reads the way it does now: a List is *generated from filter

@@ -704,3 +704,83 @@ describe('fetchAllergyNotes', () => {
     expect(world.requests).toHaveLength(0);
   });
 });
+
+describe('attendees_uuid aliases', () => {
+  const UUID = '49874dab-4135-4949-b053-b6d1b263489f';
+
+  it('carries no aliases for an org that keeps no such field', async () => {
+    const world = harness();
+    const result = await fetchRoster({
+      ...world,
+      config: baseConfig(),
+      personIds: [FIXTURE_IDS.sofiaWithAllergy],
+    });
+
+    expect(result.a32Aliases).toEqual({});
+    // And having found no field definition, it never asks for field_data.
+    expect(world.requests.some((url) => url.includes('field_data'))).toBe(false);
+  });
+
+  it('reads each roster member’s Attendees identity off the same request', async () => {
+    const world = harness();
+    world.store.seedStudent({
+      id: '7770001',
+      firstName: 'Priya',
+      lastName: 'Raghunathan',
+      grade: 9,
+      attendeesUuid: UUID,
+    });
+
+    const result = await fetchRoster({
+      ...world,
+      config: baseConfig(),
+      personIds: ['7770001', FIXTURE_IDS.sofiaWithAllergy],
+    });
+
+    expect(result.a32Aliases).toEqual({ '7770001': UUID });
+    // The pointer is server-internal: no roster row carries it.
+    for (const person of result.people) {
+      expect(JSON.stringify(person)).not.toContain(UUID);
+    }
+  });
+
+  it('labels a search hit with the alias, so one human is one row', async () => {
+    const world = harness();
+    world.store.seedStudent({
+      id: '7770002',
+      firstName: 'Wei',
+      lastName: 'Suzuki',
+      grade: 11,
+      attendeesUuid: UUID,
+    });
+
+    const results = await searchPeople({
+      ...world,
+      config: baseConfig(),
+      query: 'Suzuki',
+    });
+
+    expect(results).toHaveLength(1);
+    expect(results[0]!.a32PersonId).toBe(UUID);
+  });
+
+  it('searches without aliases when no cache rides along', async () => {
+    const world = harness();
+    world.store.seedStudent({
+      id: '7770003',
+      firstName: 'Wei',
+      lastName: 'Suzuki',
+      grade: 11,
+      attendeesUuid: UUID,
+    });
+
+    const results = await searchPeople({
+      client: world.client,
+      config: baseConfig(),
+      query: 'Suzuki',
+    });
+
+    expect(results).toHaveLength(1);
+    expect(results[0]!.a32PersonId).toBeUndefined();
+  });
+});

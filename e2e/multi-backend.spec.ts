@@ -11,7 +11,7 @@
  */
 import type { Page } from '@playwright/test';
 import { gotoReady, reloadReady } from './support/auth';
-import { removeA32Residue } from './support/emulator';
+import { a32PersonIdOf, removeA32Residue } from './support/emulator';
 import { expect, test } from './support/fixtures';
 
 /** Adds one Attendees person to the roster through the UI, and waits for the row. */
@@ -138,5 +138,93 @@ test.describe('Two backends at once', () => {
     // default push backend, and a student linked to a backend about to vanish.
     await firestore.remove('config/backends');
     await firestore.remove(`students/${keanu.id}`);
+  });
+
+  test('a person both systems hold is one student, keyed by attendees_uuid', async ({
+    page,
+    signedInAs,
+    attendees,
+    planningCenter,
+    firestore,
+  }) => {
+    /*
+     * The church's own bridge: each Planning Center person carries their
+     * Attendees UUID in the `attendees_uuid` custom field. Tomás exists in
+     * both systems; Tally must treat him as one human — one search row, one
+     * membership, and an imported history that lands on it.
+     */
+    await attendees.enable();
+    const tomasUuid = await a32PersonIdOf('Tomás Beltrán');
+    await planningCenter.createStudent({
+      firstName: 'Tomás',
+      lastName: 'Beltrán',
+      grade: 7,
+      parentName: 'Rodrigo Beltrán',
+      parentPhone: '555-0333',
+      attendeesUuid: tomasUuid,
+    });
+
+    await signedInAs('core');
+    await gotoReady(page, '/students');
+
+    // The fanned-out search recognises the pair and shows one row — the
+    // Planning Center one, since that is the side holding the pointer.
+    await page.getByRole('button', { name: /add from directory/i }).click({ timeout: 20_000 });
+    const dialog = page.getByRole('dialog', { name: /add a student/i });
+    await dialog.getByLabel(/search your directories/i).fill('Tomás Beltrán');
+    const row = dialog.locator('li').filter({ hasText: 'Tomás Beltrán' });
+    await row.waitFor({ timeout: 20_000 });
+    await expect(row).toHaveCount(1);
+    await expect(row.getByText('Planning Center')).toBeVisible();
+
+    await row.getByRole('button', { name: /^add$/i }).click();
+    await expect(row.getByText(/on the roster/i)).toBeVisible({ timeout: 20_000 });
+    await dialog.getByRole('button', { name: /done/i }).click();
+
+    // One membership, on the Planning Center side, and none on the other.
+    const pcoPeople = await planningCenter.people();
+    const tomasPcoId = String(
+      pcoPeople.find((person) => person.first_name === 'Tomás' && person.last_name === 'Beltrán')!
+        .id,
+    );
+    const keeperId = `pco_${tomasPcoId}`;
+    const students = await firestore.collection('students');
+    expect(students.some((doc) => doc.id === keeperId)).toBe(true);
+    expect(students.some((doc) => doc.id === `a32_${tomasUuid}`)).toBe(false);
+
+    // His Attendees history files under that membership — no second document.
+    await gotoReady(page, '/events');
+    await page.getByRole('button', { name: /^import$/i }).click();
+    const importDialog = page.getByRole('dialog', { name: /import history/i });
+    const meet = importDialog.locator('li').filter({ hasText: 'Friday night' });
+    await meet.waitFor({ timeout: 30_000 });
+    await meet.getByRole('button', { name: /^import$/i }).click();
+    await expect(importDialog.getByText(/is in Tally/)).toBeVisible({ timeout: 60_000 });
+
+    const after = await firestore.collection('students');
+    expect(after.some((doc) => doc.id === `a32_${tomasUuid}`)).toBe(false);
+    // History reached the membership: the import back-dates it to his first
+    // attended night, which an add alone never sets.
+    const keeper = after.find((doc) => doc.id === keeperId)!;
+    expect(keeper.data.firstAttendedAt).toBeTruthy();
+
+    // And his attendance rows are keyed by that membership on the imported
+    // nights themselves.
+    const chain = (await firestore.collection('events')).filter((doc) =>
+      doc.id.startsWith('a32-meet-'),
+    );
+    let found = false;
+    for (const event of chain) {
+      const rows = await firestore.collection(`events/${event.id}/attendance`);
+      if (rows.some((doc) => doc.id === keeperId)) {
+        found = true;
+        break;
+      }
+    }
+    expect(found).toBe(true);
+
+    // The chain and its attendance leave with the residue sweep; the
+    // membership this test added leaves here.
+    await firestore.remove(`students/${keeperId}`);
   });
 });

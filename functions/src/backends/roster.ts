@@ -38,6 +38,13 @@ export interface PerBackendRoster {
   missing: string[];
   cached: boolean;
   fetchedAt: string;
+  /**
+   * Person id -> the same person's Attendees UUID, when this backend carries
+   * the church's cross-backend pointers (Planning Center's `attendees_uuid`
+   * field). Server-internal: read by the alias fold in the entry point, never
+   * merged into the wire answer.
+   */
+  a32Aliases?: Record<string, string>;
 }
 
 export interface MergedRoster {

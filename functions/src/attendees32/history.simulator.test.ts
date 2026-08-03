@@ -165,6 +165,51 @@ describe('importMeetHistory', () => {
     expect(db.get(somePath)!.checkedInBy).toBe('uid-counselor');
   });
 
+  it('files an aliased attendee under the membership the roster already has', async () => {
+    /*
+     * The church runs both systems for the same people, and Planning Center
+     * holds each person's Attendees UUID (`attendees_uuid`). The caller
+     * resolves that into `existingStudentIds`; what matters here is that the
+     * import honours it — history lands on the Planning Center membership,
+     * no second document stands up, and the Planning Center linkage is left
+     * exactly as it was.
+     */
+    const priya = [...store.attendees.values()].find((row) => row.firstName === 'Priya')!;
+    db.seed('students/pco_140203708', {
+      status: 'active',
+      pcoPersonId: '140203708',
+      upstreamBackend: 'pco',
+      upstreamPersonId: '140203708',
+    });
+
+    const summary = await importMeetHistory({
+      db,
+      client,
+      config,
+      meetSlug: 'simorg_tally_gathering',
+      uid: 'uid-leader',
+      now: NOW,
+      existingStudentIds: { [priya.id]: 'pco_140203708' },
+    });
+
+    // No a32 document for her; her rows count her as an existing student.
+    expect(db.get(`students/a32_${priya.id}`)).toBeUndefined();
+    expect(summary.students.existing).toBeGreaterThanOrEqual(1);
+
+    // Her attendance is under the membership the church already had…
+    const herRows = [...db.data.keys()].filter((path) =>
+      path.endsWith('/attendance/pco_140203708'),
+    );
+    expect(herRows.length).toBeGreaterThan(0);
+
+    // …and that membership still belongs to Planning Center.
+    expect(db.get('students/pco_140203708')).toMatchObject({
+      pcoPersonId: '140203708',
+      upstreamBackend: 'pco',
+      upstreamPersonId: '140203708',
+    });
+  });
+
   it('skips nights nobody attended instead of importing cancelled evenings', async () => {
     const empty = store.seedGathering('2026-05-01T19:00:00.000Z', '2026-05-01T21:00:00.000Z');
     // One scheduled row, nobody attended: still an empty night.

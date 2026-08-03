@@ -19,6 +19,11 @@ import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { backendFailureStatus, describeBackendFailure } from './backends/errors.js';
 import {
+  a32AliasPairs,
+  collapseAliasPair,
+  existingStudentIdByA32Uuid,
+} from './backends/aliases.js';
+import {
   createRegistry,
   type BackendRegistry,
 } from './backends/registry.js';
@@ -445,6 +450,32 @@ export const getRoster = onCall<{ force?: boolean } | undefined, Promise<RosterR
       return reportBackendFailure(first.displayName, first.thrown, 'load the roster');
     }
 
+    /*
+     * The same human on the roster through both backends is one student, and
+     * the Planning Center read just said which pairs there are — its people
+     * carry the church's `attendees_uuid` pointers. Folding follows the merge
+     * precedent: the Planning Center side keeps the row, the Attendees-side
+     * document goes inactive with a pointer, and this response already shows
+     * the single student. Idempotent, because an inactive document leaves the
+     * next scan.
+     */
+    const pcoResult = results.find((result) => result.backendId === 'pco');
+    const aliasPairs = pcoResult?.ok ? a32AliasPairs(scan, pcoResult.a32Aliases) : [];
+    if (aliasPairs.length > 0) {
+      const folded = new Set(aliasPairs.map((pair) => pair.a32PersonId));
+      for (const pair of aliasPairs) {
+        await collapseAliasPair(database, pair);
+        logger.info('Folded one student held by both backends', {
+          keeper: pair.keeperDoc,
+          folded: pair.foldDoc,
+        });
+      }
+      for (const result of results) {
+        if (result.backendId !== 'a32' || !result.ok) continue;
+        result.people = result.people.filter((person) => !folded.has(person.pcoPersonId));
+      }
+    }
+
     for (const result of results) {
       if (!result.ok) continue;
       /*
@@ -555,10 +586,29 @@ export const searchPlanningCenterPeople = onCall<
     );
   }
 
+  /*
+   * A person both directories hold is one row, not two. The Planning Center
+   * hits carry the church's `attendees_uuid` pointers, so the Attendees hit
+   * for the same human is recognisable — and it is the one dropped, because
+   * an add from the surviving row lands on (or folds into) the Planning
+   * Center membership either way.
+   */
+  const aliased = new Set(
+    settled.flatMap((entry) =>
+      entry.people
+        .map((person) => person.a32PersonId)
+        .filter((uuid): uuid is string => typeof uuid === 'string'),
+    ),
+  );
+
   return {
     // Registry order — Planning Center first — with each backend's own
     // relevance order intact inside its run.
-    people: settled.flatMap((entry) => entry.people),
+    people: settled.flatMap((entry) =>
+      entry.backendId === 'a32'
+        ? entry.people.filter((person) => !aliased.has(person.pcoPersonId))
+        : entry.people,
+    ),
     perBackend: settled.map((entry) => ({
       backendId: entry.backendId,
       displayName: entry.backend.displayName,
@@ -1225,18 +1275,46 @@ export const addRosterMember = onCall<
   // A merged id is followed to the record the church kept — whoever pasted it
   // meant that person — and only a trail that ends dead is refused.
   let rosterPersonId: string;
+  let checkedA32Alias: string | undefined;
   try {
     const check = await backend.checkPerson({ personId });
     if (check.outcome === 'gone') {
       throw new HttpsError('not-found', `${backend.displayName} has no person with that id.`);
     }
     rosterPersonId = check.personId;
+    checkedA32Alias = check.a32PersonId;
   } catch (error) {
     return reportBackendFailure(
       backend.displayName,
       error,
       `check that person in ${backend.displayName}`,
     );
+  }
+
+  /*
+   * The same human may already be on the roster through the other backend —
+   * the church's `attendees_uuid` field says so. Adding an Attendees person a
+   * Planning Center membership already answers for would put one child on the
+   * roster twice, so the add lands on the membership the roster has. Best
+   * effort on purpose: the aliases live upstream, and not being able to read
+   * them must not break an add.
+   */
+  if (backendId === 'a32') {
+    const pco = registry.get('pco');
+    if (pco) {
+      try {
+        const scan = await scanRoster(db());
+        const aliases =
+          (await pco.fetchRoster({ personIds: scanIdsFor(scan, 'pco') })).a32Aliases ?? {};
+        const holder = Object.entries(aliases).find(([, uuid]) => uuid === rosterPersonId);
+        const keeperDoc = holder ? studentDocFor(scan, 'pco', holder[0]) : undefined;
+        if (keeperDoc) return { status: 'already-on-roster', studentId: keeperDoc };
+      } catch (error) {
+        logger.warn('Could not check the Attendees person against Planning Center aliases', {
+          error: String(error),
+        });
+      }
+    }
   }
 
   const studentId = studentIdFor(backendId, rosterPersonId);
@@ -1259,6 +1337,36 @@ export const addRosterMember = onCall<
     },
     { merge: true },
   );
+
+  /*
+   * The other direction of the same rule: this Planning Center person's alias
+   * may name an Attendees membership already on the roster. The new document
+   * is the keeper — the Planning Center side is canonical for a linked pair —
+   * and the Attendees-side document folds into it at once, rather than on the
+   * next roster read.
+   */
+  if (backendId === 'pco' && checkedA32Alias) {
+    try {
+      const scan = await scanRoster(db());
+      const foldDoc = studentDocFor(scan, 'a32', checkedA32Alias);
+      if (foldDoc && foldDoc !== studentId) {
+        await collapseAliasPair(db(), {
+          keeperDoc: studentId,
+          foldDoc,
+          pcoPersonId: rosterPersonId,
+          a32PersonId: checkedA32Alias,
+        });
+        logger.info('Folded one student held by both backends', {
+          keeper: studentId,
+          folded: foldDoc,
+        });
+      }
+    } catch (error) {
+      logger.warn('Could not fold the Attendees membership for an added person', {
+        error: String(error),
+      });
+    }
+  }
 
   return {
     status: !snapshot.exists ? 'added' : wasActive ? 'already-on-roster' : 'restored',
@@ -1461,12 +1569,39 @@ export const importCheckInsEvent = onCall<
   // runs in UTC — same reasoning, same fix as `materializeOccurrence`.
   process.env.TZ = MINISTRY_TIME_ZONE;
 
+  /*
+   * Before an Attendees import, ask Planning Center which of the roster's
+   * students *are* Attendees people — the `attendees_uuid` aliases — so an
+   * attendee the roster already holds files their history under the
+   * membership the church already has, not under a second one. Best effort:
+   * an unreadable alias list means an import that behaves as before, never a
+   * failed import.
+   */
+  let existingStudentIds: Record<string, string> | undefined;
+  if (backendId === 'a32') {
+    const pco = registry.get('pco');
+    if (pco) {
+      try {
+        const scan = await scanRoster(db());
+        const aliases =
+          (await pco.fetchRoster({ personIds: scanIdsFor(scan, 'pco') })).a32Aliases ?? {};
+        const byUuid = existingStudentIdByA32Uuid(scan, aliases);
+        if (Object.keys(byUuid).length > 0) existingStudentIds = byUuid;
+      } catch (error) {
+        logger.warn('Could not resolve Planning Center aliases before an Attendees import', {
+          error: String(error),
+        });
+      }
+    }
+  }
+
   try {
     return await backend.importHistory({
       upstreamEventId: pcoEventId.trim(),
       uid: request.auth!.uid,
       now: new Date(),
       logger,
+      existingStudentIds,
     });
   } catch (error) {
     return reportBackendFailure(backend.displayName, error, 'import that Check-Ins event');

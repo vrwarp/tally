@@ -17,6 +17,7 @@ import type {
   SimCheckInsEventTime,
   SimCheckInsPeriod,
   SimEmail,
+  SimFieldDefinition,
   SimHousehold,
   SimHouseholdMembership,
   SimList,
@@ -237,6 +238,38 @@ export class SimulatorStore {
     return this.org.fieldDefinitions.find((definition) => definition.id === id);
   }
 
+  get fieldDefinitions(): readonly SimFieldDefinition[] {
+    return this.org.fieldDefinitions;
+  }
+
+  /**
+   * Records this person's Attendees identity the way the church records it: a
+   * `FieldDatum` against the custom `attendees_uuid` field, whose definition
+   * is created on first use — exactly what an admin adding the field and
+   * filling it in produces. Replaces any value already on the person.
+   */
+  linkToAttendees(personId: string, uuid: string): void {
+    let definition = this.org.fieldDefinitions.find((d) => d.slug === 'attendees_uuid');
+    if (!definition) {
+      definition = {
+        id: '732029',
+        name: 'Attendees UUID',
+        slug: 'attendees_uuid',
+        data_type: 'string',
+      };
+      this.org.fieldDefinitions.push(definition);
+    }
+    this.org.fieldData = this.org.fieldData.filter(
+      (datum) => !(datum.person_id === personId && datum.field_definition_id === definition.id),
+    );
+    this.org.fieldData.push({
+      id: `FD${this.org.fieldData.length + 185797000}`,
+      person_id: personId,
+      field_definition_id: definition.id,
+      value: uuid,
+    });
+  }
+
   /* ---- Check-Ins reads --------------------------------------------------- */
 
   get checkInsEvents(): readonly SimCheckInsEvent[] {
@@ -446,6 +479,12 @@ export class SimulatorStore {
     parentName?: string | null;
     parentPhone?: string | null;
     parentEmail?: string | null;
+    /**
+     * The same person's id in Attendees, recorded the way the church records
+     * it: a custom field. Seeding one creates the `attendees_uuid` field
+     * definition on first use, exactly like an admin adding the field.
+     */
+    attendeesUuid?: string | null;
   }): SimPerson {
     const student = this.createPerson({
       first_name: input.firstName,
@@ -458,6 +497,7 @@ export class SimulatorStore {
       status: input.status ?? 'active',
     });
     if (input.id) student.id = input.id;
+    if (input.attendeesUuid) this.linkToAttendees(student.id, input.attendeesUuid);
 
     // A seeded student belongs on the youth pastor's List, or a deployment
     // configured for list mode would see an empty ministry.

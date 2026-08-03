@@ -90,6 +90,32 @@ blank the other's roster at a church door. Search and allergy reads degrade the 
 single-backend deployment keeps exactly the old behaviour, because its one failure is the whole
 read's failure.
 
+## When both backends hold the same person
+
+A church that runs both systems has the same teenagers in each, and keeps the bridge on the
+Planning Center side: a People custom field with slug **`attendees_uuid`**, holding each person's
+Attendees UUID. Tally reads it — `field_data` rides along on the fetches the roster already makes,
+once a cached probe of `/field_definitions` says the org keeps the field — and treats a linked pair
+as **one human**:
+
+- **Search** shows one row for them (the Planning Center one; that side holds the pointer), instead
+  of one per backend.
+- **Adding** them lands on the membership the roster already has, whichever directory the leader
+  picked them from. An add from Planning Center that finds an Attendees-side membership folds it
+  into the new document at once.
+- **The roster read** folds any pair that slipped through — two membership documents for one child,
+  from imports or from history — using the same shape as every merge in Tally: the Planning Center
+  side keeps the row, the Attendees-side document goes inactive with a `mergedIntoStudentId`
+  pointer, and the attendance it anchors stays resolvable.
+- **An Attendees history import** files an aliased attendee's nights under their existing
+  membership rather than standing up a second one, and never touches that document's linkage.
+
+Everything degrades to "no aliases" rather than to a failure: an org without the field pays one
+cached probe per window, a server without `/field_definitions` disables the whole feature
+silently, and an unreadable alias list never breaks an add or an import. The pointer is a pair of
+ids, so no personal data moves for it. Orgs are expected to keep the field's *value* correct —
+Tally follows it, it does not verify it.
+
 ## The wire contract
 
 Deployed callable names are frozen. Multi-backend arrived as optional request fields (`backendId`

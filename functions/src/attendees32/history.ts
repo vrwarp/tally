@@ -52,8 +52,16 @@ function a32Provenance(meetSlug: string, gatheringIdByEventDoc: Map<string, numb
       upstreamBackend: 'a32',
       upstreamPersonId: student.personId,
     }),
+    /*
+     * Only onto a document that carries no linkage at all. The legacy
+     * `pcoPersonId` counts: an attendee stitched onto their Planning Center
+     * membership through the `attendees_uuid` alias lands here with that
+     * document's data, and stamping Attendees linkage over a Planning Center
+     * student would rebind them wholesale.
+     */
     studentLinkPatch: (student, data) =>
-      typeof data.upstreamPersonId !== 'string' || data.upstreamPersonId.length === 0
+      (typeof data.upstreamPersonId !== 'string' || data.upstreamPersonId.length === 0) &&
+      (typeof data.pcoPersonId !== 'string' || data.pcoPersonId.length === 0)
         ? { upstreamBackend: 'a32', upstreamPersonId: student.personId }
         : {},
   };
@@ -135,6 +143,13 @@ export async function importMeetHistory(args: {
   uid: string;
   now: Date;
   logger?: FunctionLogger;
+  /**
+   * Attendee UUID -> the student document already answering for that human —
+   * through Planning Center's `attendees_uuid` alias, resolved by the caller.
+   * An attendee named here files their history under the membership the
+   * church already has instead of standing up a second one.
+   */
+  existingStudentIds?: Readonly<Record<string, string>>;
 }): Promise<CheckInsImportSummary> {
   const { db, client, meetSlug, uid, now } = args;
   const logger = args.logger ?? SILENT_LOGGER;
@@ -237,7 +252,8 @@ export async function importMeetHistory(args: {
     for (const row of attended) {
       const personId = row.attendee_id;
       if (!personId) continue;
-      const studentId = studentIdFor('a32', personId);
+      const studentId =
+        args.existingStudentIds?.[personId] ?? studentIdFor('a32', personId);
 
       const nightKey = `${eventDocId}|${studentId}`;
       if (seenPerNight.has(nightKey)) {

@@ -93,6 +93,12 @@ export type PersonCheck =
       outcome: 'exists' | 'relinked';
       /** The id to record: the same one, or the merge survivor's. */
       personId: string;
+      /**
+       * The same person's identity in the Attendees backend, when this one
+       * holds a pointer — Planning Center's `attendees_uuid` custom field.
+       * What lets an add land on a membership the roster already has.
+       */
+      a32PersonId?: string;
     }
   | { outcome: 'gone' };
 
@@ -174,6 +180,14 @@ export interface PeopleBackend {
     uid: string;
     now: Date;
     logger?: FunctionLogger;
+    /**
+     * Upstream person id -> the student document already answering for that
+     * human through *another* backend, resolved by the caller from the
+     * cross-backend aliases (see backends/aliases.ts). A person named here
+     * files their imported history under that membership instead of standing
+     * up a second one. Adapters without cross-backend people ignore it.
+     */
+    existingStudentIds?: Readonly<Record<string, string>>;
   }): Promise<CheckInsImportSummary>;
 
   /* ---- Cache control ----------------------------------------------------- */

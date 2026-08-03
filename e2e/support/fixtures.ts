@@ -48,6 +48,8 @@ export interface TallyFixtures {
       parentPhone?: string;
       parentEmail?: string;
       allergies?: string;
+      /** The same person's Attendees UUID — the `attendees_uuid` custom field. */
+      attendeesUuid?: string;
     }) => Promise<void>;
     /** What the app actually asked Planning Center for. */
     requests: () => Promise<Array<{ method: string; path: string }>>;
