@@ -24,6 +24,7 @@ import {
   contactsOf,
   displayFirstNameOf,
   findParentCandidates,
+  fullBirthdayOf,
   mapAttendeeToRosterPerson,
   parentContactOf,
   statusOf,
@@ -268,6 +269,9 @@ export async function fetchPersonDetails(
       return {
         pcoPersonId: personId,
         allergies: allergiesOf(attendee),
+        // The whole date, year included where Attendees holds a real one —
+        // the one-person read is allowed what the roster deliberately is not.
+        birthdate: fullBirthdayOf(attendee),
         ...contact,
         householdAdult: candidates.length > 0,
       };

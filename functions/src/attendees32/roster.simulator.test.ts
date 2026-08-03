@@ -162,6 +162,16 @@ describe('fetchPersonDetails', () => {
     });
   });
 
+  it('carries the whole birthdate, year included, on the one-person read', async () => {
+    const details = await fetchPersonDetails({ client, config, cache, personId: idOf('Priya') });
+    expect(details?.birthdate).toBe('2011-03-14');
+  });
+
+  it('answers a day-only birthdate through the 1800 sentinel, never the 1800', async () => {
+    const details = await fetchPersonDetails({ client, config, cache, personId: idOf('Wei') });
+    expect(details?.birthdate).toBe('09-02');
+  });
+
   it('tells a family with nobody reachable apart from no family at all', async () => {
     const details = await fetchPersonDetails({ client, config, cache, personId: idOf('Nkechi') });
     expect(details).toMatchObject({

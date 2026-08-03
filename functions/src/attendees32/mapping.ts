@@ -86,6 +86,27 @@ export function birthdayOf(attendee: A32Attendee): string | null {
   return null;
 }
 
+/**
+ * The whole birthday for the one-person read — `YYYY-MM-DD`, or `MM-DD` when
+ * the only year on file is the 1800 "day known, year unknown" sentinel, or
+ * null. The same two shapes the Planning Center mapping's `fullBirthdayOf`
+ * answers with, because they are one wire contract: what the edit form opens
+ * on and what it saves back.
+ */
+export function fullBirthdayOf(attendee: A32Attendee): string | null {
+  const monthDay = birthdayOf(attendee);
+  if (monthDay === null) return null;
+
+  for (const raw of [attendee.actual_birthday, attendee.estimated_birthday]) {
+    const value = trimmed(raw);
+    if (value === null) continue;
+    const year = Number(/^(\d{4})-/.exec(value)?.[1]);
+    if (!Number.isFinite(year) || year === A32_UNKNOWN_BIRTH_YEAR) continue;
+    return `${year}-${monthDay}`;
+  }
+  return monthDay;
+}
+
 export function allergiesOf(attendee: A32Attendee): string | null {
   return trimmed(attendee.infos?.fixed?.allergies);
 }
