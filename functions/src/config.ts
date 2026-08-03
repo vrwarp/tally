@@ -143,31 +143,17 @@ export const A32_TOKEN =
   process.env.A32_BIND_TOKEN === 'true' ? defineSecret('A32_TOKEN') : null;
 
 /**
- * Where the Attendees server lives — the host root, e.g.
- * `https://attendees.example.org`; API paths like `/persons/api/…` are
- * appended by the client. No default: unlike Planning Center there is no
- * well-known public host, so an empty value reads as "not configured" rather
- * than as anywhere in particular.
+ * Every other Attendees value is a plain environment variable, deliberately
+ * NOT a declared param. The CLI holds declared params to the same
+ * non-interactive rule as the secret above — each one must have a value in
+ * `.env.<project>`, defaults notwithstanding — so nine `defineString`s here
+ * would force an Attendees block into every deployment's deploy env just to
+ * deploy at all. Plain `.env.<project>` lines still reach the runtime as
+ * `process.env`, which `readValue(null, …)` reads; empty-means-unset and the
+ * effective defaults live in `normalizeA32Config`. Per-value documentation is
+ * in `.secret.local.example` — though most deployments configure Attendees
+ * from Settings (`config/attendees32`) and never set these at all.
  */
-const A32_API_BASE_URL = defineString('A32_API_BASE_URL', { default: '' });
-
-/**
- * Where Tally's students live inside the Attendees hierarchy. The division a
- * created attendee is filed under, and the meet + character a created student
- * is enrolled in — all printed by attendees32's `setup_tally_integration`
- * command, and all meaningless without each other.
- */
-const A32_DIVISION_ID = defineString('A32_DIVISION_ID', { default: '' });
-const A32_MEET_SLUG = defineString('A32_MEET_SLUG', { default: '' });
-const A32_CHARACTER_SLUG = defineString('A32_CHARACTER_SLUG', { default: '' });
-
-/** The assembly whose meets the history-import picker offers. */
-const A32_ASSEMBLY_SLUG = defineString('A32_ASSEMBLY_SLUG', { default: '' });
-
-const A32_WRITE_BACK = defineString('A32_WRITE_BACK', { default: 'create' });
-const A32_MIN_GRADE = defineString('A32_MIN_GRADE', { default: '6' });
-const A32_MAX_GRADE = defineString('A32_MAX_GRADE', { default: '12' });
-const A32_CACHE_TTL_SECONDS = defineString('A32_CACHE_TTL_SECONDS', { default: '30' });
 
 export const A32_SECRETS = A32_TOKEN ? [A32_TOKEN] : [];
 
@@ -518,15 +504,15 @@ export const A32_CONFIG_KEYS = [
 function readA32Params(): Required<Omit<A32ConfigOverrides, 'enabled'>> & { token: string } {
   return {
     token: readValue(A32_TOKEN, 'A32_TOKEN'),
-    baseUrl: readValue(A32_API_BASE_URL, 'A32_API_BASE_URL'),
-    divisionId: readValue(A32_DIVISION_ID, 'A32_DIVISION_ID'),
-    meetSlug: readValue(A32_MEET_SLUG, 'A32_MEET_SLUG'),
-    characterSlug: readValue(A32_CHARACTER_SLUG, 'A32_CHARACTER_SLUG'),
-    assemblySlug: readValue(A32_ASSEMBLY_SLUG, 'A32_ASSEMBLY_SLUG'),
-    writeBack: readValue(A32_WRITE_BACK, 'A32_WRITE_BACK'),
-    minGrade: readValue(A32_MIN_GRADE, 'A32_MIN_GRADE'),
-    maxGrade: readValue(A32_MAX_GRADE, 'A32_MAX_GRADE'),
-    cacheTtlSeconds: readValue(A32_CACHE_TTL_SECONDS, 'A32_CACHE_TTL_SECONDS'),
+    baseUrl: readValue(null, 'A32_API_BASE_URL'),
+    divisionId: readValue(null, 'A32_DIVISION_ID'),
+    meetSlug: readValue(null, 'A32_MEET_SLUG'),
+    characterSlug: readValue(null, 'A32_CHARACTER_SLUG'),
+    assemblySlug: readValue(null, 'A32_ASSEMBLY_SLUG'),
+    writeBack: readValue(null, 'A32_WRITE_BACK'),
+    minGrade: readValue(null, 'A32_MIN_GRADE'),
+    maxGrade: readValue(null, 'A32_MAX_GRADE'),
+    cacheTtlSeconds: readValue(null, 'A32_CACHE_TTL_SECONDS'),
   };
 }
 

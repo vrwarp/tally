@@ -41,11 +41,14 @@ Connecting is two steps:
    firebase functions:secrets:set A32_TOKEN
    ```
 
-Everything else is non-secret and follows the same two layers as Planning Center: deploy-time
-parameters as defaults, overridden by the browser-writable document `config/attendees32`
-(Settings → Attendees → Change).
+Everything else is non-secret and follows the same two layers as Planning Center: deploy-environment
+variables as defaults, overridden by the browser-writable document `config/attendees32`
+(Settings → Attendees → Change). Unlike the `PCO_*` values these are plain env vars, not declared
+params — a non-interactive deploy demands a dotenv value for every declared param, defaults
+notwithstanding, so a deployment that skips them entirely (most do; Settings is enough) still
+deploys cleanly.
 
-| Setting | Param | What it is |
+| Setting | Deploy env var | What it is |
 | --- | --- | --- |
 | `baseUrl` | `A32_API_BASE_URL` | Where the Attendees server lives. **Admin-only** in the app — every request carries the token to this address. |
 | `divisionId` | `A32_DIVISION_ID` | The division whose attendees are in scope (numeric id). |
