@@ -64,7 +64,6 @@ export function IconPickerField({ value, onChange, hint }: IconPickerFieldProps)
         aria-labelledby={`${labelId} ${valueId}`}
         className={cn(
           'flex min-h-14 items-center gap-3 rounded-xl bg-ink-900 px-3 text-left ring-1',
-          'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400',
           'pointer-fine:min-h-11 pointer-fine:rounded-lg',
           open ? 'ring-brand-400' : 'ring-ink-700 active:bg-ink-800',
         )}
@@ -108,8 +107,13 @@ export function IconPickerField({ value, onChange, hint }: IconPickerFieldProps)
                       aria-pressed={active}
                       title={icon.label}
                       className={cn(
+                        // No focus ring here, and no `focus:outline-none`: a
+                        // `ring` is a box-shadow painted outside the button, and
+                        // this grid is the inside of a `max-h-56 overflow-y-auto`
+                        // box — so the top and bottom rows of icons had theirs
+                        // cut in half. The app's own ring is drawn inward and
+                        // survives the scroller.
                         'flex aspect-square w-full items-center justify-center rounded-lg',
-                        'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400',
                         active
                           ? 'bg-brand-500/20 text-brand-300 ring-1 ring-brand-500/40'
                           : 'text-ink-300 active:bg-ink-800 pointer-fine:hover:bg-ink-900',
