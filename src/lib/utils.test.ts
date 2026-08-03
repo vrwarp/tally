@@ -7,6 +7,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  createSearchMatcher,
   formatPhone,
   formatPhoneInput,
   gradeLabel,
@@ -122,6 +123,84 @@ describe('matchesQuery: typos', () => {
     expect(matchesQuery('marcus lee', 'fatima')).toBe(false);
     expect(matchesQuery('ana martinez', 'gabriel')).toBe(false);
     expect(matchesQuery('josé garcía', 'ibrahim')).toBe(false);
+  });
+});
+
+describe('matchesQuery: the pinyin ü', () => {
+  // 吕 is LYU on a passport issued since 2012, LU or LV on an older one, and
+  // `lv` on a Chinese keyboard. Whichever spelling reached the roster, the
+  // surname a counselor types has to find it — including at two characters,
+  // where there is no typo budget to fall back on.
+  const spellings = ['lu', 'lv', 'lyu', 'lü'];
+  for (const typed of spellings) {
+    for (const stored of spellings) {
+      it(`finds "${stored} chen" when "${typed}" is typed`, () => {
+        expect(matchesQuery(`${stored} chen`, typed)).toBe(true);
+        expect(matchesQuery(`${stored} chen`, `${typed} chen`)).toBe(true);
+        expect(matchesQuery(`${stored} chen`, `${typed}chen`)).toBe(true);
+      });
+    }
+  }
+
+  it('does the same for nü, which had no spelling that worked', () => {
+    for (const typed of ['nu', 'nv', 'nyu']) {
+      for (const stored of ['nu', 'nv', 'nyu']) {
+        expect(matchesQuery(`${stored} wang`, typed)).toBe(true);
+      }
+    }
+  });
+
+  it('covers the üe finals without a second table', () => {
+    expect(matchesQuery('lyue han', 'lue')).toBe(true);
+    expect(matchesQuery('lue han', 'lyue')).toBe(true);
+    expect(matchesQuery('nyue han', 'nue')).toBe(true);
+  });
+
+  it('finds a surname that is not the first word', () => {
+    expect(matchesQuery('chen lyu', 'lu')).toBe(true);
+    expect(matchesQuery('marcus lv', 'lyu')).toBe(true);
+  });
+
+  it('only rewrites an onset, so it does not drag in unrelated names', () => {
+    // "Alvarez" and "Solvang" contain `lv` in the middle of a word. They are
+    // not spellings of anybody's Lü, and typing "lu" must not surface them.
+    expect(matchesQuery('gabriel alvarez', 'lu')).toBe(false);
+    expect(matchesQuery('tessa solvang', 'lu')).toBe(false);
+    expect(matchesQuery('hana yamamoto', 'lyu')).toBe(false);
+  });
+
+  it('leaves j, q, x and y alone — they have nothing to disambiguate', () => {
+    // Xǔ folds to "xu" on the accent pass alone, and no "xyu" spelling exists.
+    expect(matchesQuery('xǔ wei', 'xu')).toBe(true);
+    expect(matchesQuery('ju wei', 'jyu')).toBe(false);
+    expect(matchesQuery('qu wei', 'qv')).toBe(false);
+  });
+});
+
+describe('createSearchMatcher: ranking the ü variants', () => {
+  const student = (firstName: string, lastName: string) => ({
+    firstName,
+    lastName,
+    searchName: `${firstName} ${lastName}`.toLowerCase(),
+  });
+
+  it('puts the spelling that was typed above the spelling that was not', () => {
+    const matcher = createSearchMatcher('lu');
+    const exact = matcher.rank(student('Wei', 'Lu'));
+    const variant = matcher.rank(student('Wei', 'Lyu'));
+    expect(exact).toBeLessThan(variant);
+  });
+
+  it('still puts both above a name that merely contains the query', () => {
+    const matcher = createSearchMatcher('lu');
+    const variant = matcher.rank(student('Wei', 'Lyu'));
+    const contained = matcher.rank(student('Paulus', 'Reed'));
+    expect(variant).toBeLessThan(contained);
+  });
+
+  it('keeps a given-name match ahead of a surname match, variant or not', () => {
+    const matcher = createSearchMatcher('lyu');
+    expect(matcher.rank(student('Lu', 'Chen'))).toBeLessThan(matcher.rank(student('Wei', 'Lu')));
   });
 });
 

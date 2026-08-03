@@ -41,6 +41,8 @@ export function haptic(pattern: number | number[] = 12): void {
  * 4. Typos — "Marcs" and "Mracus" both find "Marcus Lee", but only once the
  *    query is long enough for a typo to still mean one person (see
  *    `editBudget`).
+ * 5. The pinyin ü — "Lu", "Lv" and "Lyu" are one surname spelled three legal
+ *    ways, and they find each other (see `UMLAUT_VOWELS`).
  */
 
 /** Combining marks left over from NFD: "é" -> "e" + U+0301 -> "e". */
@@ -101,6 +103,90 @@ function editBudget(length: number): number {
  */
 const FUZZY_MAX_LENGTH = 64;
 
+/*
+ * The pinyin ü, which is three legal spellings of one surname.
+ *
+ * Mandarin distinguishes u from ü, but a passport may not: since 2012 China's
+ * exit-and-entry offices print 吕 as LYU, before that some printed LU and others
+ * LV, and a Chinese keyboard types it as `lv` because that is the key the input
+ * method uses for ü. All four reach Tally, because a name gets into Planning
+ * Center from a passport, a parent's form and a sibling's older record, and
+ * those three do not agree. Same story for nü — 女 — as NU, NV and NYU.
+ *
+ * The umlaut itself needs nothing: `normalizeForSearch` already folds "Lü" and
+ * "Lǚ" onto "lu". What survives it are the *letters* — `lyu` and `lv` — and
+ * they are what breaks. A counselor typing a whole name got away with it by
+ * accident, because "luchen" is one edit from "lyuchen" and the typo budget
+ * covered it. Typing the surname alone did not: "lu" is two characters, its
+ * budget is zero, and Lyu Chen was simply not on the list. "nv" found nobody at
+ * all — not Nu Wang, not Nyu Wang.
+ *
+ * So `l` and `n` before this vowel are interchangeable. The trailing letters are
+ * untouched, which covers lüe and nüe (`lue`/`lve`/`lyue`) without a second
+ * table. J, Q, X and Y are deliberately absent: they never pair with a plain u,
+ * so `ju` can only ever have meant jü and there is nothing to disambiguate.
+ */
+const UMLAUT_ONSET = /^([ln])(yu|[uv])/;
+const UMLAUT_VOWELS = ['u', 'v', 'yu'];
+/**
+ * Two ambiguous words in one query is already a stretch; the cap is here so a
+ * pathological query cannot make the roster pass exponential.
+ */
+const MAX_UMLAUT_VARIANTS = 8;
+
+/**
+ * The same query spelled every other legal way, compacted and ready to match.
+ * Empty — the overwhelmingly common case — when nothing in the query is a
+ * ü-syllable, and the whole variant pass then costs nothing.
+ */
+function umlautVariants(normalized: string): string[] {
+  const words = normalized.split(' ');
+  // Word-initial only: the ambiguity is an onset. "Alvarez" contains `lv` and
+  // is not a spelling of anybody's Lü.
+  let forms: string[][] = [words];
+  for (let index = 0; index < words.length; index += 1) {
+    const found = UMLAUT_ONSET.exec(words[index]!);
+    if (!found) continue;
+    const rest = words[index]!.slice(found[0].length);
+    const alternates = UMLAUT_VOWELS.filter((vowel) => vowel !== found[2]).map(
+      (vowel) => `${found[1]}${vowel}${rest}`,
+    );
+    forms = forms.concat(
+      forms.flatMap((form) =>
+        alternates.map((alternate) => form.map((word, at) => (at === index ? alternate : word))),
+      ),
+    );
+    if (forms.length > MAX_UMLAUT_VARIANTS) break;
+  }
+  // `forms[0]` is the query as typed, which the caller already has.
+  return forms.slice(1).map((form) => compact(form.join(' ')));
+}
+
+/**
+ * Where each word of `normalized` begins once the spaces are taken out.
+ *
+ * Variants match at a word start and nowhere else, but matching happens on the
+ * gapless form so that "lyuchen" still finds "Lyu Chen". Carrying the offsets is
+ * how both hold at once.
+ */
+function wordStarts(normalized: string): number[] {
+  const starts: number[] = [];
+  let offset = 0;
+  let pending = true;
+  for (let index = 0; index < normalized.length; index += 1) {
+    if (normalized[index] === ' ') {
+      pending = true;
+      continue;
+    }
+    if (pending) {
+      starts.push(offset);
+      pending = false;
+    }
+    offset += 1;
+  }
+  return starts;
+}
+
 export interface SearchMatcher {
   /** True when the query has no searchable characters, so everything matches. */
   readonly isEmpty: boolean;
@@ -130,11 +216,40 @@ const MatchRank = {
   approximate: 3,
 } as const;
 
+/**
+ * A band, spelled exactly, then the same band reached through a ü variant.
+ *
+ * Typing "lu" should still put Lu Chen above Lyu Chen — one of them is what was
+ * typed — but both belong above everybody whose surname merely contains "lu".
+ * Interleaving beats a flat penalty: it keeps *why* a row matched as the primary
+ * key and demotes only within that reason.
+ */
+function rankOf(band: number, viaVariant: boolean): number {
+  return band * 2 + (viaVariant ? 1 : 0);
+}
+
 const MATCH_EVERYTHING: SearchMatcher = {
   isEmpty: true,
   matches: () => true,
-  rank: () => MatchRank.givenNamePrefix,
+  rank: () => rankOf(MatchRank.givenNamePrefix, false),
 };
+
+/** Which of the four reasons placed this student, for one spelling of the query. */
+function bandFor(
+  student: { firstName: string; lastName: string; searchName: string },
+  needle: string,
+): number {
+  if (compact(normalizeForSearch(student.firstName)).startsWith(needle)) {
+    return MatchRank.givenNamePrefix;
+  }
+  if (compact(normalizeForSearch(student.lastName)).startsWith(needle)) {
+    return MatchRank.lastNamePrefix;
+  }
+  if (compact(normalizeForSearch(student.searchName)).includes(needle)) {
+    return MatchRank.contained;
+  }
+  return MatchRank.approximate;
+}
 
 /**
  * Builds a reusable predicate for one query.
@@ -149,24 +264,35 @@ export function createSearchMatcher(query: string): SearchMatcher {
   if (!needle) return MATCH_EVERYTHING;
 
   const budget = needle.length <= FUZZY_MAX_LENGTH ? editBudget(needle.length) : 0;
+  const variants = umlautVariants(normalizeForSearch(query));
 
   return {
     isEmpty: false,
     matches(searchName: string): boolean {
-      const haystack = compact(normalizeForSearch(searchName));
+      const normalized = normalizeForSearch(searchName);
+      const haystack = compact(normalized);
       if (haystack.includes(needle)) return true;
+      // A variant is a different spelling, not a different name, so it is
+      // checked before the typo pass and is not charged against its budget.
+      if (variants.length > 0) {
+        const starts = wordStarts(normalized);
+        for (const variant of variants) {
+          for (const start of starts) {
+            if (haystack.startsWith(variant, start)) return true;
+          }
+        }
+      }
       if (budget === 0 || haystack.length > FUZZY_MAX_LENGTH) return false;
       return approximatelyIncludes(haystack, needle, budget);
     },
     rank(student): number {
-      const first = compact(normalizeForSearch(student.firstName));
-      if (first.startsWith(needle)) return MatchRank.givenNamePrefix;
-      const last = compact(normalizeForSearch(student.lastName));
-      if (last.startsWith(needle)) return MatchRank.lastNamePrefix;
-      if (compact(normalizeForSearch(student.searchName)).includes(needle)) {
-        return MatchRank.contained;
+      const band = bandFor(student, needle);
+      if (band !== MatchRank.approximate) return rankOf(band, false);
+      for (const variant of variants) {
+        const alternate = bandFor(student, variant);
+        if (alternate !== MatchRank.approximate) return rankOf(alternate, true);
       }
-      return MatchRank.approximate;
+      return rankOf(MatchRank.approximate, false);
     },
   };
 }
