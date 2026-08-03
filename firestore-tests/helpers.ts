@@ -217,6 +217,27 @@ export function pcoConfigDoc(overrides: Partial<PcoRuntimeConfigDoc> = {}): PcoR
   };
 }
 
+/** The Attendees counterpart of `pcoConfigDoc` — same posture, its own keys. */
+export function a32ConfigDoc(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    enabled: true,
+    baseUrl: '',
+    divisionId: '1',
+    meetSlug: 'the-rock',
+    characterSlug: 'junior-student',
+    assemblySlug: 'youth',
+    minGrade: 6,
+    maxGrade: 12,
+    writeBack: 'create',
+    cacheTtlSeconds: 30,
+    updatedAt: T0,
+    updatedBy: UID.core,
+    ...overrides,
+  };
+}
+
 /**
  * An invitation, as an admin leaves it.
  *

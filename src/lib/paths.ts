@@ -64,6 +64,12 @@ export const SETTINGS_DOC_ID = 'settings';
  */
 export const PCO_CONFIG_DOC_ID = 'planningCenter';
 
+/** The Attendees (attendees32) counterpart — same ownership, same posture. */
+export const A32_CONFIG_DOC_ID = 'attendees32';
+
+/** Cross-backend settings: which backend receives students Tally creates. */
+export const BACKENDS_CONFIG_DOC_ID = 'backends';
+
 export const paths = {
   users: () => COLLECTIONS.users,
   user: (uid: string) => `${COLLECTIONS.users}/${uid}`,
@@ -94,6 +100,8 @@ export const paths = {
 
   settings: () => `${COLLECTIONS.config}/${SETTINGS_DOC_ID}`,
   planningCenter: () => `${COLLECTIONS.config}/${PCO_CONFIG_DOC_ID}`,
+  attendees32: () => `${COLLECTIONS.config}/${A32_CONFIG_DOC_ID}`,
+  backends: () => `${COLLECTIONS.config}/${BACKENDS_CONFIG_DOC_ID}`,
 } as const;
 
 /** Well-known recurring series ids, seeded by `scripts/seed.ts`. */

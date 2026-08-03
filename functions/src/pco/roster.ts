@@ -62,7 +62,13 @@ export { pcoStudentId, personIdFromStudentId } from '../generated/backendIds.js'
  */
 export interface RosterPerson {
   id: string;
+  /**
+   * The backend's own id for this person — named for the first backend Tally
+   * had, kept because the field is on the wire and in every roster cache.
+   */
   pcoPersonId: string;
+  /** Which backend `pcoPersonId` belongs to. */
+  backendId: 'pco' | 'a32';
   firstName: string;
   lastName: string;
   grade: number;
@@ -259,6 +265,7 @@ export function rosterPersonFrom(
   return {
     id: pcoStudentId(person.id),
     pcoPersonId: person.id,
+    backendId: 'pco',
     firstName: mapped.firstName,
     lastName: mapped.lastName,
     grade: mapped.grade,
@@ -556,6 +563,8 @@ export async function fetchParentContactStatus(
 /** One candidate for the "add a student" flow. */
 export interface PersonSearchResult {
   pcoPersonId: string;
+  /** Which backend found them — the search fans out once two are connected. */
+  backendId: 'pco' | 'a32';
   /** Tally student id, so the caller can tell whether they are already on the roster. */
   id: string;
   firstName: string;
@@ -611,6 +620,7 @@ export async function searchPeople(options: {
       });
       results.push({
         pcoPersonId: person.id,
+        backendId: 'pco',
         id: pcoStudentId(person.id),
         firstName: mapped.firstName,
         lastName: mapped.lastName,
