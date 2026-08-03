@@ -47,6 +47,7 @@ function wrapper(events: TallyEvent[], loading = false) {
     rosterError: null,
     rosterOffline: false,
     rosterFetchedAt: null,
+    rosterBackends: [],
     refreshRoster: vi.fn(async () => {}),
   } as unknown as DataContextValue;
 

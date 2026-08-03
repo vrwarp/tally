@@ -9,6 +9,8 @@
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'firebase/functions';
 import { USE_EMULATORS, firebaseApp } from '@/lib/firebase';
 import type {
+  BackendId,
+  BackendStatuses,
   CheckInsEventSummary,
   CheckInsImportSummary,
   PcoPersonSearchResult,
@@ -68,6 +70,24 @@ export const provisionAccess = httpsCallable<void, ProvisionAccessResult>(
 /* Reading people                                                              */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * One backend's slice of a fanned-out roster read: counts and a sentence,
+ * never a second copy of the people. What lets the app treat "Attendees is
+ * down" as one banner instead of a blank roster.
+ */
+export interface RosterBackendStatus {
+  backendId: BackendId;
+  displayName: string;
+  ok: boolean;
+  /** Why it failed, in plain language. Null when `ok`. */
+  error: string | null;
+  people: number;
+  unresolved: number;
+  missing: number;
+  cached: boolean;
+  fetchedAt: string;
+}
+
 export interface RosterResponse {
   people: PcoRosterPerson[];
   /**
@@ -94,6 +114,12 @@ export interface RosterResponse {
   fetchedAt: string;
   /** Seconds an answer may be reused server-side. `0` means never. */
   cacheTtlSeconds: number;
+  /**
+   * Each connected backend's own outcome — exactly one entry per enabled
+   * backend. Optional so an older server answering without it still parses;
+   * absent means the whole answer came from one place, as it always did.
+   */
+  perBackend?: RosterBackendStatus[];
 }
 
 /**
@@ -119,7 +145,15 @@ export const getRoster = httpsCallable<{ force?: boolean } | void, RosterRespons
  */
 export const getPersonDetails = httpsCallable<
   {
-    pcoPersonId: string;
+    /** The old request shape: a bare person id, which has always meant
+     *  Planning Center. Kept for exactly that meaning. */
+    pcoPersonId?: string;
+    /**
+     * The shape every screen should send: the student's own document id. The
+     * server reads the linkage and asks whichever backend holds the person —
+     * the caller does not have to know.
+     */
+    studentId?: string;
     /**
      * Skip the server's held answer.
      *
@@ -154,7 +188,12 @@ export interface AllergyNotesResponse {
  * a `counselor` who only ever sees the check-in screen is exactly who it is for.
  */
 export const getAllergyNotes = httpsCallable<
-  { pcoPersonIds: readonly string[] },
+  {
+    /** Bare ids, which have always meant Planning Center. */
+    pcoPersonIds?: readonly string[];
+    /** The mixed-roster shape: each person named with their backend. */
+    personKeys?: ReadonlyArray<{ backendId: BackendId; personId: string }>;
+  },
   AllergyNotesResponse
 >(functions, 'getAllergyNotes');
 
@@ -201,6 +240,18 @@ export const getPlanningCenterStatus = httpsCallable<{ force?: boolean } | void,
 );
 
 /**
+ * Every backend Tally knows — connected or not — with its connection report,
+ * capabilities and effective settings, plus which backend a new student gets
+ * pushed to. The Settings screen's one call: it has to show Attendees before
+ * Attendees is configured, with the problem named, which is exactly what the
+ * PCO-scoped status above cannot say.
+ */
+export const getBackendStatuses = httpsCallable<{ force?: boolean } | void, BackendStatuses>(
+  functions,
+  'getBackendStatuses',
+);
+
+/**
  * The Planning Center lists this church has, for the roster picker.
  *
  * Read-only by necessity: the API has no way to create a list or to change who
@@ -221,9 +272,21 @@ export const listPlanningCenterLists = httpsCallable<
  * Searches the whole church directory, so it is core team only — a door
  * volunteer has no reason to hold a view of the congregation.
  */
+/** One backend's outcome of a fanned-out search — no counts, the rows say it. */
+export interface SearchBackendStatus {
+  backendId: BackendId;
+  displayName: string;
+  ok: boolean;
+  error: string | null;
+}
+
 export const searchPlanningCenterPeople = httpsCallable<
-  { query: string },
-  { people: PcoPersonSearchResult[] }
+  {
+    query: string;
+    /** Ask one backend only. Omitted, the search asks every enabled backend. */
+    backendId?: BackendId;
+  },
+  { people: PcoPersonSearchResult[]; perBackend?: SearchBackendStatus[] }
 >(functions, 'searchPlanningCenterPeople');
 
 /**
@@ -235,7 +298,12 @@ export const searchPlanningCenterPeople = httpsCallable<
  * exists upstream before writing it.
  */
 export const addRosterMember = httpsCallable<
-  { pcoPersonId: string },
+  {
+    /** The person's id in their own backend — bare, without the doc prefix. */
+    pcoPersonId: string;
+    /** Which backend holds them. Omitted means Planning Center, as it always did. */
+    backendId?: BackendId;
+  },
   { status: 'added' | 'restored' | 'already-on-roster'; studentId: string }
 >(functions, 'addRosterMember');
 
@@ -278,10 +346,10 @@ export const refreshPlanningCenter = httpsCallable<void, { status: 'ok' }>(
  * each with enough history attached to recognise the right one. Core team
  * only; the Check-Ins API is read-only, so this can see and never touch.
  */
-export const listCheckInsEvents = httpsCallable<void, { events: CheckInsEventSummary[] }>(
-  functions,
-  'listCheckInsEvents',
-);
+export const listCheckInsEvents = httpsCallable<
+  { backendId?: BackendId } | void,
+  { events: CheckInsEventSummary[] }
+>(functions, 'listCheckInsEvents');
 
 /**
  * Imports one Check-Ins event's whole history: every gathering anybody
@@ -294,7 +362,12 @@ export const listCheckInsEvents = httpsCallable<void, { events: CheckInsEventSum
  * browser's wait — not the import — partway through.
  */
 export const importCheckInsEvent = httpsCallable<
-  { pcoEventId: string },
+  {
+    /** The event's id in its own backend — a Check-Ins event id, a meet slug. */
+    pcoEventId: string;
+    /** Which backend's history. Omitted means Planning Center, as it always did. */
+    backendId?: BackendId;
+  },
   CheckInsImportSummary
 >(functions, 'importCheckInsEvent', { timeout: 540_000 });
 
@@ -309,7 +382,14 @@ export interface PushStudentResult {
  * when they finish a visitor's profile during an event.
  */
 export const pushStudentToPlanningCenter = httpsCallable<
-  { studentId: string },
+  {
+    studentId: string;
+    /**
+     * Send this unlinked student to a named backend instead of the deployment's
+     * default. A student already linked ignores it — they push to their own.
+     */
+    backendId?: BackendId;
+  },
   PushStudentResult
 >(functions, 'pushStudentToPlanningCenter');
 

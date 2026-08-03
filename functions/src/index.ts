@@ -1035,12 +1035,17 @@ export const getBackendStatuses = onCall<
         };
 
         if (!backend) {
+          const problem = registry.configErrorOf(backendId);
           return {
             ...base,
             enabled: false,
-            configured: false,
+            // Not serving for one of two reasons, and the card says different
+            // things for them: unfinished configuration (the problem names
+            // what is missing) versus a configured backend a leader switched
+            // off (no problem to report — it is doing as asked).
+            configured: problem === null,
             reachable: false,
-            problem: registry.configErrorOf(backendId),
+            problem,
             peopleVisible: null,
             capabilities: null,
           };

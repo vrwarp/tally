@@ -22,7 +22,7 @@ import { invalidatePersonDetails } from '@/hooks/usePersonDetails';
 import { birthdayFieldFrom, describeBirthdayField, readBirthdayField } from '@/lib/birthdayField';
 import { birthdayMaskGhost, formatBirthdayInput } from '@/lib/birthdayInput';
 import { updateStudentProfile } from '@/services/functions';
-import type { Student } from '@/types';
+import { backendLabelOf, type Student } from '@/types';
 
 export interface BirthdayFieldProps {
   value: string;
@@ -173,7 +173,7 @@ export function EditBirthday({ student, onFile, onSaved, onDone }: EditBirthdayP
       show(response.data.status === 'updated' ? response.data.message : 'Already up to date.');
       onDone();
     } catch {
-      setProblem('Planning Center could not be reached. Nothing was changed.');
+      setProblem(`${backendLabelOf(student)} could not be reached. Nothing was changed.`);
     } finally {
       setBusy(false);
     }
@@ -196,7 +196,7 @@ export function EditBirthday({ student, onFile, onSaved, onDone }: EditBirthdayP
           Cancel
         </Button>
         <Button onClick={() => void save()} loading={busy}>
-          Save to Planning Center
+          Save to {backendLabelOf(student)}
         </Button>
       </div>
     </div>

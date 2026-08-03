@@ -11,6 +11,7 @@
  * has to think about `Timestamp`.
  */
 import type { Timestamp } from 'firebase/firestore';
+import { parseStudentId, type BackendId } from '@/lib/backendIds';
 
 /* -------------------------------------------------------------------------- */
 /* Primitives                                                                  */
@@ -128,13 +129,24 @@ export interface StudentDoc {
   /** A Tally-created student still waiting to be pushed to Planning Center. */
   pcoPushPending: boolean;
   /**
-   * True while the linked Planning Center record is known gone — deleted, or
-   * merged with the trail ending dead. Written only by the server, from what
-   * Planning Center actually answered; the rules refuse it from a client and
-   * refuse check-ins while it stands. A leader thaws the student by removing
-   * them from the roster or re-creating the record.
+   * True while the linked upstream record is known gone — deleted, or merged
+   * with the trail ending dead. Written only by the server, from what the
+   * backend actually answered; the rules refuse it from a client and refuse
+   * check-ins while it stands. A leader thaws the student by removing them
+   * from the roster or re-creating the record. Named for the first backend
+   * Tally had; it freezes for every backend.
    */
   pcoRecordMissing?: boolean;
+
+  /**
+   * The generic linkage pair, written by the server alongside (or instead of)
+   * `pcoPersonId` above: which people-backend holds this student, and as
+   * whom. Planning Center pushes write both fields for compatibility;
+   * Attendees pushes write only these. `pcoPersonId` keeps meaning Planning
+   * Center and only Planning Center.
+   */
+  upstreamBackend?: BackendId | null;
+  upstreamPersonId?: string | null;
 
   /** Lowercased "first last", used for the substring search fallback. */
   searchName: string;
@@ -603,9 +615,12 @@ export type PcoWriteBackMode = 'off' | 'create' | 'full';
  * documents that exist for visitors and for students somebody has annotated.
  */
 export interface PcoRosterPerson {
-  /** Already in Tally's student-id form: `pco_{personId}`. */
+  /** Already in Tally's student-id form: `pco_{personId}`, `a32_{uuid}`. */
   id: string;
+  /** The backend's own id for this person — named for the first backend. */
   pcoPersonId: string;
+  /** Which backend `pcoPersonId` belongs to. Absent from older servers = pco. */
+  backendId?: BackendId;
   firstName: string;
   lastName: string;
   grade: number;
@@ -651,6 +666,8 @@ export interface PcoRosterPerson {
  */
 export interface PcoPersonSearchResult {
   pcoPersonId: string;
+  /** Which backend found them — the search fans out once two are connected. */
+  backendId?: BackendId;
   /** Tally student id, so a caller can tell who is already on the roster. */
   id: string;
   firstName: string;
@@ -664,6 +681,8 @@ export interface PcoPersonSearchResult {
 /** The fields the roster deliberately withholds, fetched one person at a time. */
 export interface PcoPersonDetails {
   pcoPersonId: string;
+  /** Which backend answered — and whose write-back the flags below describe. */
+  backendId?: BackendId;
   parentName: string | null;
   parentPhone: string | null;
   parentEmail: string | null;
@@ -758,6 +777,44 @@ export interface PcoStatus {
 }
 
 /**
+ * One backend's connection report, from `getBackendStatuses` — every backend
+ * Tally knows, connected or not, which is what lets the Settings screen show
+ * Attendees before it is configured with the problem named.
+ */
+export interface BackendStatus {
+  backendId: BackendId;
+  displayName: string;
+  /** Switched on and fully configured. */
+  enabled: boolean;
+  configured: boolean;
+  reachable: boolean;
+  problem: string | null;
+  writeBack: PcoWriteBackMode;
+  cacheTtlSeconds: number;
+  peopleVisible: number | null;
+  unresolved: number;
+  /** Present only on an enabled backend. */
+  capabilities: {
+    writeBack: PcoWriteBackMode;
+    parentCreatable: boolean;
+    mergeAware: boolean;
+    listsSupported: boolean;
+    historyImportSupported: boolean;
+    attendancePushSupported: boolean;
+  } | null;
+  /** The effective settings, shaped per backend. */
+  settings: Record<string, unknown>;
+}
+
+export interface BackendStatuses {
+  backends: BackendStatus[];
+  /** Where a student Tally creates gets pushed. */
+  defaultPushBackend: BackendId;
+  /** Active students no backend holds yet — a deployment-wide count. */
+  queued: number;
+}
+
+/**
  * The non-secret settings the server is running on right now.
  *
  * "Effective" rather than "saved": these are the deploy-time parameters with
@@ -796,6 +853,38 @@ export interface PcoRuntimeConfigDoc {
   cacheTtlSeconds: number;
   /** Admin-only, and flagged everywhere it is not the real Planning Center. */
   baseUrl: string;
+  updatedAt: Timestamp | null;
+  updatedBy: string | null;
+}
+
+/**
+ * The browser-writable half of the Attendees configuration —
+ * `config/attendees32`, the `PcoRuntimeConfigDoc` reasoning applied to the
+ * second backend. The DRF token is not here and cannot be: this document is
+ * written by a browser, and a credential a browser can write is a credential
+ * a browser can read.
+ */
+export interface A32RuntimeConfigDoc {
+  /** The off switch. Absent counts as on — being configured is the real gate. */
+  enabled: boolean;
+  /** Admin-only: every Attendees request carries the token to this address. */
+  baseUrl: string;
+  divisionId: string;
+  meetSlug: string;
+  characterSlug: string;
+  assemblySlug: string;
+  minGrade: number;
+  maxGrade: number;
+  writeBack: PcoWriteBackMode;
+  cacheTtlSeconds: number;
+  updatedAt: Timestamp | null;
+  updatedBy: string | null;
+}
+
+/** Cross-backend settings — `config/backends`. */
+export interface BackendsConfigDoc {
+  /** Which backend receives the students Tally creates. Absent means `pco`. */
+  defaultPushBackend: BackendId;
   updatedAt: Timestamp | null;
   updatedBy: string | null;
 }
@@ -951,12 +1040,48 @@ export {
   BACKEND_PREFIXES,
   PCO_ID_PREFIX,
   isBackendId,
-  parseStudentId,
   pcoStudentId,
   personIdFromStudentId,
   studentIdFor,
 } from '@/lib/backendIds';
-export type { BackendId } from '@/lib/backendIds';
+export { parseStudentId };
+export type { BackendId };
+
+/** What screens call each backend. Sentences build around these. */
+export const BACKEND_LABELS: Record<BackendId, string> = {
+  pco: 'Planning Center',
+  a32: 'Attendees',
+};
+
+/**
+ * Which backend holds a student, or null for a visitor no push has landed on.
+ * The id prefix is the claim when there is one; the server-written linkage
+ * fields answer for a visitor document, with the legacy `pcoPersonId` still
+ * meaning Planning Center.
+ */
+export function backendOfStudent(
+  student: Pick<Student, 'id' | 'pcoPersonId'> & {
+    upstreamBackend?: BackendId | null;
+    upstreamPersonId?: string | null;
+  },
+): BackendId | null {
+  const parsed = parseStudentId(student.id);
+  if (parsed) return parsed.backendId;
+  if (student.upstreamBackend && student.upstreamPersonId) return student.upstreamBackend;
+  return student.pcoPersonId ? 'pco' : null;
+}
+
+/**
+ * The name a sentence about this student's backend should use.
+ *
+ * Falls back to Planning Center for a student no backend holds, because that
+ * is where an unlinked student has always been said to be going — the queued
+ * badge, the push button — and where the server still sends them unless a
+ * leader has picked otherwise.
+ */
+export function backendLabelOf(student: Parameters<typeof backendOfStudent>[0]): string {
+  return BACKEND_LABELS[backendOfStudent(student) ?? 'pco'];
+}
 
 /* -------------------------------------------------------------------------- */
 /* Derived view models                                                         */

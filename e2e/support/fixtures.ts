@@ -5,6 +5,7 @@
  * what actually reached Firestore rather than trusting what the screen drew.
  */
 import { test as base, expect, type Page } from '@playwright/test';
+import { E2E } from '../../playwright.config';
 import { TEAM, signIn, type TeamRole } from './auth';
 import {
   clearSimulatorFaults,
@@ -12,9 +13,12 @@ import {
   deleteDocument,
   failSimulator,
   readCollection,
+  resetA32Simulator,
   resetSimulator,
+  setA32Down,
   simulatorPeople,
   simulatorRequests,
+  writeDocument,
   type FirestoreDoc,
 } from './emulator';
 
@@ -47,6 +51,18 @@ export interface TallyFixtures {
     }) => Promise<void>;
     /** What the app actually asked Planning Center for. */
     requests: () => Promise<Array<{ method: string; path: string }>>;
+  };
+  /**
+   * The second backend, off unless a spec turns it on. `enable` writes the
+   * `config/attendees32` document pointing at the simulator; the fixture's
+   * teardown removes it and revives the simulator, so no other spec ever sees
+   * a world with two backends by accident.
+   */
+  attendees: {
+    enable: (writeBack?: 'off' | 'create' | 'full') => Promise<void>;
+    disable: () => Promise<void>;
+    reset: () => Promise<void>;
+    down: (down: boolean) => Promise<void>;
   };
 }
 
@@ -88,6 +104,49 @@ export const test = base.extend<TallyFixtures>({
     // resetting the organisation would replace the seeded ministry with the
     // built-in fixtures, and the roster on screen comes from here.
     await clearSimulatorFaults();
+  },
+
+  attendees: async ({}, use) => {
+    let touched = false;
+
+    await use({
+      enable: async (writeBack = 'full') => {
+        touched = true;
+        // The coordinates the simulator's seeded organisation answers to —
+        // the same ones `setup_tally_integration` prints for a real server.
+        await writeDocument('config/attendees32', {
+          enabled: true,
+          baseUrl: E2E.a32SimulatorUrl,
+          divisionId: '11',
+          meetSlug: 'simorg_tally_gathering',
+          characterSlug: 'simorg_tally_student',
+          assemblySlug: 'simorg_tally_youth_ministry',
+          writeBack,
+          minGrade: 6,
+          maxGrade: 12,
+          cacheTtlSeconds: 5,
+        });
+      },
+      disable: async () => {
+        await deleteDocument('config/attendees32');
+      },
+      reset: async () => {
+        touched = true;
+        await resetA32Simulator();
+      },
+      down: async (down: boolean) => {
+        touched = true;
+        await setA32Down(down);
+      },
+    });
+
+    // A spec that turned the second backend on leaves a single-backend world
+    // behind it — configuration gone, simulator up and reseeded.
+    if (touched) {
+      await deleteDocument('config/attendees32');
+      await setA32Down(false);
+      await resetA32Simulator();
+    }
   },
 });
 

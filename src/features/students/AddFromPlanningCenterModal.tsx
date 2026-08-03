@@ -26,7 +26,19 @@ import { fetchPlanningCenterLists } from '@/services/planningCenter';
 import { pcoErrorReport } from '@/lib/pcoErrors';
 import { ordinalGrade } from '@/lib/utils';
 import { cn } from '@/lib/utils';
-import type { PcoErrorReport, PcoList, PcoPersonSearchResult } from '@/types';
+import {
+  BACKEND_LABELS,
+  parseStudentId,
+  type BackendId,
+  type PcoErrorReport,
+  type PcoList,
+  type PcoPersonSearchResult,
+} from '@/types';
+
+/** Which backend a search row came from; every row can say. */
+function backendOf(person: PcoPersonSearchResult): BackendId {
+  return person.backendId ?? parseStudentId(person.id)?.backendId ?? 'pco';
+}
 
 /** Long enough that a typed name is one request, short enough to feel live. */
 const SEARCH_DEBOUNCE_MS = 300;
@@ -44,10 +56,20 @@ export function AddFromPlanningCenterModal({
   onRoster,
 }: AddFromPlanningCenterModalProps) {
   const { show } = useToast();
-  const { refreshRoster } = useData();
+  const { refreshRoster, rosterBackends } = useData();
+
+  /*
+   * More than one backend serving the roster changes the words on this screen:
+   * a row has to say where its person lives, and "Planning Center" stops being
+   * the name for everything. The roster's own per-backend report is the source
+   * — it lists exactly the enabled backends, and it is already here.
+   */
+  const multiBackend = rosterBackends.length >= 2;
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<PcoPersonSearchResult[] | null>(null);
+  /** Backends the last search could not reach — a note, not a failure. */
+  const [searchDown, setSearchDown] = useState<string[]>([]);
   /*
    * The failure itself rather than a sentence about it. Every one of these
    * four calls goes through a Cloud Function to Planning Center, so when one
@@ -67,6 +89,7 @@ export function AddFromPlanningCenterModal({
     if (open) {
       setQuery('');
       setResults(null);
+      setSearchDown([]);
       setError(null);
       setAdded(new Set());
       setShowImport(false);
@@ -94,12 +117,20 @@ export function AddFromPlanningCenterModal({
           // the current one.
           if (!cancelled && latestQuery.current.trim() === search) {
             setResults(response.data.people);
+            // A backend that could not be searched is a note over real
+            // results, not a failure: the other backends answered.
+            setSearchDown(
+              (response.data.perBackend ?? [])
+                .filter((entry) => !entry.ok)
+                .map((entry) => entry.displayName),
+            );
           }
         })
         .catch((cause: unknown) => {
           if (cancelled) return;
           setResults([]);
-          setError(pcoErrorReport(cause, 'Could not search Planning Center.'));
+          setSearchDown([]);
+          setError(pcoErrorReport(cause, 'Could not run that search.'));
         });
     }, SEARCH_DEBOUNCE_MS);
 
@@ -113,7 +144,10 @@ export function AddFromPlanningCenterModal({
     setAddingId(person.pcoPersonId);
     setError(null);
     try {
-      const response = await addRosterMember({ pcoPersonId: person.pcoPersonId });
+      const response = await addRosterMember({
+        pcoPersonId: person.pcoPersonId,
+        backendId: backendOf(person),
+      });
       setAdded((current) => new Set(current).add(person.id));
       show(
         response.data.status === 'restored'
@@ -164,8 +198,12 @@ export function AddFromPlanningCenterModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="Add from Planning Center"
-      description="Search your church directory. Tally records that they are on the roster and nothing else about them."
+      title={multiBackend ? 'Add a student' : 'Add from Planning Center'}
+      description={
+        multiBackend
+          ? 'Search every connected directory at once. Tally records that they are on the roster and nothing else about them.'
+          : 'Search your church directory. Tally records that they are on the roster and nothing else about them.'
+      }
       footer={
         <Button variant="secondary" onClick={onClose}>
           Done
@@ -181,7 +219,7 @@ export function AddFromPlanningCenterModal({
         ) : null}
 
         <TextField
-          label="Search Planning Center"
+          label={multiBackend ? 'Search your directories' : 'Search Planning Center'}
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
@@ -191,21 +229,34 @@ export function AddFromPlanningCenterModal({
           spellCheck={false}
         />
 
+        {searchDown.length > 0 && query.trim() ? (
+          <p className="rounded-xl bg-warn-500/10 px-3 py-2 text-sm text-warn-400 ring-1 ring-warn-500/25">
+            {searchDown.join(' and ')} could not be searched just now — these results are from the
+            rest.
+          </p>
+        ) : null}
+
         {!query.trim() ? (
           <p className="px-1 text-sm text-ink-500">
-            Anyone in Planning Center can be added, whatever their grade says. The roster is yours —
-            the 5th grader who comes with a sibling belongs on it if you say so.
+            {multiBackend
+              ? 'Anyone in your directories can be added, whatever their grade says. The roster is yours — the 5th grader who comes with a sibling belongs on it if you say so.'
+              : 'Anyone in Planning Center can be added, whatever their grade says. The roster is yours — the 5th grader who comes with a sibling belongs on it if you say so.'}
           </p>
         ) : results === null ? (
           <SkeletonRows count={3} />
         ) : results.length === 0 ? (
-          <p className="px-1 text-sm text-ink-400">Nobody in Planning Center matches “{query}”.</p>
+          <p className="px-1 text-sm text-ink-400">
+            {multiBackend
+              ? `Nobody matches “${query}”.`
+              : `Nobody in Planning Center matches “${query}”.`}
+          </p>
         ) : (
           <ul className="flex flex-col gap-1.5">
             {results.map((person) => {
               const already = onRoster.has(person.id) || added.has(person.id);
+              const backendName = BACKEND_LABELS[backendOf(person)];
               return (
-                <li key={person.pcoPersonId}>
+                <li key={person.id}>
                   <div
                     className={cn(
                       'flex items-center justify-between gap-3 rounded-xl px-3 py-2 ring-1',
@@ -213,15 +264,24 @@ export function AddFromPlanningCenterModal({
                     )}
                   >
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-medium text-ink-100">
-                        {person.firstName} {person.lastName}
+                      <span className="flex items-center gap-1.5 truncate text-sm font-medium text-ink-100">
+                        <span className="truncate">
+                          {person.firstName} {person.lastName}
+                        </span>
+                        {/*
+                          Which system holds them — shown only once there is
+                          more than one it could be. The same person can exist
+                          in both, and the row a leader picks decides which
+                          record the roster follows.
+                        */}
+                        {multiBackend ? <Badge tone="neutral">{backendName}</Badge> : null}
                       </span>
                       <span className="block text-xs text-ink-500">
                         {person.grade === null
-                          ? 'No grade in Planning Center'
+                          ? `No grade in ${backendName}`
                           : ordinalGrade(person.grade)}
                         {person.child ? '' : ' · not marked as a child'}
-                        {person.status === 'inactive' ? ' · inactive in Planning Center' : ''}
+                        {person.status === 'inactive' ? ` · inactive in ${backendName}` : ''}
                       </span>
                     </span>
 

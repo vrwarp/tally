@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { subscribeEventSeries, subscribeEvents, subscribeSettings } from '@/services/events';
 import { subscribeStudents } from '@/services/students';
 import { cachedRoster, fetchRoster, mergeRoster, rememberRosterPerson } from '@/services/roster';
+import type { RosterBackendStatus } from '@/services/functions';
 import { fromRosterPerson } from '@/services/converters';
 import { useNow } from '@/hooks/useNow';
 import { calendarSignature, projectEvents } from '@/lib/eventProjection';
@@ -93,15 +94,20 @@ function rosterSignature(students: readonly Student[]): string {
 
 function describeRosterError(cause: unknown): string {
   const code = (cause as { code?: string })?.code ?? '';
+  // The server's sentence already names which backend failed — "Planning
+  // Center is rate-limiting us", "Could not reach Attendees to load the
+  // roster" — which this side cannot know on its own.
+  const said = (cause as { message?: string })?.message || null;
   if (code.includes('unauthenticated')) return 'Your session expired. Sign in again.';
   if (code.includes('permission-denied')) return 'Your access to Tally is not active.';
   if (code.includes('resource-exhausted')) {
-    return 'Planning Center is rate-limiting us. The roster will refresh shortly.';
+    return said ?? 'The roster is being rate-limited upstream. It will refresh shortly.';
   }
   if (code.includes('failed-precondition')) {
-    return (cause as { message?: string })?.message ?? 'Planning Center is not configured.';
+    return said ?? 'No people backend is configured.';
   }
-  return 'Could not reach Planning Center for the roster.';
+  if (code.includes('unavailable') && said) return said;
+  return 'Could not reach the people backend for the roster.';
 }
 
 /**
@@ -115,9 +121,21 @@ function describeRosterError(cause: unknown): string {
  */
 function rosterErrorReport(cause: unknown): PcoErrorReport {
   return {
-    ...pcoErrorReport(cause, 'Could not reach Planning Center for the roster.'),
+    ...pcoErrorReport(cause, 'Could not reach the people backend for the roster.'),
     message: describeRosterError(cause),
   };
+}
+
+/**
+ * A cheap identity for the per-backend report, mirroring `rosterSignature`:
+ * only what a screen would draw. `fetchedAt` is deliberately absent — every
+ * fresh read restamps it, and restamping is not a change worth re-rendering
+ * every consumer of the context for.
+ */
+function backendReportSignature(entries: readonly RosterBackendStatus[]): string {
+  return entries
+    .map((e) => `${e.backendId}|${e.ok}|${e.error ?? ''}|${e.people}|${e.unresolved}|${e.missing}`)
+    .join('\n');
 }
 
 export function DataProvider({ children }: { children: ReactNode }) {
@@ -134,6 +152,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [rosterError, setRosterError] = useState<PcoErrorReport | null>(null);
   const [rosterOffline, setRosterOffline] = useState(() => cachedRoster() !== null);
   const [rosterFetchedAt, setRosterFetchedAt] = useState<Date | null>(null);
+  const [rosterBackends, setRosterBackends] = useState<RosterBackendStatus[]>([]);
 
   const [ready, setReady] = useState({
     students: false,
@@ -238,6 +257,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
        */
       setRosterFetchedAt((current) =>
         current?.getTime() === snapshot.fetchedAt?.getTime() ? current : snapshot.fetchedAt,
+      );
+      // Same churn guard again: most reads report the same backends saying the
+      // same thing, and that is not worth a context publish.
+      const reported = snapshot.perBackend ?? [];
+      setRosterBackends((current) =>
+        backendReportSignature(current) === backendReportSignature(reported) ? current : reported,
       );
       setRosterOffline(false);
       setRosterError(null);
@@ -353,6 +378,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       rosterError,
       rosterOffline,
       rosterFetchedAt,
+      rosterBackends,
       refreshRoster,
       applyRosterPerson,
     }),
@@ -368,6 +394,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       rosterError,
       rosterOffline,
       rosterFetchedAt,
+      rosterBackends,
       refreshRoster,
       applyRosterPerson,
     ],

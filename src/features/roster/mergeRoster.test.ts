@@ -236,4 +236,78 @@ describe('mergeRoster', () => {
     const ids = mergeRoster(roster, documents).map((student) => student.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
+
+  /* ---- A second backend on the same roster ------------------------------- */
+
+  /** A row as it arrives from Attendees. */
+  function a32Entry(personId: string, overrides = {}) {
+    return makeStudent({
+      id: `a32_${personId}`,
+      pcoPersonId: personId,
+      upstreamBackend: 'a32',
+      upstreamPersonId: personId,
+      fromPlanningCenter: true,
+      notes: null,
+      createdAt: new Date(0),
+      ...overrides,
+    });
+  }
+
+  const UUID = '8c1f2c34-9d1e-4f56-8a7b-0c1d2e3f4a5b';
+
+  it('layers an annotation onto an Attendees row without duplicating it', () => {
+    const roster = [a32Entry(UUID, { firstName: 'Priya' })];
+    const annotation = tallyDocument(`a32_${UUID}`, { notes: 'Plays veena.' });
+
+    const merged = mergeRoster(roster, [annotation]);
+
+    expect(merged).toHaveLength(1);
+    expect(merged[0]?.firstName).toBe('Priya');
+    expect(merged[0]?.notes).toBe('Plays veena.');
+  });
+
+  it('collapses a visitor linked to Attendees under the document id', () => {
+    // The generic linkage pair, without any legacy `pcoPersonId` — an Attendees
+    // push writes only the generics. The join must read them, or this child is
+    // two rows.
+    const roster = [a32Entry(UUID, { firstName: 'Wei', lastName: 'Suzuki' })];
+    const linked = tallyDocument('tally-abc', {
+      firstName: 'W.',
+      upstreamBackend: 'a32',
+      upstreamPersonId: UUID,
+      isVisitor: true,
+      notes: 'Sister of Hana.',
+    });
+
+    const merged = mergeRoster(roster, [linked]);
+
+    expect(merged).toHaveLength(1);
+    expect(merged[0]?.id).toBe('tally-abc');
+    expect(merged[0]?.firstName).toBe('Wei');
+    expect(merged[0]?.notes).toBe('Sister of Hana.');
+  });
+
+  it('keeps the two backends apart when their people share nothing but a roster', () => {
+    const roster = [rosterEntry('900', { searchName: 'amara okonkwo' }), a32Entry(UUID, { searchName: 'priya raghunathan' })];
+    const documents = [
+      tallyDocument('tally-a', { pcoPersonId: '900' }),
+      tallyDocument('tally-b', { upstreamBackend: 'a32', upstreamPersonId: UUID }),
+    ];
+
+    const merged = mergeRoster(roster, documents);
+
+    expect(merged.map((student) => student.id).sort()).toEqual(['tally-a', 'tally-b']);
+  });
+
+  it('does not blank-row an Attendees membership whose person went unresolved', () => {
+    // Same rule as the Planning Center case above it: a document holding no
+    // name, whose upstream person the roster did not return, is not a row.
+    const orphan = tallyDocument(`a32_${UUID}`, {
+      firstName: '',
+      upstreamBackend: 'a32',
+      upstreamPersonId: UUID,
+    });
+
+    expect(mergeRoster([], [orphan])).toHaveLength(0);
+  });
 });

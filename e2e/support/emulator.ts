@@ -131,6 +131,37 @@ export async function deleteDocument(path: string): Promise<void> {
   }
 }
 
+function encode(value: unknown): RestValue {
+  if (value === null) return { nullValue: null };
+  if (typeof value === 'string') return { stringValue: value };
+  if (typeof value === 'boolean') return { booleanValue: value };
+  if (typeof value === 'number') {
+    return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
+  }
+  if (Array.isArray(value)) return { arrayValue: { values: value.map(encode) } };
+  throw new Error(`No encoding for ${typeof value} in a test-written document.`);
+}
+
+/**
+ * Writes one document whole, through the admin channel — for the settings a
+ * spec arranges rather than clicks together, like pointing the Attendees
+ * configuration at the simulator. Replaces the document; there is no merge.
+ */
+export async function writeDocument(
+  path: string,
+  data: Record<string, string | number | boolean | null>,
+): Promise<void> {
+  const fields = Object.fromEntries(Object.entries(data).map(([key, value]) => [key, encode(value)]));
+  const response = await fetch(`${FIRESTORE_ROOT}/${path}`, {
+    method: 'PATCH',
+    headers: { ...ADMIN, 'content-type': 'application/json' },
+    body: JSON.stringify({ fields }),
+  });
+  if (!response.ok) {
+    throw new Error(`Writing ${path} failed: HTTP ${response.status} ${await response.text()}.`);
+  }
+}
+
 /* -------------------------------------------------------------------------- */
 /* Planning Center simulator control plane                                     */
 /* -------------------------------------------------------------------------- */
@@ -199,4 +230,55 @@ export async function simulatorPeople(): Promise<Array<Record<string, unknown>>>
   const response = await fetch(`${E2E.simulatorUrl}/_sim/people`);
   const body = (await response.json()) as { people: Array<Record<string, unknown>> };
   return body.people;
+}
+
+/**
+ * Removes everything the Attendees specs put into Firestore.
+ *
+ * The suite is seeded once and runs in file order, so a spec that imported a
+ * whole meet's history — a chain of gatherings, attendance under each, and a
+ * membership per student — would quietly reshape every number the later
+ * dashboard and check-in specs assert on. The Attendees specs run first
+ * alphabetically and sweep themselves out on the way.
+ */
+export async function removeA32Residue(): Promise<void> {
+  for (const student of await readCollection('students')) {
+    if (student.id.startsWith('a32_') || student.data.upstreamBackend === 'a32') {
+      await deleteDocument(`students/${student.id}`);
+    }
+  }
+  for (const event of await readCollection('events')) {
+    if (!event.id.startsWith('a32-meet-')) continue;
+    for (const record of await readCollection(`events/${event.id}/attendance`)) {
+      await deleteDocument(`events/${event.id}/attendance/${record.id}`);
+    }
+    for (const record of await readCollection(`events/${event.id}/rsvps`)) {
+      await deleteDocument(`events/${event.id}/rsvps/${record.id}`);
+    }
+    await deleteDocument(`events/${event.id}`);
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Attendees simulator control plane                                           */
+/* -------------------------------------------------------------------------- */
+
+/** Puts the Attendees simulator back to its seeded organisation. */
+export async function resetA32Simulator(): Promise<void> {
+  const response = await fetch(`${E2E.a32SimulatorUrl}/_sim/reset`, { method: 'POST' });
+  if (!response.ok) {
+    throw new Error(`Could not reset the Attendees simulator: HTTP ${response.status}.`);
+  }
+}
+
+/** Takes the whole Attendees server down (503s) — or brings it back. */
+export async function setA32Down(down: boolean): Promise<void> {
+  const response = await fetch(`${E2E.a32SimulatorUrl}/_sim/down`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ down }),
+  });
+  if (!response.ok) {
+    throw new Error(`Could not set the Attendees simulator down=${down}: HTTP ${response.status}.`);
+  }
 }

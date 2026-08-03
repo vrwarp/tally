@@ -63,7 +63,25 @@ describe('useAllergyNotes', () => {
     renderHook(() => useAllergyNotes([entry(sofia), entry(amara)]));
 
     await waitFor(() => expect(getAllergyNotes).toHaveBeenCalled());
-    expect(getAllergyNotes).toHaveBeenCalledWith({ pcoPersonIds: ['4200003'] });
+    expect(getAllergyNotes).toHaveBeenCalledWith({ pcoPersonIds: ['4200003'], personKeys: [] });
+  });
+
+  it('names the backend for a flagged student Planning Center does not hold', async () => {
+    getAllergyNotes.mockResolvedValue({ data: { notes: {} } });
+    const wei = makeStudent({
+      id: 'a32_8c1f2c34-9d1e-4f56-8a7b-0c1d2e3f4a5b',
+      firstName: 'Wei',
+      pcoPersonId: '8c1f2c34-9d1e-4f56-8a7b-0c1d2e3f4a5b',
+      hasAllergies: true,
+    });
+
+    renderHook(() => useAllergyNotes([entry(sofia), entry(wei)]));
+
+    await waitFor(() => expect(getAllergyNotes).toHaveBeenCalled());
+    expect(getAllergyNotes).toHaveBeenCalledWith({
+      pcoPersonIds: ['4200003'],
+      personKeys: [{ backendId: 'a32', personId: '8c1f2c34-9d1e-4f56-8a7b-0c1d2e3f4a5b' }],
+    });
   });
 
   it('asks nothing at all when nobody on screen is flagged', () => {
@@ -107,7 +125,10 @@ describe('useAllergyNotes', () => {
     // the roster: the new row is asked about, the old one is not asked again.
     rerender({ entries: [entry(sofia), entry(elijah)] });
     await waitFor(() => expect(getAllergyNotes).toHaveBeenCalledTimes(2));
-    expect(getAllergyNotes).toHaveBeenLastCalledWith({ pcoPersonIds: ['4200008'] });
+    expect(getAllergyNotes).toHaveBeenLastCalledWith({
+      pcoPersonIds: ['4200008'],
+      personKeys: [],
+    });
   });
 
   it('says nothing rather than failing the screen when Planning Center is unreachable', async () => {

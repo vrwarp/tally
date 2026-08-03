@@ -24,12 +24,21 @@ import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { pcoErrorReport } from '@/lib/pcoErrors';
 import { importCheckInsEvent, listCheckInsEvents } from '@/services/functions';
-import type { CheckInsEventSummary, CheckInsImportSummary, PcoErrorReport } from '@/types';
+import {
+  BACKEND_LABELS,
+  type BackendId,
+  type CheckInsEventSummary,
+  type CheckInsImportSummary,
+  type PcoErrorReport,
+} from '@/types';
 
 export interface ImportCheckInsModalProps {
   open: boolean;
   onClose: () => void;
 }
+
+/** One importable event, remembering which backend offered it. */
+type SourcedEvent = CheckInsEventSummary & { backendId: BackendId };
 
 /** "Jan 2024" — the era a leader recognises an event's history by. */
 function formatSince(iso: string | null): string | null {
@@ -43,12 +52,15 @@ function EventRow({
   event,
   importing,
   disabled,
+  showSource,
   onImport,
 }: {
-  event: CheckInsEventSummary;
+  event: SourcedEvent;
   importing: boolean;
   disabled: boolean;
-  onImport: (event: CheckInsEventSummary) => void;
+  /** Label the row with its backend — only once there is more than one. */
+  showSource: boolean;
+  onImport: (event: SourcedEvent) => void;
 }) {
   const since = formatSince(event.firstGatheringAt);
   const facts = [
@@ -64,6 +76,7 @@ function EventRow({
       <span className="min-w-0">
         <span className="flex min-w-0 items-center gap-2">
           <span className="truncate text-sm font-medium text-ink-100">{event.name}</span>
+          {showSource ? <Badge tone="neutral">{BACKEND_LABELS[event.backendId]}</Badge> : null}
           {event.alreadyImported ? <Badge tone="success">Imported</Badge> : null}
         </span>
         <span className="block text-xs text-ink-500">
@@ -150,10 +163,27 @@ function Summary({ summary }: { summary: CheckInsImportSummary }) {
 
 export function ImportCheckInsModal({ open, onClose }: ImportCheckInsModalProps) {
   const { show } = useToast();
-  const { refreshRoster } = useData();
+  const { refreshRoster, rosterBackends } = useData();
 
-  const [events, setEvents] = useState<CheckInsEventSummary[] | null>(null);
+  /*
+   * Which backends to offer history from. The roster's own per-backend report
+   * lists the enabled ones; before it exists — cold start, older server — the
+   * one source there has ever been is Planning Center. A backend that turns
+   * out to have no history to offer answers with a refusal that is handled
+   * per source below, so over-asking is safe.
+   */
+  const sources: BackendId[] =
+    rosterBackends.length > 0 ? rosterBackends.map((entry) => entry.backendId) : ['pco'];
+  const multiSource = sources.length >= 2;
+  // A string, so the listing effect can re-run when the set of backends
+  // genuinely changes — a roster read landing just after the modal opened —
+  // without re-listing on every roster tick.
+  const sourcesKey = sources.join('|');
+
+  const [events, setEvents] = useState<SourcedEvent[] | null>(null);
   const [error, setError] = useState<PcoErrorReport | null>(null);
+  /** Sources whose list could not be read while another's could. */
+  const [listDown, setListDown] = useState<string[]>([]);
   const [importingId, setImportingId] = useState<string | null>(null);
   const [summary, setSummary] = useState<CheckInsImportSummary | null>(null);
 
@@ -161,36 +191,64 @@ export function ImportCheckInsModal({ open, onClose }: ImportCheckInsModalProps)
     if (!open) return;
     setEvents(null);
     setError(null);
+    setListDown([]);
     setImportingId(null);
     setSummary(null);
 
     let cancelled = false;
-    listCheckInsEvents()
-      .then((response) => {
-        if (!cancelled) setEvents(response.data.events);
-      })
-      .catch((cause: unknown) => {
-        if (cancelled) return;
+    void Promise.all(
+      sources.map(async (backendId) => {
+        try {
+          const response = await listCheckInsEvents({ backendId });
+          return { backendId, events: response.data.events, cause: null };
+        } catch (cause) {
+          return { backendId, events: null, cause };
+        }
+      }),
+    ).then((settled) => {
+      if (cancelled) return;
+      const answered = settled.filter((entry) => entry.events !== null);
+      if (answered.length === 0) {
         setEvents([]);
-        setError(pcoErrorReport(cause, 'Could not read your Check-Ins events.'));
-      });
+        setError(pcoErrorReport(settled[0]?.cause, 'Could not read your importable events.'));
+        return;
+      }
+      setEvents(
+        answered.flatMap((entry) =>
+          entry.events!.map((event) => ({ ...event, backendId: entry.backendId })),
+        ),
+      );
+      setListDown(
+        settled
+          .filter((entry) => entry.events === null)
+          .map((entry) => BACKEND_LABELS[entry.backendId]),
+      );
+    });
 
     return () => {
       cancelled = true;
     };
-  }, [open]);
+    // `sources` itself changes identity every render; the key only changes
+    // when the set of backends does, which is exactly when re-listing is due.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, sourcesKey]);
 
-  const runImport = async (event: CheckInsEventSummary) => {
-    setImportingId(event.id);
+  const runImport = async (event: SourcedEvent) => {
+    setImportingId(`${event.backendId}:${event.id}`);
     setError(null);
     setSummary(null);
     try {
-      const { data } = await importCheckInsEvent({ pcoEventId: event.id });
+      const { data } = await importCheckInsEvent({
+        pcoEventId: event.id,
+        backendId: event.backendId,
+      });
       setSummary(data);
       setEvents(
         (current) =>
           current?.map((candidate) =>
-            candidate.id === event.id ? { ...candidate, alreadyImported: true } : candidate,
+            candidate.id === event.id && candidate.backendId === event.backendId
+              ? { ...candidate, alreadyImported: true }
+              : candidate,
           ) ?? current,
       );
       show(`${data.eventName} imported`, { tone: 'success' });
@@ -208,8 +266,12 @@ export function ImportCheckInsModal({ open, onClose }: ImportCheckInsModalProps)
     <Modal
       open={open}
       onClose={onClose}
-      title="Import from Planning Center"
-      description="Bring a Check-Ins event's whole history into Tally: every night it met, everyone who attended, and every check-in. Planning Center is only read — nothing there changes."
+      title={multiSource ? 'Import history' : 'Import from Planning Center'}
+      description={
+        multiSource
+          ? "Bring an event's whole attendance history into Tally: every night it met, everyone who attended, and every check-in. The source is only read — nothing there changes."
+          : "Bring a Check-Ins event's whole history into Tally: every night it met, everyone who attended, and every check-in. Planning Center is only read — nothing there changes."
+      }
       footer={
         <Button variant="secondary" onClick={onClose} disabled={importingId !== null}>
           Done
@@ -224,22 +286,32 @@ export function ImportCheckInsModal({ open, onClose }: ImportCheckInsModalProps)
           />
         ) : null}
 
+        {listDown.length > 0 ? (
+          <p className="rounded-xl bg-warn-500/10 px-3 py-2 text-sm text-warn-400 ring-1 ring-warn-500/25">
+            {listDown.join(' and ')} could not be asked for its events just now — this list is from
+            the rest.
+          </p>
+        ) : null}
+
         {summary ? <Summary summary={summary} /> : null}
 
         {events === null ? (
           <SkeletonRows count={3} />
         ) : events.length === 0 && !error ? (
           <p className="px-1 text-sm text-ink-400">
-            Planning Center has no live Check-Ins events. Archived ones are not offered.
+            {multiSource
+              ? 'No connected backend has an importable event. Archived ones are not offered.'
+              : 'Planning Center has no live Check-Ins events. Archived ones are not offered.'}
           </p>
         ) : (
           <ul className="flex flex-col gap-1.5">
             {events.map((event) => (
               <EventRow
-                key={event.id}
+                key={`${event.backendId}:${event.id}`}
                 event={event}
-                importing={importingId === event.id}
+                importing={importingId === `${event.backendId}:${event.id}`}
                 disabled={importingId !== null}
+                showSource={multiSource}
                 onImport={(target) => void runImport(target)}
               />
             ))}
@@ -248,8 +320,8 @@ export function ImportCheckInsModal({ open, onClose }: ImportCheckInsModalProps)
 
         {importingId !== null ? (
           <p className="px-1 text-xs text-ink-500">
-            Reading Planning Center and writing the history… a long-running gathering can take a
-            minute or two. Keep this open until it finishes.
+            Reading the history and writing it here… a long-running gathering can take a minute or
+            two. Keep this open until it finishes.
           </p>
         ) : (
           <p className="px-1 text-xs text-ink-500">

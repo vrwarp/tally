@@ -132,6 +132,7 @@ function openBadge(student: Student) {
     rosterError: null,
     rosterOffline: false,
     rosterFetchedAt: null,
+    rosterBackends: [],
     refreshRoster,
     applyRosterPerson,
   } as unknown as DataContextValue;

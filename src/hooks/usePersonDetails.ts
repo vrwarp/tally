@@ -14,7 +14,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getPersonDetails } from '@/services/functions';
-import { personIdFromStudentId, type PcoPersonDetails, type Student } from '@/types';
+import { backendLabelOf, personIdFromStudentId, type PcoPersonDetails, type Student } from '@/types';
 
 const cache = new Map<string, PcoPersonDetails | null>();
 
@@ -60,6 +60,9 @@ export interface PersonDetailsResult {
 export function usePersonDetails(student: Student | null): PersonDetailsResult {
   const personId = student ? (student.pcoPersonId ?? personIdFromStudentId(student.id)) : null;
   const key = student?.id ?? '';
+  // A string, not the student object, so the fetch effect can depend on it
+  // without re-running every time the roster hands down a new array.
+  const backendLabel = student ? backendLabelOf(student) : 'the backend';
 
   const [details, setDetails] = useState<PcoPersonDetails | null>(() => cache.get(key) ?? null);
   const [loaded, setLoaded] = useState(() => cache.has(key));
@@ -97,7 +100,11 @@ export function usePersonDetails(student: Student | null): PersonDetailsResult {
     const force = forceNext.current;
     forceNext.current = false;
 
-    getPersonDetails({ pcoPersonId: personId, ...(force ? { force: true } : {}) })
+    // `studentId` is the shape the server dispatches on — it reads the
+    // linkage and asks whichever backend holds the person. The bare id rides
+    // along for compatibility; a server predating `studentId` reads only it,
+    // and has always taken it to mean Planning Center.
+    getPersonDetails({ studentId: key, pcoPersonId: personId, ...(force ? { force: true } : {}) })
       .then((response) => {
         if (stale) return;
         cache.set(key, response.data);
@@ -112,7 +119,7 @@ export function usePersonDetails(student: Student | null): PersonDetailsResult {
         setError(
           code.includes('permission-denied')
             ? 'Only the core team can see parent contact details.'
-            : 'Could not reach Planning Center for these details.',
+            : `Could not reach ${backendLabel} for these details.`,
         );
       })
       .finally(() => {
@@ -122,7 +129,7 @@ export function usePersonDetails(student: Student | null): PersonDetailsResult {
     return () => {
       stale = true;
     };
-  }, [personId, key, attempt]);
+  }, [personId, key, attempt, backendLabel]);
 
   const retry = useCallback(() => {
     // Clearing the error here rather than in the effect is what lets the screen

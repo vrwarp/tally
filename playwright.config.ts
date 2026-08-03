@@ -19,6 +19,7 @@ const PORTS = {
   functions: 5001,
   emulatorUi: 4000,
   planningCenter: 4010,
+  attendees: 4011,
   app: 4173,
 } as const;
 
@@ -27,6 +28,7 @@ export const E2E = {
   projectId: 'demo-tally',
   baseURL: `http://127.0.0.1:${PORTS.app}`,
   simulatorUrl: `http://127.0.0.1:${PORTS.planningCenter}`,
+  a32SimulatorUrl: `http://127.0.0.1:${PORTS.attendees}`,
 } as const;
 
 /**
@@ -80,6 +82,14 @@ const planningCenterEnv = {
   // around it — and so a run does not depend on `functions/.env.demo-tally`
   // being in sync with the params the code declares.
   PCO_CACHE_TTL_SECONDS: '5',
+  /*
+   * Only the credential. Everything else about Attendees arrives through the
+   * `config/attendees32` document, which the Attendees specs write and remove
+   * around themselves — so every other spec runs with the second backend
+   * genuinely absent, exactly like a deployment that never set it up.
+   */
+  A32_TOKEN: 'a32-sim-token',
+  A32_CACHE_TTL_SECONDS: '5',
 };
 
 export default defineConfig({
@@ -125,6 +135,15 @@ export default defineConfig({
       command: 'npm run pco-sim',
       url: `${E2E.simulatorUrl}/_health`,
       env: { PCO_SIM_PORT: String(PORTS.planningCenter), PCO_SIM_PAGE_SIZE: '25' },
+      reuseExistingServer: !process.env.CI,
+      timeout: 30_000,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+    {
+      command: 'npm run a32-sim',
+      url: `${E2E.a32SimulatorUrl}/_health`,
+      env: { A32_SIM_PORT: String(PORTS.attendees) },
       reuseExistingServer: !process.env.CI,
       timeout: 30_000,
       stdout: 'pipe',

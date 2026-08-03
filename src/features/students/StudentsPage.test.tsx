@@ -91,6 +91,7 @@ function renderRoster(students: Student[], reachable: Record<string, boolean> = 
     rosterError: null,
     rosterOffline: false,
     rosterFetchedAt: TODAY,
+    rosterBackends: [],
     refreshRoster: vi.fn(async () => {}),
   });
   // `useAuth().user` is the Firebase Auth user, not the profile document —

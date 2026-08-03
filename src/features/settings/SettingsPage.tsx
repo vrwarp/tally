@@ -20,6 +20,7 @@ import { PageFrame } from '@/components/PageFrame';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
+import { BackendsSection } from '@/features/settings/BackendsSection';
 import { PlanningCenterCard } from '@/features/settings/PlanningCenterCard';
 import { TeamList } from '@/features/settings/TeamList';
 import { ThemeCard } from '@/features/settings/ThemeCard';
@@ -220,6 +221,8 @@ export function SettingsPage() {
       <ThemeCard />
 
       <PlanningCenterCard />
+
+      <BackendsSection />
 
       <TeamList />
     </PageFrame>

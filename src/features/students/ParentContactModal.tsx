@@ -19,7 +19,7 @@ import { useData } from '@/context/dataContext';
 import { invalidateParentContact } from '@/hooks/useParentContact';
 import { invalidatePersonDetails, usePersonDetails } from '@/hooks/usePersonDetails';
 import { AddParentContact } from '@/features/students/AddParentContact';
-import { studentFullName, type Student } from '@/types';
+import { backendLabelOf, studentFullName, type Student } from '@/types';
 
 export interface ParentContactPanelProps {
   student: Student;
@@ -57,7 +57,7 @@ export function ParentContactPanel({ student, onDone, onAdded }: ParentContactPa
   if (loading || !loaded) {
     return (
       <p className="flex items-center gap-2 text-sm text-ink-400">
-        <Spinner /> Reading Planning Center…
+        <Spinner /> Reading {backendLabelOf(student)}…
       </p>
     );
   }
