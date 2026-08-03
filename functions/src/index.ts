@@ -17,6 +17,25 @@ import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { logger, setGlobalOptions } from 'firebase-functions/v2';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
+import { backendFailureStatus, describeBackendFailure } from './backends/errors.js';
+import {
+  BackendPreconditionError,
+  type AddParentResult,
+  type CheckInsEventSummary,
+  type CheckInsImportSummary,
+  type ParentContactStatus,
+  type PcoListSummary,
+  type PeopleBackend,
+  type PersonDetails,
+  type PersonSearchResult,
+  type PushPendingResult,
+  type PushStudentResult,
+  type RecreateStudentResult,
+  type RosterPerson,
+  type SetParentContactResult,
+  type StudentProfilePatch,
+  type UpdateStudentProfileResult,
+} from './backends/types.js';
 import { PCO_SECRETS, resolveConfig, type PcoConfig } from './config.js';
 import { asFirestoreLike, PATHS, type FirestoreLike } from './firestore.js';
 import {
@@ -24,52 +43,13 @@ import {
   type DeletionSummary,
   type DeletionTarget,
 } from './eventDeletion.js';
+import { pcoStudentId, personIdFromStudentId } from './generated/backendIds.js';
 import { materializeOccurrence as materializeOne, MINISTRY_TIME_ZONE } from './occurrences.js';
-import {
-  checkInsBaseUrl,
-  importCheckInsEvent as importCheckInsEventUpstream,
-  listCheckInsEvents as listCheckInsEventsUpstream,
-  type CheckInsEventSummary,
-  type CheckInsImportSummary,
-} from './pco/checkins.js';
-import { createPcoClient, PcoApiError, type PcoClient } from './pco/client.js';
-import { describePcoFailure } from './pco/debug.js';
-import { fetchListMemberIds, fetchLists, type PcoListSummary } from './pco/lists.js';
-import {
-  setParentContact as setParentContactUpstream,
-  type SetParentContactResult,
-} from './pco/parentContact.js';
-import {
-  updateStudentProfile as updateStudentProfileUpstream,
-  type StudentProfilePatch,
-  type UpdateStudentProfileResult,
-} from './pco/profile.js';
-import { addParent as addParentUpstream, type AddParentResult } from './pco/household.js';
-import {
-  fetchAllergyNotes,
-  fetchParentContactStatus,
-  fetchPersonDetails,
-  fetchRoster,
-  pcoStudentId,
-  personDetailsCacheKey,
-  personIdFromStudentId,
-  reachableAdultsCacheKey,
-  searchPeople,
-  type ParentContactStatus,
-  type PersonDetails,
-  type PersonSearchResult,
-  type RosterPerson,
-} from './pco/roster.js';
-import { resetSharedCache, sharedCache } from './pco/sharedCache.js';
-import { followPersonLink, isPersonGoneError } from './pco/personLink.js';
-import { recreateStudent, type RecreateStudentResult } from './pco/recreate.js';
+import { createPcoBackend } from './pco/backend.js';
+import { createPcoClient } from './pco/client.js';
+import { fetchLists } from './pco/lists.js';
+import { resetSharedCache } from './pco/sharedCache.js';
 import { graftMergedStudent } from './pco/studentPerson.js';
-import {
-  pushPendingStudents,
-  pushStudent,
-  type PushPendingResult,
-  type PushStudentResult,
-} from './pco/pushStudents.js';
 
 export { provisionAccess } from './access.js';
 
@@ -84,17 +64,21 @@ function db(): FirestoreLike {
 }
 
 /**
- * Builds a client, or returns the reason it cannot be built. Missing credentials
- * are reported to the caller rather than thrown, so the Settings screen can name
- * the missing value instead of showing "internal error".
+ * The Planning Center backend, or the reason there cannot be one. Missing
+ * credentials are reported to the caller rather than thrown, so the Settings
+ * screen can name the missing value instead of showing "internal error".
+ *
+ * One backend, resolved per request like the configuration it is built from.
+ * The multi-backend registry replaces this as other backends arrive; every
+ * entry point already speaks only `PeopleBackend`, which is the point of the
+ * seam.
  */
-function clientFor(config: PcoConfig): PcoClient | null {
-  if (config.configError) return null;
-  return createPcoClient({
-    appId: config.appId,
-    secret: config.secret,
-    baseUrl: config.baseUrl,
-  });
+async function pcoBackendFor(
+  database: FirestoreLike,
+): Promise<{ backend: PeopleBackend | null; config: PcoConfig }> {
+  const config = await resolveConfig(database);
+  if (config.configError) return { backend: null, config };
+  return { backend: createPcoBackend({ db: database, config }), config };
 }
 
 /**
@@ -181,41 +165,47 @@ async function requireCoreTeam(uid: string | undefined): Promise<void> {
 }
 
 /**
- * Turns a Planning Center failure into something a counselor can act on.
+ * Turns a backend failure into something a counselor can act on.
  *
- * The distinction that matters is "Tally is broken" versus "Planning Center is
+ * The distinction that matters is "Tally is broken" versus "the backend is
  * having a minute" — the second is a reason to try again, and saying so stops a
- * volunteer hunting for a problem on their end.
+ * volunteer hunting for a problem on their end. The sentence names whichever
+ * backend actually failed, because "Planning Center is rate-limiting us" is a
+ * lie when it was Attendees.
  *
  * The sentence is the whole answer for the person reading it at a door. The
  * request and response behind it ride along as the error's `details`, for the
  * screen's "Details" panel and the person they forward it to — see
  * ./pco/debug.ts for what that payload may and may not contain.
  */
-function reportPcoFailure(error: unknown, what: string): never {
+function reportBackendFailure(displayName: string, error: unknown, what: string): never {
   if (error instanceof HttpsError) throw error;
-
-  const debug = describePcoFailure(error, what);
-  logger.error(`Failed to ${what}`, { error: String(error), pco: debug });
-
-  if (error instanceof PcoApiError) {
-    if (error.status === 429) {
-      throw new HttpsError(
-        'resource-exhausted',
-        'Planning Center is rate-limiting us. Try again in a moment.',
-        debug,
-      );
-    }
-    if (error.status === 401 || error.status === 403) {
-      throw new HttpsError(
-        'permission-denied',
-        "Planning Center rejected Tally's credentials. A leader needs to check the connection in Settings.",
-        debug,
-      );
-    }
+  // A configuration problem an adapter could only discover mid-flight. The
+  // message already says which value is wrong; the code says whose fault it is.
+  if (error instanceof BackendPreconditionError) {
+    throw new HttpsError('failed-precondition', error.message);
   }
 
-  throw new HttpsError('unavailable', `Could not reach Planning Center to ${what}.`, debug);
+  const debug = describeBackendFailure(error, what);
+  logger.error(`Failed to ${what}`, { error: String(error), backend: debug });
+
+  const status = backendFailureStatus(error);
+  if (status === 429) {
+    throw new HttpsError(
+      'resource-exhausted',
+      `${displayName} is rate-limiting us. Try again in a moment.`,
+      debug,
+    );
+  }
+  if (status === 401 || status === 403) {
+    throw new HttpsError(
+      'permission-denied',
+      `${displayName} rejected Tally's credentials. A leader needs to check the connection in Settings.`,
+      debug,
+    );
+  }
+
+  throw new HttpsError('unavailable', `Could not reach ${displayName} to ${what}.`, debug);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -351,16 +341,12 @@ export const getRoster = onCall<{ force?: boolean } | undefined, Promise<RosterR
   async (request): Promise<RosterResponse> => {
     await requireMember(request.auth?.uid);
 
-    const config = await resolveConfig(db());
-    const client = clientFor(config);
-    if (!client) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
+    const { backend, config } = await pcoBackendFor(db());
+    if (!backend) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
 
     try {
       const scan = await scanRoster(db());
-      const result = await fetchRoster({
-        client,
-        config,
-        cache: sharedCache(config),
+      const result = await backend.fetchRoster({
         /*
          * Both halves, like `getParentContactStatus` below and for the same
          * reason. A pushed visitor's row is their document, but the document
@@ -419,7 +405,7 @@ export const getRoster = onCall<{ force?: boolean } | undefined, Promise<RosterR
       }
       return { ...result, cacheTtlSeconds: config.cacheTtlSeconds };
     } catch (error) {
-      return reportPcoFailure(error, 'load the roster');
+      return reportBackendFailure(backend.displayName, error, 'load the roster');
     }
   },
 );
@@ -439,14 +425,13 @@ export const searchPlanningCenterPeople = onCall<
   const query = typeof request.data?.query === 'string' ? request.data.query.trim() : '';
   if (!query) return { people: [] };
 
-  const config = await resolveConfig(db());
-  const client = clientFor(config);
-  if (!client) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
+  const { backend, config } = await pcoBackendFor(db());
+  if (!backend) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
 
   try {
-    return { people: await searchPeople({ client, config, query }) };
+    return { people: await backend.searchPeople({ query }) };
   } catch (error) {
-    return reportPcoFailure(error, 'search Planning Center');
+    return reportBackendFailure(backend.displayName, error, `search ${backend.displayName}`);
   }
 });
 
@@ -500,15 +485,11 @@ export const getPersonDetails = onCall<
       throw new HttpsError('invalid-argument', 'pcoPersonId is required.');
     }
 
-    const config = await resolveConfig(db());
-    const client = clientFor(config);
-    if (!client) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
+    const { backend, config } = await pcoBackendFor(db());
+    if (!backend) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
 
     try {
-      const details = await fetchPersonDetails({
-        client,
-        config,
-        cache: sharedCache(config),
+      const details = await backend.fetchPersonDetails({
         personId,
         /*
          * Asked for by a screen that has just written, and honoured because the
@@ -538,7 +519,7 @@ export const getPersonDetails = onCall<
         parentCreatable: writeBackFull && !details.householdAdult,
       };
     } catch (error) {
-      return reportPcoFailure(error, 'load this student');
+      return reportBackendFailure(backend.displayName, error, 'load this student');
     }
   },
 );
@@ -590,23 +571,17 @@ export const getAllergyNotes = onCall<
       (id): id is string => typeof id === 'string' && id.length > 0,
     );
     // Nothing to ask about is a perfectly ordinary answer — a roster where
-    // nobody is flagged — and must not cost a Planning Center client.
+    // nobody is flagged — and must not cost a backend client.
     if (personIds.length === 0) return { notes: {} };
 
-    const config = await resolveConfig(db());
-    const client = clientFor(config);
-    if (!client) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
+    const { backend, config } = await pcoBackendFor(db());
+    if (!backend) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
 
     try {
-      const notes = await fetchAllergyNotes({
-        client,
-        config,
-        cache: sharedCache(config),
-        personIds,
-      });
+      const notes = await backend.fetchAllergyNotes({ personIds });
       return { notes };
     } catch (error) {
-      return reportPcoFailure(error, 'read the allergy notes');
+      return reportBackendFailure(backend.displayName, error, 'read the allergy notes');
     }
   },
 );
@@ -630,16 +605,12 @@ export const getParentContactStatus = onCall<
   async (request): Promise<ParentContactStatus> => {
     await requireCoreTeam(request.auth?.uid);
 
-    const config = await resolveConfig(db());
-    const client = clientFor(config);
-    if (!client) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
+    const { backend, config } = await pcoBackendFor(db());
+    if (!backend) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
 
     try {
       const scan = await scanRoster(db());
-      return await fetchParentContactStatus({
-        client,
-        config,
-        cache: sharedCache(config),
+      return await backend.fetchParentContactStatus({
         /*
          * Both halves of the membership, which is what makes this different
          * from every other read of the scan.
@@ -657,7 +628,11 @@ export const getParentContactStatus = onCall<
         force: request.data?.force === true,
       });
     } catch (error) {
-      return reportPcoFailure(error, 'check which students have a parent contact');
+      return reportBackendFailure(
+        backend.displayName,
+        error,
+        'check which students have a parent contact',
+      );
     }
   },
 );
@@ -716,13 +691,13 @@ export const getPlanningCenterStatus = onCall<
   async (request): Promise<PcoStatusResult> => {
     await requireCoreTeam(request.auth?.uid);
 
-    const config = await resolveConfig(db());
+    const { backend, config } = await pcoBackendFor(db());
 
     /*
      * Read before the configuration is judged, because "how many students have
      * not reached Planning Center" is most worth knowing in exactly the states
      * that return early below — write-back off, or the connection broken. The
-     * roster ids from the same scan are only usable once there is a client.
+     * roster ids from the same scan are only usable once there is a backend.
      */
     const scan = await scanRoster(db());
 
@@ -755,8 +730,7 @@ export const getPlanningCenterStatus = onCall<
       };
     }
 
-    const client = clientFor(config);
-    if (!client) {
+    if (!backend) {
       return { ...base, configured: false, reachable: false, problem: 'Not configured.', peopleVisible: null };
     }
 
@@ -765,10 +739,7 @@ export const getPlanningCenterStatus = onCall<
       // reach the API" and "we can see your students" are different claims, and
       // only the second is worth showing a leader.
       const personIds = scan.personIds;
-      const result = await fetchRoster({
-        client,
-        config,
-        cache: sharedCache(config),
+      const result = await backend.fetchRoster({
         personIds,
         force: request.data?.force === true,
       });
@@ -836,7 +807,7 @@ export const listPlanningCenterLists = onCall<
       const limit = typeof request.data?.limit === 'number' ? request.data.limit : undefined;
       return { lists: await fetchLists({ client, search, limit }) };
     } catch (error) {
-      return reportPcoFailure(error, 'load your Planning Center lists');
+      return reportBackendFailure('Planning Center', error, 'load your Planning Center lists');
     }
   },
 );
@@ -888,9 +859,8 @@ export const addRosterMember = onCall<
     throw new HttpsError('invalid-argument', 'pcoPersonId is required.');
   }
 
-  const config = await resolveConfig(db());
-  const client = clientFor(config);
-  if (!client) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
+  const { backend, config } = await pcoBackendFor(db());
+  if (!backend) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
 
   // Confirm the person is real before recording that they are on the roster: a
   // typo'd id would otherwise become a permanent row that renders as nothing.
@@ -898,17 +868,17 @@ export const addRosterMember = onCall<
   // meant that person — and only a trail that ends dead is refused.
   let rosterPersonId = personId;
   try {
-    await client.get(`/people/${encodeURIComponent(personId)}`);
-  } catch (error) {
-    if (isPersonGoneError(error)) {
-      const link = await followPersonLink(client, personId, error);
-      if (link.outcome === 'gone') {
-        throw new HttpsError('not-found', 'Planning Center has no person with that id.');
-      }
-      rosterPersonId = link.personId;
-    } else {
-      return reportPcoFailure(error, 'check that person in Planning Center');
+    const check = await backend.checkPerson({ personId });
+    if (check.outcome === 'gone') {
+      throw new HttpsError('not-found', `${backend.displayName} has no person with that id.`);
     }
+    rosterPersonId = check.personId;
+  } catch (error) {
+    return reportBackendFailure(
+      backend.displayName,
+      error,
+      `check that person in ${backend.displayName}`,
+    );
   }
 
   const studentId = pcoStudentId(rosterPersonId);
@@ -987,15 +957,17 @@ export const importPlanningCenterList = onCall<
     throw new HttpsError('invalid-argument', 'listId is required.');
   }
 
-  const config = await resolveConfig(db());
-  const client = clientFor(config);
-  if (!client) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
+  const { backend, config } = await pcoBackendFor(db());
+  if (!backend) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
+  if (!backend.fetchListMemberIds) {
+    throw new HttpsError('failed-precondition', `${backend.displayName} does not have lists.`);
+  }
 
   let personIds: string[];
   try {
-    personIds = await fetchListMemberIds(client, listId);
+    personIds = await backend.fetchListMemberIds(listId);
   } catch (error) {
-    return reportPcoFailure(error, 'read that Planning Center list');
+    return reportBackendFailure(backend.displayName, error, 'read that Planning Center list');
   }
 
   const database = db();
@@ -1039,29 +1011,13 @@ export const importPlanningCenterList = onCall<
 /* -------------------------------------------------------------------------- */
 
 /**
- * A client for the Check-Ins product, or the reason there cannot be one.
- *
- * Check-Ins lives beside People on the same host, so its root is derived from
- * the configured People root rather than being a second setting — pointing one
- * at the simulator points both. The same Personal Access Token authenticates
- * either product; whether it is *allowed* to read Check-Ins is Planning
- * Center's call, and comes back as an ordinary 403 the error path explains.
- */
-function checkInsClientFor(config: PcoConfig): PcoClient | { error: string } {
-  if (config.configError) return { error: config.configError };
-  const baseUrl = checkInsBaseUrl(config.baseUrl);
-  if (!baseUrl) {
-    return {
-      error: `The configured Planning Center URL ("${config.baseUrl}") does not end in /people/v2, so the Check-Ins API root cannot be derived from it.`,
-    };
-  }
-  return createPcoClient({ appId: config.appId, secret: config.secret, baseUrl });
-}
-
-/**
  * The Check-Ins events a leader could import — Footprints, Sunday school, the
  * preschool room — each with enough history attached to recognise the right
  * one before anything is written.
+ *
+ * The Check-Ins client — its root derived from the People root, and everything
+ * else Planning Center about it — lives inside the adapter now; a backend that
+ * cannot derive one reports it as the `failed-precondition` it is.
  *
  * Core team only: this is a view over the whole church's check-in system, not
  * something a door volunteer needs.
@@ -1071,14 +1027,16 @@ export const listCheckInsEvents = onCall<void, Promise<{ events: CheckInsEventSu
   async (request) => {
     await requireCoreTeam(request.auth?.uid);
 
-    const config = await resolveConfig(db());
-    const client = checkInsClientFor(config);
-    if ('error' in client) throw new HttpsError('failed-precondition', client.error);
+    const { backend, config } = await pcoBackendFor(db());
+    if (!backend) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
+    if (!backend.listImportableEvents) {
+      throw new HttpsError('failed-precondition', `${backend.displayName} has no history to import.`);
+    }
 
     try {
-      return { events: await listCheckInsEventsUpstream({ client, db: db() }) };
+      return { events: await backend.listImportableEvents() };
     } catch (error) {
-      return reportPcoFailure(error, 'list your Check-Ins events');
+      return reportBackendFailure(backend.displayName, error, 'list your Check-Ins events');
     }
   },
 );
@@ -1108,25 +1066,25 @@ export const importCheckInsEvent = onCall<
     throw new HttpsError('invalid-argument', 'pcoEventId is required.');
   }
 
-  const config = await resolveConfig(db());
-  const client = checkInsClientFor(config);
-  if ('error' in client) throw new HttpsError('failed-precondition', client.error);
+  const { backend, config } = await pcoBackendFor(db());
+  if (!backend) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
+  if (!backend.importHistory) {
+    throw new HttpsError('failed-precondition', `${backend.displayName} has no history to import.`);
+  }
 
   // Occurrence ids embed the ministry-local calendar day, and this container
   // runs in UTC — same reasoning, same fix as `materializeOccurrence`.
   process.env.TZ = MINISTRY_TIME_ZONE;
 
   try {
-    return await importCheckInsEventUpstream({
-      db: db(),
-      client,
-      pcoEventId: pcoEventId.trim(),
+    return await backend.importHistory({
+      upstreamEventId: pcoEventId.trim(),
       uid: request.auth!.uid,
       now: new Date(),
       logger,
     });
   } catch (error) {
-    return reportPcoFailure(error, 'import that Check-Ins event');
+    return reportBackendFailure(backend.displayName, error, 'import that Check-Ins event');
   }
 });
 
@@ -1145,9 +1103,8 @@ export const pushStudentToPlanningCenter = onCall<
     throw new HttpsError('invalid-argument', 'studentId is required.');
   }
 
-  const config = await resolveConfig(db());
-  const client = clientFor(config);
-  if (!client) {
+  const { backend, config } = await pcoBackendFor(db());
+  if (!backend) {
     return {
       status: 'skipped',
       pcoPersonId: null,
@@ -1155,10 +1112,10 @@ export const pushStudentToPlanningCenter = onCall<
     };
   }
 
-  const result = await pushStudent({ db: db(), client, config, studentId, logger });
-  // A student who is now in Planning Center must not be missing from the next
+  const result = await backend.pushStudent({ studentId, logger });
+  // A student who is now in the backend must not be missing from the next
   // roster read because a cached copy predates them.
-  if (result.status !== 'skipped') resetSharedCache();
+  if (result.status !== 'skipped') backend.resetCache();
   return result;
 });
 
@@ -1186,25 +1143,25 @@ export const setParentContact = onCall<
     throw new HttpsError('invalid-argument', 'studentId is required.');
   }
 
-  const config = await resolveConfig(db());
-  const client = clientFor(config);
-  if (!client) {
+  const { backend, config } = await pcoBackendFor(db());
+  if (!backend) {
     throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
   }
 
   let result: SetParentContactResult;
   try {
-    result = await setParentContactUpstream({
-      db: db(),
-      client,
-      config,
+    result = await backend.setParentContact({
       studentId,
       phone: request.data?.phone ?? null,
       email: request.data?.email ?? null,
       logger,
     });
   } catch (error) {
-    return reportPcoFailure(error, 'add a parent contact in Planning Center');
+    return reportBackendFailure(
+      backend.displayName,
+      error,
+      `add a parent contact in ${backend.displayName}`,
+    );
   }
 
   /*
@@ -1215,12 +1172,11 @@ export const setParentContact = onCall<
    * next read pay for one edit.
    */
   if (result.status === 'updated') {
-    const cache = sharedCache(config);
     const personId = personIdFromStudentId(studentId);
-    if (personId) cache.invalidate(personDetailsCacheKey(config.baseUrl, personId));
+    if (personId) backend.invalidatePersonDetails(personId);
     // And the sweep behind "incomplete profiles", which has just stopped being
     // true about this household.
-    cache.invalidate(reachableAdultsCacheKey(config.baseUrl));
+    backend.invalidateReachability();
   }
 
   return result;
@@ -1251,18 +1207,14 @@ export const updateStudentProfile = onCall<
     throw new HttpsError('invalid-argument', 'studentId is required.');
   }
 
-  const config = await resolveConfig(db());
-  const client = clientFor(config);
-  if (!client) {
+  const { backend, config } = await pcoBackendFor(db());
+  if (!backend) {
     throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
   }
 
   let result: UpdateStudentProfileResult;
   try {
-    result = await updateStudentProfileUpstream({
-      db: db(),
-      client,
-      config,
+    result = await backend.updateStudentProfile({
       studentId,
       firstName: request.data?.firstName,
       nickname: request.data?.nickname,
@@ -1273,7 +1225,11 @@ export const updateStudentProfile = onCall<
       logger,
     });
   } catch (error) {
-    return reportPcoFailure(error, 'save this profile to Planning Center');
+    return reportBackendFailure(
+      backend.displayName,
+      error,
+      `save this profile to ${backend.displayName}`,
+    );
   }
 
   /*
@@ -1282,7 +1238,7 @@ export const updateStudentProfile = onCall<
    * includes them — and that answer is held under a different key on every
    * device that asks. One edit is a fine price for one cold read.
    */
-  if (result.status === 'updated') resetSharedCache();
+  if (result.status === 'updated') backend.resetCache();
 
   return result;
 });
@@ -1320,18 +1276,14 @@ export const addParent = onCall<
     throw new HttpsError('invalid-argument', 'studentId is required.');
   }
 
-  const config = await resolveConfig(db());
-  const client = clientFor(config);
-  if (!client) {
+  const { backend, config } = await pcoBackendFor(db());
+  if (!backend) {
     throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
   }
 
   let result: AddParentResult;
   try {
-    result = await addParentUpstream({
-      db: db(),
-      client,
-      config,
+    result = await backend.addParent({
       studentId,
       personId: request.data?.personId ?? null,
       firstName: request.data?.firstName ?? null,
@@ -1342,7 +1294,11 @@ export const addParent = onCall<
       logger,
     });
   } catch (error) {
-    return reportPcoFailure(error, 'add a parent in Planning Center');
+    return reportBackendFailure(
+      backend.displayName,
+      error,
+      `add a parent in ${backend.displayName}`,
+    );
   }
 
   /*
@@ -1352,7 +1308,7 @@ export const addParent = onCall<
    * household, and the roster's own view of this family. One cold read is the
    * right price for a family that did not exist a second ago.
    */
-  if (result.status === 'added') resetSharedCache();
+  if (result.status === 'added') backend.resetCache();
 
   return result;
 });
@@ -1378,18 +1334,14 @@ export const recreatePlanningCenterPerson = onCall<
     throw new HttpsError('invalid-argument', 'studentId is required.');
   }
 
-  const config = await resolveConfig(db());
-  const client = clientFor(config);
-  if (!client) {
+  const { backend, config } = await pcoBackendFor(db());
+  if (!backend) {
     throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
   }
 
   let result: RecreateStudentResult;
   try {
-    result = await recreateStudent({
-      db: db(),
-      client,
-      config,
+    result = await backend.recreateStudent({
       studentId,
       firstName: request.data?.firstName ?? undefined,
       lastName: request.data?.lastName ?? undefined,
@@ -1397,11 +1349,15 @@ export const recreatePlanningCenterPerson = onCall<
       logger,
     });
   } catch (error) {
-    return reportPcoFailure(error, 're-create this student in Planning Center');
+    return reportBackendFailure(
+      backend.displayName,
+      error,
+      `re-create this student in ${backend.displayName}`,
+    );
   }
 
   // A new (or newly pointed-at) person changes what every cached read answers.
-  if (result.status === 'recreated' || result.status === 'relinked') resetSharedCache();
+  if (result.status === 'recreated' || result.status === 'relinked') backend.resetCache();
 
   return result;
 });
@@ -1419,12 +1375,11 @@ export const pushPendingVisitors = onCall<void, Promise<PushPendingResult>>(
   async (request): Promise<PushPendingResult> => {
     await requireCoreTeam(request.auth?.uid);
 
-    const config = await resolveConfig(db());
-    const client = clientFor(config);
-    if (!client) return { pushed: 0, skipped: 0, errors: 0 };
+    const { backend } = await pcoBackendFor(db());
+    if (!backend) return { pushed: 0, skipped: 0, errors: 0 };
 
-    const result = await pushPendingStudents({ db: db(), client, config, logger });
-    if (result.pushed > 0) resetSharedCache();
+    const result = await backend.pushPendingStudents({ logger });
+    if (result.pushed > 0) backend.resetCache();
     return result;
   },
 );
@@ -1446,23 +1401,17 @@ export const onStudentCreated = onDocumentCreated(
     const data = event.data?.data();
     if (!data || data.pcoPushPending !== true || typeof data.pcoPersonId === 'string') return;
 
-    const config = await resolveConfig(db());
-    const client = clientFor(config);
-    if (!client || config.writeBack === 'off') return;
+    const { backend, config } = await pcoBackendFor(db());
+    if (!backend || config.writeBack === 'off') return;
 
     try {
-      const result = await pushStudent({
-        db: db(),
-        client,
-        config,
-        studentId: event.params.studentId,
-        logger,
-      });
+      const result = await backend.pushStudent({ studentId: event.params.studentId, logger });
       // The roster cache predates this person; without the drop they would be
       // missing from the next read for up to the TTL.
-      if (result.status !== 'skipped') resetSharedCache();
-      logger.info('Pushed a new student to Planning Center', {
+      if (result.status !== 'skipped') backend.resetCache();
+      logger.info('Pushed a new student to the people backend', {
         studentId: event.params.studentId,
+        backend: backend.id,
         ...result,
       });
     } catch (error) {

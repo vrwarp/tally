@@ -16,6 +16,7 @@
  *   name, a grade or a parent's phone number — that is the entire point, and it
  *   is worth keeping true.
  */
+import { pcoStudentId } from '../generated/backendIds.js';
 import type { PcoConfig } from '../config.js';
 import type { PcoClient } from './client.js';
 import { cacheKey, type TtlCache } from './cache.js';
@@ -47,15 +48,10 @@ import {
  * The Planning Center id, in the form Tally uses as a student id everywhere
  * else. Prefixed so it can never collide with the id of a visitor Tally created
  * itself, and so a bare Planning Center id is never mistaken for a Tally one.
+ * The scheme itself lives in the shared module — both packages must agree on
+ * these prefixes, so there is exactly one copy to agree with.
  */
-export function pcoStudentId(personId: string): string {
-  return `pco_${personId}`;
-}
-
-/** Inverse of `pcoStudentId`, or null for a Tally-owned id. */
-export function personIdFromStudentId(studentId: string): string | null {
-  return studentId.startsWith('pco_') ? studentId.slice(4) : null;
-}
+export { pcoStudentId, personIdFromStudentId } from '../generated/backendIds.js';
 
 /**
  * What a counselor standing at a door needs, and nothing else.

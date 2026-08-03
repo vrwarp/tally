@@ -941,17 +941,22 @@ export interface CheckInsImportSummary {
   warnings: string[];
 }
 
-/** The id Tally uses for a Planning Center person, everywhere. */
-export const PCO_ID_PREFIX = 'pco_';
-
-export function pcoStudentId(personId: string): string {
-  return `${PCO_ID_PREFIX}${personId}`;
-}
-
-/** Null for a Tally-owned id — a visitor whose push has not landed. */
-export function personIdFromStudentId(studentId: string): string | null {
-  return studentId.startsWith(PCO_ID_PREFIX) ? studentId.slice(PCO_ID_PREFIX.length) : null;
-}
+/**
+ * The backend id scheme lives in src/lib/backendIds.ts — shared verbatim with
+ * the Cloud Functions — and is re-exported here because this module is where
+ * every screen already looks for it.
+ */
+export {
+  BACKEND_IDS,
+  BACKEND_PREFIXES,
+  PCO_ID_PREFIX,
+  isBackendId,
+  parseStudentId,
+  pcoStudentId,
+  personIdFromStudentId,
+  studentIdFor,
+} from '@/lib/backendIds';
+export type { BackendId } from '@/lib/backendIds';
 
 /* -------------------------------------------------------------------------- */
 /* Derived view models                                                         */
