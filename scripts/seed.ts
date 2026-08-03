@@ -667,7 +667,19 @@ function buildEvents(now: Date): BuiltEvent[] {
   );
 
   if (!somethingIsLive) {
-    const startAt = addMinutes(now, -30);
+    /*
+     * Half an hour ago, but never yesterday.
+     *
+     * Between midnight and half past, `now - 30min` lands on the previous day,
+     * and a gathering that started before midnight is a different screen's
+     * problem in every view that slices by calendar day. The demo — and the
+     * end-to-end suite, which is the thing that actually noticed — wants a
+     * gathering that is live *and* on today, so the start is clamped to the
+     * day it is supposed to belong to.
+     */
+    const startAt = new Date(
+      Math.max(addMinutes(now, -30).getTime(), atTime(now, '00:00').getTime()),
+    );
     const endAt = addMinutes(now, 90);
     events.push({
       id: `${SERIES_IDS.fridayFellowship}-live-${isoDay(now)}`,

@@ -77,6 +77,11 @@ function show(events: readonly TallyEvent[], role: 'counselor' | 'core' = 'core'
   return render(wrap(<ChooseEvent events={events} now={NOW} />, role));
 }
 
+/** The same, at an hour of the caller's choosing — for the night that runs late. */
+function showAt(events: readonly TallyEvent[], now: Date, role: 'counselor' | 'core' = 'core') {
+  return render(wrap(<ChooseEvent events={events} now={now} />, role));
+}
+
 /**
  * Let the catch-up read land.
  *
@@ -191,6 +196,56 @@ describe('choosing a gathering', () => {
     await settle();
   });
 
+  it('keeps a gathering that started before midnight and is still open', async () => {
+    /*
+     * The lock-in at half eleven, twenty past midnight.
+     *
+     * By the calendar it began yesterday, so a screen that slices on the day a
+     * gathering starts drops it — and the counselor on the door, checking
+     * people in right now, gets "Nothing on today" instead of the thing they
+     * are standing at. This is also what took CI down: the seed's synthetic
+     * live gathering starts half an hour ago, which before half past midnight
+     * is yesterday, so every end-to-end run in that window found no card.
+     */
+    showAt(
+      [
+        event({
+          id: 'lock-in',
+          title: 'Fall Lock-In',
+          startAt: new Date(2026, 6, 28, 23, 30),
+          endAt: new Date(2026, 6, 29, 8, 0),
+        }),
+      ],
+      new Date(2026, 6, 29, 0, 20),
+    );
+
+    expect(screen.getByRole('link', { name: /start check-in/i })).toHaveAttribute(
+      'href',
+      '/event/lock-in',
+    );
+    expect(screen.queryByText('Nothing on today')).not.toBeInTheDocument();
+    await settle();
+  });
+
+  it('still drops a gathering that started yesterday and has closed', async () => {
+    // The rule is "open", not "recent" — last night's finished Friday belongs
+    // in the catch-up tail, not at the top of the screen.
+    showAt(
+      [
+        event({
+          id: 'last-night',
+          title: 'Friday Fellowship',
+          startAt: new Date(2026, 6, 28, 19, 0),
+          endAt: new Date(2026, 6, 28, 21, 0),
+        }),
+      ],
+      new Date(2026, 6, 29, 0, 20),
+    );
+
+    expect(screen.getByText('Nothing on today')).toBeInTheDocument();
+    await settle();
+  });
+
   it('shows nothing from tomorrow, or from next month', async () => {
     show([
       event({ title: 'Sunday School', startAt: at(31, 9, 30), endAt: at(31, 10, 45) }),
@@ -236,6 +291,27 @@ describe('the catch-up tail', () => {
 
     await settle();
     expect(fetchPastEvents).toHaveBeenCalledWith(new Date(2026, 6, 29), null, 5);
+  });
+
+  it('does not repeat last night’s gathering while it is still open', async () => {
+    /*
+     * The tail reads back from midnight, so a gathering that began before it is
+     * in *both* lists the moment the one above stops slicing by calendar day.
+     * Catching up is for gatherings nobody can still be standing at.
+     */
+    const lockIn = event({
+      id: 'lock-in',
+      title: 'Fall Lock-In',
+      startAt: new Date(2026, 6, 28, 23, 30),
+      endAt: new Date(2026, 6, 29, 8, 0),
+    });
+    fetchPastEvents.mockResolvedValue({ events: [lockIn], cursor: null, hasMore: false });
+
+    showAt([lockIn], new Date(2026, 6, 29, 0, 20));
+    await settle();
+
+    expect(screen.getByRole('link', { name: /start check-in/i })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: /catch up/i })).not.toBeInTheDocument();
   });
 
   it('offers a short tail with head counts, not the whole history', async () => {

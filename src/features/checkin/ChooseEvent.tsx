@@ -9,9 +9,10 @@
  * because the answer is the whole job of the screen, and because the person
  * answering is holding the phone one-handed with a queue in front of them.
  *
- * Today only. The gathering somebody is standing at is on today by definition,
- * and a list that also offered next month would be a calendar — which is what
- * the Events tab is for.
+ * Today, plus whatever is open. The gathering somebody is standing at is nearly
+ * always on today, and a list that also offered next month would be a calendar —
+ * which is what the Events tab is for. The exception is the night that runs past
+ * midnight: a window still open outranks the calendar day it opened on.
  *
  * The one exception is the tail at the bottom. Taking the register for a
  * Friday somebody forgot is a real job, and the Events tab is core-team only,
@@ -46,17 +47,34 @@ export interface ChooseEventProps {
 
 /* -------------------------------------------------------------------------- */
 
-function CatchUp({ before }: { before: Date }) {
+function CatchUp({ before, now }: { before: Date; now: Date }) {
   const { events, loading } = usePastEvents(before, CATCH_UP);
-  const { snapshots } = useEventSnapshots(events);
+
+  /*
+   * "Before midnight" and "finished" are not the same thing.
+   *
+   * This list reads back from the start of today, so a gathering that began
+   * last night and is still open for check-in comes back in it — and it is
+   * already up top as the one happening now. Catching up is for gatherings
+   * nobody can still be standing at.
+   *
+   * Narrowed before the head counts are read rather than after, so a gathering
+   * that is not going to be shown is not paid for either.
+   */
+  const finished = useMemo(
+    () => events.filter((event) => !isCheckInOpen(event, now)),
+    [events, now],
+  );
+
+  const { snapshots } = useEventSnapshots(finished);
 
   const counts = useMemo(
     () => new Map(snapshots.map((s) => [s.event.id, s.presentStudentIds.size])),
     [snapshots],
   );
 
-  if (loading && events.length === 0) return null;
-  if (events.length === 0) return null;
+  if (loading && finished.length === 0) return null;
+  if (finished.length === 0) return null;
 
   return (
     <section aria-labelledby="catch-up">
@@ -70,7 +88,7 @@ function CatchUp({ before }: { before: Date }) {
         Nobody took the register? Open one of these and add them now.
       </p>
       <ul className="flex flex-col gap-2">
-        {events.map((event) => (
+        {finished.map((event) => (
           <PastEventRow key={event.id} event={event} count={counts.get(event.id)} />
         ))}
       </ul>
@@ -91,6 +109,13 @@ export function ChooseEvent({ events, now }: ChooseEventProps) {
      * counselor catching up at teatime should find it here rather than in the
      * tail below. The catch-up list reads back from the same boundary, so
      * nothing appears twice.
+     *
+     * Open beats the boundary, though. A lock-in that started at eleven and is
+     * still going at half past midnight is on *yesterday* by the calendar, and
+     * the counselor holding the door is checking people into it right now — so
+     * a window that is open puts a gathering here whichever day it began on.
+     * Without that, the one screen whose whole job is to open a gathering was
+     * the one screen that could not see it.
      */
     const dayStart = startOfDay(now);
     const dayEnd = new Date(dayStart.getTime() + 86_400_000);
@@ -98,7 +123,10 @@ export function ChooseEvent({ events, now }: ChooseEventProps) {
     return {
       dayStart,
       today: events
-        .filter((event) => event.startAt >= dayStart && event.startAt < dayEnd)
+        .filter(
+          (event) =>
+            (event.startAt >= dayStart && event.startAt < dayEnd) || isCheckInOpen(event, now),
+        )
         // Whatever is open right now goes to the top: on a Sunday with a class
         // at half nine and a lunch at one, the one happening is the one being
         // reached for.
@@ -160,7 +188,7 @@ export function ChooseEvent({ events, now }: ChooseEventProps) {
         />
       )}
 
-      <CatchUp before={dayStart} />
+      <CatchUp before={dayStart} now={now} />
     </PageFrame>
   );
 }
