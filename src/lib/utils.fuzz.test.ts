@@ -83,6 +83,25 @@ describe('utility properties', () => {
     expect(matchesQuery(name, typo)).toBe(true);
   });
 
+  const UMLAUT_SPELLINGS = ['lu', 'lv', 'lyu', 'lü', 'lǚ'];
+  const NU_SPELLINGS = ['nu', 'nv', 'nyu', 'nü', 'nǚ'];
+
+  forAll('every spelling of the pinyin ü finds every other', (rng) => ({
+    spellings: rng.pick([UMLAUT_SPELLINGS, NU_SPELLINGS]),
+    typed: rng.int(0, 4),
+    stored: rng.int(0, 4),
+    final: rng.pick(['', 'e']),
+    rest: rng.pick(['', ' chen', ' wang', '-mei ho']),
+  }), ({ spellings, typed, stored, final, rest }) => {
+    // One surname, spelled whichever way the passport office, the parent and
+    // the keyboard each landed on. The relation has to be total: any of them
+    // typed finds any of them stored, at two characters and with no typo
+    // budget to lean on.
+    const query = `${spellings[typed]}${final}`;
+    const name = `${spellings[stored]}${final}${rest}`;
+    expect(matchesQuery(name, query)).toBe(true);
+  });
+
   forAll('a one-character query is never fuzzy', (rng) => ({
     name: arbitraryString(rng),
     letter: rng.pick(['q', 'x', 'z', 'j']),
