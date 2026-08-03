@@ -179,8 +179,29 @@
     }
   }
 
+  /*
+   * The focus ring is drawn *inside* the control, not around it.
+   *
+   * An outlined-and-offset ring is painted outside the border box, and it is
+   * the *ancestor* that clips it — so every box in the app that scrolls or
+   * rounds its corners was quietly eating the ring of everything inside it.
+   * That is most of the app's chrome, not a corner of it: the filter row is an
+   * `overflow-x-auto` strip exactly one chip tall, so a focused chip lost the
+   * top and bottom of its ring and kept the two arcs at the ends; a roster row
+   * is a button flush to the edge of an `overflow-hidden rounded-xl` card, so
+   * it lost the ring altogether and looked like nothing had focus at all. The
+   * menu panel, the modal shell, the grade checklist and the number stepper are
+   * all the same shape of container.
+   *
+   * Padding those containers is not a fix — the rounded, clipping card has
+   * nowhere to put the padding, and a scroller would need it on an axis it does
+   * not scroll. A negative offset does fix all of them at once, because an
+   * outline drawn within the border box has nothing left to clip it. It costs
+   * the small halo of daylight around a focused control and buys a ring that is
+   * whole everywhere, which is the part a keyboard user is actually reading.
+   */
   :focus-visible {
-    @apply outline-2 outline-offset-2 outline-brand-400;
+    @apply outline-2 -outline-offset-2 outline-brand-400;
   }
 }
 

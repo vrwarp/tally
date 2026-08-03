@@ -413,10 +413,14 @@ const StudentListRow = memo(function StudentListRow({
       is what the row was always for.
     */
     <li className="relative flex min-h-16 items-center gap-3 px-3 py-2 hover:bg-ink-800/40 lg:min-h-11 lg:py-1">
+      {/* `rounded-lg` on an invisible layer is there for one thing: the focus
+          ring traces the border radius, and a square ring over a rounded row
+          reads as a misalignment. The ring itself is the app's, from
+          `index.css` — drawn inward, so the row cannot clip it. */}
       <Link
         to={`/students/${student.id}`}
         aria-label={grade ? `${name}, ${grade} grade` : `${name}, no grade on file`}
-        className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-400"
+        className="absolute inset-0 rounded-lg"
       />
 
       <span

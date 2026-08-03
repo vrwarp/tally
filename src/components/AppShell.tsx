@@ -91,7 +91,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           setMenuOpen(false);
           void signOut();
         }}
-        className="block w-full px-3 py-2 text-left text-danger-400 hover:bg-ink-800"
+        // Last item in a `rounded-xl overflow-hidden` panel, so its focus ring
+        // has to follow the panel's curve or the menu clips the two bottom
+        // corners off it. `lg` is the same shape the other way up, and the
+        // panel's own `py-1` is why 8px rather than the panel's 12px.
+        className="block w-full rounded-b-lg px-3 py-2 text-left text-danger-400 hover:bg-ink-800"
       >
         Sign out
       </button>

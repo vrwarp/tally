@@ -170,6 +170,28 @@ export const StudentRow = memo(function StudentRow({
 
   const actionsId = `row-actions-${student.id}`;
 
+  /*
+   * Which corners of the card each button actually owns.
+   *
+   * The card draws the rounded shape and clips to it, so a square-cornered
+   * button inside it looks right at rest and wrong the moment it is focused: a
+   * focus ring is an outline, an outline traces the *button's* radius, and the
+   * card's curve then cuts the corners off it. The ring ran straight, stopped
+   * short at each curve and picked up again after it.
+   *
+   * It cannot be a flat `rounded-xl`, because the row changes shape under it. A
+   * checked-in row hands its right-hand side to the undo button; an expanded
+   * one hands its bottom edge to the actions strip. Rounding a corner another
+   * control owns would put a curve in the middle of the card.
+   */
+  const undoBeside = here && !swapping;
+  const rowCorners = cn(
+    'rounded-tl-xl',
+    !open && 'rounded-bl-xl',
+    !undoBeside && 'rounded-tr-xl',
+    !undoBeside && !open && 'rounded-br-xl',
+  );
+
   return (
     <li>
       {/*
@@ -203,6 +225,7 @@ export const StudentRow = memo(function StudentRow({
             aria-controls={open ? actionsId : undefined}
             className={cn(
               'flex min-h-16 min-w-0 flex-1 items-center gap-3 px-3 py-2 text-left',
+              rowCorners,
               'disabled:cursor-default',
               // Hover is the pointer's version of the press state. Without it the
               // roster was the one list in the app that gave a mouse nothing back —
@@ -319,6 +342,10 @@ export const StudentRow = memo(function StudentRow({
               aria-label={`Undo check-in for ${name}${gradeClause}, checked in at ${formatClock(attendance.checkedInAt)}`}
               className={cn(
                 'flex w-16 shrink-0 flex-col items-center justify-center gap-0.5 px-2',
+                // The right-hand end of the card, minus its bottom corner
+                // whenever the actions strip is open underneath. See `rowCorners`.
+                'rounded-tr-xl',
+                !open && 'rounded-br-xl',
                 'border-l border-present-500/20 text-present-400',
                 'hover:bg-present-500/15 active:bg-present-500/15 disabled:opacity-60',
               )}

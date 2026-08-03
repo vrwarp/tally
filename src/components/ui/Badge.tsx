@@ -67,7 +67,11 @@ export function Badge({ tone = 'neutral', children, className, title, onPress, p
           SHAPE,
           TONES[tone],
           'cursor-pointer transition-[filter,box-shadow] hover:brightness-125',
-          'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-400',
+          // No focus ring spelled out here: the one in `index.css` is the same
+          // ring, drawn inside the badge so the roster row's `overflow-hidden`
+          // card cannot clip it. Restating it with a positive offset — which is
+          // what this line used to do — put the outward version back on the one
+          // control most likely to be inside a clipping box.
           className,
         )}
       >
