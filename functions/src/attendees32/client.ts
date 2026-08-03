@@ -246,12 +246,7 @@ export function createA32Client(options: A32ClientOptions): A32Client {
       const retryAfterMs = parseRetryAfter(response.headers.get('Retry-After'), now());
 
       const apiError = async (): Promise<A32ApiError> => {
-        let text = '';
-        try {
-          text = await response.text();
-        } catch {
-          text = '';
-        }
+        const text = await response.text().catch(() => '');
         return new A32ApiError(response.status, url, errorLines(text), retryAfterMs, {
           request: traceRequest(attempt),
           response: {

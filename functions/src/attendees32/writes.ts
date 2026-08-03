@@ -654,9 +654,9 @@ export async function addParent(
   const email = normalizeEmail(options.email);
 
   /* ---- An adult chosen from a previous round ----------------------------- */
-  let parentId: string | null = null;
+  let parentId: string | null;
   let createdPerson = false;
-  let parentName: string | null = null;
+  let parentName: string | null;
 
   if (options.personId) {
     let chosen: A32Attendee;

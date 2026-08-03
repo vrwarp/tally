@@ -1224,7 +1224,7 @@ export const addRosterMember = onCall<
   // typo'd id would otherwise become a permanent row that renders as nothing.
   // A merged id is followed to the record the church kept — whoever pasted it
   // meant that person — and only a trail that ends dead is refused.
-  let rosterPersonId = personId;
+  let rosterPersonId: string;
   try {
     const check = await backend.checkPerson({ personId });
     if (check.outcome === 'gone') {
