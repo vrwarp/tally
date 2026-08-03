@@ -76,15 +76,46 @@ function readStored(): StoredRoster | null {
   }
 }
 
-function writeStored(people: PcoRosterPerson[]): void {
+/**
+ * `storedAt` is passed in only by a patch of one person: correcting a row does
+ * not make the other four hundred any fresher, and stamping the whole roster
+ * with the time of a birthday edit would keep a week-old copy alive past the
+ * point `STALE_AFTER_MS` is there to end it.
+ */
+function writeStored(people: PcoRosterPerson[], storedAt = Date.now()): void {
   try {
     window.localStorage.setItem(
       CACHE_KEY,
-      JSON.stringify({ people, storedAt: Date.now() } satisfies StoredRoster),
+      JSON.stringify({ people, storedAt } satisfies StoredRoster),
     );
   } catch {
     /* Out of quota is not a reason to fail a check-in. */
   }
+}
+
+/**
+ * Replaces one person in the roster parked on this device.
+ *
+ * So that a save survives a reload. The in-memory roster is corrected from a
+ * write's own answer rather than by re-reading Planning Center (see
+ * `applyRosterPerson`), and without this the copy in storage would still hold
+ * the pre-edit row — which is what a cold start paints from, so a leader who
+ * saved a birthday and reloaded would watch it disappear until the first read
+ * came back.
+ *
+ * A person the stored roster does not hold is not added: storage mirrors the
+ * last read, and a row that read never returned is not this function's to
+ * invent.
+ */
+export function rememberRosterPerson(person: PcoRosterPerson): void {
+  const stored = readStored();
+  if (!stored) return;
+  if (!stored.people.some((held) => held.pcoPersonId === person.pcoPersonId)) return;
+
+  writeStored(
+    stored.people.map((held) => (held.pcoPersonId === person.pcoPersonId ? person : held)),
+    stored.storedAt,
+  );
 }
 
 /** Called on sign-out: the next person to use this device is not this person. */

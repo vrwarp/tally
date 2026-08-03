@@ -49,6 +49,7 @@ function harness(overrides: Partial<DataContextValue> = {}) {
     rosterOffline: false,
     rosterFetchedAt: null,
     refreshRoster,
+    applyRosterPerson: () => {},
     ...overrides,
   };
 

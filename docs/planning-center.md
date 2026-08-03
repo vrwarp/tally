@@ -231,6 +231,14 @@ changed the grade does not restate the name. A blank name or a grade outside 6�
 anything is written, and a new grade that leaves the configured band is saved *with* a warning that
 the student is about to drop off the roster.
 
+The call answers with the student's **roster row** as Planning Center now holds it — the same shape
+`getRoster` returns, built by the same function — and the browser puts that one row into the roster
+it already has (`applyRosterPerson`). Save blocks on Planning Center confirming the write, and on
+nothing else. It used to also wait on `refreshRoster(true)`: a forced, uncached, paged sweep of every
+child in the church, to be told back the date somebody had just typed, with the leader watching a
+spinner through it. The row is carried on `unchanged` as well as `updated`, because "Planning Center
+already matches" is often a browser discovering that *it* is the stale one.
+
 Two fields are not part of this. **Status** is never written upstream in any mode — who is on the
 roster is Tally's own list, and the control for it is Remove from roster on the student's page.
 **Allergies** can be cleared here, on a form showing the value being deleted, but a reconcile push

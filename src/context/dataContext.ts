@@ -3,6 +3,7 @@ import type {
   AppSettings,
   EventSeries,
   PcoErrorReport,
+  PcoRosterPerson,
   Student,
   TallyEvent,
 } from '@/types';
@@ -66,6 +67,25 @@ export interface DataContextValue {
    * from here would only ever clear one of them.
    */
   refreshRoster: (force?: boolean) => Promise<void>;
+  /**
+   * Puts one Planning Center row into the roster, in place of re-reading it.
+   *
+   * For a screen that has just written to Planning Center and been handed the
+   * finished row back — `updateStudentProfile` returns one. The alternative,
+   * and what every such screen used to do, was `refreshRoster(true)`: a forced
+   * sweep of every child in the church, paged and uncached, waited on with a
+   * spinner over a modal, to learn one field the write had already confirmed.
+   *
+   * Not an optimistic update. Nothing is applied until the server has said the
+   * write landed, and what is applied is the server's row rather than the
+   * browser's guess at it — so this can only ever agree with the next read.
+   *
+   * Given nothing, or somebody the roster does not hold, it falls back to a
+   * re-read in the background. That covers a person whose upstream record was
+   * merged mid-edit, where the row comes back under the surviving id and there
+   * is nothing here to match it to.
+   */
+  applyRosterPerson: (person?: PcoRosterPerson | null) => void;
 }
 
 export const DataContext = createContext<DataContextValue | null>(null);

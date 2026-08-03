@@ -19,15 +19,57 @@ import { AuthContext, type AuthContextValue } from '@/context/authContext';
 import { DataContext, type DataContextValue } from '@/context/dataContext';
 import { ToastContext, type ToastContextValue } from '@/context/toastContext';
 import { RowBadgeModal } from '@/features/students/RowBadgeModal';
-import type { PcoPersonDetails, Student } from '@/types';
+import type { PcoPersonDetails, PcoRosterPerson, Student } from '@/types';
 import { makeSettings, makeStudent } from '../../../tests/factories';
 
+/** The row Planning Center holds once the write has landed. */
+function savedRow(overrides: Partial<PcoRosterPerson> = {}): PcoRosterPerson {
+  return {
+    id: 'pco_4200003',
+    pcoPersonId: '4200003',
+    firstName: 'Sofia',
+    lastName: 'Delgado',
+    grade: 9,
+    status: 'active',
+    searchName: 'sofia delgado',
+    profileComplete: null,
+    hasAllergies: false,
+    birthday: '03-16',
+    gradeOnFile: true,
+    ...overrides,
+  };
+}
+
 const updateStudentProfile = vi.hoisted(() =>
-  vi.fn<(...args: unknown[]) => Promise<{ data: { status: string; wrote: string[]; message: string } }>>(
-    async () => ({
-      data: { status: 'updated', wrote: ['birthdate'], message: 'Saved birthday in Planning Center.' },
-    }),
-  ),
+  vi.fn<
+    (...args: unknown[]) => Promise<{
+      data: {
+        status: string;
+        wrote: string[];
+        message: string;
+        person?: Record<string, unknown> | null;
+      };
+    }>
+  >(async () => ({
+    data: {
+      status: 'updated',
+      wrote: ['birthdate'],
+      message: 'Saved birthday in Planning Center.',
+      person: {
+        id: 'pco_4200003',
+        pcoPersonId: '4200003',
+        firstName: 'Sofia',
+        lastName: 'Delgado',
+        grade: 9,
+        status: 'active',
+        searchName: 'sofia delgado',
+        profileComplete: null,
+        hasAllergies: false,
+        birthday: '03-16',
+        gradeOnFile: true,
+      },
+    },
+  })),
 );
 vi.mock('@/services/functions', () => ({
   updateStudentProfile,
@@ -55,6 +97,7 @@ vi.mock('@/hooks/usePersonDetails', () => ({
 }));
 
 const refreshRoster = vi.fn(async () => {});
+const applyRosterPerson = vi.fn();
 const show = vi.fn();
 
 /** Sat 14 March 2026 — the day the roster's badges are read against. */
@@ -89,6 +132,7 @@ function openBadge(student: Student) {
     rosterOffline: false,
     rosterFetchedAt: null,
     refreshRoster,
+    applyRosterPerson,
   } as unknown as DataContextValue;
 
   const auth = { user: { uid: 'core-1' }, can: () => true } as unknown as AuthContextValue;
@@ -120,6 +164,7 @@ function linked(overrides: Partial<Student> = {}): Student {
 beforeEach(() => {
   updateStudentProfile.mockClear();
   refreshRoster.mockClear();
+  applyRosterPerson.mockClear();
   show.mockClear();
   personDetails.current = details();
   personDetails.loading = false;
@@ -178,7 +223,13 @@ describe('the birthday badge', () => {
     });
   });
 
-  it('writes the day upstream and refreshes the roster it came from', async () => {
+  /**
+   * The row rather than a re-read is the whole point, and it is worth asserting
+   * negatively too: this used to force a roster refresh — every child in the
+   * church, paged out of Planning Center — to learn back the date somebody had
+   * just typed, with the leader watching a spinner through it.
+   */
+  it('writes the day upstream and takes the corrected row from the answer', async () => {
     openBadge(linked({ birthday: '03-14' }));
 
     expect(screen.getByText('14 March')).toBeInTheDocument();
@@ -193,8 +244,28 @@ describe('the birthday badge', () => {
       studentId: 'pco_4200003',
       birthday: '03-16',
     });
-    expect(refreshRoster).toHaveBeenCalledWith(true);
+    await waitFor(() => expect(applyRosterPerson).toHaveBeenCalledWith(savedRow()));
+    expect(refreshRoster).not.toHaveBeenCalled();
     expect(show).toHaveBeenCalledWith('Saved birthday in Planning Center.');
+  });
+
+  /**
+   * A server that answers without a row — an older deploy — must still leave
+   * the screen agreeing with Planning Center. `applyRosterPerson` is what falls
+   * back to a read, so the assertion is that it is called at all.
+   */
+  it('still hands the write on when the answer carries no row', async () => {
+    updateStudentProfile.mockResolvedValueOnce({
+      data: { status: 'updated', wrote: ['birthdate'], message: 'Saved birthday in Planning Center.' },
+    });
+    openBadge(linked({ birthday: '03-14' }));
+
+    const box = screen.getByRole('textbox', { name: 'Birthday' });
+    await userEvent.clear(box);
+    await userEvent.type(box, '3/16');
+    await userEvent.click(screen.getByRole('button', { name: /Save to Planning Center/ }));
+
+    await waitFor(() => expect(applyRosterPerson).toHaveBeenCalledWith(undefined));
   });
 
   it('keeps the form open and says why when Planning Center refuses', async () => {

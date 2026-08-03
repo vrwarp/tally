@@ -30,8 +30,9 @@
  */
 import { ABSOLUTE_MAX_GRADE, ABSOLUTE_MIN_GRADE, type PcoConfig } from '../config.js';
 import type { PcoClient } from './client.js';
+import { rosterPersonFrom, type RosterPerson } from './roster.js';
 import { readThroughMerges, resolveStudentPerson } from './studentPerson.js';
-import type { PcoPerson } from './types.js';
+import type { PcoPerson, PcoPersonAttributes } from './types.js';
 import { PCO_TYPES } from './types.js';
 import { SILENT_LOGGER, type FirestoreLike, type FunctionLogger } from '../firestore.js';
 
@@ -55,6 +56,25 @@ export interface UpdateStudentProfileResult {
   wrote: string[];
   /** Plain language, for the leader who pressed Save. */
   message: string;
+  /**
+   * This student's roster row, as Planning Center holds it now that the write
+   * has landed. Null when there was no person to read — every refusal above the
+   * upstream read.
+   *
+   * Here so that saving a profile does not cost a roster read. The row is the
+   * only thing on screen the edit changed, and the caller used to get it by
+   * asking for the whole roster again with `force` — a sweep of every child in
+   * the church, paged, side-loaded and uncached, which the leader watched a
+   * spinner through to see one date appear. This is the same row that sweep
+   * would have produced, built by the same function, from the person this call
+   * already had in its hand.
+   *
+   * Carried on `unchanged` as well as `updated`, and that case is the one worth
+   * keeping: "Planning Center already matches" often means somebody else filled
+   * the field in and *this* browser is the stale one. Sending the row is what
+   * corrects it.
+   */
+  person: RosterPerson | null;
 }
 
 /**
@@ -108,8 +128,9 @@ function result(
   status: UpdateStudentProfileStatus,
   message: string,
   wrote: string[] = [],
+  person: RosterPerson | null = null,
 ): UpdateStudentProfileResult {
-  return { status, wrote, message };
+  return { status, wrote, message, person };
 }
 
 function trimmed(value: string | null | undefined): string | null {
@@ -416,9 +437,36 @@ export async function updateStudentProfile(
     if (resolved.birthdate !== null) attributes.birthdate = resolved.birthdate;
   }
 
+  /*
+   * The row as it will stand once this call is done, for the caller's screen.
+   *
+   * Composed rather than re-read: the person was read a moment ago and these
+   * are the only attributes about to change on them, so applying the patch to
+   * what came back says exactly what a fresh read would — without a second
+   * round trip on the path somebody is watching a spinner on. Anything the
+   * PATCH goes on to refuse never gets this far; the throw is the answer.
+   */
+  const rowAfter = (): RosterPerson =>
+    rosterPersonFrom(
+      {
+        ...person.data,
+        attributes: {
+          ...(person.data.attributes ?? {}),
+          ...(attributes as PcoPersonAttributes),
+        },
+      },
+      config,
+      options.now ?? new Date(),
+    );
+
   const wrote = Object.keys(attributes);
   if (wrote.length === 0) {
-    return result('unchanged', 'Planning Center already matches. Nothing was changed there.');
+    return result(
+      'unchanged',
+      'Planning Center already matches. Nothing was changed there.',
+      [],
+      rowAfter(),
+    );
   }
 
   await client.patch(`/people/${encodeURIComponent(personId)}`, {
@@ -451,5 +499,6 @@ export async function updateStudentProfile(
       ? `Saved ${describe(wrote)} in Planning Center. That grade is outside the ${config.minGrade}-${config.maxGrade} band Tally reads, so they will drop off the roster.`
       : `Saved ${describe(wrote)} in Planning Center.`,
     wrote,
+    rowAfter(),
   );
 }
