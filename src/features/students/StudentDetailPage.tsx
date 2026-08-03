@@ -38,6 +38,7 @@ import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { EarlierAttendance } from '@/features/students/EarlierAttendance';
 import { historyWindow, historyWindowStart } from '@/features/students/historyWindow';
+import { reconcileSeen, type SeenDates } from '@/features/students/seenDates';
 import { useProfileHistory } from '@/features/students/useProfileHistory';
 import { useToast } from '@/context/toastContext';
 import {
@@ -66,6 +67,9 @@ import { studentFullName, type TallyEvent } from '@/types';
 
 /** The group one-off events go in. Not a `chainKey`, and cannot collide with one. */
 const ONE_OFF_GROUP = 'one-off';
+
+/** Stands in while there is no student to reconcile — the page renders nothing of it. */
+const NEVER_SEEN: SeenDates = { firstSeenAt: null, lastSeenAt: null, unseenInWindow: false };
 
 interface HistoryEntry {
   event: TallyEvent;
@@ -131,6 +135,21 @@ export function StudentDetailPage() {
     loading: historyLoading,
     error: historyError,
   } = useProfileHistory(student, recentEvents, historyWindowStart(now));
+
+  /**
+   * When this student was first and last actually seen.
+   *
+   * Not `student.firstAttendedAt` / `student.lastAttendedAt` directly: those are
+   * high-water marks that a taken-back tap or a deleted night leaves standing,
+   * and this page is the one place holding the evidence to say so. See
+   * `reconcileSeen`. Before the history lands — and if it fails to — there are
+   * no snapshots to reconcile against and this is exactly the stored pair, which
+   * is what the page showed before.
+   */
+  const seen = useMemo(
+    () => (student ? reconcileSeen(student, snapshots) : NEVER_SEEN),
+    [student, snapshots],
+  );
 
   /**
    * The history, split into the gatherings it belongs to, with each gathering's
@@ -514,11 +533,19 @@ export function StudentDetailPage() {
             <Detail label="Status" value={student.status === 'active' ? 'Active' : 'Inactive'} />
             <Detail
               label="First seen"
-              value={student.firstAttendedAt ? formatShortDate(student.firstAttendedAt) : 'Never'}
+              value={seen.firstSeenAt ? formatShortDate(seen.firstSeenAt) : 'Never'}
             />
             <Detail
               label="Last seen"
-              value={student.lastAttendedAt ? formatShortDate(student.lastAttendedAt) : 'Never'}
+              value={
+                seen.lastSeenAt
+                  ? formatShortDate(seen.lastSeenAt)
+                  : // Not "Never": the year below holds no sighting, which is a
+                    // smaller claim than never having come at all.
+                    seen.unseenInWindow
+                    ? 'Not in the last year'
+                    : 'Never'
+              }
             />
           </dl>
 
@@ -660,8 +687,23 @@ export function StudentDetailPage() {
           />
           <StatTile
             label="Last seen"
-            value={student.lastAttendedAt ? formatRelative(student.lastAttendedAt) : 'Never'}
-            hint={student.lastAttendedAt ? formatShortDate(student.lastAttendedAt) : 'no check-ins yet'}
+            value={
+              seen.lastSeenAt
+                ? formatRelative(seen.lastSeenAt)
+                : // The grid's own mark for a night with nothing on record. The
+                  // hint carries the claim, which is about the year rather than
+                  // about all of history.
+                  seen.unseenInWindow
+                  ? '—'
+                  : 'Never'
+            }
+            hint={
+              seen.lastSeenAt
+                ? formatShortDate(seen.lastSeenAt)
+                : seen.unseenInWindow
+                  ? 'not at any night in the last year'
+                  : 'no check-ins yet'
+            }
           />
         </div>
 

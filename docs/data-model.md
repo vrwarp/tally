@@ -90,6 +90,16 @@ a check-in deliberately leaves both dates alone — recomputing them would need 
 event, and the dashboard derives its real numbers from attendance documents anyway. These fields are
 conveniences, not the ledger.
 
+Which makes both of them high-water marks rather than sightings: they can name a night the register
+does not, because a taken-back tap, a deleted gathering or a `markPresentOnly` write leaves them
+standing. Every screen that shows one has to decide what to do about that, and the rule is the same
+everywhere — the ledger wins wherever the ledger can speak, and the stored field covers the rest. The
+MIA list already worked this way (`computeMiaFor` reports the night it found; `computeUnseen` falls
+back to `lastAttendedAt` only when the window holds no sighting), and the profile does it through
+`reconcileSeen`, which has a year of the student's own attendance documents in hand and so can
+overrule a stored date by pointing at the very night it names. Screens with no history loaded — the
+roster's last-seen column — show the field as-is, because there is nothing to check it against.
+
 ### 3. A gathering with no attendance is a cancelled one
 
 `status: 'cancelled'` is the honest answer to "did this happen?" only when somebody remembered to open
