@@ -70,6 +70,7 @@ export function forAll<T>(
       } catch (cause) {
         throw new Error(
           `Generator for "${name}" threw on run ${index} (seed ${seed}):\n${String(cause)}`,
+          { cause },
         );
       }
 
@@ -82,6 +83,7 @@ export function forAll<T>(
             `Reproduce with:  TALLY_FUZZ_SEED=${seed} npm test\n\n` +
             `Input:\n${describeValue(value)}\n\n` +
             `Failure:\n${message}`,
+          { cause },
         );
       }
     }

@@ -11,6 +11,10 @@ export default defineConfig({
     name: 'functions',
     environment: 'node',
     include: ['src/**/*.test.ts'],
+    // Vitest 4 narrowed `restoreMocks` to undoing `vi.spyOn`; a bare `vi.fn()`
+    // keeps its calls and its implementation across tests without this. See the
+    // longer note in the repository-root vitest config.
     restoreMocks: true,
+    mockReset: true,
   },
 });

@@ -286,7 +286,7 @@ export async function addParent(options: AddParentOptions): Promise<AddParentRes
   /* ---- Who the parent is -------------------------------------------------- */
 
   let parentId: string;
-  let parentPerson: PcoPerson | null = null;
+  let parentPerson: PcoPerson | null;
   let createdPerson = false;
   /*
    * What the parent already has, side-loaded with them.

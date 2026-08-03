@@ -82,6 +82,7 @@ function forEachPerson(name: string, check: (person: PcoPerson, index: number) =
           `Failed on run ${index} (TALLY_FUZZ_SEED=${SEED}).\n` +
             `Person: ${JSON.stringify(person)}\n` +
             `${cause instanceof Error ? cause.message : String(cause)}`,
+          { cause },
         );
       }
     }

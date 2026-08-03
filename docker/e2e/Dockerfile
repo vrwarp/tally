@@ -8,7 +8,7 @@
 # Everything the suite needs runs *inside* this container — the Planning Center
 # simulator, the Firebase emulators and a production build of the app — so there
 # is nothing to wire up and no external service to be unavailable.
-FROM mcr.microsoft.com/playwright:v1.61.1-noble
+FROM mcr.microsoft.com/playwright:v1.62.0-noble
 
 # The Firestore and Auth emulators are Java programs; the Playwright image has
 # no JRE.

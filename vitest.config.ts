@@ -19,7 +19,16 @@ export default defineConfig({
           globals: true,
           setupFiles: ['./tests/setup.ts'],
           include: ['src/**/*.test.{ts,tsx}', 'tests/**/*.test.{ts,tsx}'],
+          /*
+           * `restoreMocks` alone used to mean both of these. Vitest 4 narrowed
+           * it to what the name says — putting back what `vi.spyOn` replaced —
+           * and a bare `vi.fn()` from a `vi.mock` factory is not a spy over
+           * anything, so its calls now survive into the next test. That is how
+           * a test asserting a module was never read passed while the test
+           * before it had read one: the calls it was shown were not its own.
+           */
           restoreMocks: true,
+          mockReset: true,
         },
       },
       {
