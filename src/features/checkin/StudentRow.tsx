@@ -22,7 +22,7 @@ import { memo } from 'react';
 import { Link } from 'react-router-dom';
 import { WarningBadge } from '@/components/ui';
 import { formatClock } from '@/lib/time';
-import { cn, gradeLabel, initials, NO_GRADE, sameItems } from '@/lib/utils';
+import { cn, gradeLabel, gradeSentence, initials, NO_GRADE, sameItems } from '@/lib/utils';
 import { studentFullName, type RosterEntry } from '@/types';
 
 /**
@@ -46,6 +46,14 @@ export interface StudentRowProps {
   onUndo?: (entry: RosterEntry) => void;
   /** `Wrong person` — starts the swap. */
   onSwap?: (entry: RosterEntry) => void;
+  /**
+   * Records a pickup, and puts one back. Only passed on a gathering that tracks
+   * check-out, which is what turns the trailing button from undo into `Out`.
+   */
+  onCheckOut?: (entry: RosterEntry) => void;
+  onUndoCheckOut?: (entry: RosterEntry) => void;
+  /** Whether this gathering tracks check-out at all. */
+  tracksCheckOut?: boolean;
   mode?: StudentRowMode;
   /** In `swap` mode: this row is the check-in being moved. */
   isSwapSource?: boolean;
@@ -90,6 +98,10 @@ function sameEntry(a: RosterEntry, b: RosterEntry): boolean {
     a.student === b.student &&
     (a.attendance?.checkedInAt.getTime() ?? null) ===
       (b.attendance?.checkedInAt.getTime() ?? null) &&
+    // A field this comparator does not read is a row that never repaints, and
+    // a pickup that never appears on screen.
+    (a.attendance?.checkedOutAt?.getTime() ?? null) ===
+      (b.attendance?.checkedOutAt?.getTime() ?? null) &&
     a.isRecent === b.isRecent &&
     a.recentHits === b.recentHits &&
     a.recentWindow === b.recentWindow &&
@@ -121,6 +133,9 @@ export const StudentRow = memo(function StudentRow({
   showRecentHint = false,
   canOpenProfile = false,
   allergyNote,
+  onCheckOut,
+  onUndoCheckOut,
+  tracksCheckOut = false,
 }: StudentRowProps) {
   const { student, attendance, warnings, isRecent, recentHits, recentWindow } = entry;
   const name = studentFullName(student);
@@ -129,6 +144,14 @@ export const StudentRow = memo(function StudentRow({
 
   const swapping = mode === 'swap';
   const here = attendance !== null;
+  /*
+   * Collected, on a gathering that tracks it.
+   *
+   * Gated on `tracksCheckOut` rather than on the field alone: turning the
+   * toggle back off should put the roster back exactly as it was, not leave
+   * dimmed rows behind carrying a state nothing on screen explains.
+   */
+  const gone = tracksCheckOut && attendance?.checkedOutAt != null;
   // The action strip belongs to a check-in. While the screen is picking a
   // person it would be a second, contradictory meaning for the same row.
   const open = expanded && here && !swapping;
@@ -146,16 +169,19 @@ export const StudentRow = memo(function StudentRow({
   // Null for somebody Planning Center holds no grade for — an adult on a
   // hand-picked roster. The clause goes rather than announcing a grade Tally
   // invented, which on this screen is read aloud beside a name.
-  const gradeClause = grade ? `, ${grade} grade` : '';
+  const spokenGrade = gradeSentence(student);
+  const gradeClause = spokenGrade ? `, ${spokenGrade}` : '';
   const action = swapping
     ? isSwapSource
       ? `${name}${gradeClause} — the check-in being moved`
       : here
         ? `${name}${gradeClause} — already checked in`
         : `Move the check-in to ${name}${gradeClause}`
-    : here
-      ? `More actions for ${name}${gradeClause}, checked in at ${formatClock(attendance.checkedInAt)}`
-      : `Check in ${name}${gradeClause}`;
+    : gone
+      ? `More actions for ${name}${gradeClause}, collected at ${formatClock(attendance!.checkedOutAt!)}`
+      : here
+        ? `More actions for ${name}${gradeClause}, checked in at ${formatClock(attendance.checkedInAt)}`
+        : `Check in ${name}${gradeClause}`;
   /*
    * Nothing inside the row is announced on its own, so the note has to be part
    * of a label or it is not read out at all — and this is the label it belongs
@@ -205,11 +231,17 @@ export const StudentRow = memo(function StudentRow({
       <div
         className={cn(
           'overflow-hidden rounded-xl ring-1 transition-colors',
-          here
-            ? 'bg-present-500/10 ring-present-500/30'
-            : swapping
-              ? 'bg-ink-900 ring-brand-500/30'
-              : 'bg-ink-900 ring-ink-800',
+          gone
+            ? 'bg-ink-900 ring-ink-800'
+            : here
+              ? 'bg-present-500/10 ring-present-500/30'
+              : swapping
+                ? 'bg-ink-900 ring-brand-500/30'
+                : 'bg-ink-900 ring-ink-800',
+          // Neutral and spent rather than an error colour. A collected child is
+          // the happy ending, and a student with no pickup recorded has done
+          // nothing wrong either — see the badge below.
+          gone && 'opacity-60',
           unavailable && 'opacity-60',
           flashing && 'animate-flash',
         )}
@@ -266,7 +298,7 @@ export const StudentRow = memo(function StudentRow({
                 </span>
               </span>
 
-              {warnings.length > 0 || showHint || unavailable ? (
+              {warnings.length > 0 || showHint || unavailable || gone ? (
                 // `items-start`, because the allergy badge is allowed to be
                 // several lines tall when the note is long: everything beside it
                 // should sit at its first line rather than halfway down it.
@@ -281,6 +313,16 @@ export const StudentRow = memo(function StudentRow({
                   {unavailable ? (
                     <span className="text-[11px] font-medium text-ink-400">
                       {isSwapSource ? 'The check-in being moved' : 'Already checked in'}
+                    </span>
+                  ) : null}
+                  {/*
+                    Stated, not flagged. A student with no pickup recorded gets
+                    no badge and no colour either — nothing here reads as an
+                    error, because a missed check-out is not one.
+                  */}
+                  {gone ? (
+                    <span className="text-[11px] font-medium tabular-nums text-ink-400">
+                      Out {formatClock(attendance!.checkedOutAt!)}
                     </span>
                   ) : null}
                   {showHint && !unavailable ? (
@@ -326,35 +368,56 @@ export const StudentRow = memo(function StudentRow({
           </button>
 
           {/*
-            Undo, always one tap.
+            The one-tap slot at the end of a checked-in row.
 
-            The check mark is the thing a counselor points at when they say
-            "that one is wrong", so it undoes rather than opening a menu about
-            undoing. It keeps the label the whole row used to carry — the row's
-            promise has not changed, only its geography.
+            Ordinarily undo: the check mark is the thing a counselor points at
+            when they say "that one is wrong", so it undoes rather than opening
+            a menu about undoing.
+
+            On a gathering that tracks check-out the slot goes to `Out`
+            instead, and undo moves into the action strip one tap deeper. That
+            is the right way round for a nursery: collecting children is the
+            gesture repeated forty times a morning while undo stays the rare
+            correction. Nothing is lost — the strip carries it for both states.
           */}
           {here && !swapping ? (
             <button
               type="button"
-              onClick={() => onUndo?.(entry)}
+              onClick={() =>
+                gone ? onUndoCheckOut?.(entry) : tracksCheckOut ? onCheckOut?.(entry) : onUndo?.(entry)
+              }
               disabled={busy}
               aria-busy={busy || undefined}
-              aria-label={`Undo check-in for ${name}${gradeClause}, checked in at ${formatClock(attendance.checkedInAt)}`}
+              aria-label={
+                gone
+                  ? `Put ${name}${gradeClause} back in the room — collected at ${formatClock(attendance.checkedOutAt!)}`
+                  : tracksCheckOut
+                    ? `Check out ${name}${gradeClause}, checked in at ${formatClock(attendance.checkedInAt)}`
+                    : `Undo check-in for ${name}${gradeClause}, checked in at ${formatClock(attendance.checkedInAt)}`
+              }
               className={cn(
                 'flex w-16 shrink-0 flex-col items-center justify-center gap-0.5 px-2',
                 // The right-hand end of the card, minus its bottom corner
                 // whenever the actions strip is open underneath. See `rowCorners`.
                 'rounded-tr-xl',
                 !open && 'rounded-br-xl',
-                'border-l border-present-500/20 text-present-400',
-                'hover:bg-present-500/15 active:bg-present-500/15 disabled:opacity-60',
+                'border-l disabled:opacity-60',
+                gone
+                  ? 'border-ink-800 text-ink-400 hover:bg-ink-800/60 active:bg-ink-800/60'
+                  : 'border-present-500/20 text-present-400 hover:bg-present-500/15 active:bg-present-500/15',
               )}
             >
-              <span aria-hidden="true" className="text-xl leading-none">
-                ✓
+              <span
+                aria-hidden="true"
+                className={cn(
+                  'leading-none',
+                  gone || !tracksCheckOut ? 'text-xl' : 'text-[13px] font-semibold',
+                )}
+              >
+                {gone ? '↺' : tracksCheckOut ? 'Out' : '✓'}
               </span>
               <span aria-hidden="true" className="text-[11px] tabular-nums text-ink-500">
-                {formatClock(attendance.checkedInAt)}
+                {formatClock(gone ? attendance.checkedOutAt! : attendance.checkedInAt)}
               </span>
             </button>
           ) : null}
@@ -363,8 +426,17 @@ export const StudentRow = memo(function StudentRow({
         {open ? (
           <div
             id={actionsId}
-            className="flex gap-2 border-t border-present-500/20 px-3 py-2"
+            className={cn(
+              'flex gap-2 border-t px-3 py-2',
+              gone ? 'border-ink-800' : 'border-present-500/20',
+            )}
           >
+            {/*
+              Undo the *check-in*, in both states. On a collected row that
+              deletes the record and takes the pickup with it, which is right:
+              a pickup recorded against somebody who was never here is not
+              worth keeping either.
+            */}
             <button
               type="button"
               onClick={() => onUndo?.(entry)}
@@ -415,4 +487,7 @@ export const StudentRow = memo(function StudentRow({
   prev.showRecentHint === next.showRecentHint &&
   prev.canOpenProfile === next.canOpenProfile &&
   prev.allergyNote === next.allergyNote &&
+  prev.onCheckOut === next.onCheckOut &&
+  prev.onUndoCheckOut === next.onUndoCheckOut &&
+  prev.tracksCheckOut === next.tracksCheckOut &&
   sameEntry(prev.entry, next.entry));

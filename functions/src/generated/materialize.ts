@@ -72,6 +72,8 @@ export interface OccurrenceSource {
   checkInClosesAt: Date;
   location: string | null;
   notes: string | null;
+  /** Carried onto every projected instance — see `lib/eventProjection.ts`. */
+  requiresCheckOut: boolean;
 }
 
 /**

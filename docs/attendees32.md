@@ -56,7 +56,7 @@ deploys cleanly.
 | `characterSlug` | `A32_CHARACTER_SLUG` | The character (role) new students join the meet as. |
 | `assemblySlug` | `A32_ASSEMBLY_SLUG` | The assembly history import lists meets for. |
 | `writeBack` | `A32_WRITE_BACK` | `off` / `create` / `full` — the same ladder as Planning Center. |
-| `minGrade`, `maxGrade` | `A32_MIN_GRADE` / `A32_MAX_GRADE` | The grade band; also where a student with no grade on file lands (with `gradeOnFile: false`, so screens say "No grade" rather than print the clamp). |
+| `minGrade`, `maxGrade` | `A32_MIN_GRADE` / `A32_MAX_GRADE` | The grade band a deployment reads. It decides membership and warns on a profile edit; it no longer rewrites anybody's grade — a student Attendees holds no grade for arrives with none, and screens say "No grade". Defaults stay 6–12 even though `Grade` now admits K–12. |
 | `cacheTtlSeconds` | `A32_CACHE_TTL_SECONDS` | Read-reuse window, 0–300 seconds. |
 | `enabled` | — | The document's off switch. Absent counts as on; being *configured* is the real gate. |
 
@@ -94,6 +94,13 @@ costs no extra requests.
   membership document; an Attendees re-create mints a new id, so the roster membership migrates to
   a new `a32_{uuid}` document and attendance moves with it (`backends/studentMigration.ts`).
 - **No lists.** `listsSupported: false`; the roster-from-a-list import is Planning Center only.
+- **A grade-less student is created, never matched.** Both backends now push a child with no grade
+  rather than refusing and leaving them queued for ever. Planning Center still runs its duplicate
+  check for them, guarded by `child`; Attendees skips the check entirely, because it has no such
+  flag — *holding a grade at all* is the closest fact it keeps, which is exactly the fact missing
+  here. Matching on name alone would file a three-year-old as the volunteer who shares their name,
+  in the church's permanent database, silently. A duplicate somebody can merge is the better
+  failure.
 - **History import is per meet.** `Import` on the Events screen lists the assembly's meets; one
   meet becomes one recurrence-less chain of Tally events (`a32-meet-{slug}`, one child per
   gathering day), every attendee who attended joins the roster, and rows with category *scheduled*

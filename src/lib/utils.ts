@@ -365,27 +365,54 @@ export function ordinalGrade(grade: number): string {
   return `${grade}${suffix}`;
 }
 
+/**
+ * The short token for a grade: `K`, `1st`, `9th`.
+ *
+ * Kindergarten is the one grade with a name rather than a number, and
+ * `ordinalGrade` would print "0th". Everything below kindergarten has no grade
+ * at all and never reaches here — see `Grade`.
+ */
+export function gradeName(grade: number): string {
+  return grade === 0 ? 'K' : ordinalGrade(grade);
+}
+
+/**
+ * The same thing with its noun, for the places that read "9th grade".
+ *
+ * Kindergarten needs the whole word: "K grade" is not English, and a screen
+ * reader saying it beside a child's name is worse.
+ */
+export function gradeDescription(grade: number): string {
+  return grade === 0 ? 'Kindergarten' : `${ordinalGrade(grade)} grade`;
+}
+
 /** What a grade slot says when there is no grade to put in it. */
 export const NO_GRADE = 'No grade';
 
 /**
  * The ordinal to print for somebody's grade, or null when nobody has one.
  *
- * `gradeOnFile: false` means the number in `grade` is not a grade: it is where
- * the sync's clamp landed for a person Planning Center holds neither a grade
- * nor a graduation year for. That is every adult on a hand-picked roster — the
- * leaders and volunteers a list-mode roster deliberately carries — and printing
- * the clamp turned each of them into a 6th grader on every screen that names a
- * grade — printed beside their name, where it reads as a fact about them.
+ * A null grade is every adult on a hand-picked roster — the leaders and
+ * volunteers a list-mode roster deliberately carries — and every child too
+ * young to have one. It used to be spelled as a number plus a `gradeOnFile`
+ * flag, and the flag was routinely wrong: the sync set it from whether the
+ * upstream value was *blank*, not whether it had been clamped, so a real 3rd
+ * grader was printed as a 6th grader as a fact about them.
  *
  * Callers with a slot to fill fall back to `NO_GRADE`; callers where the grade
  * is one clause of a longer line drop the clause instead, because "No grade ·"
  * spends the width that line needs on the thing it is least about.
  */
-export function gradeLabel(student: { grade: number; gradeOnFile?: boolean }): string | null {
-  // `undefined` is a Tally document, where the grade was typed by a human and
-  // is always real. Only an explicit `false` is the clamp's landing spot.
-  return student.gradeOnFile === false ? null : ordinalGrade(student.grade);
+export function gradeLabel(student: { grade: number | null }): string | null {
+  return student.grade === null ? null : gradeName(student.grade);
+}
+
+/**
+ * The same, with its noun — for aria labels and any line that reads "9th
+ * grade". Kindergarten becomes "Kindergarten" rather than "K grade".
+ */
+export function gradeSentence(student: { grade: number | null }): string | null {
+  return student.grade === null ? null : gradeDescription(student.grade);
 }
 
 /** Stable "AB" avatar initials. */

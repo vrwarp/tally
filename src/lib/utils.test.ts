@@ -10,7 +10,9 @@ import {
   createSearchMatcher,
   formatPhone,
   formatPhoneInput,
+  gradeDescription,
   gradeLabel,
+  gradeName,
   initials,
   matchesQuery,
   normalizeForSearch,
@@ -254,16 +256,35 @@ describe('ordinalGrade', () => {
   });
 });
 
-describe('gradeLabel', () => {
-  it('prints the grade Planning Center holds', () => {
-    expect(gradeLabel({ grade: 9, gradeOnFile: true })).toBe('9th');
+describe('gradeName and gradeDescription', () => {
+  it('names kindergarten rather than printing a zeroth grade', () => {
+    expect(gradeName(0)).toBe('K');
+    expect(gradeDescription(0)).toBe('Kindergarten');
   });
 
-  it('says nothing for a person Planning Center holds no grade for', () => {
-    // The bug: an adult volunteer on a hand-picked roster has no grade and no
-    // graduation year upstream, so the sync's clamp parks them on `minGrade`
-    // and every screen printed "6th grade" under their name.
-    expect(gradeLabel({ grade: 6, gradeOnFile: false })).toBeNull();
+  it('keeps the ordinal for every grade that has one', () => {
+    expect(gradeName(1)).toBe('1st');
+    expect(gradeName(9)).toBe('9th');
+    expect(gradeDescription(1)).toBe('1st grade');
+    expect(gradeDescription(12)).toBe('12th grade');
+  });
+});
+
+describe('gradeLabel', () => {
+  it('uses the short token, so a chip reads "K" and not "Kindergarten"', () => {
+    expect(gradeLabel({ grade: 0 })).toBe('K');
+  });
+
+  it('prints the grade a backend holds', () => {
+    expect(gradeLabel({ grade: 9 })).toBe('9th');
+  });
+
+  it('says nothing for somebody nobody holds a grade for', () => {
+    // The bug this fixed: an adult volunteer on a hand-picked roster has no
+    // grade and no graduation year upstream, so the sync's clamp parked them
+    // on `minGrade` and every screen printed "6th grade" under their name.
+    // There is no clamp to consult now — the grade is simply absent.
+    expect(gradeLabel({ grade: null })).toBeNull();
   });
 
   it('trusts a grade with no flag beside it', () => {

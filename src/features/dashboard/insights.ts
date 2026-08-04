@@ -860,6 +860,16 @@ export interface DashboardSummary {
   miaCount: number;
   newVisitorCount: number;
   incompleteCount: number;
+  /**
+   * How often a check-in on a check-out gathering ended with a recorded
+   * pickup, across the loaded window — or null when no gathering in it tracks
+   * check-out, which is most ministries.
+   *
+   * Null rather than zero on purpose: a tile reading 0% about a Friday
+   * fellowship that has never used the feature would be a number about
+   * nothing. The caller renders the tile only when there is one.
+   */
+  checkOutRate: number | null;
 }
 
 export function computeSummary(args: {
@@ -874,6 +884,20 @@ export function computeSummary(args: {
     for (const id of snapshot.presentStudentIds) unique.add(id);
   }
 
+  /*
+   * Counted across every gathering that asked for check-out, one-offs
+   * included: a retreat that hands children back is as much a part of this
+   * number as a Sunday nursery, and the question ("of the children we took in,
+   * how many did we record handing back?") is the same on both.
+   */
+  let tracked = 0;
+  let collected = 0;
+  for (const snapshot of args.snapshots) {
+    if (!snapshot.event.requiresCheckOut) continue;
+    tracked += snapshot.presentStudentIds.size;
+    collected += snapshot.checkedOutStudentIds.size;
+  }
+
   return {
     lastEventCount: history[0]?.presentStudentIds.size ?? 0,
     previousEventCount: history[1]?.presentStudentIds.size ?? 0,
@@ -881,5 +905,6 @@ export function computeSummary(args: {
     miaCount: args.mia.length,
     newVisitorCount: args.newVisitors.length,
     incompleteCount: args.incomplete.length,
+    checkOutRate: tracked === 0 ? null : Math.round((collected / tracked) * 100),
   };
 }

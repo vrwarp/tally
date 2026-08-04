@@ -10,9 +10,17 @@
  */
 import type { CheckInMethod, Student } from '@/types';
 
-/** The one thing the builders need from an SDK: its server-clock sentinel. */
+/**
+ * The SDK-specific ingredients the builders need.
+ *
+ * `deleteField` matters as much as the clock: undoing a check-out has to remove
+ * the key rather than null it, because a pending `serverTimestamp()` also reads
+ * back as null and "null" is what the roster reads as *still in the room*. See
+ * `toAttendance`.
+ */
 export interface PayloadClock {
   serverTimestamp(): unknown;
+  deleteField(): unknown;
 }
 
 /** The subset of a student the attendance writes need. */
@@ -22,7 +30,6 @@ export type CheckInStudent = Pick<
   | 'firstName'
   | 'lastName'
   | 'grade'
-  | 'gradeOnFile'
   | 'searchName'
   | 'firstAttendedAt'
   | 'lastAttendedAt'
@@ -63,6 +70,21 @@ export function attendancePayload(
 }
 
 /**
+ * A pickup: the two fields the check-out rule permits, and nothing else.
+ *
+ * Written as a merge or an update rather than a `set`, always — a whole-document
+ * `set` reads as "touches everything" to `touchesOnly` and the rule refuses it.
+ */
+export function checkOutPayload(clock: PayloadClock, uid: string): Record<string, unknown> {
+  return { checkedOutAt: clock.serverTimestamp(), checkedOutBy: uid };
+}
+
+/** Undoing one. Deletes the keys; see `PayloadClock`. */
+export function undoCheckOutPayload(clock: PayloadClock): Record<string, unknown> {
+  return { checkedOutAt: clock.deleteField(), checkedOutBy: clock.deleteField() };
+}
+
+/**
  * The patch a check-in makes to the student document, or `null` for nothing to do.
  *
  * `firstAttendedAt` is written once and never moved, so "New Visitors" stays
@@ -95,8 +117,8 @@ export function studentDatePatch(
     firstName: student.firstName,
     lastName: student.lastName,
     /*
-     * Left out for somebody Planning Center holds no grade for, where `grade`
-     * is where the sync's clamp landed rather than a fact — see `gradeOnFile`.
+     * Left out for somebody nobody holds a grade for — a nursery child, or an
+     * adult on a hand-picked roster.
      *
      * This is the write that reaches most people: a tap at a door is how the
      * majority of these documents come into existence at all. Stamping the
@@ -104,7 +126,7 @@ export function studentDatePatch(
      * every adult a leader ever checked in, in the one place that outlives the
      * roster row it was copied from.
      */
-    ...(student.gradeOnFile === false ? {} : { grade: student.grade }),
+    ...(student.grade === null ? {} : { grade: student.grade }),
     searchName: student.searchName,
     updatedAt: clock.serverTimestamp(),
     updatedBy: uid,

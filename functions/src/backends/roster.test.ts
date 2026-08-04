@@ -22,7 +22,6 @@ function person(overrides: Partial<RosterPerson> & { id: string; searchName: str
     profileComplete: null,
     hasAllergies: false,
     birthday: null,
-    gradeOnFile: true,
     ...overrides,
   };
 }

@@ -50,7 +50,20 @@ import type {
  *
  * Undoing that tap must not take the row away either — see `pinned`.
  */
-export type RosterFocus = 'all' | 'recent' | 'participated' | 'checkedIn';
+export type RosterFocus =
+  | 'all'
+  | 'recent'
+  | 'participated'
+  | 'checkedIn'
+  /**
+   * Checked in and not yet collected — the live room count, and the only
+   * number a nursery volunteer is actually working from. Both of these are
+   * stood down to `all` on an event that does not track check-out, so a
+   * leftover value cannot strand somebody on a filter whose chip is not on
+   * screen.
+   */
+  | 'inRoom'
+  | 'checkedOut';
 
 /**
  * What "has participated" is being measured against, for the screen that has to
@@ -93,10 +106,25 @@ export interface RosterView {
   focus: RosterFocus;
   /** True when a search query is narrowing the list. */
   isFiltered: boolean;
+  /**
+   * The grades anybody eligible tonight is in, ascending.
+   *
+   * Collected before the search filter and before the grade filter itself, so
+   * narrowing to one grade does not collapse the list of grades on offer.
+   */
+  gradesPresent: readonly Grade[];
   /** What `counts.participated` counted, so the screen can say which it means. */
   participationSource: ParticipationSource;
   counts: {
+    /**
+     * Checked in. This is attendance, and check-out does not touch it: a
+     * missed pickup must never reduce a head count.
+     */
     present: number;
+    /** Checked in and not collected. `inRoom + checkedOut === present`. */
+    inRoom: number;
+    /** Checked in and collected. */
+    checkedOut: number;
     /** Students eligible for this event, before search filtering. */
     eligible: number;
     /** Eligible students not yet checked in. */
@@ -381,12 +409,24 @@ const EMPTY_PINNED: ReadonlySet<string> = new Set();
  *
  * `participated` is also stood down when it would not narrow anything. A filter
  * that selects the entire roster is a chip that lies about what it is doing.
+ *
+ * The two check-out focuses go the same way on a gathering that does not track
+ * it. Their chips are not on screen there, so a value left over from the last
+ * roster a counselor had open would be a filter with no way to turn it off.
  */
 function resolveFocus(
   requested: RosterFocus,
-  context: { isFiltered: boolean; recent: number; participated: number; eligible: number },
+  context: {
+    isFiltered: boolean;
+    recent: number;
+    participated: number;
+    eligible: number;
+    tracksCheckOut: boolean;
+  },
 ): RosterFocus {
   let wanted = requested;
+
+  if ((wanted === 'inRoom' || wanted === 'checkedOut') && !context.tracksCheckOut) return 'all';
 
   if (wanted === 'recent') {
     if (!context.isFiltered && context.recent > 0) return 'recent';
@@ -432,7 +472,11 @@ export function buildRoster(input: BuildRosterInput): RosterView {
   // Counted before the search filter: the header must keep reading "12 of 34"
   // while a counselor types, not "1 of 34".
   let eligible = 0;
+  // Which grades are actually represented tonight, so the grade filter can
+  // offer those and not all thirteen `Grade` admits.
+  const gradesSeen = new Set<Grade>();
   let presentTotal = 0;
+  let checkedOutTotal = 0;
   let recentTotal = 0;
   let participatedTotal = 0;
 
@@ -444,13 +488,17 @@ export function buildRoster(input: BuildRosterInput): RosterView {
 
     if (!isEligible(student, event, rsvp, record !== null || isPinned)) continue;
 
+    // Which grades tonight's roster covers, collected *before* the grade
+    // filter narrows it — otherwise picking 6th would leave the dropdown
+    // offering 6th alone, with no way back to the others.
+    if (student.grade !== null) gradesSeen.add(student.grade);
+
     // Scope filters narrow *who is on this counselor's roster*; they apply
     // before search so the counts below describe the slice being taken, not
     // the whole ministry.
-    // A person Planning Center holds no grade for is in no grade, not in the
-    // one the sync's clamp landed on — narrowing to 6th must not hand a
-    // counselor the adults on the roster.
-    if (grades.length > 0 && (student.gradeOnFile === false || !grades.includes(student.grade))) {
+    // Somebody with no grade is in no grade — narrowing to 6th must not hand
+    // a counselor the adult volunteers, or the nursery.
+    if (grades.length > 0 && (student.grade === null || !grades.includes(student.grade))) {
       continue;
     }
     if (filters.incompleteOnly && student.profileComplete !== false) continue;
@@ -479,6 +527,7 @@ export function buildRoster(input: BuildRosterInput): RosterView {
 
     eligible += 1;
     if (record) presentTotal += 1;
+    if (record?.checkedOutAt) checkedOutTotal += 1;
     if (isRecent) recentTotal += 1;
     if (hasParticipated) participatedTotal += 1;
 
@@ -501,12 +550,15 @@ export function buildRoster(input: BuildRosterInput): RosterView {
     recent: recentTotal,
     participated: participatedTotal,
     eligible,
+    tracksCheckOut: event.requiresCheckOut,
   });
 
   const entries = matched.filter((entry) => {
     // `checkedIn` is a statement about right now and stays literal: a pinned
     // student who has just been undone is precisely somebody who is *not* here.
     if (focus === 'checkedIn') return entry.attendance !== null;
+    if (focus === 'inRoom') return entry.attendance !== null && entry.attendance.checkedOutAt === null;
+    if (focus === 'checkedOut') return entry.attendance?.checkedOutAt != null;
     if (focus === 'recent')
       return entry.isRecent || entry.attendance !== null || pinned.has(entry.student.id);
     if (focus === 'participated')
@@ -536,9 +588,12 @@ export function buildRoster(input: BuildRosterInput): RosterView {
     entries,
     focus,
     isFiltered,
+    gradesPresent: [...gradesSeen].sort((a, b) => a - b),
     participationSource: source,
     counts: {
       present: presentTotal,
+      inRoom: presentTotal - checkedOutTotal,
+      checkedOut: checkedOutTotal,
       eligible,
       absent: Math.max(0, eligible - presentTotal),
       historyWindow,

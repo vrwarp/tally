@@ -125,7 +125,7 @@ describe('useProfileHistory, when the registry has not examined a night', () => 
       ]),
     );
     const december = night('december', '2025-12-12');
-    fetchAttendanceByEvent.mockResolvedValue(new Map([['december', new Set(['bo'])]]));
+    fetchAttendanceByEvent.mockResolvedValue(new Map([['december', { present: new Set(['bo']), checkedOut: new Set() }]]));
 
     const { result } = renderHook(() =>
       useProfileHistory(STUDENT, [CAME, december], WINDOW_START),
@@ -139,8 +139,8 @@ describe('useProfileHistory, when the registry has not examined a night', () => 
     fetchSkippedNights.mockResolvedValue(new Map());
     fetchAttendanceByEvent.mockResolvedValue(
       new Map([
-        ['came', new Set(['ada'])],
-        ['nobody', new Set()],
+        ['came', { present: new Set(['ada']), checkedOut: new Set() }],
+        ['nobody', { present: new Set(), checkedOut: new Set() }],
       ]),
     );
 
@@ -159,7 +159,7 @@ describe('useProfileHistory, when the registry has not examined a night', () => 
 
   it('does not let a failed write break a page whose numbers are right', async () => {
     fetchSkippedNights.mockResolvedValue(new Map());
-    fetchAttendanceByEvent.mockResolvedValue(new Map([['came', new Set(['ada'])]]));
+    fetchAttendanceByEvent.mockResolvedValue(new Map([['came', { present: new Set(['ada']), checkedOut: new Set() }]]));
     recordExamination.mockRejectedValueOnce(new Error('offline'));
 
     const { result } = renderHook(() => useProfileHistory(STUDENT, [CAME], WINDOW_START));
@@ -181,7 +181,7 @@ describe('useProfileHistory, on a one-off', () => {
       seriesId: null,
       startAt: new Date('2026-01-30T19:00:00'),
     });
-    fetchAttendanceByEvent.mockResolvedValue(new Map([['retreat', new Set(['ada'])]]));
+    fetchAttendanceByEvent.mockResolvedValue(new Map([['retreat', { present: new Set(['ada']), checkedOut: new Set() }]]));
 
     const { result } = renderHook(() => useProfileHistory(STUDENT, [retreat], WINDOW_START));
 

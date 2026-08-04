@@ -5,17 +5,26 @@
  * the kiosk's whole point, and the worst a mis-tap can do is mark somebody
  * present who then walks in anyway. Undo lives with the staff in the main app,
  * deliberately not here.
+ *
+ * A pickup holds for three seconds instead, and that is not ceremony. Marking
+ * a child collected is a claim that somebody took them out of the building,
+ * made on an unattended screen in a lobby — and unlike a stray check-in it is
+ * not self-correcting when the child walks in anyway. Undoing one needs a
+ * volunteer and the main app, so the gesture is worth a deliberate second.
  */
+import { gradeDescription } from '@/lib/utils';
+import { HoldButton } from '../components/HoldButton';
+import type { KioskIntent } from '../KioskApp';
 import type { KioskStudent } from '../search';
 
 export function ConfirmScreen({
   student,
-  alreadyPresent,
+  intent,
   onConfirm,
   onBack,
 }: {
   student: KioskStudent;
-  alreadyPresent: boolean;
+  intent: KioskIntent;
   onConfirm: () => void;
   onBack: () => void;
 }) {
@@ -26,12 +35,19 @@ export function ConfirmScreen({
           {student.firstName} {student.lastName}
         </div>
         {student.grade !== null && (
-          <div className="pt-3 text-2xl text-ink-400">{student.grade}th grade</div>
+          <div className="pt-3 text-2xl text-ink-400">{gradeDescription(student.grade)}</div>
         )}
       </div>
 
-      {alreadyPresent ? (
+      {intent === 'done' ? (
         <div className="text-2xl font-semibold text-present-400">✓ Already checked in</div>
+      ) : intent === 'check-out' ? (
+        <HoldButton
+          onHeld={onConfirm}
+          className="w-full max-w-md rounded-2xl bg-brand-600 p-7 text-3xl font-bold text-white"
+        >
+          Hold to collect
+        </HoldButton>
       ) : (
         <button
           type="button"

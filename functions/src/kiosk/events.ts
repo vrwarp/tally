@@ -33,6 +33,15 @@ export interface KioskEventEntry {
   checkInClosesAt: number;
   seriesId: string | null;
   location: string | null;
+  /**
+   * Whether this gathering hands children back.
+   *
+   * The one per-event flag the kiosk is told about. It never reads an event
+   * document — everything it knows arrives on this row and is persisted into
+   * the binding — so a behaviour flag has to be carried here or the lobby
+   * screen cannot honour it.
+   */
+  requiresCheckOut: boolean;
 }
 
 export const DEFAULT_KIOSK_EVENT_DAYS = 7;
@@ -54,7 +63,13 @@ function entryFromSource(source: OccurrenceSource): KioskEventEntry {
     checkInClosesAt: source.checkInClosesAt.getTime(),
     seriesId: source.seriesId,
     location: source.location,
+    requiresCheckOut: source.requiresCheckOut,
   };
+}
+
+/** Mirrors `bindingIsLive` in src/kiosk/binding.ts — keep the two together. */
+function offeredUntil(endAt: Date, checkInClosesAt: Date): number {
+  return Math.max(endAt.getTime(), checkInClosesAt.getTime());
 }
 
 /**
@@ -64,6 +79,12 @@ function entryFromSource(source: OccurrenceSource): KioskEventEntry {
  * "Between now and the horizon" keeps a gathering that is already running:
  * anything whose end is still ahead is offered, because the kiosk being set up
  * at 19:10 for the 19:00 Friday is the ordinary case, not the edge.
+ *
+ * It also keeps one that has *finished* but whose check-in window has not, for
+ * the same span `bindingIsLive` uses. Without it a kiosk that reboots during
+ * pickup could not get back to the gathering it was collecting for: it would
+ * sit at an empty chooser while a queue formed in the lobby. The chooser
+ * labels these rather than letting them look upcoming.
  */
 export async function listKioskEvents(
   db: FirestoreLike,
@@ -91,7 +112,7 @@ export async function listKioskEvents(
 
   for (const source of sources) {
     if (source.status === 'cancelled') continue;
-    if (source.endAt.getTime() <= now.getTime()) continue;
+    if (offeredUntil(source.endAt, source.checkInClosesAt) <= now.getTime()) continue;
     if (source.startAt.getTime() > horizon.getTime()) continue;
     entries.push(entryFromSource(source));
   }
@@ -101,7 +122,7 @@ export async function listKioskEvents(
   // the filtered list above. It only ever returns occurrences no document
   // covers, so the two sets cannot overlap.
   for (const occurrence of projectOccurrences(sources, now, { horizonDays: days })) {
-    if (occurrence.endAt.getTime() <= now.getTime()) continue;
+    if (offeredUntil(occurrence.endAt, occurrence.checkInClosesAt) <= now.getTime()) continue;
     entries.push({
       chain: chainKey(occurrence.source),
       id: null,
@@ -112,6 +133,7 @@ export async function listKioskEvents(
       checkInClosesAt: occurrence.checkInClosesAt.getTime(),
       seriesId: occurrence.source.seriesId,
       location: occurrence.source.location,
+      requiresCheckOut: occurrence.source.requiresCheckOut,
     });
   }
 

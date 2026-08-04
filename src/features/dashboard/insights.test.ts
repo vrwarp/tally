@@ -1793,3 +1793,54 @@ describe('computeOneOffOnly', () => {
     expect(studentIds(rows)).toEqual([late.id, early.id]);
   });
 });
+
+/* -------------------------------------------------------------------------- */
+/* Check-out and the metrics                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The rule the whole feature rests on: a missed check-out is not a miss.
+ *
+ * `presentStudentIds` still means everybody who was checked in, so a nursery
+ * where half the parents walked off without telling anybody reads exactly like
+ * one where they all signed out. Nothing about attendance moves.
+ */
+describe('check-out never touches attendance', () => {
+  const events = makeWeeklyEvents({ count: 4, seriesId: FRIDAY, requiresCheckOut: true });
+  const settings = makeSettings();
+
+  /** Everybody there; `collected` were handed back, the rest never were. */
+  const night = (event: TallyEvent, present: string[], collected: string[] = []) =>
+    makeSnapshot(event, present, present.length > 0, collected);
+
+  it('still reads a gathering as held when nobody was checked out', () => {
+    const snapshots = [night(events[0]!, ['ada', 'bo'])];
+    expect(snapshots[0]!.held).toBe(true);
+    expect(computeSummary({ snapshots, mia: [], newVisitors: [], incomplete: [] }).lastEventCount)
+      .toBe(2);
+  });
+
+  it('does not turn a student with no pickup into a miss', () => {
+    const student = makeStudent({ id: 'ada', createdAt: LONG_AGO });
+    // Present every night, collected on none of them.
+    const snapshots = events.map((event) => night(event, [student.id]));
+
+    expect(computeMia([student], snapshots, settings)).toEqual([]);
+  });
+
+  it('reports the share of check-ins that ended in a recorded pickup', () => {
+    const snapshots = [night(events[0]!, ['ada', 'bo'], ['ada']), night(events[1]!, ['ada'], ['ada'])];
+
+    expect(computeSummary({ snapshots, mia: [], newVisitors: [], incomplete: [] }).checkOutRate)
+      .toBe(67);
+  });
+
+  /** A tile reading 0% about a gathering that never used the feature. */
+  it('says nothing at all when no gathering tracks check-out', () => {
+    const ordinary = makeWeeklyEvents({ count: 1, seriesId: FRIDAY });
+    const snapshots = [makeSnapshot(ordinary[0]!, ['ada'])];
+
+    expect(computeSummary({ snapshots, mia: [], newVisitors: [], incomplete: [] }).checkOutRate)
+      .toBeNull();
+  });
+});

@@ -80,6 +80,21 @@ describe('projectEvents', () => {
     expect(next?.requiresRsvp).toBe(false);
   });
 
+  /**
+   * The mirror image of `requiresRsvp`, and the failure would be silent and
+   * total: a nursery repeats every Sunday, and its projected occurrences are
+   * the ones volunteers actually open. Forcing the flag false the way
+   * `requiresRsvp` is forced would render every un-materialised Sunday as an
+   * ordinary roster with no way to hand a child back.
+   */
+  it('inherits check-out, unlike RSVP', () => {
+    const nursery = projectEvents([friday({ requiresCheckOut: true })], FRIDAY);
+    expect(nursery.find((event) => !event.materialized)?.requiresCheckOut).toBe(true);
+
+    const ordinary = projectEvents([friday()], FRIDAY);
+    expect(ordinary.find((event) => !event.materialized)?.requiresCheckOut).toBe(false);
+  });
+
   it('inherits the bookkeeping fields rather than inventing them', () => {
     // `updatedAt` is load-bearing: the editor keys its form reset on it, and a
     // value that moved every render would reset the form under a leader.

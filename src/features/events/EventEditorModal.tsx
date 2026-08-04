@@ -78,6 +78,7 @@ interface EditorForm {
   location: string;
   notes: string;
   requiresRsvp: boolean;
+  requiresCheckOut: boolean;
   /**
    * A window left at the standard hour follows the event when its times move;
    * one somebody hand-tuned is pinned and never rewritten underneath them.
@@ -146,6 +147,7 @@ function buildForm(
     location: event?.location ?? defaults?.location ?? '',
     notes: event?.notes ?? defaults?.notes ?? '',
     requiresRsvp: event?.requiresRsvp ?? defaults?.requiresRsvp ?? mode === 'oneoff',
+    requiresCheckOut: event?.requiresCheckOut ?? defaults?.requiresCheckOut ?? false,
     opensPinned:
       Math.round((startAt.getTime() - opensAt.getTime()) / 60_000) !== OPENS_BEFORE_MIN,
     closesPinned:
@@ -371,6 +373,7 @@ export function EventEditorModal({
       location: form.location.trim() || null,
       notes: form.notes.trim() || null,
       requiresRsvp: form.mode === 'oneoff' && form.requiresRsvp,
+      requiresCheckOut: form.requiresCheckOut,
       // `buildEventPayload` writes `status` on every save, so an edit has to
       // carry the current one forward or it would quietly un-cancel the event.
       status: event?.status ?? 'scheduled',
@@ -645,6 +648,16 @@ export function EventEditorModal({
               />
             </>
           ) : null}
+
+          {/* Outside the one-off block, and deliberately not reset by a mode
+              change: a room children are collected from is most often the one
+              that repeats every Sunday. */}
+          <CheckboxField
+            label="Track check-out"
+            hint="Volunteers record when each child is collected, and the roster shows a live room count."
+            checked={form.requiresCheckOut}
+            onChange={(changed) => patch({ requiresCheckOut: changed.target.checked })}
+          />
 
           <TextField
             label="Location"

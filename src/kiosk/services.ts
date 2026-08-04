@@ -29,8 +29,10 @@ import {
   getDocs,
   getFirestore,
   query,
+  deleteField,
   serverTimestamp,
   where,
+  updateDoc,
   writeBatch,
   type Firestore,
 } from 'firebase/firestore/lite';
@@ -39,6 +41,7 @@ import { missingKeys, parseFirebaseConfig } from '@/lib/firebaseConfig';
 import { paths } from '@/lib/paths';
 import {
   attendancePayload,
+  checkOutPayload,
   isFirstEver,
   studentDatePatch,
   type CheckInStudent,
@@ -120,6 +123,7 @@ export interface KioskEventEntry {
   checkInClosesAt: number;
   seriesId: string | null;
   location: string | null;
+  requiresCheckOut: boolean;
 }
 
 const startKioskPairing = httpsCallable<void, { code: string; secret: string; expiresInSeconds: number }>(
@@ -203,6 +207,7 @@ export async function bindEntry(entry: KioskEventEntry): Promise<KioskBinding> {
     startAtMs: entry.startAt,
     endAtMs: entry.endAt,
     checkInClosesAtMs: entry.checkInClosesAt,
+    requiresCheckOut: entry.requiresCheckOut,
     boundAtMs: Date.now(),
   };
 }
@@ -225,7 +230,7 @@ function rosterFromResponse(people: PcoRosterPerson[]): KioskStudent[] {
       id: person.id,
       firstName: person.firstName,
       lastName: person.lastName,
-      grade: person.gradeOnFile === false ? null : person.grade,
+      grade: person.grade,
       searchName: person.searchName,
     }));
 }
@@ -352,20 +357,40 @@ export async function loadPhoneIndex(
 /* Attendance                                                                  */
 /* -------------------------------------------------------------------------- */
 
-/** Who is already checked in — one explicit read, no listener. */
-export async function fetchPresentIds(eventId: string): Promise<Set<string>> {
+/**
+ * Who is already checked in, and who has been collected — one explicit read,
+ * no listener.
+ *
+ * The register used to be reduced to its ids on the way past. A pickup screen
+ * needs to tell "here" from "gone", which is the same read of the same
+ * documents at the same cost: only the discarding changes.
+ */
+export interface KioskAttendance {
+  present: Set<string>;
+  checkedOut: Set<string>;
+}
+
+export async function fetchAttendance(eventId: string): Promise<KioskAttendance> {
   const snapshot = await getDocs(collection(db, paths.attendanceCollection(eventId)));
-  return new Set(snapshot.docs.map((docSnapshot) => docSnapshot.id));
+  return {
+    present: new Set(snapshot.docs.map((docSnapshot) => docSnapshot.id)),
+    checkedOut: new Set(
+      snapshot.docs
+        .filter((docSnapshot) => docSnapshot.get('checkedOutAt') != null)
+        .map((docSnapshot) => docSnapshot.id),
+    ),
+  };
 }
 
 /* -------------------------------------------------------------------------- */
 /* Check-in                                                                    */
 /* -------------------------------------------------------------------------- */
 
-const CLOCK = { serverTimestamp };
+const CLOCK = { serverTimestamp, deleteField };
 const MAX_QUEUED = 50;
 
 interface PendingCheckIn {
+  kind?: 'check-in';
   eventId: string;
   seriesId: string | null;
   startAtMs: number;
@@ -374,6 +399,24 @@ interface PendingCheckIn {
   uid: string;
   queuedAtMs: number;
 }
+
+/**
+ * A pickup the network dropped. Far smaller than a check-in because it patches
+ * a document that already exists — there is no student to describe.
+ *
+ * `kind` is optional on the check-in above so a queue written before pickup
+ * existed still reads: an entry with no discriminator is a check-in, which is
+ * all it could have been.
+ */
+interface PendingCheckOut {
+  kind: 'check-out';
+  eventId: string;
+  studentId: string;
+  uid: string;
+  queuedAtMs: number;
+}
+
+type PendingWrite = PendingCheckIn | PendingCheckOut;
 
 function toDateOrNull(value: unknown): Date | null {
   if (value && typeof (value as { toDate?: unknown }).toDate === 'function') {
@@ -404,10 +447,9 @@ export async function performCheckIn(args: {
     id: student.id,
     firstName: student.firstName,
     lastName: student.lastName,
-    // A null grade is "nobody holds one": mark it not-on-file so the patch
-    // omits it, exactly as the main app does for the same student.
-    grade: (student.grade ?? 6) as Grade,
-    gradeOnFile: student.grade === null ? false : undefined,
+    // Straight through. `KioskStudent.grade` has always been nullable; it was
+    // the domain model underneath that could not hold the answer.
+    grade: student.grade as Grade | null,
     searchName: student.searchName,
     firstAttendedAt: dates.firstAttendedAt,
     lastAttendedAt: dates.lastAttendedAt,
@@ -430,6 +472,30 @@ export async function performCheckIn(args: {
   if (patch) batch.set(doc(db, paths.student(student.id)), patch, { merge: true });
 
   await batch.commit();
+}
+
+/**
+ * Records a pickup from the lobby.
+ *
+ * `updateDoc`, emphatically not the `writeBatch.set` that `performCheckIn`
+ * uses: a whole-document set reads as "touches every key" to the rules'
+ * `touchesOnly`, so the check-out rule would refuse it. It also means a pickup
+ * for a child nobody checked in fails rather than inventing a record.
+ *
+ * No undo counterpart, deliberately. The kiosk has never offered one for
+ * check-in either — a bystander clearing a collection somebody witnessed is
+ * not a self-serve action — and the rules enforce that rather than trusting
+ * this file to keep the promise.
+ */
+export async function performCheckOut(args: {
+  eventId: string;
+  studentId: string;
+  uid: string;
+}): Promise<void> {
+  await updateDoc(
+    doc(db, paths.attendance(args.eventId, args.studentId)),
+    checkOutPayload(CLOCK, args.uid),
+  );
 }
 
 const dateCache = new Map<string, Promise<{ firstAttendedAt: Date | null; lastAttendedAt: Date | null }>>();
@@ -476,9 +542,33 @@ export function forgetStudentDates(studentId: string): void {
  * seconds, and a serverTimestamp sentinel cannot be serialized anyway.
  */
 
-function readQueue(): PendingCheckIn[] {
-  const stored = readJson<PendingCheckIn[]>(KIOSK_KEYS.pending);
+function readQueue(): PendingWrite[] {
+  const stored = readJson<PendingWrite[]>(KIOSK_KEYS.pending);
   return Array.isArray(stored) ? stored : [];
+}
+
+/** A pickup the network dropped. Same convergence argument as a check-in. */
+export function enqueueCheckOut(args: {
+  binding: Pick<KioskBinding, 'eventId'>;
+  student: { id: string };
+  uid: string;
+}): void {
+  const queue = readQueue().filter(
+    (entry) =>
+      !(
+        entry.kind === 'check-out' &&
+        entry.eventId === args.binding.eventId &&
+        entry.studentId === args.student.id
+      ),
+  );
+  queue.push({
+    kind: 'check-out',
+    eventId: args.binding.eventId,
+    studentId: args.student.id,
+    uid: args.uid,
+    queuedAtMs: Date.now(),
+  });
+  writeJson(KIOSK_KEYS.pending, queue.slice(-MAX_QUEUED));
 }
 
 export function enqueueCheckIn(args: {
@@ -511,18 +601,23 @@ export async function replayQueue(): Promise<number> {
   const queue = readQueue();
   if (queue.length === 0) return 0;
 
-  const stuck: PendingCheckIn[] = [];
+  const stuck: PendingWrite[] = [];
   for (const entry of queue) {
     try {
-      await performCheckIn({
-        binding: { eventId: entry.eventId, seriesId: entry.seriesId, startAtMs: entry.startAtMs },
-        student: { id: entry.studentId, ...entry.student },
-        uid: entry.uid,
-      });
+      if (entry.kind === 'check-out') {
+        await performCheckOut({ eventId: entry.eventId, studentId: entry.studentId, uid: entry.uid });
+      } else {
+        await performCheckIn({
+          binding: { eventId: entry.eventId, seriesId: entry.seriesId, startAtMs: entry.startAtMs },
+          student: { id: entry.studentId, ...entry.student },
+          uid: entry.uid,
+        });
+      }
     } catch (error) {
       // permission-denied is not "try later", it is "this write will never be
-      // accepted" — the student is frozen, or already present and the kiosk
-      // may only create. Either way retrying forever helps nobody.
+      // accepted" — the student is frozen, the kiosk may only create a
+      // check-in, or a pickup is already recorded and only staff may move one.
+      // Either way retrying forever helps nobody.
       if ((error as { code?: string }).code?.includes('permission-denied')) continue;
       stuck.push(entry);
     }

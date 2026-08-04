@@ -232,7 +232,9 @@ describe('the history', () => {
       hasMore: false,
     });
     fetchAttendanceByEvent.mockResolvedValue(
-      new Map([['last-friday', new Set(['a', 'b', 'c', 'd'])]]),
+      new Map([
+        ['last-friday', { present: new Set(['a', 'b', 'c', 'd']), checkedOut: new Set() }],
+      ]),
     );
 
     show([]);
@@ -250,7 +252,7 @@ describe('the history', () => {
       cursor: null,
       hasMore: false,
     });
-    fetchAttendanceByEvent.mockResolvedValue(new Map([['snowed-off', new Set()]]));
+    fetchAttendanceByEvent.mockResolvedValue(new Map([['snowed-off', { present: new Set(), checkedOut: new Set() }]]));
 
     show([]);
 

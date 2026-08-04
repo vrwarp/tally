@@ -65,7 +65,7 @@ export function seedDefaultOrganization(store: A32SimulatorStore): void {
     actualBirthday: '2010-06-21',
   });
 
-  // No grade on file: lands on the band floor with gradeOnFile false.
+  // No grade on file: the roster row reports null rather than a band floor.
   const salote = store.seedStudent({
     firstName: 'Salote',
     lastName: 'Fifita',

@@ -16,6 +16,7 @@ function night(iso: string, present: boolean): EventAttendanceSnapshot {
   return {
     event: makeEvent({ id: `night-${iso}`, startAt, endAt: new Date(startAt.getTime() + 7_200_000) }),
     presentStudentIds: new Set(present ? [STUDENT_ID] : []),
+    checkedOutStudentIds: new Set<string>(),
     held: true,
   };
 }

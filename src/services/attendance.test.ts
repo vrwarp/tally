@@ -19,13 +19,23 @@
  * that batch has to satisfy are checked.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { checkIn, fetchAttendanceByEvent, swapCheckIn } from '@/services/attendance';
+import {
+  checkIn,
+  checkOut,
+  fetchAttendanceByEvent,
+  quickAddAndCheckIn,
+  swapCheckIn,
+  undoCheckOut,
+} from '@/services/attendance';
 import { makeAttendance, makeEvent, makeStudent } from '../../tests/factories';
 
 const set = vi.hoisted(() => vi.fn());
 const remove = vi.hoisted(() => vi.fn());
 const commit = vi.hoisted(() => vi.fn(async () => {}));
 const getDocs = vi.hoisted(() => vi.fn());
+const updateDoc = vi.hoisted(() =>
+  vi.fn(async (_ref: { path: string }, _payload: Record<string, unknown>) => {}),
+);
 
 vi.mock('@/lib/firebase', () => ({ db: {} }));
 vi.mock('firebase/firestore', () => ({
@@ -36,6 +46,8 @@ vi.mock('firebase/firestore', () => ({
   // which event each in-flight query is for.
   collection: (_db: unknown, path: string) => ({ path }),
   getDocs,
+  deleteField: () => 'deleted',
+  updateDoc,
   // Imported by the module but not reached by anything here.
   deleteDoc: vi.fn(),
   onSnapshot: vi.fn(),
@@ -87,8 +99,7 @@ describe('checkIn', () => {
         id: 'pco_41',
         firstName: 'Alan',
         lastName: 'Wan',
-        grade: 6,
-        gradeOnFile: false,
+        grade: null,
       }),
     );
 
@@ -182,6 +193,95 @@ describe('swapCheckIn', () => {
     expect(commit).not.toHaveBeenCalled();
     expect(remove).not.toHaveBeenCalled();
   });
+
+  /**
+   * The arrival moment travels; the pickup does not.
+   *
+   * A check-out recorded against the wrong child is a statement about a parent
+   * who collected somebody else's kid — there is nothing in it worth keeping.
+   * The corrected record starts present, and if the right child has already
+   * gone home somebody checks them out again.
+   */
+  it('does not carry a check-out across to the corrected student', async () => {
+    // `from` is a `Pick` that does not include the check-out fields at all, so
+    // the type already makes this impossible to get wrong by accident. The
+    // claim worth pinning is about the document that lands: the corrected
+    // record starts present, whatever the mistaken one had against it.
+    await swapCheckIn({ event: EVENT, from: RECORD, to: RIGHT, uid: 'counselor-2' });
+
+    const [, payload] = set.mock.calls[0]!;
+    expect(payload).not.toHaveProperty('checkedOutAt');
+    expect(payload).not.toHaveProperty('checkedOutBy');
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* quickAddAndCheckIn                                                          */
+/* -------------------------------------------------------------------------- */
+
+describe('quickAddAndCheckIn', () => {
+  const draft = { firstName: 'Nia', lastName: 'Fontaine', grade: 9 as const };
+
+  it('writes the grade a counselor typed', async () => {
+    await quickAddAndCheckIn({ draft, event: EVENT, uid: 'counselor-1' });
+
+    const [, payload] = set.mock.calls[0]!;
+    expect(payload).toMatchObject({ grade: 9 });
+  });
+
+  /**
+   * A nursery child has no grade to type, and the document has to say so by
+   * omission — a zero would be a claim about a real child that nobody made,
+   * and it is the church's database that ends up keeping it.
+   */
+  it('omits the field entirely for a child with no grade', async () => {
+    await quickAddAndCheckIn({
+      draft: { ...draft, grade: null },
+      event: EVENT,
+      uid: 'counselor-1',
+    });
+
+    const [, payload] = set.mock.calls[0]!;
+    expect(payload).not.toHaveProperty('grade');
+    // Still a real student in every other respect, and still queued for a push.
+    expect(payload).toMatchObject({ firstName: 'Nia', pcoPushPending: true });
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* checkOut                                                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Two fields, and an update rather than a set.
+ *
+ * `updateDoc` matters twice over: a whole-document `set` reads as "touches
+ * every key" to the rules' `touchesOnly` and would be refused outright, and a
+ * pickup for a child nobody checked in should fail rather than invent a
+ * half-record for them.
+ */
+describe('checkOut', () => {
+  beforeEach(() => updateDoc.mockClear());
+
+  it('writes the moment and who recorded it, and nothing else', async () => {
+    await checkOut('event-1', 'student-1', 'counselor-2');
+
+    const [ref, payload] = updateDoc.mock.calls[0]!;
+    expect(ref).toEqual({ path: 'events/event-1/attendance/student-1' });
+    expect(payload).toEqual({ checkedOutAt: 'server-timestamp', checkedOutBy: 'counselor-2' });
+  });
+
+  /**
+   * The undo deletes the keys rather than nulling them, and that asymmetry is
+   * load-bearing: a pending `serverTimestamp()` reads back as null locally, and
+   * null is exactly the state that means "still in the room".
+   */
+  it('undoes by deleting both fields, never by writing null', async () => {
+    await undoCheckOut('event-1', 'student-1');
+
+    const [, payload] = updateDoc.mock.calls[0]!;
+    expect(payload).toEqual({ checkedOutAt: 'deleted', checkedOutBy: 'deleted' });
+  });
 });
 
 /* -------------------------------------------------------------------------- */
@@ -209,7 +309,7 @@ describe('fetchAttendanceByEvent', () => {
   it('reads every event exactly once, however many are asked for', async () => {
     const ids = Array.from({ length: 200 }, (_, index) => `night-${index}`);
     getDocs.mockImplementation(async (ref: { path: string }) => ({
-      docs: [{ id: `student-for-${eventOf(ref.path)}` }],
+      docs: [{ id: `student-for-${eventOf(ref.path)}`, get: () => null }],
     }));
 
     const result = await fetchAttendanceByEvent(ids);
@@ -219,7 +319,7 @@ describe('fetchAttendanceByEvent', () => {
     // Not just the right count — the right people against the right night. A
     // pool that raced two workers onto one index would show up here.
     for (const id of ids) {
-      expect(result.get(id)).toEqual(new Set([`student-for-${id}`]));
+      expect(result.get(id)?.present).toEqual(new Set([`student-for-${id}`]));
     }
   });
 
@@ -234,7 +334,7 @@ describe('fetchAttendanceByEvent', () => {
       return new Promise((resolve) => {
         release.push(() => {
           inFlight -= 1;
-          resolve({ docs: [{ id: `student-for-${eventOf(ref.path)}` }] });
+          resolve({ docs: [{ id: `student-for-${eventOf(ref.path)}`, get: () => null }] });
         });
       });
     });

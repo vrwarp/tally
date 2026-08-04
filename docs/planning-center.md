@@ -180,18 +180,37 @@ membership moves on its own, which is what made it a poor roster in the first pl
 
 ### What the grade band is still for
 
-`PCO_MIN_GRADE`/`PCO_MAX_GRADE` no longer select anybody. They are the range the app understands
-(`Grade` is 6–12) and the landing spot for a student Planning Center has no grade for. A student
-outside the band can be on the roster; their grade is clamped for display.
+`PCO_MIN_GRADE`/`PCO_MAX_GRADE` no longer select anybody, and no longer rewrite anybody either.
+They are the band a deployment reads — used for the roster cache key and to warn on a profile edit
+that would take somebody out of it. A student outside the band can be on the roster, and arrives
+saying what grade they are actually in.
 
-**A clamp is never shown as a grade.** A roster row carries `gradeOnFile` alongside the number, and
-it is `false` for anybody Planning Center holds neither a grade nor a graduation year for — every
-adult a hand-picked roster deliberately carries, since a leader or a volunteer has no grade. Screens
-read the pair rather than the number: a slot with a grade in it says "No grade", a line that merely
-mentions the grade drops the clause, and the grade filters treat them as being in no grade rather
-than in the one the clamp landed on. Nothing writes the clamp down either — not the check-in batch,
-not an annotation document, not a push — so a student document may carry no grade at all, and the
-Add-from-Planning-Center search reports a missing grade as missing.
+**A grade is either real or absent.** There is no clamp to shade. Anybody Planning Center holds
+neither a grade nor a graduation year for — every adult a hand-picked roster deliberately carries,
+and every child too young to have one — arrives with `grade: null`, and screens say "No grade", drop
+the clause, or leave them out of a grade filter accordingly. Nothing writes an invented grade down
+either: not the check-in batch, not an annotation document, not a push.
+
+This replaced a `gradeOnFile` boolean carried alongside the number. The flag tracked whether the
+upstream value was *blank*, not whether it had been clamped, so a real 3rd grader was reported as
+`{ grade: 6, gradeOnFile: true }` — Tally asserting as a fact that a child in 3rd grade was in 6th.
+`Grade` now spans K–12 (`0` is kindergarten), so most of those children are simply representable;
+anything still outside it is null, which loses information but says something true.
+
+A graduation year still counts as a grade: the mapper derives one, and deriving is not inventing.
+Only a person with neither is grade-less.
+
+**A grade-less student is still pushed.** Creating one used to be refused — on the reasoning that
+every student queued for a create had a grade typed at quick-add — which left a nursery child sitting
+on `pcoPushPending` for ever, a queue that never drains rather than a visible failure. The create now
+omits the attribute rather than sending a zero, and still sends `child: true`, so they land in the
+church's children's views rather than the adult directory.
+
+The duplicate check leans on that flag. Upstream, the grade-less population is two groups at once:
+children too young for a grade, and every adult volunteer and leader. So a grade-less candidate has
+to be a child *and* hold no grade before Tally will collapse a quick-add onto it — matching on name
+alone would file a three-year-old as the volunteer who shares their name, silently, in the church's
+permanent database.
 
 The one place the clamp is still a plain number is arithmetic: `Student.grade` is always defined, so
 counting and sorting never have to special-case it.

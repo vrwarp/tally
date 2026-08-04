@@ -17,10 +17,23 @@ import { parseStudentId, type BackendId } from '@/lib/backendIds';
 /* Primitives                                                                  */
 /* -------------------------------------------------------------------------- */
 
-/** The ministry serves 6th through 12th grade. */
-export type Grade = 6 | 7 | 8 | 9 | 10 | 11 | 12;
+/**
+ * Kindergarten through 12th grade, with `0` meaning kindergarten.
+ *
+ * Wider than the 6–12 the youth ministry runs on, because a nursery or a
+ * children's ministry is the same app with a different band — and which band a
+ * church actually reads is configuration (`minGrade`/`maxGrade`), not this
+ * type. Widening here only decides what Tally can *represent*; an existing
+ * deployment's band stays 6–12 until somebody changes it in Settings.
+ *
+ * Below kindergarten there is no grade at all, and that is `null` rather than a
+ * negative sentinel: `grade` is pushed into Planning Center's own attribute and
+ * an Attendees `infos.fixed.grade`, where a `-2` would be a lie in somebody
+ * else's system.
+ */
+export type Grade = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
 
-export const GRADES: readonly Grade[] = [6, 7, 8, 9, 10, 11, 12] as const;
+export const GRADES: readonly Grade[] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
 
 export function isGrade(value: unknown): value is Grade {
   return typeof value === 'number' && GRADES.includes(value as Grade);
@@ -107,7 +120,20 @@ export interface Invitation extends Omit<InvitationDoc, 'invitedAt'> {
 export interface StudentDoc {
   firstName: string;
   lastName: string;
-  grade: Grade;
+  /**
+   * Optional, and absent — never null — when nobody holds one.
+   *
+   * A nursery child has no grade, and neither does an adult on a hand-picked
+   * roster. This used to be a required number paired with a `gradeOnFile`
+   * boolean, which is a nullable field spelled as a sentinel plus a flag: every
+   * reader had to remember to consult the flag, and the mapper that set it
+   * tracked only whether the upstream value was *blank*, so a real 3rd grader
+   * arrived asserting they were in 6th.
+   *
+   * Absent rather than `null` because `validStudent` in firestore.rules reads
+   * `!('grade' in d.keys()) || d.grade is int` — a stored null fails it.
+   */
+  grade?: Grade;
 
   /**
    * Notes a counselor typed, about the ministry rather than about the child.
@@ -179,8 +205,13 @@ export interface StudentDoc {
  */
 
 export interface Student
-  extends Omit<StudentDoc, 'firstAttendedAt' | 'lastAttendedAt' | 'createdAt' | 'updatedAt'> {
+  extends Omit<
+    StudentDoc,
+    'firstAttendedAt' | 'lastAttendedAt' | 'createdAt' | 'updatedAt' | 'grade'
+  > {
   id: string;
+  /** Null when nobody holds a grade for them. See `StudentDoc.grade`. */
+  grade: Grade | null;
   firstAttendedAt: Date | null;
   lastAttendedAt: Date | null;
   createdAt: Date;
@@ -207,22 +238,6 @@ export interface Student
    * Planning Center holds no birthdate. Never the year — see `PcoRosterPerson`.
    */
   birthday: string | null;
-  /**
-   * Whether anybody holds a grade of their own for this person, or the `grade`
-   * above is only where a fallback landed.
-   *
-   * Present on roster-sourced rows, where Planning Center answers it. Absent on
-   * a document that carries a grade — one typed by a human at quick-add, always
-   * real — and `false` on one that carries none, which is an annotation written
-   * against somebody Planning Center holds no grade for.
-   *
-   * Three readers. `gradeLabel` keeps every screen from printing the fallback
-   * as a fact, which is what turned the adults on a hand-picked roster into 6th
-   * graders; `mergeRoster` lets a grade a human typed at quick-add out-rank one
-   * — see the note there; and `updateStudent` declines to write one down, so a
-   * document that outlives its roster row is not left asserting it.
-   */
-  gradeOnFile?: boolean;
 }
 
 /**
@@ -459,6 +474,17 @@ export interface TallyEventDoc {
   /** Closes a one-off event's roster to the students who RSVP'd. */
   requiresRsvp: boolean;
 
+  /**
+   * Turns the roster ternary: a student can be checked in, and then checked out.
+   *
+   * For a room somebody is collected from rather than simply attends — a
+   * nursery, where the number a volunteer needs mid-service is not how many
+   * came but how many are still here. Off by default and unconditionally:
+   * unlike `requiresRsvp`, which follows from `mode`, nothing about a
+   * gathering's shape implies that children get handed back.
+   */
+  requiresCheckOut: boolean;
+
   status: EventStatus;
 
   createdAt: Timestamp;
@@ -525,12 +551,31 @@ export interface AttendanceRecordDoc {
   method: CheckInMethod;
   /** First time this student has ever been marked present at anything. */
   isFirstEver: boolean;
+  /**
+   * When somebody collected them, on an event that tracks check-out.
+   *
+   * The key is *absent* while they are still in the room — not null. A
+   * `serverTimestamp()` sentinel reads back as null locally until the write
+   * round-trips, and null is the state that means "still here", so an undo
+   * writes `deleteField()` rather than null and the two stay distinguishable.
+   * See `toAttendance`.
+   */
+  checkedOutAt?: Timestamp;
+  /**
+   * Who recorded the pickup — not necessarily who checked them in. The
+   * volunteer who takes a child in is rarely the one who hands them back.
+   */
+  checkedOutBy?: string;
 }
 
-export interface AttendanceRecord extends Omit<AttendanceRecordDoc, 'checkedInAt'> {
+export interface AttendanceRecord
+  extends Omit<AttendanceRecordDoc, 'checkedInAt' | 'checkedOutAt' | 'checkedOutBy'> {
   /** Equal to `studentId`. */
   id: string;
   checkedInAt: Date;
+  /** Null while they are still in the room. */
+  checkedOutAt: Date | null;
+  checkedOutBy: string | null;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -625,7 +670,8 @@ export interface PcoRosterPerson {
   backendId?: BackendId;
   firstName: string;
   lastName: string;
-  grade: number;
+  /** Null when the backend holds no grade and no graduation year for them. */
+  grade: number | null;
   status: StudentStatus;
   searchName: string;
   /** `null` when the roster read did not look. See the server-side note. */
@@ -650,13 +696,6 @@ export interface PcoRosterPerson {
    * roster. Null means Planning Center has no birthdate on file.
    */
   birthday: string | null;
-  /**
-   * Whether Planning Center itself holds a grade (or graduation year), or the
-   * number in `grade` is only the clamp's landing spot. The merge prefers the
-   * grade a human typed at quick-add over a clamp on a person upstream holds
-   * nothing for.
-   */
-  gradeOnFile: boolean;
 }
 
 /**
@@ -1180,7 +1219,13 @@ export interface NewVisitor {
  */
 export interface EventAttendanceSnapshot {
   event: TallyEvent;
+  /**
+   * Everybody who was checked in. This is the head count, and check-out does
+   * not touch it — every metric built on attendance reads this and only this.
+   */
   presentStudentIds: ReadonlySet<string>;
+  /** The subset who were collected. Always a subset of the above. */
+  checkedOutStudentIds: ReadonlySet<string>;
   /** Whether anybody at all was checked in. Never inferred from the set above. */
   held: boolean;
 }

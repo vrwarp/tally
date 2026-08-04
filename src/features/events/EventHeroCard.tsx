@@ -90,6 +90,7 @@ export function EventHeroCard({
         {cancelled ? <Badge tone="danger">Cancelled</Badge> : null}
         {open ? <Badge tone="success">Check-in open</Badge> : null}
         {event.requiresRsvp ? <Badge tone="warn">RSVP only</Badge> : null}
+        {event.requiresCheckOut ? <Badge tone="neutral">Check-out</Badge> : null}
         {/*
           Said once.
 

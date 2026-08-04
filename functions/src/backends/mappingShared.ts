@@ -118,7 +118,11 @@ export function computeProfileComplete(input: {
  * counselor thumb-typing "Jose" at the door and the office entering "José" are
  * the same child.
  */
-export function nameGradeKey(firstName: string, lastName: string, grade: number): string {
+export function nameGradeKey(
+  firstName: string,
+  lastName: string,
+  grade: number | null,
+): string {
   const normalise = (value: string): string => {
     const folded = value
       .normalize('NFD')
@@ -130,7 +134,19 @@ export function nameGradeKey(firstName: string, lastName: string, grade: number)
     // be merged into whichever came first. Keep the characters instead.
     return latin.length > 0 ? latin : folded.replace(/\s+/g, ' ').trim();
   };
-  return `${normalise(firstName)}|${normalise(lastName)}|${grade}`;
+  /*
+   * `none` is its own slot, not a stand-in for a number.
+   *
+   * Two grade-less people of the same name still key alike — this is a pure
+   * function of what is known, and for somebody with no grade the name is all
+   * there is. What the distinct slot buys is that they never collide with a
+   * *graded* person of the same name, which a zero or an empty string would.
+   * Whether name alone is enough to merge on is the caller's judgement:
+   * `findExistingPerson` additionally requires `child`, because the grade-less
+   * population upstream is children too young for a grade and every adult
+   * volunteer at once.
+   */
+  return `${normalise(firstName)}|${normalise(lastName)}|${grade ?? 'none'}`;
 }
 
 /**
@@ -158,18 +174,16 @@ export interface GradeRange {
 /**
  * The grade a student document carries, from whatever the backend holds.
  *
- * A document must carry *some* grade, so a blank lands on `minGrade` — and
- * `gradeOnFile` is how a caller tells the landing spot from a fact. The clamp
- * itself is part of mapping upstream data into Tally's `Grade`, which is why it
- * lives here with the mappers rather than in configuration: each backend
- * carries its own band and clamps with it.
+ * A passthrough now, and the name is kept only because the call sites read
+ * well: nothing is clamped, and a blank stays blank.
+ *
+ * It used to round every value into the configured band and report
+ * `gradeOnFile: raw !== null` beside it — which tracked whether the upstream
+ * value was *blank*, not whether it had been clamped. So a real 3rd grader
+ * arrived as `{ grade: 6, gradeOnFile: true }`: Tally asserting, as a fact,
+ * that a child in 3rd grade was in 6th. The band's job is to decide who is on
+ * the roster, not to rewrite a child's grade into it.
  */
-export function clampGrade(
-  raw: number | null,
-  range: GradeRange,
-): { grade: number; gradeOnFile: boolean } {
-  return {
-    grade: Math.min(range.maxGrade, Math.max(range.minGrade, raw ?? range.minGrade)),
-    gradeOnFile: raw !== null,
-  };
+export function clampGrade(raw: number | null): { grade: number | null } {
+  return { grade: raw };
 }

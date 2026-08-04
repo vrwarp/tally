@@ -94,13 +94,13 @@ describe('Planning Center mapping properties', () => {
     expect(() => mapPersonToStudent(person, CTX)).not.toThrow();
   });
 
-  forEachPerson('a mapped student always lands inside the configured grade band', (person) => {
+  forEachPerson('a mapped student carries a real grade or none at all', (person) => {
     const student = mapPersonToStudent(person, CTX);
 
-    // Outside the band, `Grade` in the app would silently rewrite it to 6 and
-    // report a 12th grader as a 6th grader.
-    expect(student.grade).toBeGreaterThanOrEqual(CTX.minGrade);
-    expect(student.grade).toBeLessThanOrEqual(CTX.maxGrade);
+    // Never a rounded-off guess: whatever the backend holds, or null. An
+    // out-of-band value is the roster's problem to filter, not the mapper's to
+    // rewrite into a claim nobody made.
+    if (student.grade !== null) expect(Number.isFinite(student.grade)).toBe(true);
     expect(['active', 'inactive']).toContain(student.status);
     expect(typeof student.firstName).toBe('string');
     expect(typeof student.lastName).toBe('string');

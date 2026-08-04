@@ -98,7 +98,7 @@ async function resolve(
   // down so this is the last time anybody pays for them.
   const registers = await fetchAttendanceByEvent(unexamined.map((event) => event.id));
   for (const [eventId, ids] of registers) {
-    if (ids.size > 0) held.add(eventId);
+    if (ids.present.size > 0) held.add(eventId);
   }
 
   await recordExaminations(unexamined, registers, registries, windowStart);
@@ -117,7 +117,7 @@ async function resolve(
  */
 async function recordExaminations(
   unexamined: readonly TallyEvent[],
-  registers: ReadonlyMap<string, ReadonlySet<string>>,
+  registers: ReadonlyMap<string, { present: ReadonlySet<string> }>,
   registries: ReadonlyMap<string, SkippedNights>,
   windowStart: Date,
 ): Promise<void> {
@@ -127,7 +127,7 @@ async function recordExaminations(
     if (!isChained(event)) continue;
     const key = chainKey(event);
     const bucket = byChain.get(key) ?? { skipped: [], held: [] };
-    (registers.get(event.id)?.size ? bucket.held : bucket.skipped).push(event.id);
+    (registers.get(event.id)?.present.size ? bucket.held : bucket.skipped).push(event.id);
     byChain.set(key, bucket);
   }
 
@@ -227,6 +227,9 @@ export function useProfileHistory(
       event,
       // At most the subject student. This is a projection, not a register.
       presentStudentIds: resolved.attended.has(event.id) ? new Set([student.id]) : new Set(),
+      // This projection answers "was this student here" and nothing else; it
+      // never reads the registers, so it has no pickup to report.
+      checkedOutStudentIds: new Set<string>(),
       held: resolved.held.has(event.id),
     }));
 

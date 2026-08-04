@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { fetchAttendanceByEvent } from '@/services/attendance';
+import { fetchAttendanceByEvent, type EventAttendanceIds } from '@/services/attendance';
 import type { EventAttendanceSnapshot, TallyEvent } from '@/types';
 
 /**
@@ -10,7 +10,7 @@ import type { EventAttendanceSnapshot, TallyEvent } from '@/types';
  * results are memoised for the session because the predictive roster and the
  * dashboard ask for overlapping windows.
  */
-const cache = new Map<string, ReadonlySet<string>>();
+const cache = new Map<string, EventAttendanceIds>();
 
 /** Drops cached history — call after editing attendance for a past event. */
 export function invalidateSnapshotCache(eventId?: string): void {
@@ -101,21 +101,27 @@ export function useEventSnapshots(events: readonly TallyEvent[]): EventSnapshots
 
   const snapshots = useMemo(() => {
     const next = events
-      .map((event) => ({ event, presentStudentIds: cache.get(event.id) }))
-      .filter(
-        (entry): entry is { event: TallyEvent; presentStudentIds: ReadonlySet<string> } =>
-          entry.presentStudentIds !== undefined,
+      .map((event) => ({ event, ids: cache.get(event.id) }))
+      .filter((entry): entry is { event: TallyEvent; ids: EventAttendanceIds } =>
+        entry.ids !== undefined,
       )
       // This hook reads whole registers, so the set is the register and an empty
-      // one really does mean nobody came.
-      .map<EventAttendanceSnapshot>((entry) => ({ ...entry, held: entry.presentStudentIds.size > 0 }));
+      // one really does mean nobody came. `held` stays keyed to who was checked
+      // *in*: a gathering nobody remembered to check out of still happened.
+      .map<EventAttendanceSnapshot>((entry) => ({
+        event: entry.event,
+        presentStudentIds: entry.ids.present,
+        checkedOutStudentIds: entry.ids.checkedOut,
+        held: entry.ids.present.size > 0,
+      }));
 
     const unchanged =
       next.length === last.current.length &&
       next.every(
         (entry, index) =>
           entry.event === last.current[index].event &&
-          entry.presentStudentIds === last.current[index].presentStudentIds,
+          entry.presentStudentIds === last.current[index].presentStudentIds &&
+          entry.checkedOutStudentIds === last.current[index].checkedOutStudentIds,
       );
 
     if (!unchanged) last.current = next;

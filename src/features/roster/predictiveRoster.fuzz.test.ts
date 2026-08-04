@@ -45,6 +45,11 @@ describe('buildRoster properties', () => {
       const { counts } = buildRoster(input);
 
       expect(counts.present + counts.absent).toBe(counts.eligible);
+      // The room split. `present` is still the head count — a missed pickup
+      // must never reduce it — and the two halves have to add back up to it.
+      expect(counts.inRoom + counts.checkedOut).toBe(counts.present);
+      expect(counts.inRoom).toBeGreaterThanOrEqual(0);
+      expect(counts.checkedOut).toBeGreaterThanOrEqual(0);
       expect(counts.present).toBeGreaterThanOrEqual(0);
       expect(counts.absent).toBeGreaterThanOrEqual(0);
       expect(counts.eligible).toBeGreaterThanOrEqual(0);
@@ -258,6 +263,8 @@ describe('buildRoster properties', () => {
             checkedInBy: 'fuzz',
             method: 'tap' as const,
             isFirstEver: false,
+            checkedOutAt: null,
+            checkedOutBy: null,
           },
         ],
         filters: { query: '' },

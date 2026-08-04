@@ -1,6 +1,6 @@
 # Tally
 
-Tally is an attendance app for a 6th-through-12th-grade youth ministry: a counselor
+Tally is an attendance app for a church's youth and children's ministry: a counselor
 standing at the door taps a name and the student is marked present in under three seconds, live on
 every other counselor's phone. The core team uses the same data to see who has gone missing, who
 turned up for the first time, and whose profile still has no way to reach a parent.
@@ -40,7 +40,9 @@ by grade, on the same one list.
 **Journey 3 — a visitor nobody has met.** Quick-add takes a first name, a last name and a grade,
 creates the student and checks them in as a single atomic write. They are flagged as an incomplete
 profile so the core team can chase a parent contact later, and queued for a push into Planning
-Center.
+Center. **No grade** is one of the answers, not a blank to be filled in later — a child too young for
+one has none, and on a gathering that tracks check-out the field opens there. The push carries them
+upstream either way; the grade is simply omitted rather than sent as a zero.
 
 **Journey 4 — the retreat bus.** A one-off event carries its own guest list, and restricts its roster
 to the students who RSVP'd yes or maybe: the counselor at the bus door sees the trip list, not the
@@ -50,6 +52,21 @@ the trip is a core-team decision made before the door, not at it.
 
 Tally deliberately stops there. It does not track signed waivers, fees or payments: those are
 someone's clipboard and someone's cash box, and a half-kept copy in an app is worse than none.
+
+**Journey 4b — the nursery, where children are collected.** A gathering can turn on **check-out**,
+which makes the roster ternary: absent, in the room, collected. The header leads with the live room
+count rather than the head count (`12 in room · 18 checked in`), the two filter chips become "In
+room" and "Checked out", and the one-tap button at the end of a present row changes verb from undo
+to **Out** — undo moves one tap deeper into the action strip, which is the right way round when
+collecting children is the gesture repeated forty times a morning. A parent can also collect their
+own child at the lobby kiosk, with a three-second hold rather than a tap: a stray check-in corrects
+itself when the child walks in anyway, while a stray pickup claims somebody left the building.
+
+Two rules make it honest. **A missed check-out is not a miss** — attendance is untouched by any of
+it, so a morning where half the parents walked off without telling anybody counts exactly like one
+where they all signed out, and no screen marks the difference with a badge or a colour. And
+**nothing ever invents a pickup time** for a child somebody forgot to check out: a fabricated
+timestamp on a custody record is worse than an absent one.
 
 **Journey 5 — the follow-up list.** The dashboard is a call list, not a report: students who have
 missed three gatherings in a row, first-timers from the last week, profiles with no parent contact,
@@ -313,6 +330,18 @@ converge on one record instead of racing to create two, with no transaction, no 
 coordination, and no duplicate to clean up later. Security rules enforce the key rather than trusting
 the client, because idempotency that depends on well-behaved callers is not idempotency. RSVPs are
 keyed the same way for the same reason.
+
+**`present` means checked in; `inRoom` is the new number.** Check-out adds a state, not a redefinition.
+`counts.present` and `EventAttendanceSnapshot.presentStudentIds` still mean everybody with an
+attendance record, which is what the header, the MIA derivation, the trend strip and every dashboard
+metric read — so a missed pickup cannot quietly reduce a head count. The live figure is a sibling,
+and `inRoom + checkedOut === present` is the invariant the fuzz suite holds.
+
+**Undoing a check-out deletes the field rather than nulling it.** A pending `serverTimestamp()` reads
+back as `null` in the optimistic local snapshot, and `null` is exactly the state that means *still in
+the room* — so a nulling undo would strand a child in the Present view until the server answered.
+A check-out writes the sentinel and an undo writes `deleteField()`, which keeps four cases apart:
+absent, confirmed, in flight, and a document somebody hand-wrote in the console.
 
 **Event history is fetched once, not streamed.** The roster and the dashboard both need "who attended
 each of the last N gatherings". A Friday from three weeks ago is not going to change while a

@@ -454,19 +454,64 @@ describe('pushStudent against the simulator', () => {
       expect(h.store.personById(FIXTURE_IDS.amara)?.grade).toBe(held);
     });
 
-    it('refuses to create a person rather than filing one as grade zero', async () => {
-      // A create claims a grade twice over: the duplicate check matches on it,
-      // and the person is filed as a child of it in the church's permanent
-      // database. Neither can be done from a number nobody supplied.
+    it('creates a grade-less child rather than sending a grade nobody supplied', async () => {
+      // A nursery child has no grade to type at quick-add. This used to be
+      // refused outright, which left them queued on `pcoPushPending` for ever.
       h.db.seed('students/s1', tallyOnlyStudent({ grade: undefined }));
-      const before = h.store.people.length;
 
       const result = await push('s1', 'create');
 
-      expect(result).toMatchObject({ status: 'skipped', pcoPersonId: null });
-      expect(result.message).toMatch(/missing a grade/);
-      expect(h.store.people).toHaveLength(before);
-      expect(h.store.requestLog.some((entry) => entry.method === 'POST')).toBe(false);
+      expect(result.status).toBe('created');
+      const created = h.store.personById(result.pcoPersonId!);
+      // Absent, not zero: a grade nobody supplied is a claim about a real child
+      // and it is the church's database that keeps it. `child` still goes, so
+      // they land in the children's views rather than the adult directory.
+      expect(created?.grade ?? null).toBeNull();
+      expect(created?.child).toBe(true);
+    });
+
+    /**
+     * The one thing name-only matching must not do.
+     *
+     * The grade-less population upstream is two groups at once: children too
+     * young for a grade, and every adult volunteer. Collapsing a three-year-old
+     * onto the volunteer who shares their name would file the child as that
+     * adult, silently, in the church's permanent database.
+     */
+    it('will not match a grade-less child onto a same-named adult', async () => {
+      const adult = h.store.createPerson({
+        first_name: 'Nia',
+        last_name: 'Fontaine',
+        child: false,
+      });
+      h.db.seed(
+        'students/s1',
+        tallyOnlyStudent({ firstName: 'Nia', lastName: 'Fontaine', grade: undefined }),
+      );
+
+      const result = await push('s1', 'create');
+
+      expect(result.status).toBe('created');
+      expect(result.pcoPersonId).not.toBe(adult.id);
+    });
+
+    it('does match a grade-less child onto a same-named grade-less child', async () => {
+      // The other half of the pair above: without this, the adult test would
+      // pass simply because nothing ever matches when the grade is absent.
+      const child = h.store.createPerson({
+        first_name: 'Nia',
+        last_name: 'Fontaine',
+        child: true,
+      });
+      h.db.seed(
+        'students/s1',
+        tallyOnlyStudent({ firstName: 'Nia', lastName: 'Fontaine', grade: undefined }),
+      );
+
+      const result = await push('s1', 'create');
+
+      expect(result.status).toBe('updated');
+      expect(result.pcoPersonId).toBe(child.id);
     });
   });
 

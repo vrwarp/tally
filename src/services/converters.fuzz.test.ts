@@ -23,6 +23,7 @@ import {
   toStudent,
   toUserProfile,
 } from './converters';
+import { GRADES } from '@/types';
 
 interface FakeSnapshotInput {
   id: string;
@@ -68,9 +69,11 @@ describe('converter properties', () => {
     const student = toStudent(snap);
 
     // Grade indexes into UI and into the grade filter; out of band it would
-    // silently misplace a child.
-    expect(student.grade).toBeGreaterThanOrEqual(6);
-    expect(student.grade).toBeLessThanOrEqual(12);
+    // silently misplace a child. Null is the honest answer for anything the
+    // model cannot represent — an absence, never a rounded-off guess.
+    if (student.grade !== null) {
+      expect(GRADES).toContain(student.grade);
+    }
     expect(['active', 'inactive']).toContain(student.status);
     expect(typeof student.firstName).toBe('string');
     expect(typeof student.searchName).toBe('string');

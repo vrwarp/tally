@@ -12,7 +12,7 @@
  * than the roster underneath it.
  */
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
-import { cn, ordinalGrade } from '@/lib/utils';
+import { cn, gradeDescription, gradeName } from '@/lib/utils';
 import { GRADES, type Grade } from '@/types';
 
 /** Breathing room between the bottom of the panel and the bottom of the screen. */
@@ -25,18 +25,35 @@ export interface GradeFilterProps {
   /** Selected grades. Empty means every grade — the default. */
   grades: readonly Grade[];
   onChange: (grades: readonly Grade[]) => void;
+  /**
+   * The grades anybody on this roster is actually in.
+   *
+   * `Grade` spans K–12 so a children's ministry can exist, but a youth
+   * ministry has seven of those and would otherwise get a six-row-longer
+   * panel listing grades nobody on its roster is in. Omitted means "offer them
+   * all", which is what a caller with nothing to narrow by should do.
+   */
+  available?: readonly Grade[];
 }
 
 function summarise(grades: readonly Grade[]): string {
   if (grades.length === 0) return 'All grades';
-  if (grades.length === 1) return `${ordinalGrade(grades[0]!)} grade`;
+  if (grades.length === 1) return gradeDescription(grades[0]!);
   // Past two, the ordinals are longer than the chip and get truncated to
   // something unreadable ("6th, 7th, 9…"), so the count carries it instead.
-  if (grades.length === 2) return grades.map((grade) => ordinalGrade(grade)).join(', ');
+  if (grades.length === 2) return grades.map((grade) => gradeName(grade)).join(', ');
   return `${grades.length} grades`;
 }
 
-export function GradeFilter({ grades, onChange }: GradeFilterProps) {
+export function GradeFilter({ grades, onChange, available }: GradeFilterProps) {
+  /*
+   * Always in `GRADES` order, and always including anything already selected —
+   * a chip that is on must stay switchable off even if the roster moved out
+   * from under it.
+   */
+  const offered = GRADES.filter(
+    (grade) => !available || available.includes(grade) || grades.includes(grade),
+  );
   const [open, setOpen] = useState(false);
   const panelId = useId();
   const container = useRef<HTMLDivElement>(null);
@@ -152,11 +169,11 @@ export function GradeFilter({ grades, onChange }: GradeFilterProps) {
             onToggle={() => onChange([])}
           />
           <span aria-hidden="true" className="my-1 block h-px bg-ink-800" />
-          {GRADES.map((grade) => (
+          {offered.map((grade) => (
             <Option
               key={grade}
               checked={grades.includes(grade)}
-              label={`${ordinalGrade(grade)} grade`}
+              label={gradeDescription(grade)}
               onToggle={() => toggle(grade)}
             />
           ))}

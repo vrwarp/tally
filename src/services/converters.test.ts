@@ -113,21 +113,25 @@ describe('toStudent', () => {
     expect(own.profileComplete).toBe(false);
   });
 
-  it('flags a document that holds no grade, rather than letting the 6 pass as one', () => {
-    // An annotation written against somebody Planning Center holds no grade
-    // for. `grade` still answers a number because the filters downstream want
-    // one; the flag is what stops it being printed as a fact.
+  it('answers null for a document that holds no grade, rather than inventing a 6', () => {
+    // An annotation written against somebody the backend holds no grade for.
+    // This used to answer 6 with a `gradeOnFile: false` flag beside it, which
+    // every screen had to remember to consult before printing the number.
     const annotated = toStudent(fakeSnapshot({ data: { pcoPersonId: '4200099', notes: 'Drives' } }));
 
-    expect(annotated.grade).toBe(6);
-    expect(annotated.gradeOnFile).toBe(false);
+    expect(annotated.grade).toBeNull();
   });
 
-  it('says nothing about a grade a human typed, because there is nothing to say', () => {
+  it('takes a grade a human typed at face value', () => {
     const visitor = toStudent(fakeSnapshot({ data: { grade: 9 } }));
 
     expect(visitor.grade).toBe(9);
-    expect(visitor.gradeOnFile).toBeUndefined();
+  });
+
+  it('answers null for a grade outside what Tally can represent', () => {
+    // Honest rather than confident: a 14 is not a 12, and saying so beats
+    // rounding somebody into the band and asserting it as a fact.
+    expect(toStudent(fakeSnapshot({ data: { grade: 14 } })).grade).toBeNull();
   });
 
   it('leaves attendance markers null until the student has been checked in', () => {
@@ -176,6 +180,58 @@ describe('toAttendance', () => {
       'event-1',
     );
     expect(record.checkedInAt).toEqual(checkedInAt);
+  });
+
+  /*
+   * The four states of `checkedOutAt`, and why they have to stay apart.
+   *
+   * An absent key is the whole "still in the room" state, so it cannot share
+   * an encoding with anything else — which is why the undo deletes the field
+   * rather than nulling it, and why a pending write is distinguishable from a
+   * document somebody hand-wrote in the console.
+   */
+  it('reads an absent check-out as still in the room', () => {
+    const record = toAttendance(fakeSnapshot({ data: { studentId: 'student-7' } }), 'event-1');
+    expect(record.checkedOutAt).toBeNull();
+    expect(record.checkedOutBy).toBeNull();
+  });
+
+  it('uses the pickup time once it lands', () => {
+    const checkedOutAt = new Date(2026, 1, 13, 20, 45);
+    const record = toAttendance(
+      fakeSnapshot({ data: { checkedOutAt: ts(checkedOutAt), checkedOutBy: 'counselor-2' } }),
+      'event-1',
+    );
+    expect(record.checkedOutAt).toEqual(checkedOutAt);
+    expect(record.checkedOutBy).toBe('counselor-2');
+  });
+
+  it('dates a locally-pending check-out to now, so the row leaves the room at once', () => {
+    // Without this the child would stay in the Present view until the server
+    // answered — the one thing the pickup flow must not do.
+    const before = Date.now();
+    const record = toAttendance(
+      fakeSnapshot({
+        data: { studentId: 'student-7', checkedOutAt: null, checkedOutBy: 'counselor-2' },
+        hasPendingWrites: true,
+      }),
+      'event-1',
+    );
+    const after = Date.now();
+
+    expect(record.checkedOutAt).not.toBeNull();
+    expect(record.checkedOutAt!.getTime()).toBeGreaterThanOrEqual(before);
+    expect(record.checkedOutAt!.getTime()).toBeLessThanOrEqual(after);
+  });
+
+  it('treats a confirmed null as no check-out at all', () => {
+    // A document somebody hand-wrote in the console. It says no more than an
+    // absent key would, and must not read as a pickup with no time.
+    const record = toAttendance(
+      fakeSnapshot({ data: { studentId: 'student-7', checkedOutAt: null }, hasPendingWrites: false }),
+      'event-1',
+    );
+    expect(record.checkedOutAt).toBeNull();
   });
 
   it('falls back to the document id for studentId and to the argument for eventId', () => {

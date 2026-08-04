@@ -23,7 +23,14 @@ describe('useEventSnapshots', () => {
     invalidateSnapshotCache();
     fetchAttendanceByEvent.mockReset();
     fetchAttendanceByEvent.mockImplementation((ids: string[]) =>
-      Promise.resolve(new Map(ids.map((id) => [id, new Set([`student-of-${id}`])]))),
+      Promise.resolve(
+        new Map(
+          ids.map((id) => [
+            id,
+            { present: new Set([`student-of-${id}`]), checkedOut: new Set<string>() },
+          ]),
+        ),
+      ),
     );
   });
 

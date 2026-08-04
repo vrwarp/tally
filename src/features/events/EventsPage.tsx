@@ -76,6 +76,9 @@ function EventRow({
     event.mode === 'oneoff' ? <Badge key="oneoff" tone="brand">One-off</Badge> : null,
     cancelled ? <Badge key="cancelled" tone="danger">Cancelled</Badge> : null,
     event.requiresRsvp ? <Badge key="rsvp" tone="warn">RSVP only</Badge> : null,
+    event.requiresCheckOut ? (
+      <Badge key="checkout" tone="neutral">Check-out</Badge>
+    ) : null,
   ].filter(Boolean);
 
   return (

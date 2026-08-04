@@ -15,7 +15,6 @@ import {
   composeFirstName,
   splitFirstName,
   trimmed,
-  type GradeRange,
 } from '../backends/mappingShared.js';
 import { studentIdFor } from '../generated/backendIds.js';
 import type { ParentContact } from '../pco/mapping.js';
@@ -120,10 +119,10 @@ export function statusOf(attendee: A32Attendee): 'active' | 'inactive' {
 /* Person -> roster row                                                        */
 /* -------------------------------------------------------------------------- */
 
-export function mapAttendeeToRosterPerson(attendee: A32Attendee, range: GradeRange): RosterPerson {
+export function mapAttendeeToRosterPerson(attendee: A32Attendee): RosterPerson {
   const firstName = displayFirstNameOf(attendee);
   const lastName = trimmed(attendee.last_name) ?? '';
-  const { grade, gradeOnFile } = clampGrade(a32Grade(attendee), range);
+  const { grade } = clampGrade(a32Grade(attendee));
 
   return {
     id: studentIdFor('a32', attendee.id),
@@ -139,7 +138,6 @@ export function mapAttendeeToRosterPerson(attendee: A32Attendee, range: GradeRan
     profileComplete: null,
     hasAllergies: allergiesOf(attendee) !== null,
     birthday: birthdayOf(attendee),
-    gradeOnFile,
   };
 }
 

@@ -29,7 +29,6 @@ function person(overrides: Partial<PcoRosterPerson> = {}): PcoRosterPerson {
     profileComplete: null,
     hasAllergies: false,
     birthday: null,
-    gradeOnFile: true,
     ...overrides,
   };
 }

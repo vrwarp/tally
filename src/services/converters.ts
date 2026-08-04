@@ -99,8 +99,17 @@ function numOrNull(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
-function grade(value: unknown): Grade {
-  return isGrade(value) ? value : 6;
+/**
+ * The grade on a document, or null when there is not one.
+ *
+ * No invented fallback. This used to answer 6 for anything unrecognised and
+ * pair that with a `gradeOnFile: false` flag, which meant every screen had to
+ * remember to ask the flag before printing the number — and a value outside
+ * the range Tally understands came back as a confident lie rather than an
+ * absence.
+ */
+function grade(value: unknown): Grade | null {
+  return isGrade(value) ? value : null;
 }
 
 /**
@@ -126,20 +135,10 @@ export function toStudent(snapshot: DocumentSnapshot<DocumentData>): Student {
     id: snapshot.id,
     firstName,
     lastName,
+    // Null for a document that holds no grade at all — an annotation written
+    // against somebody the backend has no grade for, which `updateStudent`
+    // deliberately declines to invent one for.
     grade: grade(data.grade),
-    /*
-     * A document that holds no grade at all.
-     *
-     * That is an annotation written against somebody Planning Center holds no
-     * grade for — `updateStudent` deliberately declines to invent one. `grade`
-     * above still answers 6, because `Student.grade` is a number and the
-     * filters and counters downstream want one; this flag is what stops that 6
-     * being *printed* as a fact. See `gradeLabel`.
-     *
-     * Absent rather than `true` for a document that does carry a grade: a
-     * quick-added visitor's grade was typed by a human and needs no flag.
-     */
-    ...(isGrade(data.grade) ? {} : { gradeOnFile: false }),
     notes: strOrNull(data.notes),
     status: data.status === 'inactive' ? 'inactive' : 'active',
     isVisitor: bool(data.isVisitor),
@@ -262,6 +261,9 @@ export function toEvent(snapshot: DocumentSnapshot<DocumentData>): TallyEvent {
     // A one-off without an explicit flag still defaults to an RSVP roster: a
     // trip with a fixed list is the reason one-offs have a roster story at all.
     requiresRsvp: bool(data.requiresRsvp, mode === 'oneoff'),
+    // No default from `mode`: a nursery is a thing somebody turns on, not
+    // something a gathering's shape implies.
+    requiresCheckOut: bool(data.requiresCheckOut, false),
     status: data.status === 'cancelled' ? 'cancelled' : 'scheduled',
     createdAt: toDate(data.createdAt, fallback),
     updatedAt: toDate(data.updatedAt, fallback),
@@ -300,6 +302,22 @@ export function toAttendance(
         ? method
         : 'tap',
     isFirstEver: bool(data.isFirstEver),
+    /*
+     * Four cases, and they have to stay apart.
+     *
+     * The key being *absent* is the whole "still in the room" state, so it
+     * cannot share an encoding with anything else. A key that is present but
+     * null is a pending `serverTimestamp()` — the same substitution
+     * `checkedInAt` makes above — unless nothing is pending, in which case it
+     * is a document somebody hand-wrote in the console and means no more than
+     * an absent key would.
+     */
+    checkedOutAt:
+      'checkedOutAt' in data
+        ? (toDateOrNull(data.checkedOutAt) ??
+          (snapshot.metadata.hasPendingWrites ? new Date() : null))
+        : null,
+    checkedOutBy: strOrNull(data.checkedOutBy),
   };
 }
 
@@ -430,10 +448,6 @@ export function fromRosterPerson(person: PcoRosterPerson, now: Date): Student {
     // build that predates this field comes back without it, and `undefined`
     // would reach the badge as "not missing" and quietly say nothing.
     birthday: person.birthday ?? null,
-    // Same storage story, opposite default: a stored roster that predates the
-    // field is treated as the old behavior — trust the roster's grade — for
-    // the one refresh it takes a fresh read to replace it.
-    gradeOnFile: person.gradeOnFile ?? true,
     searchName: person.searchName,
     firstAttendedAt: null,
     lastAttendedAt: null,

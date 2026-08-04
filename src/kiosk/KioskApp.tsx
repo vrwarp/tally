@@ -32,9 +32,19 @@ export type { KioskEventEntry } from './services';
 
 type Phase = 'booting' | 'pairing' | 'choosing' | 'ready';
 
+/**
+ * What the overlay is asking about.
+ *
+ * `intent` is what a confirm would do, decided once when the row is tapped so
+ * the confirm and the success screen cannot disagree — a register refresh
+ * landing mid-tap must not turn "Collect" into "already checked in" under a
+ * parent's thumb.
+ */
+export type KioskIntent = 'check-in' | 'check-out' | 'done';
+
 type Overlay =
-  | { kind: 'confirm'; student: KioskStudent }
-  | { kind: 'success'; student: KioskStudent; alreadyPresent: boolean }
+  | { kind: 'confirm'; student: KioskStudent; intent: KioskIntent }
+  | { kind: 'success'; student: KioskStudent; intent: KioskIntent }
   | null;
 
 const MAX_BUFFER = 24;
@@ -59,6 +69,7 @@ export function KioskApp() {
     () => readJson<{ last4: Record<string, string[]> }>(KIOSK_KEYS.phoneIndex)?.last4 ?? {},
   );
   const [presentIds, setPresentIds] = useState<ReadonlySet<string>>(new Set());
+  const [checkedOutIds, setCheckedOutIds] = useState<ReadonlySet<string>>(new Set());
   const [buffer, setBuffer] = useState('');
   const [overlay, setOverlay] = useState<Overlay>(null);
 
@@ -94,8 +105,11 @@ export function KioskApp() {
       void loaded.loadRoster(setStudents).then(setStudents);
       void loaded.loadPhoneIndex(setLast4Index).then(setLast4Index);
       void loaded
-        .fetchPresentIds(bound.eventId)
-        .then(setPresentIds)
+        .fetchAttendance(bound.eventId)
+        .then((register) => {
+          setPresentIds(register.present);
+          setCheckedOutIds(register.checkedOut);
+        })
         .catch(() => {});
       void loaded.replayQueue().catch(() => {});
     },
@@ -108,16 +122,15 @@ export function KioskApp() {
 
     const present = setInterval(() => {
       void services
-        .fetchPresentIds(binding.eventId)
-        .then((ids) =>
-          setPresentIds((held) => {
-            // Never un-green a row this kiosk itself marked: the union keeps
-            // an optimistic tick standing until the server copy includes it.
-            const merged = new Set(ids);
-            for (const id of held) merged.add(id);
-            return merged;
-          }),
-        )
+        .fetchAttendance(binding.eventId)
+        .then((register) => {
+          // Never un-green a row this kiosk itself marked: the union keeps an
+          // optimistic tick standing until the server copy includes it. The
+          // same argument applies to a pickup — both are one-way here, and a
+          // staff undo on the main app is picked up on the next rebind.
+          setPresentIds((held) => new Set([...register.present, ...held]));
+          setCheckedOutIds((held) => new Set([...register.checkedOut, ...held]));
+        })
         .catch(() => {});
     }, PRESENT_REFRESH_MS);
     const replay = setInterval(() => void services.replayQueue().catch(() => {}), QUEUE_REPLAY_MS);
@@ -142,6 +155,7 @@ export function KioskApp() {
         setBuffer('');
         setOverlay(null);
         setPresentIds(new Set());
+        setCheckedOutIds(new Set());
         setPhase((current) => (current === 'ready' ? 'choosing' : current));
       }
       // A page that runs for weeks needs a moment to shed what Chromium
@@ -168,15 +182,43 @@ export function KioskApp() {
     });
   }, []);
 
-  /* ---- Check-in ----------------------------------------------------------- */
+  /* ---- Check-in and pickup ------------------------------------------------ */
+
+  /**
+   * What tapping this student would do, right now.
+   *
+   * On a gathering that does not track check-out this is the behaviour the
+   * kiosk has always had: check them in, or tell them they already are. Where
+   * it does, a present child becomes collectable and a collected one is done.
+   */
+  const intentFor = useCallback(
+    (student: KioskStudent): KioskIntent => {
+      if (!presentIds.has(student.id)) return 'check-in';
+      if (!binding?.requiresCheckOut) return 'done';
+      return checkedOutIds.has(student.id) ? 'done' : 'check-out';
+    },
+    [presentIds, checkedOutIds, binding],
+  );
 
   const onConfirm = useCallback(
-    (student: KioskStudent) => {
+    (student: KioskStudent, intent: KioskIntent) => {
       if (!services || !binding || !uid) return;
-      const alreadyPresent = presentIds.has(student.id);
       // Optimistic: the tick paints now; the write follows.
-      setOverlay({ kind: 'success', student, alreadyPresent });
-      if (alreadyPresent) return;
+      setOverlay({ kind: 'success', student, intent });
+      if (intent === 'done') return;
+
+      if (intent === 'check-out') {
+        setCheckedOutIds((held) => new Set(held).add(student.id));
+        void services
+          .performCheckOut({ eventId: binding.eventId, studentId: student.id, uid })
+          .catch((error: { code?: string }) => {
+            // Refused outright — a pickup already stands, and only staff may
+            // move one. The row stays collected because it is.
+            if (error.code?.includes('permission-denied')) return;
+            services.enqueueCheckOut({ binding, student, uid });
+          });
+        return;
+      }
 
       setPresentIds((held) => new Set(held).add(student.id));
       void services
@@ -190,7 +232,7 @@ export function KioskApp() {
           services.enqueueCheckIn({ binding, student, uid });
         });
     },
-    [services, binding, uid, presentIds],
+    [services, binding, uid],
   );
 
   /* ---- Render ------------------------------------------------------------- */
@@ -220,6 +262,7 @@ export function KioskApp() {
           setBinding(bound);
           setBuffer('');
           setPresentIds(new Set());
+          setCheckedOutIds(new Set());
           setPhase('ready');
         }}
       />
@@ -231,7 +274,7 @@ export function KioskApp() {
       return (
         <SuccessScreen
           student={overlay.student}
-          alreadyPresent={overlay.alreadyPresent}
+          intent={overlay.intent}
           onDone={() => setOverlay(null)}
         />
       );
@@ -240,8 +283,8 @@ export function KioskApp() {
       return (
         <ConfirmScreen
           student={overlay.student}
-          alreadyPresent={presentIds.has(overlay.student.id)}
-          onConfirm={() => onConfirm(overlay.student)}
+          intent={overlay.intent}
+          onConfirm={() => onConfirm(overlay.student, overlay.intent)}
           onBack={() => setOverlay(null)}
         />
       );
@@ -254,9 +297,11 @@ export function KioskApp() {
         students={students}
         last4Index={last4Index}
         presentIds={presentIds}
+        checkedOutIds={checkedOutIds}
+        tracksCheckOut={binding.requiresCheckOut ?? false}
         onPick={(student) => {
           services?.warmStudentDates(student.id);
-          setOverlay({ kind: 'confirm', student });
+          setOverlay({ kind: 'confirm', student, intent: intentFor(student) });
         }}
         onUnbind={() => {
           clearBinding();

@@ -51,9 +51,6 @@ export function makeStudent(overrides: Partial<Student> = {}): Student {
     profileComplete: pick(overrides, 'profileComplete', true),
     hasAllergies: pick(overrides, 'hasAllergies', false),
     birthday: pick(overrides, 'birthday', '03-14'),
-    // Optional on `Student`: present on roster-sourced rows, absent on
-    // documents. Only carried through when a test says so.
-    ...(overrides.gradeOnFile === undefined ? {} : { gradeOnFile: overrides.gradeOnFile }),
     ...(overrides.upstreamBackend === undefined
       ? {}
       : { upstreamBackend: overrides.upstreamBackend }),
@@ -96,6 +93,7 @@ export function makeEvent(overrides: Partial<TallyEvent> = {}): TallyEvent {
     location: pick(overrides, 'location', null),
     notes: pick(overrides, 'notes', null),
     requiresRsvp: pick(overrides, 'requiresRsvp', false),
+    requiresCheckOut: pick(overrides, 'requiresCheckOut', false),
     status: pick(overrides, 'status', 'scheduled'),
     createdAt: pick(overrides, 'createdAt', new Date('2026-01-01T12:00:00')),
     updatedAt: pick(overrides, 'updatedAt', new Date('2026-01-01T12:00:00')),
@@ -117,6 +115,8 @@ export function makeAttendance(overrides: Partial<AttendanceRecord> = {}): Atten
     checkedInBy: pick(overrides, 'checkedInBy', 'counselor-1'),
     method: pick(overrides, 'method', 'tap'),
     isFirstEver: pick(overrides, 'isFirstEver', false),
+    checkedOutAt: pick(overrides, 'checkedOutAt', null),
+    checkedOutBy: pick(overrides, 'checkedOutBy', null),
   };
 }
 
@@ -162,8 +162,14 @@ export function makeSnapshot(
   event: TallyEvent,
   presentStudentIds: readonly string[],
   held: boolean = presentStudentIds.length > 0,
+  checkedOutStudentIds: readonly string[] = [],
 ): EventAttendanceSnapshot {
-  return { event, presentStudentIds: new Set(presentStudentIds), held };
+  return {
+    event,
+    presentStudentIds: new Set(presentStudentIds),
+    checkedOutStudentIds: new Set(checkedOutStudentIds),
+    held,
+  };
 }
 
 /**
@@ -175,6 +181,7 @@ export function makeWeeklyEvents(options: {
   seriesId?: string;
   title?: string;
   endingBefore?: Date;
+  requiresCheckOut?: boolean;
 }): TallyEvent[] {
   const { count, seriesId = 'friday-fellowship', title = 'Friday Fellowship' } = options;
   const anchor = options.endingBefore ?? NOW;
@@ -193,6 +200,7 @@ export function makeWeeklyEvents(options: {
       endAt,
       checkInOpensAt: new Date(startAt.getTime() - 60 * 60_000),
       checkInClosesAt: new Date(endAt.getTime() + 60 * 60_000),
+      requiresCheckOut: options.requiresCheckOut ?? false,
     });
   });
 }

@@ -13,7 +13,7 @@ import { makeStudent } from '../../../tests/factories';
 describe('buildContactList', () => {
   it('puts the grade in brackets after the name', () => {
     const line = buildContactList('Chase:', [
-      makeStudent({ firstName: 'Alena', lastName: 'Ruiz', grade: 9, gradeOnFile: true }),
+      makeStudent({ firstName: 'Alena', lastName: 'Ruiz', grade: 9 }),
     ]).split('\n')[1];
 
     expect(line).toBe('- Alena Ruiz (9th) contact in Planning Center');
@@ -21,7 +21,7 @@ describe('buildContactList', () => {
 
   it('drops the brackets for somebody Planning Center holds no grade for', () => {
     const line = buildContactList('Chase:', [
-      makeStudent({ firstName: 'Alan', lastName: 'Wan', grade: 6, gradeOnFile: false }),
+      makeStudent({ firstName: 'Alan', lastName: 'Wan', grade: null }),
     ]).split('\n')[1];
 
     expect(line).toBe('- Alan Wan contact in Planning Center');

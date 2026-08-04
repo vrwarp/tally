@@ -73,7 +73,6 @@ describe('fetchRoster', () => {
       firstName: 'Priya',
       lastName: 'Raghunathan',
       grade: 9,
-      gradeOnFile: true,
       hasAllergies: true,
       birthday: '03-14',
       status: 'active',
@@ -91,10 +90,10 @@ describe('fetchRoster', () => {
     expect(result.people[0]!.firstName).toBe('Wei “鈴木偉”');
   });
 
-  it('lands a missing grade on the band floor and says the floor is not a fact', async () => {
-    const result = await fetchRoster({ client, config, cache, personIds: [idOf('Salote')] });
-    expect(result.people[0]!.grade).toBe(6);
-    expect(result.people[0]!.gradeOnFile).toBe(false);
+  it('answers null for a missing grade rather than the band floor', () => {
+    return fetchRoster({ client, config, cache, personIds: [idOf('Salote')] }).then((result) => {
+      expect(result.people[0]!.grade).toBeNull();
+    });
   });
 
   it('reports a removed person as missing rather than dropping them silently', async () => {

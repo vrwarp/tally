@@ -50,7 +50,7 @@ const updateStudentProfile = vi.hoisted(() =>
         profileComplete: null,
         hasAllergies: true,
         birthday: null,
-        gradeOnFile: true,
+        
       },
     },
   })),
@@ -437,7 +437,7 @@ describe('when write-back is full', () => {
  * grown adult's record in Planning Center.
  */
 describe('a student with no grade on file', () => {
-  const gradeless = () => linked({ grade: 6, gradeOnFile: false });
+  const gradeless = () => linked({ grade: null });
 
   it('opens on nothing selected rather than on the bottom of the range', () => {
     personDetails.current = details();
@@ -471,7 +471,7 @@ describe('a student with no grade on file', () => {
     await save();
 
     await waitFor(() => expect(updateStudent).toHaveBeenCalled());
-    expect(updateStudent.mock.calls[0]?.[3]).toMatchObject({ gradeOnFile: false });
+    expect(updateStudent.mock.calls[0]?.[3]).toMatchObject({ grade: null });
   });
 
   it('takes a grade from a leader who knows it', async () => {
@@ -487,7 +487,7 @@ describe('a student with no grade on file', () => {
 
   it('offers no blank option to a student whose grade is genuinely on file', () => {
     personDetails.current = details();
-    open(linked({ grade: 11, gradeOnFile: true }));
+    open(linked({ grade: 11 }));
 
     expect(screen.getByLabelText(/Grade/)).toHaveValue('11');
     expect(screen.queryByRole('option', { name: 'No grade' })).not.toBeInTheDocument();

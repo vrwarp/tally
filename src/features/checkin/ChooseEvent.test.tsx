@@ -328,7 +328,9 @@ describe('the catch-up tail', () => {
       hasMore: false,
     });
     fetchAttendanceByEvent.mockResolvedValue(
-      new Map([['last-friday', new Set(['a', 'b', 'c', 'd'])]]),
+      new Map([
+        ['last-friday', { present: new Set(['a', 'b', 'c', 'd']), checkedOut: new Set() }],
+      ]),
     );
 
     show([]);

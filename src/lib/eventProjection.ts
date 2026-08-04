@@ -57,6 +57,11 @@ function asEvent(
     location: source.location,
     notes: source.notes,
     requiresRsvp: false,
+    // Inherited, unlike `requiresRsvp` above, and for the mirror-image reason:
+    // a room children are collected from is exactly the kind of gathering that
+    // repeats every Sunday, and these projections are the Sundays a volunteer
+    // actually opens.
+    requiresCheckOut: source.requiresCheckOut,
     // A projected gathering is on by definition. Calling one off is an act, and
     // an act materialises it.
     status: 'scheduled',

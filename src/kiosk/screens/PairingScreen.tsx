@@ -128,7 +128,12 @@ export function PairingScreen({
       <div className="text-lg font-medium text-ink-400">Pair this kiosk</div>
       {code ? (
         <>
-          <div className="font-mono text-8xl font-bold tracking-[0.3em] text-ink-50">{code}</div>
+          <div
+            data-testid="kiosk-pairing-code"
+            className="font-mono text-8xl font-bold tracking-[0.3em] text-ink-50"
+          >
+            {code}
+          </div>
           <div className="max-w-md text-lg leading-relaxed text-ink-300">
             A leader enters this code in Tally under{' '}
             <span className="font-semibold text-ink-100">Settings → Pair a kiosk</span>.

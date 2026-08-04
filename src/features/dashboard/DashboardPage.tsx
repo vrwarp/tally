@@ -387,6 +387,17 @@ export function DashboardPage() {
             !awaitingRoster && !awaitingContacts && summary.incompleteCount > 0 ? 'warn' : 'neutral'
           }
         />
+        {/* Only for a ministry that actually collects children — see
+            `checkOutRate`. Neutral whatever it says: this is a record of what
+            got written down, not a score. */}
+        {summary.checkOutRate !== null ? (
+          <StatTile
+            label="Checked out"
+            value={`${summary.checkOutRate}%`}
+            hint="of check-ins on check-out gatherings"
+            tone="neutral"
+          />
+        ) : null}
       </div>
 
       {/*

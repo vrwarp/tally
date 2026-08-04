@@ -34,7 +34,8 @@ import { buildSearchName, type Grade, type Student, type StudentStatus } from '@
 export interface StudentDraft {
   firstName: string;
   lastName: string;
-  grade: Grade;
+  /** Null for a child too young to have one. Omitted from the document. */
+  grade: Grade | null;
   notes?: string | null;
   status?: StudentStatus;
   /**
@@ -76,7 +77,9 @@ export function buildStudentPayload(draft: StudentDraft, uid: string) {
   return {
     firstName,
     lastName,
-    grade: draft.grade,
+    // Omitted rather than written as a zero. The rules permit a student with no
+    // grade, and a nursery child genuinely has none — see `StudentDoc.grade`.
+    ...(draft.grade === null ? {} : { grade: draft.grade }),
     notes: draft.notes?.trim() || null,
     status: draft.status ?? 'active',
     isVisitor: false,
@@ -118,7 +121,7 @@ export async function updateStudent(
   studentId: string,
   patch: Partial<StudentDraft>,
   uid: string,
-  current?: Pick<Student, 'firstName' | 'lastName' | 'grade' | 'gradeOnFile'>,
+  current?: Pick<Student, 'firstName' | 'lastName' | 'grade'>,
 ): Promise<void> {
   const payload: Record<string, unknown> = { updatedAt: serverTimestamp(), updatedBy: uid };
 
@@ -143,14 +146,13 @@ export async function updateStudent(
    * The grade goes down with the name, for the same reason — except when there
    * is no grade to write.
    *
-   * `Student.grade` is always a number, so for somebody Planning Center holds
-   * no grade for it is the sync's clamp rather than a fact (see `gradeOnFile`).
-   * Backfilling it stamped "6th" onto a real document, and unlike the roster
-   * row it came from, a document outlives the roster: take that person off it
-   * and the invented 6 is all that is left, with nothing beside it to say so.
+   * Nothing is backfilled for somebody who has no grade. A document outlives
+   * the roster row it was copied from: take that person off the roster and
+   * whatever was written here is all that is left of them, so writing down a
+   * grade nobody actually holds would be the only surviving claim about it.
    * The rules allow a student document with no grade at all.
    */
-  if (payload.grade === undefined && current?.grade !== undefined && current.gradeOnFile !== false) {
+  if (payload.grade === undefined && current?.grade != null) {
     payload.grade = current.grade;
   }
 
@@ -167,7 +169,7 @@ export async function setStudentStatus(
   studentId: string,
   status: StudentStatus,
   uid: string,
-  current?: Pick<Student, 'firstName' | 'lastName' | 'grade' | 'gradeOnFile'>,
+  current?: Pick<Student, 'firstName' | 'lastName' | 'grade'>,
 ): Promise<void> {
   await updateStudent(studentId, { status }, uid, current);
 }

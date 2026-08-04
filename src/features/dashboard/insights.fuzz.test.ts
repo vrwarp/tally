@@ -62,7 +62,12 @@ function arbitraryDashboard(rng: Rng): DashboardInput {
     const present = new Set(students.filter(() => rng.bool(0.5)).map((s) => s.id));
     // A whole register, so an empty one is a gathering nobody came to — which is
     // exactly the case several of these properties are about.
-    return { event, presentStudentIds: present, held: present.size > 0 };
+    return {
+      event,
+      presentStudentIds: present,
+      checkedOutStudentIds: new Set<string>(),
+      held: present.size > 0,
+    };
   });
 
   return { students, snapshots, settings: arbitrarySettings(rng), reachable };
@@ -315,6 +320,7 @@ describe('dashboard insight properties', () => {
     const nobodyCame = input.snapshots.map((snapshot) => ({
       ...snapshot,
       presentStudentIds: new Set<string>(),
+      checkedOutStudentIds: new Set<string>(),
       held: false,
     }));
 
@@ -340,6 +346,16 @@ describe('dashboard insight properties', () => {
     expect(summary.miaCount).toBe(mia.length);
     expect(summary.newVisitorCount).toBe(newVisitors.length);
     expect(summary.incompleteCount).toBe(incomplete.length);
-    for (const value of Object.values(summary)) expect(value).toBeGreaterThanOrEqual(0);
+    // `checkOutRate` is the one nullable member — null when nothing in the
+    // window tracks check-out — so it gets its own claim rather than being
+    // swept into the counts.
+    const { checkOutRate, ...counts } = summary;
+    for (const value of Object.values(counts)) expect(value).toBeGreaterThanOrEqual(0);
+    if (checkOutRate !== null) {
+      expect(checkOutRate).toBeGreaterThanOrEqual(0);
+      // A percentage of check-ins that were collected, and a collected child
+      // was necessarily checked in — so it can never run over 100.
+      expect(checkOutRate).toBeLessThanOrEqual(100);
+    }
   });
 });

@@ -12,11 +12,14 @@ import {
   attendancePayload,
   isFirstEver,
   studentDatePatch,
+  checkOutPayload,
+  undoCheckOutPayload,
   type CheckInStudent,
 } from '@/services/attendancePayloads';
 
 const SENTINEL = Symbol('serverTimestamp');
-const clock = { serverTimestamp: () => SENTINEL };
+const DELETED = Symbol('deleteField');
+const clock = { serverTimestamp: () => SENTINEL, deleteField: () => DELETED };
 
 const event = { id: 'event-1', seriesId: 'friday', startAt: new Date('2026-08-07T19:00:00Z') };
 
@@ -26,7 +29,6 @@ function student(overrides: Partial<CheckInStudent> = {}): CheckInStudent {
     firstName: 'Maya',
     lastName: 'Chen',
     grade: 9,
-    gradeOnFile: undefined,
     searchName: 'maya chen',
     firstAttendedAt: null,
     lastAttendedAt: null,
@@ -103,7 +105,7 @@ describe('studentDatePatch', () => {
   });
 
   it('omits the grade when nobody actually holds one', () => {
-    const patch = studentDatePatch(clock, student({ gradeOnFile: false }), event, 'uid-1');
+    const patch = studentDatePatch(clock, student({ grade: null }), event, 'uid-1');
     expect(patch).not.toHaveProperty('grade');
   });
 });
@@ -112,5 +114,28 @@ describe('isFirstEver', () => {
   it('is exactly "no first attendance on record"', () => {
     expect(isFirstEver(student())).toBe(true);
     expect(isFirstEver(student({ firstAttendedAt: new Date() }))).toBe(false);
+  });
+});
+
+/**
+ * The two check-out builders.
+ *
+ * The asymmetry between them is the whole point: a pending `serverTimestamp()`
+ * reads back as null locally, and null is exactly the state that means "still
+ * in the room", so an undo has to *delete* the keys rather than null them.
+ */
+describe('checkOutPayload', () => {
+  it('writes the moment and who recorded it, and nothing else', () => {
+    expect(checkOutPayload(clock, 'uid-2')).toEqual({
+      checkedOutAt: SENTINEL,
+      checkedOutBy: 'uid-2',
+    });
+  });
+
+  it('undoes by deleting both fields, never by writing null', () => {
+    const payload = undoCheckOutPayload(clock);
+
+    expect(payload).toEqual({ checkedOutAt: DELETED, checkedOutBy: DELETED });
+    expect(payload.checkedOutAt).not.toBeNull();
   });
 });
