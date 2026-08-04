@@ -10,7 +10,46 @@
 import { useEffect, useRef, useState } from 'react';
 import type { KioskServices } from '../KioskApp';
 
-const POLL_MS = 2000;
+/** Exported so tests can drive the poll loop rather than wait through it. */
+export const POLL_MS = 2000;
+
+/**
+ * How many consecutive failures before the screen says anything.
+ *
+ * At a two-second poll this is roughly six seconds of silence — longer than any
+ * blip worth mentioning, shorter than a leader's patience after tapping approve.
+ */
+export const TROUBLE_AFTER_FAILURES = 3;
+
+/**
+ * Which of the two waits this is. The distinction is *where* it stalled, which
+ * the screen knows for certain, rather than *why*, which it cannot know.
+ *
+ * The tempting version of this reads the Firebase error code and reports a
+ * server fault on `internal`. It does not work: the Functions SDK gives a
+ * failed fetch an HTTP status of 0 and maps both 0 and a real 500 to
+ * `internal`, so a kiosk with its network unplugged is indistinguishable by
+ * code from a deployment that cannot sign tokens. Asserting a cause from that
+ * would send a leader to edit IAM over a dropped connection.
+ *
+ * Having a code is a fact, and a useful one: this device reached Tally, Tally
+ * answered, and the handshake began. Only the second half is failing.
+ */
+type PairingTrouble = 'no-code' | 'stuck';
+
+/**
+ * Addressed to the leader standing at the kiosk — no parent sees this screen
+ * while it is pairing. The `stuck` line states what is observably true and
+ * hands off to the one screen that *can* name a cause, rather than guessing at
+ * one here.
+ */
+const TROUBLE_TEXT: Record<PairingTrouble, string> = {
+  'no-code': 'Can’t reach Tally right now. Trying again shortly…',
+  stuck:
+    'This kiosk has its code, but the pairing isn’t completing. If a leader has already ' +
+    'approved it, they should open Settings → Check-in kiosk in Tally, which will say ' +
+    'whether anything needs fixing.',
+};
 
 export function PairingScreen({
   services,
@@ -20,7 +59,7 @@ export function PairingScreen({
   onPaired: (uid: string) => void;
 }) {
   const [code, setCode] = useState<string | null>(null);
-  const [trouble, setTrouble] = useState(false);
+  const [trouble, setTrouble] = useState<PairingTrouble | null>(null);
   const pairedRef = useRef(onPaired);
   pairedRef.current = onPaired;
 
@@ -30,10 +69,17 @@ export function PairingScreen({
 
     const run = async () => {
       try {
-        setTrouble(false);
+        setTrouble(null);
         const pairing = await services.beginPairing();
         if (cancelled) return;
         setCode(pairing.code);
+
+        /*
+         * Consecutive, not cumulative: one failure in an otherwise healthy
+         * hour is the lobby wifi, and a kiosk that has been failing since it
+         * was switched on is a fault. Only an unbroken run means anything.
+         */
+        let failures = 0;
 
         const poll = async () => {
           if (cancelled) return;
@@ -49,8 +95,14 @@ export function PairingScreen({
               void run();
               return;
             }
+            failures = 0;
+            setTrouble(null);
           } catch {
-            // A dropped poll is just a slow lobby network; keep going.
+            if (cancelled) return;
+            // Still patient with a dropped poll — but no longer silent once
+            // the failures stop looking like a blip.
+            failures += 1;
+            if (failures >= TROUBLE_AFTER_FAILURES) setTrouble('stuck');
           }
           timer = setTimeout(poll, POLL_MS);
         };
@@ -59,7 +111,7 @@ export function PairingScreen({
         if (cancelled) return;
         // Could not even start a pairing — network down, or the cap reached.
         setCode(null);
-        setTrouble(true);
+        setTrouble('no-code');
         timer = setTimeout(run, 30_000);
       }
     };
@@ -81,11 +133,16 @@ export function PairingScreen({
             A leader enters this code in Tally under{' '}
             <span className="font-semibold text-ink-100">Settings → Pair a kiosk</span>.
           </div>
+          {/* The code stays up: it is still the right code, and a leader may be
+              mid-approval. This only adds why nothing is happening. */}
+          {trouble ? (
+            <div className="max-w-md text-base leading-relaxed text-warn-400">
+              {TROUBLE_TEXT[trouble]}
+            </div>
+          ) : null}
         </>
       ) : trouble ? (
-        <div className="max-w-md text-lg text-ink-300">
-          Can&apos;t reach Tally right now. Trying again shortly…
-        </div>
+        <div className="max-w-md text-lg text-ink-300">{TROUBLE_TEXT[trouble]}</div>
       ) : (
         <div className="text-lg text-ink-400">Getting a code…</div>
       )}
