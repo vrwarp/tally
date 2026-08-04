@@ -73,6 +73,11 @@ export type { Label } from '@vrwarp/brother-ql-webusb/labels';
 export type { PrinterStatus } from '@vrwarp/brother-ql-webusb/printer-core';
 
 /**
+ * Compile-time flag gating the end-to-end seam below. See `lib/firebase.ts`.
+ */
+declare const __E2E_HOOKS__: boolean;
+
+/**
  * What the printer is doing, as far as any screen needs to know.
  *
  * Deliberately coarse. The only consumer is a staff surface deciding between
@@ -352,12 +357,38 @@ export async function readStatus(): Promise<PrinterStatus | null> {
 /* Printing                                                                    */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Where a job goes instead of the wire, when the end-to-end suite is watching.
+ *
+ * There is no way to give Playwright a USB printer, so the transport is the one
+ * part of this that cannot be exercised in CI. Everything upstream of it can be,
+ * and is worth far more than a stub of the whole feature: a recorded job proves
+ * the real worker started, `OffscreenCanvas` measured and drew real text in a
+ * real browser, and `createJob` produced a plausible number of bytes — none of
+ * which the unit tests can show, because jsdom has no canvas and Node has no
+ * worker.
+ *
+ * Opt-in from the test side: the array only exists if a spec created it. A test
+ * seam that ships is not a test seam, it is a way in — and this one is inside
+ * `__E2E_HOOKS__` besides, so it is eliminated from anything a church deploys.
+ */
+function recorder(): { bytes: number; pageCount: number }[] | null {
+  if (!__E2E_HOOKS__) return null;
+  const held = (window as unknown as Record<string, unknown>).__tallyKioskLabels;
+  return Array.isArray(held) ? (held as { bytes: number; pageCount: number }[]) : null;
+}
+
 const queue = createLabelQueue({
   raster: (job) => {
     if (!config) return Promise.reject(new Error('No printer is configured.'));
     return rasterInWorker(config, job);
   },
   send: async (result) => {
+    const recording = recorder();
+    if (recording) {
+      recording.push({ bytes: result.job.length, pageCount: result.pageCount });
+      return;
+    }
     // A label arriving while the printer is down should reopen it rather than
     // fail: the device may have been replugged without a connect event landing.
     if (!printer?.opened) await reopen();

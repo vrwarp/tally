@@ -8,7 +8,7 @@
  * dynamic imports included, because the Firebase SDK deliberately loads
  * behind the first paint and a regression there must still fail the build.
  *
- * Two assertions:
+ * Three assertions:
  *
  *   1. Nothing reachable from kiosk.html is the full Firestore chunk — the
  *      chunk-splitting in vite.config.ts exists so the kiosk (firestore/lite
@@ -17,6 +17,15 @@
  *   2. The gzipped total of the reachable graph stays under the budget, and
  *      the *first-paint* subset (the statically referenced chunks) under its
  *      own smaller one.
+ *   3. Label printing stays inside a budget of its own.
+ *
+ * That third one exists because printing is a feature most kiosks do not have.
+ * It loads behind `import()` gated on a localStorage key, so a lobby screen with
+ * no printer never parses a byte of it — but it still counts against the total,
+ * and the total has enough headroom to hide it growing. Left alone, "the kiosk
+ * is under budget" would slowly come to mean "the kiosk plus a rasteriser is
+ * under budget", and a regression in the part every kiosk *does* download would
+ * have somewhere to hide. Naming it separately keeps both numbers honest.
  *
  * Run after `npm run build`: `node scripts/check-kiosk-budget.mjs`.
  */
@@ -30,6 +39,24 @@ const DIST = join(ROOT, 'dist');
 
 const TOTAL_BUDGET_GZIP_BYTES = 250_000;
 const FIRST_PAINT_BUDGET_GZIP_BYTES = 130_000;
+
+/**
+ * Label printing: the rasteriser, its worker and the WebUSB transport.
+ *
+ * Measured over the chunks reachable *only* through the printing entry, so the
+ * label template and the render maths — which the main app shares — are not
+ * charged to it twice.
+ *
+ * 25 kB against about 14 kB in use. Enough room for a barcode or a second media
+ * table, not enough for somebody to reach for the full `@vrwarp/brother-ql-webusb`
+ * barrel and pull the imaging pipeline in alongside the transport. That is the
+ * mistake this number is here to catch, and it is the reason the package has a
+ * `printer-core` entry point at all.
+ */
+const PRINTING_BUDGET_GZIP_BYTES = 25_000;
+
+/** Chunks whose names mark them as the printing feature's own. */
+const PRINTING_CHUNK = /^(printing|raster\.worker)-/;
 
 const html = readFileSync(join(DIST, 'kiosk.html'), 'utf8');
 const staticRefs = [...new Set([...html.matchAll(/assets\/[^"']+\.js/g)].map((m) => m[0]))];
@@ -49,18 +76,29 @@ function importsOf(ref) {
   return [...found];
 }
 
-const reachable = new Set();
-const queue = [...staticRefs.map((ref) => basename(ref))];
-while (queue.length > 0) {
-  const name = queue.pop();
-  if (reachable.has(name)) continue;
-  reachable.add(name);
-  try {
-    queue.push(...importsOf(`assets/${name}`));
-  } catch {
-    // A specifier that is not an emitted chunk (sw.js references, workers).
+/**
+ * Everything reachable from the kiosk's static entries, optionally stopping at a
+ * set of chunks — which is how the printing subgraph is isolated below.
+ */
+function walk(stopAt = new Set()) {
+  const seen = new Set();
+  const queue = [...staticRefs.map((ref) => basename(ref))];
+  while (queue.length > 0) {
+    const name = queue.pop();
+    if (seen.has(name)) continue;
+    seen.add(name);
+    // Counted, but not traversed through: its imports belong to it.
+    if (stopAt.has(name)) continue;
+    try {
+      queue.push(...importsOf(`assets/${name}`));
+    } catch {
+      // A specifier that is not an emitted chunk (sw.js references, workers).
+    }
   }
+  return seen;
 }
+
+const reachable = walk();
 
 const fullFirestore = [...reachable].filter((name) => /^firestore-(?!lite)/.test(name));
 if (fullFirestore.length > 0) {
@@ -72,29 +110,81 @@ if (fullFirestore.length > 0) {
   process.exit(1);
 }
 
+/*
+ * The printing subgraph: what a kiosk downloads *only* because it has a printer.
+ *
+ * Found by walking the graph a second time without traversing into the printing
+ * entry, and taking the difference. Anything the main app or the rest of the
+ * kiosk also needs — the label template, say — is reachable by another route and
+ * so stays out of it, which is the point of doing it by difference rather than by
+ * matching more names.
+ *
+ * Failing when no printing chunk is found is deliberate. This check is keyed on
+ * chunk names, which come from module paths, so a rename or a refactor that
+ * inlined the module could quietly make it measure nothing at all — and an
+ * assertion that has stopped asserting is worse than no assertion, because the
+ * output still reads as a pass.
+ */
+const printingEntries = new Set([...reachable].filter((name) => PRINTING_CHUNK.test(name)));
+if (printingEntries.size === 0) {
+  console.error(
+    'No printing chunk found in the kiosk graph, so its budget is measuring nothing.\n' +
+      'If src/kiosk/printing/ moved or was renamed, update PRINTING_CHUNK in this script. ' +
+      'If printing was removed, remove this check with it.',
+  );
+  process.exit(1);
+}
+
+const withoutPrinting = walk(printingEntries);
+const printingOnly = new Set([...reachable].filter((name) => !withoutPrinting.has(name)));
+// The entries themselves are reached-but-not-traversed by the second walk, so
+// they land in `withoutPrinting`; they are printing's own weight regardless.
+for (const name of printingEntries) printingOnly.add(name);
+
 const staticNames = new Set(staticRefs.map((ref) => basename(ref)));
 let total = 0;
 let firstPaint = 0;
+let printing = 0;
 const rows = [];
 for (const name of reachable) {
   const bytes = gzipSync(readFileSync(join(DIST, `assets/${name}`))).length;
   total += bytes;
   const isStatic = staticNames.has(name);
   if (isStatic) firstPaint += bytes;
-  rows.push(`  ${(bytes / 1024).toFixed(1).padStart(7)} KB gz  ${isStatic ? 'entry ' : 'lazy  '} ${name}`);
+  if (printingOnly.has(name)) printing += bytes;
+  const tag = isStatic ? 'entry ' : printingOnly.has(name) ? 'print ' : 'lazy  ';
+  rows.push(`  ${(bytes / 1024).toFixed(1).padStart(7)} KB gz  ${tag} ${name}`);
 }
 
+/** What every kiosk downloads, printer or not — the number that must stay honest. */
+const core = total - printing;
+
 console.log(rows.sort((a, b) => Number(b.slice(0, 10)) - Number(a.slice(0, 10))).join('\n'));
+const kb = (bytes) => (bytes / 1024).toFixed(1);
 console.log(
-  `  first paint ${(firstPaint / 1024).toFixed(1)} KB gz (budget ${FIRST_PAINT_BUDGET_GZIP_BYTES / 1024}), ` +
-    `total ${(total / 1024).toFixed(1)} KB gz (budget ${TOTAL_BUDGET_GZIP_BYTES / 1024})`,
+  `  first paint ${kb(firstPaint)} KB gz (budget ${FIRST_PAINT_BUDGET_GZIP_BYTES / 1024}), ` +
+    `core ${kb(core)} KB gz (budget ${TOTAL_BUDGET_GZIP_BYTES / 1024}), ` +
+    `printing ${kb(printing)} KB gz (budget ${PRINTING_BUDGET_GZIP_BYTES / 1024}), ` +
+    `all ${kb(total)} KB gz`,
 );
 
 if (firstPaint > FIRST_PAINT_BUDGET_GZIP_BYTES) {
   console.error(`Kiosk first-paint JS exceeds its budget: ${firstPaint} > ${FIRST_PAINT_BUDGET_GZIP_BYTES} bytes gzipped.`);
   process.exit(1);
 }
-if (total > TOTAL_BUDGET_GZIP_BYTES) {
-  console.error(`Kiosk JS exceeds its budget: ${total} > ${TOTAL_BUDGET_GZIP_BYTES} bytes gzipped.`);
+if (core > TOTAL_BUDGET_GZIP_BYTES) {
+  console.error(
+    `Kiosk JS exceeds its budget: ${core} > ${TOTAL_BUDGET_GZIP_BYTES} bytes gzipped ` +
+      '(excluding label printing, which has its own budget).',
+  );
+  process.exit(1);
+}
+if (printing > PRINTING_BUDGET_GZIP_BYTES) {
+  console.error(
+    `Kiosk label printing exceeds its budget: ${printing} > ${PRINTING_BUDGET_GZIP_BYTES} bytes gzipped.\n` +
+      'The usual cause is importing @vrwarp/brother-ql-webusb rather than its ' +
+      '/printer-core and /convert entry points, which puts the imaging pipeline on ' +
+      'the main thread and in the worker both. See src/kiosk/printing/index.ts.',
+  );
   process.exit(1);
 }
