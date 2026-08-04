@@ -193,7 +193,9 @@ service cloud.firestore {
         let d = request.resource.data;
         return (!('firstName' in d.keys()) || (d.firstName is string && d.firstName.size() > 0))
           && (!('lastName' in d.keys()) || (d.lastName is string && d.lastName.size() > 0))
-          && (!('grade' in d.keys()) || (d.grade is int && d.grade >= 6 && d.grade <= 12))
+          // 0 is kindergarten. Absent is a real state — somebody too young to
+          // have a grade, or an adult on a hand-picked roster.
+          && (!('grade' in d.keys()) || (d.grade is int && d.grade >= 0 && d.grade <= 12))
           && (!('status' in d.keys()) || d.status in ['active', 'inactive']);
       }
 
@@ -577,8 +579,8 @@ service cloud.firestore {
           && (!('studentListId' in d.keys()) || d.studentListId is string)
           && (!('counselorListId' in d.keys()) || d.counselorListId is string)
           && (!('writeBack' in d.keys()) || d.writeBack in ['off', 'create', 'full'])
-          && (!('minGrade' in d.keys()) || (d.minGrade is int && d.minGrade >= 6 && d.minGrade <= 12))
-          && (!('maxGrade' in d.keys()) || (d.maxGrade is int && d.maxGrade >= 6 && d.maxGrade <= 12))
+          && (!('minGrade' in d.keys()) || (d.minGrade is int && d.minGrade >= 0 && d.minGrade <= 12))
+          && (!('maxGrade' in d.keys()) || (d.maxGrade is int && d.maxGrade >= 0 && d.maxGrade <= 12))
           && (!('minGrade' in d.keys()) || !('maxGrade' in d.keys()) || d.maxGrade >= d.minGrade)
           && (!('cacheTtlSeconds' in d.keys())
               || (d.cacheTtlSeconds is int && d.cacheTtlSeconds >= 0 && d.cacheTtlSeconds <= 300))
@@ -626,8 +628,8 @@ service cloud.firestore {
           && (!('characterSlug' in d.keys()) || d.characterSlug is string)
           && (!('assemblySlug' in d.keys()) || d.assemblySlug is string)
           && (!('writeBack' in d.keys()) || d.writeBack in ['off', 'create', 'full'])
-          && (!('minGrade' in d.keys()) || (d.minGrade is int && d.minGrade >= 6 && d.minGrade <= 12))
-          && (!('maxGrade' in d.keys()) || (d.maxGrade is int && d.maxGrade >= 6 && d.maxGrade <= 12))
+          && (!('minGrade' in d.keys()) || (d.minGrade is int && d.minGrade >= 0 && d.minGrade <= 12))
+          && (!('maxGrade' in d.keys()) || (d.maxGrade is int && d.maxGrade >= 0 && d.maxGrade <= 12))
           && (!('minGrade' in d.keys()) || !('maxGrade' in d.keys()) || d.maxGrade >= d.minGrade)
           && (!('cacheTtlSeconds' in d.keys())
               || (d.cacheTtlSeconds is int && d.cacheTtlSeconds >= 0 && d.cacheTtlSeconds <= 300))

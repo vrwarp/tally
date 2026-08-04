@@ -45,7 +45,14 @@ import {
   type BirthdayState,
 } from '@/lib/birthday';
 import { formatSeenShort } from '@/lib/time';
-import { cn, createSearchMatcher, gradeLabel, initials, NO_GRADE, ordinalGrade } from '@/lib/utils';
+import {
+  cn,
+  createSearchMatcher,
+  gradeName,
+  gradeSentence,
+  initials,
+  NO_GRADE,
+} from '@/lib/utils';
 import { GRADES, backendLabelOf, backendOfStudent, type Grade, type Student } from '@/types';
 
 type StatusFilter = 'active' | 'inactive' | 'all';
@@ -196,7 +203,7 @@ export function StudentsPage() {
             <option value="">All grades</option>
             {GRADES.map((value) => (
               <option key={value} value={value}>
-                {ordinalGrade(value)}
+                {gradeName(value)}
               </option>
             ))}
           </SelectField>
@@ -387,7 +394,7 @@ const StudentListRow = memo(function StudentListRow({
 }) {
   const name = `${student.firstName} ${student.lastName}`;
   const birthday = birthdayState(student.birthday, now);
-  const grade = gradeLabel(student);
+  const spokenGrade = gradeSentence(student);
 
   return (
     /*
@@ -421,7 +428,9 @@ const StudentListRow = memo(function StudentListRow({
           `index.css` — drawn inward, so the row cannot clip it. */}
       <Link
         to={`/students/${student.id}`}
-        aria-label={grade ? `${name}, ${grade} grade` : `${name}, no grade on file`}
+        aria-label={
+          spokenGrade ? `${name}, ${spokenGrade}` : `${name}, no grade on file`
+        }
         className="absolute inset-0 rounded-lg"
       />
 
@@ -490,7 +499,7 @@ const StudentListRow = memo(function StudentListRow({
             only below `lg`; the wide layout has a lane for this.
           */}
           <span className="shrink-0 lg:w-20 lg:text-right">
-            {grade ? `${grade} grade` : NO_GRADE}
+            {spokenGrade ?? NO_GRADE}
           </span>
           <span className="hidden lg:block lg:flex-1" />
 

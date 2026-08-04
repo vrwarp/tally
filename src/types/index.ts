@@ -17,10 +17,23 @@ import { parseStudentId, type BackendId } from '@/lib/backendIds';
 /* Primitives                                                                  */
 /* -------------------------------------------------------------------------- */
 
-/** The ministry serves 6th through 12th grade. */
-export type Grade = 6 | 7 | 8 | 9 | 10 | 11 | 12;
+/**
+ * Kindergarten through 12th grade, with `0` meaning kindergarten.
+ *
+ * Wider than the 6–12 the youth ministry runs on, because a nursery or a
+ * children's ministry is the same app with a different band — and which band a
+ * church actually reads is configuration (`minGrade`/`maxGrade`), not this
+ * type. Widening here only decides what Tally can *represent*; an existing
+ * deployment's band stays 6–12 until somebody changes it in Settings.
+ *
+ * Below kindergarten there is no grade at all, and that is `null` rather than a
+ * negative sentinel: `grade` is pushed into Planning Center's own attribute and
+ * an Attendees `infos.fixed.grade`, where a `-2` would be a lie in somebody
+ * else's system.
+ */
+export type Grade = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
 
-export const GRADES: readonly Grade[] = [6, 7, 8, 9, 10, 11, 12] as const;
+export const GRADES: readonly Grade[] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
 
 export function isGrade(value: unknown): value is Grade {
   return typeof value === 'number' && GRADES.includes(value as Grade);

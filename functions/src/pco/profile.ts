@@ -48,7 +48,7 @@ export type UpdateStudentProfileStatus =
   | 'no-student'
   /** A Tally-only visitor: there is no upstream person to edit. */
   | 'not-in-planning-center'
-  /** The edit itself is not writable — a blank name, a grade outside 6-12. */
+  /** The edit itself is not writable — a blank name, a grade outside K-12. */
   | 'invalid';
 
 export interface UpdateStudentProfileResult {
@@ -365,7 +365,9 @@ export async function updateStudentProfile(
       grade < ABSOLUTE_MIN_GRADE ||
       grade > ABSOLUTE_MAX_GRADE
     ) {
-      return result('invalid', `Grade has to be between ${ABSOLUTE_MIN_GRADE} and ${ABSOLUTE_MAX_GRADE}.`);
+      // 0 is kindergarten, and "between 0 and 12" reads like a bug report.
+      const floor = ABSOLUTE_MIN_GRADE === 0 ? 'K' : String(ABSOLUTE_MIN_GRADE);
+      return result('invalid', `Grade has to be between ${floor} and ${ABSOLUTE_MAX_GRADE}.`);
     }
   }
   /*

@@ -190,14 +190,14 @@ export function Attendees32Editor({
           <div className="grid grid-cols-2 gap-3">
             <NumberStepperField
               label="Lowest grade"
-              min={6}
+              min={0}
               max={12}
               value={draft.minGrade}
               onValueChange={(value) => set('minGrade', value)}
             />
             <NumberStepperField
               label="Highest grade"
-              min={6}
+              min={0}
               max={12}
               value={draft.maxGrade}
               onValueChange={(value) => set('maxGrade', value)}

@@ -43,7 +43,7 @@ import {
   readBirthdayField,
 } from '@/lib/birthdayField';
 import { pcoPersonUrl } from '@/lib/planningCenter';
-import { formatPhone, ordinalGrade } from '@/lib/utils';
+import { formatPhone, gradeDescription } from '@/lib/utils';
 import { updateStudentProfile } from '@/services/functions';
 import { createStudent, updateStudent, type StudentDraft } from '@/services/students';
 import {
@@ -578,7 +578,7 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
           {gradeUnknown ? <option value="">No grade</option> : null}
           {GRADES.map((value) => (
             <option key={value} value={value}>
-              {ordinalGrade(value)} grade
+              {gradeDescription(value)}
             </option>
           ))}
         </SelectField>

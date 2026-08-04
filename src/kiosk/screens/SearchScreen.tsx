@@ -11,7 +11,7 @@
  * and staff are told where it is.
  */
 import { useMemo } from 'react';
-import { ordinalGrade } from '@/lib/utils';
+import { gradeDescription } from '@/lib/utils';
 import { HoldButton } from '../components/HoldButton';
 import { Keyboard, type KioskKey } from '../components/Keyboard';
 import { windowHasClosed, type KioskBinding } from '../binding';
@@ -22,7 +22,7 @@ import {
 } from '../search';
 
 function gradeLabel(grade: number | null): string {
-  return grade === null ? '' : `${ordinalGrade(grade)} grade`;
+  return grade === null ? '' : gradeDescription(grade);
 }
 
 export function SearchScreen({

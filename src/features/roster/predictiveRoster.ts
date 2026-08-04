@@ -106,6 +106,13 @@ export interface RosterView {
   focus: RosterFocus;
   /** True when a search query is narrowing the list. */
   isFiltered: boolean;
+  /**
+   * The grades anybody eligible tonight is in, ascending.
+   *
+   * Collected before the search filter and before the grade filter itself, so
+   * narrowing to one grade does not collapse the list of grades on offer.
+   */
+  gradesPresent: readonly Grade[];
   /** What `counts.participated` counted, so the screen can say which it means. */
   participationSource: ParticipationSource;
   counts: {
@@ -465,6 +472,9 @@ export function buildRoster(input: BuildRosterInput): RosterView {
   // Counted before the search filter: the header must keep reading "12 of 34"
   // while a counselor types, not "1 of 34".
   let eligible = 0;
+  // Which grades are actually represented tonight, so the grade filter can
+  // offer those and not all thirteen `Grade` admits.
+  const gradesSeen = new Set<Grade>();
   let presentTotal = 0;
   let checkedOutTotal = 0;
   let recentTotal = 0;
@@ -477,6 +487,11 @@ export function buildRoster(input: BuildRosterInput): RosterView {
     const isPinned = pinned.has(student.id);
 
     if (!isEligible(student, event, rsvp, record !== null || isPinned)) continue;
+
+    // Which grades tonight's roster covers, collected *before* the grade
+    // filter narrows it — otherwise picking 6th would leave the dropdown
+    // offering 6th alone, with no way back to the others.
+    if (student.grade !== null) gradesSeen.add(student.grade);
 
     // Scope filters narrow *who is on this counselor's roster*; they apply
     // before search so the counts below describe the slice being taken, not
@@ -573,6 +588,7 @@ export function buildRoster(input: BuildRosterInput): RosterView {
     entries,
     focus,
     isFiltered,
+    gradesPresent: [...gradesSeen].sort((a, b) => a - b),
     participationSource: source,
     counts: {
       present: presentTotal,

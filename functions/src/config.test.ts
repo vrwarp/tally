@@ -94,12 +94,21 @@ describe('loadConfig', () => {
   });
 
   describe('grade band', () => {
-    it('clamps a band wider than the ministry into 6-12', () => {
+    it('clamps a band wider than Tally can represent into 0-12', () => {
+      // Kindergarten is grade zero, so 1 is a band a children's ministry might
+      // genuinely want and is kept. 99 is not a grade in any school.
       env({ ...CREDENTIALS, PCO_MIN_GRADE: '1', PCO_MAX_GRADE: '99' });
       const config = loadConfig();
 
-      expect(config.minGrade).toBe(6);
+      expect(config.minGrade).toBe(1);
       expect(config.maxGrade).toBe(12);
+    });
+
+    it('refuses a band below kindergarten', () => {
+      // Nothing under 0 is representable: a child too young for kindergarten
+      // has no grade at all, which is null rather than a negative number.
+      env({ ...CREDENTIALS, PCO_MIN_GRADE: '-3', PCO_MAX_GRADE: '12' });
+      expect(loadConfig().minGrade).toBe(0);
     });
 
     it('never lets the maximum fall below the minimum', () => {
@@ -110,7 +119,9 @@ describe('loadConfig', () => {
       expect(config.maxGrade).toBeGreaterThanOrEqual(config.minGrade);
     });
 
-    it('falls back to the full band on unparseable input', () => {
+    it('falls back to the youth-ministry band on unparseable input', () => {
+      // 6, not 0. Widening what `Grade` can represent must not hand an existing
+      // church the whole children's ministry on the next deploy.
       env({ ...CREDENTIALS, PCO_MIN_GRADE: 'six' });
       expect(loadConfig().minGrade).toBe(6);
     });
@@ -240,10 +251,10 @@ describe('resolveConfig', () => {
     // own `Grade` type admits, whatever the rules let through.
     env(CREDENTIALS);
     const config = await resolveConfig(
-      withDocument({ minGrade: 1, maxGrade: 99, cacheTtlSeconds: 86_400, writeBack: 'everything' }),
+      withDocument({ minGrade: -3, maxGrade: 99, cacheTtlSeconds: 86_400, writeBack: 'everything' }),
     );
 
-    expect(config.minGrade).toBe(6);
+    expect(config.minGrade).toBe(0);
     expect(config.maxGrade).toBe(12);
     expect(config.cacheTtlSeconds).toBe(300);
     // Never silently escalate: an unrecognised mode must not become `full`.

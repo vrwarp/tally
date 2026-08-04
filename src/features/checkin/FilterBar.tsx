@@ -35,6 +35,8 @@ export interface FilterBarProps {
   /** How many students have been to this gathering before. */
   participatedCount: number;
   present: number;
+  /** The grades anybody eligible tonight is in. See `GradeFilter`. */
+  availableGrades?: readonly Grade[];
   /**
    * Whether this gathering tracks check-out. When it does, `Checked in` is
    * replaced by `In room` and `Checked out`, and Recent/Participated yield
@@ -103,6 +105,7 @@ export function FilterBar({
   showParticipated,
   participatedCount,
   present,
+  availableGrades,
   tracksCheckOut = false,
   inRoomCount = 0,
   checkedOutCount = 0,
@@ -184,7 +187,7 @@ export function FilterBar({
           </div>
         </div>
 
-        <GradeFilter grades={grades} onChange={onGradesChange} />
+        <GradeFilter grades={grades} onChange={onGradesChange} available={availableGrades} />
       </div>
     </div>
   );

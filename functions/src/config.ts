@@ -161,12 +161,27 @@ export const A32_SECRETS = A32_TOKEN ? [A32_TOKEN] : [];
 export const BACKEND_SECRETS = [...PCO_SECRETS, ...A32_SECRETS];
 
 /**
- * Grades Tally understands at all (`Grade` in src/types is 6..12). The
- * configured band is clamped into this, so a typo cannot produce a student the
- * client-side converter would silently rewrite to 6.
+ * Grades Tally understands at all — `Grade` in src/types is 0..12, where 0 is
+ * kindergarten. The configured band is clamped into this, so a typo cannot
+ * produce a student the client-side converter would answer null for.
+ *
+ * Wider than any one ministry's band on purpose: which grades a church
+ * actually reads is `minGrade`/`maxGrade` in Settings, and those still default
+ * to 6 and 12. Widening here does not widen anybody's roster.
  */
-export const ABSOLUTE_MIN_GRADE = 6;
+export const ABSOLUTE_MIN_GRADE = 0;
 export const ABSOLUTE_MAX_GRADE = 12;
+
+/**
+ * The band a deployment gets when it has not said otherwise.
+ *
+ * Deliberately narrower than what `Grade` can represent. Widening the type so a
+ * nursery *can* exist must not hand every existing church the whole children's
+ * ministry on the next deploy: a band below 6th grade is something somebody
+ * chooses in Settings.
+ */
+export const DEFAULT_MIN_GRADE = 6;
+export const DEFAULT_MAX_GRADE = 12;
 
 /* -------------------------------------------------------------------------- */
 /* Reading                                                                     */
@@ -313,11 +328,11 @@ function normalizeConfig(raw: RawConfig, managedInApp: boolean): PcoConfig {
     rawWriteBack === 'off' || rawWriteBack === 'full' ? rawWriteBack : 'create';
 
   const minGrade = clamp(
-    parseInteger(raw.minGrade, ABSOLUTE_MIN_GRADE),
+    parseInteger(raw.minGrade, DEFAULT_MIN_GRADE),
     ABSOLUTE_MIN_GRADE,
     ABSOLUTE_MAX_GRADE,
   );
-  const maxGrade = clamp(parseInteger(raw.maxGrade, ABSOLUTE_MAX_GRADE), minGrade, ABSOLUTE_MAX_GRADE);
+  const maxGrade = clamp(parseInteger(raw.maxGrade, DEFAULT_MAX_GRADE), minGrade, ABSOLUTE_MAX_GRADE);
 
   // An unreadable value falls back to the default rather than to zero: silently
   // disabling the cache because of a typo would look like Planning Center got
@@ -545,11 +560,11 @@ function normalizeA32Config(
     rawWriteBack === 'off' || rawWriteBack === 'full' ? rawWriteBack : 'create';
 
   const minGrade = clamp(
-    parseInteger(raw.minGrade, ABSOLUTE_MIN_GRADE),
+    parseInteger(raw.minGrade, DEFAULT_MIN_GRADE),
     ABSOLUTE_MIN_GRADE,
     ABSOLUTE_MAX_GRADE,
   );
-  const maxGrade = clamp(parseInteger(raw.maxGrade, ABSOLUTE_MAX_GRADE), minGrade, ABSOLUTE_MAX_GRADE);
+  const maxGrade = clamp(parseInteger(raw.maxGrade, DEFAULT_MAX_GRADE), minGrade, ABSOLUTE_MAX_GRADE);
   const cacheTtlSeconds = clamp(
     parseInteger(raw.cacheTtlSeconds, DEFAULT_CACHE_TTL_SECONDS),
     0,

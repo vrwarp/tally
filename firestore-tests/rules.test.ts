@@ -20,6 +20,7 @@ import {
   getDocs,
   orderBy,
   query,
+  deleteField,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -388,11 +389,14 @@ describe('students', () => {
     );
   });
 
-  it('rejects grades outside 6..12', async () => {
+  it('rejects grades outside K..12', async () => {
     const db = asUser(env, UID.counselor);
     // Off-model on purpose: `Grade` makes these unrepresentable in TypeScript,
-    // which is exactly why the rule has to say it too.
-    await assertFails(setDoc(doc(db, paths.student('student-g5')), { ...studentDoc(), grade: 5 }));
+    // which is exactly why the rule has to say it too. Below kindergarten
+    // there is no grade at all — that is an absent field, not a negative one.
+    await assertFails(
+      setDoc(doc(db, paths.student('student-gneg')), { ...studentDoc(), grade: -1 }),
+    );
     await assertFails(
       setDoc(doc(db, paths.student('student-g13')), { ...studentDoc(), grade: 13 }),
     );
@@ -400,7 +404,8 @@ describe('students', () => {
 
   it('accepts the boundary grades', async () => {
     const db = asUser(env, UID.counselor);
-    await assertSucceeds(setDoc(doc(db, paths.student('student-g6')), studentDoc({ grade: 6 })));
+    // 0 is kindergarten — a children's ministry roster, on the same rules.
+    await assertSucceeds(setDoc(doc(db, paths.student('student-gk')), studentDoc({ grade: 0 })));
     await assertSucceeds(setDoc(doc(db, paths.student('student-g12')), studentDoc({ grade: 12 })));
   });
 
@@ -585,6 +590,96 @@ describe('attendance', () => {
         ),
       );
     }
+  });
+});
+
+/**
+ * Recording that somebody collected a child.
+ *
+ * `ID.student` is seeded as already checked in, by `UID.counselor`. The claim
+ * that matters most here is the first one: the volunteer who takes a child in
+ * is rarely the one who hands them back, so a check-out must not be gated on
+ * `checkedInBy == uid` the way an ordinary attendance update is.
+ */
+describe('check-out', () => {
+  it('lets a different counselor record the pickup', async () => {
+    await assertSucceeds(
+      updateDoc(doc(asUser(env, UID.core), paths.attendance(ID.event, ID.student)), {
+        checkedOutAt: serverTimestamp(),
+        checkedOutBy: UID.core,
+      }),
+    );
+  });
+
+  it('refuses a pickup recorded under somebody else\'s name', async () => {
+    await assertFails(
+      updateDoc(doc(asUser(env, UID.core), paths.attendance(ID.event, ID.student)), {
+        checkedOutAt: serverTimestamp(),
+        checkedOutBy: UID.counselor,
+      }),
+    );
+  });
+
+  it('refuses a check-out that also rewrites the check-in', async () => {
+    // The whole point of the narrow key set: the rest of the record is a fact
+    // about the arrival and has to survive being handed to a second volunteer.
+    //
+    // Deliberately not testing `checkedInBy` here. Claiming a record as your
+    // own has always been a legal *ordinary* attendance update — `validAttendance`
+    // asks only that the caller name themselves — so it succeeds by that path
+    // rather than this one, and asserting otherwise would be asserting a rule
+    // Tally does not have.
+    for (const extra of [
+      { checkedInAt: serverTimestamp() },
+      { method: 'manual' },
+      { isFirstEver: true },
+    ]) {
+      await assertFails(
+        updateDoc(doc(asUser(env, UID.core), paths.attendance(ID.event, ID.student)), {
+          checkedOutAt: serverTimestamp(),
+          checkedOutBy: UID.core,
+          ...extra,
+        }),
+      );
+    }
+  });
+
+  it('lets a counselor put somebody back in the room', async () => {
+    const db = asUser(env, UID.core);
+    await assertSucceeds(
+      updateDoc(doc(db, paths.attendance(ID.event, ID.student)), {
+        checkedOutAt: serverTimestamp(),
+        checkedOutBy: UID.core,
+      }),
+    );
+    // Both fields deleted, naming nobody — which is why the authorship check
+    // only applies when a time is being written.
+    await assertSucceeds(
+      updateDoc(doc(db, paths.attendance(ID.event, ID.student)), {
+        checkedOutAt: deleteField(),
+        checkedOutBy: deleteField(),
+      }),
+    );
+  });
+
+  it('refuses a pickup for a child nobody checked in', async () => {
+    // `updateDoc` on a document that does not exist. A half-record invented by
+    // a pickup is a bug, not a shortcut.
+    await assertFails(
+      updateDoc(doc(asUser(env, UID.core), paths.attendance(ID.event, ID.otherStudent)), {
+        checkedOutAt: serverTimestamp(),
+        checkedOutBy: UID.core,
+      }),
+    );
+  });
+
+  it('refuses one from somebody with no role at all', async () => {
+    await assertFails(
+      updateDoc(doc(asUser(env, UID.stranger), paths.attendance(ID.event, ID.student)), {
+        checkedOutAt: serverTimestamp(),
+        checkedOutBy: UID.stranger,
+      }),
+    );
   });
 });
 
@@ -798,7 +893,7 @@ describe('config/planningCenter', () => {
 
   it('rejects a grade band outside the grades the app understands', async () => {
     const db = asUser(env, UID.core);
-    await assertFails(setDoc(doc(db, paths.planningCenter()), pcoConfigDoc({ minGrade: 1 })));
+    await assertFails(setDoc(doc(db, paths.planningCenter()), pcoConfigDoc({ minGrade: -1 })));
     await assertFails(setDoc(doc(db, paths.planningCenter()), pcoConfigDoc({ maxGrade: 13 })));
   });
 
@@ -902,7 +997,7 @@ describe('config/attendees32', () => {
 
   it('rejects a grade band outside the grades the app understands', async () => {
     const db = asUser(env, UID.core);
-    await assertFails(setDoc(doc(db, paths.attendees32()), a32ConfigDoc({ minGrade: 1 })));
+    await assertFails(setDoc(doc(db, paths.attendees32()), a32ConfigDoc({ minGrade: -1 })));
     await assertFails(setDoc(doc(db, paths.attendees32()), a32ConfigDoc({ maxGrade: 13 })));
   });
 
@@ -1127,12 +1222,67 @@ describe('kiosk', () => {
 
     it('may not overwrite an existing check-in — a lobby tap must not move a counselor\'s record', async () => {
       // ID.student is seeded as already checked in; the same write from the
-      // full session would be a legal update.
+      // full session would be a legal update. Narrowed rather than dropped
+      // when pickup arrived: a kiosk gained exactly one shape of update, and
+      // this is still not it.
       await assertFails(
         setDoc(
           doc(asKiosk(env, UID.counselor), paths.attendance(ID.event, ID.student)),
           attendanceDoc({ studentId: ID.student, checkedInBy: UID.counselor }),
         ),
+      );
+    });
+
+    it('may record a pickup that has not been recorded yet', async () => {
+      await assertSucceeds(
+        updateDoc(doc(asKiosk(env, UID.counselor), paths.attendance(ID.event, ID.student)), {
+          checkedOutAt: serverTimestamp(),
+          checkedOutBy: UID.counselor,
+        }),
+      );
+    });
+
+    it('may not move a pickup already standing', async () => {
+      // Correcting a recorded collection is a staff decision made on the
+      // roster, not something an unattended lobby screen does.
+      const kiosk = asKiosk(env, UID.counselor);
+      await assertSucceeds(
+        updateDoc(doc(kiosk, paths.attendance(ID.event, ID.student)), {
+          checkedOutAt: serverTimestamp(),
+          checkedOutBy: UID.counselor,
+        }),
+      );
+      await assertFails(
+        updateDoc(doc(kiosk, paths.attendance(ID.event, ID.student)), {
+          checkedOutAt: serverTimestamp(),
+          checkedOutBy: UID.counselor,
+        }),
+      );
+    });
+
+    it('may not undo a pickup either — the kiosk offers no undo at all', async () => {
+      const kiosk = asKiosk(env, UID.counselor);
+      await assertSucceeds(
+        updateDoc(doc(kiosk, paths.attendance(ID.event, ID.student)), {
+          checkedOutAt: serverTimestamp(),
+          checkedOutBy: UID.counselor,
+        }),
+      );
+      await assertFails(
+        updateDoc(doc(kiosk, paths.attendance(ID.event, ID.student)), {
+          checkedOutAt: deleteField(),
+          checkedOutBy: deleteField(),
+        }),
+      );
+    });
+
+    it('may not smuggle a check-in rewrite in beside a pickup', async () => {
+      await assertFails(
+        updateDoc(doc(asKiosk(env, UID.counselor), paths.attendance(ID.event, ID.student)), {
+          checkedOutAt: serverTimestamp(),
+          checkedOutBy: UID.counselor,
+          method: 'manual',
+        }),
       );
     });
 

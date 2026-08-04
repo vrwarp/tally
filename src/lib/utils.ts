@@ -365,6 +365,27 @@ export function ordinalGrade(grade: number): string {
   return `${grade}${suffix}`;
 }
 
+/**
+ * The short token for a grade: `K`, `1st`, `9th`.
+ *
+ * Kindergarten is the one grade with a name rather than a number, and
+ * `ordinalGrade` would print "0th". Everything below kindergarten has no grade
+ * at all and never reaches here — see `Grade`.
+ */
+export function gradeName(grade: number): string {
+  return grade === 0 ? 'K' : ordinalGrade(grade);
+}
+
+/**
+ * The same thing with its noun, for the places that read "9th grade".
+ *
+ * Kindergarten needs the whole word: "K grade" is not English, and a screen
+ * reader saying it beside a child's name is worse.
+ */
+export function gradeDescription(grade: number): string {
+  return grade === 0 ? 'Kindergarten' : `${ordinalGrade(grade)} grade`;
+}
+
 /** What a grade slot says when there is no grade to put in it. */
 export const NO_GRADE = 'No grade';
 
@@ -383,7 +404,15 @@ export const NO_GRADE = 'No grade';
  * spends the width that line needs on the thing it is least about.
  */
 export function gradeLabel(student: { grade: number | null }): string | null {
-  return student.grade === null ? null : ordinalGrade(student.grade);
+  return student.grade === null ? null : gradeName(student.grade);
+}
+
+/**
+ * The same, with its noun — for aria labels and any line that reads "9th
+ * grade". Kindergarten becomes "Kindergarten" rather than "K grade".
+ */
+export function gradeSentence(student: { grade: number | null }): string | null {
+  return student.grade === null ? null : gradeDescription(student.grade);
 }
 
 /** Stable "AB" avatar initials. */

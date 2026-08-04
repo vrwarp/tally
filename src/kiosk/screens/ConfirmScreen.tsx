@@ -12,7 +12,7 @@
  * not self-correcting when the child walks in anyway. Undoing one needs a
  * volunteer and the main app, so the gesture is worth a deliberate second.
  */
-import { ordinalGrade } from '@/lib/utils';
+import { gradeDescription } from '@/lib/utils';
 import { HoldButton } from '../components/HoldButton';
 import type { KioskIntent } from '../KioskApp';
 import type { KioskStudent } from '../search';
@@ -35,7 +35,7 @@ export function ConfirmScreen({
           {student.firstName} {student.lastName}
         </div>
         {student.grade !== null && (
-          <div className="pt-3 text-2xl text-ink-400">{ordinalGrade(student.grade)} grade</div>
+          <div className="pt-3 text-2xl text-ink-400">{gradeDescription(student.grade)}</div>
         )}
       </div>
 

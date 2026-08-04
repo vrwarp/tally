@@ -195,7 +195,9 @@ function driftedAttributes(
    * Center holds no grade for.
    */
   const heldGrade = (person.attributes ?? {}).grade;
-  if (grade !== null && grade > 0) {
+  // `>= 0`, not `> 0`: kindergarten is grade zero, and the old guard dropped
+  // every kindergartener's grade on the way upstream.
+  if (grade !== null && grade >= 0) {
     if (heldGrade === null || heldGrade === undefined) {
       attributes.grade = grade;
       /*

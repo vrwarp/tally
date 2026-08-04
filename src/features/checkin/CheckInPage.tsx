@@ -836,6 +836,7 @@ export function CheckInPage() {
           showParticipated={showParticipatedChip}
           participatedCount={counts.participated}
           present={counts.present}
+          availableGrades={roster.gradesPresent}
           tracksCheckOut={tracksCheckOut}
           inRoomCount={counts.inRoom}
           checkedOutCount={counts.checkedOut}

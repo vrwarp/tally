@@ -24,7 +24,7 @@ import { useToast } from '@/context/toastContext';
 import { addRosterMember, importPlanningCenterList, searchPlanningCenterPeople } from '@/services/functions';
 import { fetchPlanningCenterLists } from '@/services/planningCenter';
 import { pcoErrorReport } from '@/lib/pcoErrors';
-import { ordinalGrade } from '@/lib/utils';
+import { gradeDescription } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import {
   BACKEND_LABELS,
@@ -279,7 +279,7 @@ export function AddFromPlanningCenterModal({
                       <span className="block text-xs text-ink-500">
                         {person.grade === null
                           ? `No grade in ${backendName}`
-                          : ordinalGrade(person.grade)}
+                          : gradeDescription(person.grade)}
                         {person.child ? '' : ' · not marked as a child'}
                         {person.status === 'inactive' ? ` · inactive in ${backendName}` : ''}
                       </span>

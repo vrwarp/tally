@@ -9,7 +9,7 @@
 import { useEffect, useId, useState, type FormEvent } from 'react';
 import { Button, Modal, SelectField, TextField } from '@/components/ui';
 import { useToast } from '@/context/toastContext';
-import { haptic, ordinalGrade } from '@/lib/utils';
+import { gradeDescription, haptic } from '@/lib/utils';
 import { quickAddAndCheckIn } from '@/services/attendance';
 import { GRADES, type Grade, type TallyEvent } from '@/types';
 
@@ -129,7 +129,7 @@ export function QuickAddVisitorModal({
         >
           {GRADES.map((value) => (
             <option key={value} value={value}>
-              {ordinalGrade(value)} grade
+              {gradeDescription(value)}
             </option>
           ))}
         </SelectField>

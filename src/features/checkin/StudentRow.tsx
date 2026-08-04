@@ -22,7 +22,7 @@ import { memo } from 'react';
 import { Link } from 'react-router-dom';
 import { WarningBadge } from '@/components/ui';
 import { formatClock } from '@/lib/time';
-import { cn, gradeLabel, initials, NO_GRADE, sameItems } from '@/lib/utils';
+import { cn, gradeLabel, gradeSentence, initials, NO_GRADE, sameItems } from '@/lib/utils';
 import { studentFullName, type RosterEntry } from '@/types';
 
 /**
@@ -169,7 +169,8 @@ export const StudentRow = memo(function StudentRow({
   // Null for somebody Planning Center holds no grade for — an adult on a
   // hand-picked roster. The clause goes rather than announcing a grade Tally
   // invented, which on this screen is read aloud beside a name.
-  const gradeClause = grade ? `, ${grade} grade` : '';
+  const spokenGrade = gradeSentence(student);
+  const gradeClause = spokenGrade ? `, ${spokenGrade}` : '';
   const action = swapping
     ? isSwapSource
       ? `${name}${gradeClause} — the check-in being moved`
