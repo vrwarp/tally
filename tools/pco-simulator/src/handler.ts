@@ -731,13 +731,18 @@ function collectionFor(
  * which reads as a client bug and is anything but.
  */
 function pageUrl(store: SimulatorStore, selfPath: string, rawQuery: string, offset: number): string {
+  /*
+   * Parsed rather than split on `&`, because the raw pairs are still
+   * percent-encoded and `URLSearchParams.append` encodes again. The double
+   * encoding turned `include=phone_numbers%2Chouseholds` into
+   * `…%252Chouseholds` on the next link, the include list stopped parsing on
+   * page three, and every sweep quietly lost its side-loaded phone numbers
+   * exactly one page after anybody's test data ran out.
+   */
   const params = new URLSearchParams();
-  for (const pair of rawQuery.split('&')) {
-    if (!pair) continue;
-    const eq = pair.indexOf('=');
-    const key = eq === -1 ? pair : pair.slice(0, eq);
+  for (const [key, value] of new URLSearchParams(rawQuery)) {
     if (key === 'offset') continue;
-    params.append(key, eq === -1 ? '' : pair.slice(eq + 1));
+    params.append(key, value);
   }
   params.append('offset', String(offset));
   // Bracket characters are left literal, matching the client's own encoder and
