@@ -13,10 +13,12 @@
  * that has to happen whether or not anybody opened the app.
  */
 import { initializeApp } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { logger, setGlobalOptions } from 'firebase-functions/v2';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { backendFailureStatus, describeBackendFailure } from './backends/errors.js';
 import {
   a32AliasPairs,
@@ -73,6 +75,15 @@ import {
   studentIdFor,
   type BackendId,
 } from './generated/backendIds.js';
+import {
+  approvePairing,
+  claimPairing,
+  startPairing,
+  type ApprovePairingStatus,
+  type StartPairingResult,
+} from './kiosk/pairing.js';
+import { listKioskEvents, type KioskEventEntry } from './kiosk/events.js';
+import { buildPhoneIndex, type PhoneIndexSummary } from './kiosk/phoneIndex.js';
 import { materializeOccurrence as materializeOne, MINISTRY_TIME_ZONE } from './occurrences.js';
 // Imported for its registration side effect and nothing else: pulling the
 // adapter package in is what makes the Attendees backend available to the
@@ -2086,3 +2097,146 @@ export const deleteEvents = onCall<
 
   return summary;
 });
+
+/* -------------------------------------------------------------------------- */
+/* Kiosk                                                                       */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * The self-serve check-in kiosk: a browser on a shelf holding a custom-token
+ * session for the staff member who approved it. The handshake and its
+ * reasoning live in ./kiosk/pairing.ts; these wrappers add only what belongs
+ * at an entry point — argument checking, the permission gate on approval, and
+ * the Admin SDK's token mint.
+ */
+
+/**
+ * UNAUTHENTICATED — the kiosk has no identity yet; acquiring one is the point.
+ * The guardrails are in the module: a cap on live pairings, a ten-minute
+ * expiry, and the fact that nothing here grants anything — only an
+ * authenticated approval does.
+ */
+export const startKioskPairing = onCall<void, Promise<StartPairingResult>>(
+  { timeoutSeconds: 30, memory: '256MiB' },
+  async (): Promise<StartPairingResult> => {
+    const result = await startPairing(db(), new Date());
+    if (result === 'busy') {
+      throw new HttpsError('resource-exhausted', 'Too many kiosks are pairing right now. Try again in a few minutes.');
+    }
+    return result;
+  },
+);
+
+/**
+ * A staff member vouching for the code on a kiosk's screen. Any active member:
+ * the identity the kiosk inherits is the approver's own, and the attendance
+ * rules already require that identity to be at least a counselor for its
+ * writes to land.
+ */
+export const approveKioskPairing = onCall<
+  { code?: unknown },
+  Promise<{ status: ApprovePairingStatus }>
+>({ timeoutSeconds: 30, memory: '256MiB' }, async (request) => {
+  await requireMember(request.auth?.uid);
+
+  const code = request.data?.code;
+  if (typeof code !== 'string' || code.trim().length === 0) {
+    throw new HttpsError('invalid-argument', 'code is required.');
+  }
+
+  return { status: await approvePairing(db(), code, request.auth!.uid, new Date()) };
+});
+
+/**
+ * UNAUTHENTICATED — polled by the kiosk until the approval lands. The secret
+ * is what stands between the code on the lobby screen and the token: only the
+ * device that started the pairing holds it.
+ *
+ * Deployed minting needs the runtime service account to hold
+ * `roles/iam.serviceAccountTokenCreator` on itself — see docs/data-model.md's
+ * kiosk section. The Auth emulator mints unsigned tokens and needs nothing.
+ */
+export const claimKioskToken = onCall<
+  { code?: unknown; secret?: unknown },
+  Promise<{ status: 'pending' | 'not-found' | 'expired' } | { status: 'ready'; token: string }>
+>({ timeoutSeconds: 30, memory: '256MiB' }, async (request) => {
+  const code = request.data?.code;
+  const secret = request.data?.secret;
+  if (typeof code !== 'string' || typeof secret !== 'string') {
+    throw new HttpsError('invalid-argument', 'code and secret are required.');
+  }
+
+  const result = await claimPairing(db(), code, secret, new Date());
+  if (result.status !== 'ready') return { status: result.status };
+
+  const token = await getAuth().createCustomToken(result.uid, { kiosk: true });
+  return { status: 'ready', token };
+});
+
+/**
+ * The kiosk's event chooser: every gathering in the window, materialised or
+ * merely described by a recurrence rule. Same projection the app renders, run
+ * on the server so the kiosk bundle carries none of it. Any active member —
+ * which a paired kiosk is, as its approver.
+ */
+export const getKioskEvents = onCall<
+  { days?: unknown } | undefined,
+  Promise<{ events: KioskEventEntry[] }>
+>({ timeoutSeconds: 30, memory: '256MiB' }, async (request) => {
+  await requireMember(request.auth?.uid);
+
+  process.env.TZ = MINISTRY_TIME_ZONE;
+
+  const days = typeof request.data?.days === 'number' ? request.data.days : undefined;
+  return { events: await listKioskEvents(db(), new Date(), logger, { days }) };
+});
+
+/**
+ * Rebuilds `kioskIndex/phones` on demand: the Settings button, and the kiosk
+ * itself when it finds the stored index stale at bind time. Any active member —
+ * the output is only tail digits and student ids, data the same people already
+ * read from the document this writes.
+ */
+export const refreshKioskPhoneIndex = onCall<
+  { force?: unknown } | undefined,
+  Promise<PhoneIndexSummary>
+>({ secrets: BACKEND_SECRETS, timeoutSeconds: 300, memory: '512MiB' }, async (request) => {
+  await requireMember(request.auth?.uid);
+
+  const database = db();
+  const registry = await createRegistry(database);
+  try {
+    return await buildPhoneIndex(database, registry, {
+      force: request.data?.force === true,
+      builtBy: request.auth!.uid,
+      logger: logger,
+    });
+  } catch (error) {
+    reportBackendFailure('A people backend', error, 'rebuild the kiosk phone index');
+  }
+});
+
+/**
+ * The nightly rebuild, so the index never drifts more than a day from the
+ * numbers upstream even if no kiosk is ever paired. 3:30 am local: after
+ * everything, before everyone.
+ */
+export const rebuildKioskPhoneIndex = onSchedule(
+  {
+    schedule: 'every day 03:30',
+    timeZone: MINISTRY_TIME_ZONE,
+    secrets: BACKEND_SECRETS,
+    timeoutSeconds: 300,
+    memory: '512MiB',
+  },
+  async () => {
+    const database = db();
+    const registry = await createRegistry(database);
+    if (registry.ids().length === 0) return;
+    const summary = await buildPhoneIndex(database, registry, {
+      builtBy: 'schedule',
+      logger: logger,
+    });
+    logger.info('Rebuilt the kiosk phone index', summary);
+  },
+);

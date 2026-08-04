@@ -193,6 +193,27 @@ function ownedBy(resource: JsonApiResource, personId: string): boolean {
   return data.id === personId;
 }
 
+/**
+ * Every phone number Planning Center holds for this person, raw as entered.
+ *
+ * All of them, unlike `extractParentContact`'s one: the kiosk's last-4 index
+ * answers "does any number in this family end in these digits", and a parent
+ * types whichever of their numbers they think of first.
+ */
+export function phoneNumbersOf(person: PcoPerson, index: IncludedIndex): string[] {
+  const values: string[] = [];
+  for (const phone of listIncluded<PcoPhoneNumber>(index, PCO_TYPES.phoneNumber)) {
+    if (!ownedBy(phone, person.id)) continue;
+    const value = firstNonEmpty(
+      phone.attributes?.number,
+      phone.attributes?.national,
+      phone.attributes?.e164,
+    );
+    if (value) values.push(value);
+  }
+  return values;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Person -> student                                                           */
 /* -------------------------------------------------------------------------- */

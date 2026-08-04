@@ -13,6 +13,7 @@ import type { A32Config } from '../config.js';
 import { BACKEND_PREFIXES } from '../generated/backendIds.js';
 import { createA32Client } from './client.js';
 import { a32RootEventId, importMeetHistory, listImportableMeets } from './history.js';
+import { collectPhoneLast4 } from './phoneIndex.js';
 import {
   fetchAllergyNotes,
   fetchParentContactStatus,
@@ -65,6 +66,8 @@ export function createA32Backend(args: BackendContext & { config: A32Config }): 
       fetchAllergyNotes({ client, config, cache, personIds, force }),
     fetchParentContactStatus: ({ personIds, force }) =>
       fetchParentContactStatus({ client, config, cache, personIds, force }),
+    collectPhoneLast4: ({ personIds, force }) =>
+      collectPhoneLast4({ client, config, cache, personIds, force }),
     checkPerson: ({ personId }) => checkPerson(client, personId),
 
     pushStudent: ({ studentId, logger }) =>

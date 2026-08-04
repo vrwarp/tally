@@ -503,9 +503,11 @@ export interface TallyEvent
  *
  * `import` marks a row that came from Planning Center Check-Ins history
  * rather than from anybody's thumb; those rows also carry
- * `checkedInBy: 'planning-center'` instead of a uid.
+ * `checkedInBy: 'planning-center'` instead of a uid. `kiosk` marks a
+ * self-serve check-in from the lobby kiosk, written under the staff session
+ * that paired the device.
  */
-export type CheckInMethod = 'tap' | 'search' | 'quick-add' | 'manual' | 'import';
+export type CheckInMethod = 'tap' | 'search' | 'quick-add' | 'manual' | 'import' | 'kiosk';
 
 /**
  * Stored at `events/{eventId}/attendance/{studentId}`.

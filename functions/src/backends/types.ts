@@ -169,6 +169,19 @@ export interface PeopleBackend {
 
   /* ---- Optional surfaces, promised by `capabilities` --------------------- */
 
+  /**
+   * The kiosk phone index's raw material: backend person id -> every distinct
+   * phone last-4 across that person's family (their own numbers included).
+   * Keyed by the backend's id because the caller knows which student document
+   * each person answers for — a pushed visitor's document keeps its Tally id.
+   * Optional because it arrived after the adapters' mocks were written; the
+   * index builder simply skips a backend without it.
+   */
+  collectPhoneLast4?(args: {
+    personIds: readonly string[];
+    force?: boolean;
+  }): Promise<Record<string, string[]>>;
+
   /** Planning Center Lists. Present iff `capabilities.listsSupported`. */
   fetchLists?(args: { search?: string; limit?: number }): Promise<PcoListSummary[]>;
   fetchListMemberIds?(listId: string): Promise<string[]>;

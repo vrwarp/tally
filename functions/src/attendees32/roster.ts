@@ -74,7 +74,7 @@ async function sweepOrganization(client: A32Client): Promise<Map<string, A32Atte
   return byId;
 }
 
-function cachedSweep(options: A32FlowOptions): Promise<Map<string, A32Attendee>> {
+export function cachedSweep(options: A32FlowOptions): Promise<Map<string, A32Attendee>> {
   return options.cache.get(
     orgSweepCacheKey(options.config.baseUrl),
     () => sweepOrganization(options.client),

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en" class="h-full" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no"
+    />
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="robots" content="noindex" />
+    <title>Tally Kiosk</title>
+    <!--
+      The self-serve check-in kiosk: a separate page, deliberately tiny.
+
+      No PWA manifest, no service worker, no theme resolver — the kiosk is a
+      fixed dark screen on a shelf, and its update channel is this very page
+      being no-cache while the hashed assets it references are immutable. See
+      src/kiosk/main.tsx.
+    -->
+  </head>
+  <body class="h-full">
+    <div id="root" class="h-full"></div>
+    <script type="module" src="/src/kiosk/main.tsx"></script>
+  </body>
+</html>

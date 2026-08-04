@@ -51,6 +51,11 @@ const SettingsPage = lazy(() =>
     default: m.SettingsPage,
   })),
 );
+const PairKioskPage = lazy(() =>
+  import('@/features/settings/PairKioskPage').then((m) => ({
+    default: m.PairKioskPage,
+  })),
+);
 
 export default function App() {
   return (
@@ -134,6 +139,9 @@ export default function App() {
                                   </RequireRole>
                                 }
                               />
+                              {/* Any active member: the person setting up the
+                                  lobby kiosk on a Friday night is a counselor. */}
+                              <Route path="pair-kiosk" element={<PairKioskPage />} />
 
                               <Route
                                 path="*"

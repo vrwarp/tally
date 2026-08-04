@@ -25,6 +25,7 @@ import { a32AliasesFromIncluded, resolveA32UuidFieldId } from './fieldData.js';
 import { addParent } from './household.js';
 import { fetchListMemberIds, fetchLists } from './lists.js';
 import { setParentContact } from './parentContact.js';
+import { collectPhoneLast4 } from './phoneIndex.js';
 import { followPersonLink, isPersonGoneError } from './personLink.js';
 import { updateStudentProfile } from './profile.js';
 import { pushPendingStudents, pushStudent } from './pushStudents.js';
@@ -100,6 +101,8 @@ export function createPcoBackend(args: BackendContext & { config: PcoConfig }): 
       fetchAllergyNotes({ client, config, cache, personIds, force }),
     fetchParentContactStatus: ({ personIds, force }) =>
       fetchParentContactStatus({ client, config, cache, personIds, force }),
+    collectPhoneLast4: ({ personIds, force }) =>
+      collectPhoneLast4({ client, config, cache, personIds, force }),
 
     /*
      * Confirm a person is real before the roster records that they are. A
