@@ -224,6 +224,8 @@ is therefore 7.x and `tsc6` is 6.x.
 | `src/context/` | `useAuth`, `useData`, `useToast` — the three app-wide providers. |
 | `src/hooks/` | Live-data hooks: active event, series history, attendance, RSVPs, ticking clock. |
 | `src/features/` | One folder per screen: `auth`, `checkin`, `dashboard`, `events`, `students`, `settings`, `roster`. |
+| `src/kiosk/` | The lobby kiosk — its own entry (`kiosk.html`), its own screens, its own tiny Firebase surface. Nothing here imports the main app's providers, and `scripts/check-kiosk-budget.mjs` holds it to a byte budget. |
+| `src/kiosk/printing/` | Brother QL label printing over WebUSB: a rasteriser in a Web Worker, a transport on the main thread, and a serial queue between them. Behind a dynamic import gated on the device having a printer at all. |
 | `src/components/ui/` | The design system: buttons, fields, modals, badges, cards, empty and loading states. |
 | `functions/` | The Cloud Functions package — **its own npm package**, see below. |
 | `functions/src/` | The people-backend integrations: the `PeopleBackend` seam (`backends/`), the Planning Center adapter (`pco/`), the Attendees adapter (`attendees32/`), on-demand reads, write-back, access provisioning. |
@@ -336,6 +338,24 @@ keyed the same way for the same reason.
 attendance record, which is what the header, the MIA derivation, the trend strip and every dashboard
 metric read — so a missed pickup cannot quietly reduce a head count. The live figure is a sibling,
 and `inRoom + checkedOut === present` is the invariant the fuzz suite holds.
+
+**A label is rasterised in a worker and sent from the main thread.** Turning a check-in into a
+Brother raster job is one synchronous pass over a few hundred thousand pixels, and the moment it would
+run is the worst one available: the pre-raster fires when the confirm screen opens, which is while a
+parent's thumb is on its way to the button. So it happens in a Web Worker — the imaging half of
+`@vrwarp/brother-ql-webusb` is DOM-free and works on plain `Uint8Array`s, which is what makes that
+possible. What cannot follow it there is the transport, because `navigator.usb` is not exposed to
+workers, so the worker builds the bytes and the main thread sends them. The package has separate
+`printer-core` and `convert` entry points for exactly this, and the kiosk's printing budget is set
+tight enough to fail if somebody reaches for the barrel instead and bundles the imaging code twice.
+
+**Printing cannot fail a check-in, and never tells a parent.** `onConfirm` already paints the tick
+before the write lands; the label goes last, wrapped, after the attendance write is dispatched. A
+printer problem surfaces as an amber dot in the corner of the search screen and a sentence on the
+staff printer screen — never beside the green tick, where a red line reads as "your check-in failed"
+to somebody who cannot fix a printer anyway. A check-out prints nothing at all: the sticker went on at
+the door, and a parent re-tapping a child who is already checked in is a runaway reprint loop rather
+than a request.
 
 **Undoing a check-out deletes the field rather than nulling it.** A pending `serverTimestamp()` reads
 back as `null` in the optimistic local snapshot, and `null` is exactly the state that means *still in
@@ -577,6 +597,7 @@ buttons that would fail.
 | --- | --- |
 | [docs/walkthrough](docs/walkthrough/README.md) | A guided tour of every feature, screenshotted from the running app |
 | [docs/backends.md](docs/backends.md) | The people-backend abstraction: ids, capabilities, partial failure, adding one |
+| [docs/label-printing.md](docs/label-printing.md) | Setting up a Brother QL at the kiosk: models, media, per-platform quirks, what a label may say |
 | [docs/planning-center.md](docs/planning-center.md) | Tokens, configuration, roster modes, write-back, troubleshooting |
 | [docs/attendees32.md](docs/attendees32.md) | The Attendees backend: setup command, field mapping, caveats |
 | [docs/data-model.md](docs/data-model.md) | Every collection, who may write it, and why it is shaped that way |
