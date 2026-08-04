@@ -182,6 +182,58 @@ describe('toAttendance', () => {
     expect(record.checkedInAt).toEqual(checkedInAt);
   });
 
+  /*
+   * The four states of `checkedOutAt`, and why they have to stay apart.
+   *
+   * An absent key is the whole "still in the room" state, so it cannot share
+   * an encoding with anything else — which is why the undo deletes the field
+   * rather than nulling it, and why a pending write is distinguishable from a
+   * document somebody hand-wrote in the console.
+   */
+  it('reads an absent check-out as still in the room', () => {
+    const record = toAttendance(fakeSnapshot({ data: { studentId: 'student-7' } }), 'event-1');
+    expect(record.checkedOutAt).toBeNull();
+    expect(record.checkedOutBy).toBeNull();
+  });
+
+  it('uses the pickup time once it lands', () => {
+    const checkedOutAt = new Date(2026, 1, 13, 20, 45);
+    const record = toAttendance(
+      fakeSnapshot({ data: { checkedOutAt: ts(checkedOutAt), checkedOutBy: 'counselor-2' } }),
+      'event-1',
+    );
+    expect(record.checkedOutAt).toEqual(checkedOutAt);
+    expect(record.checkedOutBy).toBe('counselor-2');
+  });
+
+  it('dates a locally-pending check-out to now, so the row leaves the room at once', () => {
+    // Without this the child would stay in the Present view until the server
+    // answered — the one thing the pickup flow must not do.
+    const before = Date.now();
+    const record = toAttendance(
+      fakeSnapshot({
+        data: { studentId: 'student-7', checkedOutAt: null, checkedOutBy: 'counselor-2' },
+        hasPendingWrites: true,
+      }),
+      'event-1',
+    );
+    const after = Date.now();
+
+    expect(record.checkedOutAt).not.toBeNull();
+    expect(record.checkedOutAt!.getTime()).toBeGreaterThanOrEqual(before);
+    expect(record.checkedOutAt!.getTime()).toBeLessThanOrEqual(after);
+  });
+
+  it('treats a confirmed null as no check-out at all', () => {
+    // A document somebody hand-wrote in the console. It says no more than an
+    // absent key would, and must not read as a pickup with no time.
+    const record = toAttendance(
+      fakeSnapshot({ data: { studentId: 'student-7', checkedOutAt: null }, hasPendingWrites: false }),
+      'event-1',
+    );
+    expect(record.checkedOutAt).toBeNull();
+  });
+
   it('falls back to the document id for studentId and to the argument for eventId', () => {
     const record = toAttendance(fakeSnapshot({ id: 'student-7', data: {} }), 'event-99');
     expect(record.id).toBe('student-7');

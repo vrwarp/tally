@@ -12,6 +12,8 @@ import {
   attendancePayload,
   isFirstEver,
   studentDatePatch,
+  checkOutPayload,
+  undoCheckOutPayload,
   type CheckInStudent,
 } from '@/services/attendancePayloads';
 
@@ -112,5 +114,28 @@ describe('isFirstEver', () => {
   it('is exactly "no first attendance on record"', () => {
     expect(isFirstEver(student())).toBe(true);
     expect(isFirstEver(student({ firstAttendedAt: new Date() }))).toBe(false);
+  });
+});
+
+/**
+ * The two check-out builders.
+ *
+ * The asymmetry between them is the whole point: a pending `serverTimestamp()`
+ * reads back as null locally, and null is exactly the state that means "still
+ * in the room", so an undo has to *delete* the keys rather than null them.
+ */
+describe('checkOutPayload', () => {
+  it('writes the moment and who recorded it, and nothing else', () => {
+    expect(checkOutPayload(clock, 'uid-2')).toEqual({
+      checkedOutAt: SENTINEL,
+      checkedOutBy: 'uid-2',
+    });
+  });
+
+  it('undoes by deleting both fields, never by writing null', () => {
+    const payload = undoCheckOutPayload(clock);
+
+    expect(payload).toEqual({ checkedOutAt: DELETED, checkedOutBy: DELETED });
+    expect(payload.checkedOutAt).not.toBeNull();
   });
 });

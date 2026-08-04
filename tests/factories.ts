@@ -181,6 +181,7 @@ export function makeWeeklyEvents(options: {
   seriesId?: string;
   title?: string;
   endingBefore?: Date;
+  requiresCheckOut?: boolean;
 }): TallyEvent[] {
   const { count, seriesId = 'friday-fellowship', title = 'Friday Fellowship' } = options;
   const anchor = options.endingBefore ?? NOW;
@@ -199,6 +200,7 @@ export function makeWeeklyEvents(options: {
       endAt,
       checkInOpensAt: new Date(startAt.getTime() - 60 * 60_000),
       checkInClosesAt: new Date(endAt.getTime() + 60 * 60_000),
+      requiresCheckOut: options.requiresCheckOut ?? false,
     });
   });
 }

@@ -19,7 +19,13 @@
  * that batch has to satisfy are checked.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { checkIn, fetchAttendanceByEvent, swapCheckIn } from '@/services/attendance';
+import {
+  checkIn,
+  checkOut,
+  fetchAttendanceByEvent,
+  swapCheckIn,
+  undoCheckOut,
+} from '@/services/attendance';
 import { makeAttendance, makeEvent, makeStudent } from '../../tests/factories';
 
 const set = vi.hoisted(() => vi.fn());
@@ -183,6 +189,63 @@ describe('swapCheckIn', () => {
 
     expect(commit).not.toHaveBeenCalled();
     expect(remove).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The arrival moment travels; the pickup does not.
+   *
+   * A check-out recorded against the wrong child is a statement about a parent
+   * who collected somebody else's kid — there is nothing in it worth keeping.
+   * The corrected record starts present, and if the right child has already
+   * gone home somebody checks them out again.
+   */
+  it('does not carry a check-out across to the corrected student', async () => {
+    await swapCheckIn({
+      event: EVENT,
+      from: { ...RECORD, checkedOutAt: new Date('2026-02-13T20:45:00') },
+      to: RIGHT,
+      uid: 'counselor-2',
+    });
+
+    const [, payload] = set.mock.calls[0]!;
+    expect(payload).not.toHaveProperty('checkedOutAt');
+    expect(payload).not.toHaveProperty('checkedOutBy');
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* checkOut                                                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Two fields, and an update rather than a set.
+ *
+ * `updateDoc` matters twice over: a whole-document `set` reads as "touches
+ * every key" to the rules' `touchesOnly` and would be refused outright, and a
+ * pickup for a child nobody checked in should fail rather than invent a
+ * half-record for them.
+ */
+describe('checkOut', () => {
+  beforeEach(() => updateDoc.mockClear());
+
+  it('writes the moment and who recorded it, and nothing else', async () => {
+    await checkOut('event-1', 'student-1', 'counselor-2');
+
+    const [ref, payload] = updateDoc.mock.calls[0]!;
+    expect(ref).toEqual({ path: 'events/event-1/attendance/student-1' });
+    expect(payload).toEqual({ checkedOutAt: 'server-timestamp', checkedOutBy: 'counselor-2' });
+  });
+
+  /**
+   * The undo deletes the keys rather than nulling them, and that asymmetry is
+   * load-bearing: a pending `serverTimestamp()` reads back as null locally, and
+   * null is exactly the state that means "still in the room".
+   */
+  it('undoes by deleting both fields, never by writing null', async () => {
+    await undoCheckOut('event-1', 'student-1');
+
+    const [, payload] = updateDoc.mock.calls[0]!;
+    expect(payload).toEqual({ checkedOutAt: 'deleted', checkedOutBy: 'deleted' });
   });
 });
 

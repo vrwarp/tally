@@ -10,7 +10,9 @@ import {
   createSearchMatcher,
   formatPhone,
   formatPhoneInput,
+  gradeDescription,
   gradeLabel,
+  gradeName,
   initials,
   matchesQuery,
   normalizeForSearch,
@@ -254,7 +256,25 @@ describe('ordinalGrade', () => {
   });
 });
 
+describe('gradeName and gradeDescription', () => {
+  it('names kindergarten rather than printing a zeroth grade', () => {
+    expect(gradeName(0)).toBe('K');
+    expect(gradeDescription(0)).toBe('Kindergarten');
+  });
+
+  it('keeps the ordinal for every grade that has one', () => {
+    expect(gradeName(1)).toBe('1st');
+    expect(gradeName(9)).toBe('9th');
+    expect(gradeDescription(1)).toBe('1st grade');
+    expect(gradeDescription(12)).toBe('12th grade');
+  });
+});
+
 describe('gradeLabel', () => {
+  it('uses the short token, so a chip reads "K" and not "Kindergarten"', () => {
+    expect(gradeLabel({ grade: 0 })).toBe('K');
+  });
+
   it('prints the grade a backend holds', () => {
     expect(gradeLabel({ grade: 9 })).toBe('9th');
   });

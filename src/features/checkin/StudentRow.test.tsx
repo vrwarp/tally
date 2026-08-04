@@ -60,6 +60,18 @@ function show(entry: RosterEntry, props: Partial<StudentRowProps> = {}) {
   return { ...view, onPress, onUndo, onSwap };
 }
 
+/** Checked in, then collected at a quarter past ten. */
+function collected(student: Student): RosterEntry {
+  return entryFor(
+    student,
+    makeAttendance({
+      studentId: student.id,
+      checkedInAt: new Date('2026-02-15T09:30:00'),
+      checkedOutAt: new Date('2026-02-15T10:15:00'),
+    }),
+  );
+}
+
 describe('StudentRow', () => {
   it('is one button and one outcome until the student is here', async () => {
     const entry = entryFor(JORDAN);
@@ -262,5 +274,99 @@ describe('StudentRow', () => {
 
       expect(screen.queryByText(/Allergy/)).not.toBeInTheDocument();
     });
+  });
+});
+
+/**
+ * The trailing slot changes verb rather than gaining a neighbour.
+ *
+ * On a gathering that hands children back, `Out` takes the one-tap slot and
+ * undo moves into the action strip one tap deeper — which is the right way
+ * round when collecting is the gesture repeated forty times a morning and undo
+ * is the rare correction. Nothing is lost: the strip carries undo in both
+ * states.
+ */
+describe('StudentRow: check-out', () => {
+  const withCheckOut = (entry: RosterEntry, props: Partial<StudentRowProps> = {}) => {
+    const onCheckOut = vi.fn();
+    const onUndoCheckOut = vi.fn();
+    const view = show(entry, { tracksCheckOut: true, onCheckOut, onUndoCheckOut, ...props });
+    return { ...view, onCheckOut, onUndoCheckOut };
+  };
+
+  it('offers Out instead of undo once a student is here', async () => {
+    const entry = present(JORDAN);
+    const { onCheckOut, onUndo } = withCheckOut(entry);
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /^Check out Jordan Reyes, 9th grade/ }),
+    );
+
+    expect(onCheckOut).toHaveBeenCalledWith(entry);
+    expect(onUndo).not.toHaveBeenCalled();
+  });
+
+  it('keeps undo one tap deeper, in the action strip', async () => {
+    const entry = present(JORDAN);
+    const { onUndo } = withCheckOut(entry, { expanded: true });
+
+    await userEvent.click(screen.getByRole('button', { name: /^Undo the check-in for Jordan/ }));
+    expect(onUndo).toHaveBeenCalledWith(entry);
+  });
+
+  it('puts a collected student back from the same slot', async () => {
+    const entry = collected(JORDAN);
+    const { onUndoCheckOut } = withCheckOut(entry);
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /^Put Jordan Reyes, 9th grade back in the room/ }),
+    );
+    expect(onUndoCheckOut).toHaveBeenCalledWith(entry);
+  });
+
+  /** Stated, not flagged: a missed check-out is not an error. */
+  it('says when they were collected, without a warning colour', () => {
+    withCheckOut(collected(JORDAN));
+
+    expect(screen.getByText(/^Out \d/)).toBeInTheDocument();
+    expect(screen.queryByText(/missed|overdue/i)).not.toBeInTheDocument();
+  });
+
+  it('leaves the row alone on a gathering that does not track check-out', async () => {
+    const entry = present(JORDAN);
+    const { onUndo } = show(entry);
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /^Undo check-in for Jordan Reyes, 9th grade/ }),
+    );
+    expect(onUndo).toHaveBeenCalledWith(entry);
+  });
+
+  /**
+   * The memo trap. `buildRoster` mints fresh entries on every rebuild, so a
+   * field `sameEntry` does not compare is a row that never repaints — and a
+   * pickup that never appears on screen.
+   */
+  it('repaints when a check-out lands', () => {
+    const student = JORDAN;
+    const { rerender } = render(
+      <MemoryRouter>
+        <ul>
+          <StudentRow entry={present(student)} onPress={vi.fn()} tracksCheckOut />
+        </ul>
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByText(/^Out \d/)).not.toBeInTheDocument();
+
+    rerender(
+      <MemoryRouter>
+        <ul>
+          <StudentRow entry={collected(student)} onPress={vi.fn()} tracksCheckOut />
+        </ul>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText(/^Out \d/)).toBeInTheDocument();
   });
 });

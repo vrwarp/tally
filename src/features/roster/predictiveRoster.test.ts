@@ -1423,3 +1423,83 @@ describe('buildRoster: empty inputs', () => {
     expect(view.counts.absent).toBe(0);
   });
 });
+
+/* -------------------------------------------------------------------------- */
+/* Check-out                                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The room, as distinct from the register.
+ *
+ * `present` is attendance and does not move when somebody is collected — every
+ * dashboard metric reads it, and a missed pickup must never reduce a head
+ * count. `inRoom` is the number a nursery volunteer is actually working from.
+ */
+describe('buildRoster: check-out', () => {
+  const nursery = makeEvent({ id: 'nursery-1', seriesId: 'sunday', requiresCheckOut: true });
+  const ada = makeStudent({ id: 'ada', lastName: 'Abara' });
+  const bo = makeStudent({ id: 'bo', lastName: 'Brook' });
+
+  /** Both students checked in; `collected` have been handed back. */
+  const withPickups = (collected: readonly string[]) => ({
+    event: nursery,
+    students: [ada, bo],
+    attendance: [ada, bo].map((student) =>
+      makeAttendance({
+        studentId: student.id,
+        eventId: nursery.id,
+        checkedOutAt: collected.includes(student.id) ? new Date('2026-02-15T10:15:00') : null,
+      }),
+    ),
+    rsvps: [],
+    history: [],
+    settings: makeSettings(),
+  });
+
+  it('splits the room without touching the head count', () => {
+    const view = buildRoster(withPickups(['ada']));
+
+    expect(view.counts.present).toBe(2);
+    expect(view.counts.inRoom).toBe(1);
+    expect(view.counts.checkedOut).toBe(1);
+  });
+
+  it('narrows to who is still here', () => {
+    const view = buildRoster({
+      ...withPickups(['ada']),
+      filters: { focus: 'inRoom' },
+    });
+
+    expect(view.entries.map((entry) => entry.student.id)).toEqual(['bo']);
+  });
+
+  it('narrows to who has gone', () => {
+    const view = buildRoster({
+      ...withPickups(['ada']),
+      filters: { focus: 'checkedOut' },
+    });
+
+    expect(view.entries.map((entry) => entry.student.id)).toEqual(['ada']);
+  });
+
+  /**
+   * A leftover focus from the last roster a counselor had open must not strand
+   * them on a filter whose chip is not on screen.
+   */
+  it('stands both focuses down on a gathering that does not track check-out', () => {
+    for (const focus of ['inRoom', 'checkedOut'] as const) {
+      const view = buildRoster({
+        event: makeEvent({ id: 'friday-1', seriesId: 'friday' }),
+        students: [ada, bo],
+        attendance: [],
+        rsvps: [],
+        history: [],
+        settings: makeSettings(),
+        filters: { focus },
+      });
+
+      expect(view.focus).toBe('all');
+      expect(view.entries).toHaveLength(2);
+    }
+  });
+});
