@@ -12,6 +12,7 @@
  */
 import type { Timestamp } from 'firebase/firestore';
 import { parseStudentId, type BackendId } from '@/lib/backendIds';
+import type { LabelTemplate } from '@/lib/labelTemplate';
 
 /* -------------------------------------------------------------------------- */
 /* Primitives                                                                  */
@@ -484,6 +485,20 @@ export interface TallyEventDoc {
    * gathering's shape implies that children get handed back.
    */
   requiresCheckOut: boolean;
+
+  /**
+   * What the kiosk prints when a child is checked in here, or null for nothing.
+   *
+   * Null is the ordinary answer and printing is opt-in per gathering: a printer
+   * plugged in for the nursery must not start producing stickers at youth group.
+   *
+   * Content and layout only — no label size, no printer model. Which roll is
+   * loaded is a fact about the machine in the lobby, so it lives on the kiosk
+   * itself; see `lib/labelTemplate.ts` for the whole argument. Carried onto
+   * projected occurrences the way `requiresCheckOut` is, because a room children
+   * are collected from is exactly the kind of gathering that repeats.
+   */
+  labelTemplate: LabelTemplate | null;
 
   status: EventStatus;
 

@@ -33,6 +33,7 @@ import {
   writeBatch,
   type Firestore,
 } from 'firebase/firestore';
+import { DEFAULT_LABEL_TEMPLATE, type LabelTemplate } from '../src/lib/labelTemplate';
 import { SERIES_IDS, paths } from '../src/lib/paths';
 import {
   DEFAULT_SETTINGS,
@@ -404,6 +405,8 @@ interface BuiltEvent {
   requiresRsvp: boolean;
   /** The roster is ternary: children are checked in and then collected. */
   requiresCheckOut: boolean;
+  /** What the kiosk prints at check-in, or null for nothing. */
+  labelTemplate: LabelTemplate | null;
   startAt: Date;
   endAt: Date;
   checkInOpensAt: Date;
@@ -598,6 +601,7 @@ function buildEvents(now: Date): BuiltEvent[] {
         isOneOff: false,
         requiresRsvp: false,
         requiresCheckOut: false,
+        labelTemplate: null,
         startAt,
         endAt,
         checkInOpensAt: addMinutes(startAt, -60),
@@ -621,6 +625,7 @@ function buildEvents(now: Date): BuiltEvent[] {
     isOneOff: true,
     requiresRsvp: true,
     requiresCheckOut: false,
+    labelTemplate: null,
     startAt: retreatStart,
     endAt: retreatEnd,
     // Boarding, not the whole weekend: the roster is for the bus door.
@@ -646,6 +651,7 @@ function buildEvents(now: Date): BuiltEvent[] {
     isOneOff: true,
     requiresRsvp: false,
     requiresCheckOut: false,
+    labelTemplate: null,
     startAt: lockInStart,
     endAt: lockInEnd,
     checkInOpensAt: addMinutes(lockInStart, -60),
@@ -672,6 +678,10 @@ function buildEvents(now: Date): BuiltEvent[] {
     isOneOff: true,
     requiresRsvp: false,
     requiresCheckOut: true,
+    // The one seeded gathering that prints. A room children are collected
+    // from is what labels are for, and it means `npm run seed` leaves the
+    // kiosk's printing path reachable without configuring an event first.
+    labelTemplate: DEFAULT_LABEL_TEMPLATE,
     startAt: nurseryStart,
     endAt: addMinutes(nurseryStart, 90),
     checkInOpensAt: addMinutes(nurseryStart, -30),
@@ -719,6 +729,7 @@ function buildEvents(now: Date): BuiltEvent[] {
       isOneOff: false,
       requiresRsvp: false,
       requiresCheckOut: false,
+      labelTemplate: null,
       startAt,
       endAt,
       checkInOpensAt: addMinutes(startAt, -60),
@@ -1047,6 +1058,7 @@ function collectWrites(now: Date): {
             : null,
         requiresRsvp: event.requiresRsvp,
         requiresCheckOut: event.requiresCheckOut,
+        labelTemplate: event.labelTemplate,
         status: 'scheduled',
         createdAt: schoolYearStart(now),
         updatedAt: schoolYearStart(now),

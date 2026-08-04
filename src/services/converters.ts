@@ -9,6 +9,7 @@
  */
 import { Timestamp, type DocumentData, type DocumentSnapshot } from 'firebase/firestore';
 import { findEventIcon } from '@/lib/eventIcons';
+import { sanitizeLabelTemplate } from '@/lib/labelTemplate';
 import {
   EVERY_WEEKDAY,
   fromDateOnlyValue,
@@ -264,6 +265,9 @@ export function toEvent(snapshot: DocumentSnapshot<DocumentData>): TallyEvent {
     // No default from `mode`: a nursery is a thing somebody turns on, not
     // something a gathering's shape implies.
     requiresCheckOut: bool(data.requiresCheckOut, false),
+    // Null for "prints nothing", which is also what a malformed template reads
+    // as — the sanitizer's docblock explains why that is the safe direction.
+    labelTemplate: sanitizeLabelTemplate(data.labelTemplate),
     status: data.status === 'cancelled' ? 'cancelled' : 'scheduled',
     createdAt: toDate(data.createdAt, fallback),
     updatedAt: toDate(data.updatedAt, fallback),

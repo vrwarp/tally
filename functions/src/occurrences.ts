@@ -28,6 +28,7 @@
  * `scripts/sync-functions-shared.mjs`. This file is only the parts that differ
  * on a server: reading the collection, decoding admin `Timestamp`s, and writing.
  */
+import { sanitizeLabelTemplate } from './generated/labelTemplate.js';
 import {
   chainKey,
   findProjectedOccurrence,
@@ -144,6 +145,7 @@ export function toSource(id: string, data: Record<string, unknown>): OccurrenceS
     location: str(data.location),
     notes: str(data.notes),
     requiresCheckOut: data.requiresCheckOut === true,
+    labelTemplate: sanitizeLabelTemplate(data.labelTemplate),
   };
 }
 
@@ -183,6 +185,9 @@ function payloadFor(
     // not quietly turn it into an ordinary roster. Mirrors `asEvent` in
     // src/lib/eventProjection.ts.
     requiresCheckOut: source.requiresCheckOut,
+    // Inherited for the same reason: materialising the Sunday a kiosk is being
+    // bound to must not be what stops its labels printing.
+    labelTemplate: source.labelTemplate,
     status: 'scheduled',
     createdAt: now,
     updatedAt: now,

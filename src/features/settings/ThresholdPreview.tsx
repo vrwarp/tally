@@ -84,6 +84,7 @@ export function ThresholdPreview({ draft, saved, valid }: ThresholdPreviewProps)
           notes: null,
           requiresRsvp: false,
           requiresCheckOut: false,
+          labelTemplate: null,
           status: 'scheduled',
           createdAt: now,
           updatedAt: now,

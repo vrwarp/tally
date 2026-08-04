@@ -8,6 +8,7 @@
  * forms in the lobby, which is precisely when it is needed most.
  */
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_LABEL_TEMPLATE } from '../generated/labelTemplate.js';
 import { FakeFirestore } from '../testing/fakeFirestore.js';
 import { listKioskEvents } from './events.js';
 
@@ -130,5 +131,100 @@ describe('listKioskEvents', () => {
     });
     const entries = await listKioskEvents(db, NOW, logger);
     expect(entries[0]?.requiresCheckOut).toBe(false);
+  });
+
+  /*
+   * The label template, on the same argument as `requiresCheckOut` and one step
+   * further: the kiosk never reads an event document at all, so a template that
+   * is not on this row is a template no lobby screen can print.
+   *
+   * Both branches are checked. `entryFromSource` builds the row for a gathering
+   * that has a document, and the projection loop builds one *again*, inline, for
+   * a Sunday the recurrence rule describes that nothing stands for yet — which
+   * is the ordinary case for a weekly nursery, and the one a field added to only
+   * the first branch would silently miss.
+   */
+  it('carries a label template through, because nothing else tells the kiosk', async () => {
+    const db = new FakeFirestore();
+    seedEvent(
+      db,
+      'nursery',
+      {
+        start: '2026-08-09T10:00:00Z',
+        end: '2026-08-09T12:00:00Z',
+        closes: '2026-08-09T13:00:00Z',
+      },
+      { labelTemplate: DEFAULT_LABEL_TEMPLATE },
+    );
+    const entries = await listKioskEvents(db, NOW, logger);
+    expect(entries[0]?.labelTemplate).toEqual(DEFAULT_LABEL_TEMPLATE);
+  });
+
+  it('carries it onto an occurrence nothing stands for yet', async () => {
+    const db = new FakeFirestore();
+    // A weekly Sunday whose latest instance is last week: this week's is
+    // projected, has no document, and is what the kiosk will bind to.
+    db.seed('events/sunday-nursery', {
+      title: 'Sunday Nursery',
+      mode: 'recurring',
+      seriesId: 'sunday-nursery',
+      recurrence: {
+        frequency: 'weekly',
+        interval: 1,
+        weekdays: [0],
+        monthlyMode: 'dayOfMonth',
+        until: null,
+        count: null,
+      },
+      recurrenceRootId: null,
+      status: 'scheduled',
+      startAt: at('2026-08-02T10:00:00Z'),
+      endAt: at('2026-08-02T12:00:00Z'),
+      checkInOpensAt: at('2026-08-02T10:00:00Z'),
+      checkInClosesAt: at('2026-08-02T13:00:00Z'),
+      location: null,
+      notes: null,
+      requiresCheckOut: true,
+      labelTemplate: DEFAULT_LABEL_TEMPLATE,
+    });
+
+    const entries = await listKioskEvents(db, NOW, logger);
+    const projected = entries.filter((entry) => entry.id === null);
+
+    expect(projected.length).toBeGreaterThan(0);
+    for (const entry of projected) {
+      expect(entry.labelTemplate).toEqual(DEFAULT_LABEL_TEMPLATE);
+      expect(entry.requiresCheckOut).toBe(true);
+    }
+  });
+
+  it('reads a gathering with no template as printing nothing', async () => {
+    const db = new FakeFirestore();
+    seedEvent(db, 'friday', {
+      start: '2026-08-09T10:00:00Z',
+      end: '2026-08-09T12:00:00Z',
+      closes: '2026-08-09T13:00:00Z',
+    });
+    const entries = await listKioskEvents(db, NOW, logger);
+    expect(entries[0]?.labelTemplate).toBeNull();
+  });
+
+  it('reads a malformed template as printing nothing rather than failing', async () => {
+    // A kiosk that throws on a bad template is a kiosk somebody has to drive
+    // out and reboot. The whole row must survive.
+    const db = new FakeFirestore();
+    seedEvent(
+      db,
+      'friday',
+      {
+        start: '2026-08-09T10:00:00Z',
+        end: '2026-08-09T12:00:00Z',
+        closes: '2026-08-09T13:00:00Z',
+      },
+      { labelTemplate: { lines: 'the name', copies: 'lots' } },
+    );
+    const entries = await listKioskEvents(db, NOW, logger);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.labelTemplate).toBeNull();
   });
 });

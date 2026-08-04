@@ -17,6 +17,7 @@
  * produce one. Taking the later of the two cannot shorten any binding, which
  * a bare `checkInClosesAt` would.
  */
+import type { LabelTemplate } from '@/lib/labelTemplate';
 import { KIOSK_KEYS, readJson, removeKey, writeJson } from './storage';
 
 export interface KioskBinding {
@@ -33,6 +34,16 @@ export interface KioskBinding {
    * deploy: it reads as "off" and the next rebind picks the real answer up.
    */
   requiresCheckOut?: boolean;
+  /**
+   * What to print at check-in, or null/absent for nothing.
+   *
+   * Optional for the same reason `requiresCheckOut` is: a binding written before
+   * labels existed has no such key, and a paired lobby screen must not be logged
+   * out by a deploy. Absent reads as "prints nothing", and the next rebind picks
+   * up the real answer — which is the safe direction, since the failure is a
+   * missing sticker rather than a wrong one.
+   */
+  labelTemplate?: LabelTemplate | null;
   boundAtMs: number;
 }
 
