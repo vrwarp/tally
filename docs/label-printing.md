@@ -4,12 +4,15 @@ A Brother QL plugged into the lobby kiosk, driven straight from the browser over
 WebUSB. No print server, no CUPS queue, no native helper — the page talks to the
 printer.
 
-This is the part of the feature no test can cover, because it needs a printer.
-Everything else is covered: the layout arithmetic in
+Confirmed working on a QL-810W on 2026-08-02. That matters because it is the one
+claim no test here can make: the layout arithmetic is covered in
 `src/lib/labelRender.test.ts`, the queue's ordering and staleness in
 `src/kiosk/printing/queue.test.ts`, which taps print in
 `src/kiosk/KioskApp.printing.test.tsx`, and a real worker producing a real raster
-job in `e2e/kiosk.spec.ts`. What follows is what a person has to do once.
+job in `e2e/kiosk.spec.ts` — but nothing in CI has a printer, so a label actually
+coming out of one is something a person has to go and see.
+
+What follows is what that person has to do.
 
 ## What you need
 
