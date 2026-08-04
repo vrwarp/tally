@@ -82,7 +82,7 @@ export function SearchScreen({
         {printerNeedsAttention && (
           <span
             aria-label="The label printer needs attention"
-            className="absolute top-[max(1rem,var(--spacing-safe-top))] right-4 h-3 w-3 rounded-full bg-amber-500"
+            className="absolute top-[max(1rem,var(--spacing-safe-top))] right-4 h-3 w-3 rounded-full bg-warn-500"
           />
         )}
         <div className="text-lg font-semibold text-ink-200">{binding.title}</div>

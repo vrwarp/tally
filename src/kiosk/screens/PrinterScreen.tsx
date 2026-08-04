@@ -45,9 +45,9 @@ function stateLine(state: PrinterState): { text: string; tone: string } {
     case 'unpaired':
       return { text: 'No printer connected yet.', tone: 'text-ink-400' };
     case 'unsupported':
-      return { text: state.message, tone: 'text-amber-400' };
+      return { text: state.message, tone: 'text-warn-400' };
     case 'trouble':
-      return { text: state.message, tone: 'text-amber-400' };
+      return { text: state.message, tone: 'text-warn-400' };
     default:
       return { text: 'No printer set up on this kiosk.', tone: 'text-ink-400' };
   }
@@ -187,7 +187,7 @@ export function PrinterScreen({
           )}
 
           {status && status.errors.length > 0 && (
-            <div className="rounded-xl bg-ink-900 p-4 text-sm text-amber-400">
+            <div className="rounded-xl bg-ink-900 p-4 text-sm text-warn-400">
               {status.errors.map((flag) => (
                 <div key={`${flag.byte}:${flag.bit}`}>{flag.message}</div>
               ))}
