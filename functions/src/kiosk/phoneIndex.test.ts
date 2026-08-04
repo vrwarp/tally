@@ -33,7 +33,7 @@ function backendWith(
 function registryOf(backends: PeopleBackend[]): BackendRegistry {
   return {
     ids: () => backends.map((backend) => backend.id),
-    get: (id) => backends.find((backend) => backend.id === id) ?? null,
+    get: (id: string) => backends.find((backend) => backend.id === id) ?? null,
   } as unknown as BackendRegistry;
 }
 
