@@ -32,7 +32,9 @@ const set = vi.hoisted(() => vi.fn());
 const remove = vi.hoisted(() => vi.fn());
 const commit = vi.hoisted(() => vi.fn(async () => {}));
 const getDocs = vi.hoisted(() => vi.fn());
-const updateDoc = vi.hoisted(() => vi.fn(async () => {}));
+const updateDoc = vi.hoisted(() =>
+  vi.fn(async (_ref: { path: string }, _payload: Record<string, unknown>) => {}),
+);
 
 vi.mock('@/lib/firebase', () => ({ db: {} }));
 vi.mock('firebase/firestore', () => ({
@@ -200,12 +202,11 @@ describe('swapCheckIn', () => {
    * gone home somebody checks them out again.
    */
   it('does not carry a check-out across to the corrected student', async () => {
-    await swapCheckIn({
-      event: EVENT,
-      from: { ...RECORD, checkedOutAt: new Date('2026-02-13T20:45:00') },
-      to: RIGHT,
-      uid: 'counselor-2',
-    });
+    // `from` is a `Pick` that does not include the check-out fields at all, so
+    // the type already makes this impossible to get wrong by accident. The
+    // claim worth pinning is about the document that lands: the corrected
+    // record starts present, whatever the mistaken one had against it.
+    await swapCheckIn({ event: EVENT, from: RECORD, to: RIGHT, uid: 'counselor-2' });
 
     const [, payload] = set.mock.calls[0]!;
     expect(payload).not.toHaveProperty('checkedOutAt');

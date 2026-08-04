@@ -133,6 +133,9 @@ export async function deleteDocument(path: string): Promise<void> {
 
 function encode(value: unknown): RestValue {
   if (value === null) return { nullValue: null };
+  // A spec that arranges an *event* needs the four timestamps, and the REST
+  // shape wants them as RFC 3339 rather than epoch millis.
+  if (value instanceof Date) return { timestampValue: value.toISOString() };
   if (typeof value === 'string') return { stringValue: value };
   if (typeof value === 'boolean') return { booleanValue: value };
   if (typeof value === 'number') {
@@ -149,7 +152,7 @@ function encode(value: unknown): RestValue {
  */
 export async function writeDocument(
   path: string,
-  data: Record<string, string | number | boolean | null>,
+  data: Record<string, string | number | boolean | null | Date>,
 ): Promise<void> {
   const fields = Object.fromEntries(Object.entries(data).map(([key, value]) => [key, encode(value)]));
   const response = await fetch(`${FIRESTORE_ROOT}/${path}`, {

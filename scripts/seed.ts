@@ -402,6 +402,8 @@ interface BuiltEvent {
   isOneOff: boolean;
   /** One-offs only: the roster is closed to the students who RSVP'd. */
   requiresRsvp: boolean;
+  /** The roster is ternary: children are checked in and then collected. */
+  requiresCheckOut: boolean;
   startAt: Date;
   endAt: Date;
   checkInOpensAt: Date;
@@ -595,6 +597,7 @@ function buildEvents(now: Date): BuiltEvent[] {
         seriesId,
         isOneOff: false,
         requiresRsvp: false,
+        requiresCheckOut: false,
         startAt,
         endAt,
         checkInOpensAt: addMinutes(startAt, -60),
@@ -617,6 +620,7 @@ function buildEvents(now: Date): BuiltEvent[] {
     seriesId: null,
     isOneOff: true,
     requiresRsvp: true,
+    requiresCheckOut: false,
     startAt: retreatStart,
     endAt: retreatEnd,
     // Boarding, not the whole weekend: the roster is for the bus door.
@@ -641,11 +645,38 @@ function buildEvents(now: Date): BuiltEvent[] {
     seriesId: null,
     isOneOff: true,
     requiresRsvp: false,
+    requiresCheckOut: false,
     startAt: lockInStart,
     endAt: lockInEnd,
     checkInOpensAt: addMinutes(lockInStart, -60),
     checkInClosesAt: addMinutes(lockInStart, 240),
     isPast: true,
+  });
+
+  /*
+   * A nursery, so the check-out roster is one command away rather than a setup
+   * ritual.
+   *
+   * Deliberately later today rather than live. A second open gathering would
+   * compete with the guaranteed-live Friday below — both for the "is anything
+   * on?" test and for the top of the chooser — and every spec that opens a
+   * roster by reaching for the first card would start depending on which of
+   * the two sorted first. Check-in is never gated on the window anyway, so a
+   * roster three hours out is fully usable.
+   */
+  const nurseryStart = addMinutes(now, 180);
+  events.push({
+    id: `nursery-${isoDay(now)}`,
+    title: 'Nursery',
+    seriesId: SERIES_IDS.sundaySchool,
+    isOneOff: true,
+    requiresRsvp: false,
+    requiresCheckOut: true,
+    startAt: nurseryStart,
+    endAt: addMinutes(nurseryStart, 90),
+    checkInOpensAt: addMinutes(nurseryStart, -30),
+    checkInClosesAt: addMinutes(nurseryStart, 150),
+    isPast: false,
   });
 
   /*
@@ -687,6 +718,7 @@ function buildEvents(now: Date): BuiltEvent[] {
       seriesId: SERIES_IDS.fridayFellowship,
       isOneOff: false,
       requiresRsvp: false,
+      requiresCheckOut: false,
       startAt,
       endAt,
       checkInOpensAt: addMinutes(startAt, -60),
@@ -1014,6 +1046,7 @@ function collectWrites(now: Date): {
             ? 'Doors locked at 9pm. Breakfast at 7.'
             : null,
         requiresRsvp: event.requiresRsvp,
+        requiresCheckOut: event.requiresCheckOut,
         status: 'scheduled',
         createdAt: schoolYearStart(now),
         updatedAt: schoolYearStart(now),
