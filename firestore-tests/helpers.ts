@@ -90,6 +90,14 @@ export function asAnonymous(env: RulesTestEnvironment): Firestore {
   return firestoreOf(env.unauthenticatedContext());
 }
 
+/**
+ * A kiosk session: a real member's uid narrowed by the `kiosk: true` custom
+ * claim the pairing flow mints. Same person, less allowed.
+ */
+export function asKiosk(env: RulesTestEnvironment, uid: string): Firestore {
+  return firestoreOf(env.authenticatedContext(uid, { kiosk: true }));
+}
+
 /* -------------------------------------------------------------------------- */
 /* Document builders — stored shapes, so `Timestamp` rather than `Date`        */
 /* -------------------------------------------------------------------------- */

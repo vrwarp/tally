@@ -31,6 +31,7 @@ import {
   UID,
   a32ConfigDoc,
   asAnonymous,
+  asKiosk,
   asUser,
   attendanceDoc,
   eventDoc,
@@ -1075,6 +1076,130 @@ describe('skippedNights', () => {
   });
 });
 
+
+describe('kiosk', () => {
+  /*
+   * A kiosk session is a real member's uid carrying `kiosk: true` — minted by
+   * the pairing flow, operated by the public in a lobby. These tests pin the
+   * narrowing: it may create a check-in and write the date patch that rides on
+   * one, and nothing else a full session of the same person could do.
+   */
+
+  describe('kioskIndex', () => {
+    it('is readable by active members, kiosk sessions included', async () => {
+      await assertSucceeds(getDoc(doc(asUser(env, UID.counselor), 'kioskIndex/phones')));
+      await assertSucceeds(getDoc(doc(asKiosk(env, UID.counselor), 'kioskIndex/phones')));
+    });
+
+    it('is denied to strangers and signed-out callers', async () => {
+      await assertFails(getDoc(doc(asUser(env, UID.stranger), 'kioskIndex/phones')));
+      await assertFails(getDoc(doc(asAnonymous(env), 'kioskIndex/phones')));
+    });
+
+    it('is written by nobody — a client that could write it could make any four digits answer any student', async () => {
+      await assertFails(
+        setDoc(doc(asUser(env, UID.admin), 'kioskIndex/phones'), { last4: { '0134': ['x'] } }),
+      );
+      await assertFails(
+        setDoc(doc(asKiosk(env, UID.counselor), 'kioskIndex/phones'), { last4: {} }),
+      );
+    });
+  });
+
+  describe('kioskPairings', () => {
+    it('is invisible and untouchable, admins included', async () => {
+      const db = asUser(env, UID.admin);
+      await assertFails(getDoc(doc(db, 'kioskPairings/ABC234')));
+      await assertFails(setDoc(doc(db, 'kioskPairings/ABC234'), { status: 'approved' }));
+      await assertFails(getDocs(collection(db, 'kioskPairings')));
+    });
+  });
+
+  describe('attendance, from a kiosk session', () => {
+    it('may create a check-in under its own uid', async () => {
+      await assertSucceeds(
+        setDoc(
+          doc(asKiosk(env, UID.counselor), paths.attendance(ID.event, ID.otherStudent)),
+          attendanceDoc({ studentId: ID.otherStudent, checkedInBy: UID.counselor }),
+        ),
+      );
+    });
+
+    it('may not overwrite an existing check-in — a lobby tap must not move a counselor\'s record', async () => {
+      // ID.student is seeded as already checked in; the same write from the
+      // full session would be a legal update.
+      await assertFails(
+        setDoc(
+          doc(asKiosk(env, UID.counselor), paths.attendance(ID.event, ID.student)),
+          attendanceDoc({ studentId: ID.student, checkedInBy: UID.counselor }),
+        ),
+      );
+    });
+
+    it('may not undo anything', async () => {
+      await assertFails(
+        deleteDoc(doc(asKiosk(env, UID.counselor), paths.attendance(ID.event, ID.student))),
+      );
+    });
+  });
+
+  describe('students, from a kiosk session', () => {
+    const datePatch = () => ({
+      firstAttendedAt: Timestamp.fromDate(new Date('2026-02-13T19:00:00Z')),
+      lastAttendedAt: Timestamp.fromDate(new Date('2026-02-13T19:00:00Z')),
+      firstName: 'Jamie',
+      lastName: 'Rivera',
+      grade: 8,
+      searchName: 'jamie rivera',
+      updatedAt: serverTimestamp(),
+      updatedBy: UID.counselor,
+    });
+
+    it('may merge the check-in date patch onto an existing document', async () => {
+      await assertSucceeds(
+        setDoc(doc(asKiosk(env, UID.counselor), paths.student(ID.student)), datePatch(), {
+          merge: true,
+        }),
+      );
+    });
+
+    it('may create the document the patch usually creates', async () => {
+      await assertSucceeds(
+        setDoc(doc(asKiosk(env, UID.counselor), paths.student('kiosk-new-student')), datePatch()),
+      );
+    });
+
+    it('may not touch anything beyond the patch — notes, status, linkage', async () => {
+      const db = asKiosk(env, UID.counselor);
+      await assertFails(
+        setDoc(
+          doc(db, paths.student(ID.student)),
+          { ...datePatch(), notes: 'scribbled from a lobby' },
+          { merge: true },
+        ),
+      );
+      await assertFails(
+        setDoc(doc(db, paths.student(ID.student)), { status: 'inactive' }, { merge: true }),
+      );
+      // The same writes from the same person's full session are legal.
+      await assertSucceeds(
+        setDoc(
+          doc(asUser(env, UID.counselor), paths.student(ID.student)),
+          { notes: 'a counselor may' },
+          { merge: true },
+        ),
+      );
+    });
+  });
+
+  describe('users, from a kiosk session', () => {
+    it('may not read profiles — not even its own', async () => {
+      const db = asKiosk(env, UID.counselor);
+      await assertFails(getDoc(doc(db, paths.user(UID.counselor))));
+      await assertFails(getDocs(collection(db, COLLECTIONS.users)));
+    });
+  });
+});
 
 describe('default deny', () => {
   it('denies an unmodelled collection to every role', async () => {

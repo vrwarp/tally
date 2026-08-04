@@ -55,6 +55,21 @@ service cloud.firestore {
     function isCore() { return hasRole('core'); }
     function isAdmin() { return hasRole('admin'); }
 
+    /**
+     * A session minted by the kiosk pairing flow: a real staff member's uid,
+     * carrying a `kiosk: true` custom claim.
+     *
+     * The kiosk stands in a lobby and is operated by the public, so its
+     * session is the approver's *narrowed*: it may add an attendance record
+     * and write the date patch a check-in makes, and nothing else — no
+     * undo, no edits, no reading other people's profiles. Everything a kiosk
+     * screen shows beyond that comes through callables, which gate
+     * themselves.
+     */
+    function isKioskSession() {
+      return isSignedIn() && request.auth.token.get('kiosk', false) == true;
+    }
+
     /*
      * Field-level diffing. Firestore evaluates both the create and the update
      * rule for a `set()` and picks the one matching the document's actual
@@ -91,8 +106,10 @@ service cloud.firestore {
        * member, and treats a denial as "pending". Denying the read would make
        * a legitimate pending user indistinguishable from an error.
        */
-      allow get: if isSignedIn() && (request.auth.uid == uid || isActive());
-      allow list: if isActive();
+      // A kiosk session is refused even its own profile: nothing a lobby
+      // screen renders needs one, and the deny costs it nothing.
+      allow get: if isSignedIn() && !isKioskSession() && (request.auth.uid == uid || isActive());
+      allow list: if isActive() && !isKioskSession();
 
       /**
        * Role and `active` are the only things standing between a signed-in
@@ -244,6 +261,25 @@ service cloud.firestore {
         return after.get('pcoRecordMissing', false) == before.get('pcoRecordMissing', false);
       }
 
+      /**
+       * The only student write a kiosk makes is the date patch riding on a
+       * check-in — see `studentDatePatch` in src/services/attendancePayloads.ts.
+       * Pinning the key set here means a compromised kiosk session cannot
+       * touch `notes`, `status`, or anything else a full counselor session
+       * may: the create case covers the patch creating the document, the
+       * update case covers it merging onto one.
+       */
+      function kioskDatePatchKeys() {
+        return ['firstName', 'lastName', 'grade', 'searchName',
+                'firstAttendedAt', 'lastAttendedAt', 'updatedAt', 'updatedBy'];
+      }
+
+      function kioskWriteAllowed() {
+        return !isKioskSession()
+          || (resource == null && request.resource.data.keys().hasOnly(kioskDatePatchKeys()))
+          || touchesOnly(kioskDatePatchKeys());
+      }
+
       allow get, list: if isActive();
 
       // Quick-add happens at the door, and check-in itself writes
@@ -253,12 +289,14 @@ service cloud.firestore {
                     && noMirroredPersonalData()
                     && pcoLinkageUnclaimed()
                     && upstreamLinkageUnclaimed()
+                    && kioskWriteAllowed()
                     && request.resource.data.get('pcoRecordMissing', false) == false;
       allow update: if isCounselor()
                     && validStudent()
                     && noMirroredPersonalData()
                     && pcoLinkageUnchanged()
                     && upstreamLinkageUnchanged()
+                    && kioskWriteAllowed()
                     && pcoRecordFlagUnchanged();
 
       // Never. Attendance documents reference students by id; deleting one
@@ -360,8 +398,16 @@ service cloud.firestore {
         }
 
         allow get, list: if isActive();
-        allow create, update: if isCounselor() && validAttendance() && !checkInFrozen();
-        allow delete: if isCounselor() && !checkInFrozen();
+        allow create: if isCounselor() && validAttendance() && !checkInFrozen();
+        /**
+         * A kiosk may only ever *add* a record. Updating would let a lobby
+         * tap overwrite the moment and method a counselor recorded, and
+         * deleting would be an undo nobody at a kiosk is trusted to perform.
+         * The kiosk client knows this and renders an already-present student
+         * as done rather than re-writing them.
+         */
+        allow update: if isCounselor() && validAttendance() && !checkInFrozen() && !isKioskSession();
+        allow delete: if isCounselor() && !checkInFrozen() && !isKioskSession();
       }
 
       /**
@@ -586,6 +632,33 @@ service cloud.firestore {
      * Planning Center for directly, at the moment somebody signs in. Neither is
      * written any more, and the default-deny below covers anything that tries.
      */
+
+    /* ---------------------------------------------------------------- */
+    /* Kiosk                                                             */
+    /* ---------------------------------------------------------------- */
+
+    /**
+     * The kiosk's search-by-phone index: `last4 -> student ids`, derived
+     * server-side from the backends and rebuildable at any time. Only the
+     * four digits are ever here — see docs/data-model.md. Readable by any
+     * active member (the kiosk session is one); written only by the
+     * functions, because a client that could write it could make any four
+     * digits answer any student.
+     */
+    match /kioskIndex/{docId} {
+      allow get: if isActive();
+      allow list, write: if false;
+    }
+
+    /**
+     * Pairing handshakes. Never a client's to touch in either direction:
+     * the unauthenticated halves go through callables, the secret in here is
+     * hashed, and a readable pairing document would let a bystander race the
+     * kiosk for its token.
+     */
+    match /kioskPairings/{code} {
+      allow read, write: if false;
+    }
 
     /* ---------------------------------------------------------------- */
     /* One student's attendance, across every event                      */

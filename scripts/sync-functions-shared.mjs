@@ -31,7 +31,7 @@ const TO = join(ROOT, 'functions', 'src', 'generated');
  * In dependency order, though only for readability — each file names its own
  * imports. Every module listed here must import nothing but the others.
  */
-export const SHARED_FILES = ['backendIds.ts', 'recurrenceCore.ts', 'materialize.ts'];
+export const SHARED_FILES = ['backendIds.ts', 'recurrenceCore.ts', 'materialize.ts', 'phoneDigits.ts'];
 
 const BANNER = `/*
  * GENERATED FILE — DO NOT EDIT.

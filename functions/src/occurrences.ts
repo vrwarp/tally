@@ -115,7 +115,7 @@ function str(value: unknown): string | null {
  * security rules already require all four, so anything without them is
  * corruption rather than an older shape.
  */
-function toSource(id: string, data: Record<string, unknown>): OccurrenceSource | null {
+export function toSource(id: string, data: Record<string, unknown>): OccurrenceSource | null {
   const startAt = toDateOrNull(data.startAt);
   const endAt = toDateOrNull(data.endAt);
   const checkInOpensAt = toDateOrNull(data.checkInOpensAt);

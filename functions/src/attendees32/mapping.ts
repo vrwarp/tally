@@ -260,6 +260,23 @@ export function contactsOf(attendee: A32Attendee): { phone: string | null; email
   };
 }
 
+/**
+ * Every phone-like value in `infos.contacts`, in slot order.
+ *
+ * All of them, unlike `contactsOf`'s first: the kiosk's last-4 index answers
+ * "does any number in this family end in these digits", and a family types
+ * whichever of its numbers comes to mind.
+ */
+export function allPhonesOf(attendee: A32Attendee): string[] {
+  const contacts = attendee.infos?.contacts ?? {};
+  const values: string[] = [];
+  for (const key of Object.keys(contacts).sort()) {
+    const value = trimmed(contacts[key]);
+    if (value && !value.includes('@') && /\d/.test(value)) values.push(value);
+  }
+  return values;
+}
+
 /** Parent name/phone/email for a student, from an already-fetched parent. */
 export function parentContactOf(parent: A32Attendee): ParentContact {
   const { phone, email } = contactsOf(parent);

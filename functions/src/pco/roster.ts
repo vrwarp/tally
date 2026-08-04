@@ -715,7 +715,7 @@ export async function searchPeople(options: {
 /* One person, in full                                                         */
 /* -------------------------------------------------------------------------- */
 
-function householdIdsOf(person: PcoPerson): string[] {
+export function householdIdsOf(person: PcoPerson): string[] {
   const data = person.relationships?.households?.data;
   if (!data) return [];
   const list: JsonApiIdentifier[] = Array.isArray(data) ? data : [data];

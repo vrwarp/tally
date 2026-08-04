@@ -1,0 +1,100 @@
+/**
+ * Asserts the kiosk entry stays inside its performance budget.
+ *
+ * The kiosk runs on modern-but-slow hardware where gzipped bytes are a fair
+ * proxy for parse-and-compile milliseconds, so the budget is a hard number
+ * rather than a sentiment. Coverage is the *whole reachable graph* — the
+ * chunks kiosk.html references statically plus everything they import,
+ * dynamic imports included, because the Firebase SDK deliberately loads
+ * behind the first paint and a regression there must still fail the build.
+ *
+ * Two assertions:
+ *
+ *   1. Nothing reachable from kiosk.html is the full Firestore chunk — the
+ *      chunk-splitting in vite.config.ts exists so the kiosk (firestore/lite
+ *      only) never downloads it, and one careless import anywhere under
+ *      src/kiosk/ would quietly undo that.
+ *   2. The gzipped total of the reachable graph stays under the budget, and
+ *      the *first-paint* subset (the statically referenced chunks) under its
+ *      own smaller one.
+ *
+ * Run after `npm run build`: `node scripts/check-kiosk-budget.mjs`.
+ */
+import { readFileSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { gzipSync } from 'node:zlib';
+
+const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+const DIST = join(ROOT, 'dist');
+
+const TOTAL_BUDGET_GZIP_BYTES = 250_000;
+const FIRST_PAINT_BUDGET_GZIP_BYTES = 130_000;
+
+const html = readFileSync(join(DIST, 'kiosk.html'), 'utf8');
+const staticRefs = [...new Set([...html.matchAll(/assets\/[^"']+\.js/g)].map((m) => m[0]))];
+
+if (staticRefs.length === 0) {
+  console.error('dist/kiosk.html references no JS at all — the build layout changed.');
+  process.exit(1);
+}
+
+/** Chunk basenames imported (statically or dynamically) by one built chunk. */
+function importsOf(ref) {
+  const source = readFileSync(join(DIST, ref), 'utf8');
+  const found = new Set();
+  for (const match of source.matchAll(/["'`]\.?\.?\/?((?:assets\/)?[\w.-]+\.js)["'`]/g)) {
+    found.add(match[1].replace(/^assets\//, ''));
+  }
+  return [...found];
+}
+
+const reachable = new Set();
+const queue = [...staticRefs.map((ref) => basename(ref))];
+while (queue.length > 0) {
+  const name = queue.pop();
+  if (reachable.has(name)) continue;
+  reachable.add(name);
+  try {
+    queue.push(...importsOf(`assets/${name}`));
+  } catch {
+    // A specifier that is not an emitted chunk (sw.js references, workers).
+  }
+}
+
+const fullFirestore = [...reachable].filter((name) => /^firestore-(?!lite)/.test(name));
+if (fullFirestore.length > 0) {
+  console.error(
+    `The kiosk graph reaches the full Firestore chunk: ${fullFirestore.join(', ')}\n` +
+      'Something under src/kiosk/ imports firebase/firestore (or a module that does). ' +
+      'The kiosk must only ever import firebase/firestore/lite.',
+  );
+  process.exit(1);
+}
+
+const staticNames = new Set(staticRefs.map((ref) => basename(ref)));
+let total = 0;
+let firstPaint = 0;
+const rows = [];
+for (const name of reachable) {
+  const bytes = gzipSync(readFileSync(join(DIST, `assets/${name}`))).length;
+  total += bytes;
+  const isStatic = staticNames.has(name);
+  if (isStatic) firstPaint += bytes;
+  rows.push(`  ${(bytes / 1024).toFixed(1).padStart(7)} KB gz  ${isStatic ? 'entry ' : 'lazy  '} ${name}`);
+}
+
+console.log(rows.sort((a, b) => Number(b.slice(0, 10)) - Number(a.slice(0, 10))).join('\n'));
+console.log(
+  `  first paint ${(firstPaint / 1024).toFixed(1)} KB gz (budget ${FIRST_PAINT_BUDGET_GZIP_BYTES / 1024}), ` +
+    `total ${(total / 1024).toFixed(1)} KB gz (budget ${TOTAL_BUDGET_GZIP_BYTES / 1024})`,
+);
+
+if (firstPaint > FIRST_PAINT_BUDGET_GZIP_BYTES) {
+  console.error(`Kiosk first-paint JS exceeds its budget: ${firstPaint} > ${FIRST_PAINT_BUDGET_GZIP_BYTES} bytes gzipped.`);
+  process.exit(1);
+}
+if (total > TOTAL_BUDGET_GZIP_BYTES) {
+  console.error(`Kiosk JS exceeds its budget: ${total} > ${TOTAL_BUDGET_GZIP_BYTES} bytes gzipped.`);
+  process.exit(1);
+}

@@ -27,9 +27,14 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { COLLECTIONS, paths } from '@/lib/paths';
+import {
+  attendancePayload as buildAttendancePayload,
+  studentDatePatch as buildStudentDatePatch,
+  type CheckInStudent,
+} from '@/services/attendancePayloads';
 import { toAttendance, toEvent } from '@/services/converters';
 import { buildStudentPayload, newStudentRef, type StudentDraft } from '@/services/students';
-import type { AttendanceRecord, CheckInMethod, Student, TallyEvent } from '@/types';
+import type { AttendanceRecord, CheckInMethod, TallyEvent } from '@/types';
 
 /** Live attendance for one event — the shared source of truth across devices. */
 export function subscribeAttendance(
@@ -44,91 +49,25 @@ export function subscribeAttendance(
   );
 }
 
-function attendancePayload(args: {
-  event: Pick<TallyEvent, 'id' | 'seriesId'>;
-  studentId: string;
-  uid: string;
-  method: CheckInMethod;
-  isFirstEver: boolean;
-  /**
-   * When they arrived, if that is already known.
-   *
-   * Only `swapCheckIn` passes it: a correction is not a new arrival, so the
-   * moment has to survive being moved to another student. Everything else takes
-   * the server clock, which is the one clock every device agrees on.
-   */
-  checkedInAt?: Date;
-}) {
-  return {
-    studentId: args.studentId,
-    eventId: args.event.id,
-    seriesId: args.event.seriesId,
-    checkedInAt: args.checkedInAt ?? serverTimestamp(),
-    checkedInBy: args.uid,
-    method: args.method,
-    isFirstEver: args.isFirstEver,
-  };
+/*
+ * The payload builders live in `attendancePayloads.ts`, SDK-free, because the
+ * kiosk entry writes the same documents through `firebase/firestore/lite`.
+ * These two wrappers bind them to this module's SDK clock.
+ */
+const CLOCK = { serverTimestamp };
+
+function attendancePayload(
+  args: Parameters<typeof buildAttendancePayload>[1],
+): Record<string, unknown> {
+  return buildAttendancePayload(CLOCK, args);
 }
 
-/** The subset of a student the attendance writes need. */
-type CheckInStudent = Pick<
-  Student,
-  | 'id'
-  | 'firstName'
-  | 'lastName'
-  | 'grade'
-  | 'gradeOnFile'
-  | 'searchName'
-  | 'firstAttendedAt'
-  | 'lastAttendedAt'
->;
-
-/**
- * The patch a check-in makes to the student document, or `null` for nothing to do.
- *
- * `firstAttendedAt` is written once and never moved, so "New Visitors" stays
- * stable even if someone back-fills an older event later. `lastAttendedAt` only
- * moves forward, so checking a student into a historical event does not rewrite
- * their "last seen" to the past.
- *
- * The name and grade ride along even though a check-in does not change them.
- * Most students have no Firestore document at all — the roster comes from
- * Planning Center, and Tally writes one only when it has something of its own to
- * record. Being checked in *is* that something, so this write frequently creates
- * the document, and a document with nothing in it but two timestamps is
- * unreadable in the console and fails the rules' identity check.
- */
 function studentDatePatch(
   student: CheckInStudent,
   event: Pick<TallyEvent, 'startAt'>,
   uid: string,
 ): Record<string, unknown> | null {
-  const dates: Record<string, unknown> = {};
-  if (student.firstAttendedAt === null) dates.firstAttendedAt = event.startAt;
-  if (!student.lastAttendedAt || student.lastAttendedAt < event.startAt) {
-    dates.lastAttendedAt = event.startAt;
-  }
-  if (Object.keys(dates).length === 0) return null;
-
-  return {
-    ...dates,
-    firstName: student.firstName,
-    lastName: student.lastName,
-    /*
-     * Left out for somebody Planning Center holds no grade for, where `grade`
-     * is where the sync's clamp landed rather than a fact — see `gradeOnFile`.
-     *
-     * This is the write that reaches most people: a tap at a door is how the
-     * majority of these documents come into existence at all. Stamping the
-     * clamp here would put an invented 6th grade on the permanent record of
-     * every adult a leader ever checked in, in the one place that outlives the
-     * roster row it was copied from.
-     */
-    ...(student.gradeOnFile === false ? {} : { grade: student.grade }),
-    searchName: student.searchName,
-    updatedAt: serverTimestamp(),
-    updatedBy: uid,
-  };
+  return buildStudentDatePatch(CLOCK, student, event, uid);
 }
 
 /**

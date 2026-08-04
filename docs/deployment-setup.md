@@ -286,6 +286,37 @@ constraint, or to serve the callables through a Firebase Hosting rewrite and giv
 service agent the invoker role instead — a larger change than it sounds, since it moves every
 callable's URL.
 
+### The kiosk needs two one-time grants
+
+Two pieces of the kiosk (see [data-model.md](./data-model.md#kioskpairingscode)) lean on project
+configuration the emulator never exercises, so both surface only on a real deploy:
+
+**Custom-token minting.** `claimKioskToken` calls `createCustomToken`, and a deployed 2nd-gen
+function signs those tokens with its runtime service account — which needs permission to sign as
+itself:
+
+```bash
+gcloud iam service-accounts add-iam-policy-binding \
+  <project-number>-compute@developer.gserviceaccount.com \
+  --project tally-76406 \
+  --member="serviceAccount:<project-number>-compute@developer.gserviceaccount.com" \
+  --role=roles/iam.serviceAccountTokenCreator
+```
+
+Without it, pairing fails at the very last step with a signing error in the function's logs, while
+everything works flawlessly against the Auth emulator (which mints unsigned tokens). If the
+functions run as a custom service account, grant the role on that account instead.
+
+**Cloud Scheduler.** `rebuildKioskPhoneIndex` is the project's first scheduled function; the first
+deploy that includes it may prompt to enable the Cloud Scheduler API (and creates an App Engine
+application if the project has never had one). Say yes; there is nothing else to configure.
+
+`startKioskPairing` and `claimKioskToken` are unauthenticated on purpose — a kiosk has no identity
+until pairing gives it one — and are covered by the same `allUsers` invoker binding as every other
+callable above. What keeps them harmless is in the handlers: a cap on live pairings, a ten-minute
+expiry, a hashed device secret, and the fact that no token exists until a signed-in staff member
+approves the code.
+
 ### The artifact cleanup policy
 
 Every functions deploy builds a container image and leaves it in Artifact Registry, so without a

@@ -341,6 +341,59 @@ year cannot undo a correction another device made while it was reading.
 **Who writes:** counselor and up. Readable by anyone active. Deletes are refused — forgetting the
 document silently un-examines a year, and the way to correct one night is to remove one night.
 
+### `kioskPairings/{code}`
+
+The self-serve kiosk's pairing handshake — how a browser on a lobby shelf acquires a session
+without anybody signing in to Google on it. The kiosk (served at `/kiosk`) calls an
+unauthenticated callable and puts the returned six-character code on screen; a staff member
+approves that code from `/pair-kiosk` under their real session; the kiosk then redeems the code
+*plus a secret only it holds* for a custom token minted for the **approver's uid**, carrying a
+`kiosk: true` claim. Every check-in the kiosk writes is attributed to the person who approved it.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `secretHash` | string | SHA-256 of the kiosk-held secret. The plaintext never touches Firestore — the code is public by design (it is on a screen in a lobby), and the secret is what stops a bystander who saw it from racing the kiosk for the token. |
+| `status` | `'pending' \| 'approved'` | |
+| `approvedBy`, `approvedAt` | — | The staff member whose identity the kiosk inherits. |
+| `createdAt`, `expiresAt`, `claimedAt` | — | Ten-minute lifetime; expired documents are swept opportunistically by the next `startKioskPairing` call. |
+
+**Who writes: nobody, from a client.** The rules deny every read and write; the three pairing
+callables and the Admin SDK are the only parties. Claiming is idempotent while the pairing lives —
+a kiosk whose claim response is lost to a wifi blip retries the same call — and the guardrails on
+the unauthenticated ends are a cap on live pairings, the expiry, and the fact that no token exists
+until an authenticated approval does.
+
+The `kiosk: true` claim narrows the session rather than widening it: a kiosk may *create* an
+attendance record and write the date patch a check-in makes (a pinned key set on `students`), and
+may not update or delete attendance, read `users`, or touch anything else a full counselor session
+can. The kill switch is the approver's `users/{uid}` document — deactivating it cuts the kiosk off
+on its next request, like any other session.
+
+### `kioskIndex/phones`
+
+The kiosk's search-by-phone: one document mapping **the last four digits of a phone number → the
+student ids whose family holds a number ending in them**. A parent types four digits and the kiosk
+answers from this map locally; "family" means the student's own numbers plus every number belonging
+to anyone sharing their household (Planning Center) or family folk (Attendees) — parents and
+siblings alike.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `version` | `1` | |
+| `builtAt`, `builtBy` | — | `builtBy` is a uid, or `'schedule'` for the nightly rebuild. |
+| `last4` | map | `'1234' -> [studentId, …]`, sorted, deduped. |
+
+Derived data in the fullest sense: rebuilt from the backends at any time (nightly on a schedule,
+on demand from Settings, and by a kiosk that finds it stale at bind time), holding nothing but
+tail digits and ids the same readers already see on every roster row. The full numbers are read
+upstream by the server-side collectors and reduced to last-4s page by page — the whole church's
+phone book is never held anywhere, and only the four digits are ever written down. That is the
+bargain that lets this document exist in a database whose posture is
+[storing no phone numbers at all](#what-is-not-stored).
+
+**Who writes:** only the functions. A client that could write it could make any four digits answer
+any student. Readable by any active member — the kiosk session is one.
+
 ### `config/settings`
 
 A single document holding the four thresholds the core team can tune:
@@ -415,6 +468,11 @@ the ones who should be making it.
 No birthdates, addresses, photographs, student phone numbers or emails, medical information beyond a
 single allergy line, and nothing financial whatsoever — not a card number, not a fee, not a record of
 who has paid. See the data-handling note in the [README](../README.md#handling-minors-data).
+
+The one deliberate brush with contact data is [`kioskIndex/phones`](#kioskindexphones): the kiosk's
+phone search stores the **last four digits** of family numbers, mapped to student ids, and nothing
+more. Never a full number, never a name attached to a number, and always rebuildable — deleting the
+document costs one rebuild, not any data.
 
 Everything the dashboard and the check-in screen display beyond the fields above is derived in the
 browser: the Recent filter, MIA students, new visitors, roster warnings, head-count trends. Those live

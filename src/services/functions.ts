@@ -655,3 +655,29 @@ export const deleteEvents = httpsCallable<
   DeletionTarget & { preview?: boolean },
   DeletionSummary
 >(functions, 'deleteEvents');
+
+/* -------------------------------------------------------------------------- */
+/* Kiosk                                                                      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A staff member vouching for the code a kiosk is displaying. The kiosk then
+ * collects a session bound to *this caller's* uid — its check-ins are theirs.
+ * Any active member may approve; attendance writes need counselor anyway.
+ */
+export const approveKioskPairing = httpsCallable<
+  { code: string },
+  { status: 'approved' | 'not-found' | 'expired' }
+>(functions, 'approveKioskPairing');
+
+/**
+ * Rebuilds the kiosk's search-by-phone index from the backends' household
+ * numbers. Only the last four digits of anything are ever stored — see
+ * docs/data-model.md. The kiosk also triggers this itself when it finds the
+ * stored index stale, so the button exists for "we just fixed a number and
+ * the family is standing here".
+ */
+export const refreshKioskPhoneIndex = httpsCallable<
+  { force?: boolean } | void,
+  { students: number; entries: number; builtAt: string }
+>(functions, 'refreshKioskPhoneIndex');
