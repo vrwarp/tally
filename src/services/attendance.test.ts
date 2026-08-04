@@ -19,13 +19,7 @@
  * that batch has to satisfy are checked.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  checkIn,
-  checkOut,
-  fetchAttendanceByEvent,
-  swapCheckIn,
-  undoCheckOut,
-} from '@/services/attendance';
+import { checkIn, fetchAttendanceByEvent, swapCheckIn } from '@/services/attendance';
 import { makeAttendance, makeEvent, makeStudent } from '../../tests/factories';
 
 const set = vi.hoisted(() => vi.fn());

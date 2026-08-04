@@ -49,7 +49,13 @@ import { invalidateSnapshotCache, useEventSnapshots } from '@/hooks/useEventSnap
 import { chainKey } from '@/lib/materialize';
 import { clearSkippedNight } from '@/services/skippedNights';
 import { cn, haptic } from '@/lib/utils';
-import { checkIn, swapCheckIn, undoCheckIn } from '@/services/attendance';
+import {
+  checkIn,
+  checkOut,
+  swapCheckIn,
+  undoCheckIn,
+  undoCheckOut,
+} from '@/services/attendance';
 import { formatClock, isCheckInOpen } from '@/lib/time';
 import { ensureMaterialized } from '@/services/events';
 import { studentFullName, type Grade, type RosterEntry } from '@/types';
@@ -89,6 +95,8 @@ const FOCUS_TITLE: Record<RosterFocus, string> = {
   recent: "Recent",
   participated: "Participated",
   checkedIn: "Checked in",
+  inRoom: "In room",
+  checkedOut: "Checked out",
 };
 
 const FOCUS_EMPTY: Record<RosterFocus, string> = {
@@ -96,6 +104,8 @@ const FOCUS_EMPTY: Record<RosterFocus, string> = {
   recent: "No regulars on this roster yet.",
   participated: "Nobody has been to this gathering yet.",
   checkedIn: "Nobody is checked in yet.",
+  inRoom: "Nobody is in the room.",
+  checkedOut: "Nobody has been collected yet.",
 };
 
 export function CheckInPage() {
@@ -122,6 +132,21 @@ export function CheckInPage() {
   // whenever the prediction has nothing to say, so a one-off trip or a brand-new
   // series never opens on an empty list.
   const [focus, setFocus] = useState<RosterFocus>("recent");
+
+  /*
+   * A check-out roster opens on the room while the gathering is running.
+   *
+   * `isCheckInOpen` as a *default*, never as a lock — the rest of this screen
+   * is built on the principle that a counselor may record attendance whenever
+   * they get to it. After the window it opens on the whole roster, because the
+   * question has changed from "who is here" to "who came".
+   */
+  const openedOnRoom = useRef(false);
+  useEffect(() => {
+    if (!event?.requiresCheckOut || openedOnRoom.current) return;
+    openedOnRoom.current = true;
+    setFocus(isCheckInOpen(event, now) ? "inRoom" : "all");
+  }, [event, now]);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [announcement, setAnnouncement] = useState("");
 
@@ -485,6 +510,42 @@ export function CheckInPage() {
     [event, show, write],
   );
 
+  const handleCheckOut = useCallback(
+    async (entry: RosterEntry) => {
+      if (!event || !user) return;
+      // The rules refuse a check-out on a frozen student just as they refuse a
+      // check-in, so say why rather than letting it die on a generic toast.
+      if (refuseFrozen(entry)) return;
+      const name = studentFullName(entry.student);
+
+      setExpandedId(null);
+      await write([entry.student.id], `Could not check out ${name}. Try again.`, async () => {
+        // No `flash`: the green animation means "checked in", and saying that
+        // as somebody leaves would be the wrong confirmation entirely.
+        haptic();
+        setAnnouncement(`${name} checked out`);
+        await checkOut(event.id, entry.student.id, user.uid);
+      });
+    },
+    [event, user, write, refuseFrozen],
+  );
+
+  const handleUndoCheckOut = useCallback(
+    async (entry: RosterEntry) => {
+      if (!event) return;
+      if (refuseFrozen(entry)) return;
+      const name = studentFullName(entry.student);
+
+      setExpandedId(null);
+      await write([entry.student.id], `Could not undo the check-out for ${name}. Try again.`, async () => {
+        haptic();
+        setAnnouncement(`${name} back in the room`);
+        await undoCheckOut(event.id, entry.student.id);
+      });
+    },
+    [event, write, refuseFrozen],
+  );
+
   /**
    * Hands one check-in to the student it should have been.
    *
@@ -623,6 +684,16 @@ export function CheckInPage() {
   // regulars has none to show.
   const canFocusRecent = !roster.isFiltered && counts.recent > 0;
 
+  /*
+   * A check-out roster spends both chip slots on the room.
+   *
+   * A nursery volunteer is not filtering by predicted regulars — they are
+   * working a room, and In room / Checked out are the whole job. Recent still
+   * *applies* if it is somehow the active focus; it just stops competing for a
+   * slot it would win and then not be used.
+   */
+  const tracksCheckOut = event.requiresCheckOut;
+
   // Same test one rung wider, plus one of its own: a filter that selects every
   // eligible student is not a filter. These mirror `resolveFocus`, which is what
   // actually decides — the chips only have to agree with it.
@@ -645,7 +716,8 @@ export function CheckInPage() {
    * and that button says so in words.
    */
   const showParticipatedChip =
-    canFocusParticipated && (!canFocusRecent || appliedFocus === 'participated');
+    !tracksCheckOut && canFocusParticipated && (!canFocusRecent || appliedFocus === 'participated');
+  const showRecentChip = canFocusRecent && (!tracksCheckOut || appliedFocus === 'recent');
 
   /*
    * The way back out, one rung at a time.
@@ -659,7 +731,14 @@ export function CheckInPage() {
    * The rung is skipped when it would reveal nobody new, so the button is never
    * an invitation to press it and watch nothing happen.
    */
-  const shownCount = appliedFocus === 'recent' ? counts.recent : counts.present;
+  const shownCount =
+    appliedFocus === 'recent'
+      ? counts.recent
+      : appliedFocus === 'inRoom'
+        ? counts.inRoom
+        : appliedFocus === 'checkedOut'
+          ? counts.checkedOut
+          : counts.present;
   const widenTo: RosterFocus =
     appliedFocus !== 'participated' && canFocusParticipated && counts.participated > shownCount
       ? 'participated'
@@ -678,6 +757,8 @@ export function CheckInPage() {
           now={now}
           present={counts.present}
           eligible={counts.eligible}
+          inRoom={counts.inRoom}
+          tracksCheckOut={event.requiresCheckOut}
         />
       </div>
 
@@ -750,11 +831,14 @@ export function CheckInPage() {
           onGradesChange={setGrades}
           focus={appliedFocus}
           onFocusChange={setFocus}
-          showRecent={canFocusRecent}
+          showRecent={showRecentChip}
           recentCount={counts.recent}
           showParticipated={showParticipatedChip}
           participatedCount={counts.participated}
           present={counts.present}
+          tracksCheckOut={tracksCheckOut}
+          inRoomCount={counts.inRoom}
+          checkedOutCount={counts.checkedOut}
         />
       </div>
 
@@ -857,14 +941,23 @@ export function CheckInPage() {
                         : "checked in at least once before"
                       : appliedFocus === "checkedIn"
                         ? "tap the check mark to undo"
-                        : undefined
+                        : appliedFocus === "inRoom"
+                          ? "tap Out when somebody collects them"
+                          : appliedFocus === "checkedOut"
+                            ? "tap ↺ to put somebody back"
+                            : undefined
               }
               emptyLabel={FOCUS_EMPTY[appliedFocus]}
-              tone={appliedFocus === "checkedIn" ? "present" : "default"}
+              tone={
+                appliedFocus === "checkedIn" || appliedFocus === "inRoom" ? "present" : "default"
+              }
               showRecentHint={event.mode === "recurring"}
               onPress={onPress}
               onUndo={onUndo}
               onSwap={onSwap}
+              onCheckOut={handleCheckOut}
+              onUndoCheckOut={handleUndoCheckOut}
+              tracksCheckOut={tracksCheckOut}
               mode={swapSource ? "swap" : "checkin"}
               swapSourceId={swapSource?.student.id ?? null}
               expandedId={expandedId}

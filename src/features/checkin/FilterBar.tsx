@@ -35,6 +35,16 @@ export interface FilterBarProps {
   /** How many students have been to this gathering before. */
   participatedCount: number;
   present: number;
+  /**
+   * Whether this gathering tracks check-out. When it does, `Checked in` is
+   * replaced by `In room` and `Checked out`, and Recent/Participated yield
+   * their slots — see `CheckInPage`.
+   */
+  tracksCheckOut?: boolean;
+  /** Checked in and not yet collected. */
+  inRoomCount?: number;
+  /** Checked in and collected. */
+  checkedOutCount?: number;
 }
 
 function Chip({
@@ -93,6 +103,9 @@ export function FilterBar({
   showParticipated,
   participatedCount,
   present,
+  tracksCheckOut = false,
+  inRoomCount = 0,
+  checkedOutCount = 0,
 }: FilterBarProps) {
   // Pressing the chip that is already on means "stop filtering", the same way
   // the grade checklist clears back to All grades. Deliberately all the way to
@@ -133,14 +146,41 @@ export function FilterBar({
                 <Tally active={focus === 'participated'}>{participatedCount}</Tally>
               </Chip>
             ) : null}
-            <Chip
-              active={focus === 'checkedIn'}
-              label="Show checked-in students only"
-              onPress={() => setFocus('checkedIn')}
-            >
-              Checked in
-              <Tally active={focus === 'checkedIn'}>{present}</Tally>
-            </Chip>
+            {/*
+              On a gathering that hands children back, these are the two
+              questions being asked all morning — who is still here, and who has
+              gone — and they take the slot `Checked in` held. The total is not
+              lost: the header carries it, beside the room count.
+            */}
+            {tracksCheckOut ? (
+              <>
+                <Chip
+                  active={focus === 'inRoom'}
+                  label="Show students still in the room"
+                  onPress={() => setFocus('inRoom')}
+                >
+                  In room
+                  <Tally active={focus === 'inRoom'}>{inRoomCount}</Tally>
+                </Chip>
+                <Chip
+                  active={focus === 'checkedOut'}
+                  label="Show students who have been collected"
+                  onPress={() => setFocus('checkedOut')}
+                >
+                  Checked out
+                  <Tally active={focus === 'checkedOut'}>{checkedOutCount}</Tally>
+                </Chip>
+              </>
+            ) : (
+              <Chip
+                active={focus === 'checkedIn'}
+                label="Show checked-in students only"
+                onPress={() => setFocus('checkedIn')}
+              >
+                Checked in
+                <Tally active={focus === 'checkedIn'}>{present}</Tally>
+              </Chip>
+            )}
           </div>
         </div>
 

@@ -19,6 +19,15 @@ export interface EventHeaderProps {
   now: Date;
   present: number;
   eligible: number;
+  /**
+   * Checked in and not yet collected, on a gathering that tracks check-out.
+   *
+   * When it does, this is the number the header leads with: it is the entire
+   * reason the feature exists, and the attendance total moves beside it rather
+   * than away.
+   */
+  inRoom?: number;
+  tracksCheckOut?: boolean;
 }
 
 export function EventHeader({
@@ -27,6 +36,8 @@ export function EventHeader({
   now,
   present,
   eligible,
+  inRoom = 0,
+  tracksCheckOut = false,
 }: EventHeaderProps) {
   const navigate = useNavigate();
   const open = isCheckInOpen(event, now);
@@ -60,14 +71,21 @@ export function EventHeader({
 
         <p className="shrink-0 text-right leading-none">
           <span aria-hidden="true" className="text-2xl font-bold tabular-nums text-present-400">
-            {present}
-            <span className="text-base text-ink-500">/{eligible}</span>
+            {tracksCheckOut ? inRoom : present}
+            <span className="text-base text-ink-500">
+              /{tracksCheckOut ? present : eligible}
+            </span>
           </span>
+          {/* Both numbers, always: the room count is what the volunteer is
+              working from, and the head count is what the evening will be
+              remembered as. A screen reader user needs the same pair. */}
           <span className="sr-only">
-            {present} of {eligible} students checked in
+            {tracksCheckOut
+              ? `${inRoom} of ${present} checked-in students still in the room, out of ${eligible} eligible`
+              : `${present} of ${eligible} students checked in`}
           </span>
           <span className="mt-1 block text-[11px] uppercase tracking-wide text-ink-500">
-            present
+            {tracksCheckOut ? 'in room' : 'present'}
           </span>
         </p>
       </div>

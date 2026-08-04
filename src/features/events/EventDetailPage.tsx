@@ -112,6 +112,8 @@ export function EventDetailPage() {
     .map((record) => ({ record, student: studentsById.get(record.studentId) ?? null }))
     .sort((a, b) => b.record.checkedInAt.getTime() - a.record.checkedInAt.getTime());
 
+  const collected = attendance.filter((record) => record.checkedOutAt !== null);
+
   const toggleStatus = async () => {
     if (!user) return;
     setBusy(true);
@@ -168,6 +170,7 @@ export function EventDetailPage() {
               <Badge tone="success">Check-in open</Badge>
             ) : null}
             {event.requiresRsvp ? <Badge tone="warn">RSVP only</Badge> : null}
+            {event.requiresCheckOut ? <Badge tone="neutral">Check-out</Badge> : null}
           </div>
 
           <dl className="divide-y divide-ink-800 border-t border-ink-800 pt-1">
@@ -270,6 +273,22 @@ export function EventDetailPage() {
             }
           />
 
+          {/* Neutral whatever the number: a gathering where half the children
+              were signed out by a parent who then walked off without telling
+              anybody is a normal morning, not a failure to report. */}
+          {event.requiresCheckOut ? (
+            <StatTile
+              label="Checked out"
+              value={collected.length}
+              tone="neutral"
+              hint={
+                attendance.length > 0
+                  ? `${collected.length} of ${attendance.length} collected.`
+                  : undefined
+              }
+            />
+          ) : null}
+
           {present.length === 0 ? (
             readsAsCancelled ? (
               <div className="rounded-xl bg-ink-950 px-3 py-2 ring-1 ring-ink-800">
@@ -304,6 +323,13 @@ export function EventDetailPage() {
                   <span className="shrink-0 text-xs tabular-nums text-ink-500">
                     {formatClock(record.checkedInAt)}
                   </span>
+                  {/* Only where there is one. A student with no pickup recorded
+                      gets nothing here — no badge, no dash, no colour. */}
+                  {event.requiresCheckOut && record.checkedOutAt ? (
+                    <span className="shrink-0 text-xs tabular-nums text-ink-400">
+                      → {formatClock(record.checkedOutAt)}
+                    </span>
+                  ) : null}
                 </li>
               ))}
             </ul>

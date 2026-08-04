@@ -33,6 +33,11 @@ export interface RosterListProps {
   onUndo?: (entry: RosterEntry) => void;
   /** `Wrong person` — hands this check-in to the picker. */
   onSwap?: (entry: RosterEntry) => void;
+  /** Records a pickup, and puts one back. See `StudentRow`. */
+  onCheckOut?: (entry: RosterEntry) => void;
+  onUndoCheckOut?: (entry: RosterEntry) => void;
+  /** Whether this gathering tracks check-out at all. */
+  tracksCheckOut?: boolean;
   /** What a tap means right now. See `StudentRowMode`. */
   mode?: StudentRowMode;
   /** In `swap` mode, the student whose check-in is being moved. */
@@ -74,6 +79,9 @@ export const RosterList = memo(function RosterList({
   onPress,
   onUndo,
   onSwap,
+  onCheckOut,
+  onUndoCheckOut,
+  tracksCheckOut = false,
   mode = 'checkin',
   swapSourceId = null,
   expandedId = null,
@@ -118,6 +126,9 @@ export const RosterList = memo(function RosterList({
               onPress={onPress}
               onUndo={onUndo}
               onSwap={onSwap}
+              onCheckOut={onCheckOut}
+              onUndoCheckOut={onUndoCheckOut}
+              tracksCheckOut={tracksCheckOut}
               mode={mode}
               isSwapSource={entry.student.id === swapSourceId}
               expanded={entry.student.id === expandedId}
