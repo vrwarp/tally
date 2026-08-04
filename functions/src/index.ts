@@ -84,6 +84,7 @@ import {
 } from './kiosk/pairing.js';
 import { listKioskEvents, type KioskEventEntry } from './kiosk/events.js';
 import { buildPhoneIndex, type PhoneIndexSummary } from './kiosk/phoneIndex.js';
+import { probeSigning, type SigningStatus } from './kiosk/signing.js';
 import { materializeOccurrence as materializeOne, MINISTRY_TIME_ZONE } from './occurrences.js';
 // Imported for its registration side effect and nothing else: pulling the
 // adapter package in is what makes the Attendees backend available to the
@@ -2215,6 +2216,27 @@ export const refreshKioskPhoneIndex = onCall<
     reportBackendFailure('A people backend', error, 'rebuild the kiosk phone index');
   }
 });
+
+/**
+ * Whether this deployment can mint kiosk tokens, for the Settings card.
+ *
+ * The IAM grant behind `claimKioskToken` is invisible three times over: absent
+ * from the code, unexercised by the emulator, and swallowed by the kiosk's own
+ * poll loop when it is missing. Settings asking here is the only place the
+ * answer surfaces short of reading the function logs.
+ *
+ * Core team rather than any member: this reports on project configuration, and
+ * its answer is addressed to whoever can go and fix it.
+ */
+export const getKioskStatus = onCall<undefined, Promise<SigningStatus>>(
+  { timeoutSeconds: 30, memory: '256MiB' },
+  async (request) => {
+    await requireCoreTeam(request.auth?.uid);
+    // The token is discarded inside `probeSigning` and never returned: this
+    // callable answers whether signing works, not with a usable credential.
+    return probeSigning((uid) => getAuth().createCustomToken(uid));
+  },
+);
 
 /**
  * The nightly rebuild, so the index never drifts more than a day from the

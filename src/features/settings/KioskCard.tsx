@@ -6,15 +6,36 @@
  * the button exists for exactly one moment: a family's number was just fixed
  * upstream and they are standing at the kiosk now.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Button, Card, CardHeader } from '@/components/ui';
+import { Badge, Button, Card, CardHeader } from '@/components/ui';
 import { useToast } from '@/context/toastContext';
-import { refreshKioskPhoneIndex } from '@/services/functions';
+import { getKioskStatus, refreshKioskPhoneIndex, type KioskStatus } from '@/services/functions';
 
 export function KioskCard() {
   const { show } = useToast();
   const [rebuilding, setRebuilding] = useState(false);
+  const [status, setStatus] = useState<KioskStatus | null>(null);
+
+  /*
+   * Asked once, on open. A failure here is left silent: it means the question
+   * could not be put, which is not the same as an answer of "broken" and must
+   * not be dressed up as one on a card that is otherwise about pairing.
+   */
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data } = await getKioskStatus();
+        if (!cancelled) setStatus(data);
+      } catch {
+        if (!cancelled) setStatus(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const rebuild = async () => {
     if (rebuilding) return;
@@ -40,6 +61,27 @@ export function KioskCard() {
         description="A self-serve check-in screen for a device in the lobby, served at /kiosk on this same site."
       />
       <div className="flex flex-col gap-3 px-4 py-3">
+        {status ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {status.state === 'ok' ? (
+              <Badge tone="success">Ready to pair</Badge>
+            ) : status.state === 'denied' ? (
+              <Badge tone="danger">Cannot sign kiosk tokens</Badge>
+            ) : (
+              <Badge tone="warn">Signing unverified</Badge>
+            )}
+          </div>
+        ) : null}
+
+        {status?.problem ? (
+          <p className="rounded-xl bg-warn-500/10 px-3 py-2 text-sm text-warn-400 ring-1 ring-warn-500/25">
+            {status.problem}
+            {status.remedy ? (
+              <span className="mt-1 block text-warn-400/80">{status.remedy}</span>
+            ) : null}
+          </p>
+        ) : null}
+
         <p className="text-sm text-ink-400">
           On the kiosk device, open <span className="font-mono text-ink-300">/kiosk</span> — it
           shows a pairing code. Approve the code from{' '}

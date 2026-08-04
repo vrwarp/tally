@@ -309,7 +309,29 @@ functions run as a custom service account, grant the role on that account instea
 
 **Cloud Scheduler.** `rebuildKioskPhoneIndex` is the project's first scheduled function; the first
 deploy that includes it may prompt to enable the Cloud Scheduler API (and creates an App Engine
-application if the project has never had one). Say yes; there is nothing else to configure.
+application if the project has never had one). Say yes.
+
+Enabling the API is enough when a human with broad rights runs the deploy, and is *not* enough for
+the narrow CI service account below — deploying a scheduled function creates and then updates a
+Cloud Scheduler job, which no role in the original table covers:
+
+```
+HTTP Error: 403, The principal (user or service account) lacks IAM permission
+"cloudscheduler.jobs.update" for the resource
+"projects/tally-76406/locations/us-central1/jobs/firebase-schedule-rebuildKioskPhoneIndex-us-central1"
+```
+
+The trailing "(or the resource may not exist)" makes that read like a missing job on a first deploy.
+It is the permission: the deployer cannot see the job either way. Grant
+[`roles/cloudscheduler.admin`](#repository-secrets) to whichever principal deploys — it is the
+narrowest role carrying `jobs.create` and `jobs.update`, where `roles/cloudscheduler.jobRunner`
+only carries `jobs.run`:
+
+```bash
+gcloud projects add-iam-policy-binding tally-76406 \
+  --member="serviceAccount:<the deploying service account>" \
+  --role=roles/cloudscheduler.admin
+```
 
 `startKioskPairing` and `claimKioskToken` are unauthenticated on purpose — a kiosk has no identity
 until pairing gives it one — and are covered by the same `allUsers` invoker binding as every other
@@ -374,6 +396,7 @@ once per project.
   | `roles/datastore.indexAdmin` | Deploys `firestore.indexes.json`. Indexes are a Firestore resource rather than a rules one, so `firebaserules.admin` does not reach them: without this a deploy uploads the rules and then 403s on the first index. **Do not** reach for `roles/datastore.owner` to fix that — it would hand the CI key read and write access to the roster itself. `indexAdmin` can manage indexes and cannot touch a document. |
   | `roles/iam.serviceAccountUser` | Lets the deploy act as the functions' own runtime service account. |
   | `roles/artifactregistry.writer` | Holds the container image each function is built into. |
+  | `roles/cloudscheduler.admin` | Creates and updates the Cloud Scheduler job behind `rebuildKioskPhoneIndex`, the one scheduled function. Without it a deploy gets all the way through the functions themselves and then 403s on `cloudscheduler.jobs.update` — see [the kiosk grants](#the-kiosk-needs-two-one-time-grants). Enabling the Cloud Scheduler API does not imply it. |
   | `roles/secretmanager.viewer` | Reads `PCO_APP_ID` and `PCO_SECRET` to bind them to the deployed functions. `secretAccessor` is the obvious guess and the wrong one — it grants `versions.access`, the payload, but not `secrets.get`, so the deploy fails looking up the very secret it is about to bind. The deploy never needs the payload itself; the functions' runtime account reads that — see [the secret bindings](#the-secret-bindings) above. |
 
   `roles/firebase.admin` covers all of these in one grant and is what most guides suggest. It also

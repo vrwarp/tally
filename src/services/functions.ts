@@ -681,3 +681,19 @@ export const refreshKioskPhoneIndex = httpsCallable<
   { force?: boolean } | void,
   { students: number; entries: number; builtAt: string }
 >(functions, 'refreshKioskPhoneIndex');
+
+/** Mirrors `SigningStatus` in functions/src/kiosk/signing.ts. */
+export interface KioskStatus {
+  state: 'ok' | 'denied' | 'unknown';
+  problem: string | null;
+  remedy: string | null;
+}
+
+/**
+ * Whether this project can sign a kiosk token at all.
+ *
+ * Worth asking on a screen rather than leaving to a deploy checklist because
+ * the failure is silent everywhere else: pairing simply never completes, and
+ * the reason only ever reaches the function logs.
+ */
+export const getKioskStatus = httpsCallable<void, KioskStatus>(functions, 'getKioskStatus');
