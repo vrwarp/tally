@@ -143,6 +143,7 @@ export function toSource(id: string, data: Record<string, unknown>): OccurrenceS
     checkInClosesAt,
     location: str(data.location),
     notes: str(data.notes),
+    requiresCheckOut: data.requiresCheckOut === true,
   };
 }
 
@@ -177,6 +178,11 @@ function payloadFor(
     location: source.location,
     notes: source.notes,
     requiresRsvp: false,
+    // Inherited, unlike `requiresRsvp`: a room children are collected from is
+    // precisely the kind of gathering that repeats, and materialising one must
+    // not quietly turn it into an ordinary roster. Mirrors `asEvent` in
+    // src/lib/eventProjection.ts.
+    requiresCheckOut: source.requiresCheckOut,
     status: 'scheduled',
     createdAt: now,
     updatedAt: now,

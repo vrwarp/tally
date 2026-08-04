@@ -83,6 +83,10 @@ export function EventChooser({
         <div className="mx-auto flex max-w-2xl flex-col gap-3">
           {entries?.map((entry, index) => {
             const live = nowMs >= entry.checkInOpensAt && nowMs <= entry.checkInClosesAt;
+            // Finished, but still offered because its window has not closed —
+            // the row a kiosk rebooting mid-pickup needs to find. Said out
+            // loud so it cannot be mistaken for something upcoming.
+            const ended = nowMs > entry.endAt;
             const isSelected = selected === index;
             return (
               <button
@@ -103,6 +107,7 @@ export function EventChooser({
                   {dayLabel(entry.startAt, nowMs)} · {timeLabel(entry.startAt)}–{timeLabel(entry.endAt)}
                   {entry.location ? ` · ${entry.location}` : ''}
                   {live && <span className="pl-2 font-medium text-present-400">Check-in open</span>}
+                  {ended && <span className="pl-2 font-medium text-ink-500">Ended — pickup only</span>}
                 </div>
               </button>
             );

@@ -2,11 +2,20 @@
  * Which gathering this kiosk is for.
  *
  * Chosen by a staff member at setup and persisted so a reboot lands back on
- * the same event. The binding dies when the event *ends* — not when the
- * check-in window closes, which is advisory everywhere in Tally: a parent
- * arriving at 8pm for a gathering that runs to 9 still gets to check in, with
- * a quiet note that the window has passed. After `endAt` the kiosk returns to
- * the (staff-gated) chooser on its own.
+ * the same event. Afterwards the kiosk returns to the (staff-gated) chooser on
+ * its own.
+ *
+ * The binding used to die at `endAt`, which is exactly when a nursery's
+ * parents arrive: the screen unbound itself at the moment pickup began. It now
+ * lasts until the later of the event ending and the check-in window closing —
+ * the same "the evening is still being recorded" window the rest of Tally
+ * works to, and already the thing `checkInClosesAtMs` is here for.
+ *
+ * `max` rather than `checkInClosesAt` outright. The editor refuses to save a
+ * window that closes before the event ends, but `firestore.rules` only asks
+ * that the field be a timestamp, so a seed, a migration or an older client can
+ * produce one. Taking the later of the two cannot shorten any binding, which
+ * a bare `checkInClosesAt` would.
  */
 import { KIOSK_KEYS, readJson, removeKey, writeJson } from './storage';
 
@@ -17,6 +26,13 @@ export interface KioskBinding {
   startAtMs: number;
   endAtMs: number;
   checkInClosesAtMs: number;
+  /**
+   * Whether this gathering hands children back — the one behaviour flag the
+   * kiosk carries. Optional because a binding written before pickup existed
+   * has no such key, and a paired lobby screen must not be logged out by a
+   * deploy: it reads as "off" and the next rebind picks the real answer up.
+   */
+  requiresCheckOut?: boolean;
   boundAtMs: number;
 }
 
@@ -46,9 +62,13 @@ export function clearBinding(): void {
   removeKey(KIOSK_KEYS.binding);
 }
 
-/** The user decision, verbatim: the binding lasts "until the event ends". */
+/** How long a kiosk stays on one gathering. See the note above. */
+export function bindingEndsAt(binding: KioskBinding): number {
+  return Math.max(binding.endAtMs, binding.checkInClosesAtMs);
+}
+
 export function bindingIsLive(binding: KioskBinding, nowMs: number): boolean {
-  return nowMs < binding.endAtMs;
+  return nowMs < bindingEndsAt(binding);
 }
 
 /** Whether to show the quiet "check-in window has closed" line. */

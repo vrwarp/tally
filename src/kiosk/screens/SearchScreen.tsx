@@ -11,6 +11,7 @@
  * and staff are told where it is.
  */
 import { useMemo } from 'react';
+import { ordinalGrade } from '@/lib/utils';
 import { HoldButton } from '../components/HoldButton';
 import { Keyboard, type KioskKey } from '../components/Keyboard';
 import { windowHasClosed, type KioskBinding } from '../binding';
@@ -21,8 +22,7 @@ import {
 } from '../search';
 
 function gradeLabel(grade: number | null): string {
-  // The ministry is 6th–12th; every one of those ordinals ends in "th".
-  return grade === null ? '' : `${grade}th grade`;
+  return grade === null ? '' : `${ordinalGrade(grade)} grade`;
 }
 
 export function SearchScreen({
@@ -32,6 +32,8 @@ export function SearchScreen({
   students,
   last4Index,
   presentIds,
+  checkedOutIds,
+  tracksCheckOut,
   onPick,
   onUnbind,
 }: {
@@ -41,6 +43,8 @@ export function SearchScreen({
   students: readonly KioskStudent[];
   last4Index: Readonly<Record<string, string[]>>;
   presentIds: ReadonlySet<string>;
+  checkedOutIds: ReadonlySet<string>;
+  tracksCheckOut: boolean;
   onPick: (student: KioskStudent) => void;
   onUnbind: () => void;
 }) {
@@ -63,7 +67,11 @@ export function SearchScreen({
         </HoldButton>
         <div className="text-lg font-semibold text-ink-200">{binding.title}</div>
         <div className="text-sm text-ink-500">
-          {closed ? 'Check-in window has closed — you can still check in.' : 'Welcome! Check in below.'}
+          {tracksCheckOut
+            ? 'Welcome! Check in below, or tap a name to collect.'
+            : closed
+              ? 'Check-in window has closed — you can still check in.'
+              : 'Welcome! Check in below.'}
         </div>
       </div>
 
@@ -93,6 +101,16 @@ export function SearchScreen({
           )}
           {outcome.results.slice(0, MAX_RESULTS).map((student) => {
             const present = presentIds.has(student.id);
+            /*
+             * Three states where check-out is tracked, two everywhere else.
+             *
+             * A present child stops being an inert "already done" row and
+             * becomes the collect target — which is the whole pickup flow.
+             * A collected one goes inert again, dimmed, so a parent cannot
+             * hand the same child back twice.
+             */
+            const collected = tracksCheckOut && checkedOutIds.has(student.id);
+            const inert = present && !tracksCheckOut;
             return (
               <button
                 key={student.id}
@@ -103,14 +121,26 @@ export function SearchScreen({
                   onPick(student);
                 }}
                 className={`flex h-16 shrink-0 items-center justify-between rounded-xl px-5 text-left ${
-                  present ? 'bg-present-600/20' : 'bg-ink-900 active:bg-ink-700'
-                }`}
+                  collected
+                    ? 'bg-ink-900/60 opacity-60'
+                    : present
+                      ? 'bg-present-600/20'
+                      : 'bg-ink-900 active:bg-ink-700'
+                } ${inert || collected ? '' : 'active:bg-ink-700'}`}
               >
                 <span className="truncate text-xl font-semibold text-ink-100">
                   {student.firstName} {student.lastName}
                 </span>
                 <span className="pl-3 text-base whitespace-nowrap text-ink-400">
-                  {present ? <span className="font-semibold text-present-400">✓ Checked in</span> : gradeLabel(student.grade)}
+                  {collected ? (
+                    <span className="font-semibold text-ink-400">Collected</span>
+                  ) : present && tracksCheckOut ? (
+                    <span className="font-semibold text-brand-300">Tap to collect</span>
+                  ) : present ? (
+                    <span className="font-semibold text-present-400">✓ Checked in</span>
+                  ) : (
+                    gradeLabel(student.grade)
+                  )}
                 </span>
               </button>
             );
