@@ -200,6 +200,18 @@ anything still outside it is null, which loses information but says something tr
 A graduation year still counts as a grade: the mapper derives one, and deriving is not inventing.
 Only a person with neither is grade-less.
 
+**A grade-less student is still pushed.** Creating one used to be refused — on the reasoning that
+every student queued for a create had a grade typed at quick-add — which left a nursery child sitting
+on `pcoPushPending` for ever, a queue that never drains rather than a visible failure. The create now
+omits the attribute rather than sending a zero, and still sends `child: true`, so they land in the
+church's children's views rather than the adult directory.
+
+The duplicate check leans on that flag. Upstream, the grade-less population is two groups at once:
+children too young for a grade, and every adult volunteer and leader. So a grade-less candidate has
+to be a child *and* hold no grade before Tally will collapse a quick-add onto it — matching on name
+alone would file a three-year-old as the volunteer who shares their name, silently, in the church's
+permanent database.
+
 The one place the clamp is still a plain number is arithmetic: `Student.grade` is always defined, so
 counting and sorting never have to special-case it.
 

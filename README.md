@@ -40,7 +40,9 @@ by grade, on the same one list.
 **Journey 3 — a visitor nobody has met.** Quick-add takes a first name, a last name and a grade,
 creates the student and checks them in as a single atomic write. They are flagged as an incomplete
 profile so the core team can chase a parent contact later, and queued for a push into Planning
-Center.
+Center. **No grade** is one of the answers, not a blank to be filled in later — a child too young for
+one has none, and on a gathering that tracks check-out the field opens there. The push carries them
+upstream either way; the grade is simply omitted rather than sent as a zero.
 
 **Journey 4 — the retreat bus.** A one-off event carries its own guest list, and restricts its roster
 to the students who RSVP'd yes or maybe: the counselor at the bus door sees the trip list, not the

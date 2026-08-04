@@ -407,13 +407,9 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
         }
         show(saved.message, { tone: 'success' });
       } else {
-        // Create mode never shows the blank option — there is no student to
-        // hold no grade — so this refuses nothing anybody can reach. It is here
-        // so the one grade Tally stores itself can never be an invented one.
-        if (form.grade === null) {
-          setErrors({ grade: 'Pick a grade' });
-          return;
-        }
+        // No refusal for a grade-less create. A child too young for a grade
+        // has none to pick, and `buildStudentPayload` omits the field rather
+        // than inventing one — see `StudentDoc.grade`.
         await createStudent(
           {
             firstName,
@@ -575,7 +571,10 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
             grade in this form stays undoable without closing it. Going back to
             it means the save carries no grade at all, not a grade cleared.
           */}
-          {gradeUnknown ? <option value="">No grade</option> : null}
+          {/* Offered on a create too, now: a nursery child genuinely has no
+              grade, and the alternative was a leader picking one at random for
+              a three-year-old. */}
+          {gradeUnknown || !student ? <option value="">No grade</option> : null}
           {GRADES.map((value) => (
             <option key={value} value={value}>
               {gradeDescription(value)}

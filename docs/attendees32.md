@@ -94,6 +94,13 @@ costs no extra requests.
   membership document; an Attendees re-create mints a new id, so the roster membership migrates to
   a new `a32_{uuid}` document and attendance moves with it (`backends/studentMigration.ts`).
 - **No lists.** `listsSupported: false`; the roster-from-a-list import is Planning Center only.
+- **A grade-less student is created, never matched.** Both backends now push a child with no grade
+  rather than refusing and leaving them queued for ever. Planning Center still runs its duplicate
+  check for them, guarded by `child`; Attendees skips the check entirely, because it has no such
+  flag — *holding a grade at all* is the closest fact it keeps, which is exactly the fact missing
+  here. Matching on name alone would file a three-year-old as the volunteer who shares their name,
+  in the church's permanent database, silently. A duplicate somebody can merge is the better
+  failure.
 - **History import is per meet.** `Import` on the Events screen lists the assembly's meets; one
   meet becomes one recurrence-less chain of Tally events (`a32-meet-{slug}`, one child per
   gathering day), every attendee who attended joins the roster, and rows with category *scheduled*

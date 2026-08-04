@@ -34,7 +34,8 @@ import { buildSearchName, type Grade, type Student, type StudentStatus } from '@
 export interface StudentDraft {
   firstName: string;
   lastName: string;
-  grade: Grade;
+  /** Null for a child too young to have one. Omitted from the document. */
+  grade: Grade | null;
   notes?: string | null;
   status?: StudentStatus;
   /**
@@ -76,7 +77,9 @@ export function buildStudentPayload(draft: StudentDraft, uid: string) {
   return {
     firstName,
     lastName,
-    grade: draft.grade,
+    // Omitted rather than written as a zero. The rules permit a student with no
+    // grade, and a nursery child genuinely has none — see `StudentDoc.grade`.
+    ...(draft.grade === null ? {} : { grade: draft.grade }),
     notes: draft.notes?.trim() || null,
     status: draft.status ?? 'active',
     isVisitor: false,

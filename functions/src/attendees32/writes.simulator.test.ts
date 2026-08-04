@@ -85,6 +85,38 @@ describe('pushStudent', () => {
     expect(doc.pcoPersonId).toBeUndefined();
   });
 
+  /**
+   * A nursery child, who has no grade to type at quick-add.
+   *
+   * This used to be refused outright, leaving them queued on
+   * `pcoPushPending` for ever — a queue that never drains rather than a
+   * visible failure.
+   */
+  it('creates a grade-less child, and does not try to match one', async () => {
+    // A same-named attendee upstream. Attendees has no `child` flag — holding
+    // a grade at all is the closest fact it keeps, which is exactly the fact
+    // missing here — so matching on name alone could file a three-year-old as
+    // the volunteer who shares their name. The duplicate check is skipped.
+    const before = store.attendees.size;
+    db.seed('students/nursery-1', {
+      firstName: 'Priya',
+      lastName: 'Raghunathan',
+      status: 'active',
+      pcoPushPending: true,
+    });
+
+    const result = await pushStudent({ db, client, config, cache, studentId: 'nursery-1' });
+
+    expect(result.status).toBe('created');
+    expect(result.pcoPersonId).not.toBe(idOf('Priya'));
+    expect(store.attendees.size).toBe(before + 1);
+
+    // Omitted, not zero: a grade nobody supplied is a claim about a real child.
+    const created = store.attendees.get(result.pcoPersonId!)!;
+    expect((created.infos.fixed as Record<string, unknown>).grade).toBeUndefined();
+    expect(db.get('students/nursery-1')!.pcoPushPending).toBe(false);
+  });
+
   it('links to the person the office already typed in rather than duplicating them', async () => {
     db.seed('students/visitor-2', {
       firstName: 'Priya',

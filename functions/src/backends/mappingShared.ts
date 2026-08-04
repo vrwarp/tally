@@ -134,10 +134,19 @@ export function nameGradeKey(
     // be merged into whichever came first. Keep the characters instead.
     return latin.length > 0 ? latin : folded.replace(/\s+/g, ' ').trim();
   };
-  // Two grade-less children of the same name are *not* assumed to be the same
-  // person: a nursery is full of people with no grade, and collapsing them on
-  // a name collision would merge two real children into one record.
-  return `${normalise(firstName)}|${normalise(lastName)}|${grade ?? `none:${normalise(firstName)}${normalise(lastName)}`}`;
+  /*
+   * `none` is its own slot, not a stand-in for a number.
+   *
+   * Two grade-less people of the same name still key alike — this is a pure
+   * function of what is known, and for somebody with no grade the name is all
+   * there is. What the distinct slot buys is that they never collide with a
+   * *graded* person of the same name, which a zero or an empty string would.
+   * Whether name alone is enough to merge on is the caller's judgement:
+   * `findExistingPerson` additionally requires `child`, because the grade-less
+   * population upstream is children too young for a grade and every adult
+   * volunteer at once.
+   */
+  return `${normalise(firstName)}|${normalise(lastName)}|${grade ?? 'none'}`;
 }
 
 /**

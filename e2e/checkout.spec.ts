@@ -38,14 +38,24 @@ async function nurseryId(): Promise<string> {
 const COLLECTED = 'Aisha Rahman';
 const RETURNED = 'Amara Osei';
 
-/** Opens the nursery roster, and waits for the roster to actually be there. */
-async function openNursery(page: Page, child: string): Promise<string> {
+/**
+ * Opens the nursery roster, and waits for the roster to actually be there.
+ *
+ * `child` is the row a test is about to act on, and waiting for it is what
+ * stops a test racing the Planning Center read. A test that acts on nobody in
+ * particular passes nothing and waits for the quick-add button instead — by
+ * then the roster has rendered, and no assumption is made about who is still
+ * un-checked-in, which the tests above change as they go.
+ */
+async function openNursery(page: Page, child?: string): Promise<string> {
   const id = await nurseryId();
   await gotoReady(page, `/event/${id}`);
   await expect(page.getByRole('heading', { name: /nursery/i })).toBeVisible();
-  await expect(page.getByRole('button', { name: new RegExp(`^Check in ${child}`) })).toBeVisible({
-    timeout: 30_000,
-  });
+  await expect(
+    child
+      ? page.getByRole('button', { name: new RegExp(`^Check in ${child}`) })
+      : page.getByRole('button', { name: /quick add a visitor/i }),
+  ).toBeVisible({ timeout: 30_000 });
   return id;
 }
 
@@ -126,6 +136,60 @@ test.describe('check-out', () => {
     await expect(
       page.getByRole('button', { name: new RegExp(`^Check out ${RETURNED}`) }),
     ).toBeVisible();
+  });
+
+  /**
+   * The nursery's own quick-add, end to end.
+   *
+   * A child too young for a grade has none to type, and both backends used to
+   * refuse to create one — so a volunteer adding a three-year-old at the door
+   * left them queued on `pcoPushPending` for ever, which is a queue that never
+   * drains rather than a visible failure.
+   */
+  test('quick-adds a child with no grade, and pushes them upstream', async ({
+    page,
+    signedInAs,
+    firestore,
+    planningCenter,
+  }) => {
+    await signedInAs('counselor');
+    await openNursery(page);
+
+    await page.getByRole('button', { name: /quick add a visitor/i }).click();
+    const dialog = page.getByRole('dialog', { name: /add a visitor/i });
+
+    // A check-out roster opens the field on "No grade": clearing it forty
+    // times a morning is the same mistake as reaching for undo forty times.
+    await expect(dialog.getByLabel(/grade/i)).toHaveValue('');
+
+    await dialog.getByLabel(/first name/i).fill('Wren');
+    await dialog.getByLabel(/last name/i).fill('Halloran');
+    await dialog.getByRole('button', { name: /save & check in|save and check in/i }).click();
+    await expect(dialog).toBeHidden();
+
+    const students = await firestore.until(
+      'students',
+      (docs) => docs.some((doc) => doc.data.firstName === 'Wren'),
+      'the grade-less child',
+    );
+    const created = students.find((doc) => doc.data.firstName === 'Wren')!;
+    // Absent, not zero: a grade nobody supplied is a claim about a real child.
+    expect(created.data.grade).toBeUndefined();
+
+    // And they really reach Planning Center rather than queueing for ever.
+    await expect
+      .poll(
+        async () => {
+          const people = await planningCenter.people();
+          return people.some(
+            (person) =>
+              (person as { first_name?: string }).first_name === 'Wren' ||
+              (person as { attributes?: { first_name?: string } }).attributes?.first_name === 'Wren',
+          );
+        },
+        { timeout: 20_000 },
+      )
+      .toBe(true);
   });
 
   test('leaves an ordinary gathering exactly as it was', async ({ page, signedInAs }) => {

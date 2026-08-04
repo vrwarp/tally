@@ -235,11 +235,24 @@ export async function pushStudent(
   if (data.pcoPushPending !== true) {
     return { status: 'skipped', pcoPersonId: null, message: 'Student is not queued for Attendees.' };
   }
-  if (grade === null) {
-    return { status: 'skipped', pcoPersonId: null, message: 'Student is missing a grade.' };
-  }
-
-  const existing = await findExistingAttendee(client, firstName, lastName, grade);
+  /*
+   * A grade-less student is created, but never matched onto an existing one.
+   *
+   * The create used to be refused outright, which left a nursery child queued
+   * on `pcoPushPending` for ever — a queue that never drains rather than a
+   * visible failure.
+   *
+   * The duplicate check is skipped rather than widened, and that is the
+   * difference from Planning Center. There, `child` distinguishes a child too
+   * young for a grade from an adult volunteer, who is equally grade-less;
+   * Attendees has no such flag — *holding a grade at all* is the closest fact
+   * it keeps, which is exactly the fact missing here. Matching on name alone
+   * would file a three-year-old as the volunteer who shares their name, in the
+   * church's permanent database, silently. A duplicate somebody can merge is
+   * the better failure.
+   */
+  const existing =
+    grade === null ? null : await findExistingAttendee(client, firstName, lastName, grade);
   if (existing) {
     await ref.update({
       upstreamBackend: 'a32',
@@ -271,7 +284,9 @@ export async function pushStudent(
       last_name: lastName,
       gender: 'UNSPECIFIED',
       division: Number.parseInt(config.divisionId, 10),
-      infos: { fixed: { grade }, contacts: {} },
+      // Omitted rather than sent as a zero: a grade nobody supplied is a claim
+      // about a real child, and it is the church's database that keeps it.
+      infos: { fixed: grade === null ? {} : { grade }, contacts: {} },
     },
     {
       // A family folk from the start (the app's own grids hide family-less
@@ -848,11 +863,13 @@ export async function recreateStudent(
 
   const firstName = options.firstName?.trim() || readString(resolved.data, 'firstName');
   const lastName = options.lastName?.trim() || readString(resolved.data, 'lastName');
+  // A grade is no longer required: a nursery child has none, and refusing to
+  // re-create them would strand a student whose upstream record died.
   const grade = options.grade ?? readGrade(resolved.data);
-  if (!firstName || !lastName || grade === null) {
+  if (!firstName || !lastName) {
     return {
       status: 'needs-details',
-      message: 'A name and a grade are needed to re-create this student in Attendees.',
+      message: 'A name is needed to re-create this student in Attendees.',
     };
   }
 
@@ -867,7 +884,9 @@ export async function recreateStudent(
       last_name: lastName,
       gender: 'UNSPECIFIED',
       division: Number.parseInt(config.divisionId, 10),
-      infos: { fixed: { grade }, contacts: {} },
+      // Omitted rather than sent as a zero: a grade nobody supplied is a claim
+      // about a real child, and it is the church's database that keeps it.
+      infos: { fixed: grade === null ? {} : { grade }, contacts: {} },
     },
     {
       ...(relationIds.child !== null

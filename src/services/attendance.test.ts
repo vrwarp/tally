@@ -23,6 +23,7 @@ import {
   checkIn,
   checkOut,
   fetchAttendanceByEvent,
+  quickAddAndCheckIn,
   swapCheckIn,
   undoCheckOut,
 } from '@/services/attendance';
@@ -211,6 +212,39 @@ describe('swapCheckIn', () => {
     const [, payload] = set.mock.calls[0]!;
     expect(payload).not.toHaveProperty('checkedOutAt');
     expect(payload).not.toHaveProperty('checkedOutBy');
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* quickAddAndCheckIn                                                          */
+/* -------------------------------------------------------------------------- */
+
+describe('quickAddAndCheckIn', () => {
+  const draft = { firstName: 'Nia', lastName: 'Fontaine', grade: 9 as const };
+
+  it('writes the grade a counselor typed', async () => {
+    await quickAddAndCheckIn({ draft, event: EVENT, uid: 'counselor-1' });
+
+    const [, payload] = set.mock.calls[0]!;
+    expect(payload).toMatchObject({ grade: 9 });
+  });
+
+  /**
+   * A nursery child has no grade to type, and the document has to say so by
+   * omission — a zero would be a claim about a real child that nobody made,
+   * and it is the church's database that ends up keeping it.
+   */
+  it('omits the field entirely for a child with no grade', async () => {
+    await quickAddAndCheckIn({
+      draft: { ...draft, grade: null },
+      event: EVENT,
+      uid: 'counselor-1',
+    });
+
+    const [, payload] = set.mock.calls[0]!;
+    expect(payload).not.toHaveProperty('grade');
+    // Still a real student in every other respect, and still queued for a push.
+    expect(payload).toMatchObject({ firstName: 'Nia', pcoPushPending: true });
   });
 });
 

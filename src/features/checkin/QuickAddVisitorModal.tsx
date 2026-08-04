@@ -13,7 +13,18 @@ import { gradeDescription, haptic } from '@/lib/utils';
 import { quickAddAndCheckIn } from '@/services/attendance';
 import { GRADES, type Grade, type TallyEvent } from '@/types';
 
-const DEFAULT_GRADE: Grade = 9;
+/**
+ * What the grade field opens on.
+ *
+ * A youth ministry gets the middle of its band, which is one fewer tap for
+ * most of the students walking in. A gathering that hands children back opens
+ * on no grade at all: a nursery child has none to type, and making a volunteer
+ * clear the field forty times a morning is the same mistake as making them
+ * reach for undo.
+ */
+function defaultGrade(event: Pick<TallyEvent, 'requiresCheckOut'>): Grade | null {
+  return event.requiresCheckOut ? null : 9;
+}
 
 export interface QuickAddVisitorModalProps {
   open: boolean;
@@ -39,7 +50,7 @@ export function QuickAddVisitorModal({
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [grade, setGrade] = useState<Grade>(DEFAULT_GRADE);
+  const [grade, setGrade] = useState<Grade | null>(() => defaultGrade(event));
   const [errors, setErrors] = useState<{ firstName?: string; lastName?: string }>({});
 
   useEffect(() => {
@@ -47,9 +58,9 @@ export function QuickAddVisitorModal({
     const parts = (initialName ?? '').trim().split(/\s+/).filter(Boolean);
     setFirstName(parts[0] ?? '');
     setLastName(parts.slice(1).join(' '));
-    setGrade(DEFAULT_GRADE);
+    setGrade(defaultGrade(event));
     setErrors({});
-  }, [open, initialName]);
+  }, [open, initialName, event]);
 
   const handleSubmit = (submitted: FormEvent<HTMLFormElement>) => {
     submitted.preventDefault();
@@ -124,9 +135,14 @@ export function QuickAddVisitorModal({
         />
         <SelectField
           label="Grade"
-          value={grade}
-          onChange={(changed) => setGrade(Number(changed.target.value) as Grade)}
+          value={grade ?? ''}
+          onChange={(changed) =>
+            setGrade(changed.target.value === '' ? null : (Number(changed.target.value) as Grade))
+          }
         >
+          {/* A real answer, not a blank one to be filled in later: a child too
+              young for a grade has none, and the document simply omits it. */}
+          <option value="">No grade</option>
           {GRADES.map((value) => (
             <option key={value} value={value}>
               {gradeDescription(value)}

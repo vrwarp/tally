@@ -88,22 +88,42 @@ async function findExistingPerson(
   config: PcoConfig,
   firstName: string,
   lastName: string,
-  grade: number,
+  grade: number | null,
 ): Promise<PcoPerson | null> {
   // The server's fuzzy `search_name` has never seen `Benson “蔡秉洲” Tsai` — it
   // indexes the halves — so it is asked for the plain name and the composite is
   // matched locally below.
   const plainFirstName = splitFirstName(firstName).firstName;
   const body = await client.get<PcoPerson[]>('/people', {
-    where: { search_name: `${plainFirstName} ${lastName}`, grade },
+    // `where[grade]` takes one exact value and has no "is blank" form, so a
+    // grade-less student is searched by name and filtered below.
+    where: { search_name: `${plainFirstName} ${lastName}`, ...(grade === null ? {} : { grade }) },
     per_page: SEARCH_PAGE_SIZE,
   });
 
   const wanted = nameGradeKey(firstName, lastName, grade);
   const matches = (Array.isArray(body.data) ? body.data : []).filter((person) => {
-    // The *raw* grade, not the clamped one: a person whose grade is blank would
-    // otherwise be normalised into the band and match by accident.
-    if (person.attributes?.grade !== grade) return false;
+    const held = person.attributes?.grade;
+
+    if (grade === null) {
+      /*
+       * Name alone is all there is to match on, so `child` has to carry the
+       * rest of the weight.
+       *
+       * The grade-less population upstream is two groups at once: children too
+       * young for a grade, and every adult volunteer and leader. Matching a
+       * nursery child onto a same-named adult would file a three-year-old as
+       * that volunteer, silently, in the church's permanent database — so a
+       * candidate has to be a child *and* hold no grade, and anything else is
+       * left alone even at the cost of a duplicate somebody can merge later.
+       */
+      if (held !== null && held !== undefined) return false;
+      if (person.attributes?.child !== true) return false;
+    } else if (held !== grade) {
+      // The *raw* grade, not the clamped one: a person whose grade is blank
+      // would otherwise be normalised into the band and match by accident.
+      return false;
+    }
 
     const mapped = mapPersonToStudent(person, {
       minGrade: config.minGrade,
@@ -334,20 +354,15 @@ export async function pushStudent(options: PushStudentOptions): Promise<PushStud
   }
 
   /*
-   * A create needs a real grade; an update does not.
+   * A create no longer needs a grade.
    *
-   * The duplicate check below matches on first name, last name *and* grade, and
-   * the person this is about to add is filed as a child of that grade in the
-   * church's permanent database. Neither can be done from a number nobody
-   * supplied. Every student queued for a create has one — it is typed at
-   * quick-add — so this is a refusal rather than a fallback: it is the linked
-   * path above that has to cope with a document holding no grade, and it does,
-   * by patching nothing.
+   * It used to refuse one, on the reasoning that every student queued for a
+   * create had a grade typed at quick-add. A nursery does not: a child too
+   * young for a grade has none to type, and the refusal left them queued on
+   * `pcoPushPending` for ever — a queue that never drains rather than a visible
+   * failure. `createAttributes` omits the field rather than sending a zero, and
+   * the duplicate check above leans on `child` instead.
    */
-  if (grade === null) {
-    return { status: 'skipped', pcoPersonId: null, message: 'Student is missing a grade.' };
-  }
-
   const existing = await findExistingPerson(client, config, firstName, lastName, grade);
   if (existing) {
     await ref.update({
