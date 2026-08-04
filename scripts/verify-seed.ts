@@ -44,7 +44,12 @@ for (const event of events) {
   const attendance = await getDocs(collection(db, `events/${event.id}/attendance`));
   const present = new Set(attendance.docs.map((d) => d.id));
   // The whole register, so its emptiness is the gathering's.
-  snapshots.push({ event, presentStudentIds: present, held: present.size > 0 });
+  snapshots.push({
+    event,
+    presentStudentIds: present,
+    checkedOutStudentIds: new Set(),
+    held: present.size > 0,
+  });
 }
 
 const now = new Date();

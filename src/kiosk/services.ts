@@ -29,6 +29,7 @@ import {
   getDocs,
   getFirestore,
   query,
+  deleteField,
   serverTimestamp,
   where,
   writeBatch,
@@ -362,7 +363,7 @@ export async function fetchPresentIds(eventId: string): Promise<Set<string>> {
 /* Check-in                                                                    */
 /* -------------------------------------------------------------------------- */
 
-const CLOCK = { serverTimestamp };
+const CLOCK = { serverTimestamp, deleteField };
 const MAX_QUEUED = 50;
 
 interface PendingCheckIn {

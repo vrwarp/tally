@@ -262,6 +262,9 @@ export function toEvent(snapshot: DocumentSnapshot<DocumentData>): TallyEvent {
     // A one-off without an explicit flag still defaults to an RSVP roster: a
     // trip with a fixed list is the reason one-offs have a roster story at all.
     requiresRsvp: bool(data.requiresRsvp, mode === 'oneoff'),
+    // No default from `mode`: a nursery is a thing somebody turns on, not
+    // something a gathering's shape implies.
+    requiresCheckOut: bool(data.requiresCheckOut, false),
     status: data.status === 'cancelled' ? 'cancelled' : 'scheduled',
     createdAt: toDate(data.createdAt, fallback),
     updatedAt: toDate(data.updatedAt, fallback),
@@ -300,6 +303,22 @@ export function toAttendance(
         ? method
         : 'tap',
     isFirstEver: bool(data.isFirstEver),
+    /*
+     * Four cases, and they have to stay apart.
+     *
+     * The key being *absent* is the whole "still in the room" state, so it
+     * cannot share an encoding with anything else. A key that is present but
+     * null is a pending `serverTimestamp()` — the same substitution
+     * `checkedInAt` makes above — unless nothing is pending, in which case it
+     * is a document somebody hand-wrote in the console and means no more than
+     * an absent key would.
+     */
+    checkedOutAt:
+      'checkedOutAt' in data
+        ? (toDateOrNull(data.checkedOutAt) ??
+          (snapshot.metadata.hasPendingWrites ? new Date() : null))
+        : null,
+    checkedOutBy: strOrNull(data.checkedOutBy),
   };
 }
 

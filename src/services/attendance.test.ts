@@ -19,13 +19,20 @@
  * that batch has to satisfy are checked.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { checkIn, fetchAttendanceByEvent, swapCheckIn } from '@/services/attendance';
+import {
+  checkIn,
+  checkOut,
+  fetchAttendanceByEvent,
+  swapCheckIn,
+  undoCheckOut,
+} from '@/services/attendance';
 import { makeAttendance, makeEvent, makeStudent } from '../../tests/factories';
 
 const set = vi.hoisted(() => vi.fn());
 const remove = vi.hoisted(() => vi.fn());
 const commit = vi.hoisted(() => vi.fn(async () => {}));
 const getDocs = vi.hoisted(() => vi.fn());
+const updateDoc = vi.hoisted(() => vi.fn(async () => {}));
 
 vi.mock('@/lib/firebase', () => ({ db: {} }));
 vi.mock('firebase/firestore', () => ({
@@ -36,6 +43,8 @@ vi.mock('firebase/firestore', () => ({
   // which event each in-flight query is for.
   collection: (_db: unknown, path: string) => ({ path }),
   getDocs,
+  deleteField: () => 'deleted',
+  updateDoc,
   // Imported by the module but not reached by anything here.
   deleteDoc: vi.fn(),
   onSnapshot: vi.fn(),
@@ -209,7 +218,7 @@ describe('fetchAttendanceByEvent', () => {
   it('reads every event exactly once, however many are asked for', async () => {
     const ids = Array.from({ length: 200 }, (_, index) => `night-${index}`);
     getDocs.mockImplementation(async (ref: { path: string }) => ({
-      docs: [{ id: `student-for-${eventOf(ref.path)}` }],
+      docs: [{ id: `student-for-${eventOf(ref.path)}`, get: () => null }],
     }));
 
     const result = await fetchAttendanceByEvent(ids);
@@ -219,7 +228,7 @@ describe('fetchAttendanceByEvent', () => {
     // Not just the right count — the right people against the right night. A
     // pool that raced two workers onto one index would show up here.
     for (const id of ids) {
-      expect(result.get(id)).toEqual(new Set([`student-for-${id}`]));
+      expect(result.get(id)?.present).toEqual(new Set([`student-for-${id}`]));
     }
   });
 
@@ -234,7 +243,7 @@ describe('fetchAttendanceByEvent', () => {
       return new Promise((resolve) => {
         release.push(() => {
           inFlight -= 1;
-          resolve({ docs: [{ id: `student-for-${eventOf(ref.path)}` }] });
+          resolve({ docs: [{ id: `student-for-${eventOf(ref.path)}`, get: () => null }] });
         });
       });
     });

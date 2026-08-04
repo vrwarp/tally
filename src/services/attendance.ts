@@ -9,6 +9,7 @@ import {
   collection,
   collectionGroup,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -19,6 +20,7 @@ import {
   serverTimestamp,
   setDoc,
   startAfter,
+  updateDoc,
   where,
   writeBatch,
   type DocumentData,
@@ -30,6 +32,8 @@ import { COLLECTIONS, paths } from '@/lib/paths';
 import {
   attendancePayload as buildAttendancePayload,
   studentDatePatch as buildStudentDatePatch,
+  checkOutPayload as buildCheckOutPayload,
+  undoCheckOutPayload as buildUndoCheckOutPayload,
   type CheckInStudent,
 } from '@/services/attendancePayloads';
 import { toAttendance, toEvent } from '@/services/converters';
@@ -54,7 +58,7 @@ export function subscribeAttendance(
  * kiosk entry writes the same documents through `firebase/firestore/lite`.
  * These two wrappers bind them to this module's SDK clock.
  */
-const CLOCK = { serverTimestamp };
+const CLOCK = { serverTimestamp, deleteField };
 
 function attendancePayload(
   args: Parameters<typeof buildAttendancePayload>[1],
@@ -158,6 +162,12 @@ export async function swapCheckIn(args: {
       // about the student, not about the check-in being moved.
       isFirstEver: to.firstAttendedAt === null,
       checkedInAt: from.checkedInAt,
+      // A check-out deliberately does not travel. The arrival moment is copied
+      // because only *who* was wrong about it — but a pickup recorded against
+      // the wrong child is a statement about a parent who collected somebody
+      // else's kid, and there is nothing in it worth preserving. The corrected
+      // record starts present; if the right child has already gone home,
+      // somebody checks them out again.
     }),
   );
 
@@ -177,6 +187,32 @@ export async function swapCheckIn(args: {
  */
 export async function undoCheckIn(eventId: string, studentId: string): Promise<void> {
   await deleteDoc(doc(db, paths.attendance(eventId, studentId)));
+}
+
+/**
+ * Records that somebody collected a student, on an event that tracks check-out.
+ *
+ * `updateDoc` rather than `setDoc`, for two reasons that both matter. A pickup
+ * for a child nobody checked in is a bug, and this fails rather than inventing
+ * a half-record for them. And a whole-document `set` reads as "touches
+ * everything" to the rules' `touchesOnly`, which would refuse the write.
+ *
+ * Deliberately not gated on who did the check-in: the volunteer who takes a
+ * child in is rarely the one who hands them back.
+ */
+export async function checkOut(eventId: string, studentId: string, uid: string): Promise<void> {
+  await updateDoc(doc(db, paths.attendance(eventId, studentId)), buildCheckOutPayload(CLOCK, uid));
+}
+
+/**
+ * Puts a student back in the room.
+ *
+ * Deletes the two fields rather than nulling them — see `PayloadClock`. This is
+ * not the same as undoing a check-in, which deletes the record entirely and
+ * takes any pickup with it.
+ */
+export async function undoCheckOut(eventId: string, studentId: string): Promise<void> {
+  await updateDoc(doc(db, paths.attendance(eventId, studentId)), buildUndoCheckOutPayload(CLOCK));
 }
 
 /**
@@ -259,11 +295,20 @@ const ATTENDANCE_READ_CONCURRENCY = 12;
  * The returned map is keyed by event id and carries one entry per id asked for;
  * its iteration order is completion order, not the order given, and no caller
  * reads it as a sequence.
+ *
+ * `present` is everyone with a record — the head count, unchanged by check-out.
+ * `checkedOut` is the subset that was collected, always a subset, and read from
+ * the same documents at the same cost.
  */
+export interface EventAttendanceIds {
+  present: Set<string>;
+  checkedOut: Set<string>;
+}
+
 export async function fetchAttendanceByEvent(
   eventIds: readonly string[],
-): Promise<Map<string, Set<string>>> {
-  const results = new Map<string, Set<string>>();
+): Promise<Map<string, EventAttendanceIds>> {
+  const results = new Map<string, EventAttendanceIds>();
   let next = 0;
 
   // Each worker takes the next id and reads it, until there are none left. The
@@ -274,7 +319,12 @@ export async function fetchAttendanceByEvent(
       const eventId = eventIds[index];
       if (eventId === undefined) continue;
       const snapshot = await getDocs(collection(db, paths.attendanceCollection(eventId)));
-      results.set(eventId, new Set(snapshot.docs.map((d) => d.id)));
+      results.set(eventId, {
+        present: new Set(snapshot.docs.map((d) => d.id)),
+        checkedOut: new Set(
+          snapshot.docs.filter((d) => d.get('checkedOutAt') != null).map((d) => d.id),
+        ),
+      });
     }
   };
 

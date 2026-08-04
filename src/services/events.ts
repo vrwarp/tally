@@ -60,6 +60,7 @@ export interface EventDraft {
   location?: string | null;
   notes?: string | null;
   requiresRsvp?: boolean;
+  requiresCheckOut?: boolean;
   status?: EventStatus;
 }
 
@@ -223,6 +224,9 @@ function buildEventPayload(draft: EventDraft, uid: string, isNew: boolean) {
     location: draft.location?.trim() || null,
     notes: draft.notes?.trim() || null,
     requiresRsvp: draft.requiresRsvp ?? draft.mode === 'oneoff',
+    // Not defaulted from `mode`: recurring and one-off alike, this is on only
+    // when somebody said so.
+    requiresCheckOut: draft.requiresCheckOut ?? false,
     status: draft.status ?? 'scheduled',
     updatedAt: serverTimestamp(),
   };

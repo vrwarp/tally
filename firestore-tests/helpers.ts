@@ -160,6 +160,7 @@ export function eventDoc(overrides: Partial<TallyEventDoc> = {}): TallyEventDoc 
     location: null,
     notes: null,
     requiresRsvp: false,
+    requiresCheckOut: false,
     status: 'scheduled',
     createdAt: T0,
     updatedAt: T0,

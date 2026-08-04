@@ -62,7 +62,12 @@ function arbitraryDashboard(rng: Rng): DashboardInput {
     const present = new Set(students.filter(() => rng.bool(0.5)).map((s) => s.id));
     // A whole register, so an empty one is a gathering nobody came to — which is
     // exactly the case several of these properties are about.
-    return { event, presentStudentIds: present, held: present.size > 0 };
+    return {
+      event,
+      presentStudentIds: present,
+      checkedOutStudentIds: new Set<string>(),
+      held: present.size > 0,
+    };
   });
 
   return { students, snapshots, settings: arbitrarySettings(rng), reachable };
@@ -315,6 +320,7 @@ describe('dashboard insight properties', () => {
     const nobodyCame = input.snapshots.map((snapshot) => ({
       ...snapshot,
       presentStudentIds: new Set<string>(),
+      checkedOutStudentIds: new Set<string>(),
       held: false,
     }));
 

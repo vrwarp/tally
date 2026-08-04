@@ -459,6 +459,17 @@ export interface TallyEventDoc {
   /** Closes a one-off event's roster to the students who RSVP'd. */
   requiresRsvp: boolean;
 
+  /**
+   * Turns the roster ternary: a student can be checked in, and then checked out.
+   *
+   * For a room somebody is collected from rather than simply attends — a
+   * nursery, where the number a volunteer needs mid-service is not how many
+   * came but how many are still here. Off by default and unconditionally:
+   * unlike `requiresRsvp`, which follows from `mode`, nothing about a
+   * gathering's shape implies that children get handed back.
+   */
+  requiresCheckOut: boolean;
+
   status: EventStatus;
 
   createdAt: Timestamp;
@@ -525,12 +536,31 @@ export interface AttendanceRecordDoc {
   method: CheckInMethod;
   /** First time this student has ever been marked present at anything. */
   isFirstEver: boolean;
+  /**
+   * When somebody collected them, on an event that tracks check-out.
+   *
+   * The key is *absent* while they are still in the room — not null. A
+   * `serverTimestamp()` sentinel reads back as null locally until the write
+   * round-trips, and null is the state that means "still here", so an undo
+   * writes `deleteField()` rather than null and the two stay distinguishable.
+   * See `toAttendance`.
+   */
+  checkedOutAt?: Timestamp;
+  /**
+   * Who recorded the pickup — not necessarily who checked them in. The
+   * volunteer who takes a child in is rarely the one who hands them back.
+   */
+  checkedOutBy?: string;
 }
 
-export interface AttendanceRecord extends Omit<AttendanceRecordDoc, 'checkedInAt'> {
+export interface AttendanceRecord
+  extends Omit<AttendanceRecordDoc, 'checkedInAt' | 'checkedOutAt' | 'checkedOutBy'> {
   /** Equal to `studentId`. */
   id: string;
   checkedInAt: Date;
+  /** Null while they are still in the room. */
+  checkedOutAt: Date | null;
+  checkedOutBy: string | null;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1180,7 +1210,13 @@ export interface NewVisitor {
  */
 export interface EventAttendanceSnapshot {
   event: TallyEvent;
+  /**
+   * Everybody who was checked in. This is the head count, and check-out does
+   * not touch it — every metric built on attendance reads this and only this.
+   */
   presentStudentIds: ReadonlySet<string>;
+  /** The subset who were collected. Always a subset of the above. */
+  checkedOutStudentIds: ReadonlySet<string>;
   /** Whether anybody at all was checked in. Never inferred from the set above. */
   held: boolean;
 }

@@ -16,7 +16,8 @@ import {
 } from '@/services/attendancePayloads';
 
 const SENTINEL = Symbol('serverTimestamp');
-const clock = { serverTimestamp: () => SENTINEL };
+const DELETED = Symbol('deleteField');
+const clock = { serverTimestamp: () => SENTINEL, deleteField: () => DELETED };
 
 const event = { id: 'event-1', seriesId: 'friday', startAt: new Date('2026-08-07T19:00:00Z') };
 

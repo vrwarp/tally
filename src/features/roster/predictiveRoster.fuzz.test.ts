@@ -258,6 +258,8 @@ describe('buildRoster properties', () => {
             checkedInBy: 'fuzz',
             method: 'tap' as const,
             isFirstEver: false,
+            checkedOutAt: null,
+            checkedOutBy: null,
           },
         ],
         filters: { query: '' },

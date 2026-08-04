@@ -397,16 +397,60 @@ service cloud.firestore {
                  .data.get('pcoRecordMissing', false) == true;
         }
 
+        function checkOutKeys() { return ['checkedOutAt', 'checkedOutBy']; }
+
+        /**
+         * A pickup, recorded by whoever was at the door for it.
+         *
+         * Deliberately *not* gated on `validAttendance()`: that demands
+         * `checkedInBy == request.auth.uid`, and the volunteer who takes a
+         * child in is rarely the one who hands them back. Requiring it would
+         * mean a shift change either fails or overwrites the provenance of the
+         * check-in, which is the half of the audit that gets asked about.
+         *
+         * The rest of the record is a fact about the check-in and has to
+         * survive being handed on, so this touches two fields and no others.
+         * `touchesOnly` requires `resource != null`, so it can never create a
+         * record either: a pickup for a child nobody checked in is a bug, not
+         * a shortcut.
+         *
+         * The undo — both fields cleared — names nobody, which is why the
+         * authorship check only applies when a time is being written.
+         */
+        function validCheckOut() {
+          return touchesOnly(checkOutKeys())
+            && (request.resource.data.get('checkedOutAt', null) == null
+                || request.resource.data.checkedOutBy == request.auth.uid);
+        }
+
+        /**
+         * What a lobby screen may do: record a pickup that has not been
+         * recorded yet, and nothing else.
+         *
+         * Not an undo — the kiosk offers none, and a bystander clearing a
+         * collection somebody witnessed is not a self-serve action. Not a
+         * correction to a time already standing either; that is a staff
+         * decision, made on the roster.
+         */
+        function kioskCheckOutAllowed() {
+          return validCheckOut()
+            && resource.data.get('checkedOutAt', null) == null
+            && request.resource.data.get('checkedOutAt', null) != null;
+        }
+
         allow get, list: if isActive();
         allow create: if isCounselor() && validAttendance() && !checkInFrozen();
         /**
-         * A kiosk may only ever *add* a record. Updating would let a lobby
-         * tap overwrite the moment and method a counselor recorded, and
-         * deleting would be an undo nobody at a kiosk is trusted to perform.
-         * The kiosk client knows this and renders an already-present student
-         * as done rather than re-writing them.
+         * A kiosk may add a record, and may record a first pickup. It may not
+         * overwrite the moment and method a counselor recorded, and it may not
+         * delete — an undo is nobody-at-a-kiosk's to perform. The client knows
+         * this and renders an already-collected student as done rather than
+         * re-writing them.
          */
-        allow update: if isCounselor() && validAttendance() && !checkInFrozen() && !isKioskSession();
+        allow update: if isCounselor() && !checkInFrozen()
+                      && (isKioskSession()
+                            ? kioskCheckOutAllowed()
+                            : (validAttendance() || validCheckOut()));
         allow delete: if isCounselor() && !checkInFrozen() && !isKioskSession();
       }
 
