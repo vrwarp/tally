@@ -56,7 +56,7 @@ deploys cleanly.
 | `characterSlug` | `A32_CHARACTER_SLUG` | The character (role) new students join the meet as. |
 | `assemblySlug` | `A32_ASSEMBLY_SLUG` | The assembly history import lists meets for. |
 | `writeBack` | `A32_WRITE_BACK` | `off` / `create` / `full` — the same ladder as Planning Center. |
-| `minGrade`, `maxGrade` | `A32_MIN_GRADE` / `A32_MAX_GRADE` | The grade band; also where a student with no grade on file lands (with `gradeOnFile: false`, so screens say "No grade" rather than print the clamp). |
+| `minGrade`, `maxGrade` | `A32_MIN_GRADE` / `A32_MAX_GRADE` | The grade band a deployment reads. It decides membership and warns on a profile edit; it no longer rewrites anybody's grade — a student Attendees holds no grade for arrives with none, and screens say "No grade". Defaults stay 6–12 even though `Grade` now admits K–12. |
 | `cacheTtlSeconds` | `A32_CACHE_TTL_SECONDS` | Read-reuse window, 0–300 seconds. |
 | `enabled` | — | The document's off switch. Absent counts as on; being *configured* is the real gate. |
 

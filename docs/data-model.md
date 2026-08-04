@@ -132,7 +132,40 @@ An explicit `'cancelled'` still wins over the inference, even when a few student
 before the call was made. A leader saying "this did not happen" outranks a guess, and the alternative
 would make un-cancelling the only way to stop a cancelled night counting as everyone else's absence.
 
-### 4. Tally does not track money or paperwork
+### 4. Check-out is a ternary state, and it never touches attendance
+
+`events/{eventId}.requiresCheckOut` turns the roster ternary: absent (no document), present
+(a document with no `checkedOutAt`), collected (a document with one). It is for a room children are
+handed back from rather than a register of who came — a nursery, where the number a volunteer needs
+mid-service is not how many arrived but how many are still here.
+
+**A missed check-out is not a miss.** `presentStudentIds` still means everybody who was checked in,
+so the head count, the MIA derivation, the trend strip and every dashboard metric read exactly what
+they always read. The live number is a sibling, `inRoom`, and `inRoom + checkedOut === present` is
+the invariant. Nothing on any screen marks a student without a pickup: no badge, no dash, no warning
+colour. Half a nursery walking off without telling anybody is a normal morning.
+
+**There is no sweeper.** Nothing ever invents a pickup time for a child somebody forgot to check
+out. A fabricated timestamp on a custody record is worse than an absent one, and an absent one is
+already the honest answer.
+
+**Undo deletes the field rather than nulling it**, and that asymmetry is load-bearing. A pending
+`serverTimestamp()` reads back as `null` in the optimistic local snapshot — the same substitution
+`checkedInAt` needs — and `null` is exactly the state that means *still in the room*. Nulling an undo
+would leave a child in the Present view until the server answered, and would make a hand-written
+console document indistinguishable from a real pickup. So a check-out writes `serverTimestamp()` and
+an undo writes `deleteField()`, and the converter can tell all four cases apart.
+
+**A pickup is not gated on who did the check-in.** `validAttendance` demands
+`checkedInBy == request.auth.uid`; a check-out deliberately does not, because a shift change would
+otherwise either fail or overwrite the provenance of the arrival. It touches `checkedOutAt` and
+`checkedOutBy` and nothing else, so the rest of the record survives being handed on.
+
+**The kiosk may record a first pickup, and only that.** It may not move one already standing and may
+not undo — correcting a recorded collection is a staff decision made on the roster, not something an
+unattended lobby screen does. The rules enforce that rather than trusting the client to.
+
+### 5. Tally does not track money or paperwork
 
 An earlier version of the RSVP feature carried `waiverSigned`, `paymentReceived`, `amountPaidCents`
 and an event-level `feeCents`, and rendered a red "blocked" badge at check-in for anyone outstanding.
@@ -199,7 +232,7 @@ before they exist anywhere upstream.
 | Field | Type | Notes |
 | --- | --- | --- |
 | `firstName`, `lastName` | string | Owned by the linked backend once linked; read live off the roster, and kept here only for a student no backend holds. |
-| `grade` | 6–12, or absent | Owned by the linked backend. The `Grade` type admits nothing else — and *absent* is a real state, not a malformed document: for somebody upstream holds no grade for, the number on their roster row is only where the clamp landed, and nothing writes it down. See `gradeOnFile`. |
+| `grade` | 0–12, or absent | Owned by the linked backend; `0` is kindergarten. **Absent is a real state**, and the honest one: a nursery child has no grade, and neither does an adult on a hand-picked roster. It used to be a required number paired with a `gradeOnFile` boolean — a nullable field spelled as a sentinel plus a flag, which every reader had to remember to consult and which the sync set from whether the upstream value was *blank* rather than whether it had been clamped. A real 3rd grader therefore arrived asserting they were in 6th. Absent rather than `null` because `validStudent` reads `!('grade' in d.keys()) || d.grade is int`. Which grades a deployment actually *reads* is `minGrade`/`maxGrade`, still 6–12 by default. |
 | `notes` | string \| null | Tally's own, free text. |
 | `status` | `'active' \| 'inactive'` | Inactive students leave the roster but keep their history. |
 | `isVisitor` | boolean | Set by quick-add. Cleared automatically once a parent contact exists. |
@@ -249,6 +282,7 @@ One dated gathering.
 | `location` | string \| null | |
 | `notes` | string \| null | For the core team. Shown on the event page only — see `description` above. |
 | `requiresRsvp` | boolean | Closes a one-off's roster to the students who RSVP'd. A one-off with no explicit flag still defaults to one. |
+| `requiresCheckOut` | boolean | Turns the roster ternary: children are checked in and then collected. Off by default and unconditionally — unlike `requiresRsvp`, nothing about a gathering's shape implies it. Inherited by projected occurrences, because a nursery is exactly the kind of gathering that repeats. |
 | `status` | `'scheduled' \| 'cancelled'` | Cancelled events are never offered as live and never inform prediction. A *finished* event with no attendance is treated as cancelled too — see [decision 3](#3-a-gathering-with-no-attendance-is-a-cancelled-one). |
 | `pcoCheckInsEventId`, `pcoCheckInsPeriodId` | string, on imported events only | Which Planning Center Check-Ins event and event period this gathering was imported from. Provenance for a re-import and for whoever is reading the console; nothing in the app renders them. |
 | `createdAt`, `updatedAt`, `createdBy` | — | `createdBy` is a uid, or `'planning-center'` for a gathering imported from Check-Ins history. |
@@ -276,11 +310,15 @@ chain's own instances — so removing the last one empties the calendar ahead. I
 | `seriesId` | string \| null | Copied from the event so a collection-group query can count a series without joining. |
 | `checkedInAt` | Timestamp | `serverTimestamp()`. Reads back as null in the optimistic local snapshot, which the converters handle. For imported history it is the instant the kiosk recorded, which can trail the gathering by days when attendance was taken late. |
 | `checkedInBy` | string | Must equal the caller's uid — enforced by rules for client writes. Rows imported from Planning Center Check-Ins carry the sentinel `'planning-center'` instead (written by the Admin SDK, which rules do not govern). |
-| `method` | `'tap' \| 'search' \| 'quick-add' \| 'manual' \| 'import'` | Purely diagnostic: it tells the core team whether the predictive roster is earning its keep. `import` marks a row that came from Check-Ins history rather than from anybody's thumb. |
+| `method` | `'tap' \| 'search' \| 'quick-add' \| 'manual' \| 'import' \| 'kiosk'` | Purely diagnostic: it tells the core team whether the predictive roster is earning its keep. `import` marks a row that came from Check-Ins history rather than from anybody's thumb; `kiosk` marks a self-serve tap in the lobby. |
 | `isFirstEver` | boolean | True when this was the student's first ever check-in. |
+| `checkedOutAt` | Timestamp, or **absent** | When somebody collected them, on an event with `requiresCheckOut`. The key being absent is the whole "still in the room" state, so it is never written as null — see below. |
+| `checkedOutBy` | string, or absent | Who recorded the pickup. Deliberately not required to equal `checkedInBy`: the volunteer who takes a child in is rarely the one who hands them back. |
 
 **Who writes:** any counselor may create, update and delete. Undoing a mistaken tap is a delete, and
-has to be as fast as the tap was.
+has to be as fast as the tap was. A *check-out* is a second, narrower shape of update — two fields
+and no others, permitted to any counselor rather than only the one who did the check-in — and it is
+the one update a kiosk session may perform.
 
 ### `events/{eventId}/rsvps/{studentId}`
 
@@ -297,7 +335,7 @@ roster — but never writes it: who is on the trip is decided before the door, n
 There is deliberately no waiver, fee or payment state here. An earlier version tracked all three;
 they were removed because Tally cannot be the system of record for money or signed paper, and a
 partial copy of both was worse than neither. See
-[decision 4](#4-tally-does-not-track-money-or-paperwork).
+[decision 5](#5-tally-does-not-track-money-or-paperwork).
 
 ### `eventSeries/{seriesId}`
 
@@ -349,6 +387,16 @@ unauthenticated callable and puts the returned six-character code on screen; a s
 approves that code from `/pair-kiosk` under their real session; the kiosk then redeems the code
 *plus a secret only it holds* for a custom token minted for the **approver's uid**, carrying a
 `kiosk: true` claim. Every check-in the kiosk writes is attributed to the person who approved it.
+
+**How long a kiosk stays on one gathering.** The binding lasts until
+`max(endAt, checkInClosesAt)`. It used to end at `endAt`, which on a nursery Sunday is the moment
+the parents arrive — the screen unbound itself, mid-queue, exactly when it was needed — and
+`listKioskEvents` dropped anything ended, so it could not be sent back either. Both bounds moved
+together; fixing only one leaves a kiosk that survives until somebody reloads it. `max` rather than
+`checkInClosesAt` alone because the rules only require that field to be a timestamp, so a seed or a
+migration can produce a window that closes before its event ends, and taking the later of the two
+cannot shorten any binding. A gathering that has ended but is still collecting appears in the
+chooser labelled `Ended — pickup only`.
 
 | Field | Type | Notes |
 | --- | --- | --- |
