@@ -331,7 +331,10 @@ export function StudentDetailPage() {
           ? {
               firstName: recreateForm.firstName.trim(),
               lastName: recreateForm.lastName.trim(),
-              grade: student.grade,
+              // Omitted when nobody holds one — the callable refuses to
+              // create a person without a grade, and saying so beats sending a
+              // number Tally invented.
+              ...(student.grade === null ? {} : { grade: student.grade }),
             }
           : {}),
       });

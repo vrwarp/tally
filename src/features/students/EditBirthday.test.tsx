@@ -35,7 +35,7 @@ function savedRow(overrides: Partial<PcoRosterPerson> = {}): PcoRosterPerson {
     profileComplete: null,
     hasAllergies: false,
     birthday: '03-16',
-    gradeOnFile: true,
+    
     ...overrides,
   };
 }
@@ -66,7 +66,7 @@ const updateStudentProfile = vi.hoisted(() =>
         profileComplete: null,
         hasAllergies: false,
         birthday: '03-16',
-        gradeOnFile: true,
+        
       },
     },
   })),

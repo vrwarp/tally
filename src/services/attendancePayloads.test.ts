@@ -27,7 +27,6 @@ function student(overrides: Partial<CheckInStudent> = {}): CheckInStudent {
     firstName: 'Maya',
     lastName: 'Chen',
     grade: 9,
-    gradeOnFile: undefined,
     searchName: 'maya chen',
     firstAttendedAt: null,
     lastAttendedAt: null,
@@ -104,7 +103,7 @@ describe('studentDatePatch', () => {
   });
 
   it('omits the grade when nobody actually holds one', () => {
-    const patch = studentDatePatch(clock, student({ gradeOnFile: false }), event, 'uid-1');
+    const patch = studentDatePatch(clock, student({ grade: null }), event, 'uid-1');
     expect(patch).not.toHaveProperty('grade');
   });
 });

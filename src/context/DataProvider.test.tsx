@@ -182,10 +182,10 @@ describe('DataProvider, when a read comes back different', () => {
     await waitFor(() => expect(latest?.rosterLoading).toBe(false));
     const before = latest?.students;
 
-    await readAgainWith([makeStudent({ id: 'pco_1', grade: 8, gradeOnFile: false })]);
+    await readAgainWith([makeStudent({ id: 'pco_1', grade: null })]);
 
     await waitFor(() => expect(latest?.students).not.toBe(before));
-    expect(latest?.students[0]?.gradeOnFile).toBe(false);
+    expect(latest?.students[0]?.grade).toBeNull();
   });
 
   it('still drops one that changed nothing at all', async () => {
@@ -287,7 +287,7 @@ describe('applying one row a write handed back', () => {
       profileComplete: null,
       hasAllergies: false,
       birthday: '03-16',
-      gradeOnFile: true,
+      
       ...overrides,
     };
   }

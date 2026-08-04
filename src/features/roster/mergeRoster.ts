@@ -106,19 +106,15 @@ export function mergeRoster(
         ...target,
         id: document.id,
         /*
-         * The one field where the document can out-rank Planning Center: a
-         * grade the clamp invented for a person upstream holds nothing for
-         * loses to the grade a human typed at quick-add. See `gradeOnFile`.
+         * The one field where the document can out-rank the backend: a grade
+         * a human typed at quick-add beats nothing at all upstream.
          *
-         * The flag follows whichever of the two the row took, because it
-         * describes the number on the row rather than where the row came from.
-         * Leaving the roster's `false` sitting over a grade somebody typed
-         * themselves would print "No grade" on every screen; stamping a bare
-         * `true` when neither side holds one would print the invented 6.
+         * This used to be four lines about keeping a `gradeOnFile` boolean in
+         * step with the number beside it. With a nullable grade the rule is
+         * simply "a grade beats no grade", and there is no second field left
+         * to fall out of sync.
          */
-        ...(target.gradeOnFile === false
-          ? { grade: document.grade, gradeOnFile: document.gradeOnFile !== false }
-          : { grade: target.grade, gradeOnFile: true }),
+        grade: target.grade ?? document.grade,
         // Everything the backend has no opinion about, exactly as in the
         // annotation merge below.
         notes: document.notes,

@@ -118,7 +118,7 @@ function fromStudent(student: Student | null): FormState {
     firstName: name.firstName,
     nickname: name.nickname ?? '',
     lastName: student.lastName,
-    grade: student.gradeOnFile === false ? null : student.grade,
+    grade: student.grade,
     // Not on the student at all — it is read one person at a time and seeded
     // below, once the details land.
     allergies: '',
@@ -222,7 +222,7 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
    * student Tally created holds the grade a human typed. That is what lets the
    * two paths below store a grade without ever having to invent one.
    */
-  const gradeUnknown = student?.gradeOnFile === false;
+  const gradeUnknown = student?.grade === null;
   const gradeHint = locked('grade')
     ? managedHint
     : !writable
@@ -380,7 +380,6 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
                 firstName,
                 lastName,
                 grade: form.grade ?? student.grade,
-                gradeOnFile: form.grade !== null,
               }
             : student,
         );

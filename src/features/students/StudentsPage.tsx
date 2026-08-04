@@ -103,13 +103,10 @@ export function StudentsPage() {
     const matcher = createSearchMatcher(query);
     return students.filter((student) => {
       if (status !== 'all' && student.status !== status) return false;
-      // Somebody Planning Center holds no grade for is in no grade, rather than
-      // in whichever one the sync's clamp landed on. Asking for 6th graders and
+      // Somebody with no grade is in no grade. Asking for 6th graders and
       // getting the ministry's adult volunteers back is the same bug as
       // printing "6th grade" under their name.
-      if (grade !== null && (student.gradeOnFile === false || student.grade !== grade)) {
-        return false;
-      }
+      if (grade !== null && student.grade !== grade) return false;
       if (quick === 'incomplete' && !isUnreachable(student, reachable)) return false;
       if (quick === 'visitors' && !student.isVisitor) return false;
       if (!matcher.matches(student.searchName)) return false;

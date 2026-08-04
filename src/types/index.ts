@@ -107,7 +107,20 @@ export interface Invitation extends Omit<InvitationDoc, 'invitedAt'> {
 export interface StudentDoc {
   firstName: string;
   lastName: string;
-  grade: Grade;
+  /**
+   * Optional, and absent — never null — when nobody holds one.
+   *
+   * A nursery child has no grade, and neither does an adult on a hand-picked
+   * roster. This used to be a required number paired with a `gradeOnFile`
+   * boolean, which is a nullable field spelled as a sentinel plus a flag: every
+   * reader had to remember to consult the flag, and the mapper that set it
+   * tracked only whether the upstream value was *blank*, so a real 3rd grader
+   * arrived asserting they were in 6th.
+   *
+   * Absent rather than `null` because `validStudent` in firestore.rules reads
+   * `!('grade' in d.keys()) || d.grade is int` — a stored null fails it.
+   */
+  grade?: Grade;
 
   /**
    * Notes a counselor typed, about the ministry rather than about the child.
@@ -179,8 +192,13 @@ export interface StudentDoc {
  */
 
 export interface Student
-  extends Omit<StudentDoc, 'firstAttendedAt' | 'lastAttendedAt' | 'createdAt' | 'updatedAt'> {
+  extends Omit<
+    StudentDoc,
+    'firstAttendedAt' | 'lastAttendedAt' | 'createdAt' | 'updatedAt' | 'grade'
+  > {
   id: string;
+  /** Null when nobody holds a grade for them. See `StudentDoc.grade`. */
+  grade: Grade | null;
   firstAttendedAt: Date | null;
   lastAttendedAt: Date | null;
   createdAt: Date;
@@ -207,22 +225,6 @@ export interface Student
    * Planning Center holds no birthdate. Never the year — see `PcoRosterPerson`.
    */
   birthday: string | null;
-  /**
-   * Whether anybody holds a grade of their own for this person, or the `grade`
-   * above is only where a fallback landed.
-   *
-   * Present on roster-sourced rows, where Planning Center answers it. Absent on
-   * a document that carries a grade — one typed by a human at quick-add, always
-   * real — and `false` on one that carries none, which is an annotation written
-   * against somebody Planning Center holds no grade for.
-   *
-   * Three readers. `gradeLabel` keeps every screen from printing the fallback
-   * as a fact, which is what turned the adults on a hand-picked roster into 6th
-   * graders; `mergeRoster` lets a grade a human typed at quick-add out-rank one
-   * — see the note there; and `updateStudent` declines to write one down, so a
-   * document that outlives its roster row is not left asserting it.
-   */
-  gradeOnFile?: boolean;
 }
 
 /**
@@ -655,7 +657,8 @@ export interface PcoRosterPerson {
   backendId?: BackendId;
   firstName: string;
   lastName: string;
-  grade: number;
+  /** Null when the backend holds no grade and no graduation year for them. */
+  grade: number | null;
   status: StudentStatus;
   searchName: string;
   /** `null` when the roster read did not look. See the server-side note. */
@@ -680,13 +683,6 @@ export interface PcoRosterPerson {
    * roster. Null means Planning Center has no birthdate on file.
    */
   birthday: string | null;
-  /**
-   * Whether Planning Center itself holds a grade (or graduation year), or the
-   * number in `grade` is only the clamp's landing spot. The merge prefers the
-   * grade a human typed at quick-add over a clamp on a person upstream holds
-   * nothing for.
-   */
-  gradeOnFile: boolean;
 }
 
 /**

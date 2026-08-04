@@ -111,37 +111,27 @@ describe('mergeRoster', () => {
     expect(merged[0]?.birthday).toBe('02-07');
   });
 
-  it('prefers the typed grade over a clamp on a person upstream holds none for', () => {
+  it('prefers the typed grade over nothing at all upstream', () => {
     // Planning Center has been measured discarding `grade` on create with a
-    // 200, so a pushed visitor can be grade-less upstream. The clamp lands
-    // them on 6; the document holds the 9 a human typed at the door.
-    const roster = [rosterEntry('900', { grade: 6, gradeOnFile: false })];
+    // 200, so a pushed visitor can be grade-less upstream. The document holds
+    // the 9 a human typed at the door.
+    const roster = [rosterEntry('900', { grade: null })];
     const linked = tallyDocument('tally-abc', { pcoPersonId: '900', grade: 9 });
 
     expect(mergeRoster(roster, [linked])[0]?.grade).toBe(9);
   });
 
-  it('marks the grafted grade as real, so the row prints it', () => {
-    // The row takes the 9 a human typed. Carrying the roster's `false` along
-    // with it would have every screen render "No grade" over that 9 — the flag
-    // describes the grade on the row, not where the row came from.
-    const roster = [rosterEntry('900', { grade: 6, gradeOnFile: false })];
-    const linked = tallyDocument('tally-abc', { pcoPersonId: '900', grade: 9 });
-
-    expect(mergeRoster(roster, [linked])[0]?.gradeOnFile).toBe(true);
-  });
-
   it('does not claim a grade when neither side holds one', () => {
-    // Both numbers are fallbacks — the sync's clamp on one side, the
-    // converter's on the other — so the row has nothing real to print.
-    const roster = [rosterEntry('900', { grade: 6, gradeOnFile: false })];
-    const linked = tallyDocument('tally-abc', { pcoPersonId: '900', grade: 6, gradeOnFile: false });
+    // Nothing to print, and nothing invented to print instead. This used to
+    // need a boolean kept in step with a sentinel 6.
+    const roster = [rosterEntry('900', { grade: null })];
+    const linked = tallyDocument('tally-abc', { pcoPersonId: '900', grade: null });
 
-    expect(mergeRoster(roster, [linked])[0]?.gradeOnFile).toBe(false);
+    expect(mergeRoster(roster, [linked])[0]?.grade).toBeNull();
   });
 
   it('lets Planning Center keep a grade it genuinely holds for a linked visitor', () => {
-    const roster = [rosterEntry('900', { grade: 8, gradeOnFile: true })];
+    const roster = [rosterEntry('900', { grade: 8 })];
     const linked = tallyDocument('tally-abc', { pcoPersonId: '900', grade: 9 });
 
     expect(mergeRoster(roster, [linked])[0]?.grade).toBe(8);

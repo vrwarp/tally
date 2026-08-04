@@ -451,7 +451,7 @@ export async function updateStudentProfile(
       status: 'unchanged',
       wrote: [],
       message: 'Attendees already matches.',
-      person: mapAttendeeToRosterPerson(attendee, config),
+      person: mapAttendeeToRosterPerson(attendee),
     };
   }
 
@@ -462,7 +462,7 @@ export async function updateStudentProfile(
     status: 'updated',
     wrote,
     message: `Saved ${wrote.join(', ')} to Attendees.`,
-    person: mapAttendeeToRosterPerson(updated, config),
+    person: mapAttendeeToRosterPerson(updated),
   };
 }
 

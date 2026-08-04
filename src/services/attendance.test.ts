@@ -90,8 +90,7 @@ describe('checkIn', () => {
         id: 'pco_41',
         firstName: 'Alan',
         lastName: 'Wan',
-        grade: 6,
-        gradeOnFile: false,
+        grade: null,
       }),
     );
 

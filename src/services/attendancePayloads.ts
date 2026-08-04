@@ -30,7 +30,6 @@ export type CheckInStudent = Pick<
   | 'firstName'
   | 'lastName'
   | 'grade'
-  | 'gradeOnFile'
   | 'searchName'
   | 'firstAttendedAt'
   | 'lastAttendedAt'
@@ -118,8 +117,8 @@ export function studentDatePatch(
     firstName: student.firstName,
     lastName: student.lastName,
     /*
-     * Left out for somebody Planning Center holds no grade for, where `grade`
-     * is where the sync's clamp landed rather than a fact — see `gradeOnFile`.
+     * Left out for somebody nobody holds a grade for — a nursery child, or an
+     * adult on a hand-picked roster.
      *
      * This is the write that reaches most people: a tap at a door is how the
      * majority of these documents come into existence at all. Stamping the
@@ -127,7 +126,7 @@ export function studentDatePatch(
      * every adult a leader ever checked in, in the one place that outlives the
      * roster row it was copied from.
      */
-    ...(student.gradeOnFile === false ? {} : { grade: student.grade }),
+    ...(student.grade === null ? {} : { grade: student.grade }),
     searchName: student.searchName,
     updatedAt: clock.serverTimestamp(),
     updatedBy: uid,

@@ -190,11 +190,10 @@ describe('StudentsPage grade', () => {
       id: 'pco_41',
       firstName: 'Alan',
       lastName: 'Wan',
-      grade: 6,
-      gradeOnFile: false,
+      grade: null,
     });
 
-  it('will not call somebody a 6th grader on a clamp', () => {
+  it('will not call somebody a 6th grader when nobody holds a grade', () => {
     renderRoster([volunteer()]);
 
     expect(within(row(/Alan/)).queryByText(/6th/)).not.toBeInTheDocument();
@@ -209,7 +208,7 @@ describe('StudentsPage grade', () => {
 
   it('still prints a grade Planning Center genuinely holds', () => {
     renderRoster([
-      makeStudent({ id: 'pco_9', firstName: 'Alena', lastName: 'Ruiz', grade: 6, gradeOnFile: true }),
+      makeStudent({ id: 'pco_9', firstName: 'Alena', lastName: 'Ruiz', grade: 6 }),
     ]);
 
     expect(within(row(/Alena/)).getByText('6th grade')).toBeInTheDocument();
@@ -219,7 +218,7 @@ describe('StudentsPage grade', () => {
     const user = userEvent.setup();
     renderRoster([
       volunteer(),
-      makeStudent({ id: 'pco_9', firstName: 'Alena', lastName: 'Ruiz', grade: 6, gradeOnFile: true }),
+      makeStudent({ id: 'pco_9', firstName: 'Alena', lastName: 'Ruiz', grade: 6 }),
     ]);
 
     // Found through its "All grades" option: the student editor sits mounted

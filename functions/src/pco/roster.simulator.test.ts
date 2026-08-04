@@ -134,12 +134,11 @@ describe('fetchRoster', () => {
     );
   });
 
-  it('says whether the grade is real or the clamp talking', async () => {
-    // The client shows a clamped 6 for a student upstream holds no grade for —
-    // unless the document has one a human typed, which needs this flag to win.
-    // A graduation year counts as a grade on file: the mapper derives it, and
+  it('reports the grade upstream holds, or none — never a number it invented', async () => {
+    // A graduation year counts: the mapper derives a grade from it, and
     // deriving is not inventing. Genuinely gradeless is the thinned-create
-    // shape — no grade *and* no graduation year.
+    // shape — no grade *and* no graduation year — and that answers null rather
+    // than the bottom of the band.
     const gradeless = world.store.createPerson({ first_name: 'Nia', last_name: 'Fontaine' });
 
     const { people } = await fetchRoster({
@@ -149,9 +148,10 @@ describe('fetchRoster', () => {
     });
 
     const byId = new Map(people.map((person) => [person.pcoPersonId, person]));
-    expect(byId.get(FIXTURE_IDS.oliverFifthGrader)?.gradeOnFile).toBe(true);
-    expect(byId.get(FIXTURE_IDS.ivyNoGrade)?.gradeOnFile).toBe(true);
-    expect(byId.get(gradeless.id)?.gradeOnFile).toBe(false);
+    // A 5th grader is reported as a 5th grader, not rounded up into the band.
+    expect(byId.get(FIXTURE_IDS.oliverFifthGrader)?.grade).toBe(5);
+    expect(byId.get(FIXTURE_IDS.ivyNoGrade)?.grade).not.toBeNull();
+    expect(byId.get(gradeless.id)?.grade).toBeNull();
   });
 
   it('reports somebody who is on the roster and no longer in Planning Center', async () => {
@@ -336,7 +336,10 @@ describe('fetchRoster', () => {
 
       expect(narrow.cached).toBe(false);
       expect(world.requests.length).toBeGreaterThan(afterFull);
-      expect(narrow.people.every((person) => person.grade >= 9)).toBe(true);
+      // Deliberately no claim about the grades that came back. This used to
+      // assert they all landed at or above 9, which was a fact about the clamp
+      // rather than about the cache: the band no longer rewrites anybody's
+      // grade, so the same people come back saying what they actually are.
     });
 
     it('does not cache an outage', async () => {

@@ -63,7 +63,8 @@ export type Role = 'counselor' | 'core' | 'admin';
 export interface MappedStudent {
   firstName: string;
   lastName: string;
-  grade: number;
+  /** Null when the backend holds neither a grade nor a graduation year. */
+  grade: number | null;
   allergies: string | null;
   /**
    * The day of the year somebody has a birthday on, as `MM-DD`, or null when
@@ -236,9 +237,14 @@ export function gradeFromGraduationYear(graduationYear: number, now: Date): numb
  * The grade Planning Center actually holds, or null when it says nothing.
  *
  * Kept separate from `mapPersonToStudent` because the two callers want opposite
- * things from a blank: a student document must carry *some* grade, while a
- * screen showing "what Planning Center thinks" must be able to say that
- * Planning Center thinks nothing.
+ * things from a blank: a screen showing "what Planning Center thinks" must be
+ * able to say that Planning Center thinks nothing.
+ *
+ * Both branches check `Number.isFinite`, and the second one has to. An
+ * `Infinity` graduation year derives to `-Infinity`, which used to be swallowed
+ * by the clamp that no longer runs — `Math.max(minGrade, -Infinity)` quietly
+ * answered `minGrade`, so a garbage value upstream arrived looking like a 6th
+ * grader. Found by the fuzz suite the moment the clamp came out.
  */
 export function pcoGrade(person: PcoPerson, now?: Date): number | null {
   const attributes: PcoPersonAttributes = person.attributes ?? {};
@@ -246,7 +252,8 @@ export function pcoGrade(person: PcoPerson, now?: Date): number | null {
     return attributes.grade;
   }
   if (now && typeof attributes.graduation_year === 'number') {
-    return gradeFromGraduationYear(attributes.graduation_year, now);
+    const derived = gradeFromGraduationYear(attributes.graduation_year, now);
+    return Number.isFinite(derived) ? derived : null;
   }
   return null;
 }
@@ -338,7 +345,7 @@ export function mapPersonToStudent(person: PcoPerson, ctx: StudentMappingContext
   return {
     firstName,
     lastName,
-    grade: clampGrade(grade, ctx).grade,
+    grade: clampGrade(grade).grade,
     allergies: trimmed(attributes.medical_notes),
     birthday: birthdayOf(person),
     status: normaliseStatus(person),

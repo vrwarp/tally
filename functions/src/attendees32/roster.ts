@@ -107,7 +107,7 @@ function cachedRelations(options: A32FlowOptions): Promise<Map<number, A32Relati
 export async function fetchRoster(
   options: A32FlowOptions & { personIds: readonly string[] },
 ): Promise<RosterResult> {
-  const { cache, config } = options;
+  const { cache } = options;
   const now = options.now ?? new Date();
   const wanted = [...new Set(options.personIds)].sort();
 
@@ -125,14 +125,14 @@ export async function fetchRoster(
   const stragglers: string[] = [];
   for (const personId of wanted) {
     const attendee = swept.get(personId);
-    if (attendee) people.push(mapAttendeeToRosterPerson(attendee, config));
+    if (attendee) people.push(mapAttendeeToRosterPerson(attendee));
     else stragglers.push(personId);
   }
 
   for (const personId of stragglers.slice(0, MAX_INDIVIDUAL_LOOKUPS)) {
     try {
       const attendee = await options.client.get<A32Attendee>(API.attendeeById(personId));
-      people.push(mapAttendeeToRosterPerson(attendee, config));
+      people.push(mapAttendeeToRosterPerson(attendee));
     } catch (error) {
       // Soft-deleted upstream is the ordinary case — a thing to report, not a
       // reason to fail the roster. Attendees has no merges, so there is no

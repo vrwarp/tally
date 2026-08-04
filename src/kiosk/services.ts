@@ -230,7 +230,7 @@ function rosterFromResponse(people: PcoRosterPerson[]): KioskStudent[] {
       id: person.id,
       firstName: person.firstName,
       lastName: person.lastName,
-      grade: person.gradeOnFile === false ? null : person.grade,
+      grade: person.grade,
       searchName: person.searchName,
     }));
 }
@@ -447,10 +447,9 @@ export async function performCheckIn(args: {
     id: student.id,
     firstName: student.firstName,
     lastName: student.lastName,
-    // A null grade is "nobody holds one": mark it not-on-file so the patch
-    // omits it, exactly as the main app does for the same student.
-    grade: (student.grade ?? 6) as Grade,
-    gradeOnFile: student.grade === null ? false : undefined,
+    // Straight through. `KioskStudent.grade` has always been nullable; it was
+    // the domain model underneath that could not hold the answer.
+    grade: student.grade as Grade | null,
     searchName: student.searchName,
     firstAttendedAt: dates.firstAttendedAt,
     lastAttendedAt: dates.lastAttendedAt,

@@ -255,15 +255,16 @@ describe('ordinalGrade', () => {
 });
 
 describe('gradeLabel', () => {
-  it('prints the grade Planning Center holds', () => {
-    expect(gradeLabel({ grade: 9, gradeOnFile: true })).toBe('9th');
+  it('prints the grade a backend holds', () => {
+    expect(gradeLabel({ grade: 9 })).toBe('9th');
   });
 
-  it('says nothing for a person Planning Center holds no grade for', () => {
-    // The bug: an adult volunteer on a hand-picked roster has no grade and no
-    // graduation year upstream, so the sync's clamp parks them on `minGrade`
-    // and every screen printed "6th grade" under their name.
-    expect(gradeLabel({ grade: 6, gradeOnFile: false })).toBeNull();
+  it('says nothing for somebody nobody holds a grade for', () => {
+    // The bug this fixed: an adult volunteer on a hand-picked roster has no
+    // grade and no graduation year upstream, so the sync's clamp parked them
+    // on `minGrade` and every screen printed "6th grade" under their name.
+    // There is no clamp to consult now — the grade is simply absent.
+    expect(gradeLabel({ grade: null })).toBeNull();
   });
 
   it('trusts a grade with no flag beside it', () => {

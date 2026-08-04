@@ -167,15 +167,18 @@ describe('mapPersonToStudent', () => {
     expect(mapped.grade).toBe(9);
   });
 
-  it('falls back to the lowest configured grade when nothing is known', () => {
+  it('answers null when nothing is known, rather than the bottom of the band', () => {
     const mapped = mapPersonToStudent(person('1', { first_name: 'Ada', last_name: 'Lin' }), RANGE);
 
-    expect(mapped.grade).toBe(6);
+    expect(mapped.grade).toBeNull();
   });
 
-  it('clamps an out-of-range grade into the configured band', () => {
-    expect(mapPersonToStudent(person('1', { grade: 3, last_name: 'Lin' }), RANGE).grade).toBe(6);
-    expect(mapPersonToStudent(person('1', { grade: 14, last_name: 'Lin' }), RANGE).grade).toBe(12);
+  it('reports the grade Planning Center holds, in or out of the band', () => {
+    // This used to round both of these into the band and report the result as
+    // a fact — so a child in 3rd grade arrived asserting they were in 6th. The
+    // band decides who is on the roster; it does not rewrite a child's grade.
+    expect(mapPersonToStudent(person('1', { grade: 3, last_name: 'Lin' }), RANGE).grade).toBe(3);
+    expect(mapPersonToStudent(person('1', { grade: 14, last_name: 'Lin' }), RANGE).grade).toBe(14);
   });
 
   it('carries medical notes across as allergies, blank means none', () => {
