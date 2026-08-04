@@ -34,6 +34,7 @@ export function SearchScreen({
   presentIds,
   checkedOutIds,
   tracksCheckOut,
+  printerNeedsAttention,
   onPick,
   onUnbind,
 }: {
@@ -45,6 +46,7 @@ export function SearchScreen({
   presentIds: ReadonlySet<string>;
   checkedOutIds: ReadonlySet<string>;
   tracksCheckOut: boolean;
+  printerNeedsAttention: boolean;
   onPick: (student: KioskStudent) => void;
   onUnbind: () => void;
 }) {
@@ -65,6 +67,24 @@ export function SearchScreen({
         >
           {''}
         </HoldButton>
+        {/*
+          * The printer, when it has stopped working.
+          *
+          * A dot, absolutely positioned, and only ever in the corner: a parent
+          * cannot fix a printer and telling them about it beside a green tick
+          * reads as "your check-in failed". Absolute because this file promises
+          * that a keystroke changes text and never geometry, and a warning that
+          * appears mid-evening must not push the results down by a line.
+          *
+          * What a volunteer does about it is hold the opposite corner and look
+          * at the printer screen, which says what is actually wrong.
+          */}
+        {printerNeedsAttention && (
+          <span
+            aria-label="The label printer needs attention"
+            className="absolute top-[max(1rem,var(--spacing-safe-top))] right-4 h-3 w-3 rounded-full bg-amber-500"
+          />
+        )}
         <div className="text-lg font-semibold text-ink-200">{binding.title}</div>
         <div className="text-sm text-ink-500">
           {tracksCheckOut
