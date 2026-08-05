@@ -1,15 +1,22 @@
 # PWA icons
 
-This folder is referenced by the web app manifest declared in `vite.config.ts`, and by the
-`apple-touch-icon` link in `index.html`. Three files are expected, and the committed PNGs are
-generated from `public/favicon.svg` so the mark has exactly one source of truth. If the SVG
-changes, regenerate all three — do not hand-edit them:
+Two apps install from this origin, so this folder holds two sets.
+
+**Tally** — referenced by the web app manifest declared in `vite.config.ts` and by the
+`apple-touch-icon` link in `index.html`, generated from `public/favicon.svg`.
+
+**The kiosk** — referenced by `public/kiosk.webmanifest` and by the `apple-touch-icon` link in
+`kiosk.html`, generated from `public/kiosk-icon.svg`. Same mark, brand-blue surface: both tiles end
+up on the same lobby home screen, and at 48 device pixels colour is what tells them apart.
+
+The committed PNGs are generated from those SVGs so each mark has exactly one source of truth. If an
+SVG changes, regenerate its three — do not hand-edit them:
 
 | File | Used by |
 | --- | --- |
-| `icon-192.png` | Android install prompt, iOS home screen (`apple-touch-icon`) |
-| `icon-512.png` | Splash screens, store listings, high-DPI launchers |
-| `icon-512-maskable.png` | Android adaptive icons (`purpose: "maskable"`) |
+| `icon-192.png`, `kiosk-icon-192.png` | Android install prompt, iOS home screen (`apple-touch-icon`) |
+| `icon-512.png`, `kiosk-icon-512.png` | Splash screens, store listings, high-DPI launchers |
+| `icon-512-maskable.png`, `kiosk-icon-512-maskable.png` | Android adaptive icons (`purpose: "maskable"`) |
 
 ## Generate them
 
@@ -26,6 +33,17 @@ magick -background none public/favicon.svg -resize 512x512 public/icons/icon-512
 # to the edges instead of relying on the rounded square in the SVG.
 magick -background '#0f172a' public/favicon.svg -resize 320x320 \
   -gravity center -extent 512x512 public/icons/icon-512-maskable.png
+```
+
+The kiosk's three, identically. Its surface is a flat `brand-600` rather than a gradient precisely so
+that `-background` below can name the same colour and the maskable variant shows no seam where the
+shrunk mark meets the bleed:
+
+```bash
+magick -background none public/kiosk-icon.svg -resize 192x192 public/icons/kiosk-icon-192.png
+magick -background none public/kiosk-icon.svg -resize 512x512 public/icons/kiosk-icon-512.png
+magick -background '#0284c7' public/kiosk-icon.svg -resize 320x320 \
+  -gravity center -extent 512x512 public/icons/kiosk-icon-512-maskable.png
 ```
 
 Open the results before committing to a deploy. ImageMagick only renders SVG gradients faithfully
@@ -45,11 +63,15 @@ rm -f public/pwa-64x64.png public/apple-touch-icon-180x180.png
 
 ## What happens if you skip this
 
-`npm run build` **succeeds**. Vite does not verify that the files a manifest points at exist, and
-Workbox simply precaches whatever `**/*.png` it finds. Nothing fails, which is exactly why this is
-easy to forget.
+For **Tally**, `npm run build` **succeeds**. Vite does not verify that the files a manifest points at
+exist, and Workbox simply precaches whatever `**/*.png` it finds. Nothing fails, which is exactly why
+this is easy to forget.
 
 What breaks is only visible on a device: Chrome's "Add to Home screen" prompt falls back to a
 screenshot-derived or generic icon, the installed app shows a blank tile in the launcher, and the
 `apple-touch-icon` in `index.html` 404s so iOS renders a thumbnail of the page instead. Generate the
 three files before any deploy that people will install.
+
+For the **kiosk**, the build fails: `scripts/check-kiosk-budget.mjs` resolves every icon its manifest
+names. The kiosk is the one people cannot check by looking — it is set up once, by whoever is holding
+the pairing code, and then nobody opens it again for months.

@@ -224,7 +224,7 @@ is therefore 7.x and `tsc6` is 6.x.
 | `src/context/` | `useAuth`, `useData`, `useToast` — the three app-wide providers. |
 | `src/hooks/` | Live-data hooks: active event, series history, attendance, RSVPs, ticking clock. |
 | `src/features/` | One folder per screen: `auth`, `checkin`, `dashboard`, `events`, `students`, `settings`, `roster`. |
-| `src/kiosk/` | The lobby kiosk — its own entry (`kiosk.html`), its own screens, its own tiny Firebase surface. Nothing here imports the main app's providers, and `scripts/check-kiosk-budget.mjs` holds it to a byte budget. |
+| `src/kiosk/` | The lobby kiosk — its own entry (`kiosk.html`), its own screens, its own tiny Firebase surface, and its own installable app (manifest, icons and service worker in `public/`). Nothing here imports the main app's providers, and `scripts/check-kiosk-budget.mjs` holds it to a byte budget. |
 | `src/kiosk/printing/` | Brother QL label printing over WebUSB: a rasteriser in a Web Worker, a transport on the main thread, and a serial queue between them. Behind a dynamic import gated on the device having a printer at all. |
 | `src/components/ui/` | The design system: buttons, fields, modals, badges, cards, empty and loading states. |
 | `functions/` | The Cloud Functions package — **its own npm package**, see below. |
@@ -338,6 +338,26 @@ keyed the same way for the same reason.
 attendance record, which is what the header, the MIA derivation, the trend strip and every dashboard
 metric read — so a missed pickup cannot quietly reduce a head count. The live figure is a sibling,
 and `inRoom + checkedOut === present` is the invariant the fuzz suite holds.
+
+**The kiosk installs as its own app.** `kiosk.html` carries a manifest of its own — its own id,
+its own name in the launcher, its own blue mark, and a scope of `/kiosk` — so a shelf device installs
+*the kiosk* rather than Tally, and boots into check-in instead of into a browser somebody has to find
+the right tab in. The two are separate installs on the same origin, which is also why the icon is a
+different colour: at 48 pixels on a tablet, colour is what a leader reads. Installing needs a service
+worker, and the kiosk has a hand-written one (`public/kiosk-sw.js`) rather than the Workbox build the
+main app gets: that worker owns `/` and precaches the whole app, which is the exact weight the kiosk
+exists to not carry. What the kiosk's own worker does is chosen for the shelf — navigations are
+**network first**, because the update channel is a no-cache page plus the ~4am reload and a
+cache-first shell would quietly pin a screen nobody looks at to whatever it downloaded the week it
+was set up; the cache answers only once the network has had 2.5 seconds and failed, which is the
+difference between a dropped lobby wifi and a blank page. That safety net starts at the *second*
+boot — a worker registered at `load` never saw the load that registered it — which on a shelf device
+means the small hours of the following morning. Order matters when setting one up: **install
+first, pair second.** An installed app on iOS gets its own storage container, so a kiosk paired in
+Safari and installed afterwards comes up asking for a fresh code — hence the install button on the
+pairing screen itself. `scripts/check-kiosk-budget.mjs` holds the worker to a byte budget and fails
+the build if the manifest, its icons or the registration go missing, because all three are static
+files whose absence produces a page that runs perfectly and can never be installed.
 
 **A label is rasterised in a worker and sent from the main thread.** Turning a check-in into a
 Brother raster job is one synchronous pass over a few hundred thousand pixels, and the moment it would

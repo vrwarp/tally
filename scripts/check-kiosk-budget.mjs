@@ -8,7 +8,7 @@
  * dynamic imports included, because the Firebase SDK deliberately loads
  * behind the first paint and a regression there must still fail the build.
  *
- * Three assertions:
+ * Four assertions:
  *
  *   1. Nothing reachable from kiosk.html is the full Firestore chunk — the
  *      chunk-splitting in vite.config.ts exists so the kiosk (firestore/lite
@@ -18,6 +18,8 @@
  *      the *first-paint* subset (the statically referenced chunks) under its
  *      own smaller one.
  *   3. Label printing stays inside a budget of its own.
+ *   4. The install surface is present and still small — see the section at the
+ *      bottom of this file.
  *
  * That third one exists because printing is a feature most kiosks do not have.
  * It loads behind `import()` gated on a localStorage key, so a lobby screen with
@@ -188,3 +190,85 @@ if (printing > PRINTING_BUDGET_GZIP_BYTES) {
   );
   process.exit(1);
 }
+
+/* ---- The install surface ------------------------------------------------- */
+
+/*
+ * The kiosk installs to a home screen as its own app, which takes three things
+ * the build does not otherwise verify: a manifest, an icon set it points at, and
+ * a service worker. All three are static files under public/, copied verbatim —
+ * so a rename, a stray delete or a mistyped path produces a build that succeeds,
+ * a page that runs, and a device that simply can never be installed. Nobody
+ * finds that until they are standing at the shelf.
+ *
+ * The worker also gets a byte budget, for the same reason everything else here
+ * does: it is hand-written precisely so the kiosk does not carry Workbox, and
+ * "we could just use the plugin's worker here too" is a one-line change that
+ * this number is what argues with.
+ *
+ * It is measured on the file as served — public/ is copied verbatim, nothing
+ * minifies it — so most of what it currently spends is the explanation at the
+ * top of the worker rather than the worker. That is the right trade for a file
+ * downloaded once per deploy and read by anyone debugging a shelf device, and
+ * the budget still leaves no room for a routing library.
+ */
+const SERVICE_WORKER_BUDGET_GZIP_BYTES = 4_000;
+
+/** Read something the kiosk cannot be installed without, or fail saying so. */
+function readInstallFile(name) {
+  try {
+    return readFileSync(join(DIST, name));
+  } catch {
+    console.error(
+      `dist/${name} is missing, so the kiosk cannot be installed as an app.\n` +
+        `It is copied verbatim from public/${name} — check it still exists there.`,
+    );
+    process.exit(1);
+  }
+}
+
+if (!html.includes('/kiosk.webmanifest') || !html.includes('/kiosk-sw.js')) {
+  console.error(
+    'dist/kiosk.html no longer links its manifest and registers its service worker.\n' +
+      'Both live in the <head> of kiosk.html; without them the page loads and no ' +
+      'browser will offer to install it.',
+  );
+  process.exit(1);
+}
+
+const manifest = JSON.parse(readInstallFile('kiosk.webmanifest').toString('utf8'));
+
+/*
+ * Scope and id are what keep this a *separate* app. `/` for either would install
+ * over the main app's identity instead of beside it — same launcher tile, same
+ * install slot, one of them silently replacing the other.
+ */
+if (manifest.id !== '/kiosk' || manifest.scope !== '/kiosk' || manifest.start_url !== '/kiosk') {
+  console.error(
+    'kiosk.webmanifest must keep id, scope and start_url at /kiosk — otherwise it ' +
+      'installs as (or over) the main Tally app rather than alongside it.\n' +
+      `Found id=${manifest.id}, scope=${manifest.scope}, start_url=${manifest.start_url}.`,
+  );
+  process.exit(1);
+}
+
+// Vite does not check that a manifest's icons exist, and a missing one is only
+// visible on a device: a blank tile in the launcher, or Chrome declining to
+// offer the install at all. See public/icons/README.md.
+for (const icon of manifest.icons ?? []) readInstallFile(icon.src.replace(/^\//, ''));
+
+const serviceWorker = gzipSync(readInstallFile('kiosk-sw.js')).length;
+if (serviceWorker > SERVICE_WORKER_BUDGET_GZIP_BYTES) {
+  console.error(
+    `The kiosk service worker exceeds its budget: ${serviceWorker} > ` +
+      `${SERVICE_WORKER_BUDGET_GZIP_BYTES} bytes gzipped.\n` +
+      'It is two handlers and a cache trim by design. Anything that needs more ' +
+      'than this probably belongs in the app, not in front of it.',
+  );
+  process.exit(1);
+}
+
+console.log(
+  `  install surface: manifest + ${manifest.icons.length} icons, ` +
+    `service worker ${kb(serviceWorker)} KB gz (budget ${SERVICE_WORKER_BUDGET_GZIP_BYTES / 1024})`,
+);

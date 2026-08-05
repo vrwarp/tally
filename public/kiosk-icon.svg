@@ -1,0 +1,42 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 64 64"
+  width="64"
+  height="64"
+  role="img"
+  aria-labelledby="tally-kiosk-icon-title"
+>
+  <title id="tally-kiosk-icon-title">Tally Kiosk</title>
+
+  <!--
+    The kiosk's mark: the same five strokes as favicon.svg, on a brand surface
+    rather than a dark one.
+
+    Both apps install to the same home screen from the same origin, and a leader
+    reaching for one at a lobby shelf reads colour long before they read a label.
+    So the geometry stays identical — this is Tally — and the surface inverts.
+    Nothing subtler survives being 48 device pixels on a tablet.
+
+    Flat `brand-600` rather than favicon.svg's gradient, and no inner hairline.
+    Both exist there to keep a near-black tile from dissolving into a light
+    browser chrome; a blue one has no such problem. Flat also means the maskable
+    variant — the mark shrunk onto a bleeding background, see icons/README.md —
+    can use this exact colour and show no seam where the two meet.
+  -->
+  <rect width="64" height="64" rx="14" fill="#0284c7" />
+
+  <!--
+    Four strokes and the diagonal that closes the group of five. Deliberately
+    heavy and widely spaced: at 16px each stroke is barely 1.5 device pixels, so
+    anything finer reads as a smudge.
+  -->
+  <g stroke-linecap="round" stroke-width="6" fill="none">
+    <g stroke="#f8fafc">
+      <path d="M16.5 18v28" />
+      <path d="M27 18v28" />
+      <path d="M37.5 18v28" />
+      <path d="M48 18v28" />
+    </g>
+    <path stroke="#e0f2fe" d="M11.5 48.5 53 15.5" />
+  </g>
+</svg>

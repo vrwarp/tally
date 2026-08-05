@@ -8,6 +8,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { HoldButton } from '../components/HoldButton';
+import { InstallPrompt } from '../components/InstallPrompt';
 import type { KioskEventEntry, KioskServices } from '../KioskApp';
 import type { KioskBinding } from '../binding';
 import type { PrinterState } from '../printing';
@@ -127,6 +128,15 @@ export function EventChooser({
       </div>
 
       <div className="mx-auto w-full max-w-2xl pt-4 pb-[max(1rem,var(--spacing-safe-bottom))]">
+        {/*
+          * The second way in to installing, for a kiosk that was paired in a
+          * browser tab and is being tidied up afterwards. The first is the
+          * pairing screen, which is where it does the most good — see
+          * components/InstallPrompt.tsx. Renders nothing once installed, which
+          * is the state this screen is usually in.
+          */}
+        <InstallPrompt className="mb-3" />
+
         {/*
           * The way in to the printer, and the only one.
           *

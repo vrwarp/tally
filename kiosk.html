@@ -2,7 +2,7 @@
 <html lang="en" class="h-full" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="/kiosk-icon.svg" />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no"
@@ -10,14 +10,75 @@
     <meta name="theme-color" content="#0f172a" />
     <meta name="robots" content="noindex" />
     <title>Tally Kiosk</title>
-    <!--
-      The self-serve check-in kiosk: a separate page, deliberately tiny.
 
-      No PWA manifest, no service worker, no theme resolver — the kiosk is a
-      fixed dark screen on a shelf, and its update channel is this very page
-      being no-cache while the hashed assets it references are immutable. See
+    <!--
+      Installable as its own app, and still deliberately tiny.
+
+      The kiosk is a second application on the same origin as Tally, with a
+      manifest of its own: its own id, its own name in the launcher, its own blue
+      mark, and a scope of `/kiosk` so nothing about the main app comes with it.
+      A shelf device should boot into check-in rather than into a browser
+      somebody has to find the right tab in — and on iOS an installed app gets
+      its own storage container, so the installed app is also the one that has to
+      be paired. See "The kiosk installs as its own app" in the README.
+
+      What has *not* changed is the update channel: this page is no-cache and the
+      hashed assets it names are immutable, so a deploy reaches a kiosk on its
+      next load, which KioskApp schedules for ~4am. public/kiosk-sw.js is written
+      to preserve exactly that — network first for this document, the cache
+      answering only once the network has had its chance and failed.
+
+      Still no theme resolver: the kiosk is a fixed dark screen. See
       src/kiosk/main.tsx.
     -->
+    <link rel="manifest" href="/kiosk.webmanifest" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Kiosk" />
+    <link rel="apple-touch-icon" href="/icons/kiosk-icon-192.png" />
+
+    <script>
+      /*
+       * Two small jobs, inline and ahead of the bundle.
+       *
+       * **Catch the install prompt.** Chrome fires `beforeinstallprompt` once,
+       * early, and that event is the only handle on the install flow there is —
+       * miss it and the setup screens have nothing to offer but instructions.
+       * It can fire before React has parsed, so it is caught here and parked on
+       * `window`; src/kiosk/install.ts is what reads it. `preventDefault` is
+       * what stops the browser's own install bar from covering the pairing code.
+       *
+       * **Register the worker.** After `load`, so it never competes with first
+       * paint on a weak device, and only over https — a service worker needs a
+       * secure context, and the localhost exemption is one this deliberately
+       * does not take: `vite dev` and `vite preview` then serve the kiosk
+       * exactly as written, with no cache in the middle and nothing to
+       * unregister after a debugging session. It also keeps the e2e suite, which
+       * runs against http preview, testing the page rather than a copy of it.
+       *
+       * Scope is narrowed to `/kiosk` from a script served at the root, which
+       * needs no `Service-Worker-Allowed` header — only widening does. The
+       * longest matching scope wins, so kiosk pages get this worker and not the
+       * main app's, which owns `/`.
+       */
+      window.addEventListener('beforeinstallprompt', function (event) {
+        event.preventDefault();
+        window.__tallyKioskInstall = event;
+      });
+      window.addEventListener('appinstalled', function () {
+        window.__tallyKioskInstall = null;
+      });
+
+      if ('serviceWorker' in navigator && location.protocol === 'https:') {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('/kiosk-sw.js', { scope: '/kiosk' }).catch(function () {
+            // A kiosk that cannot register a worker is one that cannot be
+            // installed — a setup problem, not a runtime one. The page itself
+            // keeps working exactly as it did before any of this existed.
+          });
+        });
+      }
+    </script>
   </head>
   <body class="h-full">
     <div id="root" class="h-full"></div>
