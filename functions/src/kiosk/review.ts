@@ -357,21 +357,17 @@ export async function approveRegistration(options: {
   let guardianMessage = '';
 
   /*
-   * Whether this deployment has anywhere to put an adult at all.
-   *
-   * Under `create` write-back there is no household to build and no
-   * `createFamily` to call, so the guardian's name and number can never land —
-   * not now, not on a retry, not next week. That is a configuration fact, not a
-   * failure, and the difference matters below: a record kept as "retryable"
-   * would sit on the Review screen offering a button that can never do
-   * anything, holding a phone number for thirty days to no purpose.
+   * `parentCreatable` says the *adapter* knows how, not that the deployment
+   * allows it — both backends hardcode it true, and the write-back mode is only
+   * discovered inside the call, which answers `disabled`. So the capability is
+   * what decides whether to ask, and the answer is what decides whether asking
+   * again could ever help. See the note below.
    */
   const buildFamily = backend.capabilities.parentCreatable ? backend.createFamily : undefined;
-  const guardianPossible = buildFamily !== undefined;
 
   if (record.guardian && buildFamily === undefined) {
     guardian = 'disabled';
-    guardianMessage = `${backend.displayName} is not set up to take a parent's details from Tally, so ${record.guardian.firstName}'s name and number were not recorded there.`;
+    guardianMessage = `${backend.displayName} cannot take a parent's details from Tally, so ${record.guardian.firstName}'s name and number were not recorded there.`;
   } else if (record.guardian && buildFamily !== undefined) {
     try {
       const family = await buildFamily.call(backend, {
@@ -401,18 +397,24 @@ export async function approveRegistration(options: {
    * It does exactly when pressing the button again could still improve things:
    * a child that has not landed, or a guardian who has not *and could*.
    *
-   * `created`, `joined` and `already-has-family` are all finished. So is a
-   * deployment that cannot take an adult at all — see `guardianPossible`; there
-   * the honest outcome is "approved, and the guardian went nowhere", which the
-   * message says. What is left is a real failure: the backend was asked and
-   * refused, or the network did.
+   * `created`, `joined` and `already-has-family` are the successes. `disabled`
+   * is the interesting one, and it is finished too: under `create` write-back
+   * there is no household to build and never will be, so the guardian's details
+   * can never reach the backend — not now, not on a retry, not next week. That
+   * is a configuration fact, and calling it an unfinished push would leave the
+   * record on the Review screen offering a button that cannot do anything,
+   * holding a phone number for thirty days to no purpose. The message says
+   * plainly where the details did not go.
+   *
+   * What is left is a real failure: the backend was asked and refused, or the
+   * network did.
    */
-  const guardianLanded =
-    !guardianPossible ||
+  const guardianSettled =
     guardian === 'created' ||
     guardian === 'joined' ||
-    guardian === 'already-has-family';
-  const unfinished = failed > 0 || (record.guardian !== null && !guardianLanded);
+    guardian === 'already-has-family' ||
+    guardian === 'disabled';
+  const unfinished = failed > 0 || (record.guardian !== null && !guardianSettled);
 
   if (unfinished) {
     await ref.set(

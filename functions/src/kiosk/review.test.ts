@@ -32,7 +32,14 @@ function backendWith(
   return {
     id: 'pco',
     displayName: 'Planning Center',
-    capabilities: { writeBack, parentCreatable: writeBack === 'full' },
+    /*
+     * `parentCreatable: true` regardless of the mode, because that is what both
+     * real adapters do — it says the adapter knows how to build a family, not
+     * that this deployment permits one. The write-back mode is only discovered
+     * inside `createFamily`, which answers `disabled`. A double that folded the
+     * two together would hide exactly the case below.
+     */
+    capabilities: { writeBack, parentCreatable: true },
     pushStudent: vi.fn(async () => ({ status: 'created' })),
     updateStudentProfile: vi.fn(async () => ({ status: 'updated' })),
     createFamily: vi.fn(async () => ({ status: 'created', message: 'Added the family.' })),
@@ -310,7 +317,19 @@ describe('approving', () => {
    */
   it('finishes under create-only write-back, and says the guardian went nowhere', async () => {
     const db = dbWithRegistration();
-    const backend = backendWith({ writeBack: 'create' });
+    /*
+     * `parentCreatable` is hardcoded true on both adapters — it says the
+     * adapter knows how, not that the deployment allows it. The write-back mode
+     * is only discovered inside `createFamily`, which answers `disabled`, so
+     * that answer is what has to be recognised as finished.
+     */
+    const backend = backendWith({
+      writeBack: 'create',
+      createFamily: vi.fn(async () => ({
+        status: 'disabled',
+        message: 'Creating families from Tally is switched off.',
+      })),
+    });
     const result = await approveRegistration({
       db,
       registry: registryOf(backend),
@@ -320,9 +339,10 @@ describe('approving', () => {
     });
 
     expect(backend.pushStudent).toHaveBeenCalledTimes(2);
-    expect(backend.createFamily).not.toHaveBeenCalled();
     expect(result.status).toBe('approved');
-    expect(result.message).toMatch(/not recorded there/i);
+    expect(result.guardian).toBe('disabled');
+    expect(result.message).toMatch(/switched off/i);
+    // Not kept as retryable: pressing again could never change the answer.
     expect(db.get(`${REGISTRATIONS_COLLECTION}/${ID}`)).toBeUndefined();
   });
 
