@@ -13,7 +13,7 @@
 import { expect, test } from './support/fixtures';
 import { gotoReady } from './support/auth';
 
-const ROUTES = ['/', '/dashboard', '/events', '/students', '/settings'] as const;
+const ROUTES = ['/', '/dashboard', '/events', '/students', '/settings', '/review'] as const;
 
 interface Overflow {
   amount: number;

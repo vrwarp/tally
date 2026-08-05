@@ -101,6 +101,34 @@ describe('EarlierAttendance', () => {
     expect(screen.getByText(/nothing is claimed about the ones in between/i)).toBeInTheDocument();
   });
 
+  /*
+   * A merged student is one child under two document ids, and merging does not
+   * re-key the attendance — that would be a write per night against records
+   * already reported on. So the read is what puts the two halves back
+   * together; without it, merging a family's duplicate makes half a child's
+   * history disappear from the only screen that shows all of it.
+   */
+  it('unions the history of a row merged into this one', async () => {
+    fetchStudentHistory.mockImplementation(async (id: string) => ({
+      entries:
+        id === 'pco_140203716'
+          ? [entry('kept', 'Footprints', '2026-03-21T02:30:00Z')]
+          : [entry('folded', 'Anchor', '2025-01-08T02:30:00Z')],
+      cursor: null,
+      hasMore: false,
+    }));
+
+    render(<EarlierAttendance studentId="pco_140203716" alsoStudentIds={['tally-dupe']} />);
+    await userEvent.click(screen.getByRole('button', { name: /show every night/i }));
+
+    expect(await screen.findByText('Footprints')).toBeInTheDocument();
+    expect(screen.getByText('Anchor')).toBeInTheDocument();
+    expect(fetchStudentHistory).toHaveBeenCalledWith('tally-dupe', null);
+    // Newest first across both streams, not one stream after the other.
+    const rows = screen.getAllByRole('listitem').map((row) => row.textContent ?? '');
+    expect(rows[0]).toContain('Footprints');
+  });
+
   it('keeps a record whose gathering is gone rather than dropping the row', async () => {
     fetchStudentHistory.mockResolvedValue({
       entries: [{ ...entry('deleted', 'Footprints', '2025-05-02T02:30:00Z'), event: null }],
