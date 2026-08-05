@@ -433,7 +433,9 @@ siblings alike.
 | `last4` | map | `'1234' -> [studentId, …]`, sorted, deduped. |
 
 Derived data in the fullest sense: rebuilt from the backends at any time (nightly on a schedule,
-on demand from Settings, and by a kiosk that finds it stale at bind time), holding nothing but
+on demand from Settings, by a kiosk that finds it stale at bind time, and by a family the kiosk
+could not find taking up its offer to look again — rate-limited there, since it is the one path a
+parent can trigger), holding nothing but
 tail digits and ids the same readers already see on every roster row. The full numbers are read
 upstream by the server-side collectors and reduced to last-4s page by page — the whole church's
 phone book is never held anywhere, and only the four digits are ever written down. That is the
