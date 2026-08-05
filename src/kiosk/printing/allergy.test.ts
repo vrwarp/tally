@@ -33,8 +33,8 @@ import type { KioskStudent } from '@/kiosk/search';
 
 const PRINTS_ALLERGY: LabelTemplate = {
   lines: [
-    { text: '{{firstName}} {{lastInitial}}', size: 'xl', bold: true, align: 'center' },
-    { text: '{{allergy}}', size: 'md', bold: true, align: 'center' },
+    { text: '{{firstName}} {{lastInitial}}', size: 'xl', bold: true, align: 'center', requiresValue: false },
+    { text: '{{allergy}}', size: 'md', bold: true, align: 'center', requiresValue: false },
   ],
   copies: 1,
 };
@@ -75,7 +75,7 @@ describe('usesAllergyToken', () => {
   it('ignores a token that merely looks like it', () => {
     expect(
       usesAllergyToken({
-        lines: [{ text: '{{allergies}} {{allergyNote}}', size: 'md', bold: false, align: 'center' }],
+        lines: [{ text: '{{allergies}} {{allergyNote}}', size: 'md', bold: false, align: 'center', requiresValue: false }],
         copies: 1,
       }),
     ).toBe(false);

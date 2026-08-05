@@ -88,7 +88,7 @@ describe('LabelTemplateField', () => {
     const user = userEvent.setup();
     render(
       <Harness
-        initial={{ lines: [{ text: '{{firstName}}', size: 'xl', bold: true, align: 'center' }], copies: 1 }}
+        initial={{ lines: [{ text: '{{firstName}}', size: 'xl', bold: true, align: 'center', requiresValue: false }], copies: 1 }}
       />,
     );
 
@@ -100,7 +100,7 @@ describe('LabelTemplateField', () => {
 
   it('edits a line', async () => {
     const user = userEvent.setup();
-    render(<Harness initial={{ lines: [{ text: 'Hi', size: 'md', bold: false, align: 'center' }], copies: 1 }} />);
+    render(<Harness initial={{ lines: [{ text: 'Hi', size: 'md', bold: false, align: 'center', requiresValue: false }], copies: 1 }} />);
 
     await user.clear(screen.getByLabelText(/^Line 1/));
     await user.type(screen.getByLabelText(/^Line 1/), 'Hello');
@@ -110,7 +110,7 @@ describe('LabelTemplateField', () => {
 
   it('inserts a token at the end of the line, with a space', async () => {
     const user = userEvent.setup();
-    render(<Harness initial={{ lines: [{ text: 'Hi', size: 'md', bold: false, align: 'center' }], copies: 1 }} />);
+    render(<Harness initial={{ lines: [{ text: 'Hi', size: 'md', bold: false, align: 'center', requiresValue: false }], copies: 1 }} />);
 
     await user.click(screen.getByRole('button', { name: 'firstName' }));
 
@@ -119,7 +119,7 @@ describe('LabelTemplateField', () => {
 
   it('does not double the space when the line already ends in one', async () => {
     const user = userEvent.setup();
-    render(<Harness initial={{ lines: [{ text: 'Hi ', size: 'md', bold: false, align: 'center' }], copies: 1 }} />);
+    render(<Harness initial={{ lines: [{ text: 'Hi ', size: 'md', bold: false, align: 'center', requiresValue: false }], copies: 1 }} />);
 
     await user.click(screen.getByRole('button', { name: 'firstName' }));
 
@@ -142,7 +142,7 @@ describe('LabelTemplateField', () => {
    */
   it('offers the allergy token, and says so once it is used', async () => {
     const user = userEvent.setup();
-    render(<Harness initial={{ lines: [{ text: '', size: 'md', bold: false, align: 'center' }], copies: 1 }} />);
+    render(<Harness initial={{ lines: [{ text: '', size: 'md', bold: false, align: 'center', requiresValue: false }], copies: 1 }} />);
 
     expect(screen.queryByText(/will print each child/i)).toBeNull();
 
@@ -150,20 +150,84 @@ describe('LabelTemplateField', () => {
 
     expect(stored()?.lines[0]?.text).toBe('{{allergy}}');
     expect(screen.getByText(/will print each child/i)).toBeTruthy();
-    // The trap this hint exists for: a leader typing `Allergy: {{allergy}}` and
-    // getting a bare "Allergy:" on every sticker in the room.
-    expect(screen.getByText(/on a line of its own/i)).toBeTruthy();
   });
 
   it('says nothing about allergies on a template that does not print them', () => {
     render(<Harness initial={DEFAULT_LABEL_TEMPLATE} />);
     expect(screen.queryByText(/will print each child/i)).toBeNull();
-    expect(screen.queryByText(/on a line of its own/i)).toBeNull();
+  });
+});
+
+/**
+ * The trap: a token that comes to nothing for plenty of children, with wording
+ * typed around it that survives them. `Allergy: {{allergy}}` leaves a bare
+ * "Allergy:" on every sticker in the room, and the preview cannot show it
+ * because the sample child has an allergy.
+ */
+describe('a line that would print its caption alone', () => {
+  const caption = (requiresValue: boolean) => ({
+    lines: [{ text: 'Allergy: {{allergy}}', size: 'md' as const, bold: false, align: 'center' as const, requiresValue }],
+    copies: 1,
+  });
+
+  it('warns, quoting exactly what would come out', () => {
+    render(<Harness initial={caption(false)} />);
+
+    // The hint quotes the caption verbatim and names the checkbox that fixes
+    // it, which is the checkbox sitting on the same row.
+    expect(screen.getByText(/still prints “Allergy:”/)).toBeTruthy();
+    expect(screen.getByLabelText('Only if filled in')).toBeTruthy();
+  });
+
+  it('stops warning once the line has been told to drop instead', () => {
+    render(<Harness initial={caption(true)} />);
+
+    // The warning names a fix; having applied it, a leader should not go on
+    // being told about it.
+    expect(screen.queryByText(/still prints/)).toBeNull();
+  });
+
+  it('says nothing about a token standing on its own', () => {
+    render(
+      <Harness
+        initial={{
+          lines: [{ text: '{{allergy}}', size: 'md', bold: false, align: 'center', requiresValue: false }],
+          copies: 1,
+        }}
+      />,
+    );
+
+    // Nothing is left behind when it resolves to nothing, so the line already
+    // disappears and there is nothing to warn about.
+    expect(screen.queryByText(/still prints/)).toBeNull();
+  });
+
+  it('records the choice on the line', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={caption(false)} />);
+
+    await user.click(screen.getByLabelText('Only if filled in'));
+
+    expect(stored()?.lines[0]?.requiresValue).toBe(true);
+  });
+
+  it('does not offer the choice on a line of fixed text', () => {
+    render(
+      <Harness
+        initial={{
+          lines: [{ text: 'Sunday Nursery', size: 'md', bold: false, align: 'center', requiresValue: false }],
+          copies: 1,
+        }}
+      />,
+    );
+
+    // No token to wait on, so the control would do nothing.
+    expect(screen.queryByLabelText('Only if filled in')).toBeNull();
   });
 
   it('says so when a token is not one Tally knows', async () => {
     const user = userEvent.setup();
-    render(<Harness initial={{ lines: [{ text: '', size: 'md', bold: false, align: 'center' }], copies: 1 }} />);
+    render(<Harness initial={{ lines: [{ text: '', size: 'md', bold: false, align: 'center', requiresValue: false }], copies: 1 }} />);
 
     // Pasted rather than typed: `user.type` reads `{{` as its own escape for a
     // literal brace, and every token in this feature starts with one.
@@ -176,7 +240,7 @@ describe('LabelTemplateField', () => {
 
   it('adds and removes lines', async () => {
     const user = userEvent.setup();
-    render(<Harness initial={{ lines: [{ text: 'One', size: 'md', bold: false, align: 'center' }], copies: 1 }} />);
+    render(<Harness initial={{ lines: [{ text: 'One', size: 'md', bold: false, align: 'center', requiresValue: false }], copies: 1 }} />);
 
     await user.click(screen.getByRole('button', { name: /Add a line/ }));
     expect(stored()?.lines).toHaveLength(2);
@@ -196,6 +260,7 @@ describe('LabelTemplateField', () => {
             size: 'sm' as const,
             bold: false,
             align: 'center' as const,
+            requiresValue: false,
           })),
           copies: 1,
         }}
@@ -219,13 +284,13 @@ describe('LabelTemplateField', () => {
 
   it('changes the size, alignment and weight of a line', async () => {
     const user = userEvent.setup();
-    render(<Harness initial={{ lines: [{ text: 'One', size: 'md', bold: false, align: 'center' }], copies: 1 }} />);
+    render(<Harness initial={{ lines: [{ text: 'One', size: 'md', bold: false, align: 'center', requiresValue: false }], copies: 1 }} />);
 
     await user.selectOptions(screen.getByLabelText(/^Size/), 'xl');
     await user.selectOptions(screen.getByLabelText(/^Align/), 'left');
     await user.click(screen.getByLabelText(/^Bold/));
 
-    expect(stored()?.lines[0]).toEqual({ text: 'One', size: 'xl', bold: true, align: 'left' });
+    expect(stored()?.lines[0]).toEqual({ text: 'One', size: 'xl', bold: true, align: 'left', requiresValue: false });
   });
 
   it('never produces a template the kiosk would refuse', async () => {

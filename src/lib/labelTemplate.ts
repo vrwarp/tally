@@ -37,6 +37,26 @@ export interface LabelLine {
   size: LabelLineSize;
   bold: boolean;
   align: LabelLineAlign;
+  /**
+   * Print this line only when at least one of its tokens has a value.
+   *
+   * A line whose text comes to nothing is always dropped — that is what makes
+   * `{{grade}}` close the gap for a child too young to have one. The problem is
+   * the line that comes to *almost* nothing: `Allergy: {{allergy}}` resolves to
+   * a bare "Allergy:" for every child with no note on file, and a sticker
+   * carrying that word for a child who has no allergy is worse than one that
+   * simply omits the line. The same trap catches `Grade {{grade}}` and
+   * `Room {{grade}}`.
+   *
+   * So a line may declare that its literal text is only worth printing when
+   * something got filled in beside it. Off by default, and off is what every
+   * template written before this existed reads as, because turning it on
+   * silently would change what labels a church is already printing.
+   *
+   * A line with no tokens at all is unaffected — there is nothing for it to
+   * wait on, and a leader who typed a fixed caption meant it.
+   */
+  requiresValue: boolean;
 }
 
 export interface LabelTemplate {
@@ -116,10 +136,12 @@ export type LabelTokenValues = Partial<Record<LabelToken, string>>;
  */
 export const DEFAULT_LABEL_TEMPLATE: LabelTemplate = {
   lines: [
-    { text: '{{firstName}} {{lastInitial}}', size: 'xl', bold: true, align: 'center' },
-    { text: '{{grade}}', size: 'md', bold: false, align: 'center' },
-    { text: '{{eventTitle}}', size: 'sm', bold: false, align: 'center' },
-    { text: '{{time}}', size: 'sm', bold: false, align: 'center' },
+    // Every line here is a token on its own, so none of them needs
+    // `requiresValue`: a child with no grade already drops the grade line.
+    { text: '{{firstName}} {{lastInitial}}', size: 'xl', bold: true, align: 'center', requiresValue: false },
+    { text: '{{grade}}', size: 'md', bold: false, align: 'center', requiresValue: false },
+    { text: '{{eventTitle}}', size: 'sm', bold: false, align: 'center', requiresValue: false },
+    { text: '{{time}}', size: 'sm', bold: false, align: 'center', requiresValue: false },
   ],
   copies: 1,
 };
@@ -159,6 +181,28 @@ export function tokensIn(text: string): string[] {
 /** Whether every token in this text is one the kiosk can answer. */
 export function unknownTokensIn(text: string): string[] {
   return tokensIn(text).filter((name) => !LABEL_TOKENS.includes(name as LabelToken));
+}
+
+/**
+ * Whether anything actually got filled in — the question `requiresValue` asks.
+ *
+ * "Any", not "all", because a line usually has more than one token and only one
+ * of them needs to have arrived for the line to be worth printing:
+ * `{{firstName}} {{lastInitial}}` on a child with no surname is still their
+ * name, and dropping it would be absurd. What the flag is for is the other
+ * shape, where every token came to nothing and all that is left is the caption
+ * the leader typed around them.
+ *
+ * A text with no tokens answers true. There is nothing for it to wait on, and a
+ * fixed caption was meant literally.
+ */
+export function anyTokenFilled(text: string, values: LabelTokenValues): boolean {
+  const names = tokensIn(text);
+  if (names.length === 0) return true;
+  return names.some((name) => {
+    const value = values[name as LabelToken];
+    return typeof value === 'string' && value.trim() !== '';
+  });
 }
 
 function isSize(value: unknown): value is LabelLineSize {
@@ -202,6 +246,9 @@ export function sanitizeLabelTemplate(value: unknown): LabelTemplate | null {
       size: isSize(line.size) ? line.size : 'md',
       bold: line.bold === true,
       align: isAlign(line.align) ? line.align : 'center',
+      // Absent reads as off, which is what every template written before this
+      // flag existed means and what keeps their labels printing unchanged.
+      requiresValue: line.requiresValue === true,
     });
   }
 
@@ -229,7 +276,8 @@ export function sameLabelTemplate(
       line.text === other.text &&
       line.size === other.size &&
       line.bold === other.bold &&
-      line.align === other.align
+      line.align === other.align &&
+      line.requiresValue === other.requiresValue
     );
   });
 }

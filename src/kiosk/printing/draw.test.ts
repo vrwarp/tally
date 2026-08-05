@@ -100,7 +100,7 @@ describe('drawLabel', () => {
 
     it('keeps the exact height however little there is to draw', () => {
       const oneLine: LabelTemplate = {
-        lines: [{ text: '{{firstName}}', size: 'sm', bold: false, align: 'center' }],
+        lines: [{ text: '{{firstName}}', size: 'sm', bold: false, align: 'center', requiresValue: false }],
         copies: 1,
       };
       expect(drawLabel(oneLine, values, { width: 696, height: 271 }).height).toBe(271);
@@ -111,8 +111,8 @@ describe('drawLabel', () => {
     it('takes its height from the content', () => {
       const two: LabelTemplate = {
         lines: [
-          { text: 'one', size: 'xl', bold: true, align: 'center' },
-          { text: 'two', size: 'xl', bold: true, align: 'center' },
+          { text: 'one', size: 'xl', bold: true, align: 'center', requiresValue: false },
+          { text: 'two', size: 'xl', bold: true, align: 'center', requiresValue: false },
         ],
         copies: 1,
       };
@@ -138,6 +138,7 @@ describe('drawLabel', () => {
           size: 'xl' as const,
           bold: true,
           align: 'center' as const,
+          requiresValue: false,
         })),
         copies: 1,
       };
@@ -187,7 +188,7 @@ describe('drawLabel', () => {
 
   it('draws nothing but white for a template that resolved to nothing', () => {
     const image = drawLabel(
-      { lines: [{ text: '{{grade}}', size: 'md', bold: false, align: 'center' }], copies: 1 },
+      { lines: [{ text: '{{grade}}', size: 'md', bold: false, align: 'center', requiresValue: false }], copies: 1 },
       { firstName: 'Ada' },
       { width: 696, height: 271 },
     );

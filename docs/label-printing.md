@@ -74,6 +74,32 @@ contacts and photographs do not reach a lobby screen — see
 them on a label is a change to what a screen in a public room is allowed to
 display, not a new token.
 
+### Lines that come to nothing
+
+Not every child has every field. A line that resolves to nothing at all is
+dropped and the label closes up — `{{grade}}` on a toddler leaves no gap.
+
+The awkward case is a line that resolves to *almost* nothing, because you typed
+something around the token:
+
+| Line | Child with a grade | Child with none |
+| --- | --- | --- |
+| `{{grade}}` | `8th grade` | *line dropped* |
+| `Grade {{grade}}` | `Grade 8th grade` | `Grade` ← still prints |
+
+Tick **Only if filled in** on such a line and it is dropped instead, caption and
+all, whenever none of its tokens has a value. It appears on any line containing a
+token, and the editor warns — quoting the exact text that would otherwise print —
+whenever a line needs it and does not have it.
+
+"None of its tokens", not "any": `{{firstName}} {{lastInitial}}` still prints for
+a child with no surname, because their first name is a value. Only a line where
+*everything* came back empty is dropped.
+
+The preview has a **A child with nothing on file** tick beside it — no grade, no
+allergy, no surname. That is the label most children get, and it is the one worth
+looking at before Sunday.
+
 ## Printing allergies
 
 `{{allergy}}` is the exception to the paragraph above, and the one place Tally
@@ -90,9 +116,10 @@ The cost is that a label is not a screen. Anyone who can see the child can read
 it. That trade is a leader's to make per gathering — a nursery is not youth
 group — which is why this is a token you add rather than a default you inherit.
 
-**Put it on a line of its own.** A child with nothing on file prints nothing and
-the line closes up, so `Allergy: {{allergy}}` leaves a bare "Allergy:" on every
-other sticker in the room. The editor says so beside the line.
+If you want a caption in front of it — `Allergy: {{allergy}}` — tick
+**Only if filled in** on that line, or every child with nothing on file gets a
+sticker reading a bare "Allergy:". See [Lines that come to nothing](#lines-that-come-to-nothing);
+the editor warns about it and quotes exactly what would print.
 
 **A line reading just `Allergy` means the note could not be read** — the kiosk
 was offline, or a backend was having a minute. The child *does* have something on

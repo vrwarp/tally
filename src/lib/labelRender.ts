@@ -20,6 +20,7 @@
  * height. The caller converts if it is drawing somewhere else.
  */
 import {
+  anyTokenFilled,
   fillLabelTokens,
   type LabelLineAlign,
   type LabelTemplate,
@@ -110,6 +111,11 @@ interface ResolvedLine {
  * A line that interpolates to nothing is dropped rather than printed blank:
  * `{{grade}}` on a child who has none should close the gap, not leave one. See
  * `fillLabelTokens`.
+ *
+ * A line marked `requiresValue` is dropped on a stricter test — nothing got
+ * filled in, even though the caption around the tokens survived. That is the
+ * difference between a label that omits an allergy line and one that prints the
+ * word "Allergy:" for a child who has none. See `LabelLine.requiresValue`.
  */
 export function resolveLines(
   template: LabelTemplate,
@@ -119,6 +125,7 @@ export function resolveLines(
   for (const line of template.lines) {
     const text = fillLabelTokens(line.text, values);
     if (text === '') continue;
+    if (line.requiresValue && !anyTokenFilled(line.text, values)) continue;
     resolved.push({
       text,
       fontPx: NOMINAL_FONT_PX[line.size],

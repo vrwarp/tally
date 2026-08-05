@@ -526,9 +526,9 @@ export function testPrint(): void {
     studentId: `__test__${nextRequestId}`,
     template: {
       lines: [
-        { text: 'Tally', size: 'lg', bold: true, align: 'center' },
-        { text: '{{eventTitle}}', size: 'sm', bold: false, align: 'center' },
-        { text: '{{time}}', size: 'sm', bold: false, align: 'center' },
+        { text: 'Tally', size: 'lg', bold: true, align: 'center', requiresValue: false },
+        { text: '{{eventTitle}}', size: 'sm', bold: false, align: 'center', requiresValue: false },
+        { text: '{{time}}', size: 'sm', bold: false, align: 'center', requiresValue: false },
       ],
       copies: 1,
     },
