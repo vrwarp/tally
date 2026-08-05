@@ -17,8 +17,15 @@
  * nothing. Which is not a subtle bug: nobody keeps their thumb down for three
  * seconds against no feedback, so the control reads as broken rather than as
  * slow. Whatever this fill is, it must contrast with the button under it.
+ *
+ * Completion buzzes; arming does not. Three seconds is long enough that a
+ * thumb wants to be told when it may leave, and one of the two holds — the
+ * staff gate in the corner of the search screen — is invisible, so the buzz is
+ * the only thing that says the gesture worked. A buzz on contact would instead
+ * announce that invisible corner to whoever brushed it.
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { haptic } from '@/lib/utils';
 
 export const HOLD_MS = 3000;
 
@@ -51,6 +58,7 @@ export function HoldButton({
       timerRef.current = setTimeout(() => {
         timerRef.current = null;
         setHolding(false);
+        haptic();
         heldRef.current();
       }, HOLD_MS);
     },
