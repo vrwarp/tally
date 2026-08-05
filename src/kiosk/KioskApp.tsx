@@ -332,6 +332,10 @@ export function KioskApp() {
     setBuffer((current) => {
       if (key.kind === 'clear') return '';
       if (key.kind === 'backspace') return current.slice(0, -1);
+      // Unreachable: search renders the keyboard without a shift key, because
+      // it folds case anyway. Handled rather than cast, so the day somebody
+      // gives search a shift key this is a decision and not a crash.
+      if (key.kind === 'shift') return current;
       const next = current + (current === '' ? key.value.trimStart() : key.value);
       if (next.length > MAX_BUFFER) return current;
       // Four digits answer the phone index completely; a fifth is noise.

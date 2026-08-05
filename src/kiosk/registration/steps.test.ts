@@ -8,6 +8,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { Grade } from '@/types';
+import type { ShiftState } from '../components/Keyboard';
 import {
   advance,
   answerAnother,
@@ -68,6 +69,72 @@ describe('typing a name', () => {
   it('will not advance on an empty answer', () => {
     expect(canAdvance(start())).toBe(false);
     expect(canAdvance(typeText(start(), 'Ada'))).toBe(true);
+  });
+});
+
+/**
+ * The shift key exists because no rule short of a dictionary gets McDonald,
+ * O'Brien and van der Berg all right, and what is typed here goes on the roster,
+ * into the church's database and onto a sticker a child wears. What is tested is
+ * the state the keyboard is *told to draw* — the letters themselves are cased by
+ * the keyboard, which shows what it will produce.
+ */
+describe('the shift key', () => {
+  const shiftKey = { kind: 'shift' } as const;
+
+  it('starts a name in capitals without anybody asking', () => {
+    expect(start().shift).toBe('on');
+  });
+
+  it('spends itself on one letter, then stands down', () => {
+    const typed = applyKey(start(), { kind: 'char', value: 'M' });
+    expect(typed.shift).toBe('off');
+  });
+
+  it('comes back at every boundary a name has', () => {
+    // A space, a hyphen and an apostrophe each start a new part of a name.
+    for (const boundary of [' ', '-', "'"]) {
+      const typed = typeText(start(), `Ann${boundary}`);
+      expect(typed.shift).toBe('on');
+    }
+  });
+
+  it('cycles off → on → lock → off, the way every phone does', () => {
+    let held = applyKey(start(), { kind: 'char', value: 'M' });
+    expect(held.shift).toBe('off');
+
+    const seen: ShiftState[] = [];
+    for (let i = 0; i < 3; i += 1) {
+      held = applyKey(held, shiftKey);
+      seen.push(held.shift);
+    }
+    expect(seen).toEqual(['on', 'lock', 'off']);
+  });
+
+  it('holds through a whole word once locked', () => {
+    let held = applyKey(start(), { kind: 'char', value: 'V' });
+    held = applyKey(held, shiftKey); // on
+    held = applyKey(held, shiftKey); // lock
+    held = typeText(held, 'AN');
+    expect(held.shift).toBe('lock');
+  });
+
+  it('follows the buffer backwards, so a correction is capitalised again', () => {
+    const typed = typeText(start(), 'Ann ');
+    expect(typed.shift).toBe('on');
+    // Deleting the space puts the caret back inside a word.
+    expect(applyKey(typed, { kind: 'backspace' }).shift).toBe('off');
+  });
+
+  it('opens a prefilled field with shift down, and an empty one with it up', () => {
+    // The surname carried forward from the last child is already written; the
+    // next keystroke belongs mid-word, not at the start of one.
+    let held = addChild(start(), 'Ada', 'Lovelace', 4 as Grade);
+    held = answerAnother(held, true, false);
+    expect(held.shift).toBe('on');
+    held = advance(typeText(held, 'Byron'));
+    expect(held.buffer).toBe('Lovelace');
+    expect(held.shift).toBe('off');
   });
 });
 

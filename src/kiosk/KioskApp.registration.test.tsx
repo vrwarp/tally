@@ -179,16 +179,19 @@ async function tap(text: RegExp | string): Promise<void> {
   await settle();
 }
 
-/** Types on the kiosk's own keyboard, which listens on glass contact. */
+/**
+ * Types on the kiosk's own keyboard, which listens on glass contact.
+ *
+ * Addressed by `data-key`, never by the label: a letter key now shows its
+ * shift state, so its text changes as you type and its name does not. What
+ * comes out is whatever case the keyboard was showing — which is the point of
+ * the shift key, and why this passes the intended text rather than a cased one.
+ */
 async function type(text: string): Promise<void> {
   for (const key of text.toUpperCase()) {
     await act(async () => {
-      const selector = key === ' ' ? '[data-key="space"]' : '[data-key]';
-      fireEvent.pointerDown(
-        key === ' '
-          ? document.querySelector(selector)!
-          : screen.getByText(key, { selector: '[data-key]' }),
-      );
+      const name = key === ' ' ? 'space' : key;
+      fireEvent.pointerDown(document.querySelector(`[data-key="${name}"]`)!);
     });
   }
   await settle();
@@ -330,6 +333,86 @@ describe('registering a family', () => {
     await type('Robin');
 
     expect(screen.getByText('✓ Checked in')).toBeTruthy();
+  });
+});
+
+describe('the four things a parent touches', () => {
+  it('names the field it is asking about, on both people', async () => {
+    // "Type here" repeated the shape of the screen back and named nothing. On
+    // the two steps where the answer could belong to either person in the room,
+    // the placeholder is the only thing that says which.
+    await mount();
+    await tap(/Register your family/);
+    await tap(/Register right here/);
+    expect(screen.getAllByText("Child's first name").length).toBeGreaterThan(0);
+
+    await type('Robin');
+    await tap('Next');
+    expect(screen.getAllByText("Child's last name").length).toBeGreaterThan(0);
+
+    await tap('Clear');
+    await type('Fields');
+    await tap('Next');
+    await tap('4');
+    await tap("That's everyone");
+    expect(screen.getAllByText('Your first name').length).toBeGreaterThan(0);
+    // And the line above it is context, not the same words again.
+    expect(screen.getByText('So we know who brought them.')).toBeTruthy();
+  });
+
+  it('offers a shift key, and types what the key is showing', async () => {
+    await mount();
+    await tap(/Register your family/);
+    await tap(/Register right here/);
+
+    // Auto-capitalised at the start, so the first letter needs no thought.
+    await type('Mc');
+    expect(screen.getByText('Mc')).toBeTruthy();
+
+    // And the key is there for the letter no rule would have capitalised.
+    await act(async () => {
+      fireEvent.pointerDown(document.querySelector('[data-key="shift"]')!);
+    });
+    await type('D');
+    await type('onald');
+    expect(screen.getByText('McDonald')).toBeTruthy();
+  });
+
+  it('gives the phone number a dialer rather than a keyboard', async () => {
+    await mount();
+    await tap(/Register your family/);
+    await tap(/Register right here/);
+    await enterChild('Robin', 'Fields', '4');
+    await tap("That's everyone");
+    await type('Dana');
+    await tap('Next');
+    await tap('Clear');
+    await type('Fields');
+    await tap('Next');
+
+    // The letters are gone; the digits are laid out as a phone.
+    expect(document.querySelector('[data-key="Q"]')).toBeNull();
+    expect(document.querySelector('[data-key="7"]')).toBeTruthy();
+    expect(screen.getByText('PQRS')).toBeTruthy();
+  });
+
+  it('shows the children so far when it asks whether there are more', async () => {
+    // The question is "anybody else?", and the parent of four cannot answer it
+    // against their memory of what they typed forty seconds ago.
+    await mount();
+    await tap(/Register your family/);
+    await tap(/Register right here/);
+    await enterChild('Robin', 'Fields', '4');
+
+    expect(screen.getByText('Robin Fields')).toBeTruthy();
+    expect(screen.getByText('4th grade')).toBeTruthy();
+
+    await tap('Add another child');
+    await enterChild('Sam', 'Fields', '2');
+
+    // Both of them, including the one just added.
+    expect(screen.getByText('Robin Fields')).toBeTruthy();
+    expect(screen.getByText('Sam Fields')).toBeTruthy();
   });
 });
 

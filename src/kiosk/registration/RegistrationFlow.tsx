@@ -19,6 +19,7 @@ import { gradeDescription, haptic, NO_GRADE } from '@/lib/utils';
 import { GRADES, type Grade, type RegisterFamilyResult } from '@/types';
 import { Keyboard, type KioskKey } from '../components/Keyboard';
 import type { KioskBinding } from '../binding';
+import { PhonePad } from './PhonePad';
 import {
   advance,
   answerAnother,
@@ -219,6 +220,21 @@ export function RegistrationFlow({
 
           {state.step === 'another' && (
             <div className="flex flex-col gap-3 pt-2">
+              {/*
+                * Who is on the list so far, above the two buttons.
+                *
+                * The question is "anybody else?", and a parent cannot answer it
+                * against their own memory of what they typed forty seconds ago
+                * — least of all the parent of four, which is exactly the parent
+                * this loop exists for. Naming them also catches the mistake
+                * this screen is otherwise the last chance to catch: a child
+                * entered twice, or the one whose name went in wrong.
+                */}
+              <div className="flex flex-col gap-2">
+                {family.map((child, index) => (
+                  <ChildRow key={`${child.firstName}-${child.lastName}-${index}`} child={child} />
+                ))}
+              </div>
               <Big
                 label="Add another child"
                 disabled={family.length >= MAX_CHILDREN}
@@ -236,17 +252,7 @@ export function RegistrationFlow({
           {state.step === 'confirm' && (
             <div className="flex flex-col gap-2 pt-2">
               {state.children.map((child, index) => (
-                <div
-                  key={`${child.firstName}-${child.lastName}-${index}`}
-                  className="flex h-16 items-center justify-between rounded-xl bg-ink-900 px-5"
-                >
-                  <span className="truncate text-xl font-semibold text-ink-100">
-                    {child.firstName} {child.lastName}
-                  </span>
-                  <span className="pl-3 text-base whitespace-nowrap text-ink-400">
-                    {child.grade === null ? NO_GRADE : gradeDescription(child.grade)}
-                  </span>
-                </div>
+                <ChildRow key={`${child.firstName}-${child.lastName}-${index}`} child={child} />
               ))}
               <div className="flex h-16 items-center justify-between rounded-xl bg-ink-900/60 px-5">
                 <span className="truncate text-lg text-ink-300">
@@ -304,7 +310,13 @@ export function RegistrationFlow({
               onPick={() => dispatch({ type: 'next' })}
             />
           </div>
-          <Keyboard onKey={onKey} />
+          {/* The one question on this screen that is a number gets the shape
+              everybody already knows for one. See PhonePad. */}
+          {state.step === 'guardian-phone' ? (
+            <PhonePad onKey={onKey} />
+          ) : (
+            <Keyboard onKey={onKey} shift={state.shift} />
+          )}
         </div>
       ) : state.step === 'confirm' ? (
         <div className="p-2 pb-[max(0.5rem,var(--spacing-safe-bottom))]">
@@ -364,6 +376,20 @@ function Header({
       )}
       <div className="text-lg font-semibold text-ink-200">{title}</div>
       <div className="text-sm text-ink-500">{subtitle}</div>
+    </div>
+  );
+}
+
+/** One child as the wizard has them: the name, and the grade beside it. */
+function ChildRow({ child }: { child: DraftChild }) {
+  return (
+    <div className="flex h-16 items-center justify-between rounded-xl bg-ink-900 px-5">
+      <span className="truncate text-xl font-semibold text-ink-100">
+        {child.firstName} {child.lastName}
+      </span>
+      <span className="pl-3 text-base whitespace-nowrap text-ink-400">
+        {child.grade === null ? NO_GRADE : gradeDescription(child.grade)}
+      </span>
     </div>
   );
 }
@@ -458,14 +484,19 @@ function subtitleFor(state: RegistrationState, binding: KioskBinding): string {
       return 'What grade are they in?';
     case 'another':
       return 'You can add the whole family in one go.';
+    /*
+     * The adult's two steps share one line, and it is context rather than a
+     * label: the readout under it already says "Your first name". A subtitle
+     * that repeated the placeholder would be the same words twice on a screen
+     * with four lines of text on it.
+     */
     case 'guardian-first':
-      return 'Your first name';
     case 'guardian-last':
-      return 'Your last name';
+      return 'So we know who brought them.';
     case 'guardian-phone':
-      // Said here rather than after the fact: a parent typing a number wants to
-      // know why it is being asked for before they type it.
-      return 'Your phone number — this is how you check in next time';
+      // Said before the number is typed rather than after: a parent wants to
+      // know why it is being asked for while they decide whether to give it.
+      return 'This is how you check in next time.';
     case 'confirm':
       return binding.title;
     default:
@@ -473,9 +504,30 @@ function subtitleFor(state: RegistrationState, binding: KioskBinding): string {
   }
 }
 
+/**
+ * What the empty readout says.
+ *
+ * The field's own name, not "Type here" — which repeated the shape of the
+ * screen back at somebody and named nothing. It matters most on the two steps
+ * where the question above and the answer below could belong to either person
+ * in the room: "Child's last name" and "Your last name" are the same box until
+ * one of them says which.
+ */
 function placeholderFor(state: RegistrationState): string {
-  if (state.step === 'guardian-phone') return '10 digits';
-  return 'Type here';
+  switch (state.step) {
+    case 'child-first':
+      return "Child's first name";
+    case 'child-last':
+      return "Child's last name";
+    case 'guardian-first':
+      return 'Your first name';
+    case 'guardian-last':
+      return 'Your last name';
+    case 'guardian-phone':
+      return 'Your phone number';
+    default:
+      return '';
+  }
 }
 
 /**

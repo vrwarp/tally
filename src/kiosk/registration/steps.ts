@@ -9,10 +9,10 @@
  *
  * Kept pure and separate for the usual two reasons: the geometry rules and the
  * validation are worth testing without rendering anything, and this file is the
- * one place that knows what "done" means for each question.
+ * one place that knows what 'done' means for each question.
  */
 import type { Grade } from '@/types';
-import type { KioskKey } from '../components/Keyboard';
+import type { KioskKey, ShiftState } from '../components/Keyboard';
 
 /** The most children one run of the wizard may add. Mirrors the server's cap. */
 export const MAX_CHILDREN = 6;
@@ -53,6 +53,14 @@ export interface RegistrationState {
   guardian: { firstName: string; lastName: string; phone: string };
   /** What the keyboard is filling in, for whichever step is showing. */
   buffer: string;
+  /**
+   * Whether the next letter is a capital.
+   *
+   * Auto-capitalised at the start of a name and after each space, hyphen and
+   * apostrophe — the boundaries a name actually has — so the common case needs
+   * no thought, and the shift key is there for the names no rule gets right.
+   */
+  shift: ShiftState;
   /** Set on `success`: the digits to teach the family. */
   last4: string;
   /** Set on `duplicate` and `error`: what to put on the screen. */
@@ -66,7 +74,7 @@ export interface RegistrationState {
  *
  * A youth gathering opens on the middle of its band, which is one fewer tap for
  * most families. A gathering that hands children back opens on no grade at all:
- * a nursery child has none, and "No grade" is an answer rather than a blank.
+ * a nursery child has none, and 'No grade' is an answer rather than a blank.
  */
 export function defaultGrade(requiresCheckOut: boolean): Grade | null {
   return requiresCheckOut ? null : (9 as Grade);
@@ -80,9 +88,14 @@ export function initialState(args: {
     step: 'child-first',
     registrationId: args.registrationId,
     children: [],
-    draft: { firstName: '', lastName: '', grade: defaultGrade(args.requiresCheckOut) },
+    draft: {
+      firstName: '',
+      lastName: '',
+      grade: defaultGrade(args.requiresCheckOut),
+    },
     guardian: { firstName: '', lastName: '', phone: '' },
     buffer: '',
+    shift: 'on',
     last4: '',
     message: '',
   };
@@ -106,25 +119,25 @@ export function isTypingStep(step: StepKind): boolean {
 const NAME_CHARACTER = /[\p{L}' -]/u;
 
 /**
- * A name as it should be written down, from a keyboard that only has capitals.
+ * Where a capital belongs in a name, if nobody says otherwise.
  *
- * The kiosk's keyboard is one static uppercase layout — no shift, because a
- * shift key is a mode and a mode is a thing to get wrong at a door. That is
- * invisible for search, which folds case anyway, and very visible here: what a
- * parent types lands on the roster, goes upstream to the church's database, and
- * is printed on a sticker their child wears. "ROBIN FIELDS" is shouting.
+ * The boundaries a name actually has: its start, and after each space, hyphen
+ * and apostrophe. That is what makes Anne-Marie and O'Brien come out right
+ * without anybody reaching for the shift key.
  *
- * So the readout capitalises as it goes, the way a phone keyboard does, and
- * what a parent reads back is exactly what will be saved. Segments start after
- * a space, a hyphen and an apostrophe, which is what makes Anne-Marie and
- * O'Brien come out right. McDonald comes out as Mcdonald — one of a handful of
- * names no rule gets right without a dictionary, and an office correction that
- * a leader can make in the church's own system.
+ * It is a *default*, not a rule, which is the whole reason the shift key exists
+ * beside it. No rule short of a dictionary gets McDonald, van der Berg and
+ * O'Sullivan all right, and what is typed here goes on the roster, into the
+ * church's database and onto a sticker a child wears. A parent can see the case
+ * as they type it and fix it themselves.
  */
-export function titleCaseName(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/(^|[\s'-])(\p{L})/gu, (_match, boundary: string, letter: string) => boundary + letter.toUpperCase());
+function autoShiftAfter(buffer: string): ShiftState {
+  return buffer === '' || /[\s'-]$/.test(buffer) ? 'on' : 'off';
+}
+
+/** Off → on → lock → off, the cycle every phone keyboard's shift key has. */
+function cycleShift(shift: ShiftState): ShiftState {
+  return shift === 'off' ? 'on' : shift === 'on' ? 'lock' : 'off';
 }
 
 /**
@@ -132,13 +145,28 @@ export function titleCaseName(value: string): string {
  *
  * A name refuses digits outright rather than accepting and failing at submit:
  * the readout is the only feedback a parent gets, and a key that does nothing
- * says "not that" faster than a sentence would. The phone takes digits only,
+ * says 'not that' faster than a sentence would. The phone takes digits only,
  * for the same reason in the other direction.
+ *
+ * The case of a letter is decided by the keyboard, not here — a key shows what
+ * it will produce, and this appends what it was given. What this owns is what
+ * the shift state becomes *next*, which is the part a keyboard cannot know.
  */
-export function applyKey(state: RegistrationState, key: KioskKey): RegistrationState {
+export function applyKey(
+  state: RegistrationState,
+  key: KioskKey,
+): RegistrationState {
   if (!isTypingStep(state.step)) return state;
-  if (key.kind === 'clear') return { ...state, buffer: '' };
-  if (key.kind === 'backspace') return { ...state, buffer: state.buffer.slice(0, -1) };
+  if (key.kind === 'shift') return { ...state, shift: cycleShift(state.shift) };
+  if (key.kind === 'clear') return { ...state, buffer: '', shift: 'on' };
+  if (key.kind === 'backspace') {
+    const buffer = state.buffer.slice(0, -1);
+    return {
+      ...state,
+      buffer,
+      shift: state.shift === 'lock' ? 'lock' : autoShiftAfter(buffer),
+    };
+  }
 
   if (state.step === 'guardian-phone') {
     if (!/^\d$/.test(key.value)) return state;
@@ -148,14 +176,23 @@ export function applyKey(state: RegistrationState, key: KioskKey): RegistrationS
 
   if (!NAME_CHARACTER.test(key.value)) return state;
   // A leading space is the one keystroke that would silently do nothing useful.
-  const next = state.buffer + (state.buffer === '' ? key.value.trimStart() : key.value);
+  const next = (
+    state.buffer + (state.buffer === '' ? key.value.trimStart() : key.value)
+  ).replace(/\s{2,}/g, ' ');
   if (next.length > NAME_MAX_LENGTH) return state;
-  return { ...state, buffer: titleCaseName(next.replace(/\s{2,}/g, ' ')) };
+  return {
+    ...state,
+    buffer: next,
+    // A held shift survives the letter; a one-shot one is spent by it, and the
+    // next word boundary sets it again.
+    shift: state.shift === 'lock' ? 'lock' : autoShiftAfter(next),
+  };
 }
 
 /** Whether the question on screen has been answered well enough to move on. */
 export function canAdvance(state: RegistrationState): boolean {
-  if (state.step === 'guardian-phone') return state.buffer.length === PHONE_LENGTH;
+  if (state.step === 'guardian-phone')
+    return state.buffer.length === PHONE_LENGTH;
   if (isTypingStep(state.step)) return state.buffer.trim().length > 0;
   return true;
 }
@@ -193,17 +230,25 @@ export function advance(state: RegistrationState): RegistrationState {
         step: 'child-last',
         // The surname the family has been typing, offered again.
         buffer: state.draft.lastName || lastNameSoFar(state),
+        shift: autoShiftAfter(state.draft.lastName || lastNameSoFar(state)),
       };
     case 'child-last':
-      return { ...state, draft: { ...state.draft, lastName: value }, step: 'child-grade', buffer: '' };
+      return {
+        ...state,
+        draft: { ...state.draft, lastName: value },
+        step: 'child-grade',
+        buffer: '',
+        shift: 'on',
+      };
     case 'child-grade':
-      return { ...state, step: 'another', buffer: '' };
+      return { ...state, step: 'another', buffer: '', shift: 'on' };
     case 'guardian-first':
       return {
         ...state,
         guardian: { ...state.guardian, firstName: value },
         step: 'guardian-last',
         buffer: state.guardian.lastName || lastNameSoFar(state),
+        shift: autoShiftAfter(state.guardian.lastName || lastNameSoFar(state)),
       };
     case 'guardian-last':
       return {
@@ -211,26 +256,38 @@ export function advance(state: RegistrationState): RegistrationState {
         guardian: { ...state.guardian, lastName: value },
         step: 'guardian-phone',
         buffer: state.guardian.phone,
+        shift: 'off',
       };
     case 'guardian-phone':
-      return { ...state, guardian: { ...state.guardian, phone: value }, step: 'confirm', buffer: '' };
+      return {
+        ...state,
+        guardian: { ...state.guardian, phone: value },
+        step: 'confirm',
+        buffer: '',
+        shift: 'on',
+      };
     default:
       return state;
   }
 }
 
 function lastNameSoFar(state: RegistrationState): string {
-  return state.children.length > 0 ? state.children[state.children.length - 1]!.lastName : '';
+  return state.children.length > 0
+    ? state.children[state.children.length - 1]!.lastName
+    : '';
 }
 
-/** The grade chips. `null` is "No grade" — an answer, not a skip. */
-export function chooseGrade(state: RegistrationState, grade: Grade | null): RegistrationState {
+/** The grade chips. `null` is 'No grade' — an answer, not a skip. */
+export function chooseGrade(
+  state: RegistrationState,
+  grade: Grade | null,
+): RegistrationState {
   if (state.step !== 'child-grade') return state;
   return advance({ ...state, draft: { ...state.draft, grade } });
 }
 
 /**
- * "Anybody else?" — the loop that makes this worth doing at a kiosk at all.
+ * 'Anybody else?' — the loop that makes this worth doing at a kiosk at all.
  *
  * The child on the draft is banked either way; what `more` decides is whether
  * the wizard goes back to the top of the child questions or on to the adult.
@@ -247,18 +304,28 @@ export function answerAnother(
     return {
       ...state,
       children,
-      draft: { firstName: '', lastName: '', grade: defaultGrade(requiresCheckOut) },
+      draft: {
+        firstName: '',
+        lastName: '',
+        grade: defaultGrade(requiresCheckOut),
+      },
       step: 'child-first',
       buffer: '',
+      shift: 'on',
     };
   }
 
   return {
     ...state,
     children,
-    draft: { firstName: '', lastName: '', grade: defaultGrade(requiresCheckOut) },
+    draft: {
+      firstName: '',
+      lastName: '',
+      grade: defaultGrade(requiresCheckOut),
+    },
     step: 'guardian-first',
     buffer: '',
+    shift: 'on',
   };
 }
 
@@ -276,22 +343,53 @@ export function goBack(state: RegistrationState): RegistrationState | null {
     case 'child-first':
       return null;
     case 'child-last':
-      return { ...state, step: 'child-first', buffer: state.draft.firstName };
+      return {
+        ...state,
+        step: 'child-first',
+        buffer: state.draft.firstName,
+        shift: autoShiftAfter(state.draft.firstName),
+      };
     case 'child-grade':
-      return { ...state, step: 'child-last', buffer: state.draft.lastName };
+      return {
+        ...state,
+        step: 'child-last',
+        buffer: state.draft.lastName,
+        shift: autoShiftAfter(state.draft.lastName),
+      };
     case 'another':
-      return { ...state, step: 'child-grade', buffer: '' };
+      return { ...state, step: 'child-grade', buffer: '', shift: 'on' };
     case 'guardian-first':
-      return { ...state, step: 'another', buffer: '' };
+      return { ...state, step: 'another', buffer: '', shift: 'on' };
     case 'guardian-last':
-      return { ...state, step: 'guardian-first', buffer: state.guardian.firstName };
+      return {
+        ...state,
+        step: 'guardian-first',
+        buffer: state.guardian.firstName,
+        shift: autoShiftAfter(state.guardian.firstName),
+      };
     case 'guardian-phone':
-      return { ...state, step: 'guardian-last', buffer: state.guardian.lastName };
+      return {
+        ...state,
+        step: 'guardian-last',
+        buffer: state.guardian.lastName,
+        shift: autoShiftAfter(state.guardian.lastName),
+      };
     case 'confirm':
-      return { ...state, step: 'guardian-phone', buffer: state.guardian.phone };
+      return {
+        ...state,
+        step: 'guardian-phone',
+        buffer: state.guardian.phone,
+        shift: 'off',
+      };
     case 'duplicate':
     case 'error':
-      return { ...state, step: 'confirm', buffer: '', message: '' };
+      return {
+        ...state,
+        step: 'confirm',
+        buffer: '',
+        shift: 'on',
+        message: '',
+      };
     default:
       return null;
   }
@@ -299,5 +397,7 @@ export function goBack(state: RegistrationState): RegistrationState | null {
 
 /** Everybody this run will register — the banked children plus the draft. */
 export function familyOf(state: RegistrationState): DraftChild[] {
-  return state.step === 'another' ? [...state.children, state.draft] : state.children;
+  return state.step === 'another'
+    ? [...state.children, state.draft]
+    : state.children;
 }
