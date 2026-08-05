@@ -211,7 +211,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
           'This screen once said "No match — please see a leader" and nothing else. Seeing a leader is still the right last word when something is wrong with the search; it was never the right first one for being new. Two offers sit under the empty result and they answer different questions: a family somebody added while they queued needs the kiosk to look again, and a family nobody has met needs a form.',
       });
 
-      await kiosk.getByRole('button', { name: /Register your family/i }).click();
+      await kiosk.getByRole('button', { name: /Register your family/i }).first().click();
       await expect(kiosk.getByLabel('Registration QR code')).toBeVisible({ timeout: 30_000 });
       await shoot(kiosk, 'kiosk', {
         act: 'Nobody has met us',
@@ -320,7 +320,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       /* Act 3 — Nobody has met us, on their own phone                       */
       /* ================================================================== */
 
-      await kiosk.getByRole('button', { name: /Register your family/i }).click();
+      await kiosk.getByRole('button', { name: /Register your family/i }).first().click();
       const code = ((await kiosk
         .getByText(/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/)
         .first()
