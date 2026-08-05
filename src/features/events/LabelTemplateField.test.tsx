@@ -128,10 +128,37 @@ describe('LabelTemplateField', () => {
 
   it('offers only tokens the kiosk can answer', () => {
     render(<Harness initial={DEFAULT_LABEL_TEMPLATE} />);
-    // The kiosk holds no allergy or contact data, and this row is the one place
+    // Parent contact never reaches a lobby screen, and this row is the one place
     // a leader would look for it.
-    expect(screen.queryByRole('button', { name: 'allergies' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'parentPhone' })).toBeNull();
     expect(screen.getAllByRole('button', { name: 'firstName' }).length).toBeGreaterThan(0);
+  });
+
+  /*
+   * The allergy token is opt-in per gathering, and the two tests below are the
+   * halves of that. It has to be reachable — a volunteer holding a child needs
+   * to read the peanut allergy off the sticker — and a leader has to be able to
+   * see that they have turned it on.
+   */
+  it('offers the allergy token, and says so once it is used', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={{ lines: [{ text: '', size: 'md', bold: false, align: 'center' }], copies: 1 }} />);
+
+    expect(screen.queryByText(/will print each child/i)).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'allergy' }));
+
+    expect(stored()?.lines[0]?.text).toBe('{{allergy}}');
+    expect(screen.getByText(/will print each child/i)).toBeTruthy();
+    // The trap this hint exists for: a leader typing `Allergy: {{allergy}}` and
+    // getting a bare "Allergy:" on every sticker in the room.
+    expect(screen.getByText(/on a line of its own/i)).toBeTruthy();
+  });
+
+  it('says nothing about allergies on a template that does not print them', () => {
+    render(<Harness initial={DEFAULT_LABEL_TEMPLATE} />);
+    expect(screen.queryByText(/will print each child/i)).toBeNull();
+    expect(screen.queryByText(/on a line of its own/i)).toBeNull();
   });
 
   it('says so when a token is not one Tally knows', async () => {

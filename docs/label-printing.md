@@ -65,14 +65,50 @@ One-off events cannot print yet.
 
 ### What a label can say
 
-`{{firstName}}`, `{{lastName}}`, `{{lastInitial}}`, `{{grade}}`,
+`{{firstName}}`, `{{lastName}}`, `{{lastInitial}}`, `{{grade}}`, `{{allergy}}`,
 `{{eventTitle}}`, `{{date}}`, `{{time}}`.
 
-That is the whole list, and it is bounded by what the kiosk holds. Allergy notes,
-parent contacts and photographs do not reach a lobby screen — see
-[Handling minors' data](../README.md#handling-minors-data) — so putting any of
+That is the whole list, and it is bounded by what the kiosk holds. Parent
+contacts and photographs do not reach a lobby screen — see
+[Handling minors' data](../README.md#handling-minors-data) — so putting either of
 them on a label is a change to what a screen in a public room is allowed to
 display, not a new token.
+
+## Printing allergies
+
+`{{allergy}}` is the exception to the paragraph above, and the one place Tally
+puts medical information on paper. It is off unless you put it on a gathering's
+template.
+
+The case for it is the volunteer holding the child. Everywhere else in Tally an
+allergy note is behind a tap by somebody signed in, which is fine for a counselor
+at a door and useless for whoever is handing out biscuits in the next room. A
+sticker that says *Peanuts — EpiPen in her bag* is read by the person who needs
+it, at the moment they need it, without anybody going to find a phone.
+
+The cost is that a label is not a screen. Anyone who can see the child can read
+it. That trade is a leader's to make per gathering — a nursery is not youth
+group — which is why this is a token you add rather than a default you inherit.
+
+**Put it on a line of its own.** A child with nothing on file prints nothing and
+the line closes up, so `Allergy: {{allergy}}` leaves a bare "Allergy:" on every
+other sticker in the room. The editor says so beside the line.
+
+**A line reading just `Allergy` means the note could not be read** — the kiosk
+was offline, or a backend was having a minute. The child *does* have something on
+file. Go and look at the roster.
+
+What the kiosk does, and does not do:
+
+- It holds the roster's allergy **flag**, never the notes. That is what lets it
+  skip the lookup entirely for the great majority of children.
+- It reads **one child's** note, when that child's parent is standing at the
+  screen — not the roster's, not in advance.
+- It keeps the note **in memory only**, for as long as it takes to draw the
+  sticker. Nothing is written to the device, and unbinding the gathering drops
+  whatever is left.
+- If the note has not arrived within four seconds it prints `Allergy` and moves
+  on, because every label behind it is also somebody's child at a door.
 
 ## When it stops working
 
@@ -132,6 +168,11 @@ replacement printer needs no visit. Vendor id `0x04f9`.
 **Blank, or a strip of nothing.** The template resolved to nothing for that
 child — every line was a token they have no value for. The preview in the event
 editor uses a sample name; try one with no grade.
+
+**No allergy line on a child who has one.** Either the template does not use
+`{{allergy}}`, or the roster read that produced this kiosk's copy did not flag
+them — check the student in the main app. A child whose flag is set but whose
+note cannot be read prints the word `Allergy`, never nothing.
 
 **Cut off at the bottom.** More lines than the label has room for. The editor
 says so when it happens; fewer or smaller lines print larger.

@@ -20,6 +20,17 @@ export interface KioskStudent {
   /** Null when nobody holds a real grade — never show a clamp as a fact. */
   grade: number | null;
   searchName: string;
+  /**
+   * *That* there is an allergy on file, never what it is — the same split the
+   * rest of Tally makes, for the same reason. See `PcoRosterPerson`.
+   *
+   * Carried here so the kiosk can tell the two cases apart without asking
+   * anybody: a child with no allergy costs no request and no note, and a child
+   * with one whose note could not be read still gets a label that says so
+   * rather than a label that quietly says nothing. Nothing on a kiosk screen
+   * renders this — a lobby does not need a badge — it exists for the label.
+   */
+  hasAllergies: boolean;
 }
 
 export const MAX_RESULTS = 8;

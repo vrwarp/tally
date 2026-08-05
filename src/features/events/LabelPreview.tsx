@@ -30,6 +30,10 @@ const SAMPLE_VALUES: LabelTokenValues = {
   lastName: 'Fitzwilliam',
   lastInitial: 'F',
   grade: '8th grade',
+  // A real-shaped allergy line rather than the word "Peanuts": most of what is
+  // on file is a sentence, and a leader should find that out here rather than
+  // on the first child it wraps for.
+  allergy: 'Peanuts — EpiPen in his bag',
   eventTitle: 'Sunday Nursery',
   date: 'Aug 9',
   time: '9:04 AM',

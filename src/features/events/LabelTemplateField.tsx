@@ -27,6 +27,7 @@ import {
   MAX_LABEL_COPIES,
   MAX_LABEL_LINES,
   MAX_LABEL_LINE_LENGTH,
+  tokensIn,
   unknownTokensIn,
   type LabelLine,
   type LabelTemplate,
@@ -78,6 +79,19 @@ export function LabelTemplateField({
   const [media, setMedia] = useState<string>(PREVIEW_MEDIA[0].id);
   const chosen = PREVIEW_MEDIA.find((entry) => entry.id === media) ?? PREVIEW_MEDIA[0];
 
+  /**
+   * Whether this gathering is about to print medical information.
+   *
+   * Worth saying out loud once, where the decision is being made. Everywhere
+   * else in Tally an allergy note is behind a tap by somebody signed in; a
+   * sticker is read by whoever is holding the child, which is the point of
+   * putting it there and also the whole of the trade. A leader ticking this for
+   * a nursery should know they have made that choice, and a leader who did not
+   * mean to should be able to see that they did.
+   */
+  const printsAllergies =
+    value?.lines.some((line) => tokensIn(line.text).includes('allergy')) ?? false;
+
   const patchLine = (index: number, patch: Partial<LabelLine>) => {
     if (!value) return;
     onChange({
@@ -120,11 +134,20 @@ export function LabelTemplateField({
 
       {value === null ? null : (
         <div className="flex flex-col gap-4 rounded-xl bg-ink-950/40 p-3 ring-1 ring-ink-800">
+          {printsAllergies ? (
+            <p className="rounded-lg bg-warn-500/10 p-2 text-xs leading-snug text-warn-400 ring-1 ring-warn-500/25">
+              These labels will print each child&rsquo;s allergy note, so a volunteer holding them can
+              read it. It is the one medical detail Tally puts on paper — anyone who can see the
+              sticker can see it too.
+            </p>
+          ) : null}
+
           <div className="@container">
             <div className="grid gap-4 @min-[34rem]:grid-cols-[1fr_auto]">
               <div className="flex min-w-0 flex-col gap-3">
                 {value.lines.map((line, index) => {
                   const unknown = unknownTokensIn(line.text);
+                  const allergyLine = tokensIn(line.text).includes('allergy');
                   return (
                     <div key={index} className="flex flex-col gap-2 rounded-lg bg-ink-900/60 p-2">
                       <TextField
@@ -133,6 +156,19 @@ export function LabelTemplateField({
                         maxLength={MAX_LABEL_LINE_LENGTH}
                         placeholder="{{firstName}}"
                         autoComplete="off"
+                        /*
+                         * Said on the line that uses it, because the two things
+                         * a leader gets wrong here are both invisible in the
+                         * preview: that most children print no allergy line at
+                         * all, and that any wording typed beside the token
+                         * survives them — `Allergy: {{allergy}}` leaves a bare
+                         * "Allergy:" on four hundred stickers.
+                         */
+                        hint={
+                          allergyLine
+                            ? 'Prints nothing for a child with no allergy on file, so the line disappears — keep {{allergy}} on a line of its own.'
+                            : undefined
+                        }
                         onChange={(changed) => patchLine(index, { text: changed.target.value })}
                         error={
                           unknown.length > 0

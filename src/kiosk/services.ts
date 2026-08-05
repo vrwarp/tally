@@ -37,6 +37,7 @@ import {
   type Firestore,
 } from 'firebase/firestore/lite';
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/functions';
+import { parseStudentId } from '@/lib/backendIds';
 import { missingKeys, parseFirebaseConfig } from '@/lib/firebaseConfig';
 import { sanitizeLabelTemplate, type LabelTemplate } from '@/lib/labelTemplate';
 import { paths } from '@/lib/paths';
@@ -50,7 +51,14 @@ import {
 import type { Grade, PcoRosterPerson } from '@/types';
 import type { KioskBinding } from './binding';
 import type { KioskStudent } from './search';
-import { KIOSK_KEYS, readJson, writeJson } from './storage';
+import {
+  KIOSK_KEYS,
+  readCachedRoster,
+  readCachedRosterOfAnyVersion,
+  readJson,
+  writeCachedRoster,
+  writeJson,
+} from './storage';
 
 /* -------------------------------------------------------------------------- */
 /* Bootstrap                                                                   */
@@ -153,6 +161,17 @@ const refreshKioskPhoneIndex = httpsCallable<
   { force?: boolean } | void,
   { students: number; entries: number; builtAt: string }
 >(functions, 'refreshKioskPhoneIndex');
+/**
+ * The same callable the check-in screen's allergy badge uses, asked one child at
+ * a time. See `fetchAllergyNote`.
+ */
+const getAllergyNotes = httpsCallable<
+  {
+    pcoPersonIds?: readonly string[];
+    personKeys?: ReadonlyArray<{ backendId: string; personId: string }>;
+  },
+  { notes: Record<string, string> }
+>(functions, 'getAllergyNotes');
 
 /* -------------------------------------------------------------------------- */
 /* Auth & pairing                                                              */
@@ -222,11 +241,6 @@ export async function bindEntry(entry: KioskEventEntry): Promise<KioskBinding> {
 /* Roster                                                                      */
 /* -------------------------------------------------------------------------- */
 
-interface StoredRoster {
-  fetchedAtMs: number;
-  students: KioskStudent[];
-}
-
 const ROSTER_REFRESH_MS = 6 * 60 * 60_000;
 
 function rosterFromResponse(people: PcoRosterPerson[]): KioskStudent[] {
@@ -238,6 +252,10 @@ function rosterFromResponse(people: PcoRosterPerson[]): KioskStudent[] {
       lastName: person.lastName,
       grade: person.grade,
       searchName: person.searchName,
+      // The flag, never the note — the roster read carries one and not the
+      // other on purpose, and the kiosk is the last place to blur that. What it
+      // buys is the label asking about one child instead of four hundred.
+      hasAllergies: person.hasAllergies === true,
     }));
 }
 
@@ -267,6 +285,11 @@ async function fetchRosterNow(): Promise<KioskStudent[]> {
         typeof data.searchName === 'string' && data.searchName
           ? data.searchName
           : `${firstName} ${lastName}`.trim().toLowerCase(),
+      // Always false, and not for want of looking: `noMirroredPersonalData` in
+      // firestore.rules refuses an `allergies` key on a student document, so a
+      // visitor no backend holds yet has nowhere for one to be. Once their push
+      // lands they come back through `rosterFromResponse` with the real answer.
+      hasAllergies: false,
     });
   }
   for (const student of rosterFromResponse(data.people)) byId.set(student.id, student);
@@ -280,21 +303,60 @@ async function fetchRosterNow(): Promise<KioskStudent[]> {
  * cheap change detection is enough for a list that changes weekly.
  */
 export async function loadRoster(onUpdate: (students: KioskStudent[]) => void): Promise<KioskStudent[]> {
-  const stored = readJson<StoredRoster>(KIOSK_KEYS.roster);
+  const stored = readCachedRoster();
   const fresh = () =>
     fetchRosterNow()
       .then((students) => {
-        writeJson(KIOSK_KEYS.roster, { fetchedAtMs: Date.now(), students } satisfies StoredRoster);
+        writeCachedRoster(students);
         onUpdate(students);
         return students;
       })
-      .catch(() => stored?.students ?? []);
+      // Any shape will do once the network has failed: an old cache still
+      // answers "who is on the roster", and the alternative is a lobby screen
+      // that cannot check anybody in. See `readCachedRosterOfAnyVersion`.
+      .catch(() => stored?.students ?? readCachedRosterOfAnyVersion()?.students ?? []);
 
-  if (stored && Array.isArray(stored.students) && stored.students.length > 0) {
+  if (stored) {
     if (Date.now() - stored.fetchedAtMs > ROSTER_REFRESH_MS) void fresh();
     return stored.students;
   }
   return fresh();
+}
+
+/* -------------------------------------------------------------------------- */
+/* Allergies                                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * One child's allergy line, for a label that asks for it.
+ *
+ * The narrowest read in the kiosk, and narrow on purpose. `useAllergyNotes` on
+ * the check-in screen asks about every flagged row it is rendering, because a
+ * counselor is looking at all of them; a kiosk is looking at exactly one child,
+ * the one whose parent is standing in front of it, so it asks about exactly one.
+ * A roster of four hundred never crosses the wire and never lands in
+ * localStorage — the caller in `printing/index.ts` holds the answer in memory
+ * only, for as long as it takes to draw the sticker.
+ *
+ * Callers gate this on `hasAllergies`, so a child with nothing on file costs no
+ * request at all. Null means "no note to print": nobody has one on file, or the
+ * student is a visitor no backend holds. A *failed* read throws, because the
+ * caller has a different answer for that — see `ALLERGY_UNREAD`.
+ */
+export async function fetchAllergyNote(studentId: string): Promise<string | null> {
+  const key = parseStudentId(studentId);
+  // A Tally-owned id has no upstream person to ask about. Their document cannot
+  // hold allergies either, so there is nothing to have missed.
+  if (!key) return null;
+
+  const { data } = await getAllergyNotes(
+    // Bare ids have always meant Planning Center to this callable and still do;
+    // the named shape is for everybody else. Same split as `useAllergyNotes`.
+    key.backendId === 'pco' ? { pcoPersonIds: [key.personId] } : { personKeys: [key] },
+  );
+
+  const note = data.notes[key.personId];
+  return typeof note === 'string' && note.trim() !== '' ? note.trim() : null;
 }
 
 /* -------------------------------------------------------------------------- */

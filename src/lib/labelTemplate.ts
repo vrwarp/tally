@@ -64,18 +64,40 @@ export const MAX_LABEL_LINE_LENGTH = 120;
  * Every token a label may use.
  *
  * Bounded by what the kiosk actually holds. It knows the roster row
- * (`KioskStudent`: names and a grade) and the binding (the gathering's title and
- * times) — and deliberately nothing else. Allergy notes, parent contacts and
- * photographs do not reach the lobby screen, which is a decision the Firestore
- * rules enforce rather than a gap; see the kiosk section of `firestore.rules`.
- * Adding any of those to a label is a change to what a shelf in a public room is
- * allowed to display, not a new entry in this list.
+ * (`KioskStudent`: names, a grade, and *that* there is an allergy) and the
+ * binding (the gathering's title and times) — and deliberately nothing else.
+ * Parent contacts and photographs do not reach the lobby screen, which is a
+ * decision the Firestore rules enforce rather than a gap; see the kiosk section
+ * of `firestore.rules`. Adding either of those to a label is a change to what a
+ * shelf in a public room is allowed to display, not a new entry in this list.
+ *
+ * `allergy` is the exception, and it is one that had to be argued for rather
+ * than assumed.
+ *
+ * A label is not a screen. It leaves the kiosk, goes onto the child, and is read
+ * by the volunteer holding them — who is exactly the person who needs to know
+ * about the peanuts, and the least likely of anyone to be looking at a roster
+ * while doing it. Withholding it made the same mistake the `⚠ Allergy` badge
+ * made before `getAllergyNotes` existed: a warning nobody can act on where they
+ * are standing.
+ *
+ * Three things keep it proportionate, and all three are load-bearing:
+ *
+ *   - **A leader opts in, per gathering.** The token prints nothing unless
+ *     somebody put it on this event's template. A nursery can; youth group need
+ *     not.
+ *   - **The kiosk still does not hold the notes.** It knows the flag, and asks
+ *     for one child's note at the moment that child is being checked in — never
+ *     the roster's. See `kiosk/printing/index.ts`.
+ *   - **Nothing is written down.** The note lives in memory for as long as it
+ *     takes to draw a sticker, and never reaches localStorage.
  */
 export const LABEL_TOKENS = [
   'firstName',
   'lastName',
   'lastInitial',
   'grade',
+  'allergy',
   'eventTitle',
   'date',
   'time',

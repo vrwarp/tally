@@ -7,6 +7,7 @@
  * throws on a corrupt cache entry is a kiosk somebody has to drive out and
  * reboot.
  */
+import type { KioskStudent } from './search';
 
 export const KIOSK_KEYS = {
   binding: 'tally:kiosk:binding',
@@ -51,4 +52,64 @@ export function removeKey(key: string): void {
   } catch {
     // Same posture as writeJson.
   }
+}
+
+/* -------------------------------------------------------------------------- */
+/* The roster cache                                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The shape version of the cached roster. Bump it when a *row* gains a field the
+ * kiosk relies on being there.
+ *
+ * Every other cache in here degrades safely when it is stale — a missing student
+ * is a search that finds nobody, and the refresh behind the screen fixes it. The
+ * allergy flag is the first field where "absent" and "false" are different
+ * claims and only one of them is safe: a roster cached before this version has
+ * no `hasAllergies`, and reading that as "no allergy" would print a clean label
+ * for a child with a peanut allergy for as long as the cache lasts. So a cache
+ * from a previous shape is ignored outright rather than half-trusted. The screen
+ * still paints instantly — `KioskApp` seeds from this same reader and the
+ * network copy lands a moment later — it simply paints an empty roster once,
+ * after a deploy, instead of a confidently wrong one.
+ */
+export const KIOSK_ROSTER_VERSION = 2;
+
+export interface CachedRoster {
+  version?: number;
+  fetchedAtMs: number;
+  students: KioskStudent[];
+}
+
+/** The cached roster, or null when there is none this build can trust. */
+export function readCachedRoster(): CachedRoster | null {
+  const stored = readCachedRosterOfAnyVersion();
+  return stored && stored.version === KIOSK_ROSTER_VERSION ? stored : null;
+}
+
+/**
+ * The cached roster whatever shape it is in — for when the network has failed
+ * and the choice is between an old copy and nothing.
+ *
+ * Nothing is the worse answer. A kiosk that rebooted into a new build with the
+ * hallway switch unplugged would otherwise have an empty search box and no way
+ * to check anybody in, which is a far bigger failure than the one the version
+ * gate exists to prevent. The rows are still names and grades; what they may
+ * lack is the allergy flag, and a missing flag reads as "print no allergy line"
+ * — exactly what every label did before the token existed. It is never read as
+ * a positive "this child has nothing on file" while a fresh copy is reachable,
+ * because `readCachedRoster` above refuses it first.
+ */
+export function readCachedRosterOfAnyVersion(): CachedRoster | null {
+  const stored = readJson<CachedRoster>(KIOSK_KEYS.roster);
+  if (!stored || !Array.isArray(stored.students) || stored.students.length === 0) return null;
+  return stored;
+}
+
+export function writeCachedRoster(students: KioskStudent[]): void {
+  writeJson(KIOSK_KEYS.roster, {
+    version: KIOSK_ROSTER_VERSION,
+    fetchedAtMs: Date.now(),
+    students,
+  } satisfies CachedRoster);
 }

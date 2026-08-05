@@ -80,10 +80,37 @@ describe('the default template', () => {
   });
 
   it('does not mention anything the kiosk is not allowed to know', () => {
-    // The kiosk holds no allergy, contact or photo data — see the docblock in
-    // labelTemplate.ts. This is a tripwire on the token list, not on the text.
-    expect(LABEL_TOKENS).not.toContain('allergies');
+    // Parent contact and photographs do not reach a lobby screen — see the
+    // docblock in labelTemplate.ts. This is a tripwire on the token list, not on
+    // the text.
     expect(LABEL_TOKENS).not.toContain('parentPhone');
+    expect(LABEL_TOKENS).not.toContain('parentName');
+    expect(LABEL_TOKENS).not.toContain('parentEmail');
+    expect(LABEL_TOKENS).not.toContain('notes');
+  });
+
+  /*
+   * The allergy token is the one exception to the paragraph above, and the pair
+   * of claims below is what makes it one rather than a hole. It has to exist —
+   * the volunteer holding the child is the person who needs to know — and it has
+   * to stay off a label nobody asked for it on.
+   */
+  it('can print an allergy, because the volunteer holding the child needs it', () => {
+    expect(LABEL_TOKENS).toContain('allergy');
+    expect(unknownTokensIn('{{allergy}}')).toEqual([]);
+  });
+
+  it('does not print one unless a leader asked for it', () => {
+    for (const line of DEFAULT_LABEL_TEMPLATE.lines) {
+      expect(tokensIn(line.text)).not.toContain('allergy');
+    }
+  });
+
+  it('leaves the line empty for a child with nothing on file', () => {
+    // Which is what makes the line disappear rather than print blank — see
+    // `resolveLines`. A template can therefore carry the token unconditionally.
+    expect(fillLabelTokens('{{allergy}}', { firstName: 'Ada' })).toBe('');
+    expect(fillLabelTokens('{{allergy}}', { allergy: 'Peanuts' })).toBe('Peanuts');
   });
 });
 
