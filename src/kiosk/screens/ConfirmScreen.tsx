@@ -12,7 +12,7 @@
  * not self-correcting when the child walks in anyway. Undoing one needs a
  * volunteer and the main app, so the gesture is worth a deliberate second.
  */
-import { gradeDescription } from '@/lib/utils';
+import { gradeDescription, haptic } from '@/lib/utils';
 import { HoldButton } from '../components/HoldButton';
 import type { KioskIntent } from '../KioskApp';
 import type { KioskStudent } from '../search';
@@ -54,6 +54,11 @@ export function ConfirmScreen({
           tabIndex={-1}
           onPointerDown={(event) => {
             event.preventDefault();
+            // The confirmation buzz, on contact rather than on the write — the
+            // success screen is painted optimistically for the same reason, and
+            // a parent already turning to walk their child in feels this when
+            // they have stopped looking at the screen.
+            haptic();
             onConfirm();
           }}
           className="w-full max-w-md rounded-2xl bg-present-600 p-7 text-3xl font-bold text-white active:bg-present-500"

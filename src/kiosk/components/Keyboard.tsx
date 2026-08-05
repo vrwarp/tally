@@ -15,8 +15,15 @@
  *    re-render, visible the same frame as the touch.
  *  - The whole subtree is memoized against a stable `onKey`, so typing
  *    re-renders the readout and the results, never these forty buttons.
+ *
+ * The one piece of JavaScript feedback is the tick of the vibrator, fired from
+ * the same `pointerdown` before the handler runs. A phone keyboard buzzes on
+ * every key and a finger expects it: on a tablet flat on a table, where a
+ * parent is watching the readout rather than their thumb, it is the only
+ * confirmation that the glass took the press at all.
  */
 import { memo, useCallback, useRef } from 'react';
+import { haptic } from '@/lib/utils';
 
 export type KioskKey =
   | { kind: 'char'; value: string }
@@ -45,6 +52,10 @@ export const Keyboard = memo(function Keyboard({ onKey }: { onKey: (key: KioskKe
     const key = target?.dataset.key;
     if (!key) return;
     event.preventDefault();
+    // Every key, including the ones the buffer will refuse (a 25th character, a
+    // fifth digit): this reports contact, not success. A key that took the press
+    // and buzzed nothing would read as a dead patch of glass.
+    haptic(8);
     if (key === 'backspace') handlerRef.current({ kind: 'backspace' });
     else if (key === 'clear') handlerRef.current({ kind: 'clear' });
     else if (key === 'space') handlerRef.current({ kind: 'char', value: ' ' });
