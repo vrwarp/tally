@@ -443,6 +443,17 @@ bargain that lets this document exist in a database whose posture is
 **Who writes:** only the functions. A client that could write it could make any four digits answer
 any student. Readable by any active member — the kiosk session is one.
 
+**Read backwards, it is also the kiosk's family.** Inverting the map gives each student the set of
+digits their family answers to, which is what lets the confirm screen offer to check a child's
+brothers and sisters in — or collect them — in the same tap
+([`src/kiosk/family.ts`](../src/kiosk/family.ts)). Two students count as family only when one's set
+of digits contains the other's, never on a bare overlap: because each collector aggregates over
+household or family-folk co-membership, real siblings always land on the same set (or a superset,
+where a child belongs to a second household), while two unrelated families that happen to end a
+number the same way each keep a digit the other lacks. The search can afford that coincidence —
+both families' children appear and a parent picks their own — but an offer cannot, so it is held to
+the stricter test. Everything offered is still ticked on screen, and unticking is a tap.
+
 ### `config/settings`
 
 A single document holding the four thresholds the core team can tune:

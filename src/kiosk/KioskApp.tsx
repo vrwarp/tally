@@ -9,12 +9,16 @@
  * next person at the kiosk is usually the next family in the queue, and a name
  * left on the glass is both their problem and the previous family's.
  *
+ * One confirm can cover several children. The kiosk offers a tapped child's
+ * brothers and sisters — see family.ts for what it takes to be that sure — so a
+ * parent with three of them walks the flow once rather than three times.
+ *
  * Firebase loads *behind* the first paint: everything persisted — the
  * binding, the roster, the phone index — is read synchronously from
  * localStorage at mount, so a warm kiosk is searchable before the SDK has
  * parsed. Only the write needs the network to have caught up.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 // Type-only, so the services chunk stays out of this graph — the value import
 // below is dynamic, and that boundary is the whole startup strategy.
 import type * as ServicesModule from './services';
@@ -25,6 +29,7 @@ import type * as PrintingModule from './printing';
 import type { PrinterState } from './printing';
 import { bindingIsLive, clearBinding, readBinding, writeBinding, type KioskBinding } from './binding';
 import type { KioskKey } from './components/Keyboard';
+import { buildFamilyDigits, familyOf } from './family';
 import {
   DEFAULT_PRINTER_LABEL,
   DEFAULT_PRINTER_MODEL,
@@ -62,9 +67,24 @@ type Phase = 'booting' | 'pairing' | 'choosing' | 'printer' | 'ready';
  */
 export type KioskIntent = 'check-in' | 'check-out' | 'done';
 
+/**
+ * `family` is the same decision made the same way: who else the confirm could
+ * cover, settled when the row is tapped. A sibling seen to by another kiosk
+ * while this screen was up must not vanish from under the finger already on its
+ * way to the button, and nothing is lost by letting the write go: a repeated
+ * check-in converges on the document that is already there, and a pickup the
+ * register has already recorded is refused by the rules rather than moved.
+ */
+type ConfirmOverlay = {
+  kind: 'confirm';
+  student: KioskStudent;
+  intent: KioskIntent;
+  family: KioskStudent[];
+};
+
 type Overlay =
-  | { kind: 'confirm'; student: KioskStudent; intent: KioskIntent }
-  | { kind: 'success'; student: KioskStudent; intent: KioskIntent }
+  | ConfirmOverlay
+  | { kind: 'success'; students: KioskStudent[]; intent: KioskIntent }
   | null;
 
 const MAX_BUFFER = 24;
@@ -264,61 +284,108 @@ export function KioskApp() {
     [presentIds, checkedOutIds, binding],
   );
 
+  /** Inverted once per index rather than once per tap. See family.ts. */
+  const familyDigits = useMemo(() => buildFamilyDigits(last4Index), [last4Index]);
+
+  /**
+   * The brothers and sisters this tap could cover.
+   *
+   * Only the ones the confirm would do the *same* thing to. A screen that
+   * offered to collect a sibling under a "Check in" button would be two actions
+   * wearing one, and the dangerous one is not the one being read.
+   *
+   * Nothing is offered alongside `done`: that screen has no button to put an
+   * offer under, and a parent who re-tapped a child already on the register is
+   * not mid-flow — they are checking, and the answer is on the screen already.
+   */
+  const familyFor = useCallback(
+    (student: KioskStudent, intent: KioskIntent): KioskStudent[] => {
+      if (intent === 'done') return [];
+      return familyOf(student, students, familyDigits).filter(
+        (member) => intentFor(member) === intent,
+      );
+    },
+    [students, familyDigits, intentFor],
+  );
+
   const onConfirm = useCallback(
-    (student: KioskStudent, intent: KioskIntent) => {
-      if (!services || !binding || !uid) return;
-      // Optimistic: the tick paints now; the write follows.
-      setOverlay({ kind: 'success', student, intent });
+    (confirm: ConfirmOverlay, chosen: KioskStudent[]) => {
+      if (!services || !binding || !uid || chosen.length === 0) return;
+      const { intent } = confirm;
+      // Optimistic: the tick paints now; the writes follow.
+      setOverlay({ kind: 'success', students: chosen, intent });
+
+      // A sibling unticked on the way past is a label nobody wants — the warm
+      // raster for them was started when this screen opened.
+      const taking = new Set(chosen.map((student) => student.id));
+      for (const member of confirm.family) {
+        if (!taking.has(member.id)) printing?.forgetLabel(member.id);
+      }
+
       if (intent === 'done') return;
 
       if (intent === 'check-out') {
-        setCheckedOutIds((held) => new Set(held).add(student.id));
-        void services
-          .performCheckOut({ eventId: binding.eventId, studentId: student.id, uid })
-          .catch((error: { code?: string }) => {
-            // Refused outright — a pickup already stands, and only staff may
-            // move one. The row stays collected because it is.
-            if (error.code?.includes('permission-denied')) return;
-            services.enqueueCheckOut({ binding, student, uid });
-          });
+        setCheckedOutIds((held) => {
+          const next = new Set(held);
+          for (const student of chosen) next.add(student.id);
+          return next;
+        });
+        for (const student of chosen) {
+          void services
+            .performCheckOut({ eventId: binding.eventId, studentId: student.id, uid })
+            .catch((error: { code?: string }) => {
+              // Refused outright — a pickup already stands, and only staff may
+              // move one. The row stays collected because it is.
+              if (error.code?.includes('permission-denied')) return;
+              services.enqueueCheckOut({ binding, student, uid });
+            });
+        }
         return;
       }
 
-      setPresentIds((held) => new Set(held).add(student.id));
-      void services
-        .performCheckIn({ binding, student, uid })
-        .then(() => services.forgetStudentDates(student.id))
-        .catch((error: { code?: string }) => {
-          // Refused outright — frozen student, or a record the kiosk may not
-          // touch. Not retryable; the row stays green because they are, in
-          // every way that matters at a door, here.
-          if (error.code?.includes('permission-denied')) return;
-          services.enqueueCheckIn({ binding, student, uid });
-        });
+      setPresentIds((held) => {
+        const next = new Set(held);
+        for (const student of chosen) next.add(student.id);
+        return next;
+      });
+      for (const student of chosen) {
+        void services
+          .performCheckIn({ binding, student, uid })
+          .then(() => services.forgetStudentDates(student.id))
+          .catch((error: { code?: string }) => {
+            // Refused outright — frozen student, or a record the kiosk may not
+            // touch. Not retryable; the row stays green because they are, in
+            // every way that matters at a door, here.
+            if (error.code?.includes('permission-denied')) return;
+            services.enqueueCheckIn({ binding, student, uid });
+          });
 
-      /*
-       * The label, and only here.
-       *
-       * A check-out prints nothing — handing a child back does not produce an
-       * artifact, the sticker went on at the door — and neither does `done`,
-       * which returned above: a parent re-tapping a child who is already checked
-       * in is exactly the runaway reprint loop to avoid. A second copy is a staff
-       * action on the printer screen.
-       *
-       * Last, and inside a `try`. `printLabel` is written not to throw, but the
-       * ordering and the catch are what make that not matter: the attendance
-       * write is already dispatched and the tick is already on screen, so there
-       * is nothing left for a printer to spoil. Nothing about a sticker may reach
-       * back into a screen that has told a parent their child is checked in — a
-       * red line beside a green tick reads as "your check-in failed", and a
-       * parent cannot fix a printer anyway. Printer trouble surfaces on the staff
-       * surfaces instead.
-       */
-      if (prints) {
-        try {
-          printing?.printLabel(student, binding);
-        } catch {
-          // Deliberately swallowed. See above.
+        /*
+         * The label, and only here.
+         *
+         * A check-out prints nothing — handing a child back does not produce an
+         * artifact, the sticker went on at the door — and neither does `done`,
+         * which returned above: a parent re-tapping a child who is already
+         * checked in is exactly the runaway reprint loop to avoid. A second copy
+         * is a staff action on the printer screen. A family checked in together
+         * gets one sticker each, which is the one thing each of them is for.
+         *
+         * Last, and inside a `try`. `printLabel` is written not to throw, but the
+         * ordering and the catch are what make that not matter: the attendance
+         * write is already dispatched and the tick is already on screen, so there
+         * is nothing left for a printer to spoil. Nothing about a sticker may reach
+         * back into a screen that has told a parent their child is checked in — a
+         * red line beside a green tick reads as "your check-in failed", and a
+         * parent cannot fix a printer anyway. Printer trouble surfaces on the staff
+         * surfaces instead. One child's jam must not cost the next child's label
+         * either, which is why the `try` is inside the loop.
+         */
+        if (prints) {
+          try {
+            printing?.printLabel(student, binding);
+          } catch {
+            // Deliberately swallowed. See above.
+          }
         }
       }
     },
@@ -383,7 +450,7 @@ export function KioskApp() {
     if (overlay?.kind === 'success') {
       return (
         <SuccessScreen
-          student={overlay.student}
+          students={overlay.students}
           intent={overlay.intent}
           onDone={() => {
             // Home, cleared. A parent with three kids retypes their four digits
@@ -401,12 +468,14 @@ export function KioskApp() {
         <ConfirmScreen
           student={overlay.student}
           intent={overlay.intent}
-          onConfirm={() => onConfirm(overlay.student, overlay.intent)}
+          family={overlay.family}
+          onConfirm={(chosen) => onConfirm(overlay, chosen)}
           onBack={() => {
-            // Backed out, so the label warmed on the way in is not wanted. The
+            // Backed out, so the labels warmed on the way in are not wanted. The
             // cache evicts on its own, but a parent who picks the wrong Noah
             // twice should not push the right one out of it.
             printing?.forgetLabel(overlay.student.id);
+            for (const member of overlay.family) printing?.forgetLabel(member.id);
             setOverlay(null);
           }}
         />
@@ -427,6 +496,7 @@ export function KioskApp() {
         printerNeedsAttention={printerState?.kind === 'trouble'}
         onPick={(student) => {
           const intent = intentFor(student);
+          const family = familyFor(student, intent);
           services?.warmStudentDates(student.id);
           /*
            * Start building the label now, while the confirm screen is on its way
@@ -438,9 +508,17 @@ export function KioskApp() {
            * Only for a check-in, because only a check-in prints. On a gathering
            * that tracks check-out, most taps once the room has filled are
            * collections, and rasterising for those is work thrown away.
+           *
+           * The siblings are warmed too, because they arrive ticked and are
+           * about to be printed. An unticked one is forgotten again on the way
+           * through the confirm — the same eviction a Back gets.
            */
-          if (prints && intent === 'check-in') printing?.warmLabel(student, binding);
-          setOverlay({ kind: 'confirm', student, intent });
+          for (const member of family) services?.warmStudentDates(member.id);
+          if (prints && intent === 'check-in') {
+            printing?.warmLabel(student, binding);
+            for (const member of family) printing?.warmLabel(member, binding);
+          }
+          setOverlay({ kind: 'confirm', student, intent, family });
         }}
         onUnbind={() => {
           clearBinding();
