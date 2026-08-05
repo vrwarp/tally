@@ -46,16 +46,78 @@ export async function openKiosk(browser: Browser): Promise<{ context: BrowserCon
  *
  * `HoldButton` listens for pointer events and cancels on leave, so this has to
  * be a real press at a real position rather than a synthesised click.
+ *
+ * Half way through, the progress bar is checked in *pixels* — see
+ * `expectProgressShows`. Pass `invisible` for the staff gate, which is drawn at
+ * `opacity-0` on purpose.
  */
-export async function hold(page: Page, selector: Parameters<Page['locator']>[0]): Promise<void> {
+export async function hold(
+  page: Page,
+  selector: Parameters<Page['locator']>[0],
+  options: { invisible?: boolean } = {},
+): Promise<void> {
   const target = page.locator(selector);
   const box = await target.boundingBox();
   if (!box) throw new Error(`Cannot hold ${String(selector)} — it has no box on screen.`);
 
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
-  await page.waitForTimeout(HOLD_MS + HOLD_SLACK_MS);
+  await page.waitForTimeout(HOLD_MS / 2);
+  if (!options.invisible) await expectProgressShows(page, box);
+  await page.waitForTimeout(HOLD_MS / 2 + HOLD_SLACK_MS);
   await page.mouse.up();
+}
+
+/**
+ * Half way through a hold, the bar has to be somewhere a person can see it.
+ *
+ * Pixels, not styles, because the bug this exists to catch passed everything
+ * else. The fill was `bg-brand-600/40` over buttons already painted
+ * `bg-brand-600`, so it composited to the button's own colour to the last unit:
+ * the element was in the DOM, the transition was running, the transform was
+ * animating, and the screen showed three seconds of a button doing nothing.
+ * Nobody holds through that, so the control read as broken on every device it
+ * was tried on while the specs stayed green. What reaches the screen is the
+ * only thing that distinguishes that from working, so that is what is asserted.
+ *
+ * At the half-way point the bar covers half the button, so a sample near the
+ * left edge is filled and one near the right edge is not.
+ */
+async function expectProgressShows(
+  page: Page,
+  box: { x: number; y: number; width: number; height: number },
+): Promise<void> {
+  const shot = (await page.screenshot()).toString('base64');
+  const gap = await page.evaluate(
+    async ({ shot, box }) => {
+      const image = new Image();
+      image.src = `data:image/png;base64,${shot}`;
+      await image.decode();
+      const canvas = document.createElement('canvas');
+      canvas.width = image.width;
+      canvas.height = image.height;
+      const context = canvas.getContext('2d')!;
+      context.drawImage(image, 0, 0);
+
+      // The shot is in device pixels and the box is in CSS pixels.
+      const scale = image.width / window.innerWidth;
+      const at = (fraction: number) => {
+        const x = Math.round((box.x + box.width * fraction) * scale);
+        const y = Math.round((box.y + box.height / 2) * scale);
+        return Array.from(context.getImageData(x, y, 1, 1).data).slice(0, 3);
+      };
+
+      const filled = at(0.06);
+      const empty = at(0.94);
+      return Math.max(...filled.map((channel, index) => Math.abs(channel - empty[index])));
+    },
+    { shot, box },
+  );
+
+  expect(
+    gap,
+    'the hold progress bar is invisible against the button it is drawn on',
+  ).toBeGreaterThan(16);
 }
 
 /**
