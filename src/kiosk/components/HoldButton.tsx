@@ -9,6 +9,14 @@
  * Progress is driven by a CSS transition on a scaling bar rather than by
  * animation frames: the only JavaScript is one timer for completion and the
  * pointer handlers that arm and cancel it.
+ *
+ * The bar is a white wash, and has to be something like it. Every caller draws
+ * this control on a dark surface — `bg-brand-600` at both visible call sites —
+ * so a fill tinted in the brand ramp composites to within nothing of the button
+ * it covers, and the hold becomes three seconds of a button doing visibly
+ * nothing. Which is not a subtle bug: nobody keeps their thumb down for three
+ * seconds against no feedback, so the control reads as broken rather than as
+ * slow. Whatever this fill is, it must contrast with the button under it.
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 
@@ -57,7 +65,11 @@ export function HoldButton({
       tabIndex={-1}
       aria-label={ariaLabel}
       className={`relative select-none overflow-hidden ${className}`}
-      style={{ touchAction: 'none' }}
+      // `WebkitTouchCallout` for the iPads these sit on: a press this long is
+      // exactly the gesture that raises the callout, and a kiosk has no use for
+      // one. `touchAction` keeps the same press from being read as a scroll.
+      style={{ touchAction: 'none', WebkitTouchCallout: 'none' }}
+      onContextMenu={(event) => event.preventDefault()}
       onPointerDown={start}
       onPointerUp={cancel}
       onPointerLeave={cancel}
@@ -65,7 +77,7 @@ export function HoldButton({
     >
       <span
         aria-hidden
-        className="absolute inset-0 origin-left bg-brand-600/40"
+        className="absolute inset-0 origin-left bg-white/35"
         style={{
           transform: holding ? 'scaleX(1)' : 'scaleX(0)',
           transition: holding ? `transform ${HOLD_MS}ms linear` : 'none',
