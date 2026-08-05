@@ -43,6 +43,7 @@ import { gradeDescription } from '@/lib/utils';
 import type { LabelTemplate, LabelTokenValues } from '@/lib/labelTemplate';
 import type { KioskBinding } from '../binding';
 import type { KioskStudent } from '../search';
+import { allergyFor, forgetAllergy, startAllergyLookup } from './allergy';
 import {
   readPrinterConfig,
   writePrinterConfig,
@@ -54,6 +55,13 @@ import type { RasterReply, RasterRequest } from './raster.worker';
 
 export { DEFAULT_PRINTER_LABEL, DEFAULT_PRINTER_MODEL, readPrinterConfig } from './device';
 export type { PrinterConfig } from './device';
+
+/*
+ * The allergy lookup's own surface, re-exported so `KioskApp` reaches it the way
+ * it reaches everything else here — through the one dynamically imported handle.
+ */
+export { ALLERGY_UNREAD, forgetAllergies, setAllergySource } from './allergy';
+export type { AllergySource } from './allergy';
 
 /*
  * The model and label tables, re-exported for the setup screen.
@@ -379,9 +387,13 @@ function recorder(): { bytes: number; pageCount: number }[] | null {
 }
 
 const queue = createLabelQueue({
-  raster: (job) => {
-    if (!config) return Promise.reject(new Error('No printer is configured.'));
-    return rasterInWorker(config, job);
+  raster: async (job) => {
+    if (!config) throw new Error('No printer is configured.');
+    const allergy = await allergyFor(job.studentId);
+    return rasterInWorker(
+      config,
+      allergy === undefined ? job : { ...job, values: { ...job.values, allergy } },
+    );
   },
   send: async (result) => {
     const recording = recorder();
@@ -419,6 +431,13 @@ const queue = createLabelQueue({
  * which a module shared with the Cloud Functions may import. Everything comes
  * from the roster row and the binding — which is all the kiosk has, and all it
  * is meant to have.
+ *
+ * All but one. `allergy` is deliberately absent: it is the only value the roster
+ * row does not answer, and it arrives from a callable rather than from a field.
+ * `allergyFor` folds it in at rasterise time, which is where waiting is allowed.
+ * A missing token reads as empty anyway, so a template using `{{allergy}}` on a
+ * kiosk that never looked prints the same tidy label as one for a child with
+ * nothing on file.
  */
 export function tokenValuesFor(student: KioskStudent, binding: KioskBinding): LabelTokenValues {
   const now = new Date();
@@ -454,6 +473,9 @@ function jobFor(
 export function warmLabel(student: KioskStudent, binding: KioskBinding): void {
   const template = binding.labelTemplate;
   if (!template) return;
+  // Before the queue, not after: `warm` starts rasterising synchronously, and
+  // the rasteriser is what waits for this.
+  startAllergyLookup(student, template);
   queue.warm(jobFor(student, binding, template));
 }
 
@@ -467,12 +489,19 @@ export function warmLabel(student: KioskStudent, binding: KioskBinding): void {
 export function printLabel(student: KioskStudent, binding: KioskBinding): void {
   const template = binding.labelTemplate;
   if (!template) return;
+  // A no-op when `warmLabel` already started it, and the reason this is not
+  // simply left to the warm: the printer screen reaches `printLabel` too.
+  startAllergyLookup(student, template);
   queue.print(jobFor(student, binding, template));
 }
 
 /** The confirm screen closed without confirming; its label is not wanted. */
 export function forgetLabel(studentId: string): void {
   queue.forget(studentId);
+  // Backed out, so nothing is going to print this child's note. Dropping it here
+  // rather than waiting for the cache to evict it keeps the window it is held
+  // for as close to the sticker as it can be.
+  forgetAllergy(studentId);
 }
 
 export function canReprint(): boolean {
@@ -497,9 +526,9 @@ export function testPrint(): void {
     studentId: `__test__${nextRequestId}`,
     template: {
       lines: [
-        { text: 'Tally', size: 'lg', bold: true, align: 'center' },
-        { text: '{{eventTitle}}', size: 'sm', bold: false, align: 'center' },
-        { text: '{{time}}', size: 'sm', bold: false, align: 'center' },
+        { text: 'Tally', size: 'lg', bold: true, align: 'center', requiresValue: false },
+        { text: '{{eventTitle}}', size: 'sm', bold: false, align: 'center', requiresValue: false },
+        { text: '{{time}}', size: 'sm', bold: false, align: 'center', requiresValue: false },
       ],
       copies: 1,
     },

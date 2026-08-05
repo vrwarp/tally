@@ -27,6 +27,7 @@ const ADA: KioskStudent = {
   lastName: 'Lovelace',
   grade: 8,
   searchName: 'ada lovelace',
+  hasAllergies: false,
 };
 
 /*

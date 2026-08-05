@@ -80,17 +80,44 @@ describe('the default template', () => {
   });
 
   it('does not mention anything the kiosk is not allowed to know', () => {
-    // The kiosk holds no allergy, contact or photo data — see the docblock in
-    // labelTemplate.ts. This is a tripwire on the token list, not on the text.
-    expect(LABEL_TOKENS).not.toContain('allergies');
+    // Parent contact and photographs do not reach a lobby screen — see the
+    // docblock in labelTemplate.ts. This is a tripwire on the token list, not on
+    // the text.
     expect(LABEL_TOKENS).not.toContain('parentPhone');
+    expect(LABEL_TOKENS).not.toContain('parentName');
+    expect(LABEL_TOKENS).not.toContain('parentEmail');
+    expect(LABEL_TOKENS).not.toContain('notes');
+  });
+
+  /*
+   * The allergy token is the one exception to the paragraph above, and the pair
+   * of claims below is what makes it one rather than a hole. It has to exist —
+   * the volunteer holding the child is the person who needs to know — and it has
+   * to stay off a label nobody asked for it on.
+   */
+  it('can print an allergy, because the volunteer holding the child needs it', () => {
+    expect(LABEL_TOKENS).toContain('allergy');
+    expect(unknownTokensIn('{{allergy}}')).toEqual([]);
+  });
+
+  it('does not print one unless a leader asked for it', () => {
+    for (const line of DEFAULT_LABEL_TEMPLATE.lines) {
+      expect(tokensIn(line.text)).not.toContain('allergy');
+    }
+  });
+
+  it('leaves the line empty for a child with nothing on file', () => {
+    // Which is what makes the line disappear rather than print blank — see
+    // `resolveLines`. A template can therefore carry the token unconditionally.
+    expect(fillLabelTokens('{{allergy}}', { firstName: 'Ada' })).toBe('');
+    expect(fillLabelTokens('{{allergy}}', { allergy: 'Peanuts' })).toBe('Peanuts');
   });
 });
 
 describe('sanitizeLabelTemplate', () => {
   it('reads a well-formed template', () => {
     const template: LabelTemplate = {
-      lines: [{ text: '{{firstName}}', size: 'xl', bold: true, align: 'left' }],
+      lines: [{ text: '{{firstName}}', size: 'xl', bold: true, align: 'left', requiresValue: false }],
       copies: 2,
     };
     expect(sanitizeLabelTemplate(template)).toEqual(template);
@@ -111,11 +138,11 @@ describe('sanitizeLabelTemplate', () => {
   it('drops lines with no usable text', () => {
     const result = sanitizeLabelTemplate({
       lines: [
-        { text: '{{firstName}}', size: 'xl', bold: true, align: 'center' },
-        { text: '   ', size: 'md', bold: false, align: 'center' },
-        { text: 42, size: 'md', bold: false, align: 'center' },
+        { text: '{{firstName}}', size: 'xl', bold: true, align: 'center', requiresValue: false },
+        { text: '   ', size: 'md', bold: false, align: 'center', requiresValue: false },
+        { text: 42, size: 'md', bold: false, align: 'center', requiresValue: false },
         null,
-        { text: '{{grade}}', size: 'md', bold: false, align: 'center' },
+        { text: '{{grade}}', size: 'md', bold: false, align: 'center', requiresValue: false },
       ],
       copies: 1,
     });
@@ -129,7 +156,7 @@ describe('sanitizeLabelTemplate', () => {
       lines: [{ text: 'Hello', size: 'gigantic', bold: 'yes', align: 'justify' }],
       copies: 1,
     });
-    expect(result?.lines[0]).toEqual({ text: 'Hello', size: 'md', bold: false, align: 'center' });
+    expect(result?.lines[0]).toEqual({ text: 'Hello', size: 'md', bold: false, align: 'center', requiresValue: false });
   });
 
   it('drops keys it does not recognise', () => {
@@ -137,7 +164,13 @@ describe('sanitizeLabelTemplate', () => {
       lines: [{ text: 'Hello', size: 'md', bold: false, align: 'center', rotate: 90, colour: 'red' }],
       copies: 1,
     });
-    expect(Object.keys(result!.lines[0]!).sort()).toEqual(['align', 'bold', 'size', 'text']);
+    expect(Object.keys(result!.lines[0]!).sort()).toEqual([
+      'align',
+      'bold',
+      'requiresValue',
+      'size',
+      'text',
+    ]);
   });
 
   it('caps the line count', () => {
@@ -151,7 +184,7 @@ describe('sanitizeLabelTemplate', () => {
   });
 
   it('caps and floors the copy count', () => {
-    const lines = [{ text: 'Hello', size: 'md', bold: false, align: 'center' }];
+    const lines = [{ text: 'Hello', size: 'md', bold: false, align: 'center', requiresValue: false }];
     expect(sanitizeLabelTemplate({ lines, copies: 99 })?.copies).toBe(MAX_LABEL_COPIES);
     expect(sanitizeLabelTemplate({ lines, copies: 0 })?.copies).toBe(1);
     expect(sanitizeLabelTemplate({ lines, copies: -3 })?.copies).toBe(1);
@@ -162,7 +195,7 @@ describe('sanitizeLabelTemplate', () => {
 
   it('truncates a line long enough to be a mistake', () => {
     const result = sanitizeLabelTemplate({
-      lines: [{ text: 'x'.repeat(500), size: 'md', bold: false, align: 'center' }],
+      lines: [{ text: 'x'.repeat(500), size: 'md', bold: false, align: 'center', requiresValue: false }],
       copies: 1,
     });
     expect(result?.lines[0]?.text.length).toBe(120);

@@ -27,12 +27,15 @@ import {
   MAX_LABEL_COPIES,
   MAX_LABEL_LINES,
   MAX_LABEL_LINE_LENGTH,
+  fillLabelTokens,
+  tokensIn,
   unknownTokensIn,
   type LabelLine,
   type LabelTemplate,
 } from '@/lib/labelTemplate';
 import { cn } from '@/lib/utils';
 import { LabelPreview } from '@/features/events/LabelPreview';
+import { SAMPLE_VALUES, SPARSE_SAMPLE_VALUES } from '@/features/events/labelSamples';
 
 /**
  * The media offered for the preview, in printable dots at 300 dpi.
@@ -65,7 +68,23 @@ const ALIGN_LABELS: Record<(typeof LABEL_LINE_ALIGNS)[number], string> = {
 };
 
 function blankLine(): LabelLine {
-  return { text: '', size: 'md', bold: false, align: 'center' };
+  return { text: '', size: 'md', bold: false, align: 'center', requiresValue: false };
+}
+
+/** What the checkbox that drops a line is called, quoted in the hint below. */
+const REQUIRES_VALUE_LABEL = 'Only if filled in';
+
+/**
+ * What this line would print for a child none of its tokens has a value for.
+ *
+ * Filling against nothing is the whole trick: `fillLabelTokens` empties every
+ * token and collapses what is left, so an empty answer means the line already
+ * disappears on its own and a non-empty one is the literal text that would be
+ * printed on its own — "Allergy:", "Grade", "Room". That string is both how the
+ * editor knows to warn and the most convincing way to say it.
+ */
+function leftoverText(text: string): string {
+  return tokensIn(text).length === 0 ? '' : fillLabelTokens(text, {});
 }
 
 export function LabelTemplateField({
@@ -77,6 +96,29 @@ export function LabelTemplateField({
 }) {
   const [media, setMedia] = useState<string>(PREVIEW_MEDIA[0].id);
   const chosen = PREVIEW_MEDIA.find((entry) => entry.id === media) ?? PREVIEW_MEDIA[0];
+
+  /**
+   * Which of the two sample children the preview is drawn for.
+   *
+   * The full one exercises the layout — a long name shrinking, a line wrapping.
+   * The sparse one exercises the template, which is a different question and the
+   * one leaders get wrong: a child with no grade and no allergy is most of a
+   * roster, and until now the editor never showed them.
+   */
+  const [previewSparse, setPreviewSparse] = useState(false);
+
+  /**
+   * Whether this gathering is about to print medical information.
+   *
+   * Worth saying out loud once, where the decision is being made. Everywhere
+   * else in Tally an allergy note is behind a tap by somebody signed in; a
+   * sticker is read by whoever is holding the child, which is the point of
+   * putting it there and also the whole of the trade. A leader ticking this for
+   * a nursery should know they have made that choice, and a leader who did not
+   * mean to should be able to see that they did.
+   */
+  const printsAllergies =
+    value?.lines.some((line) => tokensIn(line.text).includes('allergy')) ?? false;
 
   const patchLine = (index: number, patch: Partial<LabelLine>) => {
     if (!value) return;
@@ -120,11 +162,27 @@ export function LabelTemplateField({
 
       {value === null ? null : (
         <div className="flex flex-col gap-4 rounded-xl bg-ink-950/40 p-3 ring-1 ring-ink-800">
+          {printsAllergies ? (
+            <p className="rounded-lg bg-warn-500/10 p-2 text-xs leading-snug text-warn-400 ring-1 ring-warn-500/25">
+              These labels will print each child&rsquo;s allergy note, so a volunteer holding them can
+              read it. It is the one medical detail Tally puts on paper — anyone who can see the
+              sticker can see it too.
+            </p>
+          ) : null}
+
           <div className="@container">
             <div className="grid gap-4 @min-[34rem]:grid-cols-[1fr_auto]">
               <div className="flex min-w-0 flex-col gap-3">
                 {value.lines.map((line, index) => {
                   const unknown = unknownTokensIn(line.text);
+                  const hasTokens = tokensIn(line.text).length > 0;
+                  /*
+                   * The caption that would be left standing on its own. Only a
+                   * problem while the line is set to print regardless — ticking
+                   * the box is exactly the fix, so the warning goes away when it
+                   * has been applied rather than nagging about a solved case.
+                   */
+                  const leftover = line.requiresValue ? '' : leftoverText(line.text);
                   return (
                     <div key={index} className="flex flex-col gap-2 rounded-lg bg-ink-900/60 p-2">
                       <TextField
@@ -133,6 +191,20 @@ export function LabelTemplateField({
                         maxLength={MAX_LABEL_LINE_LENGTH}
                         placeholder="{{firstName}}"
                         autoComplete="off"
+                        /*
+                         * The trap this catches: a token comes to nothing for
+                         * plenty of children, but the wording typed around it
+                         * survives them — `Allergy: {{allergy}}` leaves a bare
+                         * "Allergy:" on every sticker in the room. Quoting the
+                         * exact string that would print says it better than any
+                         * description of the rule, and the preview cannot show
+                         * it unless the leader thinks to switch samples.
+                         */
+                        hint={
+                          leftover === ''
+                            ? undefined
+                            : `A child with none of these still prints “${leftover}”. Tick “${REQUIRES_VALUE_LABEL}” to drop the whole line instead.`
+                        }
                         onChange={(changed) => patchLine(index, { text: changed.target.value })}
                         error={
                           unknown.length > 0
@@ -190,6 +262,23 @@ export function LabelTemplateField({
                             onChange={(changed) => patchLine(index, { bold: changed.target.checked })}
                           />
                         </div>
+                        {/*
+                          * Offered only where it can do anything. A line of
+                          * fixed text has no token to wait on, and a checkbox
+                          * that does nothing on half the rows is a checkbox
+                          * nobody trusts on the other half.
+                          */}
+                        {hasTokens ? (
+                          <div className="pb-1">
+                            <CheckboxField
+                              label={REQUIRES_VALUE_LABEL}
+                              checked={line.requiresValue}
+                              onChange={(changed) =>
+                                patchLine(index, { requiresValue: changed.target.checked })
+                              }
+                            />
+                          </div>
+                        ) : null}
                         <button
                           type="button"
                           onClick={() => removeLine(index)}
@@ -251,7 +340,14 @@ export function LabelTemplateField({
                 </SelectField>
                 <LabelPreview
                   template={value}
+                  values={previewSparse ? SPARSE_SAMPLE_VALUES : SAMPLE_VALUES}
                   box={{ width: chosen.width, height: chosen.height }}
+                />
+                <CheckboxField
+                  label="A child with nothing on file"
+                  hint="No grade, no allergy, no surname — the label most children get."
+                  checked={previewSparse}
+                  onChange={(changed) => setPreviewSparse(changed.target.checked)}
                 />
               </div>
             </div>

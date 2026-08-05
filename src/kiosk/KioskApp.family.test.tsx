@@ -21,7 +21,14 @@ import type { KioskBinding } from '@/kiosk/binding';
 import type { KioskStudent } from '@/kiosk/search';
 
 function student(id: string, firstName: string, lastName: string): KioskStudent {
-  return { id, firstName, lastName, grade: 9, searchName: `${firstName} ${lastName}`.toLowerCase() };
+  return {
+    id,
+    firstName,
+    lastName,
+    grade: 9,
+    searchName: `${firstName} ${lastName}`.toLowerCase(),
+    hasAllergies: false,
+  };
 }
 
 const AMARA = student('s-amara', 'Amara', 'Osei');

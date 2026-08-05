@@ -16,13 +16,13 @@
  * check-in. The tick is painted before the write and before the label, and a
  * printer that throws must leave that untouched.
  */
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { KioskApp, type KioskPrinting, type KioskServices } from '@/kiosk/KioskApp';
 import { HOLD_MS } from '@/kiosk/components/HoldButton';
 import { DEFAULT_LABEL_TEMPLATE } from '@/lib/labelTemplate';
-import { KIOSK_KEYS } from '@/kiosk/storage';
+import { KIOSK_KEYS, KIOSK_ROSTER_VERSION } from '@/kiosk/storage';
 import type { KioskBinding } from '@/kiosk/binding';
 import type { KioskStudent } from '@/kiosk/search';
 
@@ -32,6 +32,7 @@ const ADA: KioskStudent = {
   lastName: 'Lovelace',
   grade: 8,
   searchName: 'ada lovelace',
+  hasAllergies: false,
 };
 
 /** Ada's brother — only her brother in the tests that say so. */
@@ -41,6 +42,7 @@ const BYRON: KioskStudent = {
   lastName: 'Lovelace',
   grade: 5,
   searchName: 'byron lovelace',
+  hasAllergies: false,
 };
 
 const ROSTER = [ADA, BYRON];
@@ -65,6 +67,8 @@ const printing = {
   warmLabel: vi.fn(),
   printLabel: vi.fn(),
   forgetLabel: vi.fn(),
+  setAllergySource: vi.fn(),
+  forgetAllergies: vi.fn(),
   currentState: vi.fn(() => ({ kind: 'ready' as const, config: { model: 'QL-810W', label: '62x29' } })),
   subscribe: vi.fn(() => () => {}),
   ready: vi.fn(async () => ({ kind: 'ready' as const, config: { model: 'QL-810W', label: '62x29' } })),
@@ -92,6 +96,7 @@ const services = {
   performCheckOut: vi.fn(async () => {}),
   warmStudentDates: vi.fn(),
   forgetStudentDates: vi.fn(),
+  fetchAllergyNote: vi.fn(async () => null),
   enqueueCheckIn: vi.fn(),
   enqueueCheckOut: vi.fn(),
 } as unknown as KioskServices;
@@ -118,7 +123,10 @@ async function settle(): Promise<void> {
 /** Boot the kiosk straight into a bound, ready screen. */
 async function mount(bound: KioskBinding = binding()): Promise<void> {
   localStorage.setItem(KIOSK_KEYS.binding, JSON.stringify(bound));
-  localStorage.setItem(KIOSK_KEYS.roster, JSON.stringify({ fetchedAtMs: Date.now(), students: ROSTER }));
+  localStorage.setItem(
+    KIOSK_KEYS.roster,
+    JSON.stringify({ version: KIOSK_ROSTER_VERSION, fetchedAtMs: Date.now(), students: ROSTER }),
+  );
   render(<KioskApp />);
   await settle();
 }
@@ -369,5 +377,29 @@ describe('a family checked in together', () => {
 
     expect(printing.printLabel).not.toHaveBeenCalled();
     expect(services.performCheckOut).toHaveBeenCalledTimes(2);
+  });
+});
+
+/**
+ * The printing chunk may not import Firebase — that split is what
+ * `check-kiosk-budget.mjs` defends — so the one callable a label needs is handed
+ * across rather than reached for. A wire nobody connects is a label that quietly
+ * prints `Allergy` instead of the peanut, which is the failure this pins.
+ */
+describe('the allergy lookup', () => {
+  it('hands the printing module a way to read one child’s note', async () => {
+    await mount();
+
+    expect(printing.setAllergySource).toHaveBeenCalledWith(services.fetchAllergyNote);
+  });
+
+  it('takes it back when the kiosk tears down', async () => {
+    await mount();
+
+    cleanup();
+
+    // A module held alive by a dynamic import must not go on holding a callable
+    // bound to a session that has gone.
+    expect(printing.setAllergySource).toHaveBeenLastCalledWith(null);
   });
 });

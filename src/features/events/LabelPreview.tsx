@@ -18,22 +18,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { labelFont, layoutLabel, type LabelBox, type MeasureText } from '@/lib/labelRender';
 import type { LabelTemplate, LabelTokenValues } from '@/lib/labelTemplate';
-
-/**
- * A child who exercises the layout rather than flattering it.
- *
- * Long enough to shrink at `xl` on a 62mm label, so a leader sees the machinery
- * work on the sample instead of discovering it on a Bartholomew.
- */
-const SAMPLE_VALUES: LabelTokenValues = {
-  firstName: 'Bartholomew',
-  lastName: 'Fitzwilliam',
-  lastInitial: 'F',
-  grade: '8th grade',
-  eventTitle: 'Sunday Nursery',
-  date: 'Aug 9',
-  time: '9:04 AM',
-};
+import { SAMPLE_VALUES } from '@/features/events/labelSamples';
 
 /** How wide the preview is drawn, in CSS pixels. */
 const PREVIEW_WIDTH_PX = 320;

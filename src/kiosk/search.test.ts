@@ -6,7 +6,14 @@ import { describe, expect, it } from 'vitest';
 import { MAX_RESULTS, searchStudents, type KioskStudent } from '@/kiosk/search';
 
 function student(id: string, firstName: string, lastName: string, grade: number | null = 9): KioskStudent {
-  return { id, firstName, lastName, grade, searchName: `${firstName} ${lastName}`.toLowerCase() };
+  return {
+    id,
+    firstName,
+    lastName,
+    grade,
+    searchName: `${firstName} ${lastName}`.toLowerCase(),
+    hasAllergies: false,
+  };
 }
 
 const ROSTER: KioskStudent[] = [

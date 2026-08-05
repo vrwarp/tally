@@ -38,7 +38,7 @@ import {
   type PrinterConfig,
 } from './printing/device';
 import { type KioskStudent } from './search';
-import { KIOSK_KEYS, readJson } from './storage';
+import { KIOSK_KEYS, readCachedRoster, readJson } from './storage';
 import { ConfirmScreen } from './screens/ConfirmScreen';
 import { EventChooser } from './screens/EventChooser';
 import { PairingScreen } from './screens/PairingScreen';
@@ -106,7 +106,7 @@ export function KioskApp() {
   const [uid, setUid] = useState<string | null>(null);
   const [binding, setBinding] = useState<KioskBinding | null>(() => readBinding());
   const [students, setStudents] = useState<KioskStudent[]>(
-    () => readJson<{ students: KioskStudent[] }>(KIOSK_KEYS.roster)?.students ?? [],
+    () => readCachedRoster()?.students ?? [],
   );
   const [last4Index, setLast4Index] = useState<Record<string, string[]>>(
     () => readJson<{ last4: Record<string, string[]> }>(KIOSK_KEYS.phoneIndex)?.last4 ?? {},
@@ -169,6 +169,21 @@ export function KioskApp() {
   }, [wantsPrinting, printerConfig]);
 
   useEffect(() => printing?.subscribe(setPrinterState), [printing]);
+
+  /*
+   * The one thing a label needs that the printing chunk cannot fetch for itself.
+   *
+   * `services.ts` is the only module under src/kiosk/ allowed to import
+   * Firebase, so the printing module is handed the callable rather than reaching
+   * for it — see `AllergySource`. Here because this is where both chunks are
+   * known to have landed, and cleared on the way out so a module kept alive by a
+   * dynamic import cannot go on holding a reference to a torn-down session.
+   */
+  useEffect(() => {
+    if (!printing) return;
+    printing.setAllergySource(services ? services.fetchAllergyNote : null);
+    return () => printing.setAllergySource(null);
+  }, [printing, services]);
 
   /* ---- Bound: load the roster, the index, who is already here ------------ */
 
@@ -521,6 +536,9 @@ export function KioskApp() {
           setOverlay({ kind: 'confirm', student, intent, family });
         }}
         onUnbind={() => {
+          // A kiosk that has left a gathering has no business still holding
+          // notes about the children who were at it.
+          printing?.forgetAllergies();
           clearBinding();
           setBinding(null);
           setBuffer('');

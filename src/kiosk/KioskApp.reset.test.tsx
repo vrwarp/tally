@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { KioskApp, type KioskServices } from '@/kiosk/KioskApp';
 import { HOLD_MS } from '@/kiosk/components/HoldButton';
-import { KIOSK_KEYS } from '@/kiosk/storage';
+import { KIOSK_KEYS, KIOSK_ROSTER_VERSION } from '@/kiosk/storage';
 import type { KioskBinding } from '@/kiosk/binding';
 import type { KioskStudent } from '@/kiosk/search';
 
@@ -25,6 +25,7 @@ const ADA: KioskStudent = {
   lastName: 'Lovelace',
   grade: 8,
   searchName: 'ada lovelace',
+  hasAllergies: false,
 };
 
 const PLACEHOLDER = /type a name, or the last 4 digits/i;
@@ -76,7 +77,10 @@ async function settle(): Promise<void> {
 /** Boot the kiosk straight into a bound, ready screen. */
 async function mount(bound: KioskBinding = binding()): Promise<void> {
   localStorage.setItem(KIOSK_KEYS.binding, JSON.stringify(bound));
-  localStorage.setItem(KIOSK_KEYS.roster, JSON.stringify({ fetchedAtMs: Date.now(), students: [ADA] }));
+  localStorage.setItem(
+    KIOSK_KEYS.roster,
+    JSON.stringify({ version: KIOSK_ROSTER_VERSION, fetchedAtMs: Date.now(), students: [ADA] }),
+  );
   render(<KioskApp />);
   await settle();
 }

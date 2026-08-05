@@ -594,6 +594,14 @@ Planning Center and are read when needed; `students/{id}` holds only what Tally 
 they first turned up — plus the complete record for a quick-added visitor who does not exist
 upstream yet.
 
+The narrowest surface is the lobby kiosk, because it is the one screen the public stands in front of.
+It holds names, grades and *that* a child has an allergy — never the note, never a parent's contact
+details, never a photograph. The one exception is deliberate and opt-in per gathering: a check-in
+label can print the allergy line, because the volunteer holding the child is exactly who needs to
+read it and is the least likely person to be looking at a roster. Even then the kiosk asks for one
+child's note at the moment they are checked in, keeps it in memory only, and writes nothing down. See
+[docs/label-printing.md](docs/label-printing.md#printing-allergies).
+
 A student who leaves the ministry is marked inactive in Planning Center and simply stops coming back
 in the roster read. Nothing in Tally deletes them, and that is deliberate: attendance history at
 `events/{id}/attendance/{studentId}` is keyed by student id and has to outlive the roster entry, or

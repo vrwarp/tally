@@ -25,7 +25,8 @@ const line = (
   size: LabelTemplate['lines'][number]['size'] = 'md',
   bold = false,
   align: LabelTemplate['lines'][number]['align'] = 'center',
-) => ({ text, size, bold, align });
+  requiresValue = false,
+) => ({ text, size, bold, align, requiresValue });
 
 /** A 62x29mm die-cut label at 300 dpi: what a nursery actually loads. */
 const DIE_CUT: LabelBox = { width: 696, height: 271 };
@@ -44,6 +45,69 @@ describe('resolveLines', () => {
   it('gives a larger size a larger font', () => {
     const [small, large] = resolveLines(template([line('a', 'sm'), line('a', 'xl')]), {});
     expect(large!.fontPx).toBeGreaterThan(small!.fontPx);
+  });
+
+  /*
+   * `requiresValue` is for the line that comes to *almost* nothing. A bare token
+   * already disappears on its own; a token with a caption around it does not,
+   * and "Allergy:" printed alone on a child who has no allergy is both the case
+   * the flag exists for and the one a leader is least likely to foresee.
+   */
+  describe('a line that only prints when something filled it in', () => {
+    it('keeps the caption for a child who has a value', () => {
+      const resolved = resolveLines(
+        template([line('Allergy: {{allergy}}', 'md', false, 'center', true)]),
+        { allergy: 'Peanuts' },
+      );
+      expect(resolved.map((entry) => entry.text)).toEqual(['Allergy: Peanuts']);
+    });
+
+    it('drops the caption for a child who has none', () => {
+      const resolved = resolveLines(
+        template([line('Allergy: {{allergy}}', 'md', false, 'center', true)]),
+        { firstName: 'Ada' },
+      );
+      expect(resolved).toEqual([]);
+    });
+
+    it('still prints the bare caption when the line has not asked to be dropped', () => {
+      // Today's behaviour, and why the flag is opt-in rather than automatic:
+      // turning it on for everybody would silently change what churches with
+      // existing templates already print.
+      const resolved = resolveLines(
+        template([line('Allergy: {{allergy}}', 'md', false, 'center', false)]),
+        { firstName: 'Ada' },
+      );
+      expect(resolved.map((entry) => entry.text)).toEqual(['Allergy:']);
+    });
+
+    it('keeps a line where only some of its tokens came to nothing', () => {
+      // "Any", not "all". A child with no surname is still their first name, and
+      // dropping the name line would be absurd.
+      const resolved = resolveLines(
+        template([line('{{firstName}} {{lastInitial}}', 'xl', true, 'center', true)]),
+        { firstName: 'Ada' },
+      );
+      expect(resolved.map((entry) => entry.text)).toEqual(['Ada']);
+    });
+
+    it('leaves a line of fixed text alone', () => {
+      // Nothing to wait on, and a leader who typed a caption with no token in it
+      // meant it literally.
+      const resolved = resolveLines(
+        template([line('Sunday Nursery', 'sm', false, 'center', true)]),
+        {},
+      );
+      expect(resolved.map((entry) => entry.text)).toEqual(['Sunday Nursery']);
+    });
+
+    it('treats a whitespace-only value as nothing', () => {
+      const resolved = resolveLines(
+        template([line('Allergy: {{allergy}}', 'md', false, 'center', true)]),
+        { allergy: '   ' },
+      );
+      expect(resolved).toEqual([]);
+    });
   });
 });
 
