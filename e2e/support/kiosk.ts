@@ -33,9 +33,20 @@ export const KIOSK_PATH = '/kiosk.html';
 const HOLD_MS = 3000;
 const HOLD_SLACK_MS = 700;
 
-/** Opens the kiosk on its own device. Caller closes the context. */
-export async function openKiosk(browser: Browser): Promise<{ context: BrowserContext; page: Page }> {
-  const context = await browser.newContext();
+/**
+ * Opens the kiosk on its own device. Caller closes the context.
+ *
+ * `viewport` is for the walkthrough, which photographs the same tour on a
+ * tablet lying in a stand and standing in one. A kiosk is whatever shape the
+ * shelf it sits on wants, and the flow has to survive both.
+ */
+export async function openKiosk(
+  browser: Browser,
+  options: { viewport?: { width: number; height: number } } = {},
+): Promise<{ context: BrowserContext; page: Page }> {
+  const context = await browser.newContext(
+    options.viewport ? { viewport: options.viewport } : {},
+  );
   const page = await context.newPage();
   await page.goto(KIOSK_PATH);
   return { context, page };
