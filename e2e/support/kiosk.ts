@@ -169,7 +169,16 @@ export async function bindTo(kiosk: Page, title: string | RegExp): Promise<void>
   });
 }
 
-/** Types on the kiosk's own keyboard — the native one never rises. */
+/**
+ * Types on the kiosk's own keyboard — the native one never rises.
+ *
+ * One trap worth knowing before you invent test data: the keyboard has a digit
+ * row (the search takes phone digits), so every key press here *lands* — but
+ * `applyKey` refuses digits into a name field. A "unique" surname like
+ * `Marchetti48321` is therefore typed in full and stored as `Marchetti`, and
+ * the assertions afterwards look for a child the flow never created. Make
+ * per-run names out of letters.
+ */
 export async function typeOnKiosk(kiosk: Page, text: string): Promise<void> {
   // The letter keys are drawn uppercase; digits are themselves.
   for (const character of text) {

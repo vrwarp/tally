@@ -19,8 +19,19 @@ import { readCollection, simulatorPeople } from './support/emulator';
 import { expect, test } from './support/fixtures';
 import { bindTo, openKiosk, pairKiosk, typeOnKiosk } from './support/kiosk';
 
-/** Unique per run — the roster is seeded once and this spec adds to it. */
-const SURNAME = `Marchetti${Math.floor(Math.random() * 100_000)}`;
+/**
+ * A different family each run, and each test — the roster is seeded once and
+ * this spec adds to it, so a fixed name would collide with the previous run's
+ * leftovers and make "which Elio" ambiguous.
+ *
+ * Letters only. The kiosk keyboard has a digit row (the search takes phone
+ * digits) but `applyKey` refuses digits into a *name*, so a numbered surname
+ * would be typed and silently dropped, and the assertions would look for a
+ * child the flow never created.
+ */
+const RUN = Array.from({ length: 4 }, () =>
+  'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)],
+).join('');
 const PHONE = '5550163311';
 
 async function enterChild(kiosk: Page, first: string, last: string, grade: string) {
@@ -33,16 +44,16 @@ async function enterChild(kiosk: Page, first: string, last: string, grade: strin
 }
 
 /** Registers one child through the on-kiosk wizard, start to sticker. */
-async function registerAtKiosk(kiosk: Page, first: string): Promise<void> {
+async function registerAtKiosk(kiosk: Page, first: string, surname: string): Promise<void> {
   await kiosk.getByRole('button', { name: /Register your family/i }).click();
   await kiosk.getByRole('button', { name: /Register right here/i }).click();
-  await enterChild(kiosk, first, SURNAME, '4th grade');
+  await enterChild(kiosk, first, surname, '4th grade');
   await kiosk.getByRole('button', { name: /That's everyone/i }).click();
 
   await typeOnKiosk(kiosk, 'Renata');
   await kiosk.getByRole('button', { name: /^Next$/ }).click();
   await kiosk.locator('[data-key="clear"]').click();
-  await typeOnKiosk(kiosk, SURNAME);
+  await typeOnKiosk(kiosk, surname);
   await kiosk.getByRole('button', { name: /^Next$/ }).click();
   await typeOnKiosk(kiosk, PHONE);
   await kiosk.getByRole('button', { name: /^Next$/ }).click();
@@ -57,13 +68,14 @@ test.describe('reviewing a family the kiosk recorded', () => {
     page,
     signedInAs,
   }) => {
+    const SURNAME = `Marchetti${RUN}`;
     await signedInAs('core');
     const { context, page: kiosk } = await openKiosk(browser);
 
     try {
       await pairKiosk(kiosk, page);
       await bindTo(kiosk, /nursery/i);
-      await registerAtKiosk(kiosk, 'Elio');
+      await registerAtKiosk(kiosk, 'Elio', SURNAME);
 
       /* ---- Nothing reached the church's database ------------------------- */
 
@@ -113,13 +125,14 @@ test.describe('reviewing a family the kiosk recorded', () => {
     page,
     signedInAs,
   }) => {
+    const SURNAME = `Baragli${RUN}`;
     await signedInAs('core');
     const { context, page: kiosk } = await openKiosk(browser);
 
     try {
       await pairKiosk(kiosk, page);
       await bindTo(kiosk, /nursery/i);
-      await registerAtKiosk(kiosk, 'Nino');
+      await registerAtKiosk(kiosk, 'Nino', SURNAME);
 
       await gotoReady(page, '/review');
       const card = page.locator('section', { hasText: `Renata ${SURNAME}` }).first();
