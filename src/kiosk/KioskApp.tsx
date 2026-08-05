@@ -5,8 +5,9 @@
  *                          ↑___________|   (event ends, or a staff hold)
  *
  * `ready` renders the search screen; picking a student overlays confirm, and
- * confirming overlays success — which returns to the same query, because a
- * parent with three kids checks them all in off one phone number.
+ * confirming overlays success — which returns to an empty search, because the
+ * next person at the kiosk is usually the next family in the queue, and a name
+ * left on the glass is both their problem and the previous family's.
  *
  * Firebase loads *behind* the first paint: everything persisted — the
  * binding, the roster, the phone index — is read synchronously from
@@ -384,7 +385,14 @@ export function KioskApp() {
         <SuccessScreen
           student={overlay.student}
           intent={overlay.intent}
-          onDone={() => setOverlay(null)}
+          onDone={() => {
+            // Home, cleared. A parent with three kids retypes their four digits
+            // rather than the whole queue behind them reading the last one's
+            // name — and a kiosk left alone mid-search shows nothing about
+            // whoever walked away from it.
+            setOverlay(null);
+            setBuffer('');
+          }}
         />
       );
     }

@@ -137,11 +137,15 @@ test.describe('the kiosk', () => {
       const nursery = await eventNamed('Nursery');
       await bindTo(kiosk, /nursery/i);
 
-      // Check in, return to the same query, then collect.
+      // Check in, land back on a cleared home screen, search again, collect.
       const row = await findOnKiosk(kiosk, COLLECTED);
       await row.click();
       await kiosk.getByRole('button', { name: /^Check in$/ }).click();
       await kiosk.getByText(/welcome/i).click();
+
+      // The placeholder is the proof: the query the check-in came from is gone.
+      await expect(kiosk.getByText(/type a name, or the last 4 digits/i)).toBeVisible();
+      await findOnKiosk(kiosk, COLLECTED);
 
       // The row that used to be inert now says what a tap would do.
       const collectable = kiosk.getByText(/tap to collect/i).first();
@@ -291,9 +295,11 @@ test.describe('the kiosk', () => {
       expect(label!.pageCount).toBe(1);
       expect(label!.bytes).toBeGreaterThan(10_000);
 
-      // Now collect the same child. Handing them back produces no sticker — the
+      // Now collect the same child — searched for again, because the tick
+      // returns to an empty screen. Handing them back produces no sticker — the
       // label went on at the door — so the count must not move.
       await kiosk.getByText(/welcome/i).click();
+      await findOnKiosk(kiosk, LABELLED);
       const collectable = kiosk.getByText(/tap to collect/i).first();
       await expect(collectable).toBeVisible({ timeout: 15_000 });
       await collectable.click();
