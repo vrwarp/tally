@@ -117,11 +117,13 @@ export function KioskCard() {
             {status.command ? (
               <div className="mt-2 flex flex-col gap-2">
                 {/*
-                 * Left selectable and unwrapped: a broken line in a gcloud
-                 * command is a command that fails halfway, and this is read by
-                 * someone at a terminal rather than skimmed.
+                 * Selectable and unwrapped: a broken line in a gcloud command is
+                 * a command that fails halfway, and this is read by someone at a
+                 * terminal rather than skimmed. `select-text` opts back out of
+                 * the app-wide selection lock in src/index.css, for the same
+                 * reason the copy button announces its own failure.
                  */}
-                <pre className="overflow-x-auto rounded-lg bg-ink-900/60 px-3 py-2 font-mono text-xs leading-relaxed text-ink-200 ring-1 ring-ink-700">
+                <pre className="select-text overflow-x-auto rounded-lg bg-ink-900/60 px-3 py-2 font-mono text-xs leading-relaxed text-ink-200 ring-1 ring-ink-700">
                   {status.command}
                 </pre>
                 <div className="flex items-center gap-3">

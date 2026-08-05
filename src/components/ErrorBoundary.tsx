@@ -80,7 +80,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
         <details className="mt-2 max-w-full text-left">
           <summary className="cursor-pointer text-xs text-ink-500">Technical details</summary>
-          <pre className="mt-2 max-w-sm overflow-x-auto rounded-lg bg-ink-900 p-3 text-left text-xs text-ink-400">
+          <pre className="mt-2 max-w-sm select-text overflow-x-auto rounded-lg bg-ink-900 p-3 text-left text-xs text-ink-400">
             {error.message}
           </pre>
         </details>
