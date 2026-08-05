@@ -23,7 +23,7 @@ the registry, with methods that mirror the flows the callables need —
 - reads: `fetchRoster`, `searchPeople`, `fetchPersonDetails`, `fetchAllergyNotes`,
   `fetchParentContactStatus`, `checkPerson`
 - writes: `pushStudent`, `pushPendingStudents`, `updateStudentProfile`, `setParentContact`,
-  `addParent`, `recreateStudent`
+  `addParent`, `createFamily`, `recreateStudent`
 - history: `listImportableEvents`, `importHistory` (optional — capability-gated)
 - lists: `fetchLists`, `fetchListMemberIds` (optional, Planning Center only)
 - cache hygiene: `invalidatePersonDetails`, `invalidateReachability`, `resetCache`
@@ -37,7 +37,7 @@ Each backend declares `capabilities`:
 | Capability | pco | a32 | Meaning |
 | --- | --- | --- | --- |
 | `writeBack` | per config | per config | `off` / `create` / `full`, same ladder both sides |
-| `parentCreatable` | yes | yes | `addParent` can create a person and a household/family |
+| `parentCreatable` | yes | yes | `addParent` and `createFamily` can create a person and a household/family |
 | `mergeAware` | yes | no | Upstream merges leave a forwarding address Tally can follow |
 | `listsSupported` | yes | no | Saved lists exist upstream and can seed the roster |
 | `historyImportSupported` | yes | yes | A whole event's attendance history can be imported |
@@ -45,6 +45,25 @@ Each backend declares `capabilities`:
 
 Callables never ask "is this Planning Center?" — they ask the capability, and refuse politely when
 it is absent.
+
+### `addParent` and `createFamily` are not the same write
+
+Both put an adult in a household with a child, and both are gated on `parentCreatable`. What differs
+is who is standing there when a name turns out to be ambiguous.
+
+`addParent` serves a leader at a desk. It builds a household around **one** student, and when it
+finds adults upstream with the name it was given it stops and hands them back as candidates for a
+human to choose from — because creating a second David Kim is a merge somebody performs by hand,
+while attaching a child to the wrong David Kim shows one family another family's contact details.
+
+`createFamily` serves the kiosk's self-registration, where there is nobody to ask. Two consequences.
+It takes **every child at once** and puts them in one household — calling `addParent` per child would
+mint one household per sibling and leave each of them alone in it. And it decides the ambiguous case
+on evidence rather than deferring it: an upstream adult is joined only when their phone number
+matches the one the parent just typed, and any other outcome — no match, a name match with a
+different number, several matches at once — creates a fresh person. A duplicate adult is next
+month's merge; a wrong join has no undo. It also refuses outright when a child's household already
+has an adult, rather than adding a second one from a lobby form.
 
 ## Ids and linkage
 

@@ -85,6 +85,12 @@ import {
 import { listKioskEvents, type KioskEventEntry } from './kiosk/events.js';
 import { buildPhoneIndex, type PhoneIndexSummary } from './kiosk/phoneIndex.js';
 import { probeSigning, type SigningStatus } from './kiosk/signing.js';
+import {
+  parseRegisterFamilyRequest,
+  registerFamily as runRegisterFamily,
+  RegistrationInputError,
+  type RegisterFamilyResult,
+} from './kiosk/registration.js';
 import { materializeOccurrence as materializeOne, MINISTRY_TIME_ZONE } from './occurrences.js';
 // Imported for its registration side effect and nothing else: pulling the
 // adapter package in is what makes the Attendees backend available to the
@@ -1960,6 +1966,15 @@ export const onStudentCreated = onDocumentCreated(
     ) {
       return;
     }
+    /*
+     * A self-registration pushes its own children, inside the request that
+     * created them — it has to, because the household write that follows has to
+     * be sequenced after every child is upstream. Two pushes racing for one
+     * child would both pass `findExistingPerson` and create two people for
+     * them. A crash before the in-request push leaves `pcoPushPending` set,
+     * which `pushPendingVisitors` sweeps like any other stranded visitor.
+     */
+    if (typeof data.registrationId === 'string') return;
 
     const registry = await createRegistry(db());
     const target = registry.defaultPush();
@@ -2191,6 +2206,53 @@ export const getKioskEvents = onCall<
   const days = typeof request.data?.days === 'number' ? request.data.days : undefined;
   return { events: await listKioskEvents(db(), new Date(), logger, { days }) };
 });
+
+/**
+ * A family registering themselves at the kiosk.
+ *
+ * The one write in Tally that creates people at the request of somebody who is
+ * not a member of the team, which is why every field of every document it
+ * writes is decided here rather than sent: the caller says who their children
+ * are, and the server says what that means.
+ *
+ * The gate is the kiosk claim *plus* the approver still being active — the same
+ * pair the shelf's check-ins already depend on, so deactivating the person who
+ * paired a kiosk stops its registrations at the same moment it stops everything
+ * else. `requireMember` rather than `requireCoreTeam` for the same reason
+ * `getKioskEvents` uses it: the identity is the approver's, and a counselor who
+ * may quick-add a visitor at a door may certainly let a family do it themselves.
+ */
+export const registerFamily = onCall<Record<string, unknown>, Promise<RegisterFamilyResult>>(
+  { secrets: BACKEND_SECRETS, timeoutSeconds: 120, memory: '256MiB' },
+  async (request) => {
+    if (request.auth?.token?.kiosk !== true) {
+      throw new HttpsError('permission-denied', 'Registration happens at a kiosk.');
+    }
+    await requireMember(request.auth?.uid);
+
+    const eventId = request.data?.eventId;
+    if (typeof eventId !== 'string' || eventId.trim().length === 0) {
+      throw new HttpsError('invalid-argument', 'eventId is required.');
+    }
+
+    const database = db();
+    try {
+      const parsed = parseRegisterFamilyRequest(request.data, 'kiosk');
+      return await runRegisterFamily({
+        db: database,
+        registry: await createRegistry(database),
+        request: parsed,
+        context: { source: 'kiosk', uid: request.auth!.uid, eventId: eventId.trim() },
+        logger,
+      });
+    } catch (error) {
+      if (error instanceof RegistrationInputError) {
+        throw new HttpsError('invalid-argument', error.message);
+      }
+      throw error;
+    }
+  },
+);
 
 /**
  * Rebuilds `kioskIndex/phones` on demand: the Settings button, and the kiosk

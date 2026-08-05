@@ -42,6 +42,7 @@ import {
   displayFirstName,
   findParentCandidate,
   nameGradeKey,
+  phoneNumbersOf,
 } from './mapping.js';
 import {
   normalizeEmail,
@@ -167,11 +168,11 @@ function personName(person: PcoPerson | null): string | null {
  * constant so the comparison is name-only, and children are dropped outright.
  * The result is a list to show somebody, never a match to act on.
  */
-async function findAdultsNamed(
+async function searchAdultsNamed(
   client: PcoClient,
   firstName: string,
   lastName: string,
-): Promise<ExistingPerson[]> {
+): Promise<{ people: PcoPerson[]; index: ReturnType<typeof buildIncludedIndex> }> {
   const body = await client.get<PcoPerson[]>('/people', {
     where: { search_name: `${firstName} ${lastName}`, child: false },
     include: ['emails', 'phone_numbers'],
@@ -181,7 +182,7 @@ async function findAdultsNamed(
   const index = buildIncludedIndex(body.included);
   const wanted = nameGradeKey(firstName, lastName, 0);
 
-  return (Array.isArray(body.data) ? body.data : [])
+  const people = (Array.isArray(body.data) ? body.data : [])
     .filter((person) => person.attributes?.child !== true)
     .filter((person) => {
       const attributes = person.attributes ?? {};
@@ -191,15 +192,25 @@ async function findAdultsNamed(
       ]);
       return candidates.has(wanted);
     })
-    .sort((a, b) => compareIds(a.id, b.id))
-    .map((person) => {
-      const onFile = contactFieldsOnFile(person, index);
-      return {
-        pcoPersonId: person.id,
-        name: personName(person) ?? `${firstName} ${lastName}`,
-        reachable: onFile.phone || onFile.email,
-      };
-    });
+    .sort((a, b) => compareIds(a.id, b.id));
+
+  return { people, index };
+}
+
+async function findAdultsNamed(
+  client: PcoClient,
+  firstName: string,
+  lastName: string,
+): Promise<ExistingPerson[]> {
+  const { people, index } = await searchAdultsNamed(client, firstName, lastName);
+  return people.map((person) => {
+    const onFile = contactFieldsOnFile(person, index);
+    return {
+      pcoPersonId: person.id,
+      name: personName(person) ?? `${firstName} ${lastName}`,
+      reachable: onFile.phone || onFile.email,
+    };
+  });
 }
 
 /** The households the student is already in, oldest id first for determinism. */
@@ -447,6 +458,306 @@ export async function addParent(options: AddParentOptions): Promise<AddParentRes
       parentPersonId: parentId,
       createdPerson,
       createdHousehold,
+      wrote,
+      skipped,
+    },
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* A whole family, from a lobby screen                                         */
+/* -------------------------------------------------------------------------- */
+
+export type CreateFamilyStatus =
+  /** A new adult, in a household with every child Planning Center knows. */
+  | 'created'
+  /** An adult the church already had, corroborated by their phone number. */
+  | 'joined'
+  /** Somebody is already the adult in this family; nothing was written. */
+  | 'already-has-family'
+  /** `PCO_WRITE_BACK` is not `full`. */
+  | 'disabled'
+  /** None of the children reached Planning Center, so there is nothing to join. */
+  | 'no-linked-children';
+
+export interface CreateFamilyResult {
+  status: CreateFamilyStatus;
+  parentName: string | null;
+  parentPersonId: string | null;
+  createdPerson: boolean;
+  createdHousehold: boolean;
+  /** The student ids that ended up in the household. */
+  linkedChildren: string[];
+  wrote: ContactField[];
+  skipped: ContactField[];
+  message: string;
+}
+
+export interface CreateFamilyOptions {
+  db: FirestoreLike;
+  client: PcoClient;
+  config: PcoConfig;
+  /** Every child of this family, as Tally student ids. */
+  studentIds: readonly string[];
+  firstName: string;
+  lastName: string;
+  phone?: string | null;
+  email?: string | null;
+  logger?: FunctionLogger;
+}
+
+function familyResult(
+  status: CreateFamilyStatus,
+  message: string,
+  extra: Partial<CreateFamilyResult> = {},
+): CreateFamilyResult {
+  return {
+    status,
+    parentName: null,
+    parentPersonId: null,
+    createdPerson: false,
+    createdHousehold: false,
+    linkedChildren: [],
+    wrote: [],
+    skipped: [],
+    message,
+    ...extra,
+  };
+}
+
+/** Just the digits, for deciding whether two records name the same human. */
+function digitsOf(value: string): string {
+  return value.replace(/\D/g, '');
+}
+
+/**
+ * Whether a number the church already holds and a number a parent just typed
+ * are the same number.
+ *
+ * Compared on the last ten digits, which is what survives the difference
+ * between `+1 (555) 010-3344` and `5550103344` without a phone-number library.
+ * Shorter than ten on either side is compared whole — an extension is not a
+ * mobile, and the caller only reaches here with ten digits anyway.
+ */
+function sameNumber(a: string, b: string): boolean {
+  const left = digitsOf(a);
+  const right = digitsOf(b);
+  if (left.length === 0 || right.length === 0) return false;
+  const tail = (value: string) => (value.length > 10 ? value.slice(-10) : value);
+  return tail(left) === tail(right);
+}
+
+/**
+ * Builds a family around several children at once, for a parent registering
+ * themselves at a kiosk.
+ *
+ * The difference from `addParent` is not the writes — they are the same
+ * household and the same membership — but who is standing there. `addParent` is
+ * used by a leader at a desk who can be shown three David Kims and asked which
+ * one; this runs with nobody to ask, so it decides on evidence instead:
+ *
+ *   - **A name and a phone number that both match** is the same person. A
+ *     parent typing their own mobile is corroborating their identity with
+ *     something only they and the church office know.
+ *   - **Anything else creates a fresh adult** — no match, a name match with a
+ *     different number, or several people matching at once. A duplicate David
+ *     Kim is a merge somebody performs in Planning Center next month; putting a
+ *     child into the wrong David Kim's household shows one family another
+ *     family's phone number, and there is no undo for that.
+ *
+ * It also refuses rather than adds when a child's household already has an
+ * adult in it. A family that already exists upstream does not need a second
+ * parent invented from a lobby form; the number they typed still reaches them
+ * through the kiosk index, and the incomplete-profile list is where a leader
+ * reconciles the rest.
+ */
+export async function createFamily(options: CreateFamilyOptions): Promise<CreateFamilyResult> {
+  const { db, client, config } = options;
+  const logger = options.logger ?? SILENT_LOGGER;
+
+  if (config.writeBack !== 'full') {
+    return familyResult(
+      'disabled',
+      'Creating families from Tally is switched off. A leader can turn on full write-back in Settings.',
+    );
+  }
+
+  const phone = normalizePhone(options.phone);
+  const email = normalizeEmail(options.email);
+  const firstName = trimmed(options.firstName);
+  const lastName = trimmed(options.lastName) ?? '';
+  if (!firstName) {
+    return familyResult('no-linked-children', "The parent's name is missing.");
+  }
+
+  /* ---- Which children reached Planning Center ----------------------------- */
+
+  const linked: { studentId: string; personId: string; loaded: NonNullable<Awaited<ReturnType<typeof loadPersonWithHousehold>>> }[] = [];
+
+  for (const studentId of options.studentIds) {
+    const target = await resolveStudentPerson(db, studentId);
+    if (!target.exists || !target.active || !target.personId) continue;
+
+    const read = await readThroughMerges({ db, client }, studentId, target.personId, (personId) =>
+      loadPersonWithHousehold(client, personId),
+    );
+    if (read.outcome === 'gone' || !read.value) continue;
+    linked.push({ studentId, personId: read.personId, loaded: read.value });
+  }
+
+  if (linked.length === 0) {
+    return familyResult(
+      'no-linked-children',
+      'None of these children are in Planning Center yet, so there is no family to build.',
+    );
+  }
+
+  /*
+   * Somebody is already here.
+   *
+   * Checked across every child rather than the first: siblings can be in
+   * different households upstream, and one of them having a parent on file is
+   * enough to make inventing another one wrong.
+   */
+  for (const child of linked) {
+    const existingAdult = findParentCandidate(child.loaded.person, child.loaded.index);
+    if (existingAdult) {
+      return familyResult(
+        'already-has-family',
+        `Planning Center already has ${existingAdult.name ?? 'an adult'} in this family.`,
+        {
+          parentName: existingAdult.name,
+          parentPersonId: existingAdult.id,
+          linkedChildren: linked.map((entry) => entry.studentId),
+        },
+      );
+    }
+  }
+
+  /* ---- Who the parent is -------------------------------------------------- */
+
+  let parentId: string;
+  let parentPerson: PcoPerson | null;
+  let createdPerson = false;
+  let parentContacts = buildIncludedIndex([]);
+
+  const { people: named, index: namedIndex } = await searchAdultsNamed(client, firstName, lastName);
+  const corroborated = phone
+    ? named.filter((person) =>
+        phoneNumbersOf(person, namedIndex).some((held) => sameNumber(held, phone)),
+      )
+    : [];
+
+  if (corroborated.length === 1) {
+    parentPerson = corroborated[0]!;
+    parentId = parentPerson.id;
+    parentContacts = namedIndex;
+  } else {
+    const created = await client.post<PcoPerson>('/people', {
+      data: {
+        type: PCO_TYPES.person,
+        attributes: { first_name: firstName, last_name: lastName, child: false },
+      },
+    });
+    if (!created.data?.id) {
+      return familyResult('no-linked-children', 'Planning Center returned no person id for the new parent.');
+    }
+    parentId = created.data.id;
+    parentPerson = created.data;
+    createdPerson = true;
+  }
+
+  /* ---- The household ------------------------------------------------------ */
+
+  /*
+   * One household for the family, not one per child. `addParent` builds around
+   * a single student because that is what a leader asked it to do; here, three
+   * siblings arriving together are three memberships in one household, and
+   * getting that wrong is not cosmetic — it is what makes a sibling invisible
+   * on the family's own record.
+   */
+  const [householdId] = linked.flatMap((child) => householdIdsOf(child.loaded.person)).sort(compareIds);
+  let createdHousehold = false;
+
+  if (householdId) {
+    /*
+     * The parent is never already in it. Every child's household was checked
+     * for an adult above and the whole call returned if one was there, so this
+     * household has none — and a corroborated adult who has a household of
+     * their own is not in *this* one.
+     */
+    await client.post(`/households/${encodeURIComponent(householdId)}/household_memberships`, {
+      data: {
+        type: PCO_TYPES.householdMembership,
+        attributes: { person_id: parentId, pending: false, household_role: 'parent_guardian' },
+        relationships: { person: { data: { type: PCO_TYPES.person, id: parentId } } },
+      },
+    });
+    // Siblings who arrived with their own household — or none — join the one
+    // the family is being built around. A child already in it is skipped
+    // rather than added twice.
+    for (const child of linked) {
+      if (householdIdsOf(child.loaded.person).includes(householdId)) continue;
+      await client.post(`/households/${encodeURIComponent(householdId)}/household_memberships`, {
+        data: {
+          type: PCO_TYPES.householdMembership,
+          attributes: { person_id: child.personId, pending: false, household_role: 'child' },
+          relationships: { person: { data: { type: PCO_TYPES.person, id: child.personId } } },
+        },
+      });
+    }
+  } else {
+    const household = await client.post<PcoHousehold>('/households', {
+      data: {
+        type: PCO_TYPES.household,
+        attributes: {
+          name: `${lastName || personName(parentPerson) || 'Tally'} Household`,
+          primary_contact_id: parentId,
+        },
+        relationships: {
+          primary_contact: { data: { type: PCO_TYPES.person, id: parentId } },
+          people: {
+            data: [
+              { type: PCO_TYPES.person, id: parentId },
+              ...linked.map((child) => ({ type: PCO_TYPES.person, id: child.personId })),
+            ],
+          },
+        },
+      },
+    });
+    createdHousehold = Boolean(household.data?.id);
+  }
+
+  /* ---- The contact -------------------------------------------------------- */
+
+  const onFile = contactFieldsOnFile(
+    parentPerson ?? { id: parentId, type: PCO_TYPES.person },
+    parentContacts,
+  );
+  const { wrote, skipped } = await writeContactOnto(client, parentId, { phone, email }, onFile);
+
+  // Ids, counts and field names. A registration's whole point is a phone
+  // number, and this line is the last place it should turn up.
+  logger.info('Built a family in Planning Center from a self-registration', {
+    children: linked.length,
+    parentPersonId: parentId,
+    createdPerson,
+    createdHousehold,
+    wrote,
+  });
+
+  const name = personName(parentPerson) ?? `${firstName} ${lastName}`.trim();
+  return familyResult(
+    createdPerson ? 'created' : 'joined',
+    createdPerson
+      ? `Added ${name} and a household with ${linked.length === 1 ? 'their child' : `their ${linked.length} children`} in Planning Center.`
+      : `Put ${linked.length === 1 ? 'the child' : `all ${linked.length} children`} in ${name}'s household.`,
+    {
+      parentName: name || null,
+      parentPersonId: parentId,
+      createdPerson,
+      createdHousehold,
+      linkedChildren: linked.map((entry) => entry.studentId),
       wrote,
       skipped,
     },

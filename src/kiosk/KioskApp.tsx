@@ -27,6 +27,9 @@ import type * as ServicesModule from './services';
 // never parses the rasteriser, the worker or the WebUSB transport.
 import type * as PrintingModule from './printing';
 import type { PrinterState } from './printing';
+// The same arrangement again for the registration wizard: a screen most
+// families never reach must not sit on the path to the one they all use.
+import type * as RegistrationModule from './registration';
 import { bindingIsLive, clearBinding, readBinding, writeBinding, type KioskBinding } from './binding';
 import type { KioskKey } from './components/Keyboard';
 import { buildFamilyDigits, familyOf } from './family';
@@ -48,6 +51,7 @@ import { SuccessScreen } from './screens/SuccessScreen';
 
 export type KioskServices = typeof ServicesModule;
 export type KioskPrinting = typeof PrintingModule;
+export type KioskRegistration = typeof RegistrationModule;
 export type { KioskEventEntry } from './services';
 
 /**
@@ -112,6 +116,20 @@ const QUEUE_REPLAY_MS = 30_000;
  */
 const REFRESH_COOLDOWN_MS = 2 * 60_000;
 
+/**
+ * The id one run of the registration wizard submits under, for as many attempts
+ * as it takes.
+ *
+ * `randomUUID` needs a secure context, which a real kiosk always has (WebUSB
+ * already demands one) — the fallback is for a test renderer and an http LAN
+ * address, where uniqueness within one device is all this has to buy.
+ */
+function newRegistrationId(): string {
+  const uuid = globalThis.crypto?.randomUUID?.();
+  if (uuid) return uuid;
+  return `r-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
 /** ~4am local: reclaim memory and pick up deploys, but only while idle. */
 function isQuietHour(): boolean {
   const hour = new Date().getHours();
@@ -137,9 +155,20 @@ export function KioskApp() {
   const [buffer, setBuffer] = useState('');
   const [overlay, setOverlay] = useState<Overlay>(null);
   const [refresh, setRefresh] = useState<KioskRefresh>('idle');
+  /**
+   * A registration in progress, with the id it will submit under.
+   *
+   * The id is minted here rather than inside the wizard so that a re-render of
+   * the flow cannot mint a second one: it is what makes a retried call answer
+   * instead of creating the family twice.
+   */
+  const [registering, setRegistering] = useState<{ registrationId: string } | null>(null);
+  const [registration, setRegistration] = useState<KioskRegistration | null>(null);
 
   const idleRef = useRef(true);
-  idleRef.current = buffer === '' && overlay === null;
+  // A family halfway through the wizard is not an idle kiosk: the binding must
+  // not expire under them and the 4am reload must not take the screen away.
+  idleRef.current = buffer === '' && overlay === null && registering === null;
 
   /* ---- Boot: load Firebase after first paint, restore the session -------- */
 
@@ -206,6 +235,18 @@ export function KioskApp() {
     printing.setAllergySource(services ? services.fetchAllergyNote : null);
     return () => printing.setAllergySource(null);
   }, [printing, services]);
+  /* ---- Registration: only once somebody asks for it ---------------------- */
+
+  useEffect(() => {
+    if (registering === null || registration !== null) return;
+    let cancelled = false;
+    void import('./registration').then((loaded) => {
+      if (!cancelled) setRegistration(loaded);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [registering, registration]);
 
   /* ---- Bound: load the roster, the index, who is already here ------------ */
 
@@ -473,6 +514,67 @@ export function KioskApp() {
     [services, printing, prints, binding, uid],
   );
 
+  /* ---- Registration ------------------------------------------------------- */
+
+  const startRegistration = useCallback(() => {
+    setBuffer('');
+    setRegistering({ registrationId: newRegistrationId() });
+  }, []);
+
+  /**
+   * A family that exists now, and did not a second ago.
+   *
+   * The server has already written them, checked them in and patched the phone
+   * index; what is left is everything this screen holds in memory. The children
+   * go into the roster so the next search finds them, their digits into the
+   * local index so the *parent* finds them, and their rows go green because
+   * they are. Then the stickers, last and inside a `try`, on exactly the terms
+   * a tap's label prints on — see `onConfirm`.
+   */
+  const onRegistered = useCallback(
+    (result: { children: readonly KioskStudent[]; last4: string; checkedIn: boolean }) => {
+      if (!services || !binding) return;
+      const added = services.applyRegistration({
+        children: result.children.map((child) => ({
+          studentId: child.id,
+          firstName: child.firstName,
+          lastName: child.lastName,
+          grade: child.grade,
+          searchName: child.searchName,
+        })),
+        last4: result.last4,
+      });
+
+      setStudents((held) => {
+        const byId = new Map(held.map((student) => [student.id, student]));
+        for (const student of added) byId.set(student.id, student);
+        return [...byId.values()];
+      });
+      setLast4Index((held) => ({
+        ...held,
+        [result.last4]: [
+          ...new Set([...(held[result.last4] ?? []), ...added.map((student) => student.id)]),
+        ].sort(),
+      }));
+      if (result.checkedIn) {
+        setPresentIds((held) => new Set([...held, ...added.map((student) => student.id)]));
+      }
+
+      if (prints && result.checkedIn) {
+        for (const student of added) {
+          try {
+            printing?.printLabel(student, binding);
+          } catch {
+            // Deliberately swallowed, exactly as in `onConfirm`: a printer
+            // cannot be allowed to contradict a screen that has told a family
+            // they are checked in, and they cannot fix one anyway.
+          }
+        }
+      }
+    },
+    [services, binding, printing, prints],
+  );
+
   /* ---- Render ------------------------------------------------------------- */
 
   if (phase === 'booting') {
@@ -528,6 +630,48 @@ export function KioskApp() {
   }
 
   if (phase === 'ready' && binding) {
+    if (registering && services) {
+      // The chunk is a few tens of kilobytes off a warm cache; the word is for
+      // the cold first tap of an evening, and it holds the frame's shape.
+      if (!registration) {
+        return <div className="flex h-full items-center justify-center text-ink-500">Loading…</div>;
+      }
+      return (
+        <registration.RegistrationFlow
+          binding={binding}
+          registrationId={registering.registrationId}
+          submit={({ registrationId, children, guardian }) =>
+            services.registerFamily({
+              registrationId,
+              children,
+              guardian,
+              eventId: binding.eventId,
+            })
+          }
+          onRegistered={(result) =>
+            onRegistered({
+              children: result.children.map((child) => ({
+                id: child.studentId,
+                firstName: child.firstName,
+                lastName: child.lastName,
+                grade: child.grade,
+                searchName: child.searchName,
+                // Nothing is on file for a child registered a second ago; an
+                // allergy note only ever arrives on the phone form, lands
+                // upstream, and reaches this screen through a later read.
+                hasAllergies: false,
+              })),
+              last4: result.last4,
+              checkedIn: result.checkedIn,
+            })
+          }
+          onClose={() => {
+            setRegistering(null);
+            setBuffer('');
+          }}
+        />
+      );
+    }
     if (overlay?.kind === 'success') {
       return (
         <SuccessScreen
@@ -577,6 +721,7 @@ export function KioskApp() {
         printerNeedsAttention={printerState?.kind === 'trouble'}
         refresh={refresh}
         onRefresh={onRefresh}
+        onRegister={startRegistration}
         onPick={(student) => {
           const intent = intentFor(student);
           const family = familyFor(student, intent);

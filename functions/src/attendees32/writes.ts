@@ -21,7 +21,7 @@ import { parseStudentId } from '../generated/backendIds.js';
 import type { TtlCache } from '../pco/cache.js';
 import { normalizeEmail, normalizePhone, type SetParentContactResult } from '../pco/parentContact.js';
 import type { StudentProfilePatch, UpdateStudentProfileResult } from '../pco/profile.js';
-import type { AddParentResult, ExistingPerson } from '../pco/household.js';
+import type { AddParentResult, CreateFamilyResult, ExistingPerson } from '../pco/household.js';
 import type { PushStudentResult } from '../pco/pushStudents.js';
 import type { RecreateStudentResult } from '../pco/recreate.js';
 import { migrateStudentMemberships } from '../backends/studentMigration.js';
@@ -816,6 +816,236 @@ export async function addParent(
     message: createdPerson
       ? 'Created the parent in Attendees and filed them into the family.'
       : 'Filed the existing person into the family.',
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* createFamily — a whole household, from a lobby screen                       */
+/* -------------------------------------------------------------------------- */
+
+/** Just the digits, for deciding whether two records name the same human. */
+function phoneDigits(value: string | null | undefined): string {
+  const digits = (value ?? '').replace(/\D/g, '');
+  return digits.length > 10 ? digits.slice(-10) : digits;
+}
+
+/**
+ * The Attendees half of the self-registration family write. Same contract and
+ * the same judgement as the Planning Center one in ../pco/household.ts — one
+ * folk holding the parent and every child, joined to an existing adult only
+ * when their phone number corroborates the name, never a candidate list — over
+ * this backend's family-folk vocabulary instead of Households.
+ */
+export async function createFamily(
+  options: A32WriteOptions & {
+    studentIds: readonly string[];
+    firstName: string;
+    lastName: string;
+    phone?: string | null;
+    email?: string | null;
+  },
+): Promise<CreateFamilyResult> {
+  const { db, client, config } = options;
+  const refuse = (
+    status: CreateFamilyResult['status'],
+    message: string,
+    extra: Partial<CreateFamilyResult> = {},
+  ): CreateFamilyResult => ({
+    status,
+    parentName: null,
+    parentPersonId: null,
+    createdPerson: false,
+    createdHousehold: false,
+    linkedChildren: [],
+    wrote: [],
+    skipped: [],
+    message,
+    ...extra,
+  });
+
+  if (config.writeBack !== 'full') {
+    return refuse(
+      'disabled',
+      'Building families in Attendees from Tally is switched off. A leader can turn on full write-back in Settings.',
+    );
+  }
+
+  const firstName = trimmed(options.firstName);
+  const lastName = trimmed(options.lastName) ?? '';
+  if (!firstName) return refuse('no-linked-children', "The parent's name is missing.");
+
+  const relationIds = await resolveRelationIds(options);
+  if (relationIds.parent === null || relationIds.child === null) {
+    return refuse(
+      'no-linked-children',
+      "Attendees is missing its 'parent'/'child' relation vocabulary; run setup_tally_integration.",
+    );
+  }
+
+  /* ---- Which children reached Attendees ----------------------------------- */
+
+  const linked: { studentId: string; personId: string; edges: A32FolkAttendee[] }[] = [];
+  for (const studentId of options.studentIds) {
+    const resolved = await resolveA32Person(db, studentId);
+    if (!resolved.exists || !resolved.active || !resolved.personId) continue;
+    linked.push({
+      studentId,
+      personId: resolved.personId,
+      edges: await loadFamilyEdges(client, resolved.personId),
+    });
+  }
+  if (linked.length === 0) {
+    return refuse(
+      'no-linked-children',
+      'None of these children are in Attendees yet, so there is no family to build.',
+    );
+  }
+
+  const relations = await allRelations(options);
+  for (const child of linked) {
+    if (findParentCandidates(child.personId, child.edges, relations).length > 0) {
+      return refuse('already-has-family', 'This family already has an adult on file.', {
+        linkedChildren: linked.map((entry) => entry.studentId),
+      });
+    }
+  }
+
+  const phone = normalizePhone(options.phone);
+  const email = normalizeEmail(options.email);
+
+  /* ---- Who the parent is -------------------------------------------------- */
+
+  let parentId: string | null = null;
+  let createdPerson = false;
+  const wantedName = buildSearchName(firstName, lastName);
+  const childIds = new Set(linked.map((entry) => entry.personId));
+
+  if (phone) {
+    const corroborated: string[] = [];
+    for await (const page of client.paginate<A32Attendee>(
+      API.attendee,
+      { searchValue: `${firstName} ${lastName}` },
+      { pageSize: 25, maxPages: 1 },
+    )) {
+      for (const attendee of page.data) {
+        if (childIds.has(attendee.id)) continue;
+        const theirs = buildSearchName(displayFirstNameOf(attendee), attendee.last_name ?? '');
+        if (theirs !== wantedName) continue;
+        const contact = parentContactOf(attendee);
+        if (phoneDigits(contact.parentPhone) === phoneDigits(phone)) corroborated.push(attendee.id);
+      }
+    }
+    // One corroborated match is the same person. Several is ambiguity, and
+    // ambiguity on a self-serve screen resolves to a new record, never a guess.
+    if (corroborated.length === 1) parentId = corroborated[0]!;
+  }
+
+  if (parentId === null) {
+    const created = await client.post<A32Attendee>(API.attendee, {
+      first_name: splitFirstName(firstName).firstName,
+      last_name: lastName,
+      gender: 'UNSPECIFIED',
+      division: Number.parseInt(config.divisionId, 10),
+      infos: { contacts: {} },
+    });
+    parentId = created?.id ?? null;
+    if (!parentId) return refuse('no-linked-children', 'Attendees returned no attendee id.');
+    createdPerson = true;
+  }
+
+  /* ---- One folk for the family -------------------------------------------- */
+
+  const anchor = linked[0]!;
+  const existingFolk = linked
+    .flatMap((child) =>
+      child.edges.filter(
+        (edge) =>
+          edge.attendee === child.personId &&
+          edge.folk.category === A32_FAMILY_CATEGORY &&
+          edge.is_removed !== true,
+      ),
+    )
+    .map((edge) => edge.folk.id);
+
+  let folkId = existingFolk[0] ?? null;
+  let createdHousehold = false;
+  if (!folkId) {
+    const folk = await client.post<A32Folk>(
+      API.families,
+      {
+        division: Number.parseInt(config.divisionId, 10),
+        category: A32_FAMILY_CATEGORY,
+        display_name: `${lastName} family`.trim(),
+      },
+      { 'X-Target-Attendee-Id': anchor.personId },
+    );
+    folkId = folk?.id ?? null;
+    if (!folkId) return refuse('no-linked-children', 'Attendees returned no folk id.');
+    createdHousehold = true;
+  }
+
+  for (const child of linked) {
+    const alreadyIn = child.edges.some(
+      (edge) =>
+        edge.attendee === child.personId && edge.folk.id === folkId && edge.is_removed !== true,
+    );
+    if (alreadyIn) continue;
+    await client.post<A32FolkAttendee>(
+      API.folkAttendees,
+      { folk: folkId, attendee: child.personId, role: relationIds.child },
+      { 'X-Target-Attendee-Id': child.personId },
+    );
+  }
+
+  await client.post<A32FolkAttendee>(
+    API.folkAttendees,
+    { folk: folkId, attendee: parentId, role: relationIds.parent },
+    { 'X-Target-Attendee-Id': anchor.personId },
+  );
+
+  /* ---- Contacts onto the parent, fill-only-when-empty --------------------- */
+
+  const wrote: Array<'phone' | 'email'> = [];
+  const skipped: Array<'phone' | 'email'> = [];
+  if (phone || email) {
+    const parent = await client.get<A32Attendee>(API.attendeeById(parentId));
+    const onFile = parentContactOf(parent);
+    const contacts = { ...((parent.infos ?? {}).contacts ?? {}) } as Record<string, string>;
+    if (phone) {
+      if (onFile.parentPhone) skipped.push('phone');
+      else {
+        contacts.phone1 = phone;
+        wrote.push('phone');
+      }
+    }
+    if (email) {
+      if (onFile.parentEmail) skipped.push('email');
+      else {
+        contacts.email1 = email;
+        wrote.push('email');
+      }
+    }
+    if (wrote.length > 0) {
+      await client.patch(
+        API.attendeeById(parentId),
+        { infos: { ...(parent.infos ?? {}), contacts } },
+        { 'X-Target-Attendee-Id': parentId },
+      );
+    }
+  }
+
+  return {
+    status: createdPerson ? 'created' : 'joined',
+    parentName: `${firstName} ${lastName}`.trim(),
+    parentPersonId: parentId,
+    createdPerson,
+    createdHousehold,
+    linkedChildren: linked.map((entry) => entry.studentId),
+    wrote,
+    skipped,
+    message: createdPerson
+      ? `Created the parent in Attendees and filed ${linked.length === 1 ? 'their child' : `all ${linked.length} children`} into the family.`
+      : `Filed ${linked.length === 1 ? 'the child' : `all ${linked.length} children`} into the existing family.`,
   };
 }
 

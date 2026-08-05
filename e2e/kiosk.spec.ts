@@ -442,6 +442,158 @@ test.describe('the kiosk', () => {
   });
 });
 
+/**
+ * A family nobody has met, at the kiosk.
+ *
+ * The whole point is that this runs against the real callable: a kiosk session
+ * cannot create a usable student itself — the rules pin what it may write to
+ * the eight keys a check-in's date patch touches — so if `registerFamily` is
+ * not doing the work, nothing here can pass.
+ */
+test.describe('registering a family at the kiosk', () => {
+  /**
+   * Distinct per run, so a re-run does not meet its own last family — and
+   * letters only, because the name fields refuse digits on purpose (a phone
+   * number typed into a name box would end up on a sticker).
+   *
+   * Written in the case the wizard produces: the kiosk keyboard is capitals
+   * only and the readout title-cases as it goes, so this is what a parent sees
+   * and what lands on the roster.
+   */
+  const SURNAME = `Quill${'abcdefghijklmnopqrstuvwxyz'
+    .split('')
+    .sort(() => Math.random() - 0.5)
+    .slice(0, 4)
+    .join('')}`;
+
+  /** One child through the three questions and the fork. */
+  async function enterChild(kiosk: Page, first: string, last: string, grade: string) {
+    await typeOnKiosk(kiosk, first);
+    await kiosk.getByRole('button', { name: /^Next$/ }).click();
+    await kiosk.locator('[data-key="clear"]').click();
+    await typeOnKiosk(kiosk, last);
+    await kiosk.getByRole('button', { name: /^Next$/ }).click();
+    await kiosk.getByRole('button', { name: grade, exact: true }).click();
+  }
+
+  test('adds two children and one parent, checks them in, and prints for each', async ({
+    browser,
+    page,
+    signedInAs,
+    firestore,
+  }) => {
+    await signedInAs('core');
+    const { context, page: kiosk } = await openKiosk(browser);
+
+    try {
+      await pairKiosk(kiosk, page);
+      const nursery = await eventNamed('Nursery');
+      await bindTo(kiosk, /nursery/i);
+      await recordLabels(kiosk);
+
+      await kiosk.getByRole('button', { name: /Register your family/i }).click();
+      await enterChild(kiosk, 'Wren', SURNAME, '4th grade');
+      await kiosk.getByRole('button', { name: /Add another child/i }).click();
+      // The second child's surname arrives already filled in from the first —
+      // typing it again is the tax this flow exists to remove.
+      await typeOnKiosk(kiosk, 'Fox');
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await expect(kiosk.getByText(SURNAME, { exact: true })).toBeVisible();
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await kiosk.getByRole('button', { name: '2nd grade', exact: true }).click();
+      await kiosk.getByRole('button', { name: /That's everyone/i }).click();
+
+      await typeOnKiosk(kiosk, 'Dana');
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await kiosk.locator('[data-key="clear"]').click();
+      await typeOnKiosk(kiosk, SURNAME);
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await typeOnKiosk(kiosk, '5550147788');
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+
+      // The confirm screen: the whole family, and one button.
+      await expect(kiosk.getByText(`Wren ${SURNAME}`)).toBeVisible();
+      await expect(kiosk.getByText(`Fox ${SURNAME}`)).toBeVisible();
+      await kiosk.getByRole('button', { name: /Check in everyone/i }).click();
+
+      await expect(kiosk.getByText('Wren and Fox are checked in. Welcome!')).toBeVisible({
+        timeout: 20_000,
+      });
+      // The sentence that makes the next visit a four-digit one.
+      await expect(kiosk.getByText('7788')).toBeVisible();
+
+      const attendance = await firestore.until(
+        `events/${nursery.id}/attendance`,
+        (docs) => docs.filter((doc) => doc.data.method === 'kiosk' && doc.data.isFirstEver).length >= 2,
+        'two self-registered children checked in',
+      );
+      expect(attendance.length).toBeGreaterThanOrEqual(2);
+
+      // The Nursery prints, so two children are two stickers.
+      await expectLabelCount(kiosk, 2);
+
+      // And the family is searchable by the digits they just gave, on this
+      // kiosk, without a refetch: the response carried the answer.
+      await kiosk.getByRole('button', { name: /^Done$/ }).click();
+      await typeOnKiosk(kiosk, '7788');
+      await expect(kiosk.getByRole('button', { name: new RegExp(`Wren ${SURNAME}`, 'i') })).toBeVisible();
+      await expect(kiosk.getByRole('button', { name: new RegExp(`Fox ${SURNAME}`, 'i') })).toBeVisible();
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('offers the door where the dead end used to be', async ({ browser, page, signedInAs }) => {
+    await signedInAs('core');
+    const { context, page: kiosk } = await openKiosk(browser);
+
+    try {
+      await pairKiosk(kiosk, page);
+      await bindTo(kiosk, /nursery/i);
+
+      await typeOnKiosk(kiosk, 'Zzzq');
+      await expect(kiosk.getByText(/No match — first time here\?/i)).toBeVisible();
+      await expect(kiosk.getByText(/or see a leader/i)).toBeVisible();
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('sends a family already on the roster to search instead', async ({
+    browser,
+    page,
+    signedInAs,
+  }) => {
+    await signedInAs('core');
+    const { context, page: kiosk } = await openKiosk(browser);
+
+    try {
+      await pairKiosk(kiosk, page);
+      await bindTo(kiosk, /nursery/i);
+
+      await kiosk.getByRole('button', { name: /Register your family/i }).click();
+      // Somebody the seed already put on the roster.
+      const [first, last] = CHECKED_IN.split(' ') as [string, string];
+      await enterChild(kiosk, first, last, '4th grade');
+      await kiosk.getByRole('button', { name: /That's everyone/i }).click();
+      await typeOnKiosk(kiosk, 'Dana');
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await kiosk.locator('[data-key="clear"]').click();
+      await typeOnKiosk(kiosk, last);
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await typeOnKiosk(kiosk, '5550199001');
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await kiosk.getByRole('button', { name: /^Check in$/ }).click();
+
+      await expect(kiosk.getByText(/already on our list/i)).toBeVisible({ timeout: 20_000 });
+      await kiosk.getByRole('button', { name: /Search for them/i }).click();
+      await expect(kiosk.getByText(/type a name, or the last 4 digits/i)).toBeVisible();
+    } finally {
+      await context.close();
+    }
+  });
+});
+
 test.describe('pairing', () => {
   test('refuses a code nobody issued', async ({ page, signedInAs }) => {
     await signedInAs('core');

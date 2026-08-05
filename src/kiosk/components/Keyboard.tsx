@@ -97,11 +97,27 @@ export const Keyboard = memo(function Keyboard({ onKey }: { onKey: (key: KioskKe
           type="button"
           tabIndex={-1}
           data-key="clear"
-          className={`${KEY_CLASS} flex-[2] text-base font-medium text-ink-300`}
+          className={`${KEY_CLASS} flex-[1.5] text-base font-medium text-ink-300`}
         >
           Clear
         </button>
-        <button type="button" tabIndex={-1} data-key="space" aria-label="Space" className={`${KEY_CLASS} flex-[5]`}>
+        {/*
+          * The two punctuation marks that appear in names.
+          *
+          * Search never needed them — the matcher folds punctuation, so
+          * "obrien" finds O'Brien — but registration does: what a parent types
+          * here is written to the roster and printed on a sticker, and a child
+          * called Anne-Marie should not become Annemarie because the lobby
+          * keyboard had no hyphen. Two keys rather than a punctuation layer,
+          * on the one static layout: a keystroke still never changes geometry.
+          */}
+        <button type="button" tabIndex={-1} data-key="'" aria-label="Apostrophe" className={KEY_CLASS}>
+          &rsquo;
+        </button>
+        <button type="button" tabIndex={-1} data-key="-" aria-label="Hyphen" className={KEY_CLASS}>
+          -
+        </button>
+        <button type="button" tabIndex={-1} data-key="space" aria-label="Space" className={`${KEY_CLASS} flex-[3.5]`}>
           &nbsp;
         </button>
       </div>

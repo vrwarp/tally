@@ -16,10 +16,36 @@
 import { Timestamp } from 'firebase-admin/firestore';
 import type { BackendRegistry } from '../backends/registry.js';
 import { scanRoster } from '../backends/scan.js';
-import type { FirestoreLike, FunctionLogger } from '../firestore.js';
+import { toDateOrNull, type FirestoreLike, type FunctionLogger } from '../firestore.js';
 import { studentIdFor } from '../generated/backendIds.js';
 
 export const PHONE_INDEX_DOC = 'kioskIndex/phones';
+
+/**
+ * The digits a family typed in themselves, waiting for the backends to say the
+ * same thing.
+ *
+ * A family who registers at the kiosk has to be findable by their phone number
+ * *immediately* — the whole handoff is "type your last four digits" — but the
+ * number they typed lives upstream at best a moment later, and on a deployment
+ * whose write-back cannot create a household, never. Rebuilding the index from
+ * the backends alone would therefore lose them: the nightly rebuild would
+ * silently un-register a family who registered that morning.
+ *
+ * So the registration writes its digits here, and every rebuild folds this
+ * document in. It holds exactly what the main index holds — tail digits and
+ * student ids — and each entry leaves as soon as it is redundant.
+ */
+export const PENDING_LAST4_DOC = 'kioskIndex/pendingLast4';
+
+/**
+ * How long an overlay entry is kept when the backends never corroborate it.
+ *
+ * Two weeks is long enough for a family to come back a second and third time on
+ * digits the church office has not yet entered anywhere, and short enough that
+ * a number typed wrongly stops answering before anybody builds a habit on it.
+ */
+export const PENDING_LAST4_TTL_MS = 14 * 24 * 60 * 60_000;
 
 /**
  * Rebuilt when older than this by the opportunistic paths (pairing approval);
@@ -34,6 +60,123 @@ export interface PhoneIndexSummary {
   students: number;
   entries: number;
   builtAt: string;
+}
+
+/* -------------------------------------------------------------------------- */
+/* The overlay                                                                 */
+/* -------------------------------------------------------------------------- */
+
+interface PendingLast4Entry {
+  last4: string;
+  studentIds: string[];
+  addedAt: Date | null;
+}
+
+function readPendingEntries(
+  data: Record<string, unknown> | undefined,
+): Map<string, PendingLast4Entry> {
+  const entries = new Map<string, PendingLast4Entry>();
+  const raw = (data?.entries ?? {}) as Record<string, unknown>;
+  for (const [registrationId, value] of Object.entries(raw)) {
+    const entry = (value ?? {}) as Record<string, unknown>;
+    const last4 = typeof entry.last4 === 'string' ? entry.last4 : '';
+    const studentIds = Array.isArray(entry.studentIds)
+      ? entry.studentIds.filter((id): id is string => typeof id === 'string')
+      : [];
+    if (!/^\d{4}$/.test(last4) || studentIds.length === 0) continue;
+    entries.set(registrationId, { last4, studentIds, addedAt: toDateOrNull(entry.addedAt) });
+  }
+  return entries;
+}
+
+/**
+ * Remembers one family's digits until the backends can answer for them.
+ *
+ * Keyed by registration rather than by digits, which is what makes it both
+ * idempotent under a retry and prunable per family: two families sharing a last
+ * four are two entries, and one being adopted upstream does not take the
+ * other's answer away.
+ */
+export async function recordPendingLast4(
+  db: FirestoreLike,
+  entry: { registrationId: string; last4: string; studentIds: readonly string[] },
+  now: Date,
+): Promise<void> {
+  await db.doc(PENDING_LAST4_DOC).set(
+    {
+      version: 1,
+      entries: {
+        [entry.registrationId]: {
+          last4: entry.last4,
+          studentIds: [...entry.studentIds],
+          addedAt: Timestamp.fromDate(now),
+        },
+      },
+    },
+    { merge: true },
+  );
+}
+
+/**
+ * Folds one family into the live index without waiting for a rebuild.
+ *
+ * A read-modify-write on a document only the functions touch, and the one race
+ * it has is benign: two registrations patching the same four digits in the same
+ * instant can drop one of the two unions, and the next rebuild restores it from
+ * the overlay. The alternative — a transaction on the ministry's whole phone
+ * index while a parent waits at a screen — costs more than the failure does.
+ */
+export async function patchPhonesNow(
+  db: FirestoreLike,
+  last4: string,
+  studentIds: readonly string[],
+): Promise<void> {
+  const ref = db.doc(PHONE_INDEX_DOC);
+  const snapshot = await ref.get();
+  const existing = ((snapshot.data()?.last4 ?? {}) as Record<string, unknown>)[last4];
+  const held = Array.isArray(existing)
+    ? existing.filter((id): id is string => typeof id === 'string')
+    : [];
+  const merged = [...new Set([...held, ...studentIds])].sort();
+  await ref.set({ last4: { [last4]: merged } }, { merge: true });
+}
+
+/**
+ * Folds the overlay into a freshly built map, and drops what it no longer owes.
+ *
+ * An entry leaves on either of two conditions: the backends now answer for
+ * every one of its students under the same digits — the household write landed,
+ * or the office typed the number in — or it has sat here past its TTL without
+ * that ever happening. Anything else stays, because the family it belongs to is
+ * still using it.
+ */
+export function mergePendingLast4(
+  built: Map<string, Set<string>>,
+  entries: Map<string, PendingLast4Entry>,
+  now: Date,
+): { survivors: Map<string, PendingLast4Entry>; merged: number } {
+  const survivors = new Map<string, PendingLast4Entry>();
+  let merged = 0;
+
+  for (const [registrationId, entry] of entries) {
+    const upstreamHasAll = entry.studentIds.every((studentId) =>
+      built.get(studentId)?.has(entry.last4),
+    );
+    if (upstreamHasAll) continue;
+
+    const addedAt = entry.addedAt;
+    if (addedAt === null || now.getTime() - addedAt.getTime() > PENDING_LAST4_TTL_MS) continue;
+
+    for (const studentId of entry.studentIds) {
+      let bucket = built.get(studentId);
+      if (!bucket) built.set(studentId, (bucket = new Set()));
+      bucket.add(entry.last4);
+    }
+    survivors.set(registrationId, entry);
+    merged += 1;
+  }
+
+  return { survivors, merged };
 }
 
 /**
@@ -75,6 +218,42 @@ export async function buildPhoneIndex(
       if (!bucket) byStudent.set(studentId, (bucket = new Set()));
       for (const last4 of last4s) bucket.add(last4);
     }
+  }
+
+  /*
+   * The families who registered themselves, folded in before the map is
+   * inverted — so a rebuild can only ever *add* to what a registration made
+   * findable, never take it away. The overlay is rewritten with whatever is
+   * still owed, which is this document's only garbage collection.
+   */
+  const pendingSnapshot = await db.doc(PENDING_LAST4_DOC).get();
+  const pending = readPendingEntries(pendingSnapshot.data());
+  if (pending.size > 0) {
+    const { survivors, merged } = mergePendingLast4(byStudent, pending, now);
+    if (survivors.size !== pending.size) {
+      await db.doc(PENDING_LAST4_DOC).set(
+        {
+          version: 1,
+          entries: Object.fromEntries(
+            [...survivors].map(([id, entry]) => [
+              id,
+              {
+                last4: entry.last4,
+                studentIds: entry.studentIds,
+                addedAt: entry.addedAt === null ? null : Timestamp.fromDate(entry.addedAt),
+              },
+            ]),
+          ),
+        },
+        // A replace, not a merge: an entry the prune dropped has to actually
+        // leave, and a merge would write it straight back.
+        { merge: false },
+      );
+    }
+    options.logger?.info('Folded self-registrations into the kiosk phone index', {
+      merged,
+      pruned: pending.size - survivors.size,
+    });
   }
 
   const last4: Record<string, string[]> = {};
