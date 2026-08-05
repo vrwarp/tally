@@ -6,16 +6,28 @@
  * the button exists for exactly one moment: a family's number was just fixed
  * upstream and they are standing at the kiosk now.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Badge, Button, Card, CardHeader } from '@/components/ui';
 import { useToast } from '@/context/toastContext';
 import { getKioskStatus, refreshKioskPhoneIndex, type KioskStatus } from '@/services/functions';
 
+const COPY_FEEDBACK_MS = 2000;
+
+type CopyState = 'idle' | 'copied' | 'failed';
+
 export function KioskCard() {
   const { show } = useToast();
   const [rebuilding, setRebuilding] = useState(false);
   const [status, setStatus] = useState<KioskStatus | null>(null);
+  const [copied, setCopied] = useState<CopyState>('idle');
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimer.current) clearTimeout(copyTimer.current);
+    };
+  }, []);
 
   /*
    * Asked once, on open. A failure here is left silent: it means the question
@@ -36,6 +48,31 @@ export function KioskCard() {
       cancelled = true;
     };
   }, []);
+
+  /*
+   * The command is on screen either way, so a clipboard that refuses (http
+   * origins, some in-app browsers) is worth saying out loud rather than
+   * silently doing nothing: the reader can still select it by hand.
+   */
+  const copyCommand = async () => {
+    const command = status?.command;
+    if (!command) return;
+    const flash = (state: CopyState) => {
+      setCopied(state);
+      if (copyTimer.current) clearTimeout(copyTimer.current);
+      copyTimer.current = setTimeout(() => setCopied('idle'), COPY_FEEDBACK_MS);
+    };
+    if (!navigator.clipboard) {
+      flash('failed');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(command);
+      flash('copied');
+    } catch {
+      flash('failed');
+    }
+  };
 
   const rebuild = async () => {
     if (rebuilding) return;
@@ -74,12 +111,34 @@ export function KioskCard() {
         ) : null}
 
         {status?.problem ? (
-          <p className="rounded-xl bg-warn-500/10 px-3 py-2 text-sm text-warn-400 ring-1 ring-warn-500/25">
-            {status.problem}
-            {status.remedy ? (
-              <span className="mt-1 block text-warn-400/80">{status.remedy}</span>
+          <div className="rounded-xl bg-warn-500/10 px-3 py-2 text-sm text-warn-400 ring-1 ring-warn-500/25">
+            <p>{status.problem}</p>
+            {status.remedy ? <p className="mt-1 text-warn-400/80">{status.remedy}</p> : null}
+            {status.command ? (
+              <div className="mt-2 flex flex-col gap-2">
+                {/*
+                 * Left selectable and unwrapped: a broken line in a gcloud
+                 * command is a command that fails halfway, and this is read by
+                 * someone at a terminal rather than skimmed.
+                 */}
+                <pre className="overflow-x-auto rounded-lg bg-ink-900/60 px-3 py-2 font-mono text-xs leading-relaxed text-ink-200 ring-1 ring-ink-700">
+                  {status.command}
+                </pre>
+                <div className="flex items-center gap-3">
+                  <Button size="sm" variant="secondary" onClick={() => void copyCommand()}>
+                    Copy command
+                  </Button>
+                  <span aria-live="polite" className="text-xs text-ink-400">
+                    {copied === 'copied'
+                      ? 'Copied.'
+                      : copied === 'failed'
+                        ? 'Could not copy — select the command above instead.'
+                        : ''}
+                  </span>
+                </div>
+              </div>
             ) : null}
-          </p>
+          </div>
         ) : null}
 
         <p className="text-sm text-ink-400">
