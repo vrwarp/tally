@@ -104,3 +104,65 @@ export async function typeOnKiosk(kiosk: Page, text: string): Promise<void> {
     await kiosk.locator(`[data-key="${key}"]`).click();
   }
 }
+
+/* -------------------------------------------------------------------------- */
+/* Label printing                                                              */
+/* -------------------------------------------------------------------------- */
+
+/** One label the kiosk sent, as the recorder in printing/index.ts saw it. */
+export interface RecordedLabel {
+  bytes: number;
+  pageCount: number;
+}
+
+/**
+ * Sets this kiosk up to print, and to record instead of printing.
+ *
+ * Two halves, both needed. The localStorage key is what makes `KioskApp` load
+ * the printing module at all — a kiosk with no printer deliberately never
+ * touches it. The array is the seam in `printing/index.ts`, which stands in for
+ * the one thing Playwright cannot provide: a USB device.
+ *
+ * Everything before the wire is real. The worker starts, `OffscreenCanvas`
+ * measures and draws actual text with actual system fonts, and `createJob`
+ * emits a real Brother raster job — all in a real browser, which is exactly
+ * what the unit tests cannot reach. What is recorded is that job's size.
+ *
+ * Must run before the page loads, hence `addInitScript`: the module is imported
+ * during boot and the recorder is read on the first label.
+ */
+export async function recordLabels(kiosk: Page): Promise<void> {
+  await kiosk.addInitScript(() => {
+    localStorage.setItem(
+      'tally:kiosk:printer',
+      JSON.stringify({ model: 'QL-810W', label: '62x29' }),
+    );
+    (window as unknown as Record<string, unknown>).__tallyKioskLabels = [];
+  });
+}
+
+/** The labels sent so far. */
+export async function recordedLabels(kiosk: Page): Promise<RecordedLabel[]> {
+  return kiosk.evaluate(
+    () => (window as unknown as { __tallyKioskLabels?: RecordedLabel[] }).__tallyKioskLabels ?? [],
+  );
+}
+
+/**
+ * Waits for the label count to settle on `expected`.
+ *
+ * Printing is fire-and-forget by design — nothing on screen waits for it — so a
+ * spec has to poll rather than await. For `expected` of zero this is a
+ * negative claim and needs a moment for the label that must not appear to fail
+ * to appear.
+ */
+export async function expectLabelCount(kiosk: Page, expected: number): Promise<void> {
+  if (expected === 0) {
+    await kiosk.waitForTimeout(1500);
+    expect(await recordedLabels(kiosk)).toHaveLength(0);
+    return;
+  }
+  await expect
+    .poll(async () => (await recordedLabels(kiosk)).length, { timeout: 15_000 })
+    .toBe(expected);
+}

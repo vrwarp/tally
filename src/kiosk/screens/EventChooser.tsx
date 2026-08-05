@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { HoldButton } from '../components/HoldButton';
 import type { KioskEventEntry, KioskServices } from '../KioskApp';
 import type { KioskBinding } from '../binding';
+import type { PrinterState } from '../printing';
 
 function dayLabel(startAtMs: number, nowMs: number): string {
   const start = new Date(startAtMs);
@@ -25,9 +26,14 @@ function timeLabel(ms: number): string {
 
 export function EventChooser({
   services,
+  printerState,
+  onSetUpPrinter,
   onBound,
 }: {
   services: KioskServices;
+  /** Null when this kiosk has no printer and nothing has asked for one yet. */
+  printerState: PrinterState | null;
+  onSetUpPrinter: () => void;
   onBound: (binding: KioskBinding) => void;
 }) {
   const [entries, setEntries] = useState<KioskEventEntry[] | null>(null);
@@ -121,6 +127,28 @@ export function EventChooser({
       </div>
 
       <div className="mx-auto w-full max-w-2xl pt-4 pb-[max(1rem,var(--spacing-safe-bottom))]">
+        {/*
+          * The way in to the printer, and the only one.
+          *
+          * Here rather than behind a second hidden gesture: this screen is
+          * already past the staff gate on the search screen, and a setup step
+          * nobody can find is a setup step nobody does. A plain button rather
+          * than a hold — the chooser's hold guards re-pointing a kiosk mid-
+          * service, and looking at the printer settings breaks nothing.
+          */}
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={onSetUpPrinter}
+          className="mb-3 w-full rounded-xl border-2 border-ink-800 p-3 text-ink-400"
+        >
+          {printerState === null || printerState.kind === 'idle'
+            ? 'Set up a label printer'
+            : printerState.kind === 'ready'
+              ? 'Label printer connected'
+              : 'Label printer needs attention'}
+        </button>
+
         <HoldButton
           onHeld={bindSelected}
           className={`w-full rounded-xl p-5 text-xl font-semibold ${

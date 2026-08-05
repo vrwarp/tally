@@ -26,6 +26,7 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore';
+import { DEFAULT_LABEL_TEMPLATE } from '@/lib/labelTemplate';
 import { COLLECTIONS, paths } from '@/lib/paths';
 import {
   ID,
@@ -497,6 +498,45 @@ describe('events', () => {
     ]) {
       await assertFails(
         setDoc(doc(db, paths.event('event-bad-recurrence')), { ...eventDoc(), recurrence }),
+      );
+    }
+  });
+
+  it('accepts a gathering that prints no label', async () => {
+    const db = asUser(env, UID.core);
+    await assertSucceeds(
+      setDoc(doc(db, paths.event('event-no-label')), { ...eventDoc(), labelTemplate: null }),
+    );
+  });
+
+  it('accepts a well-formed label template', async () => {
+    const db = asUser(env, UID.core);
+    await assertSucceeds(
+      setDoc(doc(db, paths.event('event-labelled')), {
+        ...eventDoc(),
+        labelTemplate: DEFAULT_LABEL_TEMPLATE,
+      }),
+    );
+  });
+
+  it('rejects a malformed label template', async () => {
+    // The client expands this on a shelf in a lobby with nobody watching, so
+    // the shape is pinned here as well as in lib/labelTemplate.ts.
+    const db = asUser(env, UID.core);
+
+    for (const labelTemplate of [
+      { ...DEFAULT_LABEL_TEMPLATE, lines: 'the name' },
+      // Empty means "prints nothing", which is written as null, not as this.
+      { ...DEFAULT_LABEL_TEMPLATE, lines: [] },
+      { ...DEFAULT_LABEL_TEMPLATE, lines: Array.from({ length: 7 }, () => ({ text: 'x' })) },
+      { ...DEFAULT_LABEL_TEMPLATE, copies: 0 },
+      { ...DEFAULT_LABEL_TEMPLATE, copies: 99 },
+      { ...DEFAULT_LABEL_TEMPLATE, copies: 'two' },
+      { lines: DEFAULT_LABEL_TEMPLATE.lines },
+      'the first name, big',
+    ]) {
+      await assertFails(
+        setDoc(doc(db, paths.event('event-bad-label')), { ...eventDoc(), labelTemplate }),
       );
     }
   });

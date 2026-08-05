@@ -38,6 +38,7 @@ import {
 } from 'firebase/firestore/lite';
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/functions';
 import { missingKeys, parseFirebaseConfig } from '@/lib/firebaseConfig';
+import { sanitizeLabelTemplate, type LabelTemplate } from '@/lib/labelTemplate';
 import { paths } from '@/lib/paths';
 import {
   attendancePayload,
@@ -124,6 +125,7 @@ export interface KioskEventEntry {
   seriesId: string | null;
   location: string | null;
   requiresCheckOut: boolean;
+  labelTemplate: LabelTemplate | null;
 }
 
 const startKioskPairing = httpsCallable<void, { code: string; secret: string; expiresInSeconds: number }>(
@@ -208,6 +210,10 @@ export async function bindEntry(entry: KioskEventEntry): Promise<KioskBinding> {
     endAtMs: entry.endAt,
     checkInClosesAtMs: entry.checkInClosesAt,
     requiresCheckOut: entry.requiresCheckOut,
+    // Sanitised even though the server sent it: this is the value the kiosk
+    // will read back out of localStorage for the rest of the evening, and the
+    // renderer should never be handed a shape it has to defend against.
+    labelTemplate: sanitizeLabelTemplate(entry.labelTemplate),
     boundAtMs: Date.now(),
   };
 }

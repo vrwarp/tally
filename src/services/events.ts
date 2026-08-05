@@ -21,6 +21,7 @@ import {
 import { db } from '@/lib/firebase';
 import { paths } from '@/lib/paths';
 import { findEventIcon } from '@/lib/eventIcons';
+import { sanitizeLabelTemplate, type LabelTemplate } from '@/lib/labelTemplate';
 import { chainKey } from '@/lib/materialize';
 import { normalizeRecurrence } from '@/lib/recurrence';
 import { toEvent, toEventSeries, toSettings } from '@/services/converters';
@@ -61,6 +62,7 @@ export interface EventDraft {
   notes?: string | null;
   requiresRsvp?: boolean;
   requiresCheckOut?: boolean;
+  labelTemplate?: LabelTemplate | null;
   status?: EventStatus;
 }
 
@@ -227,6 +229,15 @@ function buildEventPayload(draft: EventDraft, uid: string, isNew: boolean) {
     // Not defaulted from `mode`: recurring and one-off alike, this is on only
     // when somebody said so.
     requiresCheckOut: draft.requiresCheckOut ?? false,
+    /*
+     * Sanitised on the way out as well as on the way back in.
+     *
+     * The kiosk is the only thing that renders one and it may be running a
+     * deploy older than whatever wrote this, so what lands in Firestore should
+     * be a shape this version already agrees is valid. Round-tripping through
+     * the sanitizer also drops any stray key the editor's form state picked up.
+     */
+    labelTemplate: draft.labelTemplate ? sanitizeLabelTemplate(draft.labelTemplate) : null,
     status: draft.status ?? 'scheduled',
     updatedAt: serverTimestamp(),
   };

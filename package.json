@@ -13,7 +13,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-  "postbuild": "node scripts/check-kiosk-budget.mjs",
+    "postbuild": "node scripts/check-kiosk-budget.mjs",
     "preview": "vite preview",
     "deploy": "tsx scripts/deploy.ts",
     "typecheck": "tsc -b --noEmit false --emitDeclarationOnly false --pretty",
@@ -50,6 +50,7 @@
     "uxr:walkthrough": "tsx scripts/build-uxr-walkthrough.ts && tsx scripts/check-uxr-walkthrough.ts"
   },
   "dependencies": {
+    "@vrwarp/brother-ql-webusb": "^0.1.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "firebase": "^12.16.0",

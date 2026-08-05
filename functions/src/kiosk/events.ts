@@ -13,6 +13,7 @@
  * the gathering is as real as any other.
  */
 import type { FirestoreLike, FunctionLogger } from '../firestore.js';
+import type { LabelTemplate } from '../generated/labelTemplate.js';
 import {
   chainKey,
   projectOccurrences,
@@ -42,6 +43,15 @@ export interface KioskEventEntry {
    * screen cannot honour it.
    */
   requiresCheckOut: boolean;
+  /**
+   * What to print when a child is checked in here, or null for nothing.
+   *
+   * Here for the same reason `requiresCheckOut` is, one step further: the kiosk
+   * never reads an event document, so a template that is not on this row is a
+   * template the lobby screen cannot print. It goes into the binding and is
+   * read from there for the rest of the evening.
+   */
+  labelTemplate: LabelTemplate | null;
 }
 
 export const DEFAULT_KIOSK_EVENT_DAYS = 7;
@@ -64,6 +74,7 @@ function entryFromSource(source: OccurrenceSource): KioskEventEntry {
     seriesId: source.seriesId,
     location: source.location,
     requiresCheckOut: source.requiresCheckOut,
+    labelTemplate: source.labelTemplate,
   };
 }
 
@@ -134,6 +145,7 @@ export async function listKioskEvents(
       seriesId: occurrence.source.seriesId,
       location: occurrence.source.location,
       requiresCheckOut: occurrence.source.requiresCheckOut,
+      labelTemplate: occurrence.source.labelTemplate,
     });
   }
 

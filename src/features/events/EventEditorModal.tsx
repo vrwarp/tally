@@ -39,7 +39,9 @@ import { useToast } from '@/context/toastContext';
 import { CheckInWindowField } from '@/features/events/CheckInWindowField';
 import { IconPickerField } from '@/features/events/IconPickerField';
 import { RecurrenceField } from '@/features/events/RecurrenceField';
+import { LabelTemplateField } from '@/features/events/LabelTemplateField';
 import { gatheringOptions } from '@/lib/gatherings';
+import type { LabelTemplate } from '@/lib/labelTemplate';
 import { defaultRecurrence, retimeRecurrence, validateRecurrence } from '@/lib/recurrence';
 import { cn } from '@/lib/utils';
 import {
@@ -79,6 +81,8 @@ interface EditorForm {
   notes: string;
   requiresRsvp: boolean;
   requiresCheckOut: boolean;
+  /** What the kiosk prints at check-in, or null for nothing. */
+  labelTemplate: LabelTemplate | null;
   /**
    * A window left at the standard hour follows the event when its times move;
    * one somebody hand-tuned is pinned and never rewritten underneath them.
@@ -148,6 +152,7 @@ function buildForm(
     notes: event?.notes ?? defaults?.notes ?? '',
     requiresRsvp: event?.requiresRsvp ?? defaults?.requiresRsvp ?? mode === 'oneoff',
     requiresCheckOut: event?.requiresCheckOut ?? defaults?.requiresCheckOut ?? false,
+    labelTemplate: event?.labelTemplate ?? defaults?.labelTemplate ?? null,
     opensPinned:
       Math.round((startAt.getTime() - opensAt.getTime()) / 60_000) !== OPENS_BEFORE_MIN,
     closesPinned:
@@ -374,6 +379,10 @@ export function EventEditorModal({
       notes: form.notes.trim() || null,
       requiresRsvp: form.mode === 'oneoff' && form.requiresRsvp,
       requiresCheckOut: form.requiresCheckOut,
+      // Recurring only for now: a one-off's labels are the next piece of work,
+      // and writing a template a kiosk would honour on a trip nobody set up for
+      // it is the wrong half to ship first.
+      labelTemplate: form.mode === 'recurring' ? form.labelTemplate : null,
       // `buildEventPayload` writes `status` on every save, so an edit has to
       // carry the current one forward or it would quietly un-cancel the event.
       status: event?.status ?? 'scheduled',
@@ -658,6 +667,20 @@ export function EventEditorModal({
             checked={form.requiresCheckOut}
             onChange={(changed) => patch({ requiresCheckOut: changed.target.checked })}
           />
+
+          {/* Beside "Track check-out" and for the same reason: the gathering that
+              wants a name on the child is the gathering that hands them back, and
+              that is the one that repeats every Sunday.
+
+              Recurring only for now. A one-off's labels are the next piece of
+              work — the field is hidden rather than disabled because a trip has
+              no use for one yet and an explanation nobody needs is clutter. */}
+          {form.mode === 'recurring' ? (
+            <LabelTemplateField
+              value={form.labelTemplate}
+              onChange={(labelTemplate) => patch({ labelTemplate })}
+            />
+          ) : null}
 
           <TextField
             label="Location"

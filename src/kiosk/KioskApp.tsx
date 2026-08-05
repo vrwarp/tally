@@ -17,20 +17,39 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 // Type-only, so the services chunk stays out of this graph — the value import
 // below is dynamic, and that boundary is the whole startup strategy.
 import type * as ServicesModule from './services';
+// The same arrangement for printing, with one extra condition: the value import
+// only happens if this device has a printer configured, so a kiosk without one
+// never parses the rasteriser, the worker or the WebUSB transport.
+import type * as PrintingModule from './printing';
+import type { PrinterState } from './printing';
 import { bindingIsLive, clearBinding, readBinding, writeBinding, type KioskBinding } from './binding';
 import type { KioskKey } from './components/Keyboard';
+import {
+  DEFAULT_PRINTER_LABEL,
+  DEFAULT_PRINTER_MODEL,
+  hasConfiguredPrinter,
+  readPrinterConfig,
+  type PrinterConfig,
+} from './printing/device';
 import { type KioskStudent } from './search';
 import { KIOSK_KEYS, readJson } from './storage';
 import { ConfirmScreen } from './screens/ConfirmScreen';
 import { EventChooser } from './screens/EventChooser';
 import { PairingScreen } from './screens/PairingScreen';
+import { PrinterScreen } from './screens/PrinterScreen';
 import { SearchScreen } from './screens/SearchScreen';
 import { SuccessScreen } from './screens/SuccessScreen';
 
 export type KioskServices = typeof ServicesModule;
+export type KioskPrinting = typeof PrintingModule;
 export type { KioskEventEntry } from './services';
 
-type Phase = 'booting' | 'pairing' | 'choosing' | 'ready';
+/**
+ * `printer` is a staff detour off the chooser rather than a phase of its own —
+ * it is reached from there and returns there, and a kiosk mid-setup is not a
+ * kiosk in a different state as far as the rest of this is concerned.
+ */
+type Phase = 'booting' | 'pairing' | 'choosing' | 'printer' | 'ready';
 
 /**
  * What the overlay is asking about.
@@ -60,6 +79,9 @@ function isQuietHour(): boolean {
 export function KioskApp() {
   const [phase, setPhase] = useState<Phase>('booting');
   const [services, setServices] = useState<KioskServices | null>(null);
+  const [printing, setPrinting] = useState<KioskPrinting | null>(null);
+  const [printerConfig, setPrinterConfig] = useState<PrinterConfig | null>(() => readPrinterConfig());
+  const [printerState, setPrinterState] = useState<PrinterState | null>(null);
   const [uid, setUid] = useState<string | null>(null);
   const [binding, setBinding] = useState<KioskBinding | null>(() => readBinding());
   const [students, setStudents] = useState<KioskStudent[]>(
@@ -97,6 +119,35 @@ export function KioskApp() {
       cancelled = true;
     };
   }, []);
+
+  /* ---- Printing: only if this device has a printer ----------------------- */
+
+  /*
+   * Behind its own dynamic import, and behind a localStorage check before that.
+   * The check is the point: most kiosks have no printer, and this graph is the
+   * rasteriser plus a WebUSB transport. `getPairedDevices` needs no user gesture,
+   * so a printer paired weeks ago is reopened silently here.
+   *
+   * The setup screen is the other way in, and has to be: a kiosk being given a
+   * printer for the first time has nothing in localStorage to gate on, and the
+   * module is what knows how to ask the browser for a device.
+   */
+  const wantsPrinting = phase === 'printer' || hasConfiguredPrinter();
+
+  useEffect(() => {
+    if (!wantsPrinting) return;
+    let cancelled = false;
+    void import('./printing').then((loaded) => {
+      if (cancelled) return;
+      setPrinting(loaded);
+      void loaded.ready();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [wantsPrinting, printerConfig]);
+
+  useEffect(() => printing?.subscribe(setPrinterState), [printing]);
 
   /* ---- Bound: load the roster, the index, who is already here ------------ */
 
@@ -191,6 +242,18 @@ export function KioskApp() {
    * kiosk has always had: check them in, or tell them they already are. Where
    * it does, a present child becomes collectable and a collected one is done.
    */
+  /**
+   * Whether this gathering produces stickers at all.
+   *
+   * Asked once, here, so the warm and the print cannot disagree — and so a
+   * gathering that prints nothing never reaches the printing module, rather than
+   * reaching it and being turned away inside. `printing.warmLabel` and
+   * `printLabel` check the template too, which is not redundant: they are also
+   * reachable from the printer screen, and a module that trusts its caller about
+   * something this cheap to verify is a module that will one day be wrong.
+   */
+  const prints = printing !== null && !!binding?.labelTemplate;
+
   const intentFor = useCallback(
     (student: KioskStudent): KioskIntent => {
       if (!presentIds.has(student.id)) return 'check-in';
@@ -231,8 +294,34 @@ export function KioskApp() {
           if (error.code?.includes('permission-denied')) return;
           services.enqueueCheckIn({ binding, student, uid });
         });
+
+      /*
+       * The label, and only here.
+       *
+       * A check-out prints nothing — handing a child back does not produce an
+       * artifact, the sticker went on at the door — and neither does `done`,
+       * which returned above: a parent re-tapping a child who is already checked
+       * in is exactly the runaway reprint loop to avoid. A second copy is a staff
+       * action on the printer screen.
+       *
+       * Last, and inside a `try`. `printLabel` is written not to throw, but the
+       * ordering and the catch are what make that not matter: the attendance
+       * write is already dispatched and the tick is already on screen, so there
+       * is nothing left for a printer to spoil. Nothing about a sticker may reach
+       * back into a screen that has told a parent their child is checked in — a
+       * red line beside a green tick reads as "your check-in failed", and a
+       * parent cannot fix a printer anyway. Printer trouble surfaces on the staff
+       * surfaces instead.
+       */
+      if (prints) {
+        try {
+          printing?.printLabel(student, binding);
+        } catch {
+          // Deliberately swallowed. See above.
+        }
+      }
     },
-    [services, binding, uid],
+    [services, printing, prints, binding, uid],
   );
 
   /* ---- Render ------------------------------------------------------------- */
@@ -253,10 +342,30 @@ export function KioskApp() {
     );
   }
 
+  if (phase === 'printer' && printing) {
+    return (
+      <PrinterScreen
+        printing={printing}
+        // Defaults for a kiosk being set up for the first time — the QL-810W and
+        // the 62x29mm name badge, which is what `device.ts` says is likeliest.
+        config={printerConfig ?? { model: DEFAULT_PRINTER_MODEL, label: DEFAULT_PRINTER_LABEL }}
+        onDone={() => {
+          // Re-read rather than trusting the screen: pairing writes the config,
+          // and this is what makes the boot effect above pick up a printer that
+          // was set up for the first time just now.
+          setPrinterConfig(readPrinterConfig());
+          setPhase('choosing');
+        }}
+      />
+    );
+  }
+
   if (phase === 'choosing' && services) {
     return (
       <EventChooser
         services={services}
+        printerState={printerState}
+        onSetUpPrinter={() => setPhase('printer')}
         onBound={(bound) => {
           writeBinding(bound);
           setBinding(bound);
@@ -285,7 +394,13 @@ export function KioskApp() {
           student={overlay.student}
           intent={overlay.intent}
           onConfirm={() => onConfirm(overlay.student, overlay.intent)}
-          onBack={() => setOverlay(null)}
+          onBack={() => {
+            // Backed out, so the label warmed on the way in is not wanted. The
+            // cache evicts on its own, but a parent who picks the wrong Noah
+            // twice should not push the right one out of it.
+            printing?.forgetLabel(overlay.student.id);
+            setOverlay(null);
+          }}
         />
       );
     }
@@ -299,9 +414,25 @@ export function KioskApp() {
         presentIds={presentIds}
         checkedOutIds={checkedOutIds}
         tracksCheckOut={binding.requiresCheckOut ?? false}
+        // Only "trouble" — a kiosk with no printer is not a kiosk with a broken
+        // one, and neither is one whose printer is simply unpaired.
+        printerNeedsAttention={printerState?.kind === 'trouble'}
         onPick={(student) => {
+          const intent = intentFor(student);
           services?.warmStudentDates(student.id);
-          setOverlay({ kind: 'confirm', student, intent: intentFor(student) });
+          /*
+           * Start building the label now, while the confirm screen is on its way
+           * up and a thumb is on its way to the button. The same trick
+           * `warmStudentDates` plays with the read it needs, and the whole reason
+           * a label is moving by the time the tick paints — the rasterising is a
+           * few hundred thousand pixels in a worker, and this is the slack.
+           *
+           * Only for a check-in, because only a check-in prints. On a gathering
+           * that tracks check-out, most taps once the room has filled are
+           * collections, and rasterising for those is work thrown away.
+           */
+          if (prints && intent === 'check-in') printing?.warmLabel(student, binding);
+          setOverlay({ kind: 'confirm', student, intent });
         }}
         onUnbind={() => {
           clearBinding();

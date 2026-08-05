@@ -62,6 +62,10 @@ function asEvent(
     // repeats every Sunday, and these projections are the Sundays a volunteer
     // actually opens.
     requiresCheckOut: source.requiresCheckOut,
+    // Inherited for the same reason, and with the same consequence if it were
+    // not: a Sunday nobody has materialised yet is a Sunday a kiosk can be
+    // bound to, and it has to print the labels the chain prints.
+    labelTemplate: source.labelTemplate,
     // A projected gathering is on by definition. Calling one off is an act, and
     // an act materialises it.
     status: 'scheduled',

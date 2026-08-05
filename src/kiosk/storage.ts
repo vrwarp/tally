@@ -14,6 +14,16 @@ export const KIOSK_KEYS = {
   phoneIndex: 'tally:kiosk:phoneIndex',
   pending: 'tally:kiosk:pending',
   pairing: 'tally:kiosk:pairing',
+  /**
+   * The label printer attached to *this* device: model and loaded media.
+   *
+   * Deliberately not on the event, and deliberately not in Firestore. Which
+   * roll is loaded is a fact about the machine in this lobby — see
+   * `lib/labelTemplate.ts` — and this key is also what tells the kiosk whether
+   * to load the printing module at all, so a kiosk with no printer never parses
+   * a byte of it.
+   */
+  printer: 'tally:kiosk:printer',
 } as const;
 
 export function readJson<T>(key: string): T | null {

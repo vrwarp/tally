@@ -15,7 +15,16 @@ import type { Page } from '@playwright/test';
 import { gotoReady } from './support/auth';
 import { deleteDocument, readCollection, writeDocument } from './support/emulator';
 import { expect, test } from './support/fixtures';
-import { bindTo, openKiosk, pairKiosk, typeOnKiosk } from './support/kiosk';
+import {
+  bindTo,
+  expectLabelCount,
+  hold,
+  openKiosk,
+  pairKiosk,
+  recordLabels,
+  recordedLabels,
+  typeOnKiosk,
+} from './support/kiosk';
 
 /** A seeded gathering by title, with its document id. */
 async function eventNamed(title: string): Promise<{ id: string; title: string }> {
@@ -72,6 +81,10 @@ async function seedCollectingGathering(): Promise<string> {
  */
 const CHECKED_IN = 'Bree Sandoval';
 const COLLECTED = 'Caleb Okafor';
+/** Checked in on the Nursery, which prints, and then collected. */
+const LABELLED = 'Nia Washington';
+/** Checked in on Friday Fellowship, which does not print. */
+const UNLABELLED = 'Micah Sullivan';
 
 /** Searches by name and returns that student's row. */
 async function findOnKiosk(kiosk: Page, name: string) {
@@ -223,6 +236,101 @@ test.describe('the kiosk', () => {
 
       await kiosk.getByRole('button', { name: /back/i }).click();
       await expect(kiosk.getByText(/tap to collect/i)).toHaveCount(0);
+    } finally {
+      await context.close();
+    }
+  });
+
+  /*
+   * Label printing, as far as a browser without a printer can take it.
+   *
+   * The transport is the only stubbed part — there is no way to hand Playwright
+   * a USB device — and everything before it is real: a real worker starts, a
+   * real `OffscreenCanvas` measures and draws text in real system fonts, and
+   * `createJob` emits a real Brother raster job. That is the half the unit tests
+   * cannot reach, because jsdom has no canvas and Node has no worker, so a
+   * recorded job here is worth more than its assertion looks.
+   *
+   * The seeded Nursery carries a template (see `scripts/seed.ts`); Friday
+   * Fellowship deliberately does not.
+   */
+  test('prints one label for a check-in, and none for a collection', async ({
+    browser,
+    browserName,
+    page,
+    signedInAs,
+  }) => {
+    // WebUSB is Chromium-only and always will be — Safari and Firefox have both
+    // declined to implement it — so a printing kiosk is a Chromium kiosk. The
+    // rasteriser would probably run under WebKit, but asserting that it does is
+    // asserting something the feature will never rely on.
+    test.skip(browserName !== 'chromium', 'WebUSB is Chromium-only.');
+    await signedInAs('core');
+    const { context, page: kiosk } = await openKiosk(browser);
+
+    try {
+      await recordLabels(kiosk);
+      // The init script has to be in place before the app boots.
+      await kiosk.reload();
+
+      await pairKiosk(kiosk, page);
+      await bindTo(kiosk, /nursery/i);
+
+      const row = await findOnKiosk(kiosk, LABELLED);
+      await row.click();
+      await kiosk.getByRole('button', { name: /^Check in$/ }).click();
+      await expect(kiosk.getByText(/welcome/i)).toBeVisible();
+
+      await expectLabelCount(kiosk, 1);
+
+      const [label] = await recordedLabels(kiosk);
+      // 62x29mm at 300 dpi is 696x271 dots, so a job is tens of kilobytes: a
+      // raster row per dot row plus the QL-800 series' 400-byte preamble. The
+      // bound is loose on purpose — the claim is "a real job", not a byte count
+      // that would break the first time a font renders differently.
+      expect(label!.pageCount).toBe(1);
+      expect(label!.bytes).toBeGreaterThan(10_000);
+
+      // Now collect the same child. Handing them back produces no sticker — the
+      // label went on at the door — so the count must not move.
+      await kiosk.getByText(/welcome/i).click();
+      const collectable = kiosk.getByText(/tap to collect/i).first();
+      await expect(collectable).toBeVisible({ timeout: 15_000 });
+      await collectable.click();
+      await hold(kiosk, 'button:has-text("Hold to collect")');
+      await expect(kiosk.getByText(/checked out/i)).toBeVisible({ timeout: 15_000 });
+
+      expect(await recordedLabels(kiosk)).toHaveLength(1);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('prints nothing for a gathering with no label template', async ({
+    browser,
+    browserName,
+    page,
+    signedInAs,
+  }) => {
+    test.skip(browserName !== 'chromium', 'WebUSB is Chromium-only.');
+    await signedInAs('core');
+    const { context, page: kiosk } = await openKiosk(browser);
+
+    try {
+      await recordLabels(kiosk);
+      await kiosk.reload();
+
+      await pairKiosk(kiosk, page);
+      // Friday Fellowship prints nothing, which is the default and the reason a
+      // printer plugged in for the nursery does not spray labels at youth group.
+      await bindTo(kiosk, /friday fellowship/i);
+
+      const row = await findOnKiosk(kiosk, UNLABELLED);
+      await row.click();
+      await kiosk.getByRole('button', { name: /^Check in$/ }).click();
+      await expect(kiosk.getByText(/welcome/i)).toBeVisible();
+
+      await expectLabelCount(kiosk, 0);
     } finally {
       await context.close();
     }

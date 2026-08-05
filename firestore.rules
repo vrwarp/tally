@@ -336,15 +336,41 @@ service cloud.firestore {
           && (r.count == null || (r.count is int && r.count >= 1 && r.until == null));
       }
 
+      /**
+       * A label template is another small closed vocabulary the client expands
+       * without re-checking — the same argument as `validRecurrence` above, and
+       * with a sharper edge: the thing that expands it is a kiosk on a shelf in
+       * a lobby, and the person who would notice it misbehaving is not there.
+       *
+       * Only the vocabulary and the bounds are pinned. Per-line shape is not,
+       * because the sanitizer in `lib/labelTemplate.ts` already reads a bad line
+       * as no line, and rules cannot iterate a list to check each entry anyway.
+       * What this stops is the shape that would make the *document* nonsense:
+       * lines that are not a list, a copy count that is not a number, a
+       * template with no lines at all — which should be written as `null`,
+       * meaning "this gathering prints nothing", rather than as an empty one.
+       */
+      function validLabelTemplate(t) {
+        return t is map
+          && t.lines is list
+          && t.lines.size() >= 1
+          && t.lines.size() <= 6
+          && t.copies is int
+          && t.copies >= 1
+          && t.copies <= 3;
+      }
+
       function validEvent() {
         let d = request.resource.data;
         let recurrence = d.get('recurrence', null);
+        let labelTemplate = d.get('labelTemplate', null);
         return d.startAt is timestamp
           && d.endAt is timestamp
           && d.checkInOpensAt is timestamp
           && d.checkInClosesAt is timestamp
           && d.mode in ['recurring', 'oneoff']
-          && (recurrence == null || validRecurrence(recurrence));
+          && (recurrence == null || validRecurrence(recurrence))
+          && (labelTemplate == null || validLabelTemplate(labelTemplate));
       }
 
       allow get, list: if isActive();
