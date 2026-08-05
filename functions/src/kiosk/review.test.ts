@@ -264,6 +264,43 @@ describe('approving', () => {
     expect(db.get(`${REGISTRATIONS_COLLECTION}/${ID}`)).toBeUndefined();
   });
 
+  /*
+   * The expensive, invisible one.
+   *
+   * A merged-away child is still named on the registration. Pushing that
+   * document would create upstream exactly the duplicate the merge was
+   * performed to avoid — permanently, since there is no delete anywhere in
+   * this codebase and Attendees has no merges at all.
+   */
+  it('pushes the row that survived a merge, never the one that lost', async () => {
+    const db = dbWithRegistration({}, ['held-1']);
+    db.seed('students/pco_7', { status: 'active', firstName: 'Robin', lastName: 'Fields' });
+    db.seed('students/held-1', {
+      ...db.get('students/held-1')!,
+      status: 'inactive',
+      pendingReview: false,
+      mergedIntoStudentId: 'pco_7',
+    });
+
+    const backend = backendWith();
+    await approveRegistration({
+      db,
+      registry: registryOf(backend),
+      registrationId: ID,
+      uid: 'core-uid',
+      now: NOW,
+    });
+
+    expect(backend.pushStudent).toHaveBeenCalledTimes(1);
+    expect(backend.pushStudent).toHaveBeenCalledWith(
+      expect.objectContaining({ studentId: 'pco_7' }),
+    );
+    // And the guardian lands on the family that was already on file.
+    expect(backend.createFamily).toHaveBeenCalledWith(
+      expect.objectContaining({ studentIds: ['pco_7'] }),
+    );
+  });
+
   it('answers rather than throwing for a registration somebody already handled', async () => {
     const db = new FakeFirestore();
     const result = await approveRegistration({

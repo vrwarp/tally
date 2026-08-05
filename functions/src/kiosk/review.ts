@@ -65,6 +65,8 @@ export interface PendingRegistrationChild extends RegistrationChild {
   studentId: string | null;
   /** Whether the student document is still held. */
   pendingReview: boolean;
+  /** Set once a reviewer folded this child into a row that was already there. */
+  mergedIntoStudentId: string | null;
   /** Only ever set from the QR form; the kiosk does not ask. */
   allergies: string | null;
   /** Active students who already have this name. Suspicion, not a verdict. */
@@ -146,6 +148,10 @@ export async function listPendingRegistrations(
           ...child,
           studentId: student?.exists ? student.studentId : null,
           pendingReview: student?.data.pendingReview === true,
+          mergedIntoStudentId:
+            typeof student?.data.mergedIntoStudentId === 'string'
+              ? student.data.mergedIntoStudentId
+              : null,
           allergies: record.allergies[index] ?? null,
           possibleDuplicates: await Promise.all(
             (record.possibleDuplicateOf[String(index)] ?? []).map((id) => summarise(db, id)),
@@ -179,6 +185,29 @@ export async function listPendingRegistrations(
 /* -------------------------------------------------------------------------- */
 /* Approving                                                                   */
 /* -------------------------------------------------------------------------- */
+
+/**
+ * The student a document stands for after any merges — itself, usually.
+ *
+ * Bounded rather than recursive-until-done: a pointer cycle would otherwise
+ * hang a callable, and four hops is more merges than one registration's child
+ * will ever be through. Null when the trail ends somewhere inactive, which is
+ * a row nobody meant to keep.
+ */
+async function followMerges(db: FirestoreLike, studentId: string): Promise<string | null> {
+  let current = studentId;
+  for (let hop = 0; hop < 4; hop += 1) {
+    const snapshot = await db.doc(`${PATHS.students}/${current}`).get();
+    if (!snapshot.exists) return null;
+    const data = snapshot.data() ?? {};
+    const next = data.mergedIntoStudentId;
+    if (typeof next !== 'string' || next.length === 0) {
+      return data.status === 'inactive' ? null : current;
+    }
+    current = next;
+  }
+  return null;
+}
 
 export interface ApproveRegistrationResult {
   status: 'approved' | 'partial' | 'not-found';
@@ -230,7 +259,7 @@ export async function approveRegistration(options: {
   for (const studentId of record.studentIds) {
     const student = await db.doc(`${PATHS.students}/${studentId}`).get();
     if (!student.exists) continue;
-    live.push(studentId);
+
     await db.doc(`${PATHS.students}/${studentId}`).set(
       {
         pendingReview: false,
@@ -241,6 +270,20 @@ export async function approveRegistration(options: {
       },
       { merge: true },
     );
+
+    /*
+     * A child a reviewer already merged is pushed as the row that survived, not
+     * as the row that lost.
+     *
+     * Getting this wrong is invisible and expensive: the fold document is still
+     * named on this registration, and pushing it would create upstream exactly
+     * the duplicate the merge was performed to avoid — permanently, since there
+     * is no delete. Following the pointer instead also does something useful,
+     * because the guardian's household is built around whoever comes back from
+     * here: the adult ends up attached to the family that was already on file.
+     */
+    const survivor = await followMerges(db, studentId);
+    if (survivor !== null && !live.includes(survivor)) live.push(survivor);
   }
 
   /* ---- Where they are going ----------------------------------------------- */
@@ -294,8 +337,12 @@ export async function approveRegistration(options: {
 
   if (backend.capabilities.writeBack === 'full') {
     for (const [index, allergies] of record.allergies.entries()) {
-      const studentId = record.studentIds[index];
-      if (!allergies || !studentId || !live.includes(studentId)) continue;
+      const named = record.studentIds[index];
+      if (!allergies || !named) continue;
+      // Onto the row that survived a merge, for the same reason the push goes
+      // there: a peanut allergy on a document nobody reads is not recorded.
+      const studentId = await followMerges(db, named);
+      if (studentId === null || !live.includes(studentId)) continue;
       try {
         await backend.updateStudentProfile({ studentId, allergies, logger });
       } catch (error) {

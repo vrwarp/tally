@@ -49,6 +49,7 @@ function registration(overrides: Partial<PendingRegistration> = {}): PendingRegi
         grade: 4,
         studentId: 'held-1',
         pendingReview: true,
+        mergedIntoStudentId: null,
         allergies: null,
         possibleDuplicates: [],
       },
@@ -113,6 +114,7 @@ describe('a name that already exists', () => {
           grade: 4,
           studentId: 'held-1',
           pendingReview: true,
+          mergedIntoStudentId: null,
           allergies: null,
           possibleDuplicates: [
             {
@@ -162,6 +164,44 @@ describe('a name that already exists', () => {
 
     expect(mergeStudents).not.toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: /9th grade/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('once a child has been merged', () => {
+  const merged = () =>
+    registration({
+      children: [
+        {
+          firstName: 'Robin',
+          lastName: 'Fields',
+          grade: 4,
+          studentId: 'held-1',
+          pendingReview: false,
+          mergedIntoStudentId: 'pco_7',
+          allergies: null,
+          possibleDuplicates: [
+            {
+              studentId: 'pco_7',
+              firstName: 'Robin',
+              lastName: 'Fields',
+              grade: 9,
+              known: true,
+              status: 'active',
+            },
+          ],
+        },
+      ],
+      settled: true,
+    });
+
+  it('says merged rather than added, and stops offering the picker', async () => {
+    listPendingRegistrations.mockResolvedValue({ data: [merged()] });
+    mount();
+
+    expect(await screen.findByText('Merged')).toBeInTheDocument();
+    expect(screen.queryByText('Added')).not.toBeInTheDocument();
+    // Offering it again would invite folding the same child a second time.
+    expect(screen.queryByText(/already on the roster/i)).not.toBeInTheDocument();
   });
 });
 

@@ -310,9 +310,14 @@ function ChildRow({
   onMerge: (keeperId: string, foldId: string) => void;
 }) {
   const [picking, setPicking] = useState(false);
-  const candidates = child.possibleDuplicates.filter(
-    (candidate) => candidate.status === 'active' && candidate.studentId !== child.studentId,
-  );
+  // Nothing left to decide once a reviewer has decided: a merged child is the
+  // row it was folded into, and offering the picker again would invite folding
+  // it a second time.
+  const candidates = child.mergedIntoStudentId
+    ? []
+    : child.possibleDuplicates.filter(
+        (candidate) => candidate.status === 'active' && candidate.studentId !== child.studentId,
+      );
 
   return (
     <li className="rounded-xl bg-ink-950 px-3 py-2.5 ring-1 ring-ink-800">
@@ -338,7 +343,11 @@ function ChildRow({
             {child.allergies ? ` · ${child.allergies}` : ''}
           </span>
         </span>
-        {child.pendingReview ? null : <Badge tone="success">Added</Badge>}
+        {child.mergedIntoStudentId ? (
+          <Badge tone="neutral">Merged</Badge>
+        ) : child.pendingReview ? null : (
+          <Badge tone="success">Added</Badge>
+        )}
       </div>
 
       {/*
