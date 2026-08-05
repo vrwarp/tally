@@ -1,8 +1,8 @@
 /**
- * The green tick. Painted optimistically — before the network — and returned
- * to the same search automatically, because a parent with three kids checks
- * them in off one phone number: the results they came from are still there,
- * with this student now marked present.
+ * The green tick. Painted optimistically — before the network — and dismissed
+ * automatically after a few seconds, back to an empty search screen: the next
+ * family in the queue starts from the same blank glass every time, and nobody
+ * is left looking at the previous family's name.
  *
  * A pickup gets its own wording and a neutral mark rather than the green tick.
  * "Welcome!" is precisely wrong for somebody leaving, and the two screens have
