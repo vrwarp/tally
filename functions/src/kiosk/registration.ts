@@ -24,16 +24,41 @@
  *     kiosk minted and put in a QR. It creates the family and checks nobody in:
  *     the parent walks to the kiosk and taps their own children through.
  *
- * What it will not do is decide who somebody is. Upstream duplicate handling is
- * `pushStudent`'s exact first+last+grade match, and the guardian join is
- * corroborated by a phone number — anything less certain creates a fresh
- * person, because the alternative on a self-serve screen is showing one family
- * another family's contact details. Duplicates are a merge somebody does by
- * hand later; a wrong join is a privacy incident.
+ * Two journeys through it. A family nobody has met answers six questions. A
+ * family the church already has, whose second child is finally old enough,
+ * answers two: they found themselves by phone first, so the request carries
+ * `anchorStudentIds` — their existing children — and needs no adult at all. The
+ * anchors are what make the difference at approval, where the new child joins
+ * the household the family already has instead of founding a second one.
+ *
+ * ## What the door does not decide
+ *
+ * Nothing that cannot be taken back. This used to create people, an adult and a
+ * household in the church's database while the parent stood there, and to
+ * *refuse* a registration whose child's name already matched the roster. Both
+ * were the same mistake: asking a lobby screen with a queue behind it to settle
+ * identity, on evidence a stranger typed, against a system with no undo —
+ * there is no delete anywhere in `functions/src`, and Attendees has no merges
+ * at all.
+ *
+ * So: every registration succeeds, every child is checked in, every sticker
+ * prints, and every child is written with `pendingReview: true`
+ * (`backends/pendingReview.ts`), which is what keeps them out of Planning
+ * Center until somebody approves them on the Review screen. A name that
+ * already matches the roster is *recorded* as a suspicion on the registration
+ * document rather than turned into a refusal — the old refusal steered a family
+ * toward checking in some other family's Jacob Smith, which is a worse outcome
+ * than a duplicate a reviewer merges on Tuesday.
+ *
+ * The registration document is therefore no longer only an idempotency claim.
+ * It is the review record: the guardian's name and phone live on it, TTL'd and
+ * deleted when the review happens, because there is nowhere else in Tally they
+ * may go — `noMirroredPersonalData` in `firestore.rules` forbids them on a
+ * student, deliberately. It is functions-only in both directions and read
+ * through a core-team callable. See `docs/data-model.md`.
  */
 import { Timestamp } from 'firebase-admin/firestore';
-import type { BackendRegistry } from '../backends/registry.js';
-import { buildSearchName } from '../backends/mappingShared.js';
+import { buildSearchName, nameKey } from '../backends/mappingShared.js';
 import {
   PATHS,
   SILENT_LOGGER,
@@ -42,7 +67,7 @@ import {
   type FirestoreLike,
   type FunctionLogger,
 } from '../firestore.js';
-import { patchPhonesNow, recordPendingLast4 } from './phoneIndex.js';
+import { last4ForStudents, patchPhonesNow, recordPendingLast4 } from './phoneIndex.js';
 
 export const REGISTRATIONS_COLLECTION = 'kioskRegistrations';
 
@@ -59,17 +84,24 @@ export const MAX_REGISTRATION_CHILDREN = 6;
 /** Long enough for any real name, short enough that nothing is a paragraph. */
 export const NAME_MAX_LENGTH = 40;
 
-/** Only used in code mode; never stored in Firestore, only sent upstream. */
+/** Only used in code mode. Held for the reviewer, then sent upstream. */
 export const ALLERGIES_MAX_LENGTH = 200;
 
 /**
  * How long a registration document is kept before the sweep takes it.
  *
- * It exists only to make a retry idempotent, and a retry happens within seconds
- * of the original — a day is generous by three orders of magnitude and keeps
- * the collection small enough to sweep by reading it.
+ * It used to be a day, because the document existed only to make a retry
+ * idempotent and a retry happens within seconds. It is the review record now,
+ * and the review happens on a weekday when somebody has time — so the window
+ * has to cover a long weekend, a holiday, and the volunteer who was away. A
+ * month is that with room to spare, and it is still a *deletion date* rather
+ * than an archive: the guardian's phone number leaves Tally whether or not
+ * anybody got to it.
+ *
+ * The Review screen ages rows toward this, so a family about to be swept is
+ * visible as one before they vanish.
  */
-export const REGISTRATION_DOC_TTL_MS = 24 * 60 * 60_000;
+export const REGISTRATION_DOC_TTL_MS = 30 * 24 * 60 * 60_000;
 
 /** `createdBy` for a registration nobody was signed in for. */
 export const REMOTE_REGISTRATION_SENTINEL = 'kiosk-registration';
@@ -90,9 +122,26 @@ export interface RegistrationGuardian {
 export interface ParsedRegistration {
   registrationId: string;
   children: RegistrationChild[];
-  guardian: RegistrationGuardian;
+  /**
+   * Null on the sibling journey, and only there. A parent adding a second child
+   * to a family the church already has is not a new adult: the household
+   * upstream already holds them, the phone index already answers for their
+   * digits, and asking again would be three questions to learn nothing.
+   */
+  guardian: RegistrationGuardian | null;
   /** Index-aligned with `children`. Empty outside code mode. */
   allergies: (string | null)[];
+  /**
+   * Students this family already has on the roster, when a parent adding a
+   * sibling reached this through "add a brother or sister" rather than through
+   * the first-time wizard. Claimed by the client from the last-4 it searched
+   * with, and verified server-side before it is trusted — see `verifyAnchors`.
+   *
+   * What it buys is the whole point of that journey: at approval the household
+   * is derived from an existing sibling, so the new child joins the family the
+   * church already has instead of founding a second one.
+   */
+  anchorStudentIds: string[];
 }
 
 export type RegistrationSource = 'kiosk' | 'qr';
@@ -105,23 +154,22 @@ export interface RegisteredChild {
   searchName: string;
 }
 
-export type GuardianUpstream = 'created' | 'joined' | 'skipped' | 'failed';
-
-export type RegisterFamilyResult =
-  | {
-      status: 'created';
-      children: RegisteredChild[];
-      /** The digits the family types at the kiosk from now on. */
-      last4: string;
-      checkedIn: boolean;
-      guardian: { upstream: GuardianUpstream };
-    }
-  | {
-      status: 'duplicate';
-      /** Which of the submitted children are already on the roster. */
-      duplicateIndexes: number[];
-      message: string;
-    };
+/**
+ * What the door tells the family.
+ *
+ * One arm, on purpose. The `duplicate` refusal that used to live here is gone:
+ * it made a screen with no leader at it decide whether two children with the
+ * same name are one child, and it answered the family with "search for their
+ * name instead" — which is an instruction to check in somebody else's child.
+ * A registration either succeeds or throws.
+ */
+export interface RegisterFamilyResult {
+  status: 'created';
+  children: RegisteredChild[];
+  /** The digits the family types at the kiosk from now on. */
+  last4: string;
+  checkedIn: boolean;
+}
 
 /* -------------------------------------------------------------------------- */
 /* Validation                                                                  */
@@ -238,12 +286,59 @@ export function parseRegisterFamilyRequest(
     };
   });
 
-  const rawGuardian = (body.guardian ?? {}) as Record<string, unknown>;
-  const guardian: RegistrationGuardian = {
-    firstName: parseName(rawGuardian.firstName, "The parent's first name"),
-    lastName: parseName(rawGuardian.lastName, "The parent's last name"),
-    phone: parseRegistrationPhone(rawGuardian.phone),
-  };
+  /*
+   * The same child twice, in one submission.
+   *
+   * Nothing compared the children to *each other* before — the roster guard
+   * looked outward and this looked nowhere — so a parent who tapped "add
+   * another" and retyped the child they had just entered registered them
+   * twice, checked them in twice, and printed two stickers. Unlike a roster
+   * collision this one is not a judgement anybody has to make later: the family
+   * is standing here and can fix it in two taps, and there is no reading of two
+   * identical rows in one form that is not a mistake.
+   *
+   * Grade is deliberately not part of the comparison. Two children of the same
+   * name in different grades are still not something a parent means to type.
+   */
+  const seen = new Map<string, number>();
+  children.forEach((child, index) => {
+    const key = nameKey(child.firstName, child.lastName);
+    const first = seen.get(key);
+    if (first !== undefined) {
+      refuse(
+        `${child.firstName} ${child.lastName} is on this form twice. Remove one of them, or correct the name.`,
+      );
+    }
+    seen.set(key, index);
+  });
+
+  /*
+   * Anchors are a kiosk claim and only a kiosk claim.
+   *
+   * The phone form is opened from a QR by somebody who has not searched the
+   * roster and cannot have: the sibling ids come from a last-4 search the kiosk
+   * ran, so a request carrying them from anywhere else is a client asserting a
+   * family relationship it has no basis for.
+   */
+  const anchorStudentIds = source === 'kiosk' ? parseAnchors(body.anchorStudentIds) : [];
+
+  /*
+   * The adult, unless siblings already say who this family is.
+   *
+   * Not "optional": exactly one of the two has to be there. A registration with
+   * neither is a set of children nobody can be reached about and no household
+   * to put them in — which is the state the whole review pipeline exists to
+   * avoid arriving at silently.
+   */
+  const rawGuardian = (body.guardian ?? null) as Record<string, unknown> | null;
+  const guardian: RegistrationGuardian | null =
+    rawGuardian === null && anchorStudentIds.length > 0
+      ? null
+      : {
+          firstName: parseName(rawGuardian?.firstName, "The parent's first name"),
+          lastName: parseName(rawGuardian?.lastName, "The parent's last name"),
+          phone: parseRegistrationPhone(rawGuardian?.phone),
+        };
 
   if (source !== 'qr' && body.allergies !== undefined) {
     refuse('allergies cannot be registered from the kiosk.');
@@ -254,24 +349,57 @@ export function parseRegisterFamilyRequest(
     children,
     guardian,
     allergies: source === 'qr' ? parseAllergies(body.allergies, children.length) : [],
+    anchorStudentIds,
   };
 }
 
+/**
+ * The sibling ids a client claims this family already has.
+ *
+ * Shape only — that these are real, active students is checked against the
+ * database in `verifyAnchors`, because a client that could name any student id
+ * and have it believed would be a client that can attach its own child to a
+ * stranger's household.
+ */
+function parseAnchors(raw: unknown): string[] {
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw)) refuse('anchorStudentIds must be a list.');
+  if (raw.length > MAX_REGISTRATION_CHILDREN) refuse('Too many siblings named.');
+  const ids = raw.map((entry) => {
+    if (typeof entry !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(entry)) {
+      refuse('anchorStudentIds must be student ids.');
+    }
+    return entry;
+  });
+  return [...new Set(ids)];
+}
+
 /* -------------------------------------------------------------------------- */
-/* The registration document — idempotency, and nothing else                   */
+/* The registration document — the claim, and the review record                */
 /* -------------------------------------------------------------------------- */
 
 /**
- * What survives a request, so a retry cannot create a second family.
+ * What survives a request: enough to make a retry idempotent, and enough for
+ * somebody to review this family later.
  *
- * Deliberately not the request: no names, no phone number, no allergies. A
- * retry re-sends all of that, and a collection of half-finished registrations
- * is not a place to accumulate what the rest of the database refuses to hold.
- * What is here is the pre-allocated student ids — the reason a replay is safe,
- * since every write downstream is keyed by them — plus enough to answer a
- * completed call again.
+ * It used to be only the first half, and to hold deliberately *nothing* a
+ * person typed — on the reasoning that a collection of half-finished
+ * registrations is not a place to accumulate what the rest of the database
+ * refuses to hold. That reasoning was right about the destination and wrong
+ * about the alternative, which turned out to be losing the guardian's name and
+ * number entirely: they were only ever written straight through to Planning
+ * Center, and the push is exactly what is being deferred now.
+ *
+ * So the guardian waits here. It is a staging buffer, not a mirror, and the
+ * difference is enforced rather than asserted: no client can read this
+ * collection (`firestore.rules` denies both directions), the only way to see it
+ * is a core-team callable, the document is deleted the moment a reviewer acts,
+ * and it is swept at `REGISTRATION_DOC_TTL_MS` whether anybody acted or not.
+ * `docs/data-model.md` names this as the one exception to "Tally does not store
+ * parent contact details", because an undocumented exception is just a mirror
+ * with a good excuse.
  */
-interface RegistrationRecord {
+export interface RegistrationRecord {
   status: 'pending' | 'complete';
   source: RegistrationSource;
   eventId: string | null;
@@ -280,12 +408,33 @@ interface RegistrationRecord {
   last4: string;
   checkedIn: boolean;
   createdAt: Date | null;
+  /** The adult who registered, as they typed themselves. */
+  guardian: RegistrationGuardian | null;
+  /** The children as typed, so a reviewer sees the form and not just the roster. */
+  children: RegistrationChild[];
+  /** Index-aligned with `children`; only ever non-empty from the QR form. */
+  allergies: (string | null)[];
+  /**
+   * Child index -> the active students whose name already matched. Recorded,
+   * never acted on: it is what puts "this might be the Jacob Smith we have"
+   * in front of a human, and nothing else reads it.
+   */
+  possibleDuplicateOf: Record<string, string[]>;
+  /** Verified siblings, when this was an "add a brother or sister". */
+  anchorStudentIds: string[];
+  /** Why the last approval attempt did not finish, if one did not. */
+  lastError: string | null;
 }
 
-function readRegistration(data: Record<string, unknown>): RegistrationRecord {
-  const ids = Array.isArray(data.studentIds)
-    ? data.studentIds.filter((id): id is string => typeof id === 'string')
-    : [];
+function readStringArray(raw: unknown): string[] {
+  return Array.isArray(raw) ? raw.filter((entry): entry is string => typeof entry === 'string') : [];
+}
+
+export function readRegistration(data: Record<string, unknown>): RegistrationRecord {
+  const ids = readStringArray(data.studentIds);
+  const rawGuardian = (data.guardian ?? null) as Record<string, unknown> | null;
+  const rawChildren = Array.isArray(data.children) ? data.children : [];
+  const rawDuplicates = (data.possibleDuplicateOf ?? {}) as Record<string, unknown>;
   return {
     status: data.status === 'complete' ? 'complete' : 'pending',
     source: data.source === 'qr' ? 'qr' : 'kiosk',
@@ -295,6 +444,30 @@ function readRegistration(data: Record<string, unknown>): RegistrationRecord {
     last4: typeof data.last4 === 'string' ? data.last4 : '',
     checkedIn: data.checkedIn === true,
     createdAt: toDateOrNull(data.createdAt),
+    guardian:
+      rawGuardian && typeof rawGuardian.firstName === 'string'
+        ? {
+            firstName: rawGuardian.firstName,
+            lastName: typeof rawGuardian.lastName === 'string' ? rawGuardian.lastName : '',
+            phone: typeof rawGuardian.phone === 'string' ? rawGuardian.phone : '',
+          }
+        : null,
+    children: rawChildren.map((entry) => {
+      const child = (entry ?? {}) as Record<string, unknown>;
+      return {
+        firstName: typeof child.firstName === 'string' ? child.firstName : '',
+        lastName: typeof child.lastName === 'string' ? child.lastName : '',
+        grade: typeof child.grade === 'number' ? child.grade : null,
+      };
+    }),
+    allergies: Array.isArray(data.allergies)
+      ? data.allergies.map((entry) => (typeof entry === 'string' ? entry : null))
+      : [],
+    possibleDuplicateOf: Object.fromEntries(
+      Object.entries(rawDuplicates).map(([index, value]) => [index, readStringArray(value)]),
+    ),
+    anchorStudentIds: readStringArray(data.anchorStudentIds),
+    lastError: typeof data.lastError === 'string' ? data.lastError : null,
   };
 }
 
@@ -308,7 +481,7 @@ function isAlreadyExists(error: unknown): boolean {
  * cheap because the collection is bounded by how many families register in a
  * day, and run from the one call that is guaranteed to be paying attention.
  */
-async function sweepRegistrations(db: FirestoreLike, now: Date): Promise<void> {
+export async function sweepRegistrations(db: FirestoreLike, now: Date): Promise<void> {
   const snapshot = await db.collection(REGISTRATIONS_COLLECTION).get();
   for (const doc of snapshot.docs) {
     const record = readRegistration(doc.data() ?? {});
@@ -320,48 +493,58 @@ async function sweepRegistrations(db: FirestoreLike, now: Date): Promise<void> {
 }
 
 /* -------------------------------------------------------------------------- */
-/* The already-on-the-roster guard                                             */
+/* The already-on-the-roster suspicion                                         */
 /* -------------------------------------------------------------------------- */
 
 /**
- * Which of these children are already on the roster, by exact name.
+ * Which children share a name with somebody already on the roster, and who.
+ *
+ * This was a guard and is now a note. It used to refuse the whole registration
+ * and tell the family to search for the name instead, which sounds careful and
+ * is not: the other Jacob Smith is a different child, nothing on the kiosk's
+ * confirm screen distinguishes him except a grade nobody checks, and the family
+ * were being pointed at him by name. A duplicate the reviewer merges on Tuesday
+ * is a smaller problem than a child checked in as somebody else on Sunday.
  *
  * Name-only, and against active students only. Grade is deliberately not part
- * of the key: the remedy this produces is "search for them on the kiosk", which
- * works whatever grade the office recorded, and a family who moved up a year
- * would otherwise register a second copy of their own child.
+ * of the key — a family who moved up a year would otherwise look like two
+ * different children — and the folding is `nameKey`'s, the same one the
+ * upstream matcher uses, so *José* and *Jose* are the same suspicion here and
+ * the same person there.
  *
- * It is enumeration-safe in the sense that matters: the answer reveals only
- * whether a name the caller themselves typed is on the roster, which is exactly
- * what the kiosk's public name search already answers, one keystroke at a time.
+ * The ids are for the reviewer, who is core team and can already read the whole
+ * roster; the family never sees them.
  */
 export async function findRosterDuplicates(
   db: FirestoreLike,
   children: readonly RegistrationChild[],
-): Promise<number[]> {
+  options: { excludeStudentIds?: readonly string[] } = {},
+): Promise<Record<string, string[]>> {
+  const excluded = new Set(options.excludeStudentIds ?? []);
   const wanted = new Map<string, number[]>();
   children.forEach((child, index) => {
-    const key = buildSearchName(child.firstName, child.lastName);
+    const key = nameKey(child.firstName, child.lastName);
     const bucket = wanted.get(key);
     if (bucket) bucket.push(index);
     else wanted.set(key, [index]);
   });
 
   const snapshot = await db.collection(PATHS.students).get();
-  const hits = new Set<number>();
+  const hits: Record<string, string[]> = {};
   for (const doc of snapshot.docs) {
     const data = doc.data() ?? {};
     if (data.status === 'inactive') continue;
-    const searchName =
-      typeof data.searchName === 'string'
-        ? data.searchName
-        : typeof data.firstName === 'string' && typeof data.lastName === 'string'
-          ? buildSearchName(data.firstName, data.lastName)
-          : null;
-    if (searchName === null) continue;
-    for (const index of wanted.get(searchName) ?? []) hits.add(index);
+    // The children this same request just wrote are not duplicates of
+    // themselves — this runs after the batch commits, so they are on the roster
+    // by the time it looks.
+    if (excluded.has(doc.id)) continue;
+    if (typeof data.firstName !== 'string' || typeof data.lastName !== 'string') continue;
+    const key = nameKey(data.firstName, data.lastName);
+    for (const index of wanted.get(key) ?? []) {
+      (hits[String(index)] ??= []).push(doc.id);
+    }
   }
-  return [...hits].sort((a, b) => a - b);
+  return hits;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -406,7 +589,6 @@ export interface RegisterFamilyContext {
 
 export interface RegisterFamilyOptions {
   db: FirestoreLike;
-  registry: BackendRegistry;
   request: ParsedRegistration;
   context: RegisterFamilyContext;
   now?: Date;
@@ -414,22 +596,54 @@ export interface RegisterFamilyOptions {
 }
 
 /**
- * Creates a family, checks them in when there is a gathering to check them into,
- * and makes their phone number work at the kiosk before they have walked back
- * to it.
+ * Which of the claimed siblings are real, active students.
  *
- * The order is chosen so that the irreversible half happens after every refusal
- * and the fallible half after everything the family can see. Firestore first:
- * once the batch commits, the children are on the roster and the tick can go on
- * screen. Everything after it — the phone index patch, the pushes upstream, the
- * household — is best-effort, logged, and never able to fail the registration a
- * parent has already been told succeeded. A push that does not land leaves
- * `pcoPushPending` set, which is exactly the state `pushPendingVisitors` sweeps.
+ * The kiosk resolves a family from the last-4 it searched with and sends the
+ * ids; this is what stops that being a free assertion. It cannot check that the
+ * person typing belongs to the family — the four digits are the only credential
+ * and they are a weak one — but it can refuse ids that name nothing, which is
+ * the difference between a claim about a real family and a claim about an
+ * arbitrary document.
+ *
+ * A claim that survives here is still only used at approval time, where a
+ * person sees it: "this child says they belong to the Okonkwo family" is shown,
+ * not obeyed.
+ */
+async function verifyAnchors(db: FirestoreLike, ids: readonly string[]): Promise<string[]> {
+  const verified: string[] = [];
+  for (const id of ids) {
+    const snapshot = await db.doc(`${PATHS.students}/${id}`).get();
+    if (!snapshot.exists) continue;
+    if ((snapshot.data() ?? {}).status === 'inactive') continue;
+    verified.push(id);
+  }
+  return verified;
+}
+
+/**
+ * Puts a family on the roster, checks them in when there is a gathering to
+ * check them into, and makes their phone number work at the kiosk before they
+ * have walked back to it.
+ *
+ * Everything here is Tally's own. Nothing reaches the church's people database:
+ * each child is written `pendingReview: true`, which every push path consults
+ * (`backends/pendingReview.ts`), and `approveRegistration` is what releases
+ * them — in the right order, with one household for the whole family, with a
+ * person looking at the screen.
+ *
+ * The order below is chosen so that the irreversible half happens after every
+ * refusal and the fallible half after everything the family can see. Firestore
+ * first: once the batch commits, the children are on the roster and the tick
+ * can go on screen. The phone index patch and the duplicate scan follow, and
+ * neither can fail a registration a parent has already been told succeeded —
+ * a missed index patch costs the family nothing (the kiosk they are standing at
+ * already holds the answer locally, and the nightly rebuild folds the overlay
+ * in), and a missed duplicate scan costs a reviewer a hint, not a decision.
  */
 export async function registerFamily(
   options: RegisterFamilyOptions,
 ): Promise<RegisterFamilyResult> {
-  const { db, registry, request, context } = options;
+  const { db, request, context } = options;
   const now = options.now ?? new Date();
   const logger = options.logger ?? SILENT_LOGGER;
 
@@ -438,20 +652,39 @@ export async function registerFamily(
       ? await readEvent(db, context.eventId ?? refuse('eventId is required.'))
       : null;
   const createdBy = context.uid ?? REMOTE_REGISTRATION_SENTINEL;
-  const last4 = request.guardian.phone.slice(-4);
+  const anchorStudentIds = await verifyAnchors(db, request.anchorStudentIds);
+  if (request.guardian === null && anchorStudentIds.length === 0) {
+    /*
+     * Every claimed sibling turned out to be nobody. The request was a sibling
+     * registration and there is no family to attach to, so it is a first-time
+     * registration with the adult's questions missing — which cannot be filled
+     * in from here.
+     */
+    refuse('We could not find that family. Please register as a new family, or see a leader.');
+  }
+
+  /*
+   * The digits the family types at the kiosk.
+   *
+   * From the adult's number when there is one; otherwise read back out of the
+   * index from the siblings — never from the request, which would let a client
+   * file a child under any four digits it liked. See `last4ForStudents`.
+   */
+  const last4List =
+    request.guardian !== null
+      ? [request.guardian.phone.slice(-4)]
+      : await last4ForStudents(db, anchorStudentIds);
+  const last4 = last4List[0] ?? '';
 
   /* ---- The claim ---------------------------------------------------------- */
 
   /*
-   * Before the duplicate guard, not after it.
+   * First, before anything reads the roster.
    *
-   * The obvious order is to check the roster first and never write anything for
-   * a family who are already on it — but a *retry* of a successful call would
-   * then find the children this same request created a second ago and report
-   * them as duplicates of themselves. The claim has to be what a second call
-   * hits first, so that a retry is recognised as a retry before anything else
-   * looks at the roster. A fresh claim that turns out to be a duplicate is
-   * released below, so the "writes nothing" property survives.
+   * A retry of a successful call has to be recognised as a retry before
+   * anything else happens, or it re-does work that is not idempotent. The
+   * pre-allocated student ids are what make the rest of this function safe to
+   * run twice: every write below is keyed by them.
    */
   const registrationRef = db.doc(`${REGISTRATIONS_COLLECTION}/${request.registrationId}`);
   let studentIds: string[];
@@ -465,6 +698,18 @@ export async function registerFamily(
     last4,
     checkedIn: event !== null,
     createdAt: Timestamp.fromDate(now),
+    /*
+     * The review record's half. Written with the claim rather than at the end,
+     * so that a request which dies after the batch commits still leaves a
+     * reviewer something to act on: children held on the roster with no name
+     * against them and no way to reach the family would be the worst of both.
+     */
+    guardian: request.guardian,
+    children: request.children,
+    allergies: request.allergies,
+    anchorStudentIds,
+    possibleDuplicateOf: {},
+    lastError: null,
   };
 
   try {
@@ -475,8 +720,7 @@ export async function registerFamily(
     /*
      * Somebody has been here before — the same wizard run, retrying after a
      * response it never saw. A completed one is answered from what it wrote; a
-     * pending one is resumed against the ids it already allocated, which is
-     * what makes every write below idempotent rather than merely repeated.
+     * pending one is resumed against the ids it already allocated.
      */
     replaying = true;
     const held = readRegistration((await registrationRef.get()).data() ?? {});
@@ -496,32 +740,6 @@ export async function registerFamily(
         })),
         last4: held.last4 || last4,
         checkedIn: held.checkedIn,
-        guardian: { upstream: 'skipped' },
-      };
-    }
-  }
-
-  /* ---- Already here? ------------------------------------------------------ */
-
-  /*
-   * Only for a registration nobody has run before. A resumed one has already
-   * passed this, and its own half-written children would fail it.
-   */
-  if (!replaying) {
-    const duplicates = await findRosterDuplicates(db, request.children);
-    if (duplicates.length > 0) {
-      // Released, so the family can correct the name and try again under a new
-      // id — and so a refusal leaves nothing behind.
-      await registrationRef.delete();
-      await sweepRegistrations(db, now);
-      const names = duplicates.map((index) => request.children[index]!.firstName).join(' and ');
-      return {
-        status: 'duplicate',
-        duplicateIndexes: duplicates,
-        message:
-          duplicates.length === request.children.length
-            ? `${names} is already on our list — search for their name instead.`
-            : `${names} is already on our list. Search for them, and register the others separately.`,
       };
     }
   }
@@ -556,10 +774,17 @@ export async function registerFamily(
       lastAttendedAt: event?.startAt ?? null,
       pcoPersonId: null,
       pcoPushPending: true,
-      // What tells `onStudentCreated` to leave this one alone: the push happens
-      // below, in this request, where it can be sequenced against the household
-      // write. Two pushes racing would both pass `findExistingPerson` and create
-      // two upstream people for one child.
+      /*
+       * The hold. Nothing pushes this child anywhere until a reviewer clears
+       * it — see backends/pendingReview.ts. `pcoPushPending` stays true
+       * alongside it because the child genuinely is queued; what the hold adds
+       * is that the queue does not drain on its own.
+       */
+      pendingReview: true,
+      // Provenance, and nothing more. It used to double as the push gate,
+      // which is what `pendingReview` is for now; keeping it means a reviewer
+      // and a support question can both get from a student back to the form
+      // they were typed on.
       registrationId: request.registrationId,
       createdAt: at,
       updatedAt: at,
@@ -583,12 +808,26 @@ export async function registerFamily(
   /* ---- Findable by phone, now --------------------------------------------- */
 
   try {
-    await recordPendingLast4(
-      db,
-      { registrationId: request.registrationId, last4, studentIds },
-      now,
-    );
-    await patchPhonesNow(db, last4, studentIds);
+    if (last4 === '') {
+      /*
+       * A sibling registration whose family is in no index bucket at all —
+       * their household number never reached a backend and no overlay entry
+       * survives. Nothing to patch; the child is still on the roster and still
+       * checked in, and the family finds them by name until somebody reviews.
+       */
+      logger.warn('No phone digits found for a sibling registration; the index is unchanged', {
+        registrationId: request.registrationId,
+      });
+    } else {
+      await recordPendingLast4(
+        db,
+        { registrationId: request.registrationId, last4, studentIds },
+        now,
+      );
+      // Every bucket the family already answers to, not only the first — a
+      // household with two numbers on file must not start answering to one.
+      for (const digits of last4List) await patchPhonesNow(db, digits, studentIds);
+    }
   } catch (error) {
     // The nightly rebuild picks the overlay up either way; what is lost is only
     // the immediacy, and the family is standing at a kiosk that already holds
@@ -599,27 +838,47 @@ export async function registerFamily(
     });
   }
 
-  /* ---- Upstream ----------------------------------------------------------- */
+  /* ---- What a reviewer will want to know ---------------------------------- */
 
-  const guardianUpstream = await pushUpstream({
-    registry,
-    request,
-    children,
-    logger,
-  });
+  /*
+   * After the commit, deliberately. The scan reads the whole students
+   * collection, so it would see this request's own children and report them as
+   * duplicates of themselves — hence `excludeStudentIds`. Running it before the
+   * commit would avoid that and cost the family the wait, which is the trade
+   * the old refusal made and the reason it sat on the critical path.
+   */
+  let possibleDuplicateOf: Record<string, string[]> = {};
+  try {
+    possibleDuplicateOf = await findRosterDuplicates(db, request.children, {
+      excludeStudentIds: studentIds,
+    });
+  } catch (error) {
+    logger.warn('Could not scan for possible duplicates; the review record has none', {
+      registrationId: request.registrationId,
+      error: String(error),
+    });
+  }
 
   await registrationRef.set(
-    { status: 'complete', studentIds, completedAt: Timestamp.fromDate(now) },
+    {
+      status: 'complete',
+      studentIds,
+      possibleDuplicateOf,
+      completedAt: Timestamp.fromDate(now),
+    },
     { merge: true },
   );
   if (!replaying) await sweepRegistrations(db, now);
 
-  logger.info('Registered a family at the kiosk', {
+  // Counts and ids. The guardian's name and number are on the document this
+  // line is about; they are not going into a log as well.
+  logger.info('Registered a family at the kiosk; held for review', {
     registrationId: request.registrationId,
     source: context.source,
     children: children.length,
     checkedIn: event !== null,
-    guardian: guardianUpstream,
+    siblingsClaimed: anchorStudentIds.length,
+    possibleDuplicates: Object.keys(possibleDuplicateOf).length,
   });
 
   return {
@@ -627,93 +886,5 @@ export async function registerFamily(
     children,
     last4,
     checkedIn: event !== null,
-    guardian: { upstream: guardianUpstream },
   };
-}
-
-/**
- * Everything that happens in the church's own database, and none of it fatal.
- *
- * The ladder is the deployment's write-back mode, not a preference:
- *
- *   - **full** — the children become people upstream and the adult becomes a
- *     person in a household with them, carrying the phone number.
- *   - **create** — the children become people; there is no household write to
- *     make, so the parent's name is dropped and their number survives only as
- *     the four digits in the kiosk index. Dropping it is the honest option:
- *     `noMirroredPersonalData` forbids a parent's name on a student document,
- *     and a notes field holding it would be that mirror rebuilt one string at a
- *     time on every counselor's screen. The incomplete-profile list is where a
- *     leader picks this up.
- *   - **off, or no backend at all** — the children stay queued in Firestore,
- *     which is what `pcoPushPending` is for.
- */
-async function pushUpstream(args: {
-  registry: BackendRegistry;
-  request: ParsedRegistration;
-  children: readonly RegisteredChild[];
-  logger: FunctionLogger;
-}): Promise<GuardianUpstream> {
-  const { registry, request, children, logger } = args;
-
-  const target = registry.defaultPush();
-  if ('error' in target) return 'skipped';
-  const backend = target.backend;
-  if (backend.capabilities.writeBack === 'off') return 'skipped';
-
-  let pushed = 0;
-  for (const child of children) {
-    try {
-      const result = await backend.pushStudent({ studentId: child.studentId, logger });
-      if (result.status !== 'skipped') pushed += 1;
-    } catch (error) {
-      logger.warn('Could not push a registered child upstream; it stays queued', {
-        studentId: child.studentId,
-        error: String(error),
-      });
-    }
-  }
-  if (pushed > 0) backend.resetCache();
-
-  /* ---- Allergies, where they belong --------------------------------------- */
-
-  if (backend.capabilities.writeBack === 'full') {
-    for (const [index, allergies] of request.allergies.entries()) {
-      if (!allergies) continue;
-      const child = children[index];
-      if (!child) continue;
-      try {
-        await backend.updateStudentProfile({ studentId: child.studentId, allergies, logger });
-      } catch (error) {
-        logger.warn('Could not record allergies upstream', {
-          studentId: child.studentId,
-          error: String(error),
-        });
-      }
-    }
-  }
-
-  /* ---- The adult ---------------------------------------------------------- */
-
-  if (!backend.capabilities.parentCreatable || !backend.createFamily) return 'skipped';
-
-  try {
-    const family = await backend.createFamily({
-      studentIds: children.map((child) => child.studentId),
-      firstName: request.guardian.firstName,
-      lastName: request.guardian.lastName,
-      phone: request.guardian.phone,
-      logger,
-    });
-    backend.invalidateReachability();
-    if (family.status === 'created') return 'created';
-    if (family.status === 'joined' || family.status === 'already-has-family') return 'joined';
-    return 'skipped';
-  } catch (error) {
-    logger.warn('Could not create the family upstream', {
-      children: children.length,
-      error: String(error),
-    });
-    return 'failed';
-  }
 }

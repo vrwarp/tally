@@ -12,10 +12,10 @@
  *   - **A retry.** A parent taps once; a wifi blip means the call runs twice.
  *     One family either way, or the roster grows a duplicate every time a lobby
  *     has bad signal.
+ *   - **What does *not* happen.** Nothing upstream, and no refusal — the two
+ *     things this used to do at the door and now leaves to the Review screen.
  */
-import { describe, expect, it, vi } from 'vitest';
-import type { BackendRegistry } from '../backends/registry.js';
-import type { PeopleBackend } from '../backends/types.js';
+import { describe, expect, it } from 'vitest';
 import { FakeFirestore } from '../testing/fakeFirestore.js';
 import { PENDING_LAST4_DOC, PHONE_INDEX_DOC } from './phoneIndex.js';
 import {
@@ -51,44 +51,13 @@ function dbWithEvent(): FakeFirestore {
   return db;
 }
 
-/** A registry whose default push target is whatever the test wants it to be. */
-function registryOf(backend: PeopleBackend | null): BackendRegistry {
-  return {
-    ids: () => (backend ? [backend.id] : []),
-    get: () => backend,
-    defaultPush: () => (backend ? { backend } : { error: 'Nothing is connected.' }),
-  } as unknown as BackendRegistry;
-}
-
-function backendWith(
-  overrides: Partial<PeopleBackend> & { writeBack?: 'off' | 'create' | 'full' } = {},
-): PeopleBackend {
-  const { writeBack = 'full', ...rest } = overrides;
-  return {
-    id: 'pco',
-    displayName: 'Planning Center',
-    capabilities: { writeBack, parentCreatable: writeBack === 'full' },
-    pushStudent: vi.fn(async () => ({ status: 'created' })),
-    updateStudentProfile: vi.fn(async () => ({ status: 'updated' })),
-    createFamily: vi.fn(async () => ({ status: 'created' })),
-    resetCache: vi.fn(),
-    invalidateReachability: vi.fn(),
-    ...rest,
-  } as unknown as PeopleBackend;
-}
-
 async function run(
   db: FakeFirestore,
-  args: {
-    data?: Record<string, unknown>;
-    backend?: PeopleBackend | null;
-    source?: 'kiosk' | 'qr';
-  } = {},
+  args: { data?: Record<string, unknown>; source?: 'kiosk' | 'qr' } = {},
 ): Promise<RegisterFamilyResult> {
   const source = args.source ?? 'kiosk';
   return registerFamily({
     db,
-    registry: registryOf(args.backend === undefined ? backendWith() : args.backend),
     request: parseRegisterFamilyRequest(args.data ?? goodRequest(), source),
     context:
       source === 'kiosk'
@@ -96,6 +65,11 @@ async function run(
         : { source },
     now: NOW,
   });
+}
+
+/** The review record this registration left behind. */
+function recordFor(db: FakeFirestore, id = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee') {
+  return db.get(`${REGISTRATIONS_COLLECTION}/${id}`)!;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -123,7 +97,7 @@ describe('what it refuses', () => {
       goodRequest({ guardian: { firstName: 'Dana', lastName: 'Fields', phone: '+1 (555) 010-3344' } }),
       'kiosk',
     );
-    expect(parsed.guardian.phone).toBe('5550103344');
+    expect(parsed.guardian?.phone).toBe('5550103344');
   });
 
   it('refuses allergies from a kiosk, where nothing would ever display them', () => {
@@ -211,37 +185,73 @@ describe('the documents it writes', () => {
 });
 
 describe('a family already on the roster', () => {
-  it('sends them to search instead, and writes nothing at all', async () => {
+  /*
+   * The door records the suspicion and registers them anyway.
+   *
+   * It used to refuse and say "search for their name instead", which is an
+   * instruction to check in a different child of the same name — on a screen
+   * with nobody standing at it, and with a queue behind. Two rows a reviewer
+   * merges on Tuesday is the cheaper mistake, and the only one somebody
+   * notices.
+   */
+  it('registers them anyway, and tells the reviewer who they might be', async () => {
     const db = dbWithEvent();
-    db.seed('students/pco_7', { status: 'active', searchName: 'robin fields' });
+    db.seed('students/pco_7', { status: 'active', firstName: 'Robin', lastName: 'Fields' });
 
     const result = await run(db);
-    expect(result.status).toBe('duplicate');
-    if (result.status !== 'duplicate') return;
-    expect(result.duplicateIndexes).toEqual([0]);
-    expect(result.message).toMatch(/already on our list/);
+    expect(result.status).toBe('created');
+    expect(db.get(`students/${result.children[0]!.studentId}`)).toBeDefined();
+    expect(db.get(`events/friday-today/attendance/${result.children[0]!.studentId}`)).toBeDefined();
 
-    // Not one child, not the sibling who is genuinely new: a half-registered
-    // family is worse than one told to search.
-    expect(db.writtenPaths('students/')).toEqual([]);
-    // The claim is taken before the roster is read — otherwise a retry would
-    // find its own children and call them duplicates — and released again here,
-    // so a refusal leaves nothing behind for the family's next attempt.
-    expect(db.get(`${REGISTRATIONS_COLLECTION}/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee`)).toBeUndefined();
+    // Child 0 matched; child 1 did not. Recorded, never acted on.
+    expect(recordFor(db).possibleDuplicateOf).toEqual({ '0': ['pco_7'] });
+  });
+
+  it('does not report this run\'s own children as duplicates of themselves', async () => {
+    const db = dbWithEvent();
+    const result = await run(db);
+    expect(result.status).toBe('created');
+    expect(recordFor(db).possibleDuplicateOf).toEqual({});
   });
 
   it('ignores somebody who has left the roster', async () => {
     const db = dbWithEvent();
-    db.seed('students/pco_7', { status: 'inactive', searchName: 'robin fields' });
+    db.seed('students/pco_7', { status: 'inactive', firstName: 'Robin', lastName: 'Fields' });
 
-    expect((await run(db)).status).toBe('created');
+    await run(db);
+    expect(recordFor(db).possibleDuplicateOf).toEqual({});
   });
 
   it('matches on the name alone, whatever grade the office recorded', async () => {
     const db = dbWithEvent();
     db.seed('students/pco_7', { status: 'active', firstName: 'Robin', lastName: 'Fields', grade: 9 });
 
-    expect((await run(db)).status).toBe('duplicate');
+    await run(db);
+    expect(recordFor(db).possibleDuplicateOf).toEqual({ '0': ['pco_7'] });
+  });
+
+  it('folds accents the way the upstream matcher does', async () => {
+    const db = dbWithEvent();
+    db.seed('students/pco_7', { status: 'active', firstName: 'José', lastName: 'Núñez' });
+
+    await run(db, {
+      data: goodRequest({ children: [{ firstName: 'Jose', lastName: 'Nunez', grade: 4 }] }),
+    });
+    expect(recordFor(db).possibleDuplicateOf).toEqual({ '0': ['pco_7'] });
+  });
+
+  it('refuses the same child typed twice on one form', () => {
+    expect(() =>
+      parseRegisterFamilyRequest(
+        goodRequest({
+          children: [
+            { firstName: 'Robin', lastName: 'Fields', grade: 4 },
+            { firstName: 'robin', lastName: 'FIELDS', grade: 6 },
+          ],
+        }),
+        'kiosk',
+      ),
+    ).toThrow(RegistrationInputError);
   });
 });
 
@@ -287,97 +297,122 @@ describe('a retried call', () => {
 });
 
 describe('what reaches the church database', () => {
-  it('pushes every child, then builds one family around all of them', async () => {
+  it('nothing — every child is held until somebody approves them', async () => {
     const db = dbWithEvent();
-    const backend = backendWith();
-    const result = await run(db, { backend });
-    if (result.status !== 'created') throw new Error('expected created');
+    const result = await run(db);
 
-    expect(backend.pushStudent).toHaveBeenCalledTimes(2);
-    // One call with both children — not one household per sibling.
-    expect(backend.createFamily).toHaveBeenCalledTimes(1);
-    expect(backend.createFamily).toHaveBeenCalledWith(
-      expect.objectContaining({
-        studentIds: result.children.map((child) => child.studentId),
-        firstName: 'Dana',
-        lastName: 'Fields',
-        phone: '5550103344',
-      }),
-    );
-    expect(result.guardian.upstream).toBe('created');
+    for (const child of result.children) {
+      const document = db.get(`students/${child.studentId}`)!;
+      // The hold, and the queue flag beside it. Both: the child genuinely is
+      // queued, and what the hold adds is that the queue does not drain on its
+      // own. See backends/pendingReview.ts.
+      expect(document.pendingReview).toBe(true);
+      expect(document.pcoPushPending).toBe(true);
+    }
   });
 
-  it('degrades to children-only when write-back cannot build a family', async () => {
+  it('keeps the guardian and the allergies for the reviewer', async () => {
     const db = dbWithEvent();
-    const backend = backendWith({ writeBack: 'create' });
-    const result = await run(db, { backend });
-    if (result.status !== 'created') throw new Error('expected created');
+    await run(db, { source: 'qr', data: goodRequest({ allergies: ['peanuts', null] }) });
 
-    expect(backend.pushStudent).toHaveBeenCalledTimes(2);
-    expect(backend.createFamily).not.toHaveBeenCalled();
-    expect(result.guardian.upstream).toBe('skipped');
-    // The digits still work, which is the half the family will actually use.
-    expect((db.get(PHONE_INDEX_DOC)!.last4 as Record<string, string[]>)['3344']).toHaveLength(2);
-  });
-
-  it('leaves the children queued when no backend is connected', async () => {
-    const db = dbWithEvent();
-    const result = await run(db, { backend: null });
-    if (result.status !== 'created') throw new Error('expected created');
-
-    // `pushPendingVisitors` is what picks these up; the flag staying set is the
-    // whole mechanism.
-    expect(db.get(`students/${result.children[0]!.studentId}`)!.pcoPushPending).toBe(true);
-    expect(result.guardian.upstream).toBe('skipped');
-  });
-
-  it('still registers the family when the household write fails', async () => {
-    const db = dbWithEvent();
-    const backend = backendWith({
-      createFamily: vi.fn(async () => {
-        throw new Error('Planning Center is down');
-      }),
+    const record = recordFor(db);
+    expect(record.guardian).toEqual({
+      firstName: 'Dana',
+      lastName: 'Fields',
+      phone: '5550103344',
     });
-    const result = await run(db, { backend });
-    if (result.status !== 'created') throw new Error('expected created');
-
-    // The family is standing at the screen; an upstream outage is not their
-    // problem and must not be their answer.
-    expect(result.guardian.upstream).toBe('failed');
-    expect(db.get(`events/friday-today/attendance/${result.children[0]!.studentId}`)).toBeDefined();
-  });
-
-  it('sends allergies upstream and never writes them down', async () => {
-    const db = dbWithEvent();
-    const backend = backendWith();
-    const result = await run(db, {
-      source: 'qr',
-      backend,
-      data: goodRequest({ allergies: ['peanuts', null] }),
-    });
-    if (result.status !== 'created') throw new Error('expected created');
-
-    expect(backend.updateStudentProfile).toHaveBeenCalledTimes(1);
-    expect(backend.updateStudentProfile).toHaveBeenCalledWith(
-      expect.objectContaining({ studentId: result.children[0]!.studentId, allergies: 'peanuts' }),
-    );
-    // The rules forbid the key outright; this is the same claim one layer up.
-    expect(db.get(`students/${result.children[0]!.studentId}`)).not.toHaveProperty('allergies');
+    expect(record.allergies).toEqual(['peanuts', null]);
+    // The rules forbid the key on a student outright; this is the same claim
+    // one layer up. It waits on the registration document or nowhere.
+    const [studentPath] = db.writtenPaths('students/');
+    expect(db.get(studentPath!)).not.toHaveProperty('allergies');
   });
 });
 
-describe('what is never stored', () => {
-  it('keeps the parent out of Firestore entirely', async () => {
+describe('adding a sibling', () => {
+  function siblingRequest(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      registrationId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+      children: [{ firstName: 'Ada', lastName: 'Fields', grade: 1 }],
+      anchorStudentIds: ['pco_7'],
+      ...overrides,
+    };
+  }
+
+  function dbWithFamily(): FakeFirestore {
+    const db = dbWithEvent();
+    db.seed('students/pco_7', { status: 'active', firstName: 'Robin', lastName: 'Fields' });
+    db.seed(PHONE_INDEX_DOC, { last4: { '3344': ['pco_7'] } });
+    return db;
+  }
+
+  it('needs no adult, and finds the digits from the siblings', async () => {
+    const db = dbWithFamily();
+    const result = await run(db, { data: siblingRequest() });
+
+    // Never from the request: a client that could name the digits could file a
+    // child under a stranger's number.
+    expect(result.last4).toBe('3344');
+    expect((db.get(PHONE_INDEX_DOC)!.last4 as Record<string, string[]>)['3344']).toContain(
+      result.children[0]!.studentId,
+    );
+    expect(recordFor(db).anchorStudentIds).toEqual(['pco_7']);
+    expect(recordFor(db).guardian).toBeNull();
+  });
+
+  it('drops an anchor that names nobody', async () => {
+    const db = dbWithFamily();
+    await run(db, { data: siblingRequest({ anchorStudentIds: ['pco_7', 'made-up'] }) });
+    expect(recordFor(db).anchorStudentIds).toEqual(['pco_7']);
+  });
+
+  it('refuses when every claimed sibling turns out to be nobody', async () => {
+    const db = dbWithFamily();
+    await expect(run(db, { data: siblingRequest({ anchorStudentIds: ['made-up'] }) })).rejects.toThrow(
+      RegistrationInputError,
+    );
+  });
+
+  it('refuses siblings claimed from the phone form, which never searched', () => {
+    expect(
+      parseRegisterFamilyRequest(
+        { ...siblingRequest(), guardian: { firstName: 'Dana', lastName: 'Fields', phone: '5550103344' } },
+        'qr',
+      ).anchorStudentIds,
+    ).toEqual([]);
+  });
+
+  it('still needs an adult when no siblings are claimed', () => {
+    expect(() => parseRegisterFamilyRequest(siblingRequest({ anchorStudentIds: [] }), 'kiosk')).toThrow(
+      RegistrationInputError,
+    );
+  });
+});
+
+describe('where the parent is, and is not', () => {
+  it('keeps the guardian off every student document', async () => {
     const db = dbWithEvent();
     const result = await run(db);
-    if (result.status !== 'created') throw new Error('expected created');
 
-    const everything = JSON.stringify([...db.data.entries()]);
-    // Not the number, and not the parent's name either: `noMirroredPersonalData`
-    // forbids both on a student, and nothing else here is a place to hide them.
-    expect(everything).not.toContain('5550103344');
-    expect(everything).not.toContain('Dana');
+    const students = JSON.stringify(
+      result.children.map((child) => db.get(`students/${child.studentId}`)),
+    );
+    // `noMirroredPersonalData` forbids both on a student, and this is that
+    // claim one layer up. The registration document is the *only* place either
+    // may wait, and it is deny-all to clients and deleted on review.
+    expect(students).not.toContain('5550103344');
+    expect(students).not.toContain('Dana');
+  });
+
+  it('holds them on the registration document, and nowhere else', async () => {
+    const db = dbWithEvent();
+    await run(db);
+
+    const elsewhere = [...db.data.entries()].filter(
+      ([path]) => !path.startsWith(REGISTRATIONS_COLLECTION),
+    );
+    expect(JSON.stringify(elsewhere)).not.toContain('5550103344');
     // Four digits, which is the bargain that lets the index exist at all.
-    expect(everything).toContain('3344');
+    expect(JSON.stringify(elsewhere)).toContain('3344');
   });
 });

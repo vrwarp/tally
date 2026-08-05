@@ -131,10 +131,9 @@ export function WelcomeApp() {
         : {}),
     })
       .then((result: RegisterFamilyResult) => {
-        if (result.status === 'duplicate') {
-          setPhase({ kind: 'refused', message: result.message });
-          return;
-        }
+        // No refusal arm any more: a name that already matches the roster is
+        // recorded for a reviewer rather than turned into a dead end on a
+        // parent's phone. Only a thrown error reaches the `catch` below.
         setPhase({
           kind: 'done',
           last4: result.last4,

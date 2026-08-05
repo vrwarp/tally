@@ -15,6 +15,7 @@
  * server fetches.
  */
 import { PATHS, type FirestoreLike } from '../firestore.js';
+import { isHeldForReview } from './pendingReview.js';
 import {
   BACKEND_IDS,
   isBackendId,
@@ -90,8 +91,22 @@ export interface RosterScan {
    * Active students with no backend person yet — the same rows the Students
    * screen marks "Queued". Counted on this pass rather than its own because
    * the collection has already been read.
+   *
+   * Students held for review are *not* counted here. They have no backend
+   * person for the same reason, but nothing is stuck: no sweep will pick them
+   * up and no leader needs to do anything about the queue. Counting them
+   * together would make a healthy Sunday morning read as a broken write-back
+   * on the Settings card, which is the kind of false alarm that teaches people
+   * to ignore the real one.
    */
   queued: number;
+  /**
+   * Active students waiting for somebody to approve them — see
+   * `backends/pendingReview.ts`. Its own number so the Review screen has a
+   * badge and Settings can say "3 waiting to be reviewed" rather than
+   * "3 queued".
+   */
+  heldForReview: number;
 }
 
 /** One scan of the students collection, for the things anybody asks of it. */
@@ -103,6 +118,7 @@ export async function scanRoster(database: FirestoreLike): Promise<RosterScan> {
     studentIdByLinkedPersonId: emptyPerBackend(() => ({})),
     recordMissing: {},
     queued: 0,
+    heldForReview: 0,
   };
 
   for (const document of snapshot.docs) {
@@ -127,6 +143,8 @@ export async function scanRoster(database: FirestoreLike): Promise<RosterScan> {
       if (linkage) {
         scan.linkedPersonIds[linkage.backendId].push(linkage.personId);
         scan.studentIdByLinkedPersonId[linkage.backendId][linkage.personId] = document.id;
+      } else if (isHeldForReview(data)) {
+        scan.heldForReview += 1;
       } else {
         scan.queued += 1;
       }

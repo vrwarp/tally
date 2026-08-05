@@ -118,6 +118,22 @@ export function computeProfileComplete(input: {
  * counselor thumb-typing "Jose" at the door and the office entering "José" are
  * the same child.
  */
+/**
+ * `nameGradeKey` with the grade left out — "are these two rows the same name",
+ * for callers who have no grade to compare or deliberately will not use it.
+ *
+ * Defined in terms of the same normaliser rather than beside it, which is the
+ * whole point: the kiosk's duplicate check and the upstream matcher have to
+ * agree about *José* and *Jose*, or the door gives two different answers about
+ * the same child depending on who typed them.
+ */
+export function nameKey(firstName: string, lastName: string): string {
+  // A constant grade cancels out, so what distinguishes two of these is exactly
+  // the folded name. The `|none` tail is carried rather than trimmed — it is
+  // part of an opaque key, and trimming it would be string surgery for looks.
+  return nameGradeKey(firstName, lastName, null);
+}
+
 export function nameGradeKey(
   firstName: string,
   lastName: string,

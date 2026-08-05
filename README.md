@@ -105,15 +105,30 @@ what makes it go and look; telling somebody to type their digits without it is t
 a screen say "no match". The same refresh is offered from the no-match state, for the family who took
 ten minutes over the form and came back to a kiosk that had moved on.
 
-Nothing here is a lobby screen deciding who somebody is. A child whose name is already on the roster
-stops the whole registration with "search for their name instead" rather than being created twice —
-no half-registered families. Upstream, a parent is joined to a person the church already has only
-when the phone number corroborates the name; anything less certain creates a fresh record, because a
-duplicate adult is a merge somebody performs next month and attaching a child to the wrong family
-shows one household another household's phone number. And a kiosk cannot write any of it directly:
-the security rules pin what a lobby session may put on a student document to the eight keys a
-check-in's date patch touches, which is why registration is a callable that decides every field
-itself.
+**Nothing here is a lobby screen deciding who somebody is**, and that is the design rather than a
+disclaimer. A registration reaches Tally's roster and stops: every child is written held
+(`pendingReview`), which is what keeps them out of Planning Center or Attendees until a named person
+has looked. The first version pushed while the parent stood there and *refused* a registration whose
+child's name already matched somebody — which sounds careful and is not. Nothing upstream is
+reversible (Attendees has no merges at all), the evidence was a stranger's typing, and "search for
+their name instead" points a family at a different child of the same name. Two rows a reviewer merges
+on Tuesday is the cheaper mistake, and the only one anybody notices.
+
+So the door records the suspicion instead, and a core-team screen at `/review` shows the form as the
+family typed it beside the roster rows that share a name: approve, merge, or discard. Approving
+pushes every child and then builds **one** household for the family. The guardian's name and phone
+wait on a functions-only document with a thirty-day TTL until then — the one place in Tally a parent's
+number lives, and [documented as the exception it is](docs/data-model.md#kioskregistrationsregistrationid).
+
+**Journey 2½ — the second child.** A parent whose next child is finally old enough finds their family
+by phone as usual, taps a name, and gets "add a brother or sister" on the confirm screen: two
+questions, because the kiosk already knows which family this is and the household upstream already
+holds their parent. The siblings it names go with the registration, the server re-verifies them, and
+approval joins **their** household rather than founding a second one for the same family.
+
+And a kiosk cannot write any of it directly: the security rules pin what a lobby session may put on a
+student document to the eight keys a check-in's date patch touches, which is why registration is a
+callable that decides every field itself.
 
 **Journey 5 — the follow-up list.** The dashboard is a call list, not a report: students who have
 missed three gatherings in a row, first-timers from the last week, profiles with no parent contact,

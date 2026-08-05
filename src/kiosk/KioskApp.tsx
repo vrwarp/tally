@@ -163,7 +163,18 @@ export function KioskApp() {
    * instead of creating the family twice.
    */
   const [registering, setRegistering] = useState<
-    { screen: 'qr' } | { screen: 'wizard'; registrationId: string } | null
+    | { screen: 'qr' }
+    | {
+        screen: 'wizard';
+        registrationId: string;
+        /**
+         * The family a sibling is being added to, when the wizard was opened
+         * from a confirm screen rather than from the front door. Empty means
+         * the six-question form for a family nobody has met.
+         */
+        anchors: KioskStudent[];
+      }
+    | null
   >(null);
   const [registration, setRegistration] = useState<KioskRegistration | null>(null);
   /**
@@ -542,7 +553,22 @@ export function KioskApp() {
   }, []);
 
   const startWizard = useCallback(() => {
-    setRegistering({ screen: 'wizard', registrationId: newRegistrationId() });
+    setRegistering({ screen: 'wizard', registrationId: newRegistrationId(), anchors: [] });
+  }, []);
+
+  /**
+   * "Add a brother or sister", from the confirm screen.
+   *
+   * The anchors are the children the kiosk already found for these four digits,
+   * which is what lets the wizard skip the adult's three questions entirely:
+   * the household upstream already holds a parent, and the server re-verifies
+   * every anchor before it believes any of it. The overlay closes first — the
+   * parent is leaving the confirm screen, not stacking a second one on it.
+   */
+  const startSiblingWizard = useCallback((anchors: KioskStudent[]) => {
+    setOverlay(null);
+    setBuffer('');
+    setRegistering({ screen: 'wizard', registrationId: newRegistrationId(), anchors });
   }, []);
 
   /**
@@ -687,11 +713,14 @@ export function KioskApp() {
         <registration.RegistrationFlow
           binding={binding}
           registrationId={registering.registrationId}
-          submit={({ registrationId, children, guardian }) =>
+          mode={registering.anchors.length > 0 ? 'sibling' : 'family'}
+          anchors={registering.anchors}
+          submit={({ registrationId, children, guardian, anchorStudentIds }) =>
             services.registerFamily({
               registrationId,
               children,
               guardian,
+              anchorStudentIds,
               eventId: binding.eventId,
             })
           }
@@ -742,6 +771,7 @@ export function KioskApp() {
           intent={overlay.intent}
           family={overlay.family}
           onConfirm={(chosen) => onConfirm(overlay, chosen)}
+          onAddSibling={startSiblingWizard}
           onBack={() => {
             // Backed out, so the labels warmed on the way in are not wanted. The
             // cache evicts on its own, but a parent who picks the wrong Noah

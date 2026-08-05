@@ -96,7 +96,6 @@ let answer: RegisterFamilyResult = {
   ],
   last4: '3344',
   checkedIn: true,
-  guardian: { upstream: 'created' },
 };
 let sent: RegisterFamilyRequest[] = [];
 let registerFails = false;
@@ -241,8 +240,7 @@ beforeEach(() => {
     ],
     last4: '3344',
     checkedIn: true,
-    guardian: { upstream: 'created' },
-  };
+    };
 });
 
 afterEach(() => {
@@ -417,19 +415,16 @@ describe('the four things a parent touches', () => {
 });
 
 describe('when it does not work', () => {
-  it('sends a family who are already on the roster to search instead', async () => {
-    answer = {
-      status: 'duplicate',
-      duplicateIndexes: [0],
-      message: 'Robin is already on our list — search for their name instead.',
-    };
-    await mount();
-    await fillInTheFamily();
-    await tap('Check in everyone');
-
-    expect(screen.getByText(/already on our list/)).toBeTruthy();
-    expect(printing.printLabel).not.toHaveBeenCalled();
-  });
+  /*
+   * There is deliberately no "already on the roster" case here any more.
+   *
+   * The kiosk used to refuse a registration whose child's name matched
+   * somebody and tell the family to search instead — which is an instruction
+   * to check in a different child of the same name, on a screen with nobody
+   * standing at it. The suspicion is recorded for the Review screen now and
+   * the family is checked in either way. See
+   * functions/src/kiosk/registration.ts.
+   */
 
   it('offers a retry under the same registration id, so nobody is created twice', async () => {
     registerFails = true;

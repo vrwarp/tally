@@ -163,8 +163,19 @@ export function createPcoBackend(args: BackendContext & { config: PcoConfig }): 
       }),
     recreateStudent: ({ studentId, firstName, lastName, grade, logger }) =>
       recreateStudent({ db, client, config, studentId, firstName, lastName, grade, logger }),
-    createFamily: ({ studentIds, firstName, lastName, phone, email, logger }) =>
-      createFamily({ db, client, config, studentIds, firstName, lastName, phone, email, logger }),
+    createFamily: ({ studentIds, anchorStudentIds, firstName, lastName, phone, email, logger }) =>
+      createFamily({
+        db,
+        client,
+        config,
+        studentIds,
+        anchorStudentIds,
+        firstName,
+        lastName,
+        phone,
+        email,
+        logger,
+      }),
 
     fetchLists: ({ search, limit }) => fetchLists({ client, search, limit }),
     fetchListMemberIds: (listId) => fetchListMemberIds(client, listId),

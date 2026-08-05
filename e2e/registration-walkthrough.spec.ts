@@ -255,32 +255,50 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
           'Typed on the same screen, seconds later. Nothing was refetched: the answer came back with the registration and went straight into what this kiosk holds. It survives the nightly rebuild too — that job reads the church\'s backends, which may not know this number for hours or, on a deployment that cannot write households, ever, so a registration keeps its digits in an overlay the rebuild folds in rather than overwrites.',
       });
 
-      /* ---- The guard ------------------------------------------------------ */
+      /* ---- The second child ---------------------------------------------- */
 
-      await kiosk.locator('[data-key="clear"]').click();
-      await kiosk.getByRole('button', { name: /Register your family/i }).click();
-      await kiosk.getByRole('button', { name: /Register right here/i }).click();
-      await typeOnKiosk(kiosk, 'Chidi');
+      /*
+       * The journey the first design treated as impossible. The parent is
+       * standing at the confirm screen for the child the kiosk already has, and
+       * the kiosk already knows which family this is — so the sibling costs two
+       * questions, not six, and joins the household upstream rather than
+       * founding a second one for the same family.
+       */
+      await kiosk.getByRole('button', { name: /Chidi/i }).first().click();
+      await shoot({
+        flow: 'The second child',
+        state: 'On the confirm screen',
+        title: 'Add a brother or sister',
+        caption:
+          'A parent whose next child is finally old enough starts here, not at the front door: they have already found their family by phone and tapped a name. The offer sits below the main action in the smaller weight, because it is the rarer of the two things somebody came to this screen to do — and it is on this screen at all because this is where the kiosk knows which family is standing in front of it.',
+      });
+
+      await kiosk.getByRole('button', { name: /Add a brother or sister/i }).click();
+      await typeOnKiosk(kiosk, 'Emeka');
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.locator('[data-key="clear"]').click();
       await typeOnKiosk(kiosk, SURNAME);
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
-      await kiosk.getByRole('button', { name: '4th grade', exact: true }).click();
+      await kiosk.getByRole('button', { name: 'Kindergarten', exact: true }).click();
       await kiosk.getByRole('button', { name: /That's everyone/i }).click();
-      await typeOnKiosk(kiosk, 'Ngozi');
-      await kiosk.getByRole('button', { name: /^Next$/ }).click();
-      await kiosk.getByRole('button', { name: /^Next$/ }).click();
-      await typeOnKiosk(kiosk, PHONE);
-      await kiosk.getByRole('button', { name: /^Next$/ }).click();
-      await kiosk.getByRole('button', { name: /Check in/i }).click();
-      await expect(kiosk.getByText(/already on our list/i)).toBeVisible({ timeout: 30_000 });
       await shoot({
-        flow: 'What it will not do',
-        state: 'Refused, nothing written',
-        title: 'Already on our list',
+        flow: 'The second child',
+        state: 'Two questions, no adult',
+        title: 'Joining the family that exists',
         caption:
-          'The same family again, five minutes later — the child who wandered off, the parent who was not sure it saved. Nothing is created. Not one of the two, either: a half-registered family is worse than one told to search, so a name already on the roster stops the whole thing. This is also what a retry meets, and why the server takes its claim on the registration before it reads the roster — otherwise a retried call would find the children it created a second ago and report them as duplicates of themselves.',
+          'No name, no phone number, no second household invented — the confirm names the siblings this child is being added to and that is the whole of it. The kiosk resolved the family from the four digits it searched with; the server re-verifies every one of those ids before it believes any of them, and at approval the household comes from an existing sibling rather than from the children in the run. That last part is the fix for a real bug: a family gaining a second child used to gain a second household, with the first child left behind in the original and invisible from the new one.',
       });
+
+      await kiosk.getByRole('button', { name: /Check in/i }).click();
+      await expect(kiosk.getByText(/is checked in\. Welcome!/i)).toBeVisible({ timeout: 30_000 });
+      await shoot({
+        flow: 'The second child',
+        state: 'Checked in, held for review',
+        title: 'Recorded, not decided',
+        caption:
+          'Nothing reached Planning Center. Every child a family registers is written held, and the hold is the only thing that gates the push — both backends, both sweeps, the on-create trigger and the re-create repair all consult it. What happens next happens on a weekday, on a core-team screen, with the form as the family typed it beside any roster row that shares a name: approve, merge, or discard. The door records; a person decides.',
+      });
+
     } finally {
       await context.close();
     }

@@ -11,8 +11,24 @@
  * Paged rather than whole for the same reason: a student with two years of
  * imported history has a hundred-odd records, and a leader looking for when
  * somebody started usually finds it in the first twenty.
+ *
+ * ## More than one id
+ *
+ * A student who absorbed a duplicate is one child with two document ids, and
+ * attendance is never re-keyed when they are merged — deliberately, because
+ * re-keying is a write per night against records that have already been
+ * reported on. So the *read* is what puts the two halves back together: one
+ * cursor per id, a page from each, merged newest-first.
+ *
+ * The consequence is worth stating plainly, because it is visible. Each stream
+ * pages independently, so a later page of one can carry rows older than nothing
+ * and newer than everything already shown — the list re-sorts and rows appear
+ * in the middle rather than at the end. The alternative is a lookahead merge
+ * that fetches ahead of what it shows, which costs reads to make the scroll
+ * tidier. Showing every night, in order, in the fewest reads, is the trade
+ * taken. "Show more" is exhausted only when every stream is.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   fetchStudentHistory,
   type StudentHistoryCursor,
@@ -24,58 +40,86 @@ export interface StudentHistoryState {
   /** True once anything has been asked for — the button becomes a list. */
   started: boolean;
   loading: boolean;
-  /** False once the history is exhausted. */
+  /** False once every stream is exhausted. */
   hasMore: boolean;
   error: Error | null;
   loadMore: () => void;
 }
 
-export function useStudentHistory(studentId: string | null): StudentHistoryState {
+function timeOf(entry: StudentHistoryEntry): number {
+  return (entry.event?.startAt ?? entry.record.checkedInAt).getTime();
+}
+
+export function useStudentHistory(
+  studentId: string | readonly string[] | null,
+): StudentHistoryState {
+  const ids = useMemo(() => {
+    if (studentId === null) return [] as string[];
+    const list = typeof studentId === 'string' ? [studentId] : [...studentId];
+    return [...new Set(list.filter((id) => id.length > 0))];
+  }, [studentId]);
+  // The array identity changes on every render of a caller that builds it
+  // inline; the *key* is what the effects below should turn on.
+  const key = ids.join('|');
+
   const [entries, setEntries] = useState<StudentHistoryEntry[]>([]);
   const [started, setStarted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  const cursor = useRef<StudentHistoryCursor | null>(null);
-  /** Guards against a second page landing for the student we just left. */
+  /** Per id: the next cursor, or `done` once that stream is exhausted. */
+  const cursors = useRef<Map<string, StudentHistoryCursor | null | 'done'>>(new Map());
+  /** Guards against a page landing for the student we just left. */
   const readingFor = useRef<string | null>(null);
 
   useEffect(() => {
     // A different student is a different history. Everything resets, including
-    // the cursor, which would otherwise page one student's records into
+    // the cursors, which would otherwise page one student's records into
     // another's list.
-    cursor.current = null;
-    readingFor.current = studentId;
+    cursors.current = new Map();
+    readingFor.current = key;
     setEntries([]);
     setStarted(false);
     setLoading(false);
     setHasMore(true);
     setError(null);
-  }, [studentId]);
+  }, [key]);
 
   const loadMore = useCallback(() => {
-    if (!studentId) return;
+    if (ids.length === 0) return;
 
     setStarted(true);
     setLoading(true);
     setError(null);
 
-    const forStudent = studentId;
-    void fetchStudentHistory(forStudent, cursor.current)
-      .then((page) => {
-        if (readingFor.current !== forStudent) return;
-        cursor.current = page.cursor;
-        setEntries((current) => [...current, ...page.entries]);
-        setHasMore(page.hasMore);
+    const forKey = key;
+    const live = ids.filter((id) => cursors.current.get(id) !== 'done');
+
+    void Promise.all(
+      live.map(async (id) => {
+        const cursor = cursors.current.get(id);
+        const page = await fetchStudentHistory(id, cursor === 'done' ? null : (cursor ?? null));
+        return { id, page };
+      }),
+    )
+      .then((pages) => {
+        if (readingFor.current !== forKey) return;
+        const fresh: StudentHistoryEntry[] = [];
+        for (const { id, page } of pages) {
+          cursors.current.set(id, page.hasMore && page.cursor ? page.cursor : 'done');
+          fresh.push(...page.entries);
+        }
+        setEntries((current) => [...current, ...fresh].sort((a, b) => timeOf(b) - timeOf(a)));
+        setHasMore(ids.some((id) => cursors.current.get(id) !== 'done'));
         setLoading(false);
       })
       .catch((cause: unknown) => {
-        if (readingFor.current !== forStudent) return;
+        if (readingFor.current !== forKey) return;
         setError(cause instanceof Error ? cause : new Error(String(cause)));
         setLoading(false);
       });
-  }, [studentId]);
+  }, [ids, key]);
 
   return { entries, started, loading, hasMore, error, loadMore };
 }

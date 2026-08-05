@@ -7,6 +7,7 @@
  * Registered with the backend registry at module load; importing this module
  * is what makes the backend available to a deployment.
  */
+import { isHeldForReview } from '../backends/pendingReview.js';
 import { registerA32Backend } from '../backends/registry.js';
 import type { BackendContext, PeopleBackend } from '../backends/types.js';
 import type { A32Config } from '../config.js';
@@ -83,7 +84,11 @@ export function createA32Backend(args: BackendContext & { config: A32Config }): 
           return (
             data.pcoPushPending === true &&
             typeof data.pcoPersonId !== 'string' &&
-            typeof data.upstreamPersonId !== 'string'
+            typeof data.upstreamPersonId !== 'string' &&
+            // The same exclusion the Planning Center sweep makes: a family
+            // waiting to be reviewed is not a stranded push. See
+            // backends/pendingReview.ts.
+            !isHeldForReview(data)
           );
         })
         .slice(0, limit ?? 100);
@@ -123,13 +128,14 @@ export function createA32Backend(args: BackendContext & { config: A32Config }): 
         createNew,
         logger,
       }),
-    createFamily: ({ studentIds, firstName, lastName, phone, email, logger }) =>
+    createFamily: ({ studentIds, anchorStudentIds, firstName, lastName, phone, email, logger }) =>
       createFamily({
         db,
         client,
         config,
         cache,
         studentIds,
+        anchorStudentIds,
         firstName,
         lastName,
         phone,

@@ -533,7 +533,10 @@ export function applyRegistration(result: {
     writeCachedRoster([...byId.values()]);
   }
 
-  const storedIndex = readJson<StoredPhoneIndex>(KIOSK_KEYS.phoneIndex);
+  // Empty for a sibling registration whose family answers to no digits at all
+  // — their household number never reached a backend. Writing it would file
+  // every such child under one nameless bucket that the search can never hit.
+  const storedIndex = result.last4 ? readJson<StoredPhoneIndex>(KIOSK_KEYS.phoneIndex) : null;
   if (storedIndex && storedIndex.last4) {
     const held = storedIndex.last4[result.last4] ?? [];
     writeJson(KIOSK_KEYS.phoneIndex, {

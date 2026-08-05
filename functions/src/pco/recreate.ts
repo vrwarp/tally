@@ -24,6 +24,7 @@
  *    after the new person, pointered both ways, exactly like a merge graft —
  *    attendance history stays anchored to the old document.
  */
+import { HELD_FOR_REVIEW_MESSAGE, isHeldForReview } from '../backends/pendingReview.js';
 import type { PcoConfig } from '../config.js';
 import { PATHS, SILENT_LOGGER, type FirestoreLike, type FunctionLogger } from '../firestore.js';
 import type { PcoClient } from './client.js';
@@ -90,6 +91,15 @@ export async function recreateStudent(
   const data = snapshot.data() ?? {};
   if (data.status === 'inactive') {
     return result('no-student', 'That student is not on the roster.');
+  }
+  /*
+   * A held student would fall through to `not-linked` and be told "the ordinary
+   * push will create them", which is exactly what will not happen — and the
+   * visitor branch below clears the link and pushes, which is the one thing a
+   * hold exists to prevent. See backends/pendingReview.ts.
+   */
+  if (isHeldForReview(data)) {
+    return result('not-linked', HELD_FOR_REVIEW_MESSAGE);
   }
 
   const linkedId =

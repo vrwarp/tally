@@ -248,3 +248,37 @@ describe('going back', () => {
     expect(goBack(start())).toBeNull();
   });
 });
+
+describe('adding a sibling', () => {
+  const sibling = () =>
+    initialState({ registrationId: 'r-1', requiresCheckOut: false, mode: 'sibling' });
+
+  it('skips the adult entirely — two questions, not six', () => {
+    let held = addChild(sibling(), 'Ada', 'Lovelace', 4 as Grade);
+    expect(held.step).toBe('another');
+
+    held = answerAnother(held, false, false);
+    // Straight to the confirm. The family is already identified by the digits
+    // they searched with, and the household upstream already holds their
+    // parent — asking again is three questions to learn nothing.
+    expect(held.step).toBe('confirm');
+    expect(held.children).toHaveLength(1);
+  });
+
+  it('still loops, for the parent adding two at once', () => {
+    let held = addChild(sibling(), 'Ada', 'Lovelace', 4 as Grade);
+    held = answerAnother(held, true, false);
+    held = addChild(held, 'Byron', 'Lovelace', 1 as Grade);
+    held = answerAnother(held, false, false);
+
+    expect(held.step).toBe('confirm');
+    expect(held.children.map((child) => child.firstName)).toEqual(['Ada', 'Byron']);
+  });
+
+  it('goes back to the list rather than to an adult who was never asked about', () => {
+    let held = addChild(sibling(), 'Ada', 'Lovelace', 4 as Grade);
+    held = answerAnother(held, false, false);
+
+    expect(goBack(held)!.step).toBe('another');
+  });
+});

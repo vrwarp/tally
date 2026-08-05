@@ -33,6 +33,7 @@ import {
   isTypingStep,
   MAX_CHILDREN,
   type DraftChild,
+  type RegistrationMode,
   type RegistrationState,
 } from './steps';
 
@@ -78,9 +79,7 @@ function makeReducer(requiresCheckOut: boolean) {
       case 'submitting':
         return { ...state, step: 'submitting', message: '' };
       case 'submitted':
-        return action.result.status === 'created'
-          ? { ...state, step: 'success', last4: action.result.last4 }
-          : { ...state, step: 'duplicate', message: action.result.message };
+        return { ...state, step: 'success', last4: action.result.last4 };
       case 'failed':
         return {
           ...state,
@@ -95,13 +94,21 @@ export interface RegistrationFlowProps {
   binding: KioskBinding;
   /** Minted by the caller so a remount cannot re-mint it mid-run. */
   registrationId: string;
+  /**
+   * `sibling` when the parent got here from their own family's row, so the
+   * adult's three questions are skipped and `anchors` says who they are.
+   */
+  mode?: RegistrationMode;
+  /** The siblings already on the roster, in sibling mode. Named on the confirm. */
+  anchors?: readonly { id: string; firstName: string; lastName: string }[];
   submit: (args: {
     registrationId: string;
     children: DraftChild[];
-    guardian: { firstName: string; lastName: string; phone: string };
+    guardian: { firstName: string; lastName: string; phone: string } | null;
+    anchorStudentIds: string[];
   }) => Promise<RegisterFamilyResult>;
   /** Everybody registered and checked in — the caller greens their rows and prints. */
-  onRegistered: (result: Extract<RegisterFamilyResult, { status: 'created' }>) => void;
+  onRegistered: (result: RegisterFamilyResult) => void;
   /** Back to search: cancelled, timed out, or finished. */
   onClose: () => void;
 }
@@ -109,6 +116,8 @@ export interface RegistrationFlowProps {
 export function RegistrationFlow({
   binding,
   registrationId,
+  mode = 'family',
+  anchors,
   submit,
   onRegistered,
   onClose,
@@ -118,9 +127,10 @@ export function RegistrationFlow({
   const reduce = useMemo(() => makeReducer(tracksCheckOut), [tracksCheckOut]);
   const [state, dispatch] = useReducer(
     reduce,
-    { registrationId, requiresCheckOut: tracksCheckOut },
+    { registrationId, requiresCheckOut: tracksCheckOut, mode },
     initialState,
   );
+  const anchorIds = useMemo(() => (anchors ?? []).map((sibling) => sibling.id), [anchors]);
 
   const onKey = useCallback((key: KioskKey) => dispatch({ type: 'key', key }), []);
 
@@ -145,20 +155,31 @@ export function RegistrationFlow({
     void submit({
       registrationId: state.registrationId,
       children: state.children,
-      guardian: state.guardian,
+      // Null in sibling mode, and the server refuses that unless the anchors
+      // it verifies say which family this is.
+      guardian: state.mode === 'sibling' ? null : state.guardian,
+      anchorStudentIds: state.mode === 'sibling' ? anchorIds : [],
     })
       .then((result) => {
         // A retry re-sends the same registrationId, which is what makes the
         // callable answer rather than create a second family.
         submittedRef.current = false;
         dispatch({ type: 'submitted', result });
-        if (result.status === 'created') onRegistered(result);
+        onRegistered(result);
       })
       .catch(() => {
         submittedRef.current = false;
         dispatch({ type: 'failed' });
       });
-  }, [submit, state.registrationId, state.children, state.guardian, onRegistered]);
+  }, [
+    submit,
+    state.registrationId,
+    state.children,
+    state.guardian,
+    state.mode,
+    anchorIds,
+    onRegistered,
+  ]);
 
   useEffect(() => {
     if (state.step !== 'success') return;
@@ -254,14 +275,29 @@ export function RegistrationFlow({
               {state.children.map((child, index) => (
                 <ChildRow key={`${child.firstName}-${child.lastName}-${index}`} child={child} />
               ))}
-              <div className="flex h-16 items-center justify-between rounded-xl bg-ink-900/60 px-5">
-                <span className="truncate text-lg text-ink-300">
-                  {state.guardian.firstName} {state.guardian.lastName}
-                </span>
-                <span className="pl-3 text-base whitespace-nowrap text-ink-500">
-                  {formatPhone(state.guardian.phone)}
-                </span>
-              </div>
+              {state.mode === 'sibling' ? (
+                /*
+                  Who this child is being added to. The kiosk guessed the family
+                  from four digits (see family.ts for how much of a guess that
+                  is), so the guess goes on the glass above the button rather
+                  than staying in the request — a parent looking at a stranger's
+                  children in their own confirmation cannot miss it.
+                */
+                <p className="px-1 pt-1 text-base text-ink-400">
+                  {anchors && anchors.length > 0
+                    ? `Joining ${anchors.map((sibling) => sibling.firstName).join(', ')}.`
+                    : 'Joining your family.'}
+                </p>
+              ) : (
+                <div className="flex h-16 items-center justify-between rounded-xl bg-ink-900/60 px-5">
+                  <span className="truncate text-lg text-ink-300">
+                    {state.guardian.firstName} {state.guardian.lastName}
+                  </span>
+                  <span className="pl-3 text-base whitespace-nowrap text-ink-500">
+                    {formatPhone(state.guardian.phone)}
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
@@ -285,14 +321,10 @@ export function RegistrationFlow({
             </div>
           )}
 
-          {(state.step === 'duplicate' || state.step === 'error') && (
+          {state.step === 'error' && (
             <div className="flex flex-col gap-4 pt-6 text-center">
               <p className="text-xl text-ink-200">{state.message}</p>
-              {state.step === 'duplicate' ? (
-                <Big label="Search for them" tone="brand" onPick={onClose} />
-              ) : (
-                <Big label="Try again" tone="brand" onPick={runSubmit} />
-              )}
+              <Big label="Try again" tone="brand" onPick={runSubmit} />
             </div>
           )}
         </div>
@@ -454,7 +486,11 @@ function titleFor(state: RegistrationState, childNumber: number): string {
     case 'child-first':
     case 'child-last':
     case 'child-grade':
-      return childNumber === 1 ? 'Your child' : `Child ${childNumber}`;
+      return state.mode === 'sibling' && childNumber === 1
+        ? 'Their brother or sister'
+        : childNumber === 1
+          ? 'Your child'
+          : `Child ${childNumber}`;
     case 'another':
       return 'Anybody else?';
     case 'guardian-first':
@@ -467,8 +503,6 @@ function titleFor(state: RegistrationState, childNumber: number): string {
       return 'One moment';
     case 'success':
       return 'All done';
-    case 'duplicate':
-      return 'Already here';
     case 'error':
       return 'Something went wrong';
   }

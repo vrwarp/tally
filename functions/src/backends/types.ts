@@ -203,6 +203,13 @@ export interface PeopleBackend {
   createFamily?(args: {
     /** Every child of this family, as Tally student ids. */
     studentIds: readonly string[];
+    /**
+     * Siblings the backend already holds. Their household is the family's real
+     * one, so it is joined rather than a second one invented — the difference
+     * between "a family nobody has met" and "a family whose second child is
+     * finally old enough". Ignored by a backend with no households.
+     */
+    anchorStudentIds?: readonly string[];
     firstName: string;
     lastName: string;
     /** Digits only. Written onto the adult, never over something already there. */

@@ -25,6 +25,16 @@
  * that is about to press, and each one unticks with a tap. The kiosk's guess at
  * a family can be wrong; a parent looking at a stranger's child in their own
  * list cannot miss it.
+ *
+ * ## The one who is not on it
+ *
+ * A family whose second child is finally old enough is standing at a screen
+ * that has found the first one and has no way to mention the second. That is
+ * this screen's job too, because this is where the parent already is and where
+ * the kiosk already knows which family they are: `onAddSibling` opens the same
+ * wizard the front door uses, in its two-question form, anchored to the
+ * children on this screen. Underneath the confirm button, in the smaller
+ * weight — it is the rarer of the two things a parent came here to do.
  */
 import { useState } from 'react';
 import { gradeDescription, haptic } from '@/lib/utils';
@@ -38,6 +48,7 @@ export function ConfirmScreen({
   intent,
   family,
   onConfirm,
+  onAddSibling,
   onBack,
 }: {
   student: KioskStudent;
@@ -49,6 +60,11 @@ export function ConfirmScreen({
   family: readonly KioskStudent[];
   /** Everyone the parent is confirming, the tapped student first. */
   onConfirm: (chosen: KioskStudent[]) => void;
+  /**
+   * Opens the sibling wizard against this family. Absent when there is nothing
+   * to anchor to — a collection, or a kiosk with no registration flow.
+   */
+  onAddSibling?: (anchors: KioskStudent[]) => void;
   onBack: () => void;
 }) {
   // Empty means everybody: a family arrives together. See the note above.
@@ -153,6 +169,28 @@ export function ConfirmScreen({
           style={{ touchAction: 'manipulation' }}
         >
           {others > 0 ? `Check in all ${chosen.length}` : 'Check in'}
+        </button>
+      )}
+
+      {/*
+        Only on a check-in, and only when there is somebody to anchor to. A
+        collection is not the moment to add a child to the roster, and a
+        registration with no verified sibling is a first-time registration —
+        which is what the front door's "Register your family" is for.
+      */}
+      {onAddSibling && intent !== 'check-out' && (
+        <button
+          type="button"
+          tabIndex={-1}
+          onPointerDown={(event) => {
+            event.preventDefault();
+            haptic();
+            onAddSibling([student, ...family]);
+          }}
+          className="shrink-0 rounded-xl px-8 py-4 text-xl text-ink-400 active:bg-ink-800"
+          style={{ touchAction: 'manipulation' }}
+        >
+          + Add a brother or sister
         </button>
       )}
 

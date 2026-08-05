@@ -787,6 +787,58 @@ describe('the check-in freeze (pcoRecordMissing)', () => {
   });
 });
 
+describe('the review hold (pendingReview)', () => {
+  /*
+   * The hold is the *only* thing that keeps a self-registered family out of the
+   * church's people database (functions/src/backends/pendingReview.ts). A
+   * client that could clear it would have a direct, unreviewed line into
+   * Planning Center; one that could set it could quietly freeze a student a
+   * leader added by hand. Neither direction, then — and the database is what
+   * says so, not a reviewer.
+   */
+  async function seedHeldStudent(studentId: string): Promise<void> {
+    await env.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), paths.student(studentId)),
+        studentDoc({ pcoPushPending: true, pendingReview: true }),
+      );
+    });
+  }
+
+  it('rejects a client holding a student it creates', async () => {
+    const db = asUser(env, UID.counselor);
+    await assertFails(
+      setDoc(doc(db, paths.student('forged-hold')), studentDoc({ pendingReview: true })),
+    );
+  });
+
+  it('rejects a client approving a held student itself', async () => {
+    await seedHeldStudent(ID.otherStudent);
+    const db = asUser(env, UID.admin);
+    await assertFails(
+      updateDoc(doc(db, paths.student(ID.otherStudent)), { pendingReview: false }),
+    );
+  });
+
+  it('rejects a kiosk clearing its own registration’s hold', async () => {
+    await seedHeldStudent(ID.otherStudent);
+    const db = asKiosk(env, UID.counselor);
+    await assertFails(
+      updateDoc(doc(db, paths.student(ID.otherStudent)), { pendingReview: false }),
+    );
+  });
+
+  it('still lets an ordinary edit through on a held student', async () => {
+    await seedHeldStudent(ID.otherStudent);
+    const db = asUser(env, UID.counselor);
+    // A counselor correcting a name must not be blocked by the hold: it gates
+    // the push, not the roster.
+    await assertSucceeds(
+      updateDoc(doc(db, paths.student(ID.otherStudent)), { firstName: 'Robin' }),
+    );
+  });
+});
+
 describe('rsvps', () => {
   it('rejects a counselor changing the RSVP status', async () => {
     const db = asUser(env, UID.counselor);

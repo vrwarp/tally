@@ -592,7 +592,17 @@ test.describe('registering a family at the kiosk', () => {
     }
   });
 
-  test('sends a family already on the roster to search instead', async ({
+  /*
+   * A name already on the roster is not a refusal any more.
+   *
+   * The kiosk used to stop the whole registration and say "search for their
+   * name instead", which is an instruction to check in a different child of
+   * the same name — on an unattended screen, with a queue behind. The
+   * suspicion is recorded on the review record for a core-team member to act
+   * on, and the family walks away checked in. See
+   * functions/src/kiosk/registration.ts.
+   */
+  test('registers a family whose name is already on the roster, and checks them in', async ({
     browser,
     page,
     signedInAs,
@@ -620,9 +630,9 @@ test.describe('registering a family at the kiosk', () => {
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: /^Check in$/ }).click();
 
-      await expect(kiosk.getByText(/already on our list/i)).toBeVisible({ timeout: 20_000 });
-      await kiosk.getByRole('button', { name: /Search for them/i }).click();
-      await expect(kiosk.getByText(/type a name, or the last 4 digits/i)).toBeVisible();
+      await expect(kiosk.getByText(/is checked in\. Welcome!/i)).toBeVisible({ timeout: 20_000 });
+      // And the handoff they will use next week, which the refusal never got to.
+      await expect(kiosk.getByText(/9001/)).toBeVisible();
     } finally {
       await context.close();
     }

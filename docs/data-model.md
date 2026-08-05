@@ -241,7 +241,10 @@ before they exist anywhere upstream.
 | `upstreamBackend`, `upstreamPersonId` | `'pco' \| 'a32'` \| string, or absent | The generic linkage pair: which people-backend holds this student, and as whom. Planning Center writes both fields *and* the legacy `pcoPersonId`; Attendees writes only these. Absent generics with a bare `pcoPersonId` still mean Planning Center, which is what makes the scheme migration-free. |
 | `pcoPushPending` | boolean | A Tally-created student still waiting to be pushed — to the deployment's **default push backend**, decided server-side at push time (`config/backends`). Named for the first backend Tally had; it queues for every backend. |
 | `pcoRecordMissing` | boolean, or absent | Server-written: the linked upstream record is known gone (deleted, or merged with the trail ending dead). While it stands the rules freeze the student's check-ins, past nights included. Same naming note as above — it freezes for every backend. |
-| `registrationId` | string, or absent | Written only by `registerFamily`: this child arrived through the kiosk's "first time here" wizard rather than a leader's thumb. It does two jobs. It is the provenance mark a core-team screen can read without a new field per source. And it makes `onStudentCreated` stand down — a self-registration pushes its own children inside the request that created them, because the household write has to be sequenced after every child is upstream, and two pushes racing for one child would both pass `findExistingPerson` and create two upstream people. A crash before that push leaves `pcoPushPending` set, which `pushPendingVisitors` sweeps like any other stranded visitor. Not writable from a kiosk session: the key set pinned by `kioskDatePatchKeys()` does not include it. |
+| `registrationId` | string, or absent | Written only by `registerFamily`: this child arrived through the kiosk's "first time here" wizard rather than a leader's thumb. Provenance, and only that — it points back at the [review record](#kioskregistrationsregistrationid) a support question or a reviewer needs. It used to double as the push gate, on the reasoning that a self-registration pushed its own children; `pendingReview` below is that job now, and it is the job the field was doing by accident rather than by meaning. Not writable from a kiosk session: the key set pinned by `kioskDatePatchKeys()` does not include it. |
+| `pendingReview` | boolean, or absent | **The hold.** `true` while a self-registered family is waiting for somebody to approve them, and the *only* thing that keeps them out of the church's people database: every push path consults it — both backends' `pushStudent`, both pending sweeps, `onStudentCreated`, and the re-create repair. `pcoPushPending` stays `true` alongside it, because the child genuinely is queued; what the hold adds is that the queue does not drain on its own. Cleared by `approveRegistration`, which then pushes. Server-written in both directions: `reviewHoldUnchanged()` in the rules refuses a client that sets *or* clears it, because a kiosk that could clear its own hold would be a kiosk with a direct line into Planning Center. Counted apart from `queued` on the Settings card — a family waiting for a person is not a stuck queue. |
+| `mergedIntoStudentId` | string, or absent | Set on the loser of a merge: this row is really the student it names. The document stays, inactive, because every attendance record points at it. |
+| `mergedFromStudentIds` | string[], or absent | Set on the winner: the rows folded into it. Attendance is never re-keyed by a merge — that would be a write per night against records already reported on — so the student's profile unions the histories at read time instead (`useStudentHistory`). A list rather than the older single-valued `mergedFromStudentId`, which silently overwrote the first duplicate when a keeper absorbed a second. |
 | `createdAt`, `updatedAt`, `createdBy` | — | `createdBy` is a uid, or a source sentinel — `'planning-center'`, `'attendees32'` — for records an import created. For a student a history import touches, `createdAt` is their earliest attended gathering rather than the moment of import — `predictiveRoster` and the MIA derivation both drop history from before this date, so "created today" would excuse a student from every past night *and* leave their whole imported attendance somewhere no screen counts it. The import moves an existing `createdAt` earlier for the same reason: a student first checked in through Tally last week carries last week's date, and their two years of kiosk history sit before it. |
 
 **A document here *is* the roster membership.** No document, not on the roster. For a student a
@@ -489,15 +492,16 @@ the family upstream, reduced to its tail, and discarded with the request.
 
 ### `kioskRegistrations/{registrationId}`
 
-One document per run of the kiosk's "first time here" wizard: the claim that makes a retried
-registration answer instead of creating a second family.
+One document per run of the kiosk's "first time here" wizard. It does two jobs: it is the claim that
+makes a retried registration answer instead of creating a second family, and it is the **review
+record** a core-team member acts on afterwards.
 
 A parent taps once. A wifi blip means the call runs twice, and the kiosk's retry queue is no help —
 it replays direct Firestore writes, and a callable is not one. So the client mints a
 `registrationId` once per wizard run and re-sends it, and the server claims this document with
 `create()` (the same ALREADY_EXISTS handshake `startKioskPairing` uses). A second call with the same
-id is recognised as a retry *before anything reads the roster* — otherwise it would find the
-children it created a second ago and report them as duplicates of themselves.
+id is recognised as a retry before anything else happens; the pre-allocated student ids below are
+what make every write downstream safe to repeat.
 
 | Field | Type | Notes |
 | --- | --- | --- |
@@ -505,15 +509,39 @@ children it created a second ago and report them as duplicates of themselves.
 | `studentIds` | string[] | Pre-allocated before the batch, which is the whole mechanism. |
 | `source` | `'kiosk' \| 'qr'` | |
 | `eventId`, `checkedIn`, `childCount`, `last4` | — | Enough to answer a completed call again. |
-| `createdAt`, `completedAt` | — | Swept opportunistically after 24 hours, like the pairings. |
+| `guardian` | `{ firstName, lastName, phone }` \| null | **The exception below.** Null only on a sibling registration, where the family is already identified. |
+| `children` | `{ firstName, lastName, grade }[]` | The form as typed, so a reviewer sees what the family wrote and not only what the roster now says. |
+| `allergies` | `(string \| null)[]` | Index-aligned with `children`, and only ever non-empty from the `/welcome` form — the kiosk has no field for it. Sent upstream on approval and held nowhere else. |
+| `possibleDuplicateOf` | map | Child index → active student ids with the same name. Recorded, never acted on: it is what puts "this might be the Jacob Smith we have" in front of a human. |
+| `anchorStudentIds` | string[] | Verified siblings, when a parent added a second child to a family the church already has. Decides which household is joined at approval. |
+| `lastError` | string \| null | Why the last approval attempt did not finish. |
+| `createdAt`, `completedAt` | — | Swept after **30 days**, or deleted the moment a reviewer approves or discards. |
 
-**What is deliberately not here:** the names and the phone number. A retry re-sends all of it, and a
-collection of half-finished registrations is not a place to accumulate what the rest of the database
-refuses to hold.
+#### The one place Tally holds a parent's phone number
 
-**Who writes: nobody, from a client.** Readable, it would say which families registered today and
-how many children each brought; writable, somebody could pre-claim an id and make a family's
-registration hand them a stranger's students.
+This is a deliberate, documented exception to [what is *not* stored](#what-is-not-stored), and it
+exists because the alternative was worse. Registration used to write the guardian straight through to
+Planning Center while the parent stood at the screen — so nothing had to be kept. Deferring that push
+until somebody has reviewed the family (which is the whole point: nothing upstream is reversible, and
+a lobby screen cannot decide identity) would otherwise mean *losing* the guardian entirely, because
+`noMirroredPersonalData` in `firestore.rules` forbids a parent's name or number on a student document
+and there is nowhere else for it to go.
+
+So it waits here, and "waits" is enforced rather than asserted:
+
+- **No client can read it.** The collection is deny-all in both directions. The only way to see it is
+  the `listPendingRegistrations` callable, which is core team only — the same role that may already
+  push a student into the church's database.
+- **It is deleted on decision.** Approve or discard, the document goes. An approval whose family
+  write *failed* keeps it, with the reason, so pressing the button again can still finish the job —
+  that is the only case where it survives a review.
+- **It is deleted anyway.** Thirty days, swept from the review call. Long enough to cover a holiday
+  and a volunteer who was away; short enough that it is a deletion date and not an archive. The
+  review screen ages rows toward it, so a family about to be swept is visible as one first.
+
+**Who writes: nobody, from a client.** Readable, it would say which families registered today, how
+many children each brought, and how to ring them; writable, somebody could pre-claim an id and make a
+family's registration hand them a stranger's students.
 
 ### `kioskRegistrationCodes/{code}`
 
@@ -533,7 +561,7 @@ left on it.
 | --- | --- | --- |
 | `createdAt`, `expiresAt` | — | Twenty minutes. Long enough to walk away, find the camera app and mistype a name; short enough that a photograph of the lobby screen is worth nothing by the end of the service. |
 | `mintedBy` | string | The approver's uid, inherited by the kiosk that asked. |
-| `submissions`, `maxSubmissions` | number | Twenty families through one QR in twenty minutes is not a busy lobby, it is somebody replaying the form. Spent *after* a registration lands, so a call that failed validation or met the duplicate guard costs the family nothing. |
+| `submissions`, `maxSubmissions` | number | Twenty families through one QR in twenty minutes is not a busy lobby, it is somebody replaying the form. Spent *after* a registration lands, so a call that failed validation costs the family nothing. |
 
 Same guardrails as the pairings, for the same reasons: a TTL, a cap of ten live codes at once, and a
 sweep run from the mint. What is deliberately **not** borrowed is the device secret — a pairing
@@ -619,10 +647,19 @@ No birthdates, addresses, photographs, student phone numbers or emails, medical 
 single allergy line, and nothing financial whatsoever — not a card number, not a fee, not a record of
 who has paid. See the data-handling note in the [README](../README.md#handling-minors-data).
 
-The one deliberate brush with contact data is [`kioskIndex/phones`](#kioskindexphones): the kiosk's
-phone search stores the **last four digits** of family numbers, mapped to student ids, and nothing
-more. Never a full number, never a name attached to a number, and always rebuildable — deleting the
-document costs one rebuild, not any data.
+There are exactly two deliberate brushes with contact data, and both are bounded on purpose.
+
+[`kioskIndex/phones`](#kioskindexphones) is the kiosk's phone search: the **last four digits** of
+family numbers, mapped to student ids, and nothing more. Never a full number, never a name attached
+to a number, and always rebuildable — deleting the document costs one rebuild, not any data.
+
+[`kioskRegistrations`](#kioskregistrationsregistrationid) is the newer one and the wider one: a
+guardian's name and full phone number, waiting for somebody to review the family who typed them. It
+is a **staging buffer, not a mirror**, and the difference is enforced — no client read path at all,
+a core-team callable to see it, deletion the moment a reviewer decides, and a thirty-day sweep if
+nobody does. It exists because holding a family out of the church's database until a person has
+looked at them means holding *something* about them somewhere, and the honest place for that is one
+TTL'd document nobody can read rather than a field on four hundred student records.
 
 Everything the dashboard and the check-in screen display beyond the fields above is derived in the
 browser: the Recent filter, MIA students, new visitors, roster warnings, head-count trends. Those live

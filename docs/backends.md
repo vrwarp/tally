@@ -56,14 +56,33 @@ finds adults upstream with the name it was given it stops and hands them back as
 human to choose from — because creating a second David Kim is a merge somebody performs by hand,
 while attaching a child to the wrong David Kim shows one family another family's contact details.
 
-`createFamily` serves the kiosk's self-registration, where there is nobody to ask. Two consequences.
-It takes **every child at once** and puts them in one household — calling `addParent` per child would
-mint one household per sibling and leave each of them alone in it. And it decides the ambiguous case
-on evidence rather than deferring it: an upstream adult is joined only when their phone number
-matches the one the parent just typed, and any other outcome — no match, a name match with a
-different number, several matches at once — creates a fresh person. A duplicate adult is next
-month's merge; a wrong join has no undo. It also refuses outright when a child's household already
-has an adult, rather than adding a second one from a lobby form.
+`createFamily` serves the kiosk's self-registration — not at the door any more, but on the
+[Review screen](../README.md) where somebody approves the family. Three consequences.
+
+It takes **every child at once** and puts them in one household. Calling `addParent` per child would
+mint one household per sibling and leave each of them alone in it, which is also why approval replays
+per *registration* rather than per student.
+
+It takes **`anchorStudentIds`**: siblings the church already has, whose household is the family's
+real one. Without them the household was derived from the children in the run — every one of which
+had been created seconds earlier and had none — so a family gaining a second child got a second
+household while the first child stayed behind in the original, invisible from the new one. When an
+anchor's household already holds an adult (which is what an established family means) nothing is
+created at all: the new child is filed into it and the call returns `already-has-family`.
+
+And it decides the ambiguous case on evidence rather than deferring it: an upstream adult is joined
+only when their phone number matches the one the parent typed, and any other outcome — no match, a
+name match with a different number, several matches at once — creates a fresh person. A duplicate
+adult is next month's merge; a wrong join has no undo. Absent an anchor, it refuses outright when a
+child's household already has an adult, rather than adding a second one from a lobby form.
+
+### The push gate
+
+Every path that could put a student into a backend consults `pendingReview` first — `pushStudent` on
+both adapters, both pending sweeps, the `onStudentCreated` trigger and Planning Center's re-create
+repair. See `functions/src/backends/pendingReview.ts`. A hold with one bypass is not a hold, and the
+bypasses are the paths nobody thinks about: a button on the Settings screen that sweeps the whole
+queue, and a repair that re-creates a person somebody deleted upstream.
 
 ## Ids and linkage
 

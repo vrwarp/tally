@@ -33,8 +33,22 @@ export type StepKind =
   | 'confirm'
   | 'submitting'
   | 'success'
-  | 'duplicate'
   | 'error';
+
+/**
+ * Which of the two journeys this run is.
+ *
+ * `family` is a household nobody has met: three questions per child, three
+ * about the adult, a confirm — six for one child.
+ *
+ * `sibling` is the common case the first design treated as impossible. A parent
+ * whose second child is finally old enough found themselves by phone a moment
+ * ago, so the kiosk already knows which family this is and the server can
+ * verify it. Asking for the adult again would be three questions to learn
+ * nothing and one more chance to mistype a name onto a second household. Two
+ * questions, then.
+ */
+export type RegistrationMode = 'family' | 'sibling';
 
 export interface DraftChild {
   firstName: string;
@@ -43,6 +57,7 @@ export interface DraftChild {
 }
 
 export interface RegistrationState {
+  mode: RegistrationMode;
   step: StepKind;
   /** Minted once per run and re-sent on every retry — see the callable. */
   registrationId: string;
@@ -63,7 +78,7 @@ export interface RegistrationState {
   shift: ShiftState;
   /** Set on `success`: the digits to teach the family. */
   last4: string;
-  /** Set on `duplicate` and `error`: what to put on the screen. */
+  /** Set on `error`: what to put on the screen. */
   message: string;
 }
 
@@ -83,8 +98,10 @@ export function defaultGrade(requiresCheckOut: boolean): Grade | null {
 export function initialState(args: {
   registrationId: string;
   requiresCheckOut: boolean;
+  mode?: RegistrationMode;
 }): RegistrationState {
   return {
+    mode: args.mode ?? 'family',
     step: 'child-first',
     registrationId: args.registrationId,
     children: [],
@@ -323,7 +340,9 @@ export function answerAnother(
       lastName: '',
       grade: defaultGrade(requiresCheckOut),
     },
-    step: 'guardian-first',
+    // A sibling registration has no adult to ask about: the family is already
+    // identified, and the household upstream already holds their parent.
+    step: state.mode === 'sibling' ? 'confirm' : 'guardian-first',
     buffer: '',
     shift: 'on',
   };
@@ -375,13 +394,14 @@ export function goBack(state: RegistrationState): RegistrationState | null {
         shift: autoShiftAfter(state.guardian.lastName),
       };
     case 'confirm':
-      return {
-        ...state,
-        step: 'guardian-phone',
-        buffer: state.guardian.phone,
-        shift: 'off',
-      };
-    case 'duplicate':
+      return state.mode === 'sibling'
+        ? { ...state, step: 'another', buffer: '', shift: 'on' }
+        : {
+            ...state,
+            step: 'guardian-phone',
+            buffer: state.guardian.phone,
+            shift: 'off',
+          };
     case 'error':
       return {
         ...state,

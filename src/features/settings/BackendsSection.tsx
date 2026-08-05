@@ -10,6 +10,7 @@
  * more than one backend.
  */
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Badge, Button, Card, CardHeader, ErrorBanner, SkeletonRows } from '@/components/ui';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
@@ -267,6 +268,24 @@ export function BackendsSection() {
                 a brand-new student's record is created.
               </p>
             )}
+            {/*
+              Counted apart from the queue on purpose: a held family is not
+              stuck, it is waiting for a person. Saying "3 queued" about them
+              would read as a broken push and teach somebody to ignore the line
+              that means it. See functions/src/backends/pendingReview.ts.
+            */}
+            {statuses.heldForReview > 0 ? (
+              <p className="text-sm text-ink-300">
+                {statuses.heldForReview}{' '}
+                {statuses.heldForReview === 1 ? 'student registered' : 'students registered'}{' '}
+                themselves at the kiosk and{' '}
+                {statuses.heldForReview === 1 ? 'is' : 'are'} waiting for somebody to approve them.{' '}
+                <Link to="/review" className="text-brand-400 hover:underline">
+                  Review them
+                </Link>
+                .
+              </p>
+            ) : null}
           </div>
         </Card>
       ) : null}

@@ -264,6 +264,24 @@ service cloud.firestore {
       }
 
       /**
+       * `pendingReview` holds a self-registered family out of the church's
+       * people database until somebody has looked at them — see
+       * functions/src/backends/pendingReview.ts. It is the *only* thing gating
+       * the push, so a client that could clear it would be a client with a
+       * direct, unreviewed line into Planning Center; a client that could set
+       * it could quietly freeze a student a leader added by hand.
+       *
+       * Neither direction, then. It is written by `registerFamily` and cleared
+       * by `approveRegistration`, both server-side, and this rule says so to
+       * the database rather than to a reviewer.
+       */
+      function reviewHoldUnchanged() {
+        let after = request.resource.data;
+        let before = resource == null ? {} : resource.data;
+        return after.get('pendingReview', false) == before.get('pendingReview', false);
+      }
+
+      /**
        * The only student write a kiosk makes is the date patch riding on a
        * check-in — see `studentDatePatch` in src/services/attendancePayloads.ts.
        * Pinning the key set here means a compromised kiosk session cannot
@@ -292,6 +310,7 @@ service cloud.firestore {
                     && pcoLinkageUnclaimed()
                     && upstreamLinkageUnclaimed()
                     && kioskWriteAllowed()
+                    && reviewHoldUnchanged()
                     && request.resource.data.get('pcoRecordMissing', false) == false;
       allow update: if isCounselor()
                     && validStudent()
@@ -299,7 +318,8 @@ service cloud.firestore {
                     && pcoLinkageUnchanged()
                     && upstreamLinkageUnchanged()
                     && kioskWriteAllowed()
-                    && pcoRecordFlagUnchanged();
+                    && pcoRecordFlagUnchanged()
+                    && reviewHoldUnchanged();
 
       // Never. Attendance documents reference students by id; deleting one
       // would silently orphan history. Set `status: 'inactive'` instead.
