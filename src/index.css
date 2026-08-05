@@ -134,6 +134,54 @@
     text-size-adjust: 100%;
   }
 
+  /*
+   * A tap is a tap, not the start of a selection.
+   *
+   * Every surface in Tally is a target: a roster row is a check-in, a kiosk
+   * card is a student, a keyboard key is a letter. A thumb that lands a few
+   * milliseconds long — which is most taps, when the person is looking at the
+   * queue rather than the screen — gets the browser's text gesture instead:
+   * blue highlight over the name, a floating Define / Copy / Share bar across
+   * the top of the kiosk, and a dictionary card sliding up from the bottom.
+   * Nothing is broken, but the screen stops reading as an app and starts
+   * reading as a web page, and the volunteer is now dismissing a popover
+   * between students.
+   *
+   * `user-select` kills the highlight and the drag; `-webkit-touch-callout`
+   * kills the long-press menu on iOS, which survives the first on its own.
+   * Both are prefixed by hand — Lightning CSS only adds prefixes for the
+   * browsers in the build's target list, and the phones in the hallway run
+   * further back than that.
+   */
+  body {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  /*
+   * Except where the text *is* the point.
+   *
+   * Two kinds of thing opt back in: anything you type into, which needs a
+   * caret and a selection to be editable at all, and the diagnostic blocks —
+   * stack traces, the kiosk pairing command, a Planning Center response — that
+   * each sit behind a copy button and are written on the assumption that the
+   * button can fail (`navigator.clipboard` is absent on http origins and in
+   * several in-app browsers) and the reader will select the text by hand.
+   *
+   * `.select-text` is Tailwind's own utility; this rule only adds the two
+   * things the utility does not carry.
+   */
+  input,
+  textarea,
+  select,
+  [contenteditable]:not([contenteditable='false']),
+  .select-text {
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
+  }
+
   body {
     @apply bg-ink-950 text-ink-100 antialiased;
     /* Native form controls, scrollbars and autofill follow the theme too. */

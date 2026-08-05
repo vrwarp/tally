@@ -45,7 +45,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
  */
 function Block({ children }: { children: ReactNode }) {
   return (
-    <pre className="max-h-40 overflow-auto rounded-lg bg-ink-950/70 px-3 py-2 font-mono text-[11px] leading-relaxed text-ink-300 ring-1 ring-ink-800">
+    <pre className="max-h-40 select-text overflow-auto rounded-lg bg-ink-950/70 px-3 py-2 font-mono text-[11px] leading-relaxed text-ink-300 ring-1 ring-ink-800">
       {children}
     </pre>
   );
