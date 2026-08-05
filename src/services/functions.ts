@@ -687,6 +687,8 @@ export interface KioskStatus {
   state: 'ok' | 'denied' | 'unknown';
   problem: string | null;
   remedy: string | null;
+  /** The remedy as a command to paste into a terminal, when it can be written. */
+  command: string | null;
 }
 
 /**

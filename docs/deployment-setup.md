@@ -295,17 +295,28 @@ configuration the emulator never exercises, so both surface only on a real deplo
 function signs those tokens with its runtime service account — which needs permission to sign as
 itself:
 
+The account is whichever one the functions run as — the compute default unless a deploy set
+something else — and the role goes **on that account**, not on the project. Ask Google which it is
+rather than guessing:
+
 ```bash
-gcloud iam service-accounts add-iam-policy-binding \
-  <project-number>-compute@developer.gserviceaccount.com \
+SA=$(gcloud functions describe getKioskStatus --gen2 \
+  --region us-central1 --project tally-76406 \
+  --format='value(serviceConfig.serviceAccountEmail)')
+gcloud iam service-accounts add-iam-policy-binding "$SA" \
   --project tally-76406 \
-  --member="serviceAccount:<project-number>-compute@developer.gserviceaccount.com" \
+  --member="serviceAccount:$SA" \
   --role=roles/iam.serviceAccountTokenCreator
 ```
 
-Without it, pairing fails at the very last step with a signing error in the function's logs, while
-everything works flawlessly against the Auth emulator (which mints unsigned tokens). If the
-functions run as a custom service account, grant the role on that account instead.
+It is also shown as "Service account" on the function's Details tab in the Cloud console, and on a
+project that has never changed it, it is `<project-number>-compute@developer.gserviceaccount.com`.
+
+Without the grant, pairing fails at the very last step with a signing error in the function's logs,
+while everything works flawlessly against the Auth emulator (which mints unsigned tokens). Settings
+→ Check-in kiosk says so directly — it signs a throwaway token on open, and when that is refused it
+prints this same command with the account and project already filled in, read from the deployment
+itself.
 
 **Cloud Scheduler.** `rebuildKioskPhoneIndex` is the project's first scheduled function; the first
 deploy that includes it may prompt to enable the Cloud Scheduler API (and creates an App Engine
