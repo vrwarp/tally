@@ -82,6 +82,15 @@ type ConfirmOverlay = {
   family: KioskStudent[];
 };
 
+/**
+ * How the "look again online" offer under an empty result is doing.
+ *
+ * One search's worth of state, not the device's: it resets whenever the buffer
+ * empties, so the next family at the kiosk is offered the same thing this one
+ * was rather than inheriting the answer somebody else got.
+ */
+export type KioskRefresh = 'idle' | 'refreshing' | 'done' | 'failed';
+
 type Overlay =
   | ConfirmOverlay
   | { kind: 'success'; students: KioskStudent[]; intent: KioskIntent }
@@ -90,6 +99,18 @@ type Overlay =
 const MAX_BUFFER = 24;
 const PRESENT_REFRESH_MS = 5 * 60_000;
 const QUEUE_REPLAY_MS = 30_000;
+
+/**
+ * How long a forced refresh answers for.
+ *
+ * Behind that button is a sweep of the whole church at both backends, and the
+ * families who cannot find themselves arrive in a clump — the ten minutes after
+ * a service starts. Without this, one queue of latecomers is one sweep each. Two
+ * minutes is long enough to collapse a clump and short enough that a leader who
+ * adds a child *because* the kiosk could not find them is picked up on the
+ * family's second try.
+ */
+const REFRESH_COOLDOWN_MS = 2 * 60_000;
 
 /** ~4am local: reclaim memory and pick up deploys, but only while idle. */
 function isQuietHour(): boolean {
@@ -115,6 +136,7 @@ export function KioskApp() {
   const [checkedOutIds, setCheckedOutIds] = useState<ReadonlySet<string>>(new Set());
   const [buffer, setBuffer] = useState('');
   const [overlay, setOverlay] = useState<Overlay>(null);
+  const [refresh, setRefresh] = useState<KioskRefresh>('idle');
 
   const idleRef = useRef(true);
   idleRef.current = buffer === '' && overlay === null;
@@ -268,6 +290,50 @@ export function KioskApp() {
       return next.replace(/\s{2,}/g, ' ');
     });
   }, []);
+
+  /* ---- Looking again, for somebody the cached roster does not hold -------- */
+
+  /*
+   * A family who cannot find themselves is usually a family somebody added
+   * minutes ago — at the welcome desk, or in Tally while they queued — and the
+   * kiosk's roster is up to six hours old by design. "Please see a leader" is
+   * the right last word, but it should not be the first one when the answer is
+   * one read away.
+   *
+   * Offered rather than automatic: an empty result is the common shape of a
+   * half-typed name, and sweeping the church on every keystroke that matches
+   * nobody is how a lobby full of parents becomes a rate limit.
+   */
+  const refreshedAtRef = useRef(0);
+
+  // A cleared buffer is the next person at the kiosk, and they are owed the
+  // offer this one got — except while a read is actually in flight, which is
+  // the one state that must survive them walking away from it, or a second tap
+  // would start a second sweep of the church behind the first.
+  useEffect(() => {
+    if (buffer === '') setRefresh((current) => (current === 'refreshing' ? current : 'idle'));
+  }, [buffer]);
+
+  const onRefresh = useCallback(() => {
+    if (!services || refresh === 'refreshing') return;
+    // Already answered, for anybody who asks inside the window. The read that
+    // matters happened; saying so costs nothing and skips the sweep.
+    if (Date.now() - refreshedAtRef.current < REFRESH_COOLDOWN_MS) {
+      setRefresh('done');
+      return;
+    }
+    setRefresh('refreshing');
+    // Each half lands on its own: a name that has arrived shows up without
+    // waiting behind a rebuild of every phone number in the church, and a half
+    // that failed leaves what the kiosk already held alone.
+    void services
+      .refreshDirectory(setStudents, setLast4Index)
+      .then(() => {
+        refreshedAtRef.current = Date.now();
+        setRefresh('done');
+      })
+      .catch(() => setRefresh('failed'));
+  }, [services, refresh]);
 
   /* ---- Check-in and pickup ------------------------------------------------ */
 
@@ -509,6 +575,8 @@ export function KioskApp() {
         // Only "trouble" — a kiosk with no printer is not a kiosk with a broken
         // one, and neither is one whose printer is simply unpaired.
         printerNeedsAttention={printerState?.kind === 'trouble'}
+        refresh={refresh}
+        onRefresh={onRefresh}
         onPick={(student) => {
           const intent = intentFor(student);
           const family = familyFor(student, intent);

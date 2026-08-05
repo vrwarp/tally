@@ -22,6 +22,7 @@ import { gradeDescription } from '@/lib/utils';
 import { HoldButton } from '../components/HoldButton';
 import { Keyboard, type KioskKey } from '../components/Keyboard';
 import { useTapGuard } from '../components/tapGuard';
+import type { KioskRefresh } from '../KioskApp';
 import { windowHasClosed, type KioskBinding } from '../binding';
 import {
   searchStudents,
@@ -43,6 +44,8 @@ export function SearchScreen({
   checkedOutIds,
   tracksCheckOut,
   printerNeedsAttention,
+  refresh,
+  onRefresh,
   onPick,
   onUnbind,
 }: {
@@ -55,6 +58,8 @@ export function SearchScreen({
   checkedOutIds: ReadonlySet<string>;
   tracksCheckOut: boolean;
   printerNeedsAttention: boolean;
+  refresh: KioskRefresh;
+  onRefresh: () => void;
   onPick: (student: KioskStudent) => void;
   onUnbind: () => void;
 }) {
@@ -146,8 +151,44 @@ export function SearchScreen({
             </div>
           )}
           {(outcome.mode === 'phone' || outcome.mode === 'name') && outcome.results.length === 0 && (
-            <div className="pt-6 text-center text-lg text-ink-400">
-              No match — please see a leader.
+            /*
+             * Nothing matched — and "see a leader" is the right last word, not
+             * the right first one. The roster on this device is a cache hours
+             * old by design, and the commonest reason a family is missing from
+             * it is that somebody added them while they queued, so the offer
+             * here is to go and look. Inside the scrolling results region on
+             * purpose: this file promises that typing never moves the keyboard,
+             * and a button that appears the moment a name matches nobody would
+             * be the one thing that did.
+             */
+            <div className="flex flex-col items-center gap-4 pt-6 text-center">
+              <div className="text-lg text-ink-400">
+                {refresh === 'done'
+                  ? 'Still no match — please see a leader.'
+                  : 'No match — please see a leader.'}
+              </div>
+              {refresh === 'failed' && (
+                <div className="text-base text-ink-500">Couldn&apos;t reach the network just now.</div>
+              )}
+              {refresh !== 'done' && (
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  disabled={refresh === 'refreshing'}
+                  onPointerDown={(event) => {
+                    event.preventDefault();
+                    onRefresh();
+                  }}
+                  className="rounded-xl bg-ink-900 px-8 py-4 text-lg font-semibold text-brand-300 active:bg-ink-700 disabled:text-ink-500"
+                  style={{ touchAction: 'manipulation' }}
+                >
+                  {refresh === 'refreshing'
+                    ? 'Checking…'
+                    : refresh === 'failed'
+                      ? 'Try again'
+                      : 'Just registered? Check online'}
+                </button>
+              )}
             </div>
           )}
           {outcome.results.slice(0, MAX_RESULTS).map((student) => {

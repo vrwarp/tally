@@ -264,9 +264,9 @@ function rosterFromResponse(people: PcoRosterPerson[]): KioskStudent[] {
  * the latter cover quick-added visitors no backend holds yet. Backend rows
  * win a collision because names are owned upstream.
  */
-async function fetchRosterNow(): Promise<KioskStudent[]> {
+async function fetchRosterNow(force = false): Promise<KioskStudent[]> {
   const [{ data }, docs] = await Promise.all([
-    getRoster(),
+    getRoster({ force }),
     getDocs(query(collection(db, paths.students()), where('status', '==', 'active'))),
   ]);
 
@@ -419,6 +419,52 @@ export async function loadPhoneIndex(
     return stored.last4;
   }
   return (await refresh().catch(() => ({ fetchedAtMs: 0, builtAtMs: null, last4: {} }))).last4;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Checking again, on demand                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Both halves of what the search matches against, pulled again from upstream —
+ * the button a family gets when the kiosk cannot find them.
+ *
+ * Forced, and that is the entire point. Every other read on this page is
+ * cached-first with a TTL measured in hours, and the server's own copy of the
+ * church is cached behind that again, so an unforced "look again" would re-read
+ * exactly the answer that just failed to find somebody and report it as news.
+ * A family standing at a screen being told to go and find a leader is worth one
+ * real read.
+ *
+ * Concurrently, and reported through callbacks the way `loadRoster` does rather
+ * than in the return value, because the two are different sweeps of different
+ * sizes and the person who asked is standing at the kiosk watching. A name that
+ * has arrived has arrived; making it wait behind a rebuild of every phone number
+ * in the church would be holding back the answer to look tidy.
+ *
+ * `allSettled` for the same reason: half an answer is still an answer, and the
+ * caller keeps what it already had for the half that failed. Only a refresh
+ * where *neither* half landed rejects, so "couldn't reach the network" on screen
+ * means what it says.
+ */
+export async function refreshDirectory(
+  onRoster: (students: KioskStudent[]) => void,
+  onPhoneIndex: (last4: Record<string, string[]>) => void,
+): Promise<void> {
+  const [roster, phones] = await Promise.allSettled([
+    fetchRosterNow(true).then((students) => {
+      writeJson(KIOSK_KEYS.roster, { fetchedAtMs: Date.now(), students } satisfies StoredRoster);
+      onRoster(students);
+    }),
+    refreshKioskPhoneIndex({ force: true })
+      .then(() => fetchPhoneIndexNow())
+      .then((index) => {
+        writeJson(KIOSK_KEYS.phoneIndex, index);
+        onPhoneIndex(index.last4);
+      }),
+  ]);
+
+  if (roster.status === 'rejected' && phones.status === 'rejected') throw roster.reason;
 }
 
 /* -------------------------------------------------------------------------- */

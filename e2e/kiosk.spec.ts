@@ -245,6 +245,82 @@ test.describe('the kiosk', () => {
     }
   });
 
+  /**
+   * The family who were registered while they queued.
+   *
+   * The kiosk's roster is a cache that refreshes every six hours, and behind
+   * that the server's copy of the church is cached again — so a child added at
+   * the welcome desk two minutes ago is invisible here for the rest of the
+   * evening, and "please see a leader" is the whole of what the lobby screen
+   * has to say about it. This is the one path that reaches past both caches,
+   * and the assertion that matters is the last one: not that a button existed,
+   * but that the child it found can be checked in.
+   *
+   * Written straight into Firestore rather than through the app, because what
+   * is being tested is a roster that changed *after* this kiosk cached one —
+   * the moment, not the mechanism that made it.
+   */
+  test('looks again online for a family the cached roster does not hold', async ({
+    browser,
+    page,
+    signedInAs,
+    firestore,
+  }) => {
+    await signedInAs('core');
+    const studentId = 'student-late-arrival';
+    const nursery = await eventNamed('Nursery');
+    const { context, page: kiosk } = await openKiosk(browser);
+
+    try {
+      await pairKiosk(kiosk, page);
+      await bindTo(kiosk, /nursery/i);
+
+      await typeOnKiosk(kiosk, 'quill');
+      await expect(kiosk.getByText(/no match/i)).toBeVisible({ timeout: 15_000 });
+
+      const now = new Date();
+      await writeDocument(`students/${studentId}`, {
+        firstName: 'Quill',
+        lastName: 'Marsden',
+        grade: 7,
+        notes: null,
+        status: 'active',
+        isVisitor: true,
+        searchName: 'quill marsden',
+        firstAttendedAt: null,
+        lastAttendedAt: null,
+        pcoPersonId: null,
+        pcoPushPending: false,
+        createdAt: now,
+        updatedAt: now,
+        createdBy: 'e2e',
+        updatedBy: null,
+      });
+
+      await kiosk.getByRole('button', { name: /just registered/i }).click();
+
+      // No retyping: the search the parent already typed re-runs against the
+      // roster that just landed.
+      const row = kiosk.getByRole('button', { name: /quill marsden/i }).first();
+      await expect(row).toBeVisible({ timeout: 30_000 });
+
+      await row.click();
+      await kiosk.getByRole('button', { name: /^Check in$/ }).click();
+      await expect(kiosk.getByText(/welcome/i)).toBeVisible();
+
+      await firestore.until(
+        `events/${nursery.id}/attendance`,
+        (docs) => docs.some((doc) => doc.id === studentId),
+        'a check-in for the family the refresh found',
+      );
+    } finally {
+      await context.close();
+      // Both halves, so the next spec sees the ministry the seed built.
+      await deleteDocument(`students/${studentId}`);
+      await deleteDocument(`events/${nursery.id}/attendance/${studentId}`);
+    }
+  });
+
   /*
    * Label printing, as far as a browser without a printer can take it.
    *
