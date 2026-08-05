@@ -453,7 +453,7 @@ export async function refreshDirectory(
 ): Promise<void> {
   const [roster, phones] = await Promise.allSettled([
     fetchRosterNow(true).then((students) => {
-      writeJson(KIOSK_KEYS.roster, { fetchedAtMs: Date.now(), students } satisfies StoredRoster);
+      writeCachedRoster(students);
       onRoster(students);
     }),
     refreshKioskPhoneIndex({ force: true })

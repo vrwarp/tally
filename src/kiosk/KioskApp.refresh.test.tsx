@@ -27,6 +27,7 @@ const ADA: KioskStudent = {
   lastName: 'Lovelace',
   grade: 8,
   searchName: 'ada lovelace',
+  hasAllergies: false,
 };
 
 /** Registered at the welcome desk while her family queued — not in the cache. */
@@ -36,6 +37,7 @@ const GRACE: KioskStudent = {
   lastName: 'Hopper',
   grade: 6,
   searchName: 'grace hopper',
+  hasAllergies: false,
 };
 
 const OFFER = /just registered\?/i;
