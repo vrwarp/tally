@@ -32,6 +32,10 @@
         "destination": "/kiosk.html"
       },
       {
+        "source": "/welcome",
+        "destination": "/welcome.html"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }
@@ -48,6 +52,15 @@
       },
       {
         "source": "/kiosk.html",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "/welcome.html",
         "headers": [
           {
             "key": "Cache-Control",

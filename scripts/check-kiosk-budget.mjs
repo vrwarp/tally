@@ -60,13 +60,26 @@ const PRINTING_BUDGET_GZIP_BYTES = 25_000;
 /** Chunks whose names mark them as the printing feature's own. */
 const PRINTING_CHUNK = /^(printing|raster\.worker)-/;
 
-const html = readFileSync(join(DIST, 'kiosk.html'), 'utf8');
-const staticRefs = [...new Set([...html.matchAll(/assets\/[^"']+\.js/g)].map((m) => m[0]))];
-
-if (staticRefs.length === 0) {
-  console.error('dist/kiosk.html references no JS at all — the build layout changed.');
-  process.exit(1);
+/**
+ * One built HTML entry's source, read once and kept: the install checks at the
+ * foot of this file read the kiosk's markup as well as its chunk list.
+ */
+function htmlOf(page) {
+  return readFileSync(join(DIST, page), 'utf8');
 }
+
+/** The chunks one built HTML entry references directly. */
+function staticRefsOf(page) {
+  const refs = [...new Set([...htmlOf(page).matchAll(/assets\/[^"']+\.js/g)].map((m) => m[0]))];
+  if (refs.length === 0) {
+    console.error(`dist/${page} references no JS at all — the build layout changed.`);
+    process.exit(1);
+  }
+  return refs;
+}
+
+const html = htmlOf('kiosk.html');
+const staticRefs = staticRefsOf('kiosk.html');
 
 /** Chunk basenames imported (statically or dynamically) by one built chunk. */
 function importsOf(ref) {
@@ -82,9 +95,9 @@ function importsOf(ref) {
  * Everything reachable from the kiosk's static entries, optionally stopping at a
  * set of chunks — which is how the printing subgraph is isolated below.
  */
-function walk(stopAt = new Set()) {
+function walk(stopAt = new Set(), from = staticRefs) {
   const seen = new Set();
-  const queue = [...staticRefs.map((ref) => basename(ref))];
+  const queue = [...from.map((ref) => basename(ref))];
   while (queue.length > 0) {
     const name = queue.pop();
     if (seen.has(name)) continue;
@@ -108,6 +121,30 @@ if (fullFirestore.length > 0) {
     `The kiosk graph reaches the full Firestore chunk: ${fullFirestore.join(', ')}\n` +
       'Something under src/kiosk/ imports firebase/firestore (or a module that does). ' +
       'The kiosk must only ever import firebase/firestore/lite.',
+  );
+  process.exit(1);
+}
+
+/*
+ * The welcome page reaches no Firestore at all — neither the full SDK nor the
+ * lite one.
+ *
+ * It is a form and two callables: `firebase/app` and `firebase/functions`, no
+ * session and no documents. That is a claim about what an unauthenticated page
+ * may read as much as it is a budget, and it is one careless import away from
+ * being false — and one chunking change away, which is how it was false to
+ * begin with: `initializeApp` was hoisted into the lite-Firestore chunk, so a
+ * parent in a foyer downloaded 111 kB of a database client to fill in four
+ * fields. See the `firebase-core` group in vite.config.ts.
+ */
+const welcomeReachable = walk(new Set(), staticRefsOf('welcome.html'));
+const welcomeFirestore = [...welcomeReachable].filter((name) => /^firestore-/.test(name));
+if (welcomeFirestore.length > 0) {
+  console.error(
+    `The welcome graph reaches a Firestore chunk: ${welcomeFirestore.join(', ')}\n` +
+      'src/welcome/ must import firebase/app and firebase/functions only. If nothing ' +
+      'there changed, check the chunk groups in vite.config.ts — the SDK core is ' +
+      'easily hoisted into a product chunk that happens to claim it first.',
   );
   process.exit(1);
 }

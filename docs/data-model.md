@@ -515,6 +515,35 @@ refuses to hold.
 how many children each brought; writable, somebody could pre-claim an id and make a family's
 registration hand them a stranger's students.
 
+### `kioskRegistrationCodes/{code}`
+
+The short-lived code behind the kiosk's QR — the thing that makes "register on your own phone" mean
+"register while standing in the room".
+
+A family with a phone would rather type on it than on a tablet bolted to a shelf, so the kiosk offers
+a code to scan and the page it points at (`/welcome`) is the only unauthenticated **write** surface
+Tally has. That is exactly why the link is not one anybody can keep: a stable public registration URL
+is a form on the open internet whose submissions land in a church's real people database, and it
+would live on in browser history, in a screenshot, on whatever the QR was photographed onto. Instead
+a kiosk mints a code, shows it, and re-mints every ten minutes while the screen is up — rotation
+overlaps deliberately, so a code scanned just before one still has ten-odd minutes of form-filling
+left on it.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `createdAt`, `expiresAt` | — | Twenty minutes. Long enough to walk away, find the camera app and mistype a name; short enough that a photograph of the lobby screen is worth nothing by the end of the service. |
+| `mintedBy` | string | The approver's uid, inherited by the kiosk that asked. |
+| `submissions`, `maxSubmissions` | number | Twenty families through one QR in twenty minutes is not a busy lobby, it is somebody replaying the form. Spent *after* a registration lands, so a call that failed validation or met the duplicate guard costs the family nothing. |
+
+Same guardrails as the pairings, for the same reasons: a TTL, a cap of ten live codes at once, and a
+sweep run from the mint. What is deliberately **not** borrowed is the device secret — a pairing
+secret exists so that seeing a code on a lobby screen is not enough to claim a staff identity,
+whereas here seeing the code is the entire point, and what it buys is only what a family standing at
+the kiosk could already do.
+
+**Who writes: nobody, from a client.** Readable, a client could register against a code it never saw
+on a screen — the one thing the code exists to require.
+
 ### `config/settings`
 
 A single document holding the four thresholds the core team can tune:

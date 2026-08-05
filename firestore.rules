@@ -747,6 +747,17 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    /**
+     * The short-lived codes behind the kiosk's QR. Functions-only, like the
+     * pairings: a client that could read this collection could register
+     * against a code it never saw on a screen, which is the one thing the
+     * code exists to require — and a client that could write one could mint
+     * itself an unauthenticated write path into the church's people database.
+     */
+    match /kioskRegistrationCodes/{code} {
+      allow read, write: if false;
+    }
+
     /* ---------------------------------------------------------------- */
     /* One student's attendance, across every event                      */
     /* ---------------------------------------------------------------- */

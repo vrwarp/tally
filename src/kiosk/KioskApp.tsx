@@ -103,7 +103,6 @@ type Overlay =
 const MAX_BUFFER = 24;
 const PRESENT_REFRESH_MS = 5 * 60_000;
 const QUEUE_REPLAY_MS = 30_000;
-
 /**
  * How long a forced refresh answers for.
  *
@@ -156,14 +155,23 @@ export function KioskApp() {
   const [overlay, setOverlay] = useState<Overlay>(null);
   const [refresh, setRefresh] = useState<KioskRefresh>('idle');
   /**
-   * A registration in progress, with the id it will submit under.
+   * A registration in progress: the QR offer, or the wizard itself with the id
+   * it will submit under.
    *
    * The id is minted here rather than inside the wizard so that a re-render of
    * the flow cannot mint a second one: it is what makes a retried call answer
    * instead of creating the family twice.
    */
-  const [registering, setRegistering] = useState<{ registrationId: string } | null>(null);
+  const [registering, setRegistering] = useState<
+    { screen: 'qr' } | { screen: 'wizard'; registrationId: string } | null
+  >(null);
   const [registration, setRegistration] = useState<KioskRegistration | null>(null);
+  /**
+   * Set by "I've registered": the search screen says so until the parent types.
+   * A family who has just filled a form in on their phone needs telling that
+   * the digits are the next step, on the screen where they will type them.
+   */
+  const [justRefreshed, setJustRefreshed] = useState(false);
 
   const idleRef = useRef(true);
   // A family halfway through the wizard is not an idle kiosk: the binding must
@@ -516,9 +524,21 @@ export function KioskApp() {
 
   /* ---- Registration ------------------------------------------------------- */
 
+  /*
+   * The QR first, and the wizard behind it.
+   *
+   * A family with a phone in their hand will nearly always rather use it, and
+   * the ones without one are one tap from the wizard — which is the right way
+   * round, because the wizard is the longer of the two on the harder keyboard.
+   */
   const startRegistration = useCallback(() => {
     setBuffer('');
-    setRegistering({ registrationId: newRegistrationId() });
+    setJustRefreshed(false);
+    setRegistering({ screen: 'qr' });
+  }, []);
+
+  const startWizard = useCallback(() => {
+    setRegistering({ screen: 'wizard', registrationId: newRegistrationId() });
   }, []);
 
   /**
@@ -636,6 +656,29 @@ export function KioskApp() {
       if (!registration) {
         return <div className="flex h-full items-center justify-center text-ink-500">Loading…</div>;
       }
+      if (registering.screen === 'qr') {
+        return (
+          <registration.QrScreen
+            mintCode={services.mintRegistrationCode}
+            // The same forced read the no-match state offers, and for the same
+            // reason: this kiosk holds a roster cache that has never heard of
+            // the family who just filled a form in on their phone. Each half
+            // lands on its own and a half that fails leaves what was already
+            // held alone — see `refreshDirectory`.
+            refresh={() => services.refreshDirectory(setStudents, setLast4Index)}
+            onRefreshed={() => {
+              setRegistering(null);
+              setBuffer('');
+              setJustRefreshed(true);
+            }}
+            onRegisterHere={startWizard}
+            onClose={() => {
+              setRegistering(null);
+              setBuffer('');
+            }}
+          />
+        );
+      }
       return (
         <registration.RegistrationFlow
           binding={binding}
@@ -722,6 +765,7 @@ export function KioskApp() {
         refresh={refresh}
         onRefresh={onRefresh}
         onRegister={startRegistration}
+        justRegisteredRemotely={justRefreshed}
         onPick={(student) => {
           const intent = intentFor(student);
           const family = familyFor(student, intent);

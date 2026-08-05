@@ -1263,6 +1263,20 @@ describe('kiosk', () => {
     });
   });
 
+  describe('kioskRegistrationCodes', () => {
+    it('is invisible and untouchable, kiosks included', async () => {
+      // Readable, a client could register against a code it never saw on a
+      // screen — which is the one thing the code exists to require. Writable,
+      // it could mint itself an unauthenticated path into the church's people
+      // database.
+      for (const db of [asUser(env, UID.admin), asKiosk(env, UID.counselor), asAnonymous(env)]) {
+        await assertFails(getDoc(doc(db, 'kioskRegistrationCodes/ABC234')));
+        await assertFails(setDoc(doc(db, 'kioskRegistrationCodes/ABC234'), { submissions: 0 }));
+      }
+      await assertFails(getDocs(collection(asUser(env, UID.admin), 'kioskRegistrationCodes')));
+    });
+  });
+
   describe('students, from a kiosk session', () => {
     /*
      * The pin that makes the registration callable necessary in the first

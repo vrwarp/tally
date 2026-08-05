@@ -8,4 +8,5 @@
  * side of the boundary keep the shape known without pulling the code in.
  */
 export { RegistrationFlow, type RegistrationFlowProps } from './RegistrationFlow';
+export { QrScreen, type QrScreenProps } from './QrScreen';
 export { MAX_CHILDREN, type DraftChild } from './steps';

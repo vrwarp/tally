@@ -181,6 +181,10 @@ const registerFamilyCallable = httpsCallable<RegisterFamilyRequest, RegisterFami
   functions,
   'registerFamily',
 );
+const mintRegistrationCodeCallable = httpsCallable<
+  void,
+  { code: string; expiresAt: number; rotateAfterMs: number }
+>(functions, 'mintRegistrationCode');
 
 /* -------------------------------------------------------------------------- */
 /* Auth & pairing                                                              */
@@ -542,6 +546,12 @@ export function applyRegistration(result: {
   }
 
   return students;
+}
+
+/** The short-lived code the kiosk puts in its QR. See functions/src/kiosk/registrationCodes.ts. */
+export async function mintRegistrationCode(): Promise<{ code: string; rotateAfterMs: number }> {
+  const { data } = await mintRegistrationCodeCallable();
+  return { code: data.code, rotateAfterMs: data.rotateAfterMs };
 }
 
 /* -------------------------------------------------------------------------- */

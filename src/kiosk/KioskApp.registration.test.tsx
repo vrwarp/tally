@@ -100,6 +100,9 @@ let answer: RegisterFamilyResult = {
 };
 let sent: RegisterFamilyRequest[] = [];
 let registerFails = false;
+/** What a forced refresh finds — a family who registered on their own phone. */
+let refreshedStudents: KioskStudent[] = [];
+let refreshedLast4: Record<string, string[]> = {};
 
 const services = {
   restoredUid: vi.fn(async () => 'staff-uid'),
@@ -124,6 +127,16 @@ const services = {
     if (registerFails) throw new Error('offline');
     return answer;
   }),
+  mintRegistrationCode: vi.fn(async () => ({ code: 'ABC234', rotateAfterMs: 600_000 })),
+  refreshDirectory: vi.fn(
+    async (
+      onRoster: (students: KioskStudent[]) => void,
+      onPhoneIndex: (last4: Record<string, string[]>) => void,
+    ) => {
+      onRoster([ADA, ...refreshedStudents]);
+      onPhoneIndex(refreshedLast4);
+    },
+  ),
   // The real one merges into localStorage and hands back the students; the
   // shape is all `KioskApp` uses.
   applyRegistration: vi.fn((result: { children: readonly { studentId: string; firstName: string; lastName: string; grade: number | null; searchName: string }[] }) =>
@@ -194,6 +207,8 @@ async function enterChild(first: string, last: string, grade: string): Promise<v
 /** The whole wizard, up to but not including the final button. */
 async function fillInTheFamily(): Promise<void> {
   await tap(/Register your family/);
+  // The QR is offered first; the wizard is behind "no phone".
+  await tap(/Register right here/);
   await enterChild('Robin', 'Fields', '4');
   await tap('Add another child');
   await enterChild('Sam', 'Fields', '2');
@@ -213,6 +228,8 @@ beforeEach(() => {
   localStorage.clear();
   sent = [];
   registerFails = false;
+  refreshedStudents = [];
+  refreshedLast4 = {};
   answer = {
     status: 'created',
     children: [
@@ -348,6 +365,55 @@ describe('when it does not work', () => {
   });
 });
 
+describe('registering on your own phone', () => {
+  const REMOTE: KioskStudent = {
+    id: 'remote-wren',
+    firstName: 'Wren',
+    lastName: 'Quill',
+    grade: 3,
+    searchName: 'wren quill',
+    hasAllergies: false,
+  };
+
+  it('offers a code to scan, and the address in words for a camera that will not', async () => {
+    await mount();
+    await tap(/Register your family/);
+
+    expect(screen.getByLabelText('Registration QR code')).toBeTruthy();
+    expect(screen.getByText('ABC234')).toBeTruthy();
+  });
+
+  it('goes and looks when the family says they have registered', async () => {
+    // The form checked nobody in and this kiosk has never heard of them: it
+    // searches a local copy of the roster that refreshes every six hours.
+    refreshedStudents = [REMOTE];
+    refreshedLast4 = { '9012': [REMOTE.id] };
+
+    await mount();
+    await tap(/Register your family/);
+    await tap(/I've registered/);
+
+    // Back on search, told what to type — the digits are useless without that
+    // sentence, and the sentence is useless before the refresh.
+    expect(screen.getByText(/type the last 4 digits of your phone/i)).toBeTruthy();
+
+    await type('9012');
+    expect(screen.getByText('Wren Quill')).toBeTruthy();
+  });
+
+  it('reuses the forced read the no-match state already offers', async () => {
+    // Same button behind two doors: this kiosk's roster cache has never heard
+    // of a family who filled a form in on their phone, and there is one right
+    // way to go and look — see `refreshDirectory`.
+    await mount();
+    await tap(/Register your family/);
+    await tap(/I've registered/);
+
+    expect(services.refreshDirectory).toHaveBeenCalledTimes(1);
+  });
+
+});
+
 describe('the clock', () => {
   it('does not expire the binding under a family halfway through', async () => {
     /*
@@ -360,6 +426,7 @@ describe('the clock', () => {
     const endsSoon = Date.now() + 30_000;
     await mount(binding({ endAtMs: endsSoon, checkInClosesAtMs: endsSoon }));
     await tap(/Register your family/);
+    await tap(/Register right here/);
     await type('Robin');
 
     await act(async () => {
@@ -373,6 +440,7 @@ describe('the clock', () => {
     // Their child's half-typed name must not be what greets the next person.
     await mount();
     await tap(/Register your family/);
+    await tap(/Register right here/);
     await type('Robin');
 
     await act(async () => {

@@ -91,6 +91,13 @@ import {
   RegistrationInputError,
   type RegisterFamilyResult,
 } from './kiosk/registration.js';
+import {
+  checkCode,
+  consumeCode,
+  mintCode,
+  type CodeStatus,
+  type MintCodeResult,
+} from './kiosk/registrationCodes.js';
 import { materializeOccurrence as materializeOne, MINISTRY_TIME_ZONE } from './occurrences.js';
 // Imported for its registration side effect and nothing else: pulling the
 // adapter package in is what makes the Attendees backend available to the
@@ -2225,26 +2232,57 @@ export const getKioskEvents = onCall<
 export const registerFamily = onCall<Record<string, unknown>, Promise<RegisterFamilyResult>>(
   { secrets: BACKEND_SECRETS, timeoutSeconds: 120, memory: '256MiB' },
   async (request) => {
-    if (request.auth?.token?.kiosk !== true) {
-      throw new HttpsError('permission-denied', 'Registration happens at a kiosk.');
+    const database = db();
+    const fromKiosk = request.auth?.token?.kiosk === true;
+    const rawCode = request.data?.code;
+
+    /*
+     * Two ways in, and the difference between them is what the caller is
+     * allowed to say. A kiosk names a gathering and everybody it registers is
+     * checked in against it. A phone holds only a code the kiosk minted and put
+     * in a QR, so it may create a family and nothing more — the parent walks
+     * back to the screen and taps their own children through, which is the same
+     * act any other family performs.
+     */
+    if (fromKiosk) {
+      await requireMember(request.auth?.uid);
+    } else {
+      if (typeof rawCode !== 'string' || rawCode.trim().length === 0) {
+        throw new HttpsError('permission-denied', 'Registration happens at a kiosk.');
+      }
+      const status = await checkCode(database, rawCode, new Date());
+      if (status !== 'ok') {
+        // The page turns this into "ask at the kiosk for a fresh code", which is
+        // the only remedy and needs somebody to be in the room to perform it.
+        throw new HttpsError('permission-denied', codeRefusal(status));
+      }
     }
-    await requireMember(request.auth?.uid);
 
     const eventId = request.data?.eventId;
-    if (typeof eventId !== 'string' || eventId.trim().length === 0) {
+    if (fromKiosk && (typeof eventId !== 'string' || eventId.trim().length === 0)) {
       throw new HttpsError('invalid-argument', 'eventId is required.');
     }
 
-    const database = db();
     try {
-      const parsed = parseRegisterFamilyRequest(request.data, 'kiosk');
-      return await runRegisterFamily({
+      const parsed = parseRegisterFamilyRequest(request.data, fromKiosk ? 'kiosk' : 'qr');
+      const result = await runRegisterFamily({
         db: database,
         registry: await createRegistry(database),
         request: parsed,
-        context: { source: 'kiosk', uid: request.auth!.uid, eventId: eventId.trim() },
+        context: fromKiosk
+          ? { source: 'kiosk', uid: request.auth!.uid, eventId: (eventId as string).trim() }
+          : { source: 'qr' },
         logger,
       });
+      /*
+       * Spent after the work, not before it. A call that failed validation or
+       * met the already-on-the-roster guard has cost the church nothing, and
+       * should not cost the family one of the code's twenty.
+       */
+      if (!fromKiosk && result.status === 'created') {
+        await consumeCode(database, rawCode as string);
+      }
+      return result;
     } catch (error) {
       if (error instanceof RegistrationInputError) {
         throw new HttpsError('invalid-argument', error.message);
@@ -2253,6 +2291,66 @@ export const registerFamily = onCall<Record<string, unknown>, Promise<RegisterFa
     }
   },
 );
+
+function codeRefusal(status: CodeStatus): string {
+  return status === 'exhausted'
+    ? 'This code has been used too many times. Ask at the kiosk for a fresh one.'
+    : 'This code has expired. Ask at the kiosk for a fresh one.';
+}
+
+/**
+ * The code the kiosk puts in its QR. Kiosk sessions only, so a code cannot be
+ * conjured from anywhere but a screen a staff member vouched for.
+ */
+export const mintRegistrationCode = onCall<void, Promise<MintCodeResult>>(
+  { timeoutSeconds: 30, memory: '256MiB' },
+  async (request) => {
+    if (request.auth?.token?.kiosk !== true) {
+      throw new HttpsError('permission-denied', 'Only a kiosk can offer a registration code.');
+    }
+    await requireMember(request.auth?.uid);
+
+    const result = await mintCode(db(), request.auth!.uid, new Date());
+    if (result === 'busy') {
+      throw new HttpsError(
+        'resource-exhausted',
+        'Too many registration codes are open right now. Try again in a few minutes.',
+      );
+    }
+    return result;
+  },
+);
+
+/**
+ * UNAUTHENTICATED — the phone form, asking whether the code it was opened with
+ * is still worth filling in.
+ *
+ * Answered before somebody types their children's names rather than after, and
+ * it reveals nothing: whether a code is live is what the QR on the screen next
+ * to them already says. `allergiesSupported` rides along because the field only
+ * makes sense where there is an upstream record to put a medical note on —
+ * Tally stores none — and the browser cannot see the write-back setting.
+ */
+export const validateRegistrationCode = onCall<
+  { code?: unknown },
+  Promise<{ valid: boolean; reason?: CodeStatus; allergiesSupported: boolean }>
+>({ secrets: BACKEND_SECRETS, timeoutSeconds: 30, memory: '256MiB' }, async (request) => {
+  const code = request.data?.code;
+  if (typeof code !== 'string') {
+    throw new HttpsError('invalid-argument', 'code is required.');
+  }
+
+  const database = db();
+  const status = await checkCode(database, code, new Date());
+  if (status !== 'ok') return { valid: false, reason: status, allergiesSupported: false };
+
+  const registry = await createRegistry(database);
+  const target = registry.defaultPush();
+  return {
+    valid: true,
+    allergiesSupported: !('error' in target) && target.backend.capabilities.writeBack === 'full',
+  };
+});
 
 /**
  * Rebuilds `kioskIndex/phones` on demand: the Settings button, and the kiosk

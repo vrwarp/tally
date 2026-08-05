@@ -48,6 +48,7 @@ export function SearchScreen({
   onRefresh,
   onPick,
   onRegister,
+  justRegisteredRemotely,
   onUnbind,
 }: {
   binding: KioskBinding;
@@ -62,8 +63,14 @@ export function SearchScreen({
   refresh: KioskRefresh;
   onRefresh: () => void;
   onPick: (student: KioskStudent) => void;
-  /** Opens the registration wizard — the other door off this screen. */
+  /** Opens the registration offer — the other door off this screen. */
   onRegister: () => void;
+  /**
+   * Set when a family has just come back from registering on their phone, until
+   * they start typing. The kiosk has re-read the roster for them; what is left
+   * is telling them which four digits to type, on the screen where they type it.
+   */
+  justRegisteredRemotely?: boolean;
   onUnbind: () => void;
 }) {
   const outcome = useMemo(
@@ -148,6 +155,15 @@ export function SearchScreen({
         {/* The bottom padding rides on the column, not the scroller: end
             padding on a scroll container is not reliably scrollable to. */}
         <div className="mx-auto flex max-w-2xl flex-col gap-2 pb-2">
+          {/*
+            * Inside the scrolling region, like every other message here, so the
+            * frame's geometry is the same with it and without it.
+            */}
+          {justRegisteredRemotely && outcome.mode === 'idle' && (
+            <div className="pt-6 text-center text-lg text-brand-300">
+              You&rsquo;re on the list — type the last 4 digits of your phone.
+            </div>
+          )}
           {outcome.mode === 'phone-partial' && (
             <div className="pt-6 text-center text-lg text-ink-400">
               Enter all 4 digits of a phone number in your family.

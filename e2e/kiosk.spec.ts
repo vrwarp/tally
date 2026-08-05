@@ -492,6 +492,8 @@ test.describe('registering a family at the kiosk', () => {
       await recordLabels(kiosk);
 
       await kiosk.getByRole('button', { name: /Register your family/i }).click();
+      // The QR is offered first; the on-kiosk wizard is behind "no phone".
+      await kiosk.getByRole('button', { name: /Register right here/i }).click();
       await enterChild(kiosk, 'Wren', SURNAME, '4th grade');
       await kiosk.getByRole('button', { name: /Add another child/i }).click();
       // The second child's surname arrives already filled in from the first —
@@ -543,6 +545,30 @@ test.describe('registering a family at the kiosk', () => {
     }
   });
 
+  test('offers a scannable code, and the address in words beside it', async ({
+    browser,
+    page,
+    signedInAs,
+  }) => {
+    await signedInAs('core');
+    const { context, page: kiosk } = await openKiosk(browser);
+
+    try {
+      await pairKiosk(kiosk, page);
+      await bindTo(kiosk, /nursery/i);
+
+      await kiosk.getByRole('button', { name: /Register your family/i }).click();
+
+      // Minted by the real callable under the kiosk's own session: a code
+      // cannot be conjured from anywhere but a screen staff vouched for.
+      await expect(kiosk.getByLabel('Registration QR code')).toBeVisible({ timeout: 20_000 });
+      await expect(kiosk.getByText(/[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}/)).toBeVisible();
+      await expect(kiosk.getByRole('button', { name: /I've registered/i })).toBeVisible();
+    } finally {
+      await context.close();
+    }
+  });
+
   test('offers the door where the dead end used to be', async ({ browser, page, signedInAs }) => {
     await signedInAs('core');
     const { context, page: kiosk } = await openKiosk(browser);
@@ -572,6 +598,8 @@ test.describe('registering a family at the kiosk', () => {
       await bindTo(kiosk, /nursery/i);
 
       await kiosk.getByRole('button', { name: /Register your family/i }).click();
+      // The QR is offered first; the on-kiosk wizard is behind "no phone".
+      await kiosk.getByRole('button', { name: /Register right here/i }).click();
       // Somebody the seed already put on the roster.
       const [first, last] = CHECKED_IN.split(' ') as [string, string];
       await enterChild(kiosk, first, last, '4th grade');

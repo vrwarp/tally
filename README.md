@@ -87,6 +87,24 @@ a deployment with write-back turned down, an upstream that was offline — would
 by morning. They do not: the registration keeps its digits in an overlay the rebuild folds in rather
 than overwrites, and a rebuild can only ever *add* to what a registration made findable.
 
+**Or on their own phone.** The first thing "First time here?" offers is a QR code, because a parent
+holding a phone would rather type on it than on a tablet bolted to a shelf — their keyboard, their
+autocorrect, and the queue behind them does not have to watch. "No phone? Register right here" is one
+tap away, which is the right way round: the wizard is the longer of the two on the harder keyboard.
+
+The page it opens (`/welcome`) is the only unauthenticated write surface Tally has, and it is not a
+link anybody can keep. A stable public registration URL is a form on the open internet whose
+submissions land in a church's real people database; instead the kiosk mints a code that lives twenty
+minutes, carries at most twenty families, and re-mints itself while the screen is up. Registering
+remotely means being in the room.
+
+That form checks nobody in — it cannot know the family walked through the door — so it ends by
+sending them back: *tap "I've registered", then type 7788*. The order is the whole message. The kiosk
+searches a copy of the roster held on the device and refreshes it every six hours, so the button is
+what makes it go and look; telling somebody to type their digits without it is telling them to watch
+a screen say "no match". The same refresh is offered from the no-match state, for the family who took
+ten minutes over the form and came back to a kiosk that had moved on.
+
 Nothing here is a lobby screen deciding who somebody is. A child whose name is already on the roster
 stops the whole registration with "search for their name instead" rather than being created twice —
 no half-registered families. Upstream, a parent is joined to a person the church already has only
@@ -153,7 +171,11 @@ npm run functions:install   # Cloud Functions dependencies — a separate npm pa
 npm run dev:emulated        # builds functions, starts the emulators, starts Vite
 ```
 
-That leaves the app on <http://localhost:5173> and the Emulator UI on <http://127.0.0.1:4000>.
+That leaves the app on <http://localhost:5173> and the Emulator UI on <http://127.0.0.1:4000>. The
+lobby kiosk is a separate page at `/kiosk.html`, and the registration form a family fills in on their
+own phone is another at `/welcome.html` — both are their own Vite entries, deliberately outside the
+PWA. The welcome page needs a code from a kiosk's QR screen: open `/kiosk.html`, pair it, bind it to
+a gathering, tap **First time here?**, and use the six characters printed under the code.
 
 **You also need the Planning Center simulator running.** Tally holds no copy of the church's people:
 the roster, every profile, and the answer to "may this person sign in" all come from Planning Center
