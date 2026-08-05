@@ -111,14 +111,24 @@ function slugOf(title: string): string {
  * photograph. Letters only: the kiosk keyboard has digits but a name field
  * refuses them, so a numbered surname is typed and silently dropped.
  */
-const CAST: Record<Shape, { surname: string; qrSurname: string; phone: string; qrPhone: string }> = {
+const CAST: Record<
+  Shape,
+  { door: string; doorFirst: string; surname: string; qrSurname: string; phone: string; qrPhone: string }
+> = {
   wide: {
+    // Act 1's family, seeded. A different one per pass, because the two passes
+    // share one emulator: the second would otherwise walk up to the child the
+    // first checked in *and collected*, whose row correctly offers neither.
+    door: 'Bree Sandoval',
+    doorFirst: 'Bree',
     surname: 'Okonkwo',
     qrSurname: 'Lindqvist',
     phone: '5550172244',
     qrPhone: '5550179911',
   },
   tall: {
+    door: 'Nia Washington',
+    doorFirst: 'Nia',
     surname: 'Adeyemi',
     qrSurname: 'Bergström',
     phone: '5550178866',
@@ -169,7 +179,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
           'The kiosk asks for a name or four digits and nothing else — no account, no password, no app to install. The digits are the family\'s own phone number, which is the only credential a parent reliably has on them, and the keyboard is the kiosk\'s own: the device\'s native one is slow to rise and covers half the screen when it does.',
       });
 
-      await typeOnKiosk(kiosk, 'Bree');
+      await typeOnKiosk(kiosk, cast.doorFirst);
       await shoot(kiosk, 'kiosk', {
         act: 'At the door',
         who: 'A family the church already has',
@@ -178,7 +188,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
           'Filtering happens on the device against a roster it already holds, so the list narrows with the keystroke rather than after a round trip. That matters more than it sounds: the queue behind is what makes a kiosk worth having, and a search that waits on a network is a search that stops the queue.',
       });
 
-      await kiosk.getByRole('button', { name: /Bree Sandoval/i }).first().click();
+      await kiosk.getByRole('button', { name: new RegExp(cast.door, 'i') }).first().click();
       await shoot(kiosk, 'kiosk', {
         act: 'At the door',
         who: 'A family the church already has',
@@ -203,8 +213,8 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
        * which is why the same row now offers a collection instead of a
        * check-in: a child who is present can only be picked up.
        */
-      await typeOnKiosk(kiosk, 'Bree');
-      await kiosk.getByRole('button', { name: /Bree Sandoval/i }).first().click();
+      await typeOnKiosk(kiosk, cast.doorFirst);
+      await kiosk.getByRole('button', { name: new RegExp(cast.door, 'i') }).first().click();
       await shoot(kiosk, 'kiosk', {
         act: 'At the door',
         who: 'The same family, at the end of the morning',
