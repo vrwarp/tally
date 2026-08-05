@@ -3,14 +3,21 @@
  *
  * Fixed geometry, top to bottom: event header, the typed buffer, a
  * fixed-height results area, the keyboard. A keystroke changes text and row
- * contents and never geometry — nothing reflows, nothing scrolls, and the
+ * contents and never the geometry of the frame — nothing reflows, and the
  * keyboard subtree never re-renders (see components/Keyboard.tsx).
+ *
+ * The results area is the one part that scrolls. A search can return up to
+ * MAX_RESULTS rows and a phone in a lobby has room for about four of them, so
+ * the region clipped the rest mid-row: it looked scrollable, and wasn't, and a
+ * family whose name sorted fifth simply could not be reached. Only that region
+ * scrolls — the header, the buffer and the keyboard stay pinned, because a
+ * keyboard that scrolls off the bottom is worse than a list that ends early.
  *
  * The top-left corner hides the staff gate: a three-second hold returns to
  * the event chooser. Invisible on purpose — parents have no business there,
  * and staff are told where it is.
  */
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { gradeDescription } from '@/lib/utils';
 import { HoldButton } from '../components/HoldButton';
 import { Keyboard, type KioskKey } from '../components/Keyboard';
@@ -23,6 +30,30 @@ import {
 
 function gradeLabel(grade: number | null): string {
   return grade === null ? '' : gradeDescription(grade);
+}
+
+/**
+ * How far a finger may travel between contact and lift and still mean "this
+ * one" rather than "move the list".
+ *
+ * A dozen pixels is roughly the wobble of a thumb held still on glass; a drag
+ * to scroll is an order of magnitude more. The browser also sends
+ * `pointercancel` the moment it decides a touch is a scroll, which handles the
+ * fling — this covers the slower drag that ends with the finger lifted back
+ * near where it started.
+ */
+const TAP_SLOP_PX = 12;
+
+/** Where a finger landed on a row, and which finger it was. */
+type Press = { pointerId: number; x: number; y: number };
+
+/** Whether this pointer has moved far enough to have meant a scroll. */
+function strayed(press: Press | null, event: React.PointerEvent): boolean {
+  if (!press || press.pointerId !== event.pointerId) return true;
+  return (
+    Math.abs(event.clientX - press.x) > TAP_SLOP_PX ||
+    Math.abs(event.clientY - press.y) > TAP_SLOP_PX
+  );
 }
 
 export function SearchScreen({
@@ -55,6 +86,53 @@ export function SearchScreen({
     [buffer, students, last4Index],
   );
   const closed = windowHasClosed(binding, Date.now());
+
+  /*
+   * A row commits on lift, not on contact — the one place in the kiosk that
+   * waits for the finger to come off the glass.
+   *
+   * Everything else here fires on `pointerdown` because that is what makes a
+   * key feel instant. A row cannot: now that the list scrolls, the first touch
+   * of a scroll gesture lands on a row, and firing there would send a parent to
+   * the confirm screen for whichever child they happened to push off with. The
+   * cost is the few milliseconds between contact and lift, on the one tap in
+   * the flow where being right matters more than being quick.
+   */
+  const pressRef = useRef<Press | null>(null);
+
+  const beginPress = useCallback((event: React.PointerEvent) => {
+    // Keeps the touch from selecting text or focusing the row mid-drag.
+    event.preventDefault();
+    pressRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+  }, []);
+
+  const trackPress = useCallback((event: React.PointerEvent) => {
+    if (pressRef.current && strayed(pressRef.current, event)) pressRef.current = null;
+  }, []);
+
+  const endPress = useCallback(
+    (event: React.PointerEvent, student: KioskStudent) => {
+      const wasTap = !strayed(pressRef.current, event);
+      pressRef.current = null;
+      if (wasTap) onPick(student);
+    },
+    [onPick],
+  );
+
+  const cancelPress = useCallback(() => {
+    pressRef.current = null;
+  }, []);
+
+  /*
+   * Every keystroke starts the list again from the top. Without this, a parent
+   * who scrolled down a broad match and then typed one more letter would be
+   * looking at the bottom of a list short enough to have no bottom — an empty
+   * box, under a buffer that says their name is being searched for.
+   */
+  const resultsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (resultsRef.current) resultsRef.current.scrollTop = 0;
+  }, [buffer]);
 
   return (
     <div className="grid h-full grid-rows-[auto_auto_1fr_auto]">
@@ -106,9 +184,15 @@ export function SearchScreen({
         </div>
       </div>
 
-      {/* Results — fixed-height rows inside a fixed region. */}
-      <div className="min-h-0 overflow-hidden px-6">
-        <div className="mx-auto flex h-full max-w-2xl flex-col gap-2">
+      {/* Results — fixed-height rows in a fixed region that scrolls past them. */}
+      <div
+        ref={resultsRef}
+        className="min-h-0 overflow-y-auto overscroll-contain scroll-touch px-6"
+        style={{ touchAction: 'pan-y' }}
+      >
+        {/* The bottom padding rides on the column, not the scroller: end
+            padding on a scroll container is not reliably scrollable to. */}
+        <div className="mx-auto flex max-w-2xl flex-col gap-2 pb-2">
           {outcome.mode === 'phone-partial' && (
             <div className="pt-6 text-center text-lg text-ink-400">
               Enter all 4 digits of a phone number in your family.
@@ -136,10 +220,11 @@ export function SearchScreen({
                 key={student.id}
                 type="button"
                 tabIndex={-1}
-                onPointerDown={(event) => {
-                  event.preventDefault();
-                  onPick(student);
-                }}
+                onPointerDown={beginPress}
+                onPointerMove={trackPress}
+                onPointerUp={(event) => endPress(event, student)}
+                onPointerCancel={cancelPress}
+                onPointerLeave={cancelPress}
                 className={`flex h-16 shrink-0 items-center justify-between rounded-xl px-5 text-left ${
                   collected
                     ? 'bg-ink-900/60 opacity-60'

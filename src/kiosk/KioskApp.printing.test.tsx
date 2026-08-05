@@ -118,6 +118,10 @@ async function mount(bound: KioskBinding = binding()): Promise<void> {
  * single listener on its container — so the event has to be a real bubbling one
  * on the key itself. jsdom has no `PointerEvent` constructor, which is what
  * `fireEvent` is for.
+ *
+ * A result row is the exception and takes the finger off again: the results
+ * list scrolls, so a row waits for `pointerup` to tell a tap from the start of
+ * a drag (see screens/SearchScreen.tsx).
  */
 async function pickAda(): Promise<void> {
   for (const key of ['A', 'D', 'A']) {
@@ -125,8 +129,10 @@ async function pickAda(): Promise<void> {
       fireEvent.pointerDown(screen.getByText(key, { selector: '[data-key]' }));
     });
   }
+  const row = screen.getByText('Ada Lovelace').closest('button')!;
   await act(async () => {
-    fireEvent.pointerDown(screen.getByText('Ada Lovelace').closest('button')!);
+    fireEvent.pointerDown(row);
+    fireEvent.pointerUp(row);
   });
   await settle();
 }
