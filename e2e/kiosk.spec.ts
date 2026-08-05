@@ -478,18 +478,25 @@ test.describe('registering a family at the kiosk', () => {
 
   test('adds two children and one parent, checks them in, and prints for each', async ({
     browser,
+    browserName,
     page,
     signedInAs,
     firestore,
   }) => {
+    // WebUSB is Chromium-only, so a printing kiosk is a Chromium kiosk — same
+    // reasoning as the check-in label test above.
+    test.skip(browserName !== 'chromium', 'WebUSB is Chromium-only.');
     await signedInAs('core');
     const { context, page: kiosk } = await openKiosk(browser);
 
     try {
+      await recordLabels(kiosk);
+      // The init script has to be in place before the app boots.
+      await kiosk.reload();
+
       await pairKiosk(kiosk, page);
       const nursery = await eventNamed('Nursery');
       await bindTo(kiosk, /nursery/i);
-      await recordLabels(kiosk);
 
       await kiosk.getByRole('button', { name: /Register your family/i }).click();
       // The QR is offered first; the on-kiosk wizard is behind "no phone".
