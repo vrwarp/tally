@@ -97,9 +97,19 @@ async function type(text: string): Promise<void> {
   await settle();
 }
 
+/**
+ * Pick Ada out of the results.
+ *
+ * The one control here that takes the finger off again: the results list
+ * scrolls, so a row commits on `pointerup` to tell a tap from the start of a
+ * drag (see screens/SearchScreen.tsx). Contact alone leaves the kiosk on the
+ * search screen.
+ */
 async function pickAda(): Promise<void> {
+  const row = screen.getByText('Ada Lovelace').closest('button')!;
   await act(async () => {
-    fireEvent.pointerDown(screen.getByText('Ada Lovelace').closest('button')!);
+    fireEvent.pointerDown(row);
+    fireEvent.pointerUp(row);
   });
   await settle();
 }
