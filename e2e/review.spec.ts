@@ -105,12 +105,22 @@ test.describe('reviewing a family the kiosk recorded', () => {
 
       await card.getByRole('button', { name: /Approve and add/i }).click();
 
+      /*
+       * The child, and only the child.
+       *
+       * This suite runs `PCO_WRITE_BACK=create` (functions/.env.demo-tally),
+       * where there is no household to build and no adult to create — so the
+       * guardian correctly goes nowhere, and approval is *finished* rather than
+       * held open offering a retry that could never do anything. Asserting a
+       * parent here would be asserting a deployment's configuration, not this
+       * flow's behaviour; `review.test.ts` covers both modes against the seam.
+       */
       await expect
         .poll(
           async () => (await simulatorPeople()).filter((p) => p.last_name === SURNAME).length,
-          { timeout: 30_000, message: 'the child and the parent reach Planning Center' },
+          { timeout: 30_000, message: 'the child reaches Planning Center on approval' },
         )
-        .toBeGreaterThanOrEqual(2);
+        .toBe(1);
 
       // And the registration is gone, phone number and all.
       await expect(page.getByText(/Nothing waiting/i)).toBeVisible({ timeout: 30_000 });

@@ -356,9 +356,25 @@ export async function approveRegistration(options: {
   let guardian: CreateFamilyResult['status'] | 'skipped' = 'skipped';
   let guardianMessage = '';
 
-  if (record.guardian && backend.capabilities.parentCreatable && backend.createFamily) {
+  /*
+   * Whether this deployment has anywhere to put an adult at all.
+   *
+   * Under `create` write-back there is no household to build and no
+   * `createFamily` to call, so the guardian's name and number can never land —
+   * not now, not on a retry, not next week. That is a configuration fact, not a
+   * failure, and the difference matters below: a record kept as "retryable"
+   * would sit on the Review screen offering a button that can never do
+   * anything, holding a phone number for thirty days to no purpose.
+   */
+  const buildFamily = backend.capabilities.parentCreatable ? backend.createFamily : undefined;
+  const guardianPossible = buildFamily !== undefined;
+
+  if (record.guardian && buildFamily === undefined) {
+    guardian = 'disabled';
+    guardianMessage = `${backend.displayName} is not set up to take a parent's details from Tally, so ${record.guardian.firstName}'s name and number were not recorded there.`;
+  } else if (record.guardian && buildFamily !== undefined) {
     try {
-      const family = await backend.createFamily({
+      const family = await buildFamily.call(backend, {
         studentIds: live,
         anchorStudentIds: record.anchorStudentIds,
         firstName: record.guardian.firstName,
@@ -383,13 +399,19 @@ export async function approveRegistration(options: {
 
   /*
    * It does exactly when pressing the button again could still improve things:
-   * a child that has not landed, or a guardian who has not. `disabled` and
-   * `no-linked-children` are not retryable in that sense — the first is a
-   * setting, the second means the push above already failed and is counted
-   * there — but `already-has-family`, `created` and `joined` are all finished.
+   * a child that has not landed, or a guardian who has not *and could*.
+   *
+   * `created`, `joined` and `already-has-family` are all finished. So is a
+   * deployment that cannot take an adult at all — see `guardianPossible`; there
+   * the honest outcome is "approved, and the guardian went nowhere", which the
+   * message says. What is left is a real failure: the backend was asked and
+   * refused, or the network did.
    */
   const guardianLanded =
-    guardian === 'created' || guardian === 'joined' || guardian === 'already-has-family';
+    !guardianPossible ||
+    guardian === 'created' ||
+    guardian === 'joined' ||
+    guardian === 'already-has-family';
   const unfinished = failed > 0 || (record.guardian !== null && !guardianLanded);
 
   if (unfinished) {

@@ -301,6 +301,31 @@ describe('approving', () => {
     );
   });
 
+  /*
+   * Under `create` write-back there is no household to build and no
+   * `createFamily` to call, so the guardian can never land — not now, not on a
+   * retry. Keeping the record as "retryable" would put a button on the Review
+   * screen that can never do anything and hold a phone number for thirty days
+   * to no purpose.
+   */
+  it('finishes under create-only write-back, and says the guardian went nowhere', async () => {
+    const db = dbWithRegistration();
+    const backend = backendWith({ writeBack: 'create' });
+    const result = await approveRegistration({
+      db,
+      registry: registryOf(backend),
+      registrationId: ID,
+      uid: 'core-uid',
+      now: NOW,
+    });
+
+    expect(backend.pushStudent).toHaveBeenCalledTimes(2);
+    expect(backend.createFamily).not.toHaveBeenCalled();
+    expect(result.status).toBe('approved');
+    expect(result.message).toMatch(/not recorded there/i);
+    expect(db.get(`${REGISTRATIONS_COLLECTION}/${ID}`)).toBeUndefined();
+  });
+
   it('answers rather than throwing for a registration somebody already handled', async () => {
     const db = new FakeFirestore();
     const result = await approveRegistration({
