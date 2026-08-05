@@ -73,14 +73,20 @@ export const ALLERGY_WAIT_MS = 4_000;
 /**
  * Notes in flight or in hand, by student id.
  *
- * Bounded to the same handful as the warm rasters next door and evicted
- * oldest-first. The bound is not a token gesture, but nor is it the thing doing
- * the work: by the time an entry is read, the same text is already sitting in
- * the warm raster beside it as pixels. What matters is that this is a `Map` in a
- * module and not a key in `localStorage` — it does not survive the nightly
- * reload, and it never touches a disk.
+ * Eight, evicted oldest-first, which is the same number three times over: the
+ * warm rasters next door, the print queue's depth, and `MAX_FAMILY_OFFER` plus
+ * the child who was searched for. That last one is why it may not be smaller —
+ * a family checked in together warms every sibling's label at once, and a bound
+ * below eight would evict the first child's note before their sticker was drawn.
+ *
+ * The bound is not what makes this safe, though. By the time an entry is read
+ * the same text is already sitting in the warm raster beside it as pixels. What
+ * matters is that this is a `Map` in a module and not a key in `localStorage` —
+ * it does not survive the nightly reload, and it never touches a disk.
  */
 const held = new Map<string, Promise<string>>();
+
+/** See above: the family offer, the warm rasters and the queue all say eight. */
 const MAX_HELD = 8;
 
 /** Whether this template would print an allergy at all. */
