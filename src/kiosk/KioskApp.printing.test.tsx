@@ -34,6 +34,17 @@ const ADA: KioskStudent = {
   searchName: 'ada lovelace',
 };
 
+/** Ada's brother — only her brother in the tests that say so. */
+const BYRON: KioskStudent = {
+  id: 'student-byron',
+  firstName: 'Byron',
+  lastName: 'Lovelace',
+  grade: 5,
+  searchName: 'byron lovelace',
+};
+
+const ROSTER = [ADA, BYRON];
+
 function binding(overrides: Partial<KioskBinding> = {}): KioskBinding {
   const now = Date.now();
   return {
@@ -66,11 +77,13 @@ const printing = {
 let present = new Set<string>();
 let checkedOut = new Set<string>();
 let checkInFails: Error | null = null;
+/** The family digits, so only the tests about families see one. */
+let last4: Record<string, string[]> = {};
 
 const services = {
   restoredUid: vi.fn(async () => 'staff-uid'),
-  loadRoster: vi.fn(async () => [ADA]),
-  loadPhoneIndex: vi.fn(async () => ({})),
+  loadRoster: vi.fn(async () => ROSTER),
+  loadPhoneIndex: vi.fn(async () => last4),
   fetchAttendance: vi.fn(async () => ({ present, checkedOut })),
   replayQueue: vi.fn(async () => 0),
   performCheckIn: vi.fn(async () => {
@@ -105,7 +118,7 @@ async function settle(): Promise<void> {
 /** Boot the kiosk straight into a bound, ready screen. */
 async function mount(bound: KioskBinding = binding()): Promise<void> {
   localStorage.setItem(KIOSK_KEYS.binding, JSON.stringify(bound));
-  localStorage.setItem(KIOSK_KEYS.roster, JSON.stringify({ fetchedAtMs: Date.now(), students: [ADA] }));
+  localStorage.setItem(KIOSK_KEYS.roster, JSON.stringify({ fetchedAtMs: Date.now(), students: ROSTER }));
   render(<KioskApp />);
   await settle();
 }
@@ -170,6 +183,7 @@ beforeEach(() => {
   present = new Set();
   checkedOut = new Set();
   checkInFails = null;
+  last4 = {};
   configurePrinter();
 });
 
@@ -286,5 +300,74 @@ describe('a gathering with no label template', () => {
     expect(printing.warmLabel).not.toHaveBeenCalled();
     expect(printing.printLabel).not.toHaveBeenCalled();
     expect(services.performCheckIn).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * A family is where the label rules and a bulk action meet, and where the
+ * accounting has to stay exact: the queue holds eight, so a screen that warmed
+ * a raster it never printed — or printed one nobody ticked — would be spending
+ * the roll and the cache on a child who is not there.
+ */
+describe('a family checked in together', () => {
+  /** Ada and Byron answer to the same two numbers, and nobody else does. */
+  function asSiblings(): void {
+    last4 = { '0134': [ADA.id, BYRON.id], '7788': [ADA.id, BYRON.id] };
+  }
+
+  /** A ticked sibling, unticked — a row in a list that scrolls, so on lift. */
+  async function untick(name: string): Promise<void> {
+    const row = screen.getByText(name).closest('button')!;
+    await act(async () => {
+      fireEvent.pointerDown(row);
+      fireEvent.pointerUp(row);
+    });
+    await settle();
+  }
+
+  it('warms both labels, and prints one each', async () => {
+    asSiblings();
+    await mount();
+    await pickAda();
+
+    // The sibling arrives ticked, so their label is worth the same head start.
+    expect(vi.mocked(printing.warmLabel).mock.calls.map((call) => call[0].id).sort()).toEqual(
+      [ADA.id, BYRON.id].sort(),
+    );
+
+    await tap(/check in all 2/i);
+
+    expect(vi.mocked(printing.printLabel).mock.calls.map((call) => call[0].id).sort()).toEqual(
+      [ADA.id, BYRON.id].sort(),
+    );
+  });
+
+  it('forgets the label of a sibling who is unticked', async () => {
+    asSiblings();
+    await mount();
+    await pickAda();
+
+    await untick('Byron Lovelace');
+    await tap('Check in');
+
+    expect(printing.forgetLabel).toHaveBeenCalledWith(BYRON.id);
+    expect(printing.printLabel).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(printing.printLabel).mock.calls[0]?.[0].id).toBe(ADA.id);
+  });
+
+  it('warms nothing for a family being collected', async () => {
+    // Both are here, and this gathering hands children back: two collections,
+    // and a collection has never produced a sticker.
+    asSiblings();
+    present = new Set([ADA.id, BYRON.id]);
+    await mount();
+    await pickAda();
+
+    expect(printing.warmLabel).not.toHaveBeenCalled();
+
+    await hold(/hold to collect all 2/i);
+
+    expect(printing.printLabel).not.toHaveBeenCalled();
+    expect(services.performCheckOut).toHaveBeenCalledTimes(2);
   });
 });

@@ -17,10 +17,11 @@
  * the event chooser. Invisible on purpose — parents have no business there,
  * and staff are told where it is.
  */
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { gradeDescription } from '@/lib/utils';
 import { HoldButton } from '../components/HoldButton';
 import { Keyboard, type KioskKey } from '../components/Keyboard';
+import { useTapGuard } from '../components/tapGuard';
 import { windowHasClosed, type KioskBinding } from '../binding';
 import {
   searchStudents,
@@ -30,30 +31,6 @@ import {
 
 function gradeLabel(grade: number | null): string {
   return grade === null ? '' : gradeDescription(grade);
-}
-
-/**
- * How far a finger may travel between contact and lift and still mean "this
- * one" rather than "move the list".
- *
- * A dozen pixels is roughly the wobble of a thumb held still on glass; a drag
- * to scroll is an order of magnitude more. The browser also sends
- * `pointercancel` the moment it decides a touch is a scroll, which handles the
- * fling — this covers the slower drag that ends with the finger lifted back
- * near where it started.
- */
-const TAP_SLOP_PX = 12;
-
-/** Where a finger landed on a row, and which finger it was. */
-type Press = { pointerId: number; x: number; y: number };
-
-/** Whether this pointer has moved far enough to have meant a scroll. */
-function strayed(press: Press | null, event: React.PointerEvent): boolean {
-  if (!press || press.pointerId !== event.pointerId) return true;
-  return (
-    Math.abs(event.clientX - press.x) > TAP_SLOP_PX ||
-    Math.abs(event.clientY - press.y) > TAP_SLOP_PX
-  );
 }
 
 export function SearchScreen({
@@ -88,40 +65,10 @@ export function SearchScreen({
   const closed = windowHasClosed(binding, Date.now());
 
   /*
-   * A row commits on lift, not on contact — the one place in the kiosk that
-   * waits for the finger to come off the glass.
-   *
-   * Everything else here fires on `pointerdown` because that is what makes a
-   * key feel instant. A row cannot: now that the list scrolls, the first touch
-   * of a scroll gesture lands on a row, and firing there would send a parent to
-   * the confirm screen for whichever child they happened to push off with. The
-   * cost is the few milliseconds between contact and lift, on the one tap in
-   * the flow where being right matters more than being quick.
+   * A row commits on lift, not on contact, because this list scrolls — see
+   * components/tapGuard.ts for why that has to be, and what counts as a tap.
    */
-  const pressRef = useRef<Press | null>(null);
-
-  const beginPress = useCallback((event: React.PointerEvent) => {
-    // Keeps the touch from selecting text or focusing the row mid-drag.
-    event.preventDefault();
-    pressRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
-  }, []);
-
-  const trackPress = useCallback((event: React.PointerEvent) => {
-    if (pressRef.current && strayed(pressRef.current, event)) pressRef.current = null;
-  }, []);
-
-  const endPress = useCallback(
-    (event: React.PointerEvent, student: KioskStudent) => {
-      const wasTap = !strayed(pressRef.current, event);
-      pressRef.current = null;
-      if (wasTap) onPick(student);
-    },
-    [onPick],
-  );
-
-  const cancelPress = useCallback(() => {
-    pressRef.current = null;
-  }, []);
+  const rowTap = useTapGuard(onPick);
 
   /*
    * Every keystroke starts the list again from the top. Without this, a parent
@@ -220,11 +167,7 @@ export function SearchScreen({
                 key={student.id}
                 type="button"
                 tabIndex={-1}
-                onPointerDown={beginPress}
-                onPointerMove={trackPress}
-                onPointerUp={(event) => endPress(event, student)}
-                onPointerCancel={cancelPress}
-                onPointerLeave={cancelPress}
+                {...rowTap(student)}
                 className={`flex h-16 shrink-0 items-center justify-between rounded-xl px-5 text-left ${
                   collected
                     ? 'bg-ink-900/60 opacity-60'
