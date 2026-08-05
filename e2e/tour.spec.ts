@@ -34,7 +34,7 @@ import { expect } from '@playwright/test';
 import { gotoReady } from './support/auth';
 import { readCollection } from './support/emulator';
 import { test } from './support/fixtures';
-import { bindTo, openKiosk, pairKiosk, typeOnKiosk } from './support/kiosk';
+import { bindTo, hold, openKiosk, pairKiosk, typeOnKiosk } from './support/kiosk';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT_DIR = join(repoRoot, 'docs', 'walkthrough', 'tour');
@@ -194,6 +194,35 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
         title: 'The tick, and a sticker on its way',
         caption:
           'Painted optimistically — the write is already in flight and the screen does not wait for it, because a parent turning to walk their child in has stopped looking by then. The label rasterises in a worker that started when the confirm screen came up, so it is moving before the tick paints.',
+      });
+
+      await backToSearch(kiosk);
+
+      /*
+       * The other half of a nursery's day. The seeded Nursery tracks check-out,
+       * which is why the same row now offers a collection instead of a
+       * check-in: a child who is present can only be picked up.
+       */
+      await typeOnKiosk(kiosk, 'Bree');
+      await kiosk.getByRole('button', { name: /Bree Sandoval/i }).first().click();
+      await shoot(kiosk, 'kiosk', {
+        act: 'At the door',
+        who: 'The same family, at the end of the morning',
+        title: 'A pickup is a hold, not a tap',
+        caption:
+          'The same row, hours later, offering the only thing left to do with a child who is already here. Three seconds of deliberate pressure rather than one tap, and that is not ceremony: marking a child collected is a claim that somebody took them out of the building, made on an unattended screen in a lobby — and unlike a stray check-in it does not correct itself when the child walks back in. Undoing one needs a volunteer and the main app.',
+      });
+
+      await hold(kiosk, 'button:has-text("Hold to collect")');
+      await expect(kiosk.getByText(/collected|picked up|welcome/i).first()).toBeVisible({
+        timeout: 30_000,
+      });
+      await shoot(kiosk, 'kiosk', {
+        act: 'At the door',
+        who: 'The same family, at the end of the morning',
+        title: 'Signed out, and the count still stands',
+        caption:
+          'The pickup is its own record rather than an edit to the check-in, so the morning\'s head count is unchanged by anybody going home. Undoing a collection deletes that record rather than nulling a field — a room that thinks a child is present when they are not is a worse failure than one that has to be asked twice.',
       });
 
       await backToSearch(kiosk);
@@ -380,20 +409,22 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
           'A forced read past two caches — the kiosk\'s own roster copy and the server\'s copy of the church behind it — and then the four digits find the child the phone just created. The same refresh is offered from the no-match state, for the family who took ten minutes over the form and came back to a kiosk that had moved on.',
       });
 
-      await kiosk
-        .getByRole('button', { name: new RegExp(`Sanna ${cast.qrSurname}`, 'i') })
-        .first()
-        .click();
-      await kiosk.getByRole('button', { name: /^Check in$/ }).click();
-      await expect(kiosk.getByText(/is checked in\. Welcome!/i)).toBeVisible({ timeout: 30_000 });
-      await backToSearch(kiosk);
-
       /* ================================================================== */
       /* Act 4 — The second child                                            */
       /* ================================================================== */
 
-      await typeOnKiosk(kiosk, cast.phone.slice(-4));
-      await kiosk.getByRole('button', { name: new RegExp(`Chidi ${cast.surname}`, 'i') }).first().click();
+      /*
+       * Straight on from the frame above, without checking her in first.
+       *
+       * The offer is deliberately absent on a *collection* — the seeded Nursery
+       * tracks check-out, so a child who is already present gets a pickup
+       * screen, and a pickup is not the moment to add somebody to the roster.
+       * A family arriving is.
+       */
+      await kiosk
+        .getByRole('button', { name: new RegExp(`Sanna ${cast.qrSurname}`, 'i') })
+        .first()
+        .click();
       await shoot(kiosk, 'kiosk', {
         act: 'The second child',
         who: 'A family the church already has, growing',
@@ -403,10 +434,10 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       });
 
       await kiosk.getByRole('button', { name: /Add a brother or sister/i }).click();
-      await typeOnKiosk(kiosk, 'Emeka');
+      await typeOnKiosk(kiosk, 'Emil');
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.locator('[data-key="clear"]').click();
-      await typeOnKiosk(kiosk, cast.surname);
+      await typeOnKiosk(kiosk, cast.qrSurname);
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: '2nd grade', exact: true }).click();
       await kiosk.getByRole('button', { name: /That's everyone/i }).click();
