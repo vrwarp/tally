@@ -76,6 +76,27 @@ interface Shot {
 
 const shots: Shot[] = [];
 
+/**
+ * Back to the search screen, however the kiosk gets there.
+ *
+ * A success screen returns on its own after a few seconds — four for a
+ * check-in, eight for a registration — because a kiosk left alone must not sit
+ * showing the last family's name to the queue. So "Done" is a shortcut, not a
+ * requirement, and a tour that *clicked* it raced the timer and lost: the
+ * screenshot before it takes about a second, and the button had gone by the
+ * time the click landed. Press it if it is there; wait for the screen either
+ * way.
+ */
+async function backToSearch(kiosk: Page): Promise<void> {
+  const done = kiosk.getByRole('button', { name: /^Done$/ });
+  if (await done.isVisible().catch(() => false)) {
+    await done.click({ timeout: 2_000 }).catch(() => {});
+  }
+  await expect(kiosk.getByText(/type a name, or the last 4 digits/i)).toBeVisible({
+    timeout: 30_000,
+  });
+}
+
 function slugOf(title: string): string {
   return title
     .toLowerCase()
@@ -175,7 +196,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
           'Painted optimistically — the write is already in flight and the screen does not wait for it, because a parent turning to walk their child in has stopped looking by then. The label rasterises in a worker that started when the confirm screen came up, so it is moving before the tick paints.',
       });
 
-      await kiosk.getByRole('button', { name: /^Done$/ }).click();
+      await backToSearch(kiosk);
 
       /* ================================================================== */
       /* Act 2 — Nobody has met us, at the kiosk                             */
@@ -284,7 +305,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
           'Both children are on the roster, both are checked in against tonight\'s gathering, and a sticker is coming out of the printer for each. The sentence under the tick is the part that matters next week: the last four digits of the number they just gave are the search this kiosk already had, and this is where the family learns it. No account, no password, no app.',
       });
 
-      await kiosk.getByRole('button', { name: /^Done$/ }).click();
+      await backToSearch(kiosk);
       await typeOnKiosk(kiosk, cast.phone.slice(-4));
       await shoot(kiosk, 'kiosk', {
         act: 'Nobody has met us',
@@ -365,7 +386,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
         .click();
       await kiosk.getByRole('button', { name: /^Check in$/ }).click();
       await expect(kiosk.getByText(/is checked in\. Welcome!/i)).toBeVisible({ timeout: 30_000 });
-      await kiosk.getByRole('button', { name: /^Done$/ }).click();
+      await backToSearch(kiosk);
 
       /* ================================================================== */
       /* Act 4 — The second child                                            */
@@ -399,7 +420,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
 
       await kiosk.getByRole('button', { name: /^Check in$/ }).click();
       await expect(kiosk.getByText(/is checked in\. Welcome!/i)).toBeVisible({ timeout: 30_000 });
-      await kiosk.getByRole('button', { name: /^Done$/ }).click();
+      await backToSearch(kiosk);
 
       /* ================================================================== */
       /* Act 5 — The review                                                  */
