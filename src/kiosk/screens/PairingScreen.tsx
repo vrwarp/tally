@@ -9,6 +9,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import type { KioskServices } from '../KioskApp';
+import { InstallPrompt } from '../components/InstallPrompt';
 
 /** Exported so tests can drive the poll loop rather than wait through it. */
 export const POLL_MS = 2000;
@@ -151,6 +152,16 @@ export function PairingScreen({
       ) : (
         <div className="text-lg text-ink-400">Getting a code…</div>
       )}
+
+      {/*
+        * The best moment to install, and the reason the offer is here rather
+        * than only on the chooser: this device is unpaired, so installing now
+        * costs nothing, while installing after pairing costs a second code on
+        * iOS — where the installed app gets storage of its own and comes up
+        * knowing nothing about the pairing done in Safari. Renders nothing when
+        * the kiosk is already installed, which is every boot after the first.
+        */}
+      <InstallPrompt className="max-w-md" />
     </div>
   );
 }

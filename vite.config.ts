@@ -45,11 +45,30 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+        /*
+         * The kiosk's own install surface, kept out of this worker's precache.
+         *
+         * The kiosk is a separate installable app with a manifest, an icon set
+         * and a service worker of its own (kiosk.html, public/kiosk-sw.js), and
+         * this worker owns `/`. Precaching that surface would mean a device that
+         * once opened the main app answers `/kiosk.html` from *this* cache —
+         * pinning a shelf screen to whatever shipped the day somebody last
+         * loaded Tally on it, which is precisely the failure the kiosk's
+         * no-cache page exists to rule out. The chunks under `assets/` are
+         * shared and stay shared; only the entry points part company.
+         */
+        globIgnores: [
+          'kiosk.html',
+          'kiosk-sw.js',
+          'kiosk.webmanifest',
+          'kiosk-icon.svg',
+          'icons/kiosk-icon-*.png',
+        ],
         // Firestore/Auth traffic must never be served from the SW cache — the app
         // relies on live `onSnapshot` streams and the SDK's own offline persistence.
-        // The kiosk entry is its own page, deliberately outside the PWA: a device
-        // that once loaded the main app must not have /kiosk navigations answered
-        // with index.html from the service worker.
+        // Navigations to /kiosk belong to the kiosk's own worker, whose longer
+        // scope wins: a device that once loaded the main app must not have them
+        // answered with index.html from here.
         navigateFallbackDenylist: [/^\/__/, /^\/kiosk/],
         runtimeCaching: [],
       },
