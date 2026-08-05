@@ -27,6 +27,7 @@ import { resetSharedCache, sharedCache } from './sharedCache.js';
 import {
   addParent,
   checkPerson,
+  createFamily,
   pushStudent,
   recreateStudent,
   setParentContact,
@@ -120,6 +121,19 @@ export function createA32Backend(args: BackendContext & { config: A32Config }): 
         phone,
         email,
         createNew,
+        logger,
+      }),
+    createFamily: ({ studentIds, firstName, lastName, phone, email, logger }) =>
+      createFamily({
+        db,
+        client,
+        config,
+        cache,
+        studentIds,
+        firstName,
+        lastName,
+        phone,
+        email,
         logger,
       }),
     recreateStudent: ({ studentId, firstName, lastName, grade, logger }) =>

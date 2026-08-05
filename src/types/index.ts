@@ -668,6 +668,69 @@ export function emailKey(email: string): string {
 /** How much Tally is allowed to write back to Planning Center. */
 export type PcoWriteBackMode = 'off' | 'create' | 'full';
 
+/* -------------------------------------------------------------------------- */
+/* Self-registration at the kiosk                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The `registerFamily` wire contract — a family nobody has met, typing
+ * themselves in at a lobby screen.
+ *
+ * Mirrored in functions/src/kiosk/registration.ts, which is where every field
+ * of every document this produces is actually decided. What crosses the wire is
+ * only what the family said; the server writes nothing it was told to.
+ *
+ * The guardian's phone number is here and nowhere else. It is used inside one
+ * invocation to build the family upstream, and reduced to its last four digits
+ * for the kiosk index — Tally stores no parent's phone number, which is why
+ * this type has no Firestore counterpart.
+ */
+export interface RegisterFamilyChild {
+  firstName: string;
+  lastName: string;
+  /** Null for a child too young to have one — a real answer, not a blank. */
+  grade: Grade | null;
+}
+
+export interface RegisterFamilyRequest {
+  /**
+   * Minted once per run of the wizard and reused across retries, so a call
+   * whose answer was lost cannot create a second family.
+   */
+  registrationId: string;
+  children: RegisterFamilyChild[];
+  guardian: { firstName: string; lastName: string; phone: string };
+  /** The gathering to check everybody in against. Kiosk mode only. */
+  eventId?: string;
+}
+
+export interface RegisteredChild {
+  studentId: string;
+  firstName: string;
+  lastName: string;
+  grade: Grade | null;
+  searchName: string;
+}
+
+export type RegisterFamilyResult =
+  | {
+      status: 'created';
+      children: RegisteredChild[];
+      /** What the family types at the kiosk from now on. */
+      last4: string;
+      checkedIn: boolean;
+      guardian: { upstream: 'created' | 'joined' | 'skipped' | 'failed' };
+    }
+  | {
+      /**
+       * At least one of these children is already on the roster. Nothing was
+       * written — a family half-registered is worse than one told to search.
+       */
+      status: 'duplicate';
+      duplicateIndexes: number[];
+      message: string;
+    };
+
 /**
  * One student, as Planning Center describes them.
  *

@@ -1250,6 +1250,65 @@ describe('kiosk', () => {
     });
   });
 
+  describe('kioskRegistrations', () => {
+    it('is invisible and untouchable, kiosks and admins alike', async () => {
+      // Readable, it would say which families registered today and how many
+      // children each brought. Writable, somebody could pre-claim an id and
+      // make a family's registration hand them a stranger's students.
+      for (const db of [asUser(env, UID.admin), asKiosk(env, UID.counselor), asAnonymous(env)]) {
+        await assertFails(getDoc(doc(db, 'kioskRegistrations/reg-1')));
+        await assertFails(setDoc(doc(db, 'kioskRegistrations/reg-1'), { status: 'complete' }));
+      }
+      await assertFails(getDocs(collection(asUser(env, UID.admin), 'kioskRegistrations')));
+    });
+  });
+
+  describe('kioskRegistrationCodes', () => {
+    it('is invisible and untouchable, kiosks included', async () => {
+      // Readable, a client could register against a code it never saw on a
+      // screen — which is the one thing the code exists to require. Writable,
+      // it could mint itself an unauthenticated path into the church's people
+      // database.
+      for (const db of [asUser(env, UID.admin), asKiosk(env, UID.counselor), asAnonymous(env)]) {
+        await assertFails(getDoc(doc(db, 'kioskRegistrationCodes/ABC234')));
+        await assertFails(setDoc(doc(db, 'kioskRegistrationCodes/ABC234'), { submissions: 0 }));
+      }
+      await assertFails(getDocs(collection(asUser(env, UID.admin), 'kioskRegistrationCodes')));
+    });
+  });
+
+  describe('students, from a kiosk session', () => {
+    /*
+     * The pin that makes the registration callable necessary in the first
+     * place. A kiosk may write the eight-key date patch a check-in rides on and
+     * nothing else — so it cannot create a usable roster document itself, and a
+     * compromised lobby screen cannot mint students carrying whatever it likes.
+     *
+     * If this test ever starts failing because somebody widened the key set to
+     * "make registration simpler", the thing to widen instead is the callable.
+     */
+    it('may not create a student carrying the fields a registration needs', async () => {
+      const db = asKiosk(env, UID.counselor);
+      const base = {
+        firstName: 'Robin',
+        lastName: 'Fields',
+        grade: 4,
+        searchName: 'robin fields',
+        updatedAt: serverTimestamp(),
+        updatedBy: UID.counselor,
+      };
+
+      await assertFails(setDoc(doc(db, paths.student('lobby-invented')), { ...base, status: 'active' }));
+      await assertFails(setDoc(doc(db, paths.student('lobby-invented')), { ...base, isVisitor: true }));
+      await assertFails(
+        setDoc(doc(db, paths.student('lobby-invented')), { ...base, pcoPushPending: true }),
+      );
+      await assertFails(
+        setDoc(doc(db, paths.student('lobby-invented')), { ...base, registrationId: 'reg-1' }),
+      );
+    });
+  });
+
   describe('attendance, from a kiosk session', () => {
     it('may create a check-in under its own uid', async () => {
       await assertSucceeds(

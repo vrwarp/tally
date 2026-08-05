@@ -241,6 +241,7 @@ before they exist anywhere upstream.
 | `upstreamBackend`, `upstreamPersonId` | `'pco' \| 'a32'` \| string, or absent | The generic linkage pair: which people-backend holds this student, and as whom. Planning Center writes both fields *and* the legacy `pcoPersonId`; Attendees writes only these. Absent generics with a bare `pcoPersonId` still mean Planning Center, which is what makes the scheme migration-free. |
 | `pcoPushPending` | boolean | A Tally-created student still waiting to be pushed — to the deployment's **default push backend**, decided server-side at push time (`config/backends`). Named for the first backend Tally had; it queues for every backend. |
 | `pcoRecordMissing` | boolean, or absent | Server-written: the linked upstream record is known gone (deleted, or merged with the trail ending dead). While it stands the rules freeze the student's check-ins, past nights included. Same naming note as above — it freezes for every backend. |
+| `registrationId` | string, or absent | Written only by `registerFamily`: this child arrived through the kiosk's "first time here" wizard rather than a leader's thumb. It does two jobs. It is the provenance mark a core-team screen can read without a new field per source. And it makes `onStudentCreated` stand down — a self-registration pushes its own children inside the request that created them, because the household write has to be sequenced after every child is upstream, and two pushes racing for one child would both pass `findExistingPerson` and create two upstream people. A crash before that push leaves `pcoPushPending` set, which `pushPendingVisitors` sweeps like any other stranded visitor. Not writable from a kiosk session: the key set pinned by `kioskDatePatchKeys()` does not include it. |
 | `createdAt`, `updatedAt`, `createdBy` | — | `createdBy` is a uid, or a source sentinel — `'planning-center'`, `'attendees32'` — for records an import created. For a student a history import touches, `createdAt` is their earliest attended gathering rather than the moment of import — `predictiveRoster` and the MIA derivation both drop history from before this date, so "created today" would excuse a student from every past night *and* leave their whole imported attendance somewhere no screen counts it. The import moves an existing `createdAt` earlier for the same reason: a student first checked in through Tally last week carries last week's date, and their two years of kiosk history sit before it. |
 
 **A document here *is* the roster membership.** No document, not on the roster. For a student a
@@ -455,6 +456,93 @@ where a child belongs to a second household), while two unrelated families that 
 number the same way each keep a digit the other lacks. The search can afford that coincidence —
 both families' children appear and a parent picks their own — but an offer cannot, so it is held to
 the stricter test. Everything offered is still ticked on screen, and unticking is a tap.
+
+### `kioskIndex/pendingLast4`
+
+The digits a family typed in themselves, held until the backends say the same thing.
+
+A family who registers at the kiosk has to be findable by their phone number *immediately* — the
+whole handoff is "next time, just type your last four digits" — but that number reaches the backends
+at best a moment later, and on a deployment whose write-back cannot create a household, never. A
+rebuild from the backends alone would therefore lose them: the 3:30am job would silently
+un-register a family who registered that morning, and to a parent that looks like the church losing
+their child. So `registerFamily` writes its digits here as well as patching `kioskIndex/phones`
+directly, and every rebuild folds this document in before inverting the map. **A rebuild can only
+ever add to what a registration made findable.**
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `version` | `1` | |
+| `entries` | map | `registrationId -> { last4, studentIds, addedAt }`. Keyed by registration rather than by digits, which makes it idempotent under a retry and prunable per family: two families sharing a last four are two entries, and one being adopted upstream does not take the other's answer away. |
+
+An entry leaves on either of two conditions, both checked at rebuild time: the backends now answer
+for **every** one of its students under the same digits, or it has sat here fourteen days without
+that ever happening. The TTL is what stops a mistyped number answering forever — long enough for a
+family to come back several times on digits the church office has not yet entered anywhere, short
+enough that nobody builds a habit on a wrong one.
+
+Same bargain as the document above, and no wider: four digits and student ids, never a whole number.
+The guardian's full phone number exists only inside one `registerFamily` invocation — used to build
+the family upstream, reduced to its tail, and discarded with the request.
+
+**Who writes:** only the functions, like every other `kioskIndex` document.
+
+### `kioskRegistrations/{registrationId}`
+
+One document per run of the kiosk's "first time here" wizard: the claim that makes a retried
+registration answer instead of creating a second family.
+
+A parent taps once. A wifi blip means the call runs twice, and the kiosk's retry queue is no help —
+it replays direct Firestore writes, and a callable is not one. So the client mints a
+`registrationId` once per wizard run and re-sends it, and the server claims this document with
+`create()` (the same ALREADY_EXISTS handshake `startKioskPairing` uses). A second call with the same
+id is recognised as a retry *before anything reads the roster* — otherwise it would find the
+children it created a second ago and report them as duplicates of themselves.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `status` | `'pending' \| 'complete'` | A `pending` document is resumed rather than restarted: every write downstream is keyed by the ids below, so replaying is repeating, not duplicating. |
+| `studentIds` | string[] | Pre-allocated before the batch, which is the whole mechanism. |
+| `source` | `'kiosk' \| 'qr'` | |
+| `eventId`, `checkedIn`, `childCount`, `last4` | — | Enough to answer a completed call again. |
+| `createdAt`, `completedAt` | — | Swept opportunistically after 24 hours, like the pairings. |
+
+**What is deliberately not here:** the names and the phone number. A retry re-sends all of it, and a
+collection of half-finished registrations is not a place to accumulate what the rest of the database
+refuses to hold.
+
+**Who writes: nobody, from a client.** Readable, it would say which families registered today and
+how many children each brought; writable, somebody could pre-claim an id and make a family's
+registration hand them a stranger's students.
+
+### `kioskRegistrationCodes/{code}`
+
+The short-lived code behind the kiosk's QR — the thing that makes "register on your own phone" mean
+"register while standing in the room".
+
+A family with a phone would rather type on it than on a tablet bolted to a shelf, so the kiosk offers
+a code to scan and the page it points at (`/welcome`) is the only unauthenticated **write** surface
+Tally has. That is exactly why the link is not one anybody can keep: a stable public registration URL
+is a form on the open internet whose submissions land in a church's real people database, and it
+would live on in browser history, in a screenshot, on whatever the QR was photographed onto. Instead
+a kiosk mints a code, shows it, and re-mints every ten minutes while the screen is up — rotation
+overlaps deliberately, so a code scanned just before one still has ten-odd minutes of form-filling
+left on it.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `createdAt`, `expiresAt` | — | Twenty minutes. Long enough to walk away, find the camera app and mistype a name; short enough that a photograph of the lobby screen is worth nothing by the end of the service. |
+| `mintedBy` | string | The approver's uid, inherited by the kiosk that asked. |
+| `submissions`, `maxSubmissions` | number | Twenty families through one QR in twenty minutes is not a busy lobby, it is somebody replaying the form. Spent *after* a registration lands, so a call that failed validation or met the duplicate guard costs the family nothing. |
+
+Same guardrails as the pairings, for the same reasons: a TTL, a cap of ten live codes at once, and a
+sweep run from the mint. What is deliberately **not** borrowed is the device secret — a pairing
+secret exists so that seeing a code on a lobby screen is not enough to claim a staff identity,
+whereas here seeing the code is the entire point, and what it buys is only what a family standing at
+the kiosk could already do.
+
+**Who writes: nobody, from a client.** Readable, a client could register against a code it never saw
+on a screen — the one thing the code exists to require.
 
 ### `config/settings`
 

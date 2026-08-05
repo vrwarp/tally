@@ -48,7 +48,12 @@ import {
   studentDatePatch,
   type CheckInStudent,
 } from '@/services/attendancePayloads';
-import type { Grade, PcoRosterPerson } from '@/types';
+import type {
+  Grade,
+  PcoRosterPerson,
+  RegisterFamilyRequest,
+  RegisterFamilyResult,
+} from '@/types';
 import type { KioskBinding } from './binding';
 import type { KioskStudent } from './search';
 import {
@@ -172,6 +177,14 @@ const getAllergyNotes = httpsCallable<
   },
   { notes: Record<string, string> }
 >(functions, 'getAllergyNotes');
+const registerFamilyCallable = httpsCallable<RegisterFamilyRequest, RegisterFamilyResult>(
+  functions,
+  'registerFamily',
+);
+const mintRegistrationCodeCallable = httpsCallable<
+  void,
+  { code: string; expiresAt: number; rotateAfterMs: number }
+>(functions, 'mintRegistrationCode');
 
 /* -------------------------------------------------------------------------- */
 /* Auth & pairing                                                              */
@@ -465,6 +478,80 @@ export async function refreshDirectory(
   ]);
 
   if (roster.status === 'rejected' && phones.status === 'rejected') throw roster.reason;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Self-registration                                                           */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A family typing themselves in.
+ *
+ * Everything a registration writes happens on the server — see
+ * functions/src/kiosk/registration.ts for why a kiosk session cannot create a
+ * usable student itself. The `registrationId` is minted by the caller once per
+ * wizard run and re-sent on a retry, which is what makes a lost response safe
+ * to retry rather than a second family.
+ */
+export async function registerFamily(
+  request: RegisterFamilyRequest,
+): Promise<RegisterFamilyResult> {
+  const { data } = await registerFamilyCallable(request);
+  return data;
+}
+
+/**
+ * Folds a completed registration into what this kiosk holds locally, so the
+ * family is searchable the moment they walk back to the screen.
+ *
+ * The server has already patched `kioskIndex/phones`, but the kiosk reads that
+ * document on a 24-hour cadence — it would not see its own registration until
+ * tomorrow. Rather than force a refetch while a parent waits, the answer that
+ * came back with the response is merged into both caches directly. A refetch
+ * later can only agree with it.
+ */
+export function applyRegistration(result: {
+  children: readonly { studentId: string; firstName: string; lastName: string; grade: number | null; searchName: string }[];
+  last4: string;
+}): KioskStudent[] {
+  const students: KioskStudent[] = result.children.map((child) => ({
+    id: child.studentId,
+    firstName: child.firstName,
+    lastName: child.lastName,
+    grade: child.grade as Grade | null,
+    searchName: child.searchName,
+    // Nothing is on file for a child registered a second ago. Allergies are
+    // only ever asked for on the phone form, land upstream, and reach this
+    // screen — if at all — through a later roster read.
+    hasAllergies: false,
+  }));
+
+  const cached = readCachedRoster();
+  if (cached) {
+    const byId = new Map(cached.students.map((student) => [student.id, student]));
+    for (const student of students) byId.set(student.id, student);
+    writeCachedRoster([...byId.values()]);
+  }
+
+  const storedIndex = readJson<StoredPhoneIndex>(KIOSK_KEYS.phoneIndex);
+  if (storedIndex && storedIndex.last4) {
+    const held = storedIndex.last4[result.last4] ?? [];
+    writeJson(KIOSK_KEYS.phoneIndex, {
+      ...storedIndex,
+      last4: {
+        ...storedIndex.last4,
+        [result.last4]: [...new Set([...held, ...students.map((student) => student.id)])].sort(),
+      },
+    } satisfies StoredPhoneIndex);
+  }
+
+  return students;
+}
+
+/** The short-lived code the kiosk puts in its QR. See functions/src/kiosk/registrationCodes.ts. */
+export async function mintRegistrationCode(): Promise<{ code: string; rotateAfterMs: number }> {
+  const { data } = await mintRegistrationCodeCallable();
+  return { code: data.code, rotateAfterMs: data.rotateAfterMs };
 }
 
 /* -------------------------------------------------------------------------- */

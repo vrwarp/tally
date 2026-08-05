@@ -1,0 +1,495 @@
+/**
+ * "First time here?" — the other door off the search screen.
+ *
+ * Everything a family needs to join the roster, asked one question at a time in
+ * the frame the search screen already uses: a header, a readout, a body, and
+ * the kiosk's own keyboard. Nothing here focuses an input, for the same reason
+ * nothing on the search screen does — the device's native keyboard is slow to
+ * raise and covers half the questions when it does.
+ *
+ * The wizard is deliberately short. Three questions per child, three about one
+ * adult, and a confirm. Allergies, emails and second guardians are not here:
+ * this is the same bargain the staff quick-add makes — enough to put somebody
+ * on the roster and reach their family, with the incomplete profile as the
+ * handoff to whoever follows up. A lobby form that asks for everything is a
+ * lobby form nobody finishes.
+ */
+import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
+import { gradeDescription, haptic, NO_GRADE } from '@/lib/utils';
+import { GRADES, type Grade, type RegisterFamilyResult } from '@/types';
+import { Keyboard, type KioskKey } from '../components/Keyboard';
+import type { KioskBinding } from '../binding';
+import {
+  advance,
+  answerAnother,
+  applyKey,
+  canAdvance,
+  chooseGrade,
+  familyOf,
+  formatPhone,
+  goBack,
+  initialState,
+  isTypingStep,
+  MAX_CHILDREN,
+  type DraftChild,
+  type RegistrationState,
+} from './steps';
+
+/**
+ * How long a half-typed registration is left on the glass.
+ *
+ * A family who walks away mid-wizard — called into the service, distracted by a
+ * toddler — must not leave their child's half-typed name greeting the next
+ * person at the screen. Ninety seconds is well past a slow typist on one
+ * question and well short of the queue behind them.
+ */
+const INACTIVITY_MS = 90_000;
+
+/**
+ * Longer than the check-in tick's four seconds, because this screen ends with a
+ * number somebody has to remember.
+ */
+const SUCCESS_AUTO_RETURN_MS = 8_000;
+
+type Action =
+  | { type: 'key'; key: KioskKey }
+  | { type: 'next' }
+  | { type: 'back' }
+  | { type: 'grade'; grade: Grade | null }
+  | { type: 'another'; more: boolean }
+  | { type: 'submitting' }
+  | { type: 'submitted'; result: RegisterFamilyResult }
+  | { type: 'failed' };
+
+function makeReducer(requiresCheckOut: boolean) {
+  return function reduce(state: RegistrationState, action: Action): RegistrationState {
+    switch (action.type) {
+      case 'key':
+        return applyKey(state, action.key);
+      case 'next':
+        return advance(state);
+      case 'back':
+        return goBack(state) ?? state;
+      case 'grade':
+        return chooseGrade(state, action.grade);
+      case 'another':
+        return answerAnother(state, action.more, requiresCheckOut);
+      case 'submitting':
+        return { ...state, step: 'submitting', message: '' };
+      case 'submitted':
+        return action.result.status === 'created'
+          ? { ...state, step: 'success', last4: action.result.last4 }
+          : { ...state, step: 'duplicate', message: action.result.message };
+      case 'failed':
+        return {
+          ...state,
+          step: 'error',
+          message: 'We could not save that just now — please see a leader.',
+        };
+    }
+  };
+}
+
+export interface RegistrationFlowProps {
+  binding: KioskBinding;
+  /** Minted by the caller so a remount cannot re-mint it mid-run. */
+  registrationId: string;
+  submit: (args: {
+    registrationId: string;
+    children: DraftChild[];
+    guardian: { firstName: string; lastName: string; phone: string };
+  }) => Promise<RegisterFamilyResult>;
+  /** Everybody registered and checked in — the caller greens their rows and prints. */
+  onRegistered: (result: Extract<RegisterFamilyResult, { status: 'created' }>) => void;
+  /** Back to search: cancelled, timed out, or finished. */
+  onClose: () => void;
+}
+
+export function RegistrationFlow({
+  binding,
+  registrationId,
+  submit,
+  onRegistered,
+  onClose,
+}: RegistrationFlowProps) {
+  // Absent on a binding written before the flag existed, and absent means no.
+  const tracksCheckOut = binding.requiresCheckOut ?? false;
+  const reduce = useMemo(() => makeReducer(tracksCheckOut), [tracksCheckOut]);
+  const [state, dispatch] = useReducer(
+    reduce,
+    { registrationId, requiresCheckOut: tracksCheckOut },
+    initialState,
+  );
+
+  const onKey = useCallback((key: KioskKey) => dispatch({ type: 'key', key }), []);
+
+  /* ---- Walked away ------------------------------------------------------- */
+
+  useEffect(() => {
+    // Never while the call is in flight, and never on the screen teaching the
+    // family their digits — that one returns on its own clock below.
+    if (state.step === 'submitting' || state.step === 'success') return;
+    const timer = setTimeout(onClose, INACTIVITY_MS);
+    return () => clearTimeout(timer);
+  }, [state, onClose]);
+
+  /* ---- The call ---------------------------------------------------------- */
+
+  const submittedRef = useRef(false);
+  const runSubmit = useCallback(() => {
+    if (submittedRef.current) return;
+    submittedRef.current = true;
+    haptic();
+    dispatch({ type: 'submitting' });
+    void submit({
+      registrationId: state.registrationId,
+      children: state.children,
+      guardian: state.guardian,
+    })
+      .then((result) => {
+        // A retry re-sends the same registrationId, which is what makes the
+        // callable answer rather than create a second family.
+        submittedRef.current = false;
+        dispatch({ type: 'submitted', result });
+        if (result.status === 'created') onRegistered(result);
+      })
+      .catch(() => {
+        submittedRef.current = false;
+        dispatch({ type: 'failed' });
+      });
+  }, [submit, state.registrationId, state.children, state.guardian, onRegistered]);
+
+  useEffect(() => {
+    if (state.step !== 'success') return;
+    const timer = setTimeout(onClose, SUCCESS_AUTO_RETURN_MS);
+    return () => clearTimeout(timer);
+  }, [state.step, onClose]);
+
+  /* ---- Render ------------------------------------------------------------ */
+
+  const family = familyOf(state);
+  const childNumber = state.children.length + 1;
+
+  return (
+    <div className="grid h-full grid-rows-[auto_auto_1fr_auto]">
+      <Header
+        title={titleFor(state, childNumber)}
+        subtitle={subtitleFor(state, binding)}
+        onBack={() => {
+          haptic(8);
+          if (goBack(state) === null) onClose();
+          else dispatch({ type: 'back' });
+        }}
+        canClose={state.step !== 'submitting'}
+        onClose={onClose}
+      />
+
+      {/* The readout, on the steps that have one. A div, never an input. */}
+      <div className="px-6 pb-2">
+        {isTypingStep(state.step) ? (
+          <div className="mx-auto flex h-16 max-w-2xl items-center justify-center rounded-xl bg-ink-900 px-4">
+            {state.buffer ? (
+              <span className="truncate text-3xl font-semibold tracking-wide text-ink-50">
+                {state.step === 'guardian-phone' ? formatPhone(state.buffer) : state.buffer}
+              </span>
+            ) : (
+              <span className="text-xl text-ink-500">{placeholderFor(state)}</span>
+            )}
+          </div>
+        ) : (
+          <div className="h-16" />
+        )}
+      </div>
+
+      <div className="min-h-0 overflow-y-auto overscroll-contain scroll-touch px-6">
+        <div className="mx-auto flex max-w-2xl flex-col gap-3 pb-2">
+          {state.step === 'child-grade' && (
+            <div className="grid grid-cols-3 gap-2 pt-2">
+              <GradeChip label={NO_GRADE} onPick={() => dispatch({ type: 'grade', grade: null })} />
+              {GRADES.map((grade) => (
+                <GradeChip
+                  key={grade}
+                  label={grade === 0 ? 'K' : String(grade)}
+                  hint={gradeDescription(grade)}
+                  onPick={() => dispatch({ type: 'grade', grade })}
+                />
+              ))}
+            </div>
+          )}
+
+          {state.step === 'another' && (
+            <div className="flex flex-col gap-3 pt-2">
+              <Big
+                label="Add another child"
+                disabled={family.length >= MAX_CHILDREN}
+                onPick={() => dispatch({ type: 'another', more: true })}
+              />
+              <Big label="That's everyone" tone="brand" onPick={() => dispatch({ type: 'another', more: false })} />
+              {family.length >= MAX_CHILDREN && (
+                <p className="text-center text-base text-ink-500">
+                  That is as many as one go takes — a leader can add the rest.
+                </p>
+              )}
+            </div>
+          )}
+
+          {state.step === 'confirm' && (
+            <div className="flex flex-col gap-2 pt-2">
+              {state.children.map((child, index) => (
+                <div
+                  key={`${child.firstName}-${child.lastName}-${index}`}
+                  className="flex h-16 items-center justify-between rounded-xl bg-ink-900 px-5"
+                >
+                  <span className="truncate text-xl font-semibold text-ink-100">
+                    {child.firstName} {child.lastName}
+                  </span>
+                  <span className="pl-3 text-base whitespace-nowrap text-ink-400">
+                    {child.grade === null ? NO_GRADE : gradeDescription(child.grade)}
+                  </span>
+                </div>
+              ))}
+              <div className="flex h-16 items-center justify-between rounded-xl bg-ink-900/60 px-5">
+                <span className="truncate text-lg text-ink-300">
+                  {state.guardian.firstName} {state.guardian.lastName}
+                </span>
+                <span className="pl-3 text-base whitespace-nowrap text-ink-500">
+                  {formatPhone(state.guardian.phone)}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {state.step === 'submitting' && (
+            <p className="pt-10 text-center text-xl text-ink-400">Saving…</p>
+          )}
+
+          {state.step === 'success' && (
+            <div className="flex flex-col items-center gap-4 pt-6 text-center">
+              <div className="flex h-24 w-24 items-center justify-center rounded-full bg-present-600/20 text-5xl">
+                ✓
+              </div>
+              <p className="text-2xl font-semibold text-ink-100">{welcomeLine(state.children)}</p>
+              {/* The whole handoff, in one sentence: this is how they find
+                  themselves next week without anybody's help. */}
+              <p className="text-xl text-ink-400">
+                Next time, just type{' '}
+                <span className="font-semibold tracking-widest text-ink-100">{state.last4}</span> —
+                the last 4 digits of your phone.
+              </p>
+            </div>
+          )}
+
+          {(state.step === 'duplicate' || state.step === 'error') && (
+            <div className="flex flex-col gap-4 pt-6 text-center">
+              <p className="text-xl text-ink-200">{state.message}</p>
+              {state.step === 'duplicate' ? (
+                <Big label="Search for them" tone="brand" onPick={onClose} />
+              ) : (
+                <Big label="Try again" tone="brand" onPick={runSubmit} />
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* The bottom row: the keyboard where something is being typed, the one
+          action that ends the step where it is not. */}
+      {isTypingStep(state.step) ? (
+        <div className="flex flex-col gap-1.5">
+          <div className="px-2">
+            <Big
+              label="Next"
+              tone="brand"
+              disabled={!canAdvance(state)}
+              onPick={() => dispatch({ type: 'next' })}
+            />
+          </div>
+          <Keyboard onKey={onKey} />
+        </div>
+      ) : state.step === 'confirm' ? (
+        <div className="p-2 pb-[max(0.5rem,var(--spacing-safe-bottom))]">
+          <Big
+            label={state.children.length === 1 ? 'Check in' : 'Check in everyone'}
+            tone="brand"
+            onPick={runSubmit}
+          />
+        </div>
+      ) : state.step === 'success' ? (
+        <div className="p-2 pb-[max(0.5rem,var(--spacing-safe-bottom))]">
+          <Big label="Done" onPick={onClose} />
+        </div>
+      ) : (
+        <div className="h-4" />
+      )}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Pieces                                                                      */
+/* -------------------------------------------------------------------------- */
+
+function Header({
+  title,
+  subtitle,
+  onBack,
+  canClose,
+  onClose,
+}: {
+  title: string;
+  subtitle: string;
+  onBack: () => void;
+  canClose: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <div className="relative px-6 pt-[max(1rem,var(--spacing-safe-top))] pb-2 text-center">
+      <button
+        type="button"
+        tabIndex={-1}
+        onPointerDown={onBack}
+        className="absolute top-[max(0.75rem,var(--spacing-safe-top))] left-4 h-12 rounded-lg px-3 text-base text-ink-400 active:bg-ink-800"
+      >
+        ← Back
+      </button>
+      {canClose && (
+        <button
+          type="button"
+          tabIndex={-1}
+          onPointerDown={onClose}
+          className="absolute top-[max(0.75rem,var(--spacing-safe-top))] right-4 h-12 rounded-lg px-3 text-base text-ink-500 active:bg-ink-800"
+        >
+          Cancel
+        </button>
+      )}
+      <div className="text-lg font-semibold text-ink-200">{title}</div>
+      <div className="text-sm text-ink-500">{subtitle}</div>
+    </div>
+  );
+}
+
+function Big({
+  label,
+  onPick,
+  tone,
+  disabled,
+}: {
+  label: string;
+  onPick: () => void;
+  tone?: 'brand';
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      tabIndex={-1}
+      disabled={disabled}
+      onPointerDown={() => {
+        if (disabled) return;
+        haptic();
+        onPick();
+      }}
+      className={`flex h-16 w-full items-center justify-center rounded-xl text-xl font-semibold ${
+        disabled
+          ? 'bg-ink-900 text-ink-600'
+          : tone === 'brand'
+            ? 'bg-brand-600 text-white active:bg-brand-500'
+            : 'bg-ink-800 text-ink-100 active:bg-ink-600'
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function GradeChip({ label, hint, onPick }: { label: string; hint?: string; onPick: () => void }) {
+  return (
+    <button
+      type="button"
+      tabIndex={-1}
+      aria-label={hint ?? label}
+      onPointerDown={() => {
+        haptic();
+        onPick();
+      }}
+      className="flex h-16 items-center justify-center rounded-xl bg-ink-800 text-xl font-semibold text-ink-100 active:bg-ink-600"
+    >
+      {label}
+    </button>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Words                                                                       */
+/* -------------------------------------------------------------------------- */
+
+function titleFor(state: RegistrationState, childNumber: number): string {
+  switch (state.step) {
+    case 'child-first':
+    case 'child-last':
+    case 'child-grade':
+      return childNumber === 1 ? 'Your child' : `Child ${childNumber}`;
+    case 'another':
+      return 'Anybody else?';
+    case 'guardian-first':
+    case 'guardian-last':
+    case 'guardian-phone':
+      return 'And you';
+    case 'confirm':
+      return 'Does this look right?';
+    case 'submitting':
+      return 'One moment';
+    case 'success':
+      return 'All done';
+    case 'duplicate':
+      return 'Already here';
+    case 'error':
+      return 'Something went wrong';
+  }
+}
+
+function subtitleFor(state: RegistrationState, binding: KioskBinding): string {
+  switch (state.step) {
+    case 'child-first':
+      return 'What is their first name?';
+    case 'child-last':
+      return 'And their last name?';
+    case 'child-grade':
+      return 'What grade are they in?';
+    case 'another':
+      return 'You can add the whole family in one go.';
+    case 'guardian-first':
+      return 'Your first name';
+    case 'guardian-last':
+      return 'Your last name';
+    case 'guardian-phone':
+      // Said here rather than after the fact: a parent typing a number wants to
+      // know why it is being asked for before they type it.
+      return 'Your phone number — this is how you check in next time';
+    case 'confirm':
+      return binding.title;
+    default:
+      return '';
+  }
+}
+
+function placeholderFor(state: RegistrationState): string {
+  if (state.step === 'guardian-phone') return '10 digits';
+  return 'Type here';
+}
+
+/**
+ * "Robin, Sam and Alex are checked in. Welcome!"
+ *
+ * Built as one string rather than assembled from JSX so the sentence is one
+ * text node — a family reads it as a sentence, and so does anything testing
+ * that it says what it should.
+ */
+function welcomeLine(children: readonly DraftChild[]): string {
+  const names = children.map((child) => child.firstName);
+  const list =
+    names.length <= 1
+      ? (names[0] ?? '')
+      : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  return `${list} ${names.length === 1 ? 'is' : 'are'} checked in. Welcome!`;
+}

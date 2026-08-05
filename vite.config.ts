@@ -66,10 +66,12 @@ export default defineConfig({
         ],
         // Firestore/Auth traffic must never be served from the SW cache — the app
         // relies on live `onSnapshot` streams and the SDK's own offline persistence.
-        // Navigations to /kiosk belong to the kiosk's own worker, whose longer
-        // scope wins: a device that once loaded the main app must not have them
-        // answered with index.html from here.
-        navigateFallbackDenylist: [/^\/__/, /^\/kiosk/],
+        // The kiosk and welcome entries are their own pages, deliberately
+        // outside the PWA: a device that once loaded the main app must not have
+        // those navigations answered with index.html from the service worker.
+        // For /welcome that would be a parent's phone — quite likely a leader's
+        // — opening the sign-in gate instead of the form the QR promised.
+        navigateFallbackDenylist: [/^\/__/, /^\/kiosk/, /^\/welcome/],
         runtimeCaching: [],
       },
       devOptions: {
@@ -93,6 +95,10 @@ export default defineConfig({
         // The self-serve check-in kiosk: its own tiny page, sharing this build
         // so the two entries split vendor chunks instead of shipping two copies.
         kiosk: fileURLToPath(new URL('./kiosk.html', import.meta.url)),
+        // The registration form a family fills in on their own phone, reached
+        // from the QR on the kiosk. Separate again, and lighter still: it holds
+        // no session and reads no documents, so no Firestore SDK reaches it.
+        welcome: fileURLToPath(new URL('./welcome.html', import.meta.url)),
       },
       output: {
         /*
@@ -117,6 +123,22 @@ export default defineConfig({
          */
         advancedChunks: {
           groups: [
+            /*
+             * The SDK's shared core, peeled off ahead of everything else.
+             *
+             * `@firebase/app` and the plumbing under it are imported by every
+             * product — app, auth, functions, both Firestores — so without a
+             * group of their own they are hoisted into whichever product chunk
+             * happens to claim them first. That was `firestore-lite`, which
+             * made `initializeApp` cost 111 kB: the welcome page imports
+             * `firebase/app` and `firebase/functions` and nothing else, and was
+             * downloading the whole lite Firestore to get at it. Deliberately
+             * first, because first match wins.
+             */
+            {
+              name: 'firebase-core',
+              test: /[\\/]node_modules[\\/](firebase[\\/]app|@firebase[\\/](app|component|util|logger))[\\/]/,
+            },
             {
               name: 'firestore-lite',
               test: /[\\/]node_modules[\\/](firebase[\\/]firestore[\\/]lite|@firebase[\\/]firestore[\\/]dist[\\/]lite)[\\/]/,

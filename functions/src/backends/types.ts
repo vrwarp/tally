@@ -22,7 +22,7 @@ import type { PcoWriteBackMode } from '../config.js';
 import type { FirestoreLike, FunctionLogger } from '../firestore.js';
 import type { BackendId } from '../generated/backendIds.js';
 import type { CheckInsEventSummary, CheckInsImportSummary } from '../pco/checkins.js';
-import type { AddParentResult } from '../pco/household.js';
+import type { AddParentResult, CreateFamilyResult } from '../pco/household.js';
 import type { PcoListSummary } from '../pco/lists.js';
 import type { SetParentContactResult } from '../pco/parentContact.js';
 import type { StudentProfilePatch, UpdateStudentProfileResult } from '../pco/profile.js';
@@ -41,6 +41,7 @@ export type {
   AddParentResult,
   CheckInsEventSummary,
   CheckInsImportSummary,
+  CreateFamilyResult,
   ParentContactStatus,
   PcoListSummary,
   PersonDetails,
@@ -181,6 +182,34 @@ export interface PeopleBackend {
     personIds: readonly string[];
     force?: boolean;
   }): Promise<Record<string, string[]>>;
+
+  /**
+   * A whole family at once, for a household nobody has met.
+   *
+   * `addParent` is the staff path and cannot serve this one: it builds a
+   * household around exactly one student, so a parent registering three
+   * children would end up with three households and one sibling in each. This
+   * takes every child together and puts them in one.
+   *
+   * The other difference is what it does when the name is already upstream.
+   * `addParent` stops and hands the candidates to a human, which is right at a
+   * desk and impossible in a lobby — so this joins only when the phone number
+   * corroborates the name, and otherwise creates a fresh person. A duplicate
+   * adult is a merge somebody does later; the wrong join shows one family
+   * another family's contact details.
+   *
+   * Present iff `capabilities.parentCreatable`.
+   */
+  createFamily?(args: {
+    /** Every child of this family, as Tally student ids. */
+    studentIds: readonly string[];
+    firstName: string;
+    lastName: string;
+    /** Digits only. Written onto the adult, never over something already there. */
+    phone?: string | null;
+    email?: string | null;
+    logger?: FunctionLogger;
+  }): Promise<CreateFamilyResult>;
 
   /** Planning Center Lists. Present iff `capabilities.listsSupported`. */
   fetchLists?(args: { search?: string; limit?: number }): Promise<PcoListSummary[]>;

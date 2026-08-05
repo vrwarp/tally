@@ -732,6 +732,32 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    /**
+     * Self-registration claims — one document per run of the kiosk's
+     * "first time here" wizard, so a retried call cannot create a second
+     * family. Functions-only in both directions, like the pairings above.
+     *
+     * A client that could read them would learn which families registered
+     * today and how many children each brought; a client that could write one
+     * could pre-claim an id and make somebody's registration silently return
+     * a stranger's students. Neither is anything a lobby screen needs — the
+     * kiosk mints the id, sends it, and reads the answer.
+     */
+    match /kioskRegistrations/{registrationId} {
+      allow read, write: if false;
+    }
+
+    /**
+     * The short-lived codes behind the kiosk's QR. Functions-only, like the
+     * pairings: a client that could read this collection could register
+     * against a code it never saw on a screen, which is the one thing the
+     * code exists to require — and a client that could write one could mint
+     * itself an unauthenticated write path into the church's people database.
+     */
+    match /kioskRegistrationCodes/{code} {
+      allow read, write: if false;
+    }
+
     /* ---------------------------------------------------------------- */
     /* One student's attendance, across every event                      */
     /* ---------------------------------------------------------------- */

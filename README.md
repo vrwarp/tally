@@ -68,6 +68,53 @@ where they all signed out, and no screen marks the difference with a badge or a 
 **nothing ever invents a pickup time** for a child somebody forgot to check out: a fabricated
 timestamp on a custody record is worse than an absent one.
 
+**Journey 4c — a family nobody has met, at the lobby kiosk.** The kiosk answers one question — which
+of these is your child — and for a family arriving for the first time the answer used to be "none of
+them, please see a leader". That is still right when something is wrong with the search; it was never
+right for being new. **First time here?** stands on the search screen from the first paint, because a
+parent told "just put your name in" types a name, gets somebody else's Noah, and never fails a search
+to be offered anything. It asks three questions per child — first name, last name, grade, with "Add
+another child" between them and the surname carried forward — then one adult and one phone number,
+and checks the whole family in as a single act with a sticker each. What the last screen says is the
+part that matters next week: *next time, just type 7788* — the last four digits of the number they
+just gave, which is the search the kiosk already had.
+
+The phone number is the only reason that works, and Tally still does not store it. It exists inside
+one call: long enough to build the family in the church's database — one adult, one household, every
+child in it — and to be reduced to four digits for [the kiosk's index](docs/data-model.md#kioskindexphones).
+That index is rebuilt nightly from the backends, so a family whose household write could not happen —
+a deployment with write-back turned down, an upstream that was offline — would quietly stop matching
+by morning. They do not: the registration keeps its digits in an overlay the rebuild folds in rather
+than overwrites, and a rebuild can only ever *add* to what a registration made findable.
+
+**Or on their own phone.** The first thing "First time here?" offers is a QR code, because a parent
+holding a phone would rather type on it than on a tablet bolted to a shelf — their keyboard, their
+autocorrect, and the queue behind them does not have to watch. "No phone? Register right here" is one
+tap away, which is the right way round: the wizard is the longer of the two on the harder keyboard.
+
+The page it opens (`/welcome`) is the only unauthenticated write surface Tally has, and it is not a
+link anybody can keep. A stable public registration URL is a form on the open internet whose
+submissions land in a church's real people database; instead the kiosk mints a code that lives twenty
+minutes, carries at most twenty families, and re-mints itself while the screen is up. Registering
+remotely means being in the room.
+
+That form checks nobody in — it cannot know the family walked through the door — so it ends by
+sending them back: *tap "I've registered", then type 7788*. The order is the whole message. The kiosk
+searches a copy of the roster held on the device and refreshes it every six hours, so the button is
+what makes it go and look; telling somebody to type their digits without it is telling them to watch
+a screen say "no match". The same refresh is offered from the no-match state, for the family who took
+ten minutes over the form and came back to a kiosk that had moved on.
+
+Nothing here is a lobby screen deciding who somebody is. A child whose name is already on the roster
+stops the whole registration with "search for their name instead" rather than being created twice —
+no half-registered families. Upstream, a parent is joined to a person the church already has only
+when the phone number corroborates the name; anything less certain creates a fresh record, because a
+duplicate adult is a merge somebody performs next month and attaching a child to the wrong family
+shows one household another household's phone number. And a kiosk cannot write any of it directly:
+the security rules pin what a lobby session may put on a student document to the eight keys a
+check-in's date patch touches, which is why registration is a callable that decides every field
+itself.
+
 **Journey 5 — the follow-up list.** The dashboard is a call list, not a report: students who have
 missed three gatherings in a row, first-timers from the last week, profiles with no parent contact,
 and a head-count trend. It is split by gathering, for the same reason prediction is — a student who
@@ -124,7 +171,11 @@ npm run functions:install   # Cloud Functions dependencies — a separate npm pa
 npm run dev:emulated        # builds functions, starts the emulators, starts Vite
 ```
 
-That leaves the app on <http://localhost:5173> and the Emulator UI on <http://127.0.0.1:4000>.
+That leaves the app on <http://localhost:5173> and the Emulator UI on <http://127.0.0.1:4000>. The
+lobby kiosk is a separate page at `/kiosk.html`, and the registration form a family fills in on their
+own phone is another at `/welcome.html` — both are their own Vite entries, deliberately outside the
+PWA. The welcome page needs a code from a kiosk's QR screen: open `/kiosk.html`, pair it, bind it to
+a gathering, tap **First time here?**, and use the six characters printed under the code.
 
 **You also need the Planning Center simulator running.** Tally holds no copy of the church's people:
 the roster, every profile, and the answer to "may this person sign in" all come from Planning Center
