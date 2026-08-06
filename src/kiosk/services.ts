@@ -55,6 +55,7 @@ import type {
   RegisterFamilyResult,
 } from '@/types';
 import type { KioskBinding } from './binding';
+import { joinKioskRoster } from './roster';
 import type { KioskStudent } from './search';
 import {
   KIOSK_KEYS,
@@ -256,26 +257,13 @@ export async function bindEntry(entry: KioskEventEntry): Promise<KioskBinding> {
 
 const ROSTER_REFRESH_MS = 6 * 60 * 60_000;
 
-function rosterFromResponse(people: PcoRosterPerson[]): KioskStudent[] {
-  return people
-    .filter((person) => person.status === 'active')
-    .map((person) => ({
-      id: person.id,
-      firstName: person.firstName,
-      lastName: person.lastName,
-      grade: person.grade,
-      searchName: person.searchName,
-      // The flag, never the note — the roster read carries one and not the
-      // other on purpose, and the kiosk is the last place to blur that. What it
-      // buys is the label asking about one child instead of four hundred.
-      hasAllergies: person.hasAllergies === true,
-    }));
-}
-
 /**
  * The searchable roster: the backends' people plus Tally's own documents —
- * the latter cover quick-added visitors no backend holds yet. Backend rows
- * win a collision because names are owned upstream.
+ * the latter cover quick-added visitors no backend holds yet.
+ *
+ * The join itself is in `./roster`, pure and tested: it is by *linkage* rather
+ * than by id, because a pushed visitor is reachable under two of them and this
+ * used to draw both.
  */
 async function fetchRosterNow(force = false): Promise<KioskStudent[]> {
   const [{ data }, docs] = await Promise.all([
@@ -283,31 +271,10 @@ async function fetchRosterNow(force = false): Promise<KioskStudent[]> {
     getDocs(query(collection(db, paths.students()), where('status', '==', 'active'))),
   ]);
 
-  const byId = new Map<string, KioskStudent>();
-  for (const snapshot of docs.docs) {
-    const data = snapshot.data();
-    const firstName = typeof data.firstName === 'string' ? data.firstName : '';
-    const lastName = typeof data.lastName === 'string' ? data.lastName : '';
-    if (!firstName && !lastName) continue;
-    byId.set(snapshot.id, {
-      id: snapshot.id,
-      firstName,
-      lastName,
-      grade: typeof data.grade === 'number' ? data.grade : null,
-      searchName:
-        typeof data.searchName === 'string' && data.searchName
-          ? data.searchName
-          : `${firstName} ${lastName}`.trim().toLowerCase(),
-      // Always false, and not for want of looking: `noMirroredPersonalData` in
-      // firestore.rules refuses an `allergies` key on a student document, so a
-      // visitor no backend holds yet has nowhere for one to be. Once their push
-      // lands they come back through `rosterFromResponse` with the real answer.
-      hasAllergies: false,
-    });
-  }
-  for (const student of rosterFromResponse(data.people)) byId.set(student.id, student);
-
-  return [...byId.values()];
+  return joinKioskRoster(
+    docs.docs.map((snapshot) => ({ id: snapshot.id, data: snapshot.data() })),
+    data.people,
+  );
 }
 
 /**
