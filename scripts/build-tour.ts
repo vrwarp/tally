@@ -7,13 +7,13 @@
  *
  *   npx tsx scripts/build-tour.ts
  *
- * The two passes walk the same steps in the same order, so the nth wide frame
- * and the nth tall frame are the same moment; they are paired by position
- * rather than by title, because a title is prose and prose gets edited. A frame
- * that only one pass captured (a screen that appears conditionally) is carried
- * on its own rather than dropped.
+ * Each pass writes its own manifest, so re-shooting one shape does not require
+ * re-shooting the other; whichever `tour-*.json` files are on disk are what
+ * gets built. Frames are paired by title, and a frame only one pass captured —
+ * a screen that appears conditionally — is carried on its own rather than
+ * dropped.
  */
-import { readFile, writeFile } from 'node:fs/promises';
+import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 type Shape = 'wide' | 'tall';
@@ -41,7 +41,17 @@ interface Frame {
 
 const OUT = 'docs/walkthrough/tour';
 
-const shots = JSON.parse(await readFile(join(OUT, 'tour.json'), 'utf8')) as Shot[];
+/*
+ * One manifest per pass, so re-shooting a single shape does not require
+ * re-shooting the other. Whichever files are on disk are what gets built.
+ */
+const manifests = (await readdir(OUT).catch(() => [])).filter(
+  (name) => name.startsWith('tour-') && name.endsWith('.json'),
+);
+const shots: Shot[] = [];
+for (const name of manifests.sort()) {
+  shots.push(...(JSON.parse(await readFile(join(OUT, name), 'utf8')) as Shot[]));
+}
 
 if (shots.length === 0) {
   throw new Error(

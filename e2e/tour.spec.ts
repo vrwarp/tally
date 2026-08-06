@@ -142,11 +142,23 @@ const CAST: Record<
   },
 };
 
+/**
+ * Which passes to run, so a ninety-minute capture is resumable.
+ *
+ * Each shape writes its own manifest the moment it finishes, and the builder
+ * reads whichever ones are on disk — so a pass that fails costs only itself,
+ * and re-shooting one shape does not re-shoot the other.
+ *
+ *   TOUR_SHAPES=tall npm run tour:capture
+ */
+const SHAPES = ((process.env.TOUR_SHAPES?.split(',').map((value) => value.trim()) ??
+  ['wide', 'tall']) as Shape[]).filter((shape) => shape === 'wide' || shape === 'tall');
+
 test('capture the tour', async ({ browser, page, signedInAs }) => {
   test.setTimeout(1_800_000);
   await signedInAs('core');
 
-  for (const shape of ['wide', 'tall'] as Shape[]) {
+  for (const shape of SHAPES) {
     let n = 0;
 
     /** One frame. `device` decides which of the three viewports it belongs to. */
@@ -586,7 +598,17 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
     } finally {
       await context.close();
     }
-  }
 
-  await writeFile(join(OUT_DIR, 'tour.json'), `${JSON.stringify(shots, null, 2)}\n`, 'utf8');
+    // Written per shape rather than once at the end: a pass that fails must not
+    // take the one that already worked with it.
+    await writeFile(
+      join(OUT_DIR, `tour-${shape}.json`),
+      `${JSON.stringify(
+        shots.filter((shot) => shot.shape === shape),
+        null,
+        2,
+      )}\n`,
+      'utf8',
+    );
+  }
 });
