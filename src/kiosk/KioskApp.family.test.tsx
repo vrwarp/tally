@@ -279,3 +279,86 @@ describe('collecting a family together', () => {
     ]);
   });
 });
+
+/**
+ * The escape hatch the conservative guess creates.
+ *
+ * `family.ts` throws out every coincidence and, with it, some real siblings: a
+ * child on a different number, a family split across two households, somebody
+ * added by hand last week. Those parents are looking at one name and know there
+ * should be two — and the answer used to be a link that took them to a form
+ * asking a *new* child's name, which is not what they meant.
+ */
+describe('finding a brother or sister the kiosk did not offer', () => {
+  it('is offered on a check-in', async () => {
+    await mount();
+    await type('2200');
+    await pick('Maya Chen');
+    expect(screen.getByText(/Find a brother or sister/i)).toBeTruthy();
+  });
+
+  it('is never offered on a collection', async () => {
+    // A parent taking a child home is answering a different question, and the
+    // roster is read once at boot — so this is a kiosk that started the morning
+    // with Maya already here.
+    present = new Set([MAYA.id]);
+    await mount();
+    await type('2200');
+    await pick('Maya Chen');
+
+    expect(screen.getByText(/hold to collect/i)).toBeTruthy();
+    expect(screen.queryByText(/Find a brother or sister/i)).toBeNull();
+  });
+
+  it('checks in a sibling found by name, together with the first', async () => {
+    await mount();
+    // Maya's four digits find only Maya; Amara is a sibling this kiosk's
+    // family guess would never have offered.
+    await type('2200');
+    await pick('Maya Chen');
+    await tap(/Find a brother or sister/i);
+
+    await type('amara');
+    await pick('Amara Osei');
+
+    // Back on the confirm, with both — one group, one button, one count.
+    expect(screen.getByText(/Check in all 2/i)).toBeTruthy();
+    await tap(/Check in all 2/i);
+
+    expect(
+      vi
+        .mocked(services.performCheckIn)
+        .mock.calls.map((call) => call[0].student.id)
+        .sort(),
+    ).toEqual(['s-amara', 's-maya']);
+  });
+
+  it('does not offer somebody already on the confirm screen', async () => {
+    await mount();
+    await type('7788');
+    await pick('Amara Osei');
+    await tap(/Find a brother or sister/i);
+
+    // Marcus arrived with Amara and is ticked behind this screen; offering him
+    // again would be a row that does nothing.
+    await type('osei');
+    expect(screen.queryByText('Marcus Osei')).toBeNull();
+    expect(screen.queryByText('Amara Osei')).toBeNull();
+  });
+
+  it('leaves the confirm exactly as it was when the search finds nobody', async () => {
+    await mount();
+    await type('7788');
+    await pick('Amara Osei');
+    await untick('Marcus Osei');
+    await tap(/Find a brother or sister/i);
+
+    await type('zzq');
+    expect(screen.getByText(/are they new/i)).toBeTruthy();
+    await tap('← Back');
+
+    // Marcus is still unticked: going to look for somebody must not silently
+    // re-tick the sibling this parent deliberately left alone.
+    expect(screen.getByText(/^Check in$/)).toBeTruthy();
+  });
+});

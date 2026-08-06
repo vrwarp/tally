@@ -45,7 +45,7 @@ async function enterChild(kiosk: Page, first: string, last: string, grade: strin
 
 /** Registers one child through the on-kiosk wizard, start to sticker. */
 async function registerAtKiosk(kiosk: Page, first: string, surname: string): Promise<void> {
-  await kiosk.getByRole('button', { name: /Register your family/i }).click();
+  await kiosk.getByRole('button', { name: /Register your child/i }).click();
   await kiosk.getByRole('button', { name: /Register right here/i }).click();
   await enterChild(kiosk, first, surname, '4th grade');
   await kiosk.getByRole('button', { name: /That's everyone/i }).click();

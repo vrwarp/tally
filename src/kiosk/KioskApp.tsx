@@ -43,6 +43,7 @@ import {
 import { type KioskStudent } from './search';
 import { KIOSK_KEYS, readCachedRoster, readJson } from './storage';
 import { ConfirmScreen } from './screens/ConfirmScreen';
+import { SiblingScreen } from './screens/SiblingScreen';
 import { EventChooser } from './screens/EventChooser';
 import { PairingScreen } from './screens/PairingScreen';
 import { PrinterScreen } from './screens/PrinterScreen';
@@ -84,6 +85,16 @@ type ConfirmOverlay = {
   student: KioskStudent;
   intent: KioskIntent;
   family: KioskStudent[];
+  /**
+   * Siblings the parent has unticked. Empty means everybody, because a family
+   * arrives together.
+   *
+   * Held here rather than inside the confirm screen so that it survives the
+   * detour through "find a brother or sister": that screen unmounts the
+   * confirm, and a decision somebody made with their thumb must outlive the
+   * screen they made it on.
+   */
+  skipped: ReadonlySet<string>;
 };
 
 /**
@@ -95,8 +106,19 @@ type ConfirmOverlay = {
  */
 export type KioskRefresh = 'idle' | 'refreshing' | 'done' | 'failed';
 
+/**
+ * "Who else is with them" — a sub-screen of the confirm, not a screen of its
+ * own.
+ *
+ * It carries the confirm it came from so that Back is a genuine return rather
+ * than a re-entry: a parent who opens it, finds nobody, and goes back is
+ * looking at the same ticked family they left.
+ */
+type SiblingOverlay = { kind: 'sibling'; from: ConfirmOverlay };
+
 type Overlay =
   | ConfirmOverlay
+  | SiblingOverlay
   | { kind: 'success'; students: KioskStudent[]; intent: KioskIntent }
   | null;
 
@@ -557,13 +579,13 @@ export function KioskApp() {
   }, []);
 
   /**
-   * "Add a brother or sister", from the confirm screen.
+   * The registration half of "who else is with them".
    *
-   * The anchors are the children the kiosk already found for these four digits,
-   * which is what lets the wizard skip the adult's three questions entirely:
-   * the household upstream already holds a parent, and the server re-verifies
-   * every anchor before it believes any of it. The overlay closes first — the
-   * parent is leaving the confirm screen, not stacking a second one on it.
+   * The anchors are the children the kiosk already has for this family, which
+   * is what lets the wizard skip the adult's three questions entirely: the
+   * household upstream already holds a parent, and the server re-verifies every
+   * anchor before it believes any of it. The overlay closes first — the parent
+   * is leaving the confirm screen, not stacking a third thing on it.
    */
   const startSiblingWizard = useCallback((anchors: KioskStudent[]) => {
     setOverlay(null);
@@ -764,14 +786,56 @@ export function KioskApp() {
         />
       );
     }
+    if (overlay?.kind === 'sibling') {
+      const { from } = overlay;
+      const already = new Set([from.student.id, ...from.family.map((member) => member.id)]);
+      return (
+        <SiblingScreen
+          student={from.student}
+          buffer={buffer}
+          onKey={onKey}
+          students={students}
+          excludeIds={already}
+          presentIds={presentIds}
+          onPick={(found) => {
+            /*
+             * Straight back to the confirm with them on it, ticked. Not a
+             * second confirm screen of their own: the parent is assembling one
+             * group, and the button at the end says how many it covers.
+             */
+            services?.warmStudentDates(found.id);
+            printing?.warmLabel(found, binding);
+            setBuffer('');
+            setOverlay({ ...from, family: [...from.family, found] });
+          }}
+          onRegister={() => startSiblingWizard([from.student, ...from.family])}
+          onBack={() => {
+            setBuffer('');
+            setOverlay(from);
+          }}
+        />
+      );
+    }
     if (overlay?.kind === 'confirm') {
       return (
         <ConfirmScreen
           student={overlay.student}
           intent={overlay.intent}
           family={overlay.family}
+          skipped={overlay.skipped}
+          onToggle={(studentId) =>
+            setOverlay((held) => {
+              if (held?.kind !== 'confirm') return held;
+              const next = new Set(held.skipped);
+              if (!next.delete(studentId)) next.add(studentId);
+              return { ...held, skipped: next };
+            })
+          }
           onConfirm={(chosen) => onConfirm(overlay, chosen)}
-          onAddSibling={startSiblingWizard}
+          onFindSibling={() => {
+            setBuffer('');
+            setOverlay({ kind: 'sibling', from: overlay });
+          }}
           onBack={() => {
             // Backed out, so the labels warmed on the way in are not wanted. The
             // cache evicts on its own, but a parent who picks the wrong Noah
@@ -824,7 +888,7 @@ export function KioskApp() {
             printing?.warmLabel(student, binding);
             for (const member of family) printing?.warmLabel(member, binding);
           }
-          setOverlay({ kind: 'confirm', student, intent, family });
+          setOverlay({ kind: 'confirm', student, intent, family, skipped: new Set() });
         }}
         onUnbind={() => {
           // A kiosk that has left a gathering has no business still holding

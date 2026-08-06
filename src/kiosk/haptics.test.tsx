@@ -107,7 +107,15 @@ describe('confirming at the kiosk', () => {
   it('buzzes on the tap that checks a child in', () => {
     const onConfirm = vi.fn();
     render(
-      <ConfirmScreen student={ADA} intent="check-in" family={[]} onConfirm={onConfirm} onBack={vi.fn()} />,
+      <ConfirmScreen
+        student={ADA}
+        intent="check-in"
+        family={[]}
+        skipped={new Set()}
+        onToggle={vi.fn()}
+        onConfirm={onConfirm}
+        onBack={vi.fn()}
+      />,
     );
 
     press(screen.getByText('Check in'));
@@ -120,7 +128,15 @@ describe('confirming at the kiosk', () => {
 
   it('says nothing to a parent tapping a child who is already checked in', () => {
     render(
-      <ConfirmScreen student={ADA} intent="done" family={[]} onConfirm={vi.fn()} onBack={vi.fn()} />,
+      <ConfirmScreen
+        student={ADA}
+        intent="done"
+        family={[]}
+        skipped={new Set()}
+        onToggle={vi.fn()}
+        onConfirm={vi.fn()}
+        onBack={vi.fn()}
+      />,
     );
 
     press(screen.getByText(/Already checked in/));

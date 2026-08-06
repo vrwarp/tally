@@ -208,7 +208,7 @@ async function enterChild(first: string, last: string, grade: string): Promise<v
 
 /** The whole wizard, up to but not including the final button. */
 async function fillInTheFamily(): Promise<void> {
-  await tap(/Register your family/);
+  await tap(/Register your child/);
   // The QR is offered first; the wizard is behind "no phone".
   await tap(/Register right here/);
   await enterChild('Robin', 'Fields', '4');
@@ -340,7 +340,7 @@ describe('the four things a parent touches', () => {
     // the two steps where the answer could belong to either person in the room,
     // the placeholder is the only thing that says which.
     await mount();
-    await tap(/Register your family/);
+    await tap(/Register your child/);
     await tap(/Register right here/);
     expect(screen.getAllByText("Child's first name").length).toBeGreaterThan(0);
 
@@ -360,7 +360,7 @@ describe('the four things a parent touches', () => {
 
   it('offers a shift key, and types what the key is showing', async () => {
     await mount();
-    await tap(/Register your family/);
+    await tap(/Register your child/);
     await tap(/Register right here/);
 
     // Auto-capitalised at the start, so the first letter needs no thought.
@@ -378,7 +378,7 @@ describe('the four things a parent touches', () => {
 
   it('gives the phone number a dialer rather than a keyboard', async () => {
     await mount();
-    await tap(/Register your family/);
+    await tap(/Register your child/);
     await tap(/Register right here/);
     await enterChild('Robin', 'Fields', '4');
     await tap("That's everyone");
@@ -398,7 +398,7 @@ describe('the four things a parent touches', () => {
     // The question is "anybody else?", and the parent of four cannot answer it
     // against their memory of what they typed forty seconds ago.
     await mount();
-    await tap(/Register your family/);
+    await tap(/Register your child/);
     await tap(/Register right here/);
     await enterChild('Robin', 'Fields', '4');
 
@@ -455,7 +455,7 @@ describe('registering on your own phone', () => {
 
   it('offers a code to scan, and the address in words for a camera that will not', async () => {
     await mount();
-    await tap(/Register your family/);
+    await tap(/Register your child/);
 
     expect(screen.getByLabelText('Registration QR code')).toBeTruthy();
     expect(screen.getByText('ABC234')).toBeTruthy();
@@ -468,7 +468,7 @@ describe('registering on your own phone', () => {
     refreshedLast4 = { '9012': [REMOTE.id] };
 
     await mount();
-    await tap(/Register your family/);
+    await tap(/Register your child/);
     await tap(/I've registered/);
 
     // Back on search, told what to type — the digits are useless without that
@@ -484,7 +484,7 @@ describe('registering on your own phone', () => {
     // of a family who filled a form in on their phone, and there is one right
     // way to go and look — see `refreshDirectory`.
     await mount();
-    await tap(/Register your family/);
+    await tap(/Register your child/);
     await tap(/I've registered/);
 
     expect(services.refreshDirectory).toHaveBeenCalledTimes(1);
@@ -503,7 +503,7 @@ describe('the clock', () => {
      */
     const endsSoon = Date.now() + 30_000;
     await mount(binding({ endAtMs: endsSoon, checkInClosesAtMs: endsSoon }));
-    await tap(/Register your family/);
+    await tap(/Register your child/);
     await tap(/Register right here/);
     await type('Robin');
 
@@ -517,7 +517,7 @@ describe('the clock', () => {
   it('puts a half-typed registration away when the family walks off', async () => {
     // Their child's half-typed name must not be what greets the next person.
     await mount();
-    await tap(/Register your family/);
+    await tap(/Register your child/);
     await tap(/Register right here/);
     await type('Robin');
 

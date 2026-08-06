@@ -40,7 +40,13 @@ const GRACE: KioskStudent = {
   hasAllergies: false,
 };
 
-const OFFER = /just registered\?/i;
+/*
+ * The words the offer wears, which are about the person rather than the
+ * mechanism: it used to say "Just registered? Check online", which asked a
+ * parent to know that this kiosk holds a cache in order to press the button
+ * that refreshes it.
+ */
+const OFFER = /I already registered/i;
 
 function binding(): KioskBinding {
   const now = Date.now();
@@ -160,8 +166,8 @@ describe('looking again for somebody the cached roster does not hold', () => {
 
     // A sweep of the whole church is not instant, and a screen that says
     // nothing about it is a screen a parent taps again.
-    expect(screen.getByText(/Checking…/)).toBeTruthy();
-    await tap(/Checking…/);
+    expect(screen.getByText(/Looking again…/)).toBeTruthy();
+    await tap(/Looking again…/);
     expect(services.refreshDirectory).toHaveBeenCalledTimes(1);
 
     // Nor does walking away from it start a second one. A read in flight is the
@@ -169,8 +175,8 @@ describe('looking again for somebody the cached roster does not hold', () => {
     // stamped yet, so there would be nothing else to stop the next tap.
     await tap('Clear');
     await type('grace');
-    expect(screen.getByText(/Checking…/)).toBeTruthy();
-    await tap(/Checking…/);
+    expect(screen.getByText(/Looking again…/)).toBeTruthy();
+    await tap(/Looking again…/);
     expect(services.refreshDirectory).toHaveBeenCalledTimes(1);
 
     await act(async () => {

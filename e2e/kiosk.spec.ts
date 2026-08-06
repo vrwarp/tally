@@ -297,7 +297,7 @@ test.describe('the kiosk', () => {
         updatedBy: null,
       });
 
-      await kiosk.getByRole('button', { name: /just registered/i }).click();
+      await kiosk.getByRole('button', { name: /I already registered/i }).click();
 
       // No retyping: the search the parent already typed re-runs against the
       // roster that just landed.
@@ -498,7 +498,7 @@ test.describe('registering a family at the kiosk', () => {
       const nursery = await eventNamed('Nursery');
       await bindTo(kiosk, /nursery/i);
 
-      await kiosk.getByRole('button', { name: /Register your family/i }).click();
+      await kiosk.getByRole('button', { name: /Register your child/i }).click();
       // The QR is offered first; the on-kiosk wizard is behind "no phone".
       await kiosk.getByRole('button', { name: /Register right here/i }).click();
       await enterChild(kiosk, 'Wren', SURNAME, '4th grade');
@@ -564,7 +564,7 @@ test.describe('registering a family at the kiosk', () => {
       await pairKiosk(kiosk, page);
       await bindTo(kiosk, /nursery/i);
 
-      await kiosk.getByRole('button', { name: /Register your family/i }).click();
+      await kiosk.getByRole('button', { name: /Register your child/i }).click();
 
       // Minted by the real callable under the kiosk's own session: a code
       // cannot be conjured from anywhere but a screen staff vouched for.
@@ -614,7 +614,7 @@ test.describe('registering a family at the kiosk', () => {
       await pairKiosk(kiosk, page);
       await bindTo(kiosk, /nursery/i);
 
-      await kiosk.getByRole('button', { name: /Register your family/i }).click();
+      await kiosk.getByRole('button', { name: /Register your child/i }).click();
       // The QR is offered first; the on-kiosk wizard is behind "no phone".
       await kiosk.getByRole('button', { name: /Register right here/i }).click();
       // Somebody the seed already put on the roster.

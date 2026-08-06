@@ -131,7 +131,7 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
 
       /* ---- Door one: the QR --------------------------------------------- */
 
-      await kiosk.getByRole('button', { name: /Register your family/i }).click();
+      await kiosk.getByRole('button', { name: /Register your child/i }).click();
       await expect(kiosk.getByLabel('Registration QR code')).toBeVisible({ timeout: 20_000 });
       await shoot({
         flow: 'On your own phone',

@@ -275,7 +275,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
           'This screen once said "No match — please see a leader" and nothing else. Seeing a leader is still the right last word when something is wrong with the search; it was never the right first one for being new. Two offers sit under the empty result and they answer different questions: a family somebody added while they queued needs the kiosk to look again, and a family nobody has met needs a form.',
       });
 
-      await kiosk.getByRole('button', { name: /Register your family/i }).first().click();
+      await kiosk.getByRole('button', { name: /Register your child/i }).first().click();
       await expect(kiosk.getByLabel('Registration QR code')).toBeVisible({ timeout: 30_000 });
       await shoot(kiosk, 'kiosk', {
         act: 'Nobody has met us',
@@ -384,7 +384,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       /* Act 3 — Nobody has met us, on their own phone                       */
       /* ================================================================== */
 
-      await kiosk.getByRole('button', { name: /Register your family/i }).first().click();
+      await kiosk.getByRole('button', { name: /Register your child/i }).first().click();
       const code = ((await kiosk
         .getByText(/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/)
         .first()
@@ -468,12 +468,21 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       await shoot(kiosk, 'kiosk', {
         act: 'The second child',
         who: 'A family the church already has, growing',
-        title: 'Add a brother or sister',
+        title: 'Find a brother or sister',
         caption:
-          'The journey the first design treated as impossible: a parent whose next child is finally old enough to attend. They start here rather than at the front door, because they have already found their family by phone and tapped a name — and this is the one screen where the kiosk knows which family is standing in front of it. The offer sits below the main action in the smaller weight, being the rarer of the two things somebody came here to do.',
+          'A parent looking at one name who knows there should be two. The kiosk offers the siblings it can see, ticked, above the button — but that guess is deliberately conservative and so it misses people: a child on a different number, a family split across two households, somebody added by hand last week, a second child who is finally old enough. All of them arrive here, on the one screen where the kiosk knows which family is standing in front of it. It sits below the main action in the smaller weight, being the rarer of the two things somebody came here to do.',
       });
 
-      await kiosk.getByRole('button', { name: /Add a brother or sister/i }).click();
+      await kiosk.getByRole('button', { name: /Find a brother or sister/i }).click();
+      await shoot(kiosk, 'kiosk', {
+        act: 'The second child',
+        who: 'A family the church already has, growing',
+        title: 'Both readings of the same question',
+        caption:
+          'This used to be a link straight to the registration form, which read as one thing and did another: "add a brother or sister" is plainly an instruction to include another of my children in this check-in, and it answered by asking a new child\'s name and grade. Both readings are real, so the screen holds both — the search finds the sibling the kiosk simply failed to associate, and the standing offer underneath registers the one who genuinely is not on the roster.',
+      });
+
+      await kiosk.getByRole('button', { name: /Add a new child/i }).click();
       await typeOnKiosk(kiosk, 'Emil');
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.locator('[data-key="clear"]').click();
@@ -499,7 +508,14 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
 
       await page.setViewportSize(VIEWPORTS[shape].app);
       await gotoReady(page, '/review');
-      await expect(page.getByRole('heading', { name: /Families to review/i })).toBeVisible({
+      /*
+       * The families, not the heading.
+       *
+       * The heading paints while the callable is still in flight, so waiting on
+       * it photographed three grey skeleton bars under a caption about what the
+       * door had recorded. A frame that claims something has to contain it.
+       */
+      await expect(page.getByRole('button', { name: /Approve and add/i }).first()).toBeVisible({
         timeout: 30_000,
       });
       await shoot(page, 'app', {

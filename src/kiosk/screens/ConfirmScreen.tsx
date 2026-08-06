@@ -28,15 +28,18 @@
  *
  * ## The one who is not on it
  *
- * A family whose second child is finally old enough is standing at a screen
- * that has found the first one and has no way to mention the second. That is
- * this screen's job too, because this is where the parent already is and where
- * the kiosk already knows which family they are: `onAddSibling` opens the same
- * wizard the front door uses, in its two-question form, anchored to the
- * children on this screen. Underneath the confirm button, in the smaller
- * weight — it is the rarer of the two things a parent came here to do.
+ * The guess above misses people, on purpose, and this is where they are found.
+ * A sibling on a different number, a family split across two households, a
+ * child added by hand last week, a second child who is finally old enough —
+ * all of them are a parent looking at one name and knowing there should be
+ * two. `onFindSibling` opens a screen that searches for them by name and, if
+ * they genuinely are not on the roster, registers them.
+ *
+ * It used to say "add a brother or sister" and go straight to the wizard,
+ * which read as the first thing and did the second. Underneath the confirm
+ * button and in the smaller weight either way — it is the rarer of the two
+ * things a parent came to this screen to do.
  */
-import { useState } from 'react';
 import { gradeDescription, haptic } from '@/lib/utils';
 import { HoldButton } from '../components/HoldButton';
 import { useTapGuard } from '../components/tapGuard';
@@ -47,8 +50,10 @@ export function ConfirmScreen({
   student,
   intent,
   family,
+  skipped,
+  onToggle,
   onConfirm,
-  onAddSibling,
+  onFindSibling,
   onBack,
 }: {
   student: KioskStudent;
@@ -58,25 +63,29 @@ export function ConfirmScreen({
    * do the very same thing to. A check-in screen never offers a collection.
    */
   family: readonly KioskStudent[];
+  /**
+   * Which of `family` the parent has unticked — held by the caller, not here.
+   *
+   * It used to be this component's own state, and that was wrong the moment
+   * there was anywhere to go and come back from: opening "find a brother or
+   * sister" unmounted the screen, and returning silently re-ticked the sibling
+   * the parent had deliberately left alone. A decision somebody made with their
+   * thumb outlives the screen they made it on.
+   */
+  skipped: ReadonlySet<string>;
+  onToggle: (studentId: string) => void;
   /** Everyone the parent is confirming, the tapped student first. */
   onConfirm: (chosen: KioskStudent[]) => void;
   /**
-   * Opens the sibling wizard against this family. Absent when there is nothing
-   * to anchor to — a collection, or a kiosk with no registration flow.
+   * Opens the "who else is with them" screen against this family. Absent when
+   * there is nothing to anchor to — a collection, or a kiosk with no
+   * registration flow.
    */
-  onAddSibling?: (anchors: KioskStudent[]) => void;
+  onFindSibling?: (anchors: KioskStudent[]) => void;
   onBack: () => void;
 }) {
   // Empty means everybody: a family arrives together. See the note above.
-  const [skipped, setSkipped] = useState<ReadonlySet<string>>(() => new Set());
-
-  const memberTap = useTapGuard((id: string) => {
-    setSkipped((held) => {
-      const next = new Set(held);
-      if (!next.delete(id)) next.add(id);
-      return next;
-    });
-  });
+  const memberTap = useTapGuard(onToggle);
 
   const chosen = [student, ...family.filter((member) => !skipped.has(member.id))];
   const others = chosen.length - 1;
@@ -174,23 +183,30 @@ export function ConfirmScreen({
 
       {/*
         Only on a check-in, and only when there is somebody to anchor to. A
-        collection is not the moment to add a child to the roster, and a
-        registration with no verified sibling is a first-time registration —
-        which is what the front door's "Register your family" is for.
+        collection is not the moment to change who is on the roster — a parent
+        taking a child home is answering a different question — and a family
+        with no verified member is a first-time registration, which is what the
+        search screen's own offer is for.
       */}
-      {onAddSibling && intent !== 'check-out' && (
+      {onFindSibling && intent !== 'check-out' && (
         <button
           type="button"
           tabIndex={-1}
           onPointerDown={(event) => {
             event.preventDefault();
             haptic();
-            onAddSibling([student, ...family]);
+            onFindSibling([student, ...family]);
           }}
           className="shrink-0 rounded-xl px-8 py-4 text-xl text-ink-400 active:bg-ink-800"
           style={{ touchAction: 'manipulation' }}
         >
-          + Add a brother or sister
+          {/*
+            Not "anyone else" — the ticked list above already asks that, about
+            the siblings the kiosk found on its own. This is the other
+            question: somebody it did not find. Two controls a thumb's width
+            apart cannot share a sentence.
+          */}
+          Find a brother or sister
         </button>
       )}
 

@@ -210,7 +210,7 @@ export function SearchScreen({
                 }}
                 className="flex h-14 items-center justify-center rounded-xl bg-brand-600 px-8 text-lg font-semibold text-white active:bg-brand-500"
               >
-                Register your family
+                Register your child
               </button>
               {refresh === 'failed' && (
                 <div className="text-base text-ink-500">Couldn&apos;t reach the network just now.</div>
@@ -224,14 +224,25 @@ export function SearchScreen({
                     event.preventDefault();
                     onRefresh();
                   }}
-                  className="rounded-xl px-6 py-3 text-base font-semibold text-brand-300 active:bg-ink-800 disabled:text-ink-500"
+                  className="flex h-14 items-center justify-center rounded-xl bg-ink-800 px-8 text-lg font-semibold text-ink-100 active:bg-ink-700 disabled:text-ink-500"
                   style={{ touchAction: 'manipulation' }}
                 >
+                  {/*
+                    * The two answers to "no match" are a pair, so they look
+                    * like one: same height, same shape, the second in the
+                    * quieter fill because registering is the likelier need.
+                    *
+                    * The words are about the person, not the mechanism. "Just
+                    * registered? Check online" described what the button *did*
+                    * — reach past a cache the parent has no idea exists — and
+                    * asked them to understand that in order to press it. This
+                    * asks them something they know the answer to.
+                    */}
                   {refresh === 'refreshing'
-                    ? 'Checking…'
+                    ? 'Looking again…'
                     : refresh === 'failed'
                       ? 'Try again'
-                      : 'Just registered? Check online'}
+                      : 'I already registered'}
                 </button>
               )}
               <div className="text-base text-ink-500">or see a leader.</div>
@@ -289,21 +300,32 @@ export function SearchScreen({
         * A parent who has been told "just put your name in" types their child's
         * name and gets a list — the no-match state above never fires for them,
         * because somebody else's Noah is on the roster. So the door has to be
-        * visible without failing a search first. Low-key and fixed-height: it
-        * is one row of the grid, present from the first paint, so it cannot be
-        * the thing that moves when a keystroke lands.
+        * visible without failing a search first.
+        *
+        * It used to be a line of text with a coloured phrase in it, which read
+        * as a footnote next to the same offer's *button* two hundred pixels
+        * higher up. A family meets whichever of the two happens to fire first,
+        * so they have to be the same object: same shape, same words, one step
+        * quieter here because this one is standing next to a keyboard somebody
+        * is aiming at.
+        *
+        * Still exactly one grid row and still a fixed height, which is the
+        * promise this file makes about geometry: present from the first paint,
+        * so it cannot be the thing that moves when a keystroke lands.
         */}
-      <button
-        type="button"
-        tabIndex={-1}
-        onPointerDown={() => {
-          haptic(8);
-          onRegister();
-        }}
-        className="mx-auto flex h-12 w-full max-w-2xl items-center justify-center text-base text-ink-400 active:text-ink-200"
-      >
-        First time here? <span className="pl-1.5 font-semibold text-brand-300">Register your family</span>
-      </button>
+      <div className="flex h-14 items-center justify-center px-6 pb-1">
+        <button
+          type="button"
+          tabIndex={-1}
+          onPointerDown={() => {
+            haptic(8);
+            onRegister();
+          }}
+          className="flex h-12 items-center justify-center rounded-xl bg-brand-600/15 px-6 text-base font-semibold text-brand-300 ring-1 ring-brand-500/40 active:bg-brand-600/30"
+        >
+          First time here? Register your child
+        </button>
+      </div>
 
       <Keyboard onKey={onKey} />
     </div>
