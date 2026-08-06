@@ -126,7 +126,7 @@ const CAST: Record<
     doorLast: string;
     familyDigits: string;
     familyChild: string;
-    familySibling: string;
+    guestChild: string;
     surname: string;
     phone: string;
     qrPhone: string;
@@ -144,7 +144,15 @@ const CAST: Record<
     // happens at a lobby kiosk and the thing the confirm screen is built for.
     familyDigits: '0347',
     familyChild: 'Amara Osei',
-    familySibling: 'Kofi Osei',
+    /*
+     * A child the tour never touches otherwise, on the roster and not checked
+     * in — because the sibling search shows a child who is already present as
+     * an inert "checked in" row, correctly, and there is nothing to photograph
+     * in tapping one. Not kin to the family being confirmed either, which is
+     * the point: this path exists for the cousin, the neighbour's boy, and the
+     * sibling whose number on file is a different one.
+     */
+    guestChild: 'Maya Adebayo',
     surname: 'Okonkwo',
     phone: '5550172244',
     qrPhone: '5550179911',
@@ -155,7 +163,7 @@ const CAST: Record<
     doorLast: 'Washington',
     familyDigits: '0347',
     familyChild: 'Efua Osei',
-    familySibling: 'Kofi Osei',
+    guestChild: 'Ethan Nguyen',
     surname: 'Adeyemi',
     phone: '5550178866',
     qrPhone: '5550176655',
@@ -563,21 +571,21 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
        * back ticked in the list above the button, and one press covers both.
        * Nothing is created, and no reviewer has anything to decide.
        */
-      await typeOnKiosk(kiosk, cast.familySibling.split(' ')[0]!);
+      await typeOnKiosk(kiosk, cast.guestChild.split(' ')[0]!);
       await shoot(kiosk, 'kiosk', {
         act: 'The second child',
         who: 'A family the church already has, growing',
         title: 'Searching the roster, not a form',
         caption:
-          'A name search over the whole roster rather than the four digits that just failed. The family\'s own children are shown greyed and inert so nobody adds a child who is already on the confirm screen behind this one, and the offer to register somebody genuinely new waits underneath rather than being the destination.',
+          'A name search over the whole roster rather than the four digits that just failed — so a child the digits could never have found is reachable anyway. Anybody already on the confirm screen behind this one, or already checked in, is drawn inert rather than hidden: a parent looking for a name needs to see it and see that it is done. The offer to register somebody genuinely new waits underneath rather than being the destination.',
       });
-      await kiosk.getByRole('button', { name: new RegExp(cast.familySibling, 'i') }).first().click();
+      await kiosk.getByRole('button', { name: new RegExp(cast.guestChild, 'i') }).first().click();
       await shoot(kiosk, 'kiosk', {
         act: 'The second child',
         who: 'A family the church already has, growing',
         title: 'Added onto the check-in, not registered',
         caption:
-          'Straight back to the confirm with the child appended and ticked, and the button counting them. This is the half of "a brother or sister" that costs nothing: they were always on the roster, the guess just could not prove they were kin — a different number on file, a household split in two, somebody added by hand last week. One press now checks both in as one arrival, which is also what makes them one pickup later.',
+          'Straight back to the confirm with the child appended and ticked, and the button counting them. This is the half of "a brother or sister" that costs nothing: they were always on the roster, the four digits just could not prove they belonged together — a different number on file, a household split in two, a cousin, the neighbour\'s boy who came in the same car. One press now checks both in as one arrival, which is also what makes them one pickup later.',
       });
 
       await kiosk.getByRole('button', { name: /Another child/i }).click();
