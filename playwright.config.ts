@@ -137,22 +137,13 @@ export default defineConfig({
   },
 
   /*
-   * A reseed in front of every browser, because they share one dataset.
-   *
-   * `globalSetup` seeds once, which is right for whichever project runs first
-   * and wrong for the rest: these specs mutate shared state on purpose, so the
-   * second browser meets a child the first already checked in and waits for a
-   * button that is correctly not there. Per-browser rather than one shared
-   * dependency, so `--project=chromium-mobile` on its own still starts from a
-   * known world.
+   * Plain projects. The reseed each one needs is a worker-scoped auto fixture
+   * in `e2e/support/fixtures.ts`, not a setup project wired through
+   * `dependencies` — dependencies are resolved as a graph and all of them run
+   * before any dependent project starts, which puts every reseed at the front
+   * of the run and leaves the second browser exactly as contaminated as before.
    */
-  projects: BROWSERS.flatMap((browser) => [
-    {
-      name: `seed:${browser.name}`,
-      testMatch: /support[\\/]reseed\.setup\.ts$/,
-    },
-    { ...browser, dependencies: [`seed:${browser.name}`] },
-  ]),
+  projects: BROWSERS.map((browser) => ({ ...browser })),
 
   webServer: [
     {

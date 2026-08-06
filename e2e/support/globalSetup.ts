@@ -1,15 +1,17 @@
 /**
- * Waits for the servers Playwright started, then seeds once.
+ * Waits for the servers Playwright started.
  *
- * The seeding itself lives in ./seed.ts because it also runs before each
- * browser project — see the `seed:` projects in playwright.config.ts. What is
- * unique to this hook is the readiness checks: every one of them throws with an
- * actionable message, because a half-started emulator produces failures that
- * look exactly like application bugs and cost an hour to tell apart.
+ * Nothing else: seeding belongs to the `seededWorld` fixture in ./fixtures.ts,
+ * which runs once per project rather than once per invocation — see the note
+ * there for why the second browser needs its own. Seeding here as well would
+ * only mean doing it twice before the first project.
+ *
+ * What is unique to this hook is the readiness checks. Every one of them throws
+ * with an actionable message, because a half-started emulator produces failures
+ * that look exactly like application bugs and cost an hour to tell apart.
  */
 import { E2E } from '../../playwright.config';
 import { waitForHttp } from './emulator';
-import { seedWorld } from './seed';
 
 export default async function globalSetup(): Promise<void> {
   await Promise.all([
@@ -23,6 +25,4 @@ export default async function globalSetup(): Promise<void> {
   // is hardest to diagnose from a test failure: `provisionAccess` would simply
   // never resolve and every sign-in would time out.
   await waitForHttp(`http://127.0.0.1:${E2E.functions}/`, 'Functions emulator');
-
-  await seedWorld('global setup');
 }
