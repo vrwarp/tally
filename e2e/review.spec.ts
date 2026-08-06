@@ -122,9 +122,18 @@ test.describe('reviewing a family the kiosk recorded', () => {
         )
         .toBe(1);
 
-      // And the registration is gone, phone number and all.
-      await expect(page.getByText(/Nothing waiting/i)).toBeVisible({ timeout: 30_000 });
-      expect(await readCollection('kioskRegistrations')).toHaveLength(0);
+      /*
+       * And *this* registration is gone, phone number and all.
+       *
+       * Deliberately not "the queue is empty": other specs in this suite
+       * register families at the kiosk and leave them waiting, which is not
+       * leftover mess but the exact state `/review` exists for. Asserting the
+       * global empty state made this test a claim about every other spec's
+       * housekeeping, and it failed the moment the suite ran in one go.
+       */
+      await expect(card).toBeHidden({ timeout: 30_000 });
+      const left = await readCollection('kioskRegistrations');
+      expect(left.filter((doc) => JSON.stringify(doc.data).includes(SURNAME))).toHaveLength(0);
     } finally {
       await context.close();
     }
@@ -154,7 +163,8 @@ test.describe('reviewing a family the kiosk recorded', () => {
       await expect(card.getByText(/forgets the phone number/i)).toBeVisible();
       await card.getByRole('button', { name: /Yes, take them off/i }).click();
 
-      await expect(page.getByText(/Nothing waiting/i)).toBeVisible({ timeout: 30_000 });
+      // This card, not the whole queue — see the note in the test above.
+      await expect(card).toBeHidden({ timeout: 30_000 });
 
       const students = await readCollection('students');
       const discarded = students.find(

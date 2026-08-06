@@ -49,12 +49,20 @@ const launchOptions = (executablePath: string | undefined) =>
  * disagree about layout and storage.
  */
 /*
- * The walkthrough is a documentation build, not a test: it photographs the app
- * rather than asserting on it, and it mutates the seeded data as it goes. It is
- * opted in with `WALKTHROUGH=1` rather than ignored outright, so it can still
- * be run by path.
+ * The walkthrough and the tour are documentation builds, not tests: they
+ * photograph the app rather than asserting on it, and they mutate the seeded
+ * data as they go. They are opted in with `WALKTHROUGH=1` rather than ignored
+ * outright, so they can still be run by path.
+ *
+ * The tour belongs here for a second reason its filename hides: it needs a
+ * world nobody has touched. It walks a seeded family up to the door and checks
+ * them in, so a suite that had already checked that child in left it looking at
+ * a pickup button and waiting for a "Check in" that was never coming — and
+ * everything it registered on the way through poisoned whatever ran after it.
  */
-const SPEC_IGNORE = process.env.WALKTHROUGH ? [] : ['**/*walkthrough.spec.ts'];
+const SPEC_IGNORE = process.env.WALKTHROUGH
+  ? []
+  : ['**/*walkthrough.spec.ts', '**/tour.spec.ts'];
 
 const BROWSERS = [
   { name: 'chromium-desktop', use: { ...devices['Desktop Chrome'], ...launchOptions(chromiumExecutable) } },
