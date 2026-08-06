@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import type { BackendRegistry } from '../backends/registry.js';
 import type { PeopleBackend } from '../backends/types.js';
 import { FakeFirestore } from '../testing/fakeFirestore.js';
+import { PULSE_DOC } from './pulse.js';
 import {
   buildPhoneIndex,
   patchPhonesNow,
@@ -58,6 +59,11 @@ describe('buildPhoneIndex', () => {
 
     const summary = await buildPhoneIndex(db, registry, { builtBy: 'test', now: NOW });
     expect(summary).toMatchObject({ students: 3, entries: 2 });
+
+    // The build announces itself: phones because the document changed, roster
+    // because the sweep behind it refreshed the backend people too.
+    expect((db.get(PULSE_DOC)?.phones as { rev?: number })?.rev).toBeDefined();
+    expect((db.get(PULSE_DOC)?.roster as { rev?: number })?.rev).toBeDefined();
 
     const doc = db.get(PHONE_INDEX_DOC)!;
     expect(doc.builtBy).toBe('test');

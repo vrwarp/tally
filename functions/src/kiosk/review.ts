@@ -37,6 +37,7 @@ import { Timestamp } from 'firebase-admin/firestore';
 import type { BackendRegistry } from '../backends/registry.js';
 import type { CreateFamilyResult } from '../backends/types.js';
 import { PATHS, SILENT_LOGGER, type FirestoreLike, type FunctionLogger } from '../firestore.js';
+import { bumpPulse } from './pulse.js';
 import {
   REGISTRATIONS_COLLECTION,
   REGISTRATION_DOC_TTL_MS,
@@ -520,6 +521,10 @@ export async function discardRegistration(options: {
   }
 
   await ref.delete();
+  // A discarded child must stop being findable at the lobby within a poll, not
+  // a six-hour TTL — the search would otherwise offer a check-in for a student
+  // a reviewer just said was not real.
+  if (deactivated > 0) await bumpPulse(db, ['roster'], now, { logger });
   logger.info('Discarded a self-registration', { registrationId, deactivated });
 
   return {

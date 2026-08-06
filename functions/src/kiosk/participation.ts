@@ -34,6 +34,7 @@ import {
   type ChainInstance,
 } from '../generated/participation.js';
 import { EVENTS, toSource } from '../occurrences.js';
+import { bumpPulse } from './pulse.js';
 
 export const PARTICIPATION_DOC = 'kioskIndex/participation';
 
@@ -169,6 +170,11 @@ export async function buildParticipationIndex(
   }
 
   await db.doc(PARTICIPATION_DOC).set(payload);
+
+  // Inside the builder for the same reasons the phone index's bump is: only
+  // the builder knows the document changed, and every caller present and
+  // future gets the signal without remembering to send it.
+  await bumpPulse(db, ['participation'], now, { logger: options.logger });
 
   return {
     chains: scopes.size,

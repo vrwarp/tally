@@ -9,6 +9,7 @@ import { Timestamp } from 'firebase-admin/firestore';
 import { describe, expect, it } from 'vitest';
 import { FakeFirestore } from '../testing/fakeFirestore.js';
 import { buildParticipationIndex, PARTICIPATION_DOC } from './participation.js';
+import { PULSE_DOC } from './pulse.js';
 
 const NOW = new Date('2026-08-07T03:20:00Z');
 const DAY_MS = 86_400_000;
@@ -69,6 +70,7 @@ describe('buildParticipationIndex', () => {
     const summary = await buildParticipationIndex(db, { builtBy: 'test', now: NOW });
 
     expect(summary).toMatchObject({ chains: 1, instances: 4, students: 3 });
+    expect((db.get(PULSE_DOC)?.participation as { rev?: number })?.rev).toBeDefined();
     expect(scopes(db).friday).toEqual({
       participated: ['ada', 'bo', 'cyd'],
       recent: ['ada', 'bo'],

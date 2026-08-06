@@ -17,6 +17,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { FakeFirestore } from '../testing/fakeFirestore.js';
+import { PULSE_DOC } from './pulse.js';
 import { PENDING_LAST4_DOC, PHONE_INDEX_DOC } from './phoneIndex.js';
 import {
   parseRegisterFamilyRequest,
@@ -53,7 +54,7 @@ function dbWithEvent(): FakeFirestore {
 
 async function run(
   db: FakeFirestore,
-  args: { data?: Record<string, unknown>; source?: 'kiosk' | 'qr' } = {},
+  args: { data?: Record<string, unknown>; source?: 'kiosk' | 'qr'; qrEventId?: string | null } = {},
 ): Promise<RegisterFamilyResult> {
   const source = args.source ?? 'kiosk';
   return registerFamily({
@@ -62,7 +63,7 @@ async function run(
     context:
       source === 'kiosk'
         ? { source, uid: 'staff-uid', eventId: 'friday-today' }
-        : { source },
+        : { source, qrEventId: args.qrEventId ?? null },
     now: NOW,
   });
 }
@@ -439,5 +440,89 @@ describe('where the parent is, and is not', () => {
     expect(JSON.stringify(elsewhere)).not.toContain('5550103344');
     // Four digits, which is the bargain that lets the index exist at all.
     expect(JSON.stringify(elsewhere)).toContain('3344');
+  });
+});
+
+/**
+ * What a registration announces to the other kiosks.
+ *
+ * The kiosk the family is standing at already holds the answer locally; the
+ * pulse is for every other lobby screen, and for the QR screen the family is
+ * about to walk back to. See kiosk/pulse.ts.
+ */
+describe('the pulse', () => {
+  function channelRevs(db: FakeFirestore): Record<string, unknown> {
+    const held = db.get(PULSE_DOC) ?? {};
+    return {
+      roster: (held.roster as { rev?: number } | undefined)?.rev,
+      phones: (held.phones as { rev?: number } | undefined)?.rev,
+      registration: (held.registration as { rev?: number } | undefined)?.rev,
+    };
+  }
+
+  it('announces a kiosk registration on roster and phones, never registration', async () => {
+    const db = dbWithEvent();
+    await run(db);
+
+    const revs = channelRevs(db);
+    expect(revs.roster).toBeDefined();
+    expect(revs.phones).toBeDefined();
+    // A wizard registration resolves locally on the kiosk it happened at;
+    // waking another kiosk's QR screen for it would yank a different family's
+    // code mid-scan.
+    expect(revs.registration).toBeUndefined();
+  });
+
+  it('announces a QR registration on all three channels, naming the gathering', async () => {
+    const db = dbWithEvent();
+    await run(db, { source: 'qr', qrEventId: 'friday-today' });
+
+    const revs = channelRevs(db);
+    expect(revs.roster).toBeDefined();
+    expect(revs.phones).toBeDefined();
+    expect(revs.registration).toBeDefined();
+    expect((db.get(PULSE_DOC)!.registration as { eventId?: string }).eventId).toBe('friday-today');
+  });
+
+  it('records the code’s gathering on the review record without checking anybody in', async () => {
+    const db = dbWithEvent();
+    await run(db, { source: 'qr', qrEventId: 'friday-today' });
+
+    // The record knows which lobby the code came from; the family is still
+    // checked out — knowing which kiosk printed a QR is not evidence anybody
+    // walked through a door.
+    expect(recordFor(db)).toMatchObject({ eventId: 'friday-today', checkedIn: false });
+    const attendance = db
+      .writtenPaths('events/friday-today/attendance')
+      .filter((path) => !path.endsWith('deleted'));
+    expect(attendance).toHaveLength(0);
+  });
+
+  it('does not re-announce a replay of a completed registration', async () => {
+    const db = dbWithEvent();
+    await run(db);
+    const first = channelRevs(db);
+
+    await run(db);
+    expect(channelRevs(db)).toEqual(first);
+  });
+
+  it('announces a sibling registration with no digits on roster alone', async () => {
+    const db = dbWithEvent();
+    db.seed('students/pco_44', { status: 'active', firstName: 'Amara', lastName: 'Osei' });
+
+    await run(db, {
+      data: goodRequest({
+        children: [{ firstName: 'Kofi', lastName: 'Osei', grade: 2 }],
+        guardian: null,
+        anchorStudentIds: ['pco_44'],
+      }),
+    });
+
+    const revs = channelRevs(db);
+    expect(revs.roster).toBeDefined();
+    // No digits reached the index, so there is nothing for the phones channel
+    // to announce.
+    expect(revs.phones).toBeUndefined();
   });
 });

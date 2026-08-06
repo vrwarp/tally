@@ -9,6 +9,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { FakeFirestore } from '../testing/fakeFirestore.js';
+import { PULSE_DOC } from '../kiosk/pulse.js';
 import { mergeStudents, unmergeStudents } from './mergeStudents.js';
 
 const NOW = new Date('2026-08-11T10:00:00Z');
@@ -45,6 +46,9 @@ describe('merging', () => {
       pcoPushPending: false,
     });
     expect(store.get('students/pco_7')!.mergedFromStudentIds).toEqual(['held-1']);
+    // And the lobby screens are told: the folded row must leave the kiosk
+    // search within a poll, not a six-hour TTL.
+    expect((store.get(PULSE_DOC)?.roster as { rev?: number })?.rev).toBeDefined();
   });
 
   it('relinks a never-pushed duplicate onto the keeper’s person on the way out', async () => {

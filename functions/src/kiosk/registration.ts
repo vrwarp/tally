@@ -68,6 +68,7 @@ import {
   type FunctionLogger,
 } from '../firestore.js';
 import { last4ForStudents, patchPhonesNow, recordPendingLast4 } from './phoneIndex.js';
+import { bumpPulse, type PulseChannel } from './pulse.js';
 
 export const REGISTRATIONS_COLLECTION = 'kioskRegistrations';
 
@@ -585,6 +586,13 @@ export interface RegisterFamilyContext {
   uid?: string;
   /** Required in kiosk mode; everybody registered is checked in against it. */
   eventId?: string;
+  /**
+   * The gathering whose kiosk minted the QR code, in remote mode — read off
+   * the code document, never off the request. A hint for the pulse and the
+   * review record, and emphatically NOT a check-in: a family may register from
+   * the car park, or the sofa, before they have arrived at all.
+   */
+  qrEventId?: string | null;
 }
 
 export interface RegisterFamilyOptions {
@@ -693,7 +701,12 @@ export async function registerFamily(
   const pending = {
     status: 'pending' as const,
     source: context.source,
-    eventId: event?.id ?? null,
+    // For a QR registration this is the gathering whose kiosk minted the code
+    // — the review record stops being event-blind, and the pulse can wake the
+    // right screen. `checkedIn` below stays tied to `event`, which is null in
+    // QR mode: knowing which kiosk printed the code is not evidence that the
+    // family has walked in.
+    eventId: event?.id ?? context.qrEventId ?? null,
     childCount: request.children.length,
     last4,
     checkedIn: event !== null,
@@ -850,6 +863,24 @@ export async function registerFamily(
       error: String(error),
     });
   }
+
+  /*
+   * Tell the other kiosks. Outside the try above on purpose: a failed phone
+   * patch is exactly when the roster half of the signal matters most.
+   *
+   * The `registration` channel is QR-only, and that is not an economy. Its one
+   * consumer is "auto-advance an open QR screen for this gathering", and a
+   * wizard registration on kiosk A resolving locally must not yank kiosk B's QR
+   * screen out from under a different family mid-scan. The roster and phones
+   * channels still carry a wizard registration to every other kiosk.
+   */
+  const bumped: PulseChannel[] = ['roster'];
+  if (last4 !== '') bumped.push('phones');
+  if (context.source === 'qr') bumped.push('registration');
+  await bumpPulse(db, bumped, now, {
+    eventId: event?.id ?? context.qrEventId ?? null,
+    logger,
+  });
 
   /* ---- What a reviewer will want to know ---------------------------------- */
 

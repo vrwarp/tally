@@ -18,6 +18,7 @@ import type { BackendRegistry } from '../backends/registry.js';
 import { scanRoster } from '../backends/scan.js';
 import { toDateOrNull, type FirestoreLike, type FunctionLogger } from '../firestore.js';
 import { studentIdFor } from '../generated/backendIds.js';
+import { bumpPulse } from './pulse.js';
 
 export const PHONE_INDEX_DOC = 'kioskIndex/phones';
 
@@ -321,6 +322,16 @@ export async function buildPhoneIndex(
   }
 
   await db.doc(PHONE_INDEX_DOC).set(payload);
+
+  /*
+   * Both channels, and inside the builder rather than at its call sites: only
+   * the builder knows the document actually changed (a call-site bump after a
+   * build that threw would signal a change that never happened), and any
+   * future caller gets the signal for free. `roster` too, because this sweep
+   * just refreshed the backend people the kiosk's roster read serves — the
+   * kiosks fold in a fresh copy each morning instead of waiting out a TTL.
+   */
+  await bumpPulse(db, ['phones', 'roster'], now, { logger: options.logger });
 
   return {
     students: byStudent.size,

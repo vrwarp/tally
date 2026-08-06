@@ -33,6 +33,7 @@
  */
 import { Timestamp } from 'firebase-admin/firestore';
 import { PATHS, SILENT_LOGGER, type FirestoreLike, type FunctionLogger } from '../firestore.js';
+import { bumpPulse } from '../kiosk/pulse.js';
 import { linkageOfData } from './scan.js';
 import { migrateStudentMemberships } from './studentMigration.js';
 import { parseStudentId } from '../generated/backendIds.js';
@@ -172,6 +173,11 @@ export async function mergeStudents(options: {
     },
     { merge: true },
   );
+
+  // The folded row must leave the lobby search within a poll: a kiosk still
+  // offering the duplicate would write attendance against a student that no
+  // longer answers for anybody.
+  await bumpPulse(db, ['roster'], now, { logger });
 
   logger.info('Merged two roster rows', { keeperId, foldId });
   return {

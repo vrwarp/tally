@@ -18,6 +18,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { BackendRegistry } from '../backends/registry.js';
 import type { CreateFamilyResult, PeopleBackend } from '../backends/types.js';
 import { FakeFirestore } from '../testing/fakeFirestore.js';
+import { PULSE_DOC } from './pulse.js';
 import { REGISTRATIONS_COLLECTION } from './registration.js';
 import { approveRegistration, discardRegistration, listPendingRegistrations } from './review.js';
 
@@ -399,6 +400,9 @@ describe('discarding', () => {
       pcoPushPending: false,
     });
     expect(db.get(`${REGISTRATIONS_COLLECTION}/${ID}`)).toBeUndefined();
+    // The lobby screens are told, so the kiosk stops offering a check-in for
+    // children a reviewer just said were not real.
+    expect((db.get(PULSE_DOC)?.roster as { rev?: number })?.rev).toBeDefined();
   });
 
   it('leaves alone a child somebody has already approved', async () => {

@@ -13,6 +13,7 @@ import {
   checkCode,
   consumeCode,
   mintCode,
+  mintedEventId,
   MAX_CODE_SUBMISSIONS,
   MAX_LIVE_CODES,
   REGISTRATION_CODES_COLLECTION,
@@ -57,6 +58,29 @@ describe('minting', () => {
 
     // The ceiling is the rate limit for an endpoint that mints things.
     expect(await mintCode(db, 'staff-uid', NOW)).toBe('busy');
+  });
+
+  it('remembers the gathering the kiosk was bound to, and answers it back', async () => {
+    const db = new FakeFirestore();
+    const result = await mintCode(db, 'staff-uid', NOW, 'friday-today');
+    if (result === 'busy') throw new Error('unexpectedly busy');
+
+    expect(db.get(`${REGISTRATION_CODES_COLLECTION}/${result.code}`)).toMatchObject({
+      eventId: 'friday-today',
+    });
+    expect(await mintedEventId(db, result.code.toLowerCase())).toBe('friday-today');
+  });
+
+  it('answers null for a code that names no gathering, and for one that never existed', async () => {
+    const db = new FakeFirestore();
+    // An old kiosk bundle calling bare, and a legacy code doc with no field.
+    const bare = await mintOne(db);
+    db.seed(`${REGISTRATION_CODES_COLLECTION}/LEGACY`, { submissions: 0, maxSubmissions: 20 });
+
+    expect(await mintedEventId(db, bare)).toBeNull();
+    expect(await mintedEventId(db, 'LEGACY')).toBeNull();
+    expect(await mintedEventId(db, 'NEVERX')).toBeNull();
+    expect(await mintedEventId(db, 'way-too-long-to-be-a-code')).toBeNull();
   });
 });
 

@@ -1327,6 +1327,26 @@ describe('kiosk', () => {
         setDoc(doc(asKiosk(env, UID.counselor), 'kioskIndex/phones'), { last4: {} }),
       );
     });
+
+    /*
+     * The pulse rides the same block, pinned by name because its threat is
+     * different: writing it would let a client spoof "a registration landed"
+     * onto every lobby screen, or drive every kiosk into refetch loops.
+     */
+    it('covers the pulse: kiosk sessions read it, nobody writes it', async () => {
+      await assertSucceeds(getDoc(doc(asKiosk(env, UID.counselor), 'kioskIndex/pulse')));
+      await assertSucceeds(getDoc(doc(asUser(env, UID.counselor), 'kioskIndex/pulse')));
+      await assertFails(getDoc(doc(asUser(env, UID.stranger), 'kioskIndex/pulse')));
+      await assertFails(getDoc(doc(asAnonymous(env), 'kioskIndex/pulse')));
+      await assertFails(
+        setDoc(doc(asUser(env, UID.admin), 'kioskIndex/pulse'), { roster: { rev: 999 } }),
+      );
+      await assertFails(
+        setDoc(doc(asKiosk(env, UID.counselor), 'kioskIndex/pulse'), {
+          registration: { rev: 1, eventId: 'spoofed' },
+        }),
+      );
+    });
   });
 
   describe('kioskPairings', () => {

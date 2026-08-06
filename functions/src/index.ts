@@ -110,10 +110,12 @@ import {
   unmergeStudents as runUnmergeStudents,
   type MergeStudentsResult,
 } from './backends/mergeStudents.js';
+import { bumpPulse, PULSE_DEBOUNCE_MS } from './kiosk/pulse.js';
 import {
   checkCode,
   consumeCode,
   mintCode,
+  mintedEventId,
   type CodeStatus,
   type MintCodeResult,
 } from './kiosk/registrationCodes.js';
@@ -1997,8 +1999,23 @@ export const onStudentCreated = onDocumentCreated(
   },
   async (event) => {
     const data = event.data?.data();
+    if (!data) return;
+
+    /*
+     * The kiosk pulse first, BEFORE the push gating below: the early returns
+     * skip held children and backend imports, and those are exactly the
+     * students a lobby kiosk must learn about. Debounced, because this trigger
+     * fires once per document — a 400-person list import must cost a couple of
+     * pulse writes, not 400. `retry: false` above means a bump-then-crash
+     * cannot double anything.
+     *
+     * This is the welcome-desk case: a child quick-added in the main app is
+     * findable on every kiosk within about a minute, with nobody pressing
+     * anything.
+     */
+    await bumpPulse(db(), ['roster'], new Date(), { debounceMs: PULSE_DEBOUNCE_MS, logger });
+
     if (
-      !data ||
       data.pcoPushPending !== true ||
       typeof data.pcoPersonId === 'string' ||
       typeof data.upstreamPersonId === 'string'
@@ -2297,12 +2314,18 @@ export const registerFamily = onCall<Record<string, unknown>, Promise<RegisterFa
 
     try {
       const parsed = parseRegisterFamilyRequest(request.data, fromKiosk ? 'kiosk' : 'qr');
+      /*
+       * Off the code document, never off the request — a phone form that could
+       * name any event could wake any lobby screen in the building. Null for a
+       * code minted by an old kiosk bundle, which simply wakes nothing.
+       */
+      const qrEventId = fromKiosk ? null : await mintedEventId(database, rawCode as string);
       const result = await runRegisterFamily({
         db: database,
         request: parsed,
         context: fromKiosk
           ? { source: 'kiosk', uid: request.auth!.uid, eventId: (eventId as string).trim() }
-          : { source: 'qr' },
+          : { source: 'qr', qrEventId },
         logger,
       });
       /*
@@ -2441,7 +2464,7 @@ export const mergeStudents = onCall<
  * The code the kiosk puts in its QR. Kiosk sessions only, so a code cannot be
  * conjured from anywhere but a screen a staff member vouched for.
  */
-export const mintRegistrationCode = onCall<void, Promise<MintCodeResult>>(
+export const mintRegistrationCode = onCall<{ eventId?: unknown } | void, Promise<MintCodeResult>>(
   { timeoutSeconds: 30, memory: '256MiB' },
   async (request) => {
     if (request.auth?.token?.kiosk !== true) {
@@ -2449,7 +2472,14 @@ export const mintRegistrationCode = onCall<void, Promise<MintCodeResult>>(
     }
     await requireMember(request.auth?.uid);
 
-    const result = await mintCode(db(), request.auth!.uid, new Date());
+    // Optional on the wire: an old cached kiosk bundle still calls this bare,
+    // and its codes simply carry no event — they validate and register exactly
+    // as before, they just cannot wake the screen that minted them.
+    const rawEventId = request.data?.eventId;
+    const eventId =
+      typeof rawEventId === 'string' && rawEventId.trim() !== '' ? rawEventId.trim() : null;
+
+    const result = await mintCode(db(), request.auth!.uid, new Date(), eventId);
     if (result === 'busy') {
       throw new HttpsError(
         'resource-exhausted',
