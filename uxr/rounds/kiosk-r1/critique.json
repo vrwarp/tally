@@ -1,0 +1,37 @@
+{
+  "round": 1,
+  "subject": "kiosk confirm screen — the way to a sibling the guess missed",
+  "variant": "r0 (shipped)",
+  "scenes": ["alone (guess found nobody)", "family (guess found a sibling)"],
+  "viewports": ["kiosktall 800x1280", "kioskwide 1280x800"],
+  "agreed": [
+    "The same question is a 448x64 ticked row above the commit when the guess works and 0px2 of grey text below it when it does not — the volume of the ask is inversely proportional to how badly the parent needs it.",
+    "Nothing below a terminal button can be rescued by treatment: it is read after the decision is made.",
+    "The frame teaches 'fill means pressable, grey text means readable' on every other element, then breaks its own rule on the one door out.",
+    "'Find a brother or sister' and '← Back' share a character-for-character identical class string: same size, same #94a3b8, 32px apart, opposite consequences.",
+    "The affordance belongs in one slot present in both scenes — the last row of the who-else region."
+  ],
+  "disagreed": {
+    "gap between region and commit": {
+      "design": "16px — those people and that button are one decision",
+      "usability": "48px — the expensive mis-tap is always toward green, which commits a child the kiosk cannot undo",
+      "taken": "48px, buying the grouping back through the region's own internal tightness"
+    },
+    "label": {
+      "design": "+ A brother or sister — reads as a list continuation under the question",
+      "usability": "+ Add another child — 'brother or sister' is wrong for the cousins and carpools the code itself acknowledges; 'child' is the only noun true of both a roster row and a registration",
+      "taken": "+ Add another child"
+    }
+  },
+  "found_that_was_not_asked_about": [
+    "The round trip is barely more taps (six either way) — the cost is that it repeats the two slowest things on the kiosk in front of a queue, and that it is optional and unprompted.",
+    "A parent who forgets leaves a child in the building and off the register, which the pickup flow later treats as authority. The kiosk has no undo by design, so the fix has to land before the commit or not at all.",
+    "Going round again writes two arrival groups instead of one, so one missed sibling becomes two separate three-second holds at pickup."
+  ],
+  "deferred": [
+    "The name block has no max-width while everything else is pinned to 448px.",
+    "SearchScreen runs a 672px column and this screen runs 448px, using byte-identical row markup.",
+    "The wide frame is the tall frame's composition with more emptiness around it.",
+    "justify-center makes the student's name land 68px lower with one extra sibling."
+  ]
+}

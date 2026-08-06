@@ -102,6 +102,54 @@ const CSS = `
   .sibling-btn .plus { font-size: 1.75rem; line-height: 1; font-weight: 400; }
 
   .back { flex-shrink: 0; border-radius: 0.75rem; padding: 1rem 2rem; font-size: 1.25rem; color: var(--ink-400); }
+
+  /* ---- r1: one slot for the question, above the commit -------------------- */
+
+  /*
+   * The screen stops composing by a uniform box gap. Both critics measured the
+   * same thing: a uniform box gap plus each element's own padding produced 14/35/54/75px
+   * of *visible* air down the column, a ramp that grouped nothing and put the
+   * biggest void around the least important control. These are ink gaps, set
+   * per boundary, budgeting for the line-box slack the box gap was hiding.
+   */
+  .screen.r1 { gap: 0; justify-content: center; }
+  .screen.r1 .who { margin-bottom: 2.5rem; }
+  /* 48px of clear page either side of the commit. The expensive mis-tap is
+     always *toward* green — it commits a child and the kiosk has no undo — so
+     the boundary that needs the clearance is the one above it, not the one
+     below. The region holds together on its own internal tightness instead. */
+  .screen.r1 .whoelse { margin-bottom: 3rem; }
+  .screen.r1 .commit { margin-bottom: 3.5rem; }
+
+  .whoelse { display: flex; width: 100%; max-width: 28rem; flex-direction: column; gap: 0.5rem; }
+  /* Left, at the rows' own text inset — a caption centred 90px inside the list
+     it heads is the one alignment on the screen that is neither deliberate
+     centring nor deliberate alignment. */
+  .whoelse .ask {
+    padding: 0 1.25rem 0.25rem; text-align: left;
+    font-size: 1.125rem; line-height: 1.75rem; color: var(--ink-400);
+  }
+
+  /*
+   * The affordance, as the last row of the list rather than a caption under
+   * the button. Same 448x64 geometry as a sibling row, so the region reads as
+   * "the people you can add, ending with the way to add one more".
+   *
+   * Brand tint rather than ink-800: the sibling rows are already ink-800 at
+   * this width, so an ink fill here would be a second identical slab, and
+   * brand is already this app's colour for the other door.
+   */
+  .addrow {
+    display: flex; height: 4rem; flex-shrink: 0; align-items: center;
+    gap: 0.625rem; border-radius: 0.75rem; padding: 0 1.25rem; text-align: left;
+    font-size: 1.25rem; line-height: 1.75rem; font-weight: 600;
+    background: color-mix(in oklab, var(--brand-600) 15%, transparent);
+    color: var(--brand-300);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--brand-500) 40%, transparent);
+  }
+  /* Inline and the same size as the words: a 36px badge would collide with the
+     tick chips that mark row *state* on the opposite edge. */
+  .addrow .plus { font-weight: 400; }
 `;
 
 type Scene = 'alone' | 'family';
@@ -133,6 +181,36 @@ const VARIANTS: Record<string, (scene: Scene) => Variant> = {
     above: scene === 'family' ? TICKED_LIST : '',
     below: '<button class="sibling-link">Find a brother or sister</button>',
   }),
+
+  /**
+   * Round 1. Both critics landed on the same structural answer from opposite
+   * directions, so this takes it whole.
+   *
+   *  - **One slot, both scenes.** The affordance is the last row of the
+   *    who-else region, above the commit, in the same place whether the kiosk
+   *    guessed a sibling or not. Nothing below a terminal button can be
+   *    rescued by treatment: it is read after the decision is made.
+   *  - **A filled box.** The frame teaches "fill means pressable, grey text
+   *    means readable" on every other element and then broke its own rule on
+   *    the one door out to a child who is not on the list.
+   *  - **The label is not part of the slot.** "Checking in anyone else?" is a
+   *    question about a list; with one button under it and no list, it is a
+   *    heading over a heading. It renders only when there are siblings.
+   *  - **Back becomes the only unboxed thing**, which is what makes it read as
+   *    an exit rather than an offer. It no longer shares a class string with a
+   *    control that adds a child.
+   */
+  r1: (scene) => ({
+    above: `<div class="whoelse">
+      ${scene === 'family' ? '<div class="ask">Checking in anyone else?</div>' : ''}
+      ${
+        scene === 'family'
+          ? '<div class="row"><span class="rname">Amara Washington</span><span class="tick">&#10003;</span></div>'
+          : ''
+      }
+      <button class="addrow"><span class="plus">+</span> Add another child</button>
+    </div>`,
+  }),
 };
 
 function page(scene: Scene, variant: string, tall: boolean): string {
@@ -148,7 +226,7 @@ function page(scene: Scene, variant: string, tall: boolean): string {
 <style>${CSS}</style>
 </head>
 <body style="width:${tall ? 800 : 1280}px;height:${tall ? 1280 : 800}px">
-  <div class="screen">
+  <div class="screen${variant === 'r0' ? '' : ' ' + variant}">
     <div class="who">
       <div class="name">Nia Washington</div>
       <div class="grade">8th grade</div>
