@@ -106,24 +106,38 @@ const CSS = `
 
 type Scene = 'alone' | 'family';
 
-/** The sibling affordance, per round. Everything else on the screen is fixed. */
-const VARIANTS: Record<string, (scene: Scene) => { before?: string; after?: string }> = {
-  /** What is on the glass today: a grey line, under the commit. */
-  r0: () => ({ after: '<button class="sibling-link">Find a brother or sister</button>' }),
-};
+/**
+ * What a round may change.
+ *
+ * `above` is the whole region between the name and the commit — the "who else?"
+ * question, whatever form it takes that round. `below` is what sits between the
+ * commit and Back. A variant owns both, because the argument this loop is
+ * having is precisely about which of the two the sibling affordance belongs in.
+ */
+interface Variant {
+  above?: string;
+  below?: string;
+}
 
-function page(scene: Scene, variant: string, tall: boolean): string {
-  const build = VARIANTS[variant] ?? VARIANTS.r0!;
-  const { before = '', after = '' } = build(scene);
-  const family =
-    scene === 'family'
-      ? `<div class="family">
+/** The ticked list as it stands: the guess, found and confirmed. */
+const TICKED_LIST = `<div class="family">
       <div class="ask">Checking in anyone else?</div>
       <div class="rows">
         <div class="row"><span class="rname">Amara Washington</span><span class="tick">&#10003;</span></div>
       </div>
-    </div>`
-      : '';
+    </div>`;
+
+const VARIANTS: Record<string, (scene: Scene) => Variant> = {
+  /** What is on the glass today: a grey line, under the commit. */
+  r0: (scene) => ({
+    above: scene === 'family' ? TICKED_LIST : '',
+    below: '<button class="sibling-link">Find a brother or sister</button>',
+  }),
+};
+
+function page(scene: Scene, variant: string, tall: boolean): string {
+  const build = VARIANTS[variant] ?? VARIANTS.r0!;
+  const { above = '', below = '' } = build(scene);
 
   return `<!doctype html>
 <html lang="en" class="h-full" data-theme="dark">
@@ -139,10 +153,9 @@ function page(scene: Scene, variant: string, tall: boolean): string {
       <div class="name">Nia Washington</div>
       <div class="grade">8th grade</div>
     </div>
-    ${family}
-    ${before}
+    ${above}
     <button class="commit">Check in</button>
-    ${after}
+    ${below}
     <button class="back">&larr; Back</button>
   </div>
 </body>
