@@ -22,6 +22,14 @@
  * The four cases and the order of the checks are `mergeRoster`'s, deliberately:
  * the two joins must not disagree about which id names a row, or a child
  * checked in at the door stops being the child the app is looking at.
+ *
+ * One window this cannot close, and it is worth knowing about rather than
+ * chasing: a push creates the person upstream, re-sends whatever the create
+ * silently dropped, and only then stamps the document — so for the length of
+ * those round trips the person is on the roster read and the document does not
+ * yet name them. Nothing links the two in that gap, and a kiosk that refreshes
+ * inside it holds both until its next read. That is sub-second, and it heals
+ * itself; the bug this file exists to fix did neither.
  */
 import { isBackendId, studentIdFor } from '@/lib/backendIds';
 import type { PcoRosterPerson } from '@/types';

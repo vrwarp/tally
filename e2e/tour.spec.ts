@@ -161,9 +161,34 @@ const CAST: Record<
 const SHAPES = ((process.env.TOUR_SHAPES?.split(',').map((value) => value.trim()) ??
   ['wide', 'tall']) as Shape[]).filter((shape) => shape === 'wide' || shape === 'tall');
 
+/**
+ * Waits for the seed's push queue to drain before anything is photographed.
+ *
+ * The seed writes quick-added visitors with `pcoPushPending`, and
+ * `onStudentCreated` pushes them the moment they land — creating the person
+ * upstream, re-sending whatever the create dropped, and only then stamping the
+ * document with the id that links the two. A kiosk reading its roster inside
+ * that gap sees the person and an unlinked document and correctly draws both,
+ * because nothing yet says they are one child.
+ *
+ * That is a real sub-second window and it heals on the next read (see
+ * src/kiosk/roster.ts), but a documentation build must photograph the steady
+ * state rather than the half-second the emulator happens to be in.
+ */
+async function pushQueueDrained(): Promise<void> {
+  await expect
+    .poll(
+      async () =>
+        (await readCollection('students')).filter((doc) => doc.data.pcoPushPending === true).length,
+      { timeout: 120_000, message: 'the seeded visitors finish reaching Planning Center' },
+    )
+    .toBe(0);
+}
+
 test('capture the tour', async ({ browser, page, signedInAs }) => {
   test.setTimeout(1_800_000);
   await signedInAs('core');
+  await pushQueueDrained();
 
   for (const shape of SHAPES) {
     let n = 0;
