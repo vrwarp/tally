@@ -494,12 +494,12 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       await shoot(kiosk, 'kiosk', {
         act: 'The second child',
         who: 'A family the church already has, growing',
-        title: 'Find a brother or sister',
+        title: 'The other door, in the same slot',
         caption:
-          'A parent looking at one name who knows there should be two. The kiosk offers the siblings it can see, ticked, above the button — but that guess is deliberately conservative and so it misses people: a child on a different number, a family split across two households, somebody added by hand last week, a second child who is finally old enough. All of them arrive here, on the one screen where the kiosk knows which family is standing in front of it. It sits below the main action in the smaller weight, being the rarer of the two things somebody came here to do.',
+          'A parent looking at one name who knows there should be two. "Anyone else?" is asked on every check-in, and the answer is a list: the siblings the kiosk guessed, ticked, ending with the way to add the one it missed. Five rounds of critique went into that being one slot rather than two — it used to be a ticked list *above* the button when the guess worked and a line of grey text *below* it when it did not, which reserved the quietest thing on the glass for the only parent who needed it. The guess is deliberately conservative and so it misses people: a child on a different number, a household split in two, somebody added by hand last week.',
       });
 
-      await kiosk.getByRole('button', { name: /Find a brother or sister/i }).click();
+      await kiosk.getByRole('button', { name: /Another child/i }).click();
       await shoot(kiosk, 'kiosk', {
         act: 'The second child',
         who: 'A family the church already has, growing',

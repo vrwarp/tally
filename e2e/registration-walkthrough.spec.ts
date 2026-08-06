@@ -268,7 +268,7 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
       await shoot({
         flow: 'The second child',
         state: 'On the confirm screen',
-        title: 'Find a brother or sister',
+        title: 'The other door, in the same slot',
         caption:
           'A parent whose next child is finally old enough starts here, not at the front door: they have already found their family by phone and tapped a name. The offer sits below the main action in the smaller weight, because it is the rarer of the two things somebody came to this screen to do — and it is on this screen at all because this is where the kiosk knows which family is standing in front of it.',
       });
@@ -279,7 +279,7 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
        * simply failed to associate than one nobody has met — so the search
        * comes first, and registering is the answer standing underneath it.
        */
-      await kiosk.getByRole('button', { name: /Find a brother or sister/i }).click();
+      await kiosk.getByRole('button', { name: /Another child/i }).click();
       await shoot({
         flow: 'The second child',
         state: 'Searching the roster first',

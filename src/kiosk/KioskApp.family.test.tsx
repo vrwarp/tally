@@ -185,7 +185,7 @@ describe('checking a family in together', () => {
     await type('0134');
     await pick('Marcus Osei');
 
-    expect(screen.getByText(/checking in anyone else/i)).toBeTruthy();
+    expect(screen.getByText(/anyone else\?/i)).toBeTruthy();
     expect(screen.getByText('Amara Osei')).toBeTruthy();
 
     await tap(/check in all 2/i);
@@ -201,7 +201,10 @@ describe('checking a family in together', () => {
     await type('0134');
     await pick('Maya Chen');
 
-    expect(screen.queryByText(/anyone else/i)).toBeNull();
+    // The question is asked on every check-in now — what must not appear is a
+    // sibling row for somebody who merely shares a tail.
+    expect(screen.queryByText('Amara Osei')).toBeNull();
+    expect(screen.queryByText('Marcus Osei')).toBeNull();
     await tap('Check in');
 
     expect(checkedInIds()).toEqual(['s-maya']);
@@ -227,7 +230,9 @@ describe('checking a family in together', () => {
     await type('0134');
     await pick('Marcus Osei');
 
-    expect(screen.queryByText(/anyone else/i)).toBeNull();
+    // Amara is offered as no kind of row: a confirm only ever lists people the
+    // button would do the very same thing to.
+    expect(screen.queryByText('Amara Osei')).toBeNull();
     await tap('Check in');
 
     expect(checkedInIds()).toEqual(['s-marcus']);
@@ -252,7 +257,7 @@ describe('collecting a family together', () => {
     await type('0134');
     await pick('Marcus Osei');
 
-    expect(screen.getByText(/collecting anyone else/i)).toBeTruthy();
+    expect(screen.getByText(/Collecting anyone else/i)).toBeTruthy();
 
     // A tap is not enough for a pickup, however many children it covers.
     const button = screen.getByText(/hold to collect all 2/i).closest('button')!;
@@ -408,7 +413,7 @@ describe('finding a brother or sister the kiosk did not offer', () => {
     await mount();
     await type('2200');
     await pick('Maya Chen');
-    expect(screen.getByText(/Find a brother or sister/i)).toBeTruthy();
+    expect(screen.getByText(/Another child/i)).toBeTruthy();
   });
 
   it('is never offered on a collection', async () => {
@@ -421,7 +426,7 @@ describe('finding a brother or sister the kiosk did not offer', () => {
     await pick('Maya Chen');
 
     expect(screen.getByText(/hold to collect/i)).toBeTruthy();
-    expect(screen.queryByText(/Find a brother or sister/i)).toBeNull();
+    expect(screen.queryByText(/Another child/i)).toBeNull();
   });
 
   it('checks in a sibling found by name, together with the first', async () => {
@@ -430,7 +435,7 @@ describe('finding a brother or sister the kiosk did not offer', () => {
     // family guess would never have offered.
     await type('2200');
     await pick('Maya Chen');
-    await tap(/Find a brother or sister/i);
+    await tap(/Another child/i);
 
     await type('amara');
     await pick('Amara Osei');
@@ -451,7 +456,7 @@ describe('finding a brother or sister the kiosk did not offer', () => {
     await mount();
     await type('7788');
     await pick('Amara Osei');
-    await tap(/Find a brother or sister/i);
+    await tap(/Another child/i);
 
     // Marcus arrived with Amara and is ticked behind this screen; offering him
     // again would be a row that does nothing.
@@ -465,7 +470,7 @@ describe('finding a brother or sister the kiosk did not offer', () => {
     await type('7788');
     await pick('Amara Osei');
     await untick('Marcus Osei');
-    await tap(/Find a brother or sister/i);
+    await tap(/Another child/i);
 
     await type('zzq');
     expect(screen.getByText(/are they new/i)).toBeTruthy();
