@@ -161,8 +161,10 @@ const CAST: Record<
     door: 'Nia Washington',
     doorFirst: 'Nia',
     doorLast: 'Washington',
-    familyDigits: '0347',
-    familyChild: 'Efua Osei',
+    // A household of its own: the two passes share one emulator, and the
+    // family the wide pass checked in would offer this one a pickup.
+    familyDigits: '0592',
+    familyChild: 'Marcus Delgado',
     guestChild: 'Ethan Nguyen',
     surname: 'Adeyemi',
     phone: '5550178866',

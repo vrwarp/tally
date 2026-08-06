@@ -286,7 +286,11 @@ export function ConfirmScreen({
       className="grid h-full w-full grid-rows-[minmax(0,1fr)_auto_auto] justify-center justify-items-center p-8 pb-[max(2rem,18vh)] text-center"
       style={{ gridTemplateColumns: 'minmax(0, var(--confirm-measure, 28rem))' }}
     >
-      <div className="flex min-h-0 w-full flex-col items-center justify-end">
+      {/* The clear band above the commit, and the invariant the whole screen is
+          measured against: the same 48px in every scene, and no scene may spend
+          it. The expensive mis-tap is always *toward* the green — it commits a
+          child, and this device has no undo. */}
+      <div className="flex min-h-0 w-full flex-col items-center justify-end pb-12">
         <div className="w-full shrink-0">
           {/* Leading that survives a second line: set solid, a name one
               character longer than the column dropped its descenders into the

@@ -292,7 +292,12 @@ const SEED_STUDENTS: readonly SeedStudent[] = [
   { first: 'Camila', last: 'Torres', grade: 9, band: 'steady', parent: 'Luis Torres', contact: 'both' },
   { first: 'Tyler', last: 'McAllister', grade: 8, band: 'steady', parent: 'Beth McAllister', contact: 'phone' },
   { first: 'Aisha', last: 'Rahman', grade: 7, band: 'steady', parent: 'Farid Rahman', contact: 'email' },
-  { first: 'Marcus', last: 'Delgado', grade: 10, band: 'steady', parent: 'Elena Delgado', contact: 'phone' },
+  { first: 'Marcus', last: 'Delgado', grade: 10, band: 'steady', parent: 'Elena Delgado', contact: 'phone', household: 'delgado' },
+  // The second household, and there are two for a reason beyond variety: the
+  // walkthrough runs twice against one emulator, and a family the first pass
+  // has already checked in offers the second pass a pickup instead.
+  { first: 'Lucia', last: 'Delgado', grade: 6, band: 'steady', parent: 'Elena Delgado', contact: 'phone', household: 'delgado' },
+  { first: 'Rafael', last: 'Delgado', grade: 9, band: 'core', parent: 'Elena Delgado', contact: 'phone', household: 'delgado' },
   { first: 'Zoe', last: 'Lindqvist', grade: 6, band: 'steady', parent: 'Anders Lindqvist', contact: 'both' },
   { first: 'Andre', last: 'Beaulieu', grade: 11, band: 'steady', parent: 'Marie Beaulieu', contact: 'phone' },
   { first: 'Naomi', last: 'Tanaka', grade: 12, band: 'steady', parent: 'Kenji Tanaka', contact: 'both', allergies: 'Shellfish' },
@@ -460,7 +465,10 @@ function slug(value: string): string {
  * would hand its four digits to an unrelated student and invent a sibling —
  * `familyOf` groups on equal digit sets and would have no way to tell.
  */
-const HOUSEHOLD_PHONES: Record<string, string> = { osei: '(555) 555-0347' };
+const HOUSEHOLD_PHONES: Record<string, string> = {
+  osei: '(555) 555-0347',
+  delgado: '(555) 555-0592',
+};
 
 function parentPhone(index: number, seed?: SeedStudent): string {
   const shared = seed?.household ? HOUSEHOLD_PHONES[seed.household] : undefined;
