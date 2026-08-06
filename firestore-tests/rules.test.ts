@@ -583,6 +583,42 @@ describe('attendance', () => {
     );
   });
 
+  /*
+   * `arrivalId` decides which siblings a pickup screen arrives pre-ticked for,
+   * and the only thing that writes it is an unattended screen in a lobby. So
+   * the shape is the database's business: an opaque bounded string, absent, or
+   * refused.
+   */
+  it('takes an arrival id, and takes its absence', async () => {
+    const db = asUser(env, UID.counselor);
+    await assertSucceeds(
+      setDoc(
+        doc(db, paths.attendance(ID.event, ID.otherStudent)),
+        { ...attendanceDoc({ studentId: ID.otherStudent }), arrivalId: 'a-9f0c3d' },
+      ),
+    );
+    await assertSucceeds(
+      setDoc(
+        doc(db, paths.attendance(ID.event, ID.otherStudent)),
+        attendanceDoc({ studentId: ID.otherStudent }),
+      ),
+    );
+  });
+
+  it('refuses an arrival id that is not an opaque bounded string', async () => {
+    const db = asUser(env, UID.counselor);
+    const record = attendanceDoc({ studentId: ID.otherStudent });
+    const at = doc(db, paths.attendance(ID.event, ID.otherStudent));
+
+    // A list here would be a lobby session smuggling structure into a read the
+    // next parent acts on.
+    await assertFails(setDoc(at, { ...record, arrivalId: [ID.student] }));
+    await assertFails(setDoc(at, { ...record, arrivalId: { id: 'a-1' } }));
+    await assertFails(setDoc(at, { ...record, arrivalId: 7 }));
+    await assertFails(setDoc(at, { ...record, arrivalId: '' }));
+    await assertFails(setDoc(at, { ...record, arrivalId: 'a'.repeat(65) }));
+  });
+
   it('lets a counselor read and undo a check-in', async () => {
     const db = asUser(env, UID.counselor);
     await assertSucceeds(getDocs(collection(db, paths.attendanceCollection(ID.event))));

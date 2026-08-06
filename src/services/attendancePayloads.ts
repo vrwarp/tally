@@ -56,6 +56,26 @@ export function attendancePayload(
      * takes the server clock, which is the one clock every device agrees on.
      */
     checkedInAt?: Date;
+    /**
+     * The arrival this check-in was part of — the same value on every child a
+     * single press of the kiosk's button put on the register.
+     *
+     * It exists for the other end of the day. A pickup asks "who else is going
+     * home with them", and the honest answer is not the kiosk's guess at a
+     * family from four phone digits — it is the set that walked in together an
+     * hour ago, which is a fact somebody already stated with their thumb. That
+     * set is also frequently *wider* than the guess: a child found through
+     * "find a brother or sister", a cousin, a neighbour's boy who came in the
+     * same car, none of whom share a number with anybody.
+     *
+     * Absent on everything the main app writes and on every record made before
+     * this field existed — a volunteer checking students in one at a time from
+     * the roster is not making a claim about who arrived with whom. Absent
+     * means "no claim", which the kiosk reads as "fall back to the guess", and
+     * that is different from a *solo* arrival, which carries an id of its own
+     * and correctly ticks nobody else.
+     */
+    arrivalId?: string;
   },
 ): Record<string, unknown> {
   return {
@@ -66,6 +86,7 @@ export function attendancePayload(
     checkedInBy: args.uid,
     method: args.method,
     isFirstEver: args.isFirstEver,
+    ...(args.arrivalId ? { arrivalId: args.arrivalId } : {}),
   };
 }
 

@@ -319,6 +319,21 @@ chain's own instances — so removing the last one empties the calendar ahead. I
 | `isFirstEver` | boolean | True when this was the student's first ever check-in. |
 | `checkedOutAt` | Timestamp, or **absent** | When somebody collected them, on an event with `requiresCheckOut`. The key being absent is the whole "still in the room" state, so it is never written as null — see below. |
 | `checkedOutBy` | string, or absent | Who recorded the pickup. Deliberately not required to equal `checkedInBy`: the volunteer who takes a child in is rarely the one who hands them back. |
+| `arrivalId` | string, or **absent** | Who came through the door together — the same opaque value on every child one press of the kiosk's confirm button put on the register. Written only by the kiosk; the main app checks students in one at a time and makes no claim. Rules pin it to a non-empty string of at most 64 characters. |
+
+**Arrivals, and why absent is not empty.** A pickup asks "who else is going home with them", and
+until this field existed the only answer available was the kiosk's guess at a family from four phone
+digits — conservative by design, so it misses a child on a different number, and blind to a cousin
+or a neighbour's boy who came in the same car. The arrival is a better answer because it is not a
+guess: somebody stated it with their thumb an hour earlier. So the pickup screen ticks the arrival
+and *lists* the phone guess unticked, since families do leave together after arriving apart.
+
+The three states are distinct and all three matter. An arrival shared with others means "these came
+in together". An arrival of one means "came alone", which is what stops a sibling dropped off half an
+hour later from arriving pre-ticked for collection. **Absent** means nobody ever claimed either way —
+every record predating the field, and everything the main app writes — and the kiosk reads it as
+"fall back to the guess". Writing an empty string or a null for the solo case would collapse the
+second into the third, so the key is omitted rather than emptied.
 
 **Who writes:** any counselor may create, update and delete. Undoing a mistaken tap is a delete, and
 has to be as fast as the tap was. A *check-out* is a second, narrower shape of update — two fields

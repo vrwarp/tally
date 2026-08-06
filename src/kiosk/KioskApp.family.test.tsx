@@ -64,12 +64,14 @@ function binding(overrides: Partial<KioskBinding> = {}): KioskBinding {
 /** Who the register says is already here. Reassigned per test. */
 let present = new Set<string>();
 let checkedOut = new Set<string>();
+/** Which arrival put each of them here, where the register knows. */
+let arrivals = new Map<string, string>();
 
 const services = {
   restoredUid: vi.fn(async () => 'staff-uid'),
   loadRoster: vi.fn(async () => ROSTER),
   loadPhoneIndex: vi.fn(async () => LAST4),
-  fetchAttendance: vi.fn(async () => ({ present, checkedOut })),
+  fetchAttendance: vi.fn(async () => ({ present, checkedOut, arrivals })),
   replayQueue: vi.fn(async () => 0),
   performCheckIn: vi.fn(async () => {}),
   performCheckOut: vi.fn(async () => {}),
@@ -156,12 +158,20 @@ function checkedInIds(): string[] {
     .sort();
 }
 
+function collectedIds(): string[] {
+  return vi
+    .mocked(services.performCheckOut)
+    .mock.calls.map((call) => call[0].studentId)
+    .sort();
+}
+
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.clearAllMocks();
   localStorage.clear();
   present = new Set();
   checkedOut = new Set();
+  arrivals = new Map();
 });
 
 afterEach(() => {
@@ -277,6 +287,110 @@ describe('collecting a family together', () => {
     expect(vi.mocked(services.performCheckOut).mock.calls.map((call) => call[0].studentId)).toEqual([
       's-marcus',
     ]);
+  });
+});
+
+/**
+ * The register's own answer to "who is going home with them".
+ *
+ * A check-in guesses at a family from four phone digits, because at the front
+ * door that is all there is. By the time somebody comes back for them there is
+ * something better: the set that walked in together, stated by a thumb on this
+ * kiosk's own button and written on the register. These pin that the pickup
+ * screen prefers the fact to the guess, and — the part that matters most —
+ * that it still *shows* the guess, because a family that arrived in two waves
+ * usually leaves in one.
+ */
+describe('collecting the ones who came in together', () => {
+  it('ticks the arrival, and lists a sibling who came separately without ticking them', async () => {
+    present = new Set([AMARA.id, MARCUS.id]);
+    arrivals = new Map([
+      [AMARA.id, 'arrival-morning'],
+      // Dropped off half an hour later, by somebody else. Same family, and the
+      // register knows they were not part of the same act.
+      [MARCUS.id, 'arrival-later'],
+    ]);
+    await mount();
+    await type('0134');
+    await pick('Amara Osei');
+
+    // On the screen, because families do leave together after arriving apart.
+    expect(screen.getByText('Marcus Osei')).toBeTruthy();
+    // Not ticked, and the button counts only the one nobody has to think about.
+    expect(screen.getByText('Marcus Osei').closest('button')!.getAttribute('aria-pressed')).toBe(
+      'false',
+    );
+
+    await hold(/^hold to collect$/i);
+    expect(collectedIds()).toEqual(['s-amara']);
+  });
+
+  it('ticks a child the phone index never called family, when they arrived together', async () => {
+    /*
+     * The half of this the four-digit guess can never do. Maya is a different
+     * family by every number on file — `family.ts` refuses her on purpose — but
+     * she came through the door in the same press, so she is going home in it.
+     * A cousin, a neighbour's boy, a child found through "find a brother or
+     * sister": all of them look exactly like this.
+     */
+    present = new Set([AMARA.id, MAYA.id]);
+    arrivals = new Map([
+      [AMARA.id, 'arrival-together'],
+      [MAYA.id, 'arrival-together'],
+    ]);
+    await mount();
+    await type('0134');
+    await pick('Amara Osei');
+
+    expect(screen.getByText('Maya Chen').closest('button')!.getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+    await hold(/hold to collect all 2/i);
+    expect(collectedIds()).toEqual(['s-amara', 's-maya']);
+  });
+
+  it('falls back to the guess when nothing was ever stated', async () => {
+    // A volunteer checked them in from the roster, one at a time; or the
+    // records predate arrivals. "No claim" is not "came alone", so the screen
+    // does exactly what it did before this existed.
+    present = new Set([AMARA.id, MARCUS.id]);
+    arrivals = new Map();
+    await mount();
+    await type('0134');
+    await pick('Amara Osei');
+
+    expect(screen.getByText('Marcus Osei').closest('button')!.getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+    await hold(/hold to collect all 2/i);
+    expect(collectedIds()).toEqual(['s-amara', 's-marcus']);
+  });
+
+  it('records one arrival per press, shared by everyone it checked in', async () => {
+    await mount();
+    await type('7788');
+    await pick('Amara Osei');
+    await tap(/check in all 2/i);
+
+    const ids = vi.mocked(services.performCheckIn).mock.calls.map((call) => call[0].arrivalId);
+    expect(ids).toHaveLength(2);
+    expect(ids[0]).toBeTruthy();
+    expect(new Set(ids).size).toBe(1);
+  });
+
+  it('gives a child checked in alone an arrival of their own', async () => {
+    /*
+     * Not "no arrival". A solo check-in is a statement, and it is what stops a
+     * sibling dropped off later from arriving pre-ticked for collection —
+     * which is the whole difference between this and a null.
+     */
+    await mount();
+    await type('2200');
+    await pick('Maya Chen');
+    await tap(/^check in$/i);
+
+    const first = vi.mocked(services.performCheckIn).mock.calls[0]![0].arrivalId;
+    expect(first).toBeTruthy();
   });
 });
 

@@ -32,6 +32,7 @@ import type { PrinterState } from './printing';
 import type * as RegistrationModule from './registration';
 import { bindingIsLive, clearBinding, readBinding, writeBinding, type KioskBinding } from './binding';
 import type { KioskKey } from './components/Keyboard';
+import { sortByName } from '@/lib/utils';
 import { buildFamilyDigits, familyOf } from './family';
 import {
   DEFAULT_PRINTER_LABEL,
@@ -151,6 +152,20 @@ function newRegistrationId(): string {
   return `r-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
+/**
+ * The id every child put on the register by one press of the confirm button
+ * shares, so the pickup screen can ask who came in together.
+ *
+ * Minted per confirm rather than per child, and unique even for a child who
+ * arrived alone: "came alone" is a real answer, and it is what stops a sibling
+ * dropped off half an hour later from arriving pre-ticked for collection.
+ */
+function newArrivalId(): string {
+  const uuid = globalThis.crypto?.randomUUID?.();
+  if (uuid) return uuid;
+  return `a-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
 /** ~4am local: reclaim memory and pick up deploys, but only while idle. */
 function isQuietHour(): boolean {
   const hour = new Date().getHours();
@@ -173,6 +188,15 @@ export function KioskApp() {
   );
   const [presentIds, setPresentIds] = useState<ReadonlySet<string>>(new Set());
   const [checkedOutIds, setCheckedOutIds] = useState<ReadonlySet<string>>(new Set());
+  /**
+   * Student id -> the arrival that put them here, for the ones that carry one.
+   *
+   * The register's answer to "who came in together", which is the question a
+   * pickup is really asking. Only records this kiosk's own confirm button
+   * wrote carry it — see `attendancePayload` — so a missing entry is "nobody
+   * stated it", not "came alone".
+   */
+  const [arrivals, setArrivals] = useState<ReadonlyMap<string, string>>(new Map());
   const [buffer, setBuffer] = useState('');
   const [overlay, setOverlay] = useState<Overlay>(null);
   const [refresh, setRefresh] = useState<KioskRefresh>('idle');
@@ -300,6 +324,7 @@ export function KioskApp() {
         .then((register) => {
           setPresentIds(register.present);
           setCheckedOutIds(register.checkedOut);
+          setArrivals(register.arrivals);
         })
         .catch(() => {});
       void loaded.replayQueue().catch(() => {});
@@ -321,6 +346,9 @@ export function KioskApp() {
           // staff undo on the main app is picked up on the next rebind.
           setPresentIds((held) => new Set([...register.present, ...held]));
           setCheckedOutIds((held) => new Set([...register.checkedOut, ...held]));
+          // Same union, same reason: an arrival this kiosk recorded a second
+          // ago must not vanish because the server copy has not caught up.
+          setArrivals((held) => new Map([...register.arrivals, ...held]));
         })
         .catch(() => {});
     }, PRESENT_REFRESH_MS);
@@ -468,11 +496,63 @@ export function KioskApp() {
   const familyFor = useCallback(
     (student: KioskStudent, intent: KioskIntent): KioskStudent[] => {
       if (intent === 'done') return [];
-      return familyOf(student, students, familyDigits).filter(
-        (member) => intentFor(member) === intent,
+      const guess = familyOf(student, students, familyDigits);
+      if (intent !== 'check-out') return guess.filter((member) => intentFor(member) === intent);
+
+      /*
+       * A pickup asks the same question the check-in asked, and has a better
+       * answer available: not the kiosk's guess at a family from four phone
+       * digits, but the set that actually walked in together — stated by
+       * somebody's thumb an hour ago and written on the register.
+       *
+       * Both, though, and that is the point of the union. The arrival is
+       * frequently *wider* than the guess (a child found through "find a
+       * brother or sister", a cousin, a neighbour's boy who came in the same
+       * car — none of whom share a number with anybody) and sometimes
+       * narrower, when a family arrived in two waves. Offering only one of them
+       * would drop real children off a screen a parent is using to take their
+       * family home. Which of the two are *ticked* is the part that differs;
+       * see `skippedFor`.
+       */
+      const mine = arrivals.get(student.id);
+      const together = mine
+        ? students.filter((other) => other.id !== student.id && arrivals.get(other.id) === mine)
+        : [];
+      const offered = new Map<string, KioskStudent>();
+      for (const member of [...together, ...guess]) offered.set(member.id, member);
+      return [...offered.values()]
+        .filter((member) => intentFor(member) === 'check-out')
+        .sort(sortByName);
+    },
+    [students, familyDigits, intentFor, arrivals],
+  );
+
+  /**
+   * Which of the offered names arrive unticked.
+   *
+   * Nobody, everywhere except a pickup where the register knows who came in
+   * together — the check-in screen's reasoning is unchanged, and is argued in
+   * ConfirmScreen: a family arrives together, and an unticked list would be a
+   * second thing to do rather than a saved trip through the flow.
+   *
+   * A pickup is the one place a better answer exists. If this child arrived as
+   * part of a stated group, that group is ticked and anyone else the phone
+   * guess turned up is listed but left alone — they are on the screen because
+   * families do leave together after arriving apart, and they are unticked
+   * because nothing says they are going now. With no arrival on file (a
+   * volunteer checked them in from the roster one at a time, or the record
+   * predates arrivals) there is nothing better than the guess, so everything
+   * stays ticked exactly as before.
+   */
+  const skippedFor = useCallback(
+    (student: KioskStudent, intent: KioskIntent, family: readonly KioskStudent[]): Set<string> => {
+      const mine = intent === 'check-out' ? arrivals.get(student.id) : undefined;
+      if (!mine) return new Set();
+      return new Set(
+        family.filter((member) => arrivals.get(member.id) !== mine).map((member) => member.id),
       );
     },
-    [students, familyDigits, intentFor],
+    [arrivals],
   );
 
   const onConfirm = useCallback(
@@ -515,16 +595,33 @@ export function KioskApp() {
         for (const student of chosen) next.add(student.id);
         return next;
       });
+
+      /*
+       * One id for this press, recorded locally at the same time as the tick.
+       *
+       * Locally as well as upstream because a family can be collected before
+       * the register has been re-read — a parent who drops a child and comes
+       * straight back for a forgotten coat is inside the poll interval — and
+       * the pickup screen would otherwise have to fall back to the guess for
+       * the one arrival it knows most about.
+       */
+      const arrivalId = newArrivalId();
+      setArrivals((held) => {
+        const next = new Map(held);
+        for (const student of chosen) next.set(student.id, arrivalId);
+        return next;
+      });
+
       for (const student of chosen) {
         void services
-          .performCheckIn({ binding, student, uid })
+          .performCheckIn({ binding, student, uid, arrivalId })
           .then(() => services.forgetStudentDates(student.id))
           .catch((error: { code?: string }) => {
             // Refused outright — frozen student, or a record the kiosk may not
             // touch. Not retryable; the row stays green because they are, in
             // every way that matters at a door, here.
             if (error.code?.includes('permission-denied')) return;
-            services.enqueueCheckIn({ binding, student, uid });
+            services.enqueueCheckIn({ binding, student, uid, arrivalId });
           });
 
         /*
@@ -888,7 +985,13 @@ export function KioskApp() {
             printing?.warmLabel(student, binding);
             for (const member of family) printing?.warmLabel(member, binding);
           }
-          setOverlay({ kind: 'confirm', student, intent, family, skipped: new Set() });
+          setOverlay({
+            kind: 'confirm',
+            student,
+            intent,
+            family,
+            skipped: skippedFor(student, intent, family),
+          });
         }}
         onUnbind={() => {
           // A kiosk that has left a gathering has no business still holding

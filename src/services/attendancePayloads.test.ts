@@ -69,6 +69,25 @@ describe('attendancePayload', () => {
     });
     expect(payload.checkedInAt).toBe(arrived);
   });
+
+  it('carries an arrival when one was stated, and omits the key when none was', () => {
+    /*
+     * Omitted rather than written null, and the difference is load-bearing: the
+     * pickup screen reads a missing key as "nobody claimed who came in with
+     * whom" and falls back to the phone guess, where an arrival of one means
+     * "came alone" and correctly ticks nobody. A null would collapse the two.
+     */
+    const args = {
+      event,
+      studentId: 'pco_123',
+      uid: 'uid-1',
+      method: 'kiosk' as const,
+      isFirstEver: false,
+    };
+    expect(attendancePayload(clock, { ...args, arrivalId: 'a-9f0c' }).arrivalId).toBe('a-9f0c');
+    expect('arrivalId' in attendancePayload(clock, args)).toBe(false);
+    expect('arrivalId' in attendancePayload(clock, { ...args, arrivalId: '' })).toBe(false);
+  });
 });
 
 describe('studentDatePatch', () => {

@@ -426,7 +426,24 @@ service cloud.firestore {
           let d = request.resource.data;
           return d.studentId == studentId
             && d.eventId == eventId
-            && d.checkedInBy == request.auth.uid;
+            && d.checkedInBy == request.auth.uid
+            && validArrival(d);
+        }
+
+        /**
+         * `arrivalId` — who came through the door together.
+         *
+         * Optional: the main app writes one student at a time and makes no
+         * claim about it, and every record predating the field has none. But
+         * where it *is* written it decides which siblings a pickup screen
+         * arrives pre-ticked for, so its shape is pinned here rather than
+         * trusted to the one client that writes it. An opaque bounded string
+         * and nothing else — a map or a list in this field would be a lobby
+         * session smuggling structure into a read the next parent acts on.
+         */
+        function validArrival(d) {
+          return !('arrivalId' in d)
+            || (d.arrivalId is string && d.arrivalId.size() > 0 && d.arrivalId.size() <= 64);
         }
 
         /**

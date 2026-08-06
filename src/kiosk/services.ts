@@ -539,10 +539,23 @@ export async function mintRegistrationCode(): Promise<{ code: string; rotateAfte
 export interface KioskAttendance {
   present: Set<string>;
   checkedOut: Set<string>;
+  /**
+   * Student id -> the arrival that put them here, for the ones that carry one.
+   *
+   * Missing for anything the main app wrote and for everything recorded before
+   * arrivals existed. That absence is meaningful and is not the same as an
+   * arrival of one — see `attendancePayload`.
+   */
+  arrivals: Map<string, string>;
 }
 
 export async function fetchAttendance(eventId: string): Promise<KioskAttendance> {
   const snapshot = await getDocs(collection(db, paths.attendanceCollection(eventId)));
+  const arrivals = new Map<string, string>();
+  for (const docSnapshot of snapshot.docs) {
+    const arrivalId: unknown = docSnapshot.get('arrivalId');
+    if (typeof arrivalId === 'string' && arrivalId) arrivals.set(docSnapshot.id, arrivalId);
+  }
   return {
     present: new Set(snapshot.docs.map((docSnapshot) => docSnapshot.id)),
     checkedOut: new Set(
@@ -550,6 +563,7 @@ export async function fetchAttendance(eventId: string): Promise<KioskAttendance>
         .filter((docSnapshot) => docSnapshot.get('checkedOutAt') != null)
         .map((docSnapshot) => docSnapshot.id),
     ),
+    arrivals,
   };
 }
 
@@ -568,6 +582,12 @@ interface PendingCheckIn {
   studentId: string;
   student: { firstName: string; lastName: string; grade: number | null; searchName: string };
   uid: string;
+  /**
+   * Optional for the same reason `kind` is: a queue written before arrivals
+   * existed still replays, as a check-in that makes no claim about who else
+   * came through the door with them.
+   */
+  arrivalId?: string;
   queuedAtMs: number;
 }
 
@@ -609,8 +629,10 @@ export async function performCheckIn(args: {
   binding: Pick<KioskBinding, 'eventId' | 'seriesId' | 'startAtMs'>;
   student: { id: string; firstName: string; lastName: string; grade: number | null; searchName: string };
   uid: string;
+  /** The arrival this child was part of — see `attendancePayload`. */
+  arrivalId?: string;
 }): Promise<void> {
-  const { binding, student, uid } = args;
+  const { binding, student, uid, arrivalId } = args;
 
   const dates = await studentDates(student.id);
 
@@ -637,6 +659,7 @@ export async function performCheckIn(args: {
       uid,
       method: 'kiosk',
       isFirstEver: isFirstEver(checkInStudent),
+      arrivalId,
     }),
   );
   const patch = studentDatePatch(CLOCK, checkInStudent, event, uid);
@@ -746,6 +769,7 @@ export function enqueueCheckIn(args: {
   binding: Pick<KioskBinding, 'eventId' | 'seriesId' | 'startAtMs'>;
   student: { id: string; firstName: string; lastName: string; grade: number | null; searchName: string };
   uid: string;
+  arrivalId?: string;
 }): void {
   const queue = readQueue().filter(
     (entry) => !(entry.eventId === args.binding.eventId && entry.studentId === args.student.id),
@@ -762,6 +786,7 @@ export function enqueueCheckIn(args: {
       searchName: args.student.searchName,
     },
     uid: args.uid,
+    arrivalId: args.arrivalId,
     queuedAtMs: Date.now(),
   });
   writeJson(KIOSK_KEYS.pending, queue.slice(-MAX_QUEUED));
@@ -782,6 +807,7 @@ export async function replayQueue(): Promise<number> {
           binding: { eventId: entry.eventId, seriesId: entry.seriesId, startAtMs: entry.startAtMs },
           student: { id: entry.studentId, ...entry.student },
           uid: entry.uid,
+          arrivalId: entry.arrivalId,
         });
       }
     } catch (error) {

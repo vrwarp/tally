@@ -73,7 +73,11 @@ const services = {
   restoredUid: vi.fn(async () => 'staff-uid'),
   loadRoster: vi.fn(async () => [ADA]),
   loadPhoneIndex: vi.fn(async () => ({})),
-  fetchAttendance: vi.fn(async () => ({ present: new Set<string>(), checkedOut: new Set<string>() })),
+  fetchAttendance: vi.fn(async () => ({
+    present: new Set<string>(),
+    checkedOut: new Set<string>(),
+    arrivals: new Map<string, string>(),
+  })),
   replayQueue: vi.fn(async () => 0),
   refreshDirectory: vi.fn((onRoster: OnRoster, onPhoneIndex: OnPhoneIndex) =>
     refreshDirectory(onRoster, onPhoneIndex),
