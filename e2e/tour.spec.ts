@@ -119,7 +119,14 @@ function slugOf(title: string): string {
  */
 const CAST: Record<
   Shape,
-  { door: string; doorFirst: string; surname: string; qrSurname: string; phone: string; qrPhone: string }
+  {
+    door: string;
+    doorFirst: string;
+    doorLast: string;
+    surname: string;
+    phone: string;
+    qrPhone: string;
+  }
 > = {
   wide: {
     // Act 1's family, seeded. A different one per pass, because the two passes
@@ -127,16 +134,16 @@ const CAST: Record<
     // first checked in *and collected*, whose row correctly offers neither.
     door: 'Bree Sandoval',
     doorFirst: 'Bree',
+    doorLast: 'Sandoval',
     surname: 'Okonkwo',
-    qrSurname: 'Lindqvist',
     phone: '5550172244',
     qrPhone: '5550179911',
   },
   tall: {
     door: 'Nia Washington',
     doorFirst: 'Nia',
+    doorLast: 'Washington',
     surname: 'Adeyemi',
-    qrSurname: 'Bergstrom',
     phone: '5550178866',
     qrPhone: '5550176655',
   },
@@ -396,10 +403,19 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
             'The page the QR opens, on a real second device holding nothing but the code from the lobby screen. It is deliberately not a link anybody can keep: the code expires, is capped, and is re-minted while the kiosk is up. Registering remotely means being in the room — which is the entire security model, and it is the right one, because the alternative is a public form whose submissions land in a church\'s people database.',
         });
 
-        await phone.getByLabel(/^First name/i).fill('Sanna');
-        await phone.getByLabel(/^Last name/i).fill(cast.qrSurname);
+        /*
+         * Deliberately a child the church already has.
+         *
+         * A parent who does not know somebody put their child on the roster
+         * last term types them in again — which is the commonest way a
+         * duplicate is born, and the exact case the door used to *refuse* and
+         * now records instead. It makes Act 5's duplicate frame a real
+         * screenshot rather than a claim about one.
+         */
+        await phone.getByLabel(/^First name/i).fill(cast.doorFirst);
+        await phone.getByLabel(/^Last name/i).fill(cast.doorLast);
         await phone.getByLabel(/^Your first name/i).fill('Mira');
-        await phone.getByLabel(/^Your last name/i).fill(cast.qrSurname);
+        await phone.getByLabel(/^Your last name/i).fill(cast.doorLast);
         await phone.getByLabel(/^Your phone number/i).fill(cast.qrPhone);
         await shoot(phone, 'phone', {
           act: 'On their own phone',
@@ -426,9 +442,8 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
 
       await kiosk.getByRole('button', { name: /I've registered/i }).click();
       await typeOnKiosk(kiosk, cast.qrPhone.slice(-4));
-      await expect(
-        kiosk.getByRole('button', { name: new RegExp(`Sanna ${cast.qrSurname}`, 'i') }),
-      ).toBeVisible({ timeout: 30_000 });
+      await expect(kiosk.getByRole('button', { name: new RegExp(cast.door, 'i') }).first())
+        .toBeVisible({ timeout: 30_000 });
       await shoot(kiosk, 'kiosk', {
         act: 'On their own phone',
         who: 'The same family, back at the lobby screen',
@@ -449,10 +464,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
        * screen, and a pickup is not the moment to add somebody to the roster.
        * A family arriving is.
        */
-      await kiosk
-        .getByRole('button', { name: new RegExp(`Sanna ${cast.qrSurname}`, 'i') })
-        .first()
-        .click();
+      await kiosk.getByRole('button', { name: new RegExp(cast.door, 'i') }).first().click();
       await shoot(kiosk, 'kiosk', {
         act: 'The second child',
         who: 'A family the church already has, growing',
@@ -465,7 +477,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       await typeOnKiosk(kiosk, 'Emil');
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.locator('[data-key="clear"]').click();
-      await typeOnKiosk(kiosk, cast.qrSurname);
+      await typeOnKiosk(kiosk, cast.doorLast);
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: '2nd grade', exact: true }).click();
       await kiosk.getByRole('button', { name: /That's everyone/i }).click();
@@ -506,9 +518,20 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
           'The children with their grades, the guardian, and the four digits — and the phone number, which is the one place in Tally a parent\'s number lives. It waits on a functions-only document with a thirty-day sweep, deleted the moment a reviewer decides, because deferring the push would otherwise lose the guardian entirely: the security rules forbid a parent\'s name or number on a student document, deliberately, and there is nowhere else for it to go.',
       });
 
+      /*
+       * Scrolled to, opened, and asserted before the shutter.
+       *
+       * An earlier version shot this frame whenever the hint merely existed —
+       * which produced a photograph of three unrelated cards under a caption
+       * about a picker. A frame that claims something has to contain it.
+       */
       const duplicateHint = page.getByText(/already on the roster/i).first();
-      if (await duplicateHint.isVisible().catch(() => false)) {
-        await duplicateHint.click();
+      await duplicateHint.scrollIntoViewIfNeeded();
+      await duplicateHint.click();
+      await expect(page.getByText(/Which of these is the same child/i)).toBeVisible({
+        timeout: 10_000,
+      });
+      {
         await shoot(page, 'app', {
           act: 'The review',
           who: 'Core team, on a weekday',

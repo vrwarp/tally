@@ -200,7 +200,13 @@ function RegistrationCard({
   return (
     <Card>
       <CardHeader
-        title={row.guardian ? nameOf(row.guardian) : 'A family'}
+        title={
+          row.guardian
+            ? nameOf(row.guardian)
+            : row.anchors.length > 0
+              ? `${row.anchors[0]!.lastName || 'A'} family`.trim()
+              : 'A family'
+        }
         description={[
           when ? `Registered ${formatRelative(when)}` : null,
           gatheringTitle ? `at ${gatheringTitle}` : null,
@@ -237,19 +243,25 @@ function RegistrationCard({
             <dt className="text-ink-500">Phone</dt>
             <dd className="tabular-nums text-ink-200">{formatPhone(row.guardian.phone)}</dd>
           </dl>
+        ) : row.anchors.length > 0 ? (
+          /*
+            No guardian, and nothing wrong with that: this is a parent adding a
+            sibling to a family the church already has. Their adult is on file
+            upstream already, which is why the wizard did not ask again — and
+            saying "this registration did not finish" here, as an earlier
+            version did, accuses a working flow of being broken.
+          */
+          <p className="text-sm text-ink-400">
+            A brother or sister added to a family already on the roster:{' '}
+            {row.anchors.map((anchor) => summaryLabel(anchor)).join(', ')}. Approving joins that
+            household rather than making a second one, and asks for no new adult.
+          </p>
         ) : (
           <p className="text-sm text-ink-500">
-            Nobody was recorded as bringing them — this registration did not finish.
+            Nobody was recorded as bringing them, and no family was named — this registration did
+            not finish.
           </p>
         )}
-
-        {row.anchors.length > 0 ? (
-          <p className="text-xs text-ink-400">
-            Added to a family already on the roster:{' '}
-            {row.anchors.map((anchor) => summaryLabel(anchor)).join(', ')}. Approving joins that
-            household rather than making a second one.
-          </p>
-        ) : null}
 
         <ul className="flex flex-col gap-2">
           {row.children.map((child, index) => (
