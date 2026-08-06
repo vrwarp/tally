@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Kiosk confirm — alone — r1</title>
+<title>Kiosk confirm — alone — r2</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; }
   :root { 
@@ -123,10 +123,75 @@
   /* Inline and the same size as the words: a 36px badge would collide with the
      tick chips that mark row *state* on the opposite edge. */
   .addrow .plus { font-weight: 400; }
+
+  /* ---- r2 ---------------------------------------------------------------- */
+
+  /*
+   * 32px from the identity to the region, measured ink to ink rather than box
+   * to box. r1 asked for 40 and rendered 43-49 once the ask's line-box slack
+   * and the grade's descender had been paid, which put the region equidistant
+   * between the name and the commit and therefore in neither group -- leaving
+   * "another" with no visible antecedent. The column now ramps 14 / 32 / 48 /
+   * 76, and the 76 before the exit is a decision rather than an accident.
+   */
+  .screen.r2 { gap: 0; justify-content: center; }
+  .screen.r2 .who { margin-bottom: 2rem; }
+  .screen.r2 .whoelse { margin-bottom: 3rem; }
+  .screen.r2 .commit { margin-bottom: 2.25rem; }
+
+  /*
+   * The scroller, restored. r1 flattened the region and deleted the
+   * "min-h-0 overflow-y-auto" the real component carries -- whose own comment
+   * says it "is what lets it shrink instead of pushing the button off a short
+   * screen". Without it, five siblings on the landscape kiosk push the child's
+   * name off the top of the glass, which is the one thing on this screen the
+   * parent is being asked to check. The names scroll; the way to add one does
+   * not, so it is reachable however long the list gets.
+   */
+  /* "min-height: 0" on the region as well as the list: a flex item defaults to
+     "min-height: auto", which refuses to shrink below its content, so a
+     scroller nested inside one that has not been told otherwise never
+     engages — the column simply overflows the glass instead. */
+  .screen.r2 .whoelse { min-height: 0; }
+  .screen.r2 .rows {
+    display: flex; min-height: 0; flex-direction: column; gap: 0.5rem;
+    overflow-y: auto; margin-bottom: 0.5rem;
+  }
+  .screen.r2 .ask { font-size: 1.25rem; line-height: 1.75rem; }
+
+  /*
+   * A heavier wash. r1 borrowed the search screen's standing-offer recipe,
+   * which was tuned for a pill about a sixth of this area: at 15% the fill read
+   * 1.14:1 against the page -- fainter than the ink-800 sibling row it is meant
+   * to stand beside as an equal -- so the box existed on its 1px ring alone. At
+   * 32% it clears the sibling row and is still four times quieter than the
+   * commit, which is the ordering this screen wants.
+   */
+  .screen.r2 .addrow {
+    background: color-mix(in oklab, var(--brand-600) 32%, transparent);
+    justify-content: flex-start; gap: 0;
+  }
+  /*
+   * A gutter the whole region shares, rather than a glyph hung off the front of
+   * one row.
+   *
+   * Inline, a 13px light plus could not hold an edge against a 20px semibold
+   * cap, so the label read as indented from its own list. Hung outside the
+   * padding it sat flush against the box edge and read as cramped. Given a
+   * column of its own -- empty on the rows that name a person, occupied on the
+   * row that adds one -- every line in the region starts on the same x, and
+   * the plus is a mark in a gutter instead of a word competing with words.
+   */
+  .screen.r2 .row, .screen.r2 .addrow { padding-left: 3rem; }
+  .screen.r2 .ask { padding-left: 3rem; }
+  .screen.r2 .addrow .plus {
+    width: 1.75rem; margin-left: -1.75rem; flex-shrink: 0; text-align: left;
+  }
+  .screen.r2 .addrow .go { margin-left: auto; font-weight: 400; opacity: 0.8; }
 </style>
 </head>
 <body style="width:800px;height:1280px">
-  <div class="screen r1">
+  <div class="screen r2">
     <div class="who">
       <div class="name">Nia Washington</div>
       <div class="grade">8th grade</div>
@@ -134,7 +199,7 @@
     <div class="whoelse">
       
       
-      <button class="addrow"><span class="plus">+</span> Add another child</button>
+      <button class="addrow"><span class="plus">+</span>Another child<span class="go">&rsaquo;</span></button>
     </div>
     <button class="commit">Check in</button>
     

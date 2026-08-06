@@ -150,9 +150,94 @@ const CSS = `
   /* Inline and the same size as the words: a 36px badge would collide with the
      tick chips that mark row *state* on the opposite edge. */
   .addrow .plus { font-weight: 400; }
+
+  /* ---- r2 ---------------------------------------------------------------- */
+
+  /*
+   * 32px from the identity to the region, measured ink to ink rather than box
+   * to box. r1 asked for 40 and rendered 43-49 once the ask's line-box slack
+   * and the grade's descender had been paid, which put the region equidistant
+   * between the name and the commit and therefore in neither group -- leaving
+   * "another" with no visible antecedent. The column now ramps 14 / 32 / 48 /
+   * 76, and the 76 before the exit is a decision rather than an accident.
+   */
+  .screen.r2 { gap: 0; justify-content: center; }
+  .screen.r2 .who { margin-bottom: 2rem; }
+  .screen.r2 .whoelse { margin-bottom: 3rem; }
+  .screen.r2 .commit { margin-bottom: 2.25rem; }
+
+  /*
+   * The scroller, restored. r1 flattened the region and deleted the
+   * "min-h-0 overflow-y-auto" the real component carries -- whose own comment
+   * says it "is what lets it shrink instead of pushing the button off a short
+   * screen". Without it, five siblings on the landscape kiosk push the child's
+   * name off the top of the glass, which is the one thing on this screen the
+   * parent is being asked to check. The names scroll; the way to add one does
+   * not, so it is reachable however long the list gets.
+   */
+  /* "min-height: 0" on the region as well as the list: a flex item defaults to
+     "min-height: auto", which refuses to shrink below its content, so a
+     scroller nested inside one that has not been told otherwise never
+     engages — the column simply overflows the glass instead. */
+  .screen.r2 .whoelse { min-height: 0; }
+  .screen.r2 .rows {
+    display: flex; min-height: 0; flex-direction: column; gap: 0.5rem;
+    overflow-y: auto; margin-bottom: 0.5rem;
+  }
+  .screen.r2 .ask { font-size: 1.25rem; line-height: 1.75rem; }
+
+  /*
+   * A heavier wash. r1 borrowed the search screen's standing-offer recipe,
+   * which was tuned for a pill about a sixth of this area: at 15% the fill read
+   * 1.14:1 against the page -- fainter than the ink-800 sibling row it is meant
+   * to stand beside as an equal -- so the box existed on its 1px ring alone. At
+   * 32% it clears the sibling row and is still four times quieter than the
+   * commit, which is the ordering this screen wants.
+   */
+  .screen.r2 .addrow {
+    background: color-mix(in oklab, var(--brand-600) 32%, transparent);
+    justify-content: flex-start; gap: 0;
+  }
+  /*
+   * A gutter the whole region shares, rather than a glyph hung off the front of
+   * one row.
+   *
+   * Inline, a 13px light plus could not hold an edge against a 20px semibold
+   * cap, so the label read as indented from its own list. Hung outside the
+   * padding it sat flush against the box edge and read as cramped. Given a
+   * column of its own -- empty on the rows that name a person, occupied on the
+   * row that adds one -- every line in the region starts on the same x, and
+   * the plus is a mark in a gutter instead of a word competing with words.
+   */
+  .screen.r2 .row, .screen.r2 .addrow { padding-left: 3rem; }
+  .screen.r2 .ask { padding-left: 3rem; }
+  .screen.r2 .addrow .plus {
+    width: 1.75rem; margin-left: -1.75rem; flex-shrink: 0; text-align: left;
+  }
+  .screen.r2 .addrow .go { margin-left: auto; font-weight: 400; opacity: 0.8; }
 `;
 
-type Scene = 'alone' | 'family';
+/*
+ * CSS lives in a template literal, so a backtick in one of its comments closes
+ * the string and the failure surfaces a hundred lines away as "Expected ;".
+ * Three rounds, three times. Quote CSS identifiers instead.
+ */
+if (CSS.includes('`')) throw new Error('A backtick in the CSS block will close the template literal.');
+
+type Scene = 'alone' | 'family' | 'many' | 'added';
+
+/**
+ * Four scenes now, and the last two exist because round 2 caught what one
+ * sibling was hiding.
+ *
+ *   - **many** — five siblings. `MAX_FAMILY_OFFER` is 7, so eight children is
+ *     a supported case, and on the landscape kiosk a centred column that
+ *     cannot scroll pushes the student's *name* off the top of the glass at
+ *     five. No frame in either round had tested more than one.
+ *   - **added** — the parent came back from the sibling screen with the child
+ *     the guess missed, ticked. This is the outcome the whole change exists to
+ *     produce and neither round had photographed it.
+ */
 
 /**
  * What a round may change.
@@ -211,11 +296,65 @@ const VARIANTS: Record<string, (scene: Scene) => Variant> = {
       <button class="addrow"><span class="plus">+</span> Add another child</button>
     </div>`,
   }),
+
+  /**
+   * Round 2. Two majors, and the first is mine.
+   *
+   *  - **The label was the wizard's own button.** `RegistrationFlow.tsx` labels
+   *    its next-child control "Add another child", word for word, and
+   *    `SiblingScreen` carries "Not on the list? Add a new child" in the exact
+   *    token trio r1 borrowed. A parent who pressed a blue tinted ringed pill
+   *    saying "Add another child" and landed on a keyboard would press the one
+   *    blue tinted ringed pill on the new screen and register a duplicate of a
+   *    child already on the roster. `SiblingScreen`'s own header records that
+   *    "+ Add a brother or sister" was removed from this screen for exactly
+   *    this reason; r1 collapsed both distinctions that had been keeping them
+   *    apart in one move. So: no verb at all. A noun phrase cannot collide with
+   *    "Add" or fight "Find", and the heavier fill means the two pills no
+   *    longer wear the same costume either.
+   *  - **The scroller.** See the CSS note.
+   *
+   * And the smaller ones: the plus hangs so the words hold the list's left
+   * edge, a chevron fills the right so the row stops reading as an *unticked*
+   * sibling in its own list's grammar, the ask joins Back at one size so the
+   * screen has four type sizes rather than five, and the commit says what it
+   * will actually do.
+   */
+  r2: (scene) => {
+    const siblings =
+      scene === 'family'
+        ? ['Amara Washington']
+        : scene === 'added'
+          ? ['Malia Washington']
+          : scene === 'many'
+            ? ['Amara Washington', 'Malia Washington', 'Zuri Washington', 'Ike Washington', 'Ada Washington']
+            : [];
+    const rows = siblings
+      .map((name) => `<div class="row"><span class="rname">${name}</span><span class="tick">&#10003;</span></div>`)
+      .join('\n        ');
+    return {
+      above: `<div class="whoelse">
+      ${siblings.length > 0 ? '<div class="ask">Checking in anyone else?</div>' : ''}
+      ${siblings.length > 0 ? `<div class="rows">\n        ${rows}\n      </div>` : ''}
+      <button class="addrow"><span class="plus">+</span>Another child<span class="go">&rsaquo;</span></button>
+    </div>`,
+    };
+  },
 };
 
 function page(scene: Scene, variant: string, tall: boolean): string {
   const build = VARIANTS[variant] ?? VARIANTS.r0!;
   const { above = '', below = '' } = build(scene);
+  /*
+   * The real component renders `Check in all ${n}` whenever a sibling is
+   * ticked, and the count in the green slab is the only place on the screen
+   * that reports how many children the tap covers — which makes it the safety
+   * net for an accidental untick and the confirmation that an add worked. Two
+   * rounds judged this screen without it.
+   */
+  const ticked =
+    scene === 'family' || scene === 'added' ? 2 : scene === 'many' ? 6 : 1;
+  const commitLabel = ticked > 1 ? `Check in all ${ticked}` : 'Check in';
 
   return `<!doctype html>
 <html lang="en" class="h-full" data-theme="dark">
@@ -232,7 +371,7 @@ function page(scene: Scene, variant: string, tall: boolean): string {
       <div class="grade">8th grade</div>
     </div>
     ${above}
-    <button class="commit">Check in</button>
+    <button class="commit">${commitLabel}</button>
     ${below}
     <button class="back">&larr; Back</button>
   </div>
@@ -242,7 +381,7 @@ function page(scene: Scene, variant: string, tall: boolean): string {
 
 const variant = process.argv[2] ?? 'r0';
 await mkdir(OUT, { recursive: true });
-for (const scene of ['alone', 'family'] as Scene[]) {
+for (const scene of ['alone', 'family', 'many', 'added'] as Scene[]) {
   for (const [suffix, tall] of [
     ['kiosktall', true],
     ['kioskwide', false],
