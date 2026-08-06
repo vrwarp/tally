@@ -42,7 +42,7 @@ import {
   readPrinterConfig,
   type PrinterConfig,
 } from './printing/device';
-import { type KioskStudent } from './search';
+import { searchStudents, type KioskStudent } from './search';
 import {
   KIOSK_KEYS,
   readCachedParticipation,
@@ -157,6 +157,14 @@ export const PULSE_POLL_MS = 30_000;
  * family's second try.
  */
 const REFRESH_COOLDOWN_MS = 2 * 60_000;
+/**
+ * How long a name query has to sit still before an empty result is believed.
+ *
+ * Four digits are complete by construction and skip this; letters are a name
+ * somebody may still be typing, and "no match" two characters in is not a
+ * finding, it is a keystroke.
+ */
+const NO_MATCH_SWEEP_DEBOUNCE_MS = 2_000;
 
 /**
  * The id one run of the registration wizard submits under, for as many attempts
@@ -542,7 +550,7 @@ export function KioskApp() {
     }
   }, [buffer]);
 
-  const onRefresh = useCallback(() => {
+  const runSweep = useCallback(() => {
     if (!services || refresh === 'refreshing') return;
     // Already answered, for anybody who asks inside the window. The read that
     // matters happened; saying so costs nothing and skips the sweep.
@@ -623,7 +631,7 @@ export function KioskApp() {
    *   said at 03:20. They are in the building — a parent must be able to
    *   collect them — and it covers the family who registered at this kiosk
    *   twenty minutes ago.
-   * - `widened`, the button.
+   * - `widened`, the "Search everyone" row on the no-match panel.
    *
    * Only the front door is scoped. `familyOf` keeps the whole roster, because
    * the point of the confirm screen's list is to *offer* the siblings the
@@ -633,22 +641,20 @@ export function KioskApp() {
   /**
    * Whether this search has been widened past the gathering to all of Tally.
    *
-   * Derived rather than held, because it has exactly the lifetime `refresh`
-   * already has: the two buttons that mean "look harder for me" — "I already
-   * registered" under an empty result, and "I've registered" on the QR screen —
-   * are the two that widen, and the same cleared buffer that stands the offer
-   * back down for the next family stands this down with it.
+   * Real state now, set by exactly one thing: the **Search everyone** row on
+   * the no-match panel — a control that says what it does, where "I already
+   * registered" used to widen as a side effect of a network read nobody could
+   * see. One family's worth of lifetime, like everything else on this screen:
+   * the buffer-empty effect stands it back down, so the next family at the
+   * kiosk starts scoped again.
    *
-   * Widening is the free half of that button. The wider roster is already in
-   * memory, so it takes effect on the press rather than several seconds later
-   * when the sweep of the church comes back — which matters, because the family
-   * it is for is usually one the sweep will not help at all.
-   *
-   * Neither button says anything about scope, and neither should: a parent has
-   * no model of which children this screen is willing to find, and telling them
-   * would mean explaining a mechanism in order to ask them to press a button.
+   * Free and instant, deliberately — the wider roster is already in memory, so
+   * the tap answers before a finger has lifted, with no read behind it.
    */
-  const widened = refresh !== 'idle' || justRefreshed;
+  const [widened, setWidened] = useState(false);
+  useEffect(() => {
+    if (buffer === '') setWidened(false);
+  }, [buffer]);
 
   const searchable = useMemo(() => {
     if (widened || scope.participated.size === 0) return students;
@@ -656,6 +662,45 @@ export function KioskApp() {
       (student) => scope.participated.has(student.id) || presentIds.has(student.id),
     );
   }, [students, scope, presentIds, widened]);
+
+  /**
+   * The search itself, lifted out of SearchScreen so this file owns the one
+   * signal the silent sweep needs: "a completed search found nobody".
+   */
+  const outcome = useMemo(
+    () => searchStudents(buffer, searchable as KioskStudent[], last4Index),
+    [buffer, searchable, last4Index],
+  );
+
+  /*
+   * The sweep, silent now.
+   *
+   * This is the church-wide forced re-read that used to hide behind
+   * "I already registered" — the answer for the family somebody added straight
+   * into the backend minutes ago, whom no pulse ever fires for. It runs by
+   * itself when a *completed* search finds nobody: a 4-digit phone query is
+   * complete by construction and sweeps at once; a name is complete when the
+   * typing stops for a couple of seconds, because an empty result is the
+   * common shape of a half-typed name and sweeping the church per keystroke is
+   * how a lobby of parents becomes a rate limit. The 2-minute cooldown in
+   * `runSweep` still collapses a queue of latecomers into one read.
+   *
+   * Checked against the FULL roster, not the scoped pool: a child who merely
+   * needs "Search everyone" is already on this kiosk, and finding them must
+   * never cost a backend sweep.
+   */
+  useEffect(() => {
+    if (outcome.mode !== 'phone' && outcome.mode !== 'name') return;
+    if (outcome.results.length > 0) return;
+    if (searchStudents(buffer, students, last4Index).results.length > 0) return;
+    if (refresh !== 'idle') return;
+    if (outcome.mode === 'phone') {
+      runSweep();
+      return;
+    }
+    const timer = setTimeout(runSweep, NO_MATCH_SWEEP_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [outcome, buffer, students, last4Index, refresh, runSweep]);
 
   /**
    * The brothers and sisters this tap could cover.
@@ -1183,10 +1228,9 @@ export function KioskApp() {
         binding={binding}
         buffer={buffer}
         onKey={onKey}
-        // Scoped to this gathering's own year — see `searchable`. Every other
-        // consumer of the roster on this page keeps all of it.
-        students={searchable}
-        last4Index={last4Index}
+        // Computed here, over the scoped pool (or everybody, once widened) —
+        // see `searchable` and `outcome`. The screen renders what it is handed.
+        outcome={outcome}
         presentIds={presentIds}
         checkedOutIds={checkedOutIds}
         tracksCheckOut={binding.requiresCheckOut ?? false}
@@ -1194,7 +1238,8 @@ export function KioskApp() {
         // one, and neither is one whose printer is simply unpaired.
         printerNeedsAttention={printerState?.kind === 'trouble'}
         refresh={refresh}
-        onRefresh={onRefresh}
+        widened={widened}
+        onWiden={() => setWidened(true)}
         onRegister={startRegistration}
         justRegisteredRemotely={justRefreshed}
         onPick={(student) => {

@@ -12,13 +12,17 @@
  * room — so the children arrive on the roster but not on the register, and the
  * parent taps them through here like anybody else.
  *
- * And this kiosk will not have noticed. It searches a copy of the roster held
- * in local storage and refreshes it on a six-hourly cadence; the server patched
- * the phone index the moment the form was submitted, but nothing has told the
- * shelf to go and look. **I've registered** is that telling. It is a button
- * rather than a poll because polling a lobby screen every few seconds all
- * evening, on the chance that somebody is mid-form, is a great deal of traffic
- * to buy a few seconds nobody is waiting on.
+ * And this kiosk notices by itself. The code it minted carries the gathering,
+ * the submission bumps the pulse (`kioskIndex/pulse`) naming it, and the poll
+ * in KioskApp puts the search screen up — digits line and all — while the
+ * family is still walking back from their phone. This header used to argue
+ * that a button beat a poll, because "polling a lobby screen every few
+ * seconds all evening is a great deal of traffic to buy a few seconds nobody
+ * is waiting on" — which was right about polling the *data* and wrong about
+ * polling a *signal* the size of one small document. **I've registered**
+ * survives as the impatient path: a family who will not wait out the half
+ * minute, or whose pulse read hit a network blip, can still say "look for me
+ * now", and the answer is already fresh by the time the screen changes.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { haptic } from '@/lib/utils';

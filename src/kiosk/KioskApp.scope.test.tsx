@@ -88,13 +88,10 @@ const services = {
   })),
   replayQueue: vi.fn(async () => 0),
   /*
-   * Deliberately answers with the roster the kiosk already has.
-   *
-   * "I already registered" does two things, and only one of them is a network
-   * read. Widening the search costs nothing and happens on the press; the sweep
-   * of the church is the slow half and is frequently no help at all to the
-   * family pressing it. A no-op here means every widening assertion below is
-   * about the widening.
+   * Deliberately answers with the roster the kiosk already has: the silent
+   * sweep may fire behind a no-match, and a no-op here keeps every widening
+   * assertion below about the widening — which is free, instant, and entirely
+   * local.
    */
   refreshDirectory: vi.fn(async () => {}),
   performCheckIn: vi.fn(async () => {}),
@@ -240,22 +237,25 @@ describe('the front door', () => {
 });
 
 describe('the escape hatch', () => {
-  it('widens the search to all of Tally', async () => {
+  it('widens the search to all of Tally on "Search everyone"', async () => {
     await mount();
     await type('sofia');
     expect(screen.queryByText('Sofia Adeyemi')).toBeNull();
 
-    await tap(/I already registered/i);
+    await tap(/Search everyone/i);
 
-    // Found without the sweep answering anything: the wider roster was already
-    // in memory, and this is the family the sweep would not have helped.
+    // Instantly, with no read behind it: the wider roster was already in
+    // memory, and the control finally says what it does — where "I already
+    // registered" used to widen as a side effect of a network sweep.
     expect(screen.getByText('Sofia Adeyemi')).toBeTruthy();
+    // Spent: this search already covers everybody, so the offer stands down.
+    expect(screen.queryByText(/Search everyone/i)).toBeNull();
   });
 
   it('narrows again for the next family at the kiosk', async () => {
     await mount();
     await type('sofia');
-    await tap(/I already registered/i);
+    await tap(/Search everyone/i);
     expect(screen.getByText('Sofia Adeyemi')).toBeTruthy();
 
     // The buffer emptying is the next person walking up. They are owed the

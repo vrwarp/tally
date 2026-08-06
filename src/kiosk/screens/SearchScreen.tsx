@@ -13,22 +13,23 @@
  * scrolls — the header, the buffer and the keyboard stay pinned, because a
  * keyboard that scrolls off the bottom is worse than a list that ends early.
  *
+ * The search itself happens in KioskApp, not here — the app owns the scoped
+ * pool, the "Search everyone" widening, and the silent sweep that fires when a
+ * finished search finds nobody anywhere. This screen renders the outcome it is
+ * handed and offers the doors.
+ *
  * The top-left corner hides the staff gate: a three-second hold returns to
  * the event chooser. Invisible on purpose — parents have no business there,
  * and staff are told where it is.
  */
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { gradeDescription, haptic } from '@/lib/utils';
 import { HoldButton } from '../components/HoldButton';
 import { Keyboard, type KioskKey } from '../components/Keyboard';
 import { useTapGuard } from '../components/tapGuard';
 import type { KioskRefresh } from '../KioskApp';
 import { windowHasClosed, type KioskBinding } from '../binding';
-import {
-  searchStudents,
-  MAX_RESULTS,
-  type KioskStudent,
-} from '../search';
+import { MAX_RESULTS, type KioskSearchOutcome, type KioskStudent } from '../search';
 
 function gradeLabel(grade: number | null): string {
   return grade === null ? '' : gradeDescription(grade);
@@ -38,14 +39,14 @@ export function SearchScreen({
   binding,
   buffer,
   onKey,
-  students,
-  last4Index,
+  outcome,
   presentIds,
   checkedOutIds,
   tracksCheckOut,
   printerNeedsAttention,
   refresh,
-  onRefresh,
+  widened,
+  onWiden,
   onPick,
   onRegister,
   justRegisteredRemotely,
@@ -54,14 +55,22 @@ export function SearchScreen({
   binding: KioskBinding;
   buffer: string;
   onKey: (key: KioskKey) => void;
-  students: readonly KioskStudent[];
-  last4Index: Readonly<Record<string, string[]>>;
+  /** The search, already run — over the scoped pool, or everybody once widened. */
+  outcome: KioskSearchOutcome;
   presentIds: ReadonlySet<string>;
   checkedOutIds: ReadonlySet<string>;
   tracksCheckOut: boolean;
   printerNeedsAttention: boolean;
+  /**
+   * How the silent church-wide sweep behind an empty result is doing. No
+   * button drives it any more; what remains on screen is its headline ("Still
+   * no match" once it has landed) and its failure line.
+   */
   refresh: KioskRefresh;
-  onRefresh: () => void;
+  /** Whether this search already covers the whole ministry. */
+  widened: boolean;
+  /** Widens this one search to all of Tally. Resets when the buffer clears. */
+  onWiden: () => void;
   onPick: (student: KioskStudent) => void;
   /** Opens the registration offer — the other door off this screen. */
   onRegister: () => void;
@@ -73,10 +82,6 @@ export function SearchScreen({
   justRegisteredRemotely?: boolean;
   onUnbind: () => void;
 }) {
-  const outcome = useMemo(
-    () => searchStudents(buffer, students as KioskStudent[], last4Index),
-    [buffer, students, last4Index],
-  );
   const closed = windowHasClosed(binding, Date.now());
 
   /*
@@ -199,26 +204,22 @@ export function SearchScreen({
               Enter all 4 digits of a phone number in your family.
             </div>
           )}
-          {/*
-            * The dead end, opened.
-            *
-            * This used to be "No match — please see a leader", which was true
-            * and was also the whole of what a family nobody had met could do
-            * here. Seeing a leader is still the answer when something is wrong
-            * with the search; it is not the answer to being new, and putting
-            * the two in one sentence made the common case sound like a fault.
-            */}
           {(outcome.mode === 'phone' || outcome.mode === 'name') && outcome.results.length === 0 && (
             /*
-             * Nothing matched, and the answer is two different offers.
+             * Nothing matched, and the answer is three different doors.
              *
-             * The roster on this device is a cache hours old by design, so the
-             * commonest reason a *known* family is missing from it is that
-             * somebody added them while they queued — that is what "check
-             * online" goes and does. The other reason is that nobody has ever
-             * met them, and for that the answer is not a leader but a form.
-             * "See a leader" is the right last word and was never the right
-             * first one.
+             * The commonest reason is being new, so the register door leads.
+             * The second is a child who belongs to a *different* gathering —
+             * the search is scoped to the children who have been to this one,
+             * and "Search everyone" is that scope's honest way out, in the
+             * slot where "I already registered" used to widen as a side effect
+             * of a network read nobody could see. The third reason — somebody
+             * added the family online moments ago — needs no door at all any
+             * more: the kiosk notices registrations by itself (the pulse), and
+             * for the rare backend-direct addition the church-wide sweep now
+             * runs silently the moment a finished search comes up empty. Its
+             * only remaining surfaces are the headline's "Still" and the
+             * network-failure line below.
              *
              * Inside the scrolling results region on purpose: this file
              * promises that typing never moves the keyboard, and a block that
@@ -245,34 +246,26 @@ export function SearchScreen({
               {refresh === 'failed' && (
                 <div className="text-base text-ink-500">Couldn&apos;t reach the network just now.</div>
               )}
-              {refresh !== 'done' && (
+              {!widened && (
                 <button
                   type="button"
                   tabIndex={-1}
-                  disabled={refresh === 'refreshing'}
                   onPointerDown={(event) => {
                     event.preventDefault();
-                    onRefresh();
+                    haptic();
+                    onWiden();
                   }}
-                  className="flex h-14 items-center justify-center rounded-xl bg-ink-800 px-8 text-lg font-semibold text-ink-100 active:bg-ink-700 disabled:text-ink-500"
+                  className="flex h-14 items-center justify-center rounded-xl bg-ink-800 px-8 text-lg font-semibold text-ink-100 active:bg-ink-700"
                   style={{ touchAction: 'manipulation' }}
                 >
                   {/*
-                    * The two answers to "no match" are a pair, so they look
-                    * like one: same height, same shape, the second in the
-                    * quieter fill because registering is the likelier need.
-                    *
-                    * The words are about the person, not the mechanism. "Just
-                    * registered? Check online" described what the button *did*
-                    * — reach past a cache the parent has no idea exists — and
-                    * asked them to understand that in order to press it. This
-                    * asks them something they know the answer to.
+                    * Says what it does, unlike its predecessor. The search
+                    * only covers the children who come to *this* gathering;
+                    * a child who belongs to Sunday mornings is one tap away,
+                    * instantly — the wider list is already on the device, so
+                    * nothing loads and nothing waits.
                     */}
-                  {refresh === 'refreshing'
-                    ? 'Looking again…'
-                    : refresh === 'failed'
-                      ? 'Try again'
-                      : 'I already registered'}
+                  Search everyone
                 </button>
               )}
               <div className="text-base text-ink-500">or see a leader.</div>
@@ -336,7 +329,7 @@ export function SearchScreen({
         *
         * Tapping it opens the QR screen, whose own largest button is "I've
         * registered" — so a family who came through this door by mistake, having
-        * already filled the form in on their phone, is offered the refresh
+        * already filled the form in on their phone, is offered the way back
         * before the form rather than a second registration.
         *
         * It used to be a line of text with a coloured phrase in it, which read
