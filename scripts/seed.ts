@@ -253,6 +253,18 @@ interface SeedStudent {
   contact?: 'phone' | 'email' | 'both';
   allergies?: string;
   notes?: string;
+  /**
+   * A phone shared with a sibling, which is what makes them one.
+   *
+   * The kiosk has no households — it holds `kioskIndex/phones`, a map of
+   * last-4 to student ids, and `familyOf` calls two children siblings when
+   * their digit sets are equal or nested. Every other student here has a
+   * parent of their own and a number of their own, so before this the whole
+   * family half of the product — the ticked list on the confirm screen, one
+   * tap for three children, one hold to collect them all — could not happen in
+   * a seeded world at all. One household is enough to exercise it.
+   */
+  household?: string;
 }
 
 const SEED_STUDENTS: readonly SeedStudent[] = [
@@ -267,7 +279,11 @@ const SEED_STUDENTS: readonly SeedStudent[] = [
   { first: 'Caleb', last: 'Okafor', grade: 9, band: 'core', parent: 'Chidi Okafor', contact: 'phone' },
   { first: 'Hannah', last: 'Schmidt', grade: 7, band: 'core', parent: 'Ingrid Schmidt', contact: 'both' },
   { first: 'Diego', last: 'Herrera', grade: 10, band: 'core', parent: 'Rosa Herrera', contact: 'phone' },
-  { first: 'Amara', last: 'Osei', grade: 8, band: 'core', parent: 'Kwabena Osei', contact: 'both' },
+  { first: 'Amara', last: 'Osei', grade: 8, band: 'core', parent: 'Kwabena Osei', contact: 'both', household: 'osei' },
+  // Amara's brother and sister. Three children, one number — the family the
+  // kiosk's whole confirm screen is built around, and the only one here.
+  { first: 'Kofi', last: 'Osei', grade: 6, band: 'core', parent: 'Kwabena Osei', contact: 'phone', household: 'osei' },
+  { first: 'Efua', last: 'Osei', grade: 11, band: 'steady', parent: 'Kwabena Osei', contact: 'phone', household: 'osei' },
 
   /* ---- Steady: most weeks ------------------------------------------------ */
   { first: 'Noah', last: 'Fitzgerald', grade: 6, band: 'steady', parent: 'Erin Fitzgerald', contact: 'phone', allergies: 'Severe tree nut allergy' },
@@ -432,7 +448,23 @@ function slug(value: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
-function parentPhone(index: number): string {
+/**
+ * One number per student, except where a household says otherwise.
+ *
+ * Siblings have to answer to the *same* digits or they are not siblings as far
+ * as the kiosk is concerned — see `SeedStudent.household` and `src/kiosk/family.ts`.
+ */
+/*
+ * Outside the generated range on purpose. `parentPhone` numbers everybody else
+ * `(555) 555-0100` upward by index, so a household picked from inside that band
+ * would hand its four digits to an unrelated student and invent a sibling —
+ * `familyOf` groups on equal digit sets and would have no way to tell.
+ */
+const HOUSEHOLD_PHONES: Record<string, string> = { osei: '(555) 555-0347' };
+
+function parentPhone(index: number, seed?: SeedStudent): string {
+  const shared = seed?.household ? HOUSEHOLD_PHONES[seed.household] : undefined;
+  if (shared) return shared;
   // 555-01xx is the reserved fictional range, and ten digits so `formatPhone`
   // renders it the way a real number would look.
   return `(555) 555-${String(100 + index).padStart(4, '0')}`;
@@ -525,8 +557,9 @@ function simulatorPayload(students: readonly BuiltStudent[], now: Date) {
           birthdate: seedBirthdate(seed, index, now),
           status: seed.band === 'inactive' ? ('inactive' as const) : ('active' as const),
           parentName: seed.parent ?? null,
-          parentPhone: contact === 'phone' || contact === 'both' ? parentPhone(index) : null,
+          parentPhone: contact === 'phone' || contact === 'both' ? parentPhone(index, seed) : null,
           parentEmail: contact === 'email' || contact === 'both' ? parentEmail(seed) : null,
+          householdKey: seed.household ?? null,
         };
       }),
     team: SEED_TEAM.map((member) => {

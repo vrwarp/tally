@@ -124,6 +124,9 @@ const CAST: Record<
     door: string;
     doorFirst: string;
     doorLast: string;
+    familyDigits: string;
+    familyChild: string;
+    familySibling: string;
     surname: string;
     phone: string;
     qrPhone: string;
@@ -136,6 +139,12 @@ const CAST: Record<
     door: 'Bree Sandoval',
     doorFirst: 'Bree',
     doorLast: 'Sandoval',
+    // The one household in the seed — three children on one number. Act 1 is
+    // theirs, because a family arriving together is the commonest thing that
+    // happens at a lobby kiosk and the thing the confirm screen is built for.
+    familyDigits: '0347',
+    familyChild: 'Amara Osei',
+    familySibling: 'Kofi Osei',
     surname: 'Okonkwo',
     phone: '5550172244',
     qrPhone: '5550179911',
@@ -144,6 +153,9 @@ const CAST: Record<
     door: 'Nia Washington',
     doorFirst: 'Nia',
     doorLast: 'Washington',
+    familyDigits: '0347',
+    familyChild: 'Efua Osei',
+    familySibling: 'Kofi Osei',
     surname: 'Adeyemi',
     phone: '5550178866',
     qrPhone: '5550176655',
@@ -229,6 +241,42 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
         caption:
           'The kiosk asks for a name or four digits and nothing else — no account, no password, no app to install. The digits are the family\'s own phone number, which is the only credential a parent reliably has on them, and the keyboard is the kiosk\'s own: the device\'s native one is slow to rise and covers half the screen when it does.',
       });
+
+      /*
+       * The family first, because it is the commonest arrival and the whole
+       * reason the confirm screen has a list on it. Three children answer to
+       * one number in the seeded world — the only household in it — so the
+       * four digits find all three and a tap on any one of them offers the
+       * other two.
+       */
+      await typeOnKiosk(kiosk, cast.familyDigits);
+      await shoot(kiosk, 'kiosk', {
+        act: 'At the door',
+        who: 'Three children, one number',
+        title: 'Four digits, and the whole family answers',
+        caption:
+          'The digits are a parent\'s own phone number, and the index behind them is built from household co-membership upstream — so one family types once. This is the arrival a lobby kiosk exists for: three children, a queue behind, and about eight seconds of glass time to spend.',
+      });
+
+      await kiosk.getByRole('button', { name: new RegExp(cast.familyChild, 'i') }).first().click();
+      await shoot(kiosk, 'kiosk', {
+        act: 'At the door',
+        who: 'Three children, one number',
+        title: 'Anyone else? Asked once, answered in a list',
+        caption:
+          'The brothers and sisters arrive ticked, because a family walks in together and an unticked list would be a second job rather than a saved trip. What keeps that honest is that every name is on the glass above the thumb that is about to press, and each one unticks with a tap — the kiosk\'s guess at a family can be wrong, and a parent looking at a stranger\'s child in their own list cannot miss it. The button counts what it will do, which is the only place on the screen that says how many.',
+      });
+
+      await kiosk.getByRole('button', { name: /Check in all/i }).click();
+      await expect(kiosk.getByText(/are checked in\. Welcome!/i)).toBeVisible({ timeout: 30_000 });
+      await shoot(kiosk, 'kiosk', {
+        act: 'At the door',
+        who: 'Three children, one number',
+        title: 'One tap, three children, three stickers',
+        caption:
+          'One press of one button, one arrival written on the register, and a label rasterising for each of them in a worker that started when the confirm screen came up. The three share an arrival id, which is what lets the pickup screen later offer exactly these three back — see Act 5.',
+      });
+      await backToSearch(kiosk);
 
       await typeOnKiosk(kiosk, cast.doorFirst);
       await shoot(kiosk, 'kiosk', {
@@ -508,6 +556,31 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
           'This used to be a link straight to the registration form, which read as one thing and did another: "add a brother or sister" is plainly an instruction to include another of my children in this check-in, and it answered by asking a new child\'s name and grade. Both readings are real, so the screen holds both — the search finds the sibling the kiosk simply failed to associate, and the standing offer underneath registers the one who genuinely is not on the roster.',
       });
 
+      /*
+       * The cheap answer first, and the one the tour has never shown: the
+       * sibling is already on the roster and four digits simply failed to
+       * associate them. Finding them adds them to *this* check-in — they come
+       * back ticked in the list above the button, and one press covers both.
+       * Nothing is created, and no reviewer has anything to decide.
+       */
+      await typeOnKiosk(kiosk, cast.familySibling.split(' ')[0]!);
+      await shoot(kiosk, 'kiosk', {
+        act: 'The second child',
+        who: 'A family the church already has, growing',
+        title: 'Searching the roster, not a form',
+        caption:
+          'A name search over the whole roster rather than the four digits that just failed. The family\'s own children are shown greyed and inert so nobody adds a child who is already on the confirm screen behind this one, and the offer to register somebody genuinely new waits underneath rather than being the destination.',
+      });
+      await kiosk.getByRole('button', { name: new RegExp(cast.familySibling, 'i') }).first().click();
+      await shoot(kiosk, 'kiosk', {
+        act: 'The second child',
+        who: 'A family the church already has, growing',
+        title: 'Added onto the check-in, not registered',
+        caption:
+          'Straight back to the confirm with the child appended and ticked, and the button counting them. This is the half of "a brother or sister" that costs nothing: they were always on the roster, the guess just could not prove they were kin — a different number on file, a household split in two, somebody added by hand last week. One press now checks both in as one arrival, which is also what makes them one pickup later.',
+      });
+
+      await kiosk.getByRole('button', { name: /Another child/i }).click();
       await kiosk.getByRole('button', { name: /Add a new child/i }).click();
       await typeOnKiosk(kiosk, 'Emil');
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
