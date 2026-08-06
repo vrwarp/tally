@@ -136,7 +136,23 @@ export default defineConfig({
     actionTimeout: 15_000,
   },
 
-  projects: BROWSERS.map((browser) => ({ ...browser })),
+  /*
+   * A reseed in front of every browser, because they share one dataset.
+   *
+   * `globalSetup` seeds once, which is right for whichever project runs first
+   * and wrong for the rest: these specs mutate shared state on purpose, so the
+   * second browser meets a child the first already checked in and waits for a
+   * button that is correctly not there. Per-browser rather than one shared
+   * dependency, so `--project=chromium-mobile` on its own still starts from a
+   * known world.
+   */
+  projects: BROWSERS.flatMap((browser) => [
+    {
+      name: `seed:${browser.name}`,
+      testMatch: /support[\\/]reseed\.setup\.ts$/,
+    },
+    { ...browser, dependencies: [`seed:${browser.name}`] },
+  ]),
 
   webServer: [
     {

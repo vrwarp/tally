@@ -12,6 +12,10 @@
  * emulator. Locally `npx playwright test` runs all four projects in one process,
  * and without this the second one fails in ways that read exactly like
  * application bugs.
+ *
+ * The per-project half of that is `./reseed.setup.ts`, wired as a `dependencies`
+ * project in `playwright.config.ts`. This comment described it for a while
+ * before it was there, which is how the second project came to be reliably red.
  */
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
