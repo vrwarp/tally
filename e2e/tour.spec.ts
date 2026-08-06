@@ -108,8 +108,14 @@ function slugOf(title: string): string {
  * A family per shape, because the second pass would otherwise walk up to the
  * family the first one registered and be shown as a possible duplicate of
  * itself — which is a true thing about the system and a confusing thing in a
- * photograph. Letters only: the kiosk keyboard has digits but a name field
- * refuses them, so a numbered surname is typed and silently dropped.
+ * photograph.
+ *
+ * ASCII letters only, and both halves of that matter. The kiosk keyboard has a
+ * digit row but a name field refuses digits, so a numbered surname is typed and
+ * silently dropped. And it has no accented keys at all — a surname with an ö in
+ * it cannot be typed on the lobby glass, so the sibling wizard waits forever
+ * for a key that is not there. A parent who needs one gets it through the phone
+ * form, which uses the device's own keyboard.
  */
 const CAST: Record<
   Shape,
@@ -130,7 +136,7 @@ const CAST: Record<
     door: 'Nia Washington',
     doorFirst: 'Nia',
     surname: 'Adeyemi',
-    qrSurname: 'Bergström',
+    qrSurname: 'Bergstrom',
     phone: '5550178866',
     qrPhone: '5550176655',
   },
