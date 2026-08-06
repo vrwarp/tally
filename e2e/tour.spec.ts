@@ -9,7 +9,8 @@
  * checked in against real gatherings, and are approved by a real core-team
  * session.
  *
- * Eight acts, in the order a Sunday actually happens:
+ * Ten acts: eight in the order a Sunday actually happens, then the two that
+ * photograph the evenings it does not:
  *
  *   1. **At the door** — a family the church already has, and a pickup.
  *   2. **Nobody has met us** — the wizard on the kiosk itself.
@@ -19,6 +20,12 @@
  *   6. **Who the door will find** — the search's scope, and its way out.
  *   7. **The review** — where the door's recordings become decisions.
  *   8. **The rest of the week** — the core team's own screens.
+ *   9. **When it doesn't go that way** — half a search, a dead network, a code
+ *      that would not mint, a double tap, a gathering whose doors have shut.
+ *  10. …and the same for the phone form: a spent code, and a form submitted
+ *      empty. The failures are driven for real — the network frames abort the
+ *      callables the screen depends on, so what is photographed is the screen
+ *      reacting rather than a mock of it.
  *
  * Everything runs twice, on a wide device and a tall one, because none of these
  * screens gets to choose its shape: a kiosk is however the shelf it sits on
@@ -34,7 +41,7 @@ import { fileURLToPath } from 'node:url';
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { gotoReady } from './support/auth';
-import { readCollection } from './support/emulator';
+import { deleteDocument, readCollection, writeDocument } from './support/emulator';
 import { test } from './support/fixtures';
 import { bindTo, hold, openKiosk, pairKiosk, typeOnKiosk } from './support/kiosk';
 
@@ -77,6 +84,15 @@ interface Shot {
 }
 
 const shots: Shot[] = [];
+
+/**
+ * The gathering Act 9 arranges for one frame: doors shut, still running.
+ *
+ * Written and deleted per pass rather than seeded, because a gathering whose
+ * check-in window has closed is one every other spec's chooser would have to
+ * reason about. Named well clear of "Nursery" so Act 1's bind cannot match it.
+ */
+const DOORS_CLOSED_EVENT = 'tour-doors-closed';
 
 /**
  * Back to the search screen, however the kiosk gets there.
@@ -877,8 +893,237 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
         caption:
           'The kiosk shows a six-character code and polls; whoever types it here hands the kiosk a session bound to their own account, and every check-in it records from then on carries their name. Open to any active member, not just the core team — the person setting up the lobby screen on a Friday evening is a counselor.',
       });
+
+      /* ================================================================== */
+      /* Act 9 — When it doesn't go that way                                 */
+      /* ================================================================== */
+
+      /*
+       * The sad paths, photographed rather than described.
+       *
+       * Every frame in the eight acts above is a thing working. These are the
+       * states a lobby screen actually spends its bad evenings in, and they
+       * are the ones nobody designs on purpose — so they are the ones worth
+       * looking at. Each is driven into place for real: the network frames
+       * abort the callables the screen depends on, and the screen is
+       * photographed reacting to a genuine failure.
+       */
+
+      const clearKiosk = async () => {
+        await kiosk.locator('[data-key="clear"]').click();
+        await expect(kiosk.getByText(/type a name, or the last 4 digits/i)).toBeVisible({
+          timeout: 15_000,
+        });
+      };
+
+      /*
+       * A reload between the two sweep frames, because the two-minute cooldown
+       * lives in a ref: without it the second sweep would answer from the
+       * first one's result and photograph the wrong state.
+       */
+      const reloadKiosk = async () => {
+        await kiosk.reload();
+        await expect(kiosk.getByText(/type a name, or the last 4 digits/i)).toBeVisible({
+          timeout: 60_000,
+        });
+      };
+
+      await reloadKiosk();
+      await typeOnKiosk(kiosk, '55');
+      await expect(kiosk.getByText(/Enter all 4 digits/i)).toBeVisible({ timeout: 15_000 });
+      await shoot(kiosk, 'kiosk', {
+        act: "When it doesn't go that way",
+        who: 'A parent halfway through their number',
+        title: 'Half a number is not a failed search',
+        caption:
+          'Two digits match nobody, and saying "no match" here would be a lie about an unfinished question — the commonest way a search screen makes somebody think they are not in the system. So a partial number gets its own sentence and none of the doors: no register offer, no way out of the scope, nothing to decide. It also gates the machinery behind the screen. A finished search that finds nobody is what triggers the silent church-wide re-read, and a half-typed number must never spend that.',
+      });
+      await clearKiosk();
+
+      /*
+       * A real failure: both halves of the sweep are aborted at the network,
+       * so the line below is the screen reacting rather than a mock of it.
+       */
+      await kiosk.route('**/getRoster', (route) => route.abort());
+      await kiosk.route('**/refreshKioskPhoneIndex', (route) => route.abort());
+      await typeOnKiosk(kiosk, 'Halloran');
+      await expect(kiosk.getByText(/Couldn.t reach the network just now/i)).toBeVisible({
+        timeout: 60_000,
+      });
+      await shoot(kiosk, 'kiosk', {
+        act: "When it doesn't go that way",
+        who: 'A family the kiosk cannot look up',
+        title: 'The wifi went, and the screen says so once',
+        caption:
+          'The kiosk swept for this family by itself, and the sweep could not reach anything — so it says so, in one line, under the doors that still work. What it does *not* do is block: the register button is live, the roster held on the device still answers every other family in the queue, and check-ins recorded while this is on screen queue up and replay when the network returns. A lobby screen that stops working when the wifi does is a lobby screen that stops working, and a church hall is exactly where that happens.',
+      });
+      await clearKiosk();
+      await kiosk.unroute('**/getRoster');
+      await kiosk.unroute('**/refreshKioskPhoneIndex');
+
+      await reloadKiosk();
+      await typeOnKiosk(kiosk, 'Halloran');
+      await expect(kiosk.getByText(/Still no match/i)).toBeVisible({ timeout: 60_000 });
+      await shoot(kiosk, 'kiosk', {
+        act: "When it doesn't go that way",
+        who: 'A family who really are new',
+        title: 'One word, and the whole sweep behind it',
+        caption:
+          'The only visible trace of the church-wide re-read that used to hide behind a button. The search finished, found nobody in the roster this device holds, and the kiosk went and asked both backends without being told to — and came back with nothing, so the headline gains one word. **Still.** That is deliberately the entire report: a parent standing at a screen needs to know what to do next, not what the device has been doing. The doors underneath are unchanged, because the answer for this family has not changed either.',
+      });
+      await clearKiosk();
+
+      await kiosk.route('**/mintRegistrationCode', (route) => route.abort());
+      await kiosk.getByRole('button', { name: /First time here\? Register your child/i }).click();
+      await expect(kiosk.getByText(/The code could not be fetched/i)).toBeVisible({
+        timeout: 60_000,
+      });
+      await shoot(kiosk, 'kiosk', {
+        act: "When it doesn't go that way",
+        who: 'A family with a phone and no code to scan',
+        title: 'No QR, and the other door is right there',
+        caption:
+          'The code is minted by a callable, and a callable can fail. What the screen must not do is leave a family standing in front of an empty white square wondering whether to wait — so the failure names the alternative in the same breath, and the alternative is the thing they can do without leaving the kiosk. The wizard was always one tap below the code; here it becomes the answer.',
+      });
+      await kiosk.getByRole('button', { name: /Back/i }).click();
+      await kiosk.unroute('**/mintRegistrationCode');
+      await expect(kiosk.getByText(/type a name, or the last 4 digits/i)).toBeVisible({
+        timeout: 15_000,
+      });
+
+      /* ================================================================== */
+      /* Act 10 — The phone form, when the phone form fails                  */
+      /* ================================================================== */
+
+      await kiosk.getByRole('button', { name: /First time here\? Register your child/i }).click();
+      const sadCode = ((await kiosk
+        .getByText(/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/)
+        .first()
+        .textContent()) ?? '').trim();
+
+      const sadPhoneContext = await browser.newContext({ viewport: VIEWPORTS[shape].phone });
+      try {
+        const sadPhone = await sadPhoneContext.newPage();
+
+        await sadPhone.goto('/welcome?c=ZZZZZZ');
+        await expect(sadPhone.getByText(/That code has (expired|been used)/i)).toBeVisible({
+          timeout: 60_000,
+        });
+        await shoot(sadPhone, 'phone', {
+          act: "When it doesn't go that way",
+          who: 'Somebody who kept the link',
+          title: 'A code that is no longer a door',
+          caption:
+            'This is the whole reason the registration link is not a stable URL. A code lives twenty minutes and carries twenty families, so a photograph of the lobby screen, a link forwarded to a friend, or a browser history entry from last Sunday all end here — at the only unauthenticated write surface Tally has, closed. Registering remotely means being in the room, and this screen is where that requirement is actually enforced.',
+        });
+
+        if (sadCode.length === 6) {
+          await sadPhone.goto(`/welcome?c=${sadCode}`);
+          await sadPhone.getByLabel(/^First name/i).waitFor({ timeout: 60_000 });
+          await sadPhone.getByRole('button', { name: /^Register$/i }).click();
+          await expect(sadPhone.getByText(/Enter a 10-digit number/i)).toBeVisible({
+            timeout: 15_000,
+          });
+          await shoot(sadPhone, 'phone', {
+            act: "When it doesn't go that way",
+            who: 'A parent going too fast',
+            title: 'Every empty field at once, and none of them lost',
+            caption:
+              'Checked in the browser and marked on each field rather than announced as one sentence at the top, because a parent scrolling a form needs to know *which* box, not that something somewhere is wrong. Nothing typed is cleared and nothing is sent: the registration id was minted when this page opened and is reused when they press again, so a double press — or a submit that succeeds on a connection that then drops — cannot become two families. The phone number is the only field with a rule beyond "not empty", because it is the only one the kiosk will later have to match on.',
+          });
+        }
+      } finally {
+        await sadPhoneContext.close();
+      }
+
+      await kiosk.getByRole('button', { name: /Back/i }).click();
+      await expect(kiosk.getByText(/type a name, or the last 4 digits/i)).toBeVisible({
+        timeout: 15_000,
+      });
+
+      /* ---- Back on the kiosk: two states of a child, and a closed door ---- */
+
+      /*
+       * Tried in order rather than named outright: by this point in the tour
+       * several of these children have been checked in *and collected*, and a
+       * collected child's confirm screen is a different frame than the one
+       * this caption claims.
+       */
+      for (const candidate of [cast.guestChild, cast.familyChild, cast.door]) {
+        await typeOnKiosk(kiosk, candidate.split(' ')[0]!);
+        const row = kiosk.getByRole('button', { name: new RegExp(candidate, 'i') }).first();
+        if (!(await row.isVisible().catch(() => false))) {
+          await clearKiosk();
+          continue;
+        }
+        await row.click();
+
+        const checkIn = kiosk.getByRole('button', { name: /^Check in$/ });
+        if (await checkIn.isVisible().catch(() => false)) {
+          await checkIn.click();
+          await expect(kiosk.getByText(/checked in\. Welcome!/i)).toBeVisible({ timeout: 30_000 });
+          await backToSearch(kiosk);
+          await typeOnKiosk(kiosk, candidate.split(' ')[0]!);
+          await kiosk.getByRole('button', { name: new RegExp(candidate, 'i') }).first().click();
+        }
+
+        if (await kiosk.getByText(/Already checked in/i).isVisible().catch(() => false)) {
+          await shoot(kiosk, 'kiosk', {
+            act: "When it doesn't go that way",
+            who: 'A parent who is not sure it worked',
+            title: 'Tapped twice, counted once',
+            caption:
+              'The commonest doubt at a lobby screen: did that go through? So a child already on the register is drawn as a statement rather than a button, and there is nothing here to press twice. Underneath, the attendance document is keyed by the student id rather than a generated one, so two counselors tapping the same child a second apart on different phones address one row instead of inflating a head count. The label printer is held to the same rule — a reprint loop at a door is a queue nobody can clear.',
+          });
+          await kiosk.getByRole('button', { name: /Back/i }).click().catch(() => {});
+          await clearKiosk();
+          break;
+        }
+
+        await kiosk.getByRole('button', { name: /Back/i }).click().catch(() => {});
+        await clearKiosk();
+      }
+
+      /*
+       * A gathering whose doors shut early but which is still running — the
+       * one binding state that changes the sentence under the title. Removed
+       * on the way out, so the second shape's chooser is the seed's again.
+       */
+      await writeDocument(`events/${DOORS_CLOSED_EVENT}`, {
+        title: 'Sunday Youth (doors closed)',
+        description: null,
+        icon: null,
+        mode: 'oneoff',
+        seriesId: null,
+        recurrence: null,
+        recurrenceRootId: null,
+        predictFromChain: null,
+        startAt: new Date(Date.now() - 90 * 60_000),
+        endAt: new Date(Date.now() + 90 * 60_000),
+        checkInOpensAt: new Date(Date.now() - 120 * 60_000),
+        checkInClosesAt: new Date(Date.now() - 10 * 60_000),
+        location: null,
+        notes: null,
+        requiresRsvp: false,
+        requiresCheckOut: false,
+        status: 'scheduled',
+        createdAt: new Date(Date.now() - 200 * 60_000),
+        updatedAt: new Date(Date.now() - 200 * 60_000),
+        createdBy: 'seed',
+      });
+
+      await bindTo(kiosk, /doors closed/i);
+      await expect(kiosk.getByText(/Check-in window has closed/i)).toBeVisible({ timeout: 60_000 });
+      await shoot(kiosk, 'kiosk', {
+        act: "When it doesn't go that way",
+        who: 'A family arriving late',
+        title: 'The doors have shut, and it still works',
+        caption:
+          'A check-in window is a note to the room, not a lock on the glass. The gathering stopped admitting people ten minutes ago and the kiosk says so in the one line under the title — then goes on working exactly as before, because the alternative is a family standing in the building beside a screen that refuses to admit they are there. The same posture runs all the way down: a gathering that has *ended* is still offered to a kiosk if it collects children, since the pickup is the half nobody can skip.',
+      });
     } finally {
       await context.close();
+      await deleteDocument(`events/${DOORS_CLOSED_EVENT}`);
     }
 
     // Written per shape rather than once at the end: a pass that fails must not
