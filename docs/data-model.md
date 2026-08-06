@@ -558,6 +558,49 @@ the family upstream, reduced to its tail, and discarded with the request.
 
 **Who writes:** only the functions, like every other `kioskIndex` document.
 
+### `kioskIndex/pulse`
+
+The change signal every kiosk polls, so the caches above stop waiting out their TTLs.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `version` | `1` | |
+| `roster` | map | `{ rev, at }` — bumped by anything that changes who the roster read returns: a registration, a student created by quick-add or import, a discarded registration, a merge, the nightly phone-index rebuild. |
+| `phones` | map | `{ rev, at }` — bumped when the four-digit index changed: a registration that carried digits, the nightly rebuild. |
+| `participation` | map | `{ rev, at }` — bumped when the participation document above is rebuilt. |
+| `registration` | map | `{ rev, at, eventId }` — bumped by a **QR** registration only, naming the gathering whose kiosk minted the code, so exactly that kiosk's QR screen walks itself back to the search. A kiosk-wizard registration already resolves on the glass it happened on and must not advance somebody else's. |
+
+The revisions are **opaque change counters, not versions**. A kiosk remembers the last value it saw
+per channel and refetches that channel when the value merely *differs* (`!==`, never `>`), so
+nothing anywhere needs the numbers to be dense or ordered. They are written read-modify-write as
+`max(previous + 1, now-in-milliseconds)` — no `FieldValue.increment`, matching the codebase's
+injected-clock convention — and the epoch anchor is what makes the one dangerous race disappear:
+two concurrent writers can lose one increment harmlessly (any observed change refetches the whole
+channel; the pulse is a signal, never a delta), but they will virtually never write the *same*
+value, which is the only shape a client could actually miss.
+
+The kiosk reads this document every thirty seconds (`PULSE_POLL_MS`) — one small read beside an
+attendance poll that already re-reads a whole subcollection every five minutes — and refetches
+**only the channel whose revision moved**: an unforced roster read, the phone index, the
+participation document. Last-seen revisions live on disk with the kiosk's other caches, so a tablet
+that slept through an evening catches up on its first poll after waking instead of trusting
+whatever it went to sleep holding.
+
+Every write is best-effort and every read fails open. A bump that cannot be written is a logged
+warning and a kiosk that finds out by TTL, exactly as before this document existed; a pulse that
+cannot be read is "no signal", and the TTLs still govern. An old kiosk bundle that has never heard
+of this document keeps working untouched, and the document needs no backfill — it springs into
+existence on the first bump. The one high-volume writer, `onStudentCreated`, debounces itself
+(a bump is skipped while the channel's `at` is within ~30 s), so a 400-person import writes a
+couple of bumps rather than four hundred.
+
+It holds no names, no digits, no student ids — nothing but counters, timestamps and a gathering id.
+
+**Who writes:** only the functions, like every other `kioskIndex` document — and here that is also
+the security argument: the attack on a client-writable pulse is spoofing the signal (walking every
+open QR screen back to search for a stranger's registration) or forcing refetch loops, so `set`
+fails even for an admin. The rules test pins both.
+
 ### `kioskRegistrations/{registrationId}`
 
 One document per run of the kiosk's "first time here" wizard. It does two jobs: it is the claim that
@@ -629,6 +672,7 @@ left on it.
 | --- | --- | --- |
 | `createdAt`, `expiresAt` | — | Twenty minutes. Long enough to walk away, find the camera app and mistype a name; short enough that a photograph of the lobby screen is worth nothing by the end of the service. |
 | `mintedBy` | string | The approver's uid, inherited by the kiosk that asked. |
+| `eventId` | string \| null | The gathering bound to the kiosk that minted the code. `registerFamily` reads it back server-side — never from the request — so a QR registration's review record names its gathering and the [pulse](#kioskindexpulse) can walk exactly that kiosk's QR screen back to the search. `null` on codes minted by an old kiosk bundle, which simply means nobody auto-advances. |
 | `submissions`, `maxSubmissions` | number | Twenty families through one QR in twenty minutes is not a busy lobby, it is somebody replaying the form. Spent *after* a registration lands, so a call that failed validation costs the family nothing. |
 
 Same guardrails as the pairings, for the same reasons: a TTL, a cap of ten live codes at once, and a

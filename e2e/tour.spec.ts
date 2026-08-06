@@ -525,24 +525,38 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
         await shoot(phone, 'phone', {
           act: 'On their own phone',
           who: 'The same family, on the device in their hand',
-          title: 'Now go and tap the button',
+          title: 'The digits are the whole instruction',
           caption:
-            'This form checks nobody in — it cannot know the family walked through the door — so it ends by sending them back, and the order is the whole message: tap "I\'ve registered", *then* type the digits. The kiosk holds a copy of the roster and refreshes it every six hours; telling somebody to type their digits without the button is telling them to watch a screen say "no match".',
+            'This form checks nobody in — it cannot know the family walked through the door — so it ends by sending them back to the four digits, and to nothing else. It used to say "tap I\'ve registered, then type": the kiosk\'s roster was a cache only a button refreshed, and skipping the button meant watching a screen say "no match". The button has become the machine\'s job — the code this form was opened with remembers which gathering minted it, and the kiosk is already reacting.',
         });
       } finally {
         await phoneContext.close();
       }
 
-      await kiosk.getByRole('button', { name: /I've registered/i }).click();
+      /*
+       * Nobody touches the kiosk. The registration bumped the pulse naming
+       * this gathering; the kiosk's own poll takes the QR down and puts the
+       * digits line up while the family is still walking back.
+       */
+      await expect(kiosk.getByRole('button', { name: /I've registered/i })).toHaveCount(0, {
+        timeout: 60_000,
+      });
+      await shoot(kiosk, 'kiosk', {
+        act: 'On their own phone',
+        who: 'The same family, back at the lobby screen',
+        title: 'The kiosk noticed by itself',
+        caption:
+          'No button was pressed on this screen. The phone form\'s submission bumped a one-document change signal (`kioskIndex/pulse`) naming the gathering whose kiosk minted the code, and the kiosk — which polls that signal every thirty seconds — took its own QR down, refreshed its roster, and put the search screen up with the one instruction that matters. The "I\'ve registered" button still exists behind the QR for the family who will not wait half a minute; nobody needs it.',
+      });
       await typeOnKiosk(kiosk, cast.qrPhone.slice(-4));
       await expect(kiosk.getByRole('button', { name: new RegExp(cast.door, 'i') }).first())
         .toBeVisible({ timeout: 30_000 });
       await shoot(kiosk, 'kiosk', {
         act: 'On their own phone',
         who: 'The same family, back at the lobby screen',
-        title: 'The button is what makes it go and look',
+        title: 'Found, in a copy nobody had to refresh',
         caption:
-          'A forced read past two caches — the kiosk\'s own roster copy and the server\'s copy of the church behind it — and then the four digits find the child the phone just created. The same refresh is offered from the no-match state, for the family who took ten minutes over the form and came back to a kiosk that had moved on.',
+          'The four digits find the child the phone created a minute ago, in the kiosk\'s own roster copy — already fresh, because the same pulse that took the QR down told this screen to re-read it. Nothing was forced and nothing was pressed. The family who takes ten minutes over the form and comes back to a kiosk that moved on is covered by the same machinery\'s last resort: a finished search that finds nobody anywhere runs the church-wide re-read by itself, silently, before the screen will say "Still no match".',
       });
 
       /* ================================================================== */
@@ -695,13 +709,15 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       /* ================================================================== */
 
       /*
-       * Last of the kiosk acts, because pressing "I already registered" sweeps
-       * the whole church at both backends and replaces the roster this screen
-       * is holding. Nothing after it depends on that roster.
+       * Last of the kiosk acts by tradition — the escape hatch here used to
+       * sweep the whole church at both backends and replace the roster this
+       * screen was holding. "Search everyone" costs nothing now (it only
+       * widens the pool this one search is handed), but the closing question
+       * — who will this door find? — still reads best at the end.
        *
        * Bree was met on the lock-in bus and has been to nothing since (the
        * `oneOffGuest` band in scripts/seed.ts), so she is exactly who the scope
-       * is for and exactly who its escape hatch is for.
+       * is for and exactly who its way out is for.
        */
       await typeOnKiosk(kiosk, 'Bree');
       await shoot(kiosk, 'kiosk', {
@@ -712,16 +728,16 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
           'Bree is on the roster and is not found here, because she has never been to this gathering. The search is scoped to the children who have — the same year the check-in screen uses to decide who belongs to a room — rather than to every active student in the church. That is not tidiness: four digits are a small keyspace, and a search over the whole ministry can hand a parent a real child, correctly spelled, who is not theirs and is not even in the building. The scope is derived from attendance and rebuilt nightly, so it switches itself on once a gathering has been run and there is nothing to configure.',
       });
 
-      await kiosk.getByRole('button', { name: /I already registered/i }).click();
+      await kiosk.getByRole('button', { name: /Search everyone/i }).click();
       await expect(
         kiosk.getByRole('button', { name: /Bree Sandoval/i }).first(),
       ).toBeVisible({ timeout: 30_000 });
       await shoot(kiosk, 'kiosk', {
         act: 'Who the door will find',
         who: 'A child from another programme',
-        title: 'And the way back out, on the button already there',
+        title: 'And the way back out says what it does',
         caption:
-          'Narrowing a search is only safe if the way out is on the screen before it is needed. This is the same button a family registered while they queued would press, and it means the same thing to both of them — look harder for me. It widens to all of Tally on the press and re-reads the church behind that, and it says nothing about scope: a parent has no model of which children this screen is willing to find, and explaining one in order to ask them to press a button would be the wrong trade. Every other way this can fail widens too — a gathering with no history behind it searches everything, and so does a kiosk that cannot read the list at all.',
+          'Narrowing a search is only safe if the way out is on the screen before it is needed. It used to be "I already registered" — a button that meant look harder for me, and swept the whole church to prove it. This one says what it does: it widens this one search to all of Tally, on the spot and without the network, because Bree was on the roster all along and only outside the scope. The offer spends itself when tapped and is back for the next family. It still says nothing about scope — a parent has no model of which children this screen is willing to find, and explaining one in order to ask them to press a button would be the wrong trade. And when the kiosk itself cannot know the scope, it widens on its own: a gathering with no history behind it searches everything, and so does a kiosk that cannot read the list at all.',
       });
       await kiosk.locator('[data-key="clear"]').click();
 

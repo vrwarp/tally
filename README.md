@@ -101,12 +101,17 @@ submissions land in a church's real people database; instead the kiosk mints a c
 minutes, carries at most twenty families, and re-mints itself while the screen is up. Registering
 remotely means being in the room.
 
-That form checks nobody in — it cannot know the family walked through the door — so it ends by
-sending them back: *tap "I've registered", then type 7788*. The order is the whole message. The kiosk
-searches a copy of the roster held on the device and refreshes it every six hours, so the button is
-what makes it go and look; telling somebody to type their digits without it is telling them to watch
-a screen say "no match". The same refresh is offered from the no-match state, for the family who took
-ten minutes over the form and came back to a kiosk that had moved on.
+That form checks nobody in — it cannot know the family walked through the door — so it ends with
+the only instruction left: *type 7788*. It used to be two steps — *tap "I've registered", then type*
+— because the kiosk searched a six-hour-old copy of the roster and the button was what made it go
+and look. Now the kiosk notices by itself: the code the form was opened with remembers which
+gathering minted it, the submission bumps a one-document change signal
+([`kioskIndex/pulse`](docs/data-model.md#kioskindexpulse)), and the kiosk — polling that signal
+every thirty seconds — re-reads only what changed and walks its own QR screen back to the search,
+digits line and all, while the family is still crossing the lobby. The button survives behind the QR
+for anyone who will not wait out the half minute. And for the family who took ten minutes over the
+form and came back to a kiosk that had moved on, a finished search that finds nobody anywhere
+re-reads the whole church silently before the screen will say "Still no match".
 
 **Nothing here is a lobby screen deciding who somebody is**, and that is the design rather than a
 disclaimer. A registration reaches Tally's roster and stops: every child is written held
@@ -695,8 +700,9 @@ gathering in the last year — the same year the check-in screen uses to decide 
 standing in front of the Sunday nursery's roster and should not be able to type four digits into
 one. The scope only ever fails open: a gathering with no history behind it searches everything, so
 there is nothing to configure and no way to switch it off by accident, anyone on tonight's register
-is findable whatever last night's aggregate said, and **"I already registered"** widens the search
-to all of Tally on the press. The list itself is
+is findable whatever last night's aggregate said, and **"Search everyone"** — offered whenever a
+search comes up empty — widens that one search to all of Tally on the spot, with no read behind it.
+The list itself is
 [one precomputed document](docs/data-model.md#kioskindexparticipation) — the kiosk holds no event
 history and could not download the code that reads it.
 

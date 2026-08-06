@@ -255,24 +255,24 @@ test.describe('the kiosk', () => {
   /**
    * The family who were registered while they queued.
    *
-   * The kiosk's roster is a cache that refreshes every six hours, and behind
-   * that the server's copy of the church is cached again — so a child added at
-   * the welcome desk two minutes ago is invisible here for the rest of the
-   * evening, and "please see a leader" is the whole of what the lobby screen
-   * has to say about it. This is the one path that reaches past both caches,
-   * and the assertion that matters is the last one: not that a button existed,
-   * but that the child it found can be checked in.
+   * The kiosk's roster is a cache that refreshes every six hours — and nobody
+   * presses anything any more. Writing the student document fires the real
+   * `onStudentCreated` trigger in the emulator, the trigger bumps the real
+   * pulse, and the kiosk's thirty-second poll refetches the roster by itself.
+   * This test IS the proof of that chain end to end: if any link breaks, the
+   * row below never appears.
    *
    * Written straight into Firestore rather than through the app, because what
    * is being tested is a roster that changed *after* this kiosk cached one —
    * the moment, not the mechanism that made it.
    */
-  test('looks again online for a family the cached roster does not hold', async ({
+  test('notices a family the cached roster does not hold, with no button pressed', async ({
     browser,
     page,
     signedInAs,
     firestore,
   }) => {
+    test.setTimeout(120_000);
     await signedInAs('core');
     const studentId = 'student-late-arrival';
     const nursery = await eventNamed('Nursery');
@@ -304,12 +304,10 @@ test.describe('the kiosk', () => {
         updatedBy: null,
       });
 
-      await kiosk.getByRole('button', { name: /I already registered/i }).click();
-
-      // No retyping: the search the parent already typed re-runs against the
-      // roster that just landed.
+      // No button. The trigger-to-pulse-to-poll chain surfaces the row while
+      // the search the parent already typed stays on the glass.
       const row = kiosk.getByRole('button', { name: /quill marsden/i }).first();
-      await expect(row).toBeVisible({ timeout: 30_000 });
+      await expect(row).toBeVisible({ timeout: 60_000 });
 
       await row.click();
       await kiosk.getByRole('button', { name: /^Check in$/ }).click();
@@ -341,8 +339,9 @@ test.describe('the kiosk', () => {
    *
    * The two assertions are a pair, and the second is the one that keeps this
    * honest: narrowing a search is only safe if the way back out is on the
-   * screen already. It is the same button a family who registered while they
-   * queued presses, and it means the same thing to them — look harder for me.
+   * screen already. "Search everyone" is that way out, and it finally says
+   * what it does — the old escape hatch widened as a side effect of a button
+   * about network refreshes.
    */
   test('scopes the search to the gathering, and widens it on request', async ({
     browser,
@@ -360,12 +359,12 @@ test.describe('the kiosk', () => {
       await expect(kiosk.getByText(/no match/i)).toBeVisible({ timeout: 15_000 });
       await expect(kiosk.getByRole('button', { name: /bree sandoval/i })).toHaveCount(0);
 
-      await kiosk.getByRole('button', { name: /I already registered/i }).click();
+      await kiosk.getByRole('button', { name: /Search everyone/i }).click();
 
-      // No retyping, and nothing about scope on the screen: the parent presses
-      // the button they were going to press anyway and the name is there.
+      // Instantly — the wider list is already on the device, so no retyping
+      // and no waiting on a read.
       await expect(kiosk.getByRole('button', { name: /bree sandoval/i }).first()).toBeVisible({
-        timeout: 30_000,
+        timeout: 15_000,
       });
     } finally {
       await context.close();
@@ -690,6 +689,77 @@ test.describe('registering a family at the kiosk', () => {
       await expect(kiosk.getByText(/is checked in\. Welcome!/i)).toBeVisible({ timeout: 20_000 });
       // And the handoff they will use next week, which the refusal never got to.
       await expect(kiosk.getByText(/9001/)).toBeVisible();
+    } finally {
+      await context.close();
+    }
+  });
+
+  /**
+   * The flagship of the pulse: a family registers on their phone and the kiosk
+   * reacts with nobody touching it.
+   *
+   * Every link is real — the code the kiosk minted carries the gathering, the
+   * phone form submits through the real callable, the callable bumps the real
+   * pulse naming that gathering, and the kiosk's own thirty-second poll takes
+   * the QR screen down and puts the digits line up. The parent walks back to a
+   * screen that is already asking for the only thing they need to type.
+   *
+   * The last third proves the other half of the QR contract: the children
+   * arrived checked-OUT (a phone form cannot know the family walked in), so
+   * the digits must find them and the confirm must offer a check-in.
+   */
+  test('a QR registration walks back to a kiosk that already knows', async ({
+    browser,
+    page,
+    signedInAs,
+  }) => {
+    test.setTimeout(120_000);
+    await signedInAs('core');
+    const { context, page: kiosk } = await openKiosk(browser);
+
+    try {
+      await pairKiosk(kiosk, page);
+      await bindTo(kiosk, /nursery/i);
+
+      await kiosk.getByRole('button', { name: /Register your child/i }).click();
+      const code = ((await kiosk
+        .getByText(/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/)
+        .first()
+        .textContent()) ?? '').trim();
+      expect(code).toHaveLength(6);
+
+      const phoneContext = await browser.newContext();
+      try {
+        const phone = await phoneContext.newPage();
+        await phone.goto(`/welcome?c=${code}`);
+        await phone.getByLabel(/^First name/i).waitFor({ timeout: 30_000 });
+        await phone.getByLabel(/^First name/i).fill('Isla');
+        await phone.getByLabel(/^Last name/i).fill('Dovetail');
+        await phone.getByLabel(/^Your first name/i).fill('Rowan');
+        await phone.getByLabel(/^Your last name/i).fill('Dovetail');
+        await phone.getByLabel(/^Your phone number/i).fill('5550198822');
+        await phone.getByRole('button', { name: /^Register$/i }).click();
+        // The success copy no longer mentions any button — the digits are the
+        // whole instruction, because the kiosk needs nothing else pressed.
+        await expect(phone.getByText(/type the last 4 digits/i)).toBeVisible({ timeout: 30_000 });
+        await expect(phone.getByText(/I've registered/)).toHaveCount(0);
+      } finally {
+        await phoneContext.close();
+      }
+
+      // Nothing is pressed on the kiosk from here on. The pulse takes the QR
+      // screen down and the search screen greets the family by itself.
+      await expect(kiosk.getByRole('button', { name: /I've registered/i })).toHaveCount(0, {
+        timeout: 60_000,
+      });
+      await expect(kiosk.getByText(/type the last 4 digits/i)).toBeVisible({ timeout: 15_000 });
+
+      await typeOnKiosk(kiosk, '8822');
+      const row = kiosk.getByRole('button', { name: /Isla Dovetail/i }).first();
+      await expect(row).toBeVisible({ timeout: 30_000 });
+      await row.click();
+      await kiosk.getByRole('button', { name: /^Check in$/ }).click();
+      await expect(kiosk.getByText(/is checked in\. Welcome!/i)).toBeVisible({ timeout: 20_000 });
     } finally {
       await context.close();
     }
