@@ -34,21 +34,21 @@ The digits are a parent's own phone number, and the index behind them is built f
 
 *Three children, one number*
 
-The other children on the number arrive ticked, because a family walks in together and an unticked list would be a second job rather than a saved trip. What keeps that honest is that every name is on the glass above the thumb that is about to press, and each one unticks with a tap — the kiosk's guess at a family can be wrong, and a parent looking at a stranger's child in their own list cannot miss it. The button counts what it will do, which is the only place on the screen that says how many.
+Every child on the number is offered; the ones this gathering actually expects arrive ticked. That distinction is the whole of the screen. A household is a guess made from four phone digits, and it is frequently right about the family and wrong about tonight — the third child here has not been in months, and ticking her would have written a child who is not in the building onto a register nobody can reconcile. So the prediction decides the tick and the guess decides the list: she is still there, at full weight, one tap from being included. The button counts what it will actually do, which is the only place on the screen that says how many.
 
 ![Anyone else? Asked once, answered in a list — wide](shots/wide-03-anyone-else-asked-once-answered-in-a-list.png)
 
 <img src="shots/tall-03-anyone-else-asked-once-answered-in-a-list.png" width="320" alt="Anyone else? Asked once, answered in a list — tall">
 
-### 4. One tap, three children, three stickers
+### 4. One tap, two children, two stickers
 
 *Three children, one number*
 
-One press of one button, one arrival written on the register, and a label rasterising for each of them in a worker that started when the confirm screen came up. The three share an arrival id, which is what lets the pickup screen later offer exactly these three back — see Act 5.
+One press of one button, one arrival written on the register, and a label rasterising for each of them in a worker that started when the confirm screen came up. They share an arrival id, which is what lets the pickup screen later offer exactly this group back — see Act 5. The sibling nobody ticked is not on the register and has no sticker coming, and no volunteer has to go looking for a child who was never dropped off.
 
-![One tap, three children, three stickers — wide](shots/wide-04-one-tap-three-children-three-stickers.png)
+![One tap, two children, two stickers — wide](shots/wide-04-one-tap-two-children-two-stickers.png)
 
-<img src="shots/tall-04-one-tap-three-children-three-stickers.png" width="320" alt="One tap, three children, three stickers — tall">
+<img src="shots/tall-04-one-tap-two-children-two-stickers.png" width="320" alt="One tap, two children, two stickers — tall">
 
 ### 5. Four keystrokes is usually the whole search
 
@@ -260,7 +260,7 @@ A forced read past two caches — the kiosk's own roster copy and the server's c
 
 *A family the church already has, growing*
 
-A parent looking at one name who knows there should be two. "Anyone else?" is asked on every check-in, and the answer is a list: the siblings the kiosk guessed, ticked, ending with the way to add the one it missed. Five rounds of critique went into that being one slot rather than two — it used to be a ticked list *above* the button when the guess worked and a line of grey text *below* it when it did not, which reserved the quietest thing on the glass for the only parent who needed it. The guess is deliberately conservative and so it misses people: a child on a different number, a household split in two, somebody added by hand last week.
+A parent looking at one name who knows there should be two. "Anyone else?" is asked on every check-in, and the answer is a list: the siblings the kiosk guessed, ending with the way to add the one it missed. Five rounds of critique went into that being one slot rather than two — it used to be a ticked list *above* the button when the guess worked and a line of grey text *below* it when it did not, which reserved the quietest thing on the glass for the only parent who needed it. The guess is deliberately conservative and so it misses people: a child on a different number, a household split in two, somebody added by hand last week.
 
 ![The other door, in the same slot — wide](shots/wide-25-the-other-door-in-the-same-slot.png)
 
@@ -280,7 +280,7 @@ This used to be a link straight to the registration form, which read as one thin
 
 *A family the church already has, growing*
 
-A name search over the whole roster rather than the four digits that just failed — so a child the digits could never have found is reachable anyway. Anybody already on the confirm screen behind this one, or already checked in, is drawn inert rather than hidden: a parent looking for a name needs to see it and see that it is done. The offer to register somebody genuinely new waits underneath rather than being the destination.
+A name search over the whole roster rather than the four digits that just failed — so a child the digits could never have found is reachable anyway. Unscoped, too, unlike the front door two acts ago: the population this screen exists for is precisely the one a scope gets wrong, the daughter who comes on Fridays and the son who is new to it. A parent only reaches here by having already found their family. Anybody already on the confirm screen behind this one, or already checked in, is drawn inert rather than hidden: a parent looking for a name needs to see it and see that it is done. The offer to register somebody genuinely new waits underneath rather than being the destination.
 
 ![Searching the roster, not a form — wide](shots/wide-27-searching-the-roster-not-a-form.png)
 
@@ -338,106 +338,128 @@ A pickup holds where a check-in taps, and it still holds for three children at o
 
 <img src="shots/tall-32-three-seconds-once-for-the-whole-family.png" width="320" alt="Three seconds, once, for the whole family — tall">
 
-## Act 6 — The review
+## Act 6 — Who the door will find
 
-### 33. The door records; a person decides
+### 33. A lobby screen is not the whole ministry
+
+*A child from another programme*
+
+Bree is on the roster and is not found here, because she has never been to this gathering. The search is scoped to the children who have — the same year the check-in screen uses to decide who belongs to a room — rather than to every active student in the church. That is not tidiness: four digits are a small keyspace, and a search over the whole ministry can hand a parent a real child, correctly spelled, who is not theirs and is not even in the building. The scope is derived from attendance and rebuilt nightly, so it switches itself on once a gathering has been run and there is nothing to configure.
+
+![A lobby screen is not the whole ministry — wide](shots/wide-33-a-lobby-screen-is-not-the-whole-ministry.png)
+
+<img src="shots/tall-33-a-lobby-screen-is-not-the-whole-ministry.png" width="320" alt="A lobby screen is not the whole ministry — tall">
+
+### 34. And the way back out, on the button already there
+
+*A child from another programme*
+
+Narrowing a search is only safe if the way out is on the screen before it is needed. This is the same button a family registered while they queued would press, and it means the same thing to both of them — look harder for me. It widens to all of Tally on the press and re-reads the church behind that, and it says nothing about scope: a parent has no model of which children this screen is willing to find, and explaining one in order to ask them to press a button would be the wrong trade. Every other way this can fail widens too — a gathering with no history behind it searches everything, and so does a kiosk that cannot read the list at all.
+
+![And the way back out, on the button already there — wide](shots/wide-34-and-the-way-back-out-on-the-button-already-there.png)
+
+<img src="shots/tall-34-and-the-way-back-out-on-the-button-already-there.png" width="320" alt="And the way back out, on the button already there — tall">
+
+## Act 7 — The review
+
+### 35. The door records; a person decides
 
 *Core team, on a weekday*
 
 Everything the last three acts created is here, and *none* of it has reached Planning Center. Every registered child is written held, and that hold is the only thing gating the push — both backends, both sweeps, the on-create trigger, the re-create repair. The reason is that nothing upstream is reversible: there is no delete anywhere in this codebase, and the second backend has no merges at all. A public screen with a queue behind it should not be settling identity.
 
-![The door records; a person decides — wide](shots/wide-33-the-door-records-a-person-decides.png)
+![The door records; a person decides — wide](shots/wide-35-the-door-records-a-person-decides.png)
 
-<img src="shots/tall-33-the-door-records-a-person-decides.png" width="320" alt="The door records; a person decides — tall">
+<img src="shots/tall-35-the-door-records-a-person-decides.png" width="320" alt="The door records; a person decides — tall">
 
-### 34. The form as the family typed it
+### 36. The form as the family typed it
 
 *Core team, on a weekday*
 
 The children with their grades, the guardian, and the four digits — and the phone number, which is the one place in Tally a parent's number lives. It waits on a functions-only document with a thirty-day sweep, deleted the moment a reviewer decides, because deferring the push would otherwise lose the guardian entirely: the security rules forbid a parent's name or number on a student document, deliberately, and there is nowhere else for it to go.
 
-![The form as the family typed it — wide](shots/wide-34-the-form-as-the-family-typed-it.png)
+![The form as the family typed it — wide](shots/wide-36-the-form-as-the-family-typed-it.png)
 
-<img src="shots/tall-34-the-form-as-the-family-typed-it.png" width="320" alt="The form as the family typed it — tall">
+<img src="shots/tall-36-the-form-as-the-family-typed-it.png" width="320" alt="The form as the family typed it — tall">
 
-### 35. This might be the Jacob Smith we already have
+### 37. This might be the Jacob Smith we already have
 
 *Core team, on a weekday*
 
 The door recorded the suspicion and did nothing about it, which is the change. It used to refuse the registration and tell the family to "search for their name instead" — an instruction to check in a different child of the same name, on an unattended screen. Two rows a reviewer merges on Tuesday is the cheaper mistake, and the only one anybody notices. The grade beside each candidate is what actually tells two children apart.
 
-![This might be the Jacob Smith we already have — wide](shots/wide-35-this-might-be-the-jacob-smith-we-already-have.png)
+![This might be the Jacob Smith we already have — wide](shots/wide-37-this-might-be-the-jacob-smith-we-already-have.png)
 
-<img src="shots/tall-35-this-might-be-the-jacob-smith-we-already-have.png" width="320" alt="This might be the Jacob Smith we already have — tall">
+<img src="shots/tall-37-this-might-be-the-jacob-smith-we-already-have.png" width="320" alt="This might be the Jacob Smith we already have — tall">
 
-### 36. Approval is a replay, in the right order
+### 38. Approval is a replay, in the right order
 
 *Core team, on a weekday*
 
 Every child first, then **one** call to build the family — approving child by child would mint one household per sibling, the exact failure the family write exists to avoid. The hold comes off before the push rather than after it, which looks like the risky order and is the safe one: a push that fails after approval leaves an ordinary queued student that the Settings sweep already understands.
 
-![Approval is a replay, in the right order — wide](shots/wide-36-approval-is-a-replay-in-the-right-order.png)
+![Approval is a replay, in the right order — wide](shots/wide-38-approval-is-a-replay-in-the-right-order.png)
 
-<img src="shots/tall-36-approval-is-a-replay-in-the-right-order.png" width="320" alt="Approval is a replay, in the right order — tall">
+<img src="shots/tall-38-approval-is-a-replay-in-the-right-order.png" width="320" alt="Approval is a replay, in the right order — tall">
 
-### 37. And the other answer
+### 39. And the other answer
 
 *Core team, on a weekday*
 
 Discarding takes the children off the roster and forgets the phone number — the sentence comes before the second press, because that half is not reversible. The students go inactive rather than away: every attendance record points at these documents, and deleting one would silently drop a head count somebody has already reported to a room full of parents.
 
-![And the other answer — wide](shots/wide-37-and-the-other-answer.png)
+![And the other answer — wide](shots/wide-39-and-the-other-answer.png)
 
-<img src="shots/tall-37-and-the-other-answer.png" width="320" alt="And the other answer — tall">
+<img src="shots/tall-39-and-the-other-answer.png" width="320" alt="And the other answer — tall">
 
-## Act 7 — The rest of the week
+## Act 8 — The rest of the week
 
-### 38. The same job, without a kiosk
+### 40. The same job, without a kiosk
 
 *A counselor at a door*
 
 Check-in is the home screen, because a counselor at a door should never have to navigate to start working. It opens on the regulars rather than the whole ministry — a student who comes every Friday is one tap away, and the rest of the roster is one tap behind that. This is the screen most people who install Tally will only ever see.
 
-![The same job, without a kiosk — wide](shots/wide-38-the-same-job-without-a-kiosk.png)
+![The same job, without a kiosk — wide](shots/wide-40-the-same-job-without-a-kiosk.png)
 
-<img src="shots/tall-38-the-same-job-without-a-kiosk.png" width="320" alt="The same job, without a kiosk — tall">
+<img src="shots/tall-40-the-same-job-without-a-kiosk.png" width="320" alt="The same job, without a kiosk — tall">
 
-### 39. One student, and the history under them
+### 41. One student, and the history under them
 
 *Core team*
 
 Names, grades and allergies are read live from the church's own database rather than mirrored here — Tally stores the membership and the attendance, and nothing about who somebody is. "Every night they came" underneath reaches back as far as the records go, further than the calendar the screens above keep loaded, and it unions the history of any duplicate row merged into this one.
 
-![One student, and the history under them — wide](shots/wide-39-one-student-and-the-history-under-them.png)
+![One student, and the history under them — wide](shots/wide-41-one-student-and-the-history-under-them.png)
 
-<img src="shots/tall-39-one-student-and-the-history-under-them.png" width="320" alt="One student, and the history under them — tall">
+<img src="shots/tall-41-one-student-and-the-history-under-them.png" width="320" alt="One student, and the history under them — tall">
 
-### 40. A call list, not a report
+### 42. A call list, not a report
 
 *Core team*
 
 Students who have missed three gatherings in a row, first-timers from the last week, profiles nobody can be reached about. Split by gathering, for the same reason prediction is: a student who comes every Sunday and has never been to a Friday has missed nothing, and the pooled version phoned their family about it.
 
-![A call list, not a report — wide](shots/wide-40-a-call-list-not-a-report.png)
+![A call list, not a report — wide](shots/wide-42-a-call-list-not-a-report.png)
 
-<img src="shots/tall-40-a-call-list-not-a-report.png" width="320" alt="A call list, not a report — tall">
+<img src="shots/tall-42-a-call-list-not-a-report.png" width="320" alt="A call list, not a report — tall">
 
-### 41. Where the church's database is connected
+### 43. Where the church's database is connected
 
 *Core team*
 
 Two backends, either or both, with what is queued and what is *waiting to be reviewed* counted separately — a family held for a person is not a stuck push, and saying "3 queued" about them would teach somebody to ignore the line that means it. The link from here is how most reviewers will find the screen in Act 5.
 
-![Where the church's database is connected — wide](shots/wide-41-where-the-church-s-database-is-connected.png)
+![Where the church's database is connected — wide](shots/wide-43-where-the-church-s-database-is-connected.png)
 
-<img src="shots/tall-41-where-the-church-s-database-is-connected.png" width="320" alt="Where the church's database is connected — tall">
+<img src="shots/tall-43-where-the-church-s-database-is-connected.png" width="320" alt="Where the church's database is connected — tall">
 
-### 42. How the lobby screen gets its identity
+### 44. How the lobby screen gets its identity
 
 *Any active member*
 
 The kiosk shows a six-character code and polls; whoever types it here hands the kiosk a session bound to their own account, and every check-in it records from then on carries their name. Open to any active member, not just the core team — the person setting up the lobby screen on a Friday evening is a counselor.
 
-![How the lobby screen gets its identity — wide](shots/wide-42-how-the-lobby-screen-gets-its-identity.png)
+![How the lobby screen gets its identity — wide](shots/wide-44-how-the-lobby-screen-gets-its-identity.png)
 
-<img src="shots/tall-42-how-the-lobby-screen-gets-its-identity.png" width="320" alt="How the lobby screen gets its identity — tall">
+<img src="shots/tall-44-how-the-lobby-screen-gets-its-identity.png" width="320" alt="How the lobby screen gets its identity — tall">

@@ -9,15 +9,16 @@
  * checked in against real gatherings, and are approved by a real core-team
  * session.
  *
- * Seven acts, in the order a Sunday actually happens:
+ * Eight acts, in the order a Sunday actually happens:
  *
  *   1. **At the door** — a family the church already has, and a pickup.
  *   2. **Nobody has met us** — the wizard on the kiosk itself.
  *   3. **On their own phone** — the same thing through the QR.
  *   4. **The second child** — a family gaining a sibling.
  *   5. **Going home** — a family that arrived in two waves, leaving in one.
- *   6. **The review** — where the door's recordings become decisions.
- *   7. **The rest of the week** — the core team's own screens.
+ *   6. **Who the door will find** — the search's scope, and its way out.
+ *   7. **The review** — where the door's recordings become decisions.
+ *   8. **The rest of the week** — the core team's own screens.
  *
  * Everything runs twice, on a wide device and a tall one, because none of these
  * screens gets to choose its shape: a kiosk is however the shelf it sits on
@@ -133,15 +134,23 @@ const CAST: Record<
   }
 > = {
   wide: {
-    // Act 1's family, seeded. A different one per pass, because the two passes
-    // share one emulator: the second would otherwise walk up to the child the
-    // first checked in *and collected*, whose row correctly offers neither.
-    door: 'Bree Sandoval',
-    doorFirst: 'Bree',
-    doorLast: 'Sandoval',
-    // The one household in the seed — three children on one number. Act 1 is
-    // theirs, because a family arriving together is the commonest thing that
-    // happens at a lobby kiosk and the thing the confirm screen is built for.
+    /*
+     * Act 1's family, seeded. A different one per pass, because the two passes
+     * share one emulator: the second would otherwise walk up to the child the
+     * first checked in *and collected*, whose row correctly offers neither.
+     *
+     * Both of them are regulars of the gathering the kiosk binds to, which is
+     * now a requirement rather than a coincidence — the search is scoped to the
+     * children who have been to it. The child the scope excludes has a frame of
+     * her own in Act 2.
+     */
+    door: 'Grace Kim',
+    doorFirst: 'Grace',
+    doorLast: 'Kim',
+    // A seeded household — three children on one number, two of whom this
+    // gathering expects. Act 1 is theirs, because a family arriving together is
+    // the commonest thing that happens at a lobby kiosk and the thing the
+    // confirm screen is built for.
     familyDigits: '0347',
     familyChild: 'Amara Osei',
     /*
@@ -274,7 +283,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
         who: 'Three children, one number',
         title: 'Anyone else? Asked once, answered in a list',
         caption:
-          'The other children on the number arrive ticked, because a family walks in together and an unticked list would be a second job rather than a saved trip. What keeps that honest is that every name is on the glass above the thumb that is about to press, and each one unticks with a tap — the kiosk\'s guess at a family can be wrong, and a parent looking at a stranger\'s child in their own list cannot miss it. The button counts what it will do, which is the only place on the screen that says how many.',
+          'Every child on the number is offered; the ones this gathering actually expects arrive ticked. That distinction is the whole of the screen. A household is a guess made from four phone digits, and it is frequently right about the family and wrong about tonight — the third child here has not been in months, and ticking her would have written a child who is not in the building onto a register nobody can reconcile. So the prediction decides the tick and the guess decides the list: she is still there, at full weight, one tap from being included. The button counts what it will actually do, which is the only place on the screen that says how many.',
       });
 
       await kiosk.getByRole('button', { name: /Check in all/i }).click();
@@ -282,9 +291,9 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       await shoot(kiosk, 'kiosk', {
         act: 'At the door',
         who: 'Three children, one number',
-        title: 'One tap, three children, three stickers',
+        title: 'One tap, two children, two stickers',
         caption:
-          'One press of one button, one arrival written on the register, and a label rasterising for each of them in a worker that started when the confirm screen came up. The three share an arrival id, which is what lets the pickup screen later offer exactly these three back — see Act 5.',
+          'One press of one button, one arrival written on the register, and a label rasterising for each of them in a worker that started when the confirm screen came up. They share an arrival id, which is what lets the pickup screen later offer exactly this group back — see Act 5. The sibling nobody ticked is not on the register and has no sticker coming, and no volunteer has to go looking for a child who was never dropped off.',
       });
       await backToSearch(kiosk);
 
@@ -554,7 +563,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
         who: 'A family the church already has, growing',
         title: 'The other door, in the same slot',
         caption:
-          'A parent looking at one name who knows there should be two. "Anyone else?" is asked on every check-in, and the answer is a list: the siblings the kiosk guessed, ticked, ending with the way to add the one it missed. Five rounds of critique went into that being one slot rather than two — it used to be a ticked list *above* the button when the guess worked and a line of grey text *below* it when it did not, which reserved the quietest thing on the glass for the only parent who needed it. The guess is deliberately conservative and so it misses people: a child on a different number, a household split in two, somebody added by hand last week.',
+          'A parent looking at one name who knows there should be two. "Anyone else?" is asked on every check-in, and the answer is a list: the siblings the kiosk guessed, ending with the way to add the one it missed. Five rounds of critique went into that being one slot rather than two — it used to be a ticked list *above* the button when the guess worked and a line of grey text *below* it when it did not, which reserved the quietest thing on the glass for the only parent who needed it. The guess is deliberately conservative and so it misses people: a child on a different number, a household split in two, somebody added by hand last week.',
       });
 
       await kiosk.getByRole('button', { name: /Another child/i }).click();
@@ -579,7 +588,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
         who: 'A family the church already has, growing',
         title: 'Searching the roster, not a form',
         caption:
-          'A name search over the whole roster rather than the four digits that just failed — so a child the digits could never have found is reachable anyway. Anybody already on the confirm screen behind this one, or already checked in, is drawn inert rather than hidden: a parent looking for a name needs to see it and see that it is done. The offer to register somebody genuinely new waits underneath rather than being the destination.',
+          'A name search over the whole roster rather than the four digits that just failed — so a child the digits could never have found is reachable anyway. Unscoped, too, unlike the front door two acts ago: the population this screen exists for is precisely the one a scope gets wrong, the daughter who comes on Fridays and the son who is new to it. A parent only reaches here by having already found their family. Anybody already on the confirm screen behind this one, or already checked in, is drawn inert rather than hidden: a parent looking for a name needs to see it and see that it is done. The offer to register somebody genuinely new waits underneath rather than being the destination.',
       });
       await kiosk.getByRole('button', { name: new RegExp(cast.guestChild, 'i') }).first().click();
       await shoot(kiosk, 'kiosk', {
@@ -682,7 +691,42 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       await backToSearch(kiosk);
 
       /* ================================================================== */
-      /* Act 6 — The review                                                  */
+      /* Act 6 — Who the door will find                                      */
+      /* ================================================================== */
+
+      /*
+       * Last of the kiosk acts, because pressing "I already registered" sweeps
+       * the whole church at both backends and replaces the roster this screen
+       * is holding. Nothing after it depends on that roster.
+       *
+       * Bree was met on the lock-in bus and has been to nothing since (the
+       * `oneOffGuest` band in scripts/seed.ts), so she is exactly who the scope
+       * is for and exactly who its escape hatch is for.
+       */
+      await typeOnKiosk(kiosk, 'Bree');
+      await shoot(kiosk, 'kiosk', {
+        act: 'Who the door will find',
+        who: 'A child from another programme',
+        title: 'A lobby screen is not the whole ministry',
+        caption:
+          'Bree is on the roster and is not found here, because she has never been to this gathering. The search is scoped to the children who have — the same year the check-in screen uses to decide who belongs to a room — rather than to every active student in the church. That is not tidiness: four digits are a small keyspace, and a search over the whole ministry can hand a parent a real child, correctly spelled, who is not theirs and is not even in the building. The scope is derived from attendance and rebuilt nightly, so it switches itself on once a gathering has been run and there is nothing to configure.',
+      });
+
+      await kiosk.getByRole('button', { name: /I already registered/i }).click();
+      await expect(
+        kiosk.getByRole('button', { name: /Bree Sandoval/i }).first(),
+      ).toBeVisible({ timeout: 30_000 });
+      await shoot(kiosk, 'kiosk', {
+        act: 'Who the door will find',
+        who: 'A child from another programme',
+        title: 'And the way back out, on the button already there',
+        caption:
+          'Narrowing a search is only safe if the way out is on the screen before it is needed. This is the same button a family registered while they queued would press, and it means the same thing to both of them — look harder for me. It widens to all of Tally on the press and re-reads the church behind that, and it says nothing about scope: a parent has no model of which children this screen is willing to find, and explaining one in order to ask them to press a button would be the wrong trade. Every other way this can fail widens too — a gathering with no history behind it searches everything, and so does a kiosk that cannot read the list at all.',
+      });
+      await kiosk.locator('[data-key="clear"]').click();
+
+      /* ================================================================== */
+      /* Act 7 — The review                                                  */
       /* ================================================================== */
 
       await page.setViewportSize(VIEWPORTS[shape].app);
@@ -761,7 +805,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       await page.getByRole('button', { name: /Cancel/i }).first().click();
 
       /* ================================================================== */
-      /* Act 7 — The rest of the week                                        */
+      /* Act 8 — The rest of the week                                        */
       /* ================================================================== */
 
       await gotoReady(page, '/');

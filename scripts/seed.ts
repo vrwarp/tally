@@ -265,6 +265,21 @@ interface SeedStudent {
    * a seeded world at all. One household is enough to exercise it.
    */
   household?: string;
+  /**
+   * Overrides the random Sunday multiplier, so a student's two chains read the
+   * same way.
+   *
+   * Every other student gets `0.35 + rng() * 0.65`, which is what makes the
+   * Friday and Sunday regulars genuinely different lists — the thing the
+   * predictive roster exists to keep separate. The two households opt out
+   * because the *kiosk's* demo depends on their exact shape: two children the
+   * gathering expects and one it does not, whichever gathering the lobby screen
+   * happens to be bound to. Left to the multiplier, a child who is a Friday
+   * regular by band drifts out of the Sunday prediction on a shuffled RNG
+   * stream, and the confirm screen photographs something other than what the
+   * caption beside it says.
+   */
+  sundayBias?: number;
 }
 
 const SEED_STUDENTS: readonly SeedStudent[] = [
@@ -279,10 +294,10 @@ const SEED_STUDENTS: readonly SeedStudent[] = [
   { first: 'Caleb', last: 'Okafor', grade: 9, band: 'core', parent: 'Chidi Okafor', contact: 'phone' },
   { first: 'Hannah', last: 'Schmidt', grade: 7, band: 'core', parent: 'Ingrid Schmidt', contact: 'both' },
   { first: 'Diego', last: 'Herrera', grade: 10, band: 'core', parent: 'Rosa Herrera', contact: 'phone' },
-  { first: 'Amara', last: 'Osei', grade: 8, band: 'core', parent: 'Kwabena Osei', contact: 'both', household: 'osei' },
+  { first: 'Amara', last: 'Osei', grade: 8, band: 'core', parent: 'Kwabena Osei', contact: 'both', household: 'osei', sundayBias: 1 },
   // Amara's brother and sister. Three children, one number — the family the
   // kiosk's whole confirm screen is built around, and the only one here.
-  { first: 'Kofi', last: 'Osei', grade: 6, band: 'core', parent: 'Kwabena Osei', contact: 'phone', household: 'osei' },
+  { first: 'Kofi', last: 'Osei', grade: 6, band: 'core', parent: 'Kwabena Osei', contact: 'phone', household: 'osei', sundayBias: 1 },
   /*
    * The eldest, and deliberately not a regular any more.
    *
@@ -292,7 +307,7 @@ const SEED_STUDENTS: readonly SeedStudent[] = [
    * three regulars, so the confirm screen's whole distinction — offered, and
    * offered-and-expected — could not appear in a seeded world at all.
    */
-  { first: 'Efua', last: 'Osei', grade: 11, band: 'edge', parent: 'Kwabena Osei', contact: 'phone', household: 'osei' },
+  { first: 'Efua', last: 'Osei', grade: 11, band: 'edge', parent: 'Kwabena Osei', contact: 'phone', household: 'osei', sundayBias: 1 },
 
   /* ---- Steady: most weeks ------------------------------------------------ */
   { first: 'Noah', last: 'Fitzgerald', grade: 6, band: 'steady', parent: 'Erin Fitzgerald', contact: 'phone', allergies: 'Severe tree nut allergy' },
@@ -301,14 +316,14 @@ const SEED_STUDENTS: readonly SeedStudent[] = [
   { first: 'Camila', last: 'Torres', grade: 9, band: 'steady', parent: 'Luis Torres', contact: 'both' },
   { first: 'Tyler', last: 'McAllister', grade: 8, band: 'steady', parent: 'Beth McAllister', contact: 'phone' },
   { first: 'Aisha', last: 'Rahman', grade: 7, band: 'steady', parent: 'Farid Rahman', contact: 'email' },
-  { first: 'Marcus', last: 'Delgado', grade: 10, band: 'steady', parent: 'Elena Delgado', contact: 'phone', household: 'delgado' },
+  { first: 'Marcus', last: 'Delgado', grade: 10, band: 'steady', parent: 'Elena Delgado', contact: 'phone', household: 'delgado', sundayBias: 1 },
   // The second household, and there are two for a reason beyond variety: the
   // walkthrough runs twice against one emulator, and a family the first pass
   // has already checked in offers the second pass a pickup instead.
   // The youngest, and the same shape as Efua above for the same reason: one
   // child per household who is offered but not expected.
-  { first: 'Lucia', last: 'Delgado', grade: 6, band: 'edge', parent: 'Elena Delgado', contact: 'phone', household: 'delgado' },
-  { first: 'Rafael', last: 'Delgado', grade: 9, band: 'core', parent: 'Elena Delgado', contact: 'phone', household: 'delgado' },
+  { first: 'Lucia', last: 'Delgado', grade: 6, band: 'edge', parent: 'Elena Delgado', contact: 'phone', household: 'delgado', sundayBias: 1 },
+  { first: 'Rafael', last: 'Delgado', grade: 9, band: 'core', parent: 'Elena Delgado', contact: 'phone', household: 'delgado', sundayBias: 1 },
   { first: 'Zoe', last: 'Lindqvist', grade: 6, band: 'steady', parent: 'Anders Lindqvist', contact: 'both' },
   { first: 'Andre', last: 'Beaulieu', grade: 11, band: 'steady', parent: 'Marie Beaulieu', contact: 'phone' },
   { first: 'Naomi', last: 'Tanaka', grade: 12, band: 'steady', parent: 'Kenji Tanaka', contact: 'both', allergies: 'Shellfish' },
@@ -821,7 +836,7 @@ function buildStudents(now: Date, rng: () => number): BuiltStudent[] {
       id: pcoPersonId ? pcoStudentId(pcoPersonId) : `student-${slug(`${seed.first}-${seed.last}`)}`,
       seed,
       propensity: BASE_PROPENSITY[seed.band],
-      sundayBias: 0.35 + rng() * 0.65,
+      sundayBias: seed.sundayBias ?? 0.35 + rng() * 0.65,
       // Quick-add createdAt is filled in once we know which gathering they
       // walked into; until then the school-year date is a placeholder.
       createdAt: yearStart,
