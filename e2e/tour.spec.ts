@@ -114,7 +114,7 @@ function slugOf(title: string): string {
  * ASCII letters only, and both halves of that matter. The kiosk keyboard has a
  * digit row but a name field refuses digits, so a numbered surname is typed and
  * silently dropped. And it has no accented keys at all — a surname with an ö in
- * it cannot be typed on the lobby glass, so the sibling wizard waits forever
+ * it cannot be typed on the lobby glass, so the add-a-child wizard waits forever
  * for a key that is not there. A parent who needs one gets it through the phone
  * form, which uses the device's own keyboard.
  */
@@ -274,7 +274,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
         who: 'Three children, one number',
         title: 'Anyone else? Asked once, answered in a list',
         caption:
-          'The brothers and sisters arrive ticked, because a family walks in together and an unticked list would be a second job rather than a saved trip. What keeps that honest is that every name is on the glass above the thumb that is about to press, and each one unticks with a tap — the kiosk\'s guess at a family can be wrong, and a parent looking at a stranger\'s child in their own list cannot miss it. The button counts what it will do, which is the only place on the screen that says how many.',
+          'The other children on the number arrive ticked, because a family walks in together and an unticked list would be a second job rather than a saved trip. What keeps that honest is that every name is on the glass above the thumb that is about to press, and each one unticks with a tap — the kiosk\'s guess at a family can be wrong, and a parent looking at a stranger\'s child in their own list cannot miss it. The button counts what it will do, which is the only place on the screen that says how many.',
       });
 
       await kiosk.getByRole('button', { name: /Check in all/i }).click();
@@ -563,7 +563,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
         who: 'A family the church already has, growing',
         title: 'Both readings of the same question',
         caption:
-          'This used to be a link straight to the registration form, which read as one thing and did another: "add a brother or sister" is plainly an instruction to include another of my children in this check-in, and it answered by asking a new child\'s name and grade. Both readings are real, so the screen holds both — the search finds the sibling the kiosk simply failed to associate, and the standing offer underneath registers the one who genuinely is not on the roster.',
+          'This used to be a link straight to the registration form, which read as one thing and did another: "add a brother or sister" is plainly an instruction to include another of my children in this check-in, and it answered by asking a new child\'s name and grade. Both readings are real, so the screen holds both — the search finds the child the kiosk simply failed to associate, and the standing offer underneath registers the one who genuinely is not on the roster. Nothing here names a relationship: kinship is what the four digits *guess*, and this screen exists for everyone that guess is wrong about, so the box asks for a child\'s name and nothing more.',
       });
 
       /*

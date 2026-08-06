@@ -487,7 +487,13 @@ function titleFor(state: RegistrationState, childNumber: number): string {
     case 'child-last':
     case 'child-grade':
       return state.mode === 'sibling' && childNumber === 1
-        ? 'Their brother or sister'
+        ? // Not "their brother or sister". The kiosk infers kinship from four
+          // phone digits, and this wizard is reached from the screen that
+          // exists for everyone that inference is wrong about — a cousin, a
+          // neighbour's boy, a child on a different number. The same words as
+          // the button that started this, which is the only relationship the
+          // kiosk can actually vouch for: they are arriving together.
+          'Another child'
         : childNumber === 1
           ? 'Your child'
           : `Child ${childNumber}`;

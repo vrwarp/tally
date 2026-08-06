@@ -124,15 +124,21 @@ wait on a functions-only document with a thirty-day TTL until then — the one p
 number lives, and [documented as the exception it is](docs/data-model.md#kioskregistrationsregistrationid).
 
 **Journey 2½ — the second child.** A parent whose next child is finally old enough finds their family
-by phone as usual, taps a name, and gets **"Find a brother or sister"** on the confirm screen. That
-link asks the ambiguous question first, because it has two honest answers: the sibling is often
-already on the roster and simply did not come up under four digits, and searching is a cheaper, safer
-answer than registering a second copy of a child the church already has. So it opens a name search
-over the roster — the family's own rows shown but inert — with **"Not on the list? Add a new child"**
-standing under it. Only that second answer starts a registration, and it asks two questions rather
-than six: the kiosk already knows which family this is, and the household upstream already holds
-their parent. The siblings it names go with the registration, the server re-verifies them, and
-approval joins **their** household rather than founding a second one for the same family.
+by phone as usual, taps a name, and finds **"Anyone else?"** already asked on the confirm screen —
+the children the kiosk guessed, ticked, ending in **"+ Another child"**. That row asks the ambiguous
+question first, because it has two honest answers: the child is often already on the roster and
+simply did not come up under four digits, and searching is a cheaper, safer answer than registering
+a second copy of somebody the church already has. So it opens a name search over the roster — rows
+already on the confirm shown but inert — with **"Not on the list? Add a new child"** standing under
+it. Only that second answer starts a registration, and it asks two questions rather than six: the
+kiosk already knows which family this is, and the household upstream already holds their parent.
+
+Nothing on that path names a relationship, deliberately. Kinship is what `familyOf` *guesses*, from
+four phone digits, and this is the escape hatch for everyone the guess is wrong about — a cousin, a
+neighbour's boy who came in the same car, a child whose number on file is a different one. A parent
+checking in a nephew should not have to decide whether a box labelled "brother or sister" is asking
+about somebody else. The anchors go with the registration, the server re-verifies them, and approval
+joins **their** household rather than founding a second one.
 
 And a kiosk cannot write any of it directly: the security rules pin what a lobby session may put on a
 student document to the eight keys a check-in's date patch touches, which is why registration is a

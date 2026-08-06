@@ -465,8 +465,8 @@ bargain that lets this document exist in a database whose posture is
 any student. Readable by any active member — the kiosk session is one.
 
 **Read backwards, it is also the kiosk's family.** Inverting the map gives each student the set of
-digits their family answers to, which is what lets the confirm screen offer to check a child's
-brothers and sisters in — or collect them — in the same tap
+digits their family answers to, which is what lets the confirm screen offer to check the other
+children on that number in — or collect them — in the same tap
 ([`src/kiosk/family.ts`](../src/kiosk/family.ts)). Two students count as family only when one's set
 of digits contains the other's, never on a bare overlap: because each collector aggregates over
 household or family-folk co-membership, real siblings always land on the same set (or a superset,

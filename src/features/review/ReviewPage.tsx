@@ -246,13 +246,17 @@ function RegistrationCard({
         ) : row.anchors.length > 0 ? (
           /*
             No guardian, and nothing wrong with that: this is a parent adding a
-            sibling to a family the church already has. Their adult is on file
+            child to a family the church already has. Their adult is on file
             upstream already, which is why the wizard did not ask again — and
             saying "this registration did not finish" here, as an earlier
             version did, accuses a working flow of being broken.
           */
           <p className="text-sm text-ink-400">
-            A brother or sister added to a family the church already has:{' '}
+            {/* Not "a brother or sister": what the kiosk verified is that these
+                children arrived with those roster members, and it inferred the
+                family from four phone digits. A reviewer deciding on a Tuesday
+                should be told what was established, not what was guessed. */}
+            Another child, added alongside somebody the church already has:{' '}
             {row.anchors.map((anchor) => summaryLabel(anchor)).join(', ')}. Approving joins that
             household rather than making a second one, and asks for no new adult.
           </p>

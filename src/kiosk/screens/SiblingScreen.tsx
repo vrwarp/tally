@@ -1,5 +1,5 @@
 /**
- * "Who else is with you?" — finding a brother or sister, or adding one.
+ * "Who else is with you?" — finding another child, or adding one.
  *
  * ## Why this exists as a screen rather than a link
  *
@@ -11,12 +11,18 @@
  * a form asking a new child's name and grade answers a question they did not
  * ask.
  *
- * Both readings are legitimate, so this screen holds both. The sibling the
- * kiosk simply failed to associate — different phone number on file, a family
- * split across two households, a child added last week by hand — is found by
- * name and checked in with the first. The sibling who genuinely is not on the
- * roster gets the two-question wizard, from the same place, as the second
- * offer rather than the only one.
+ * Both readings are legitimate, so this screen holds both. The child the kiosk
+ * simply failed to associate — a different phone number on file, a family split
+ * across two households, somebody added last week by hand — is found by name
+ * and checked in with the first. The child who genuinely is not on the roster
+ * gets the two-question wizard, from the same place, as the second offer rather
+ * than the only one.
+ *
+ * Nothing on this screen names a relationship, and that is deliberate. Kinship
+ * is the *guess* — `family.ts` infers it from four phone digits — and this is
+ * the screen for everyone the guess is wrong about. A parent checking in a
+ * nephew should not have to decide whether a box labelled "brother or sister"
+ * is asking about somebody else.
  *
  * The kiosk already offers the siblings it *can* see, ticked, on the confirm
  * screen itself (see family.ts for how much of a guess that is, and why it is
@@ -102,6 +108,15 @@ export function SiblingScreen({
         <div className="text-sm text-ink-500">Type their first or last name.</div>
       </div>
 
+      {/*
+        "Child's name", not "brother or sister's". The relationship is the
+        kiosk's guess, and this screen exists for everyone that guess gets wrong
+        — a cousin, a neighbour's boy who came in the same car, a child on a
+        different number. Naming a relationship the parent may not have would
+        make them hesitate over a box that does not care: it searches the roster
+        by name and nothing else. The button that opens this screen dropped its
+        noun for the same reason.
+      */}
       <div className="px-6 pb-2">
         <div className="mx-auto flex h-16 max-w-2xl items-center justify-center rounded-xl bg-ink-900 px-4">
           {buffer ? (
@@ -109,7 +124,7 @@ export function SiblingScreen({
               {buffer}
             </span>
           ) : (
-            <span className="text-xl text-ink-500">Brother or sister&rsquo;s name</span>
+            <span className="text-xl text-ink-500">Child&rsquo;s name</span>
           )}
         </div>
       </div>
@@ -127,7 +142,7 @@ export function SiblingScreen({
           )}
           {results.slice(0, MAX_RESULTS).map((found) => {
             /*
-             * A sibling already checked in is shown and inert, not hidden.
+             * A child already checked in is shown and inert, not hidden.
              * "Where is Ada?" is a question this screen has to answer, and an
              * absent row answers it with "we have never heard of her".
              */
