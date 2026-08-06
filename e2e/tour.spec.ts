@@ -1020,6 +1020,20 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
         if (sadCode.length === 6) {
           await sadPhone.goto(`/welcome?c=${sadCode}`);
           await sadPhone.getByLabel(/^First name/i).waitFor({ timeout: 60_000 });
+          /*
+           * Every field filled but the number, and the number filled wrongly.
+           *
+           * Submitting the form *empty* photographs nothing: the fields carry
+           * `required`, so the browser blocks the submit with its own bubble
+           * and the app's validation never runs. The number is the only field
+           * with a rule beyond "not empty" anyway, which makes this the frame
+           * that was worth having.
+           */
+          await sadPhone.getByLabel(/^First name/i).fill('Tomas');
+          await sadPhone.getByLabel(/^Last name/i).fill('Halloran');
+          await sadPhone.getByLabel(/^Your first name/i).fill('Beata');
+          await sadPhone.getByLabel(/^Your last name/i).fill('Halloran');
+          await sadPhone.getByLabel(/^Your phone number/i).fill('5550');
           await sadPhone.getByRole('button', { name: /^Register$/i }).click();
           await expect(sadPhone.getByText(/Enter a 10-digit number/i)).toBeVisible({
             timeout: 15_000,
@@ -1027,9 +1041,9 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
           await shoot(sadPhone, 'phone', {
             act: "When it doesn't go that way",
             who: 'A parent going too fast',
-            title: 'Every empty field at once, and none of them lost',
+            title: 'The one field with a rule beyond “not empty”',
             caption:
-              'Checked in the browser and marked on each field rather than announced as one sentence at the top, because a parent scrolling a form needs to know *which* box, not that something somewhere is wrong. Nothing typed is cleared and nothing is sent: the registration id was minted when this page opened and is reused when they press again, so a double press — or a submit that succeeds on a connection that then drops — cannot become two families. The phone number is the only field with a rule beyond "not empty", because it is the only one the kiosk will later have to match on.',
+              'Half a phone number is caught in the browser and marked *on the field*, because a parent scrolling a form needs to know which box rather than that something somewhere is wrong. This is the only field checked for shape, and it earns that: it is the one the kiosk will have to match on for the rest of this family\'s time at the church, and the last four digits of a wrong number are a login nobody can use. Nothing typed is cleared and nothing was sent — the registration id was minted when this page opened and is reused on the next press, so pressing twice cannot become two families.',
           });
         }
       } finally {
@@ -1112,6 +1126,13 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
         createdBy: 'seed',
       });
 
+      /*
+       * The way back to the chooser is a staff gate: an invisible hold target
+       * in the corner, so a parent cannot rebind the lobby screen by leaning
+       * on it. `bindTo` assumes the chooser is already up — every other caller
+       * reaches it straight from pairing — so the gate is opened first.
+       */
+      await hold(kiosk, '[aria-label="Change event (staff)"]', { invisible: true });
       await bindTo(kiosk, /doors closed/i);
       await expect(kiosk.getByText(/Check-in window has closed/i)).toBeVisible({ timeout: 60_000 });
       await shoot(kiosk, 'kiosk', {
