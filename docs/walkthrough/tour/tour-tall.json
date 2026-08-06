@@ -403,5 +403,77 @@
     "file": "tall-45-how-the-lobby-screen-gets-its-identity.png",
     "shape": "tall",
     "device": "app"
+  },
+  {
+    "act": "When it doesn't go that way",
+    "who": "A parent halfway through their number",
+    "title": "Half a number is not a failed search",
+    "caption": "Two digits match nobody, and saying \"no match\" here would be a lie about an unfinished question — the commonest way a search screen makes somebody think they are not in the system. So a partial number gets its own sentence and none of the doors: no register offer, no way out of the scope, nothing to decide. It also gates the machinery behind the screen. A finished search that finds nobody is what triggers the silent church-wide re-read, and a half-typed number must never spend that.",
+    "file": "tall-46-half-a-number-is-not-a-failed-search.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "When it doesn't go that way",
+    "who": "A family the kiosk cannot look up",
+    "title": "The wifi went, and the screen says so once",
+    "caption": "The kiosk swept for this family by itself, and the sweep could not reach anything — so it says so, in one line, under the doors that still work. What it does *not* do is block: the register button is live, the roster held on the device still answers every other family in the queue, and check-ins recorded while this is on screen queue up and replay when the network returns. A lobby screen that stops working when the wifi does is a lobby screen that stops working, and a church hall is exactly where that happens.",
+    "file": "tall-47-the-wifi-went-and-the-screen-says-so-once.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "When it doesn't go that way",
+    "who": "A family who really are new",
+    "title": "One word, and the whole sweep behind it",
+    "caption": "The only visible trace of the church-wide re-read that used to hide behind a button. The search finished, found nobody in the roster this device holds, and the kiosk went and asked both backends without being told to — and came back with nothing, so the headline gains one word. **Still.** That is deliberately the entire report: a parent standing at a screen needs to know what to do next, not what the device has been doing. The doors underneath are unchanged, because the answer for this family has not changed either.",
+    "file": "tall-48-one-word-and-the-whole-sweep-behind-it.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "When it doesn't go that way",
+    "who": "A family with a phone and no code to scan",
+    "title": "No QR, and the other door is right there",
+    "caption": "The code is minted by a callable, and a callable can fail. What the screen must not do is leave a family standing in front of an empty white square wondering whether to wait — so the failure names the alternative in the same breath, and the alternative is the thing they can do without leaving the kiosk. The wizard was always one tap below the code; here it becomes the answer.",
+    "file": "tall-49-no-qr-and-the-other-door-is-right-there.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "When it doesn't go that way",
+    "who": "Somebody who kept the link",
+    "title": "A code that is no longer a door",
+    "caption": "This is the whole reason the registration link is not a stable URL. A code lives twenty minutes and carries twenty families, so a photograph of the lobby screen, a link forwarded to a friend, or a browser history entry from last Sunday all end here — at the only unauthenticated write surface Tally has, closed. Registering remotely means being in the room, and this screen is where that requirement is actually enforced.",
+    "file": "tall-50-a-code-that-is-no-longer-a-door.png",
+    "shape": "tall",
+    "device": "phone"
+  },
+  {
+    "act": "When it doesn't go that way",
+    "who": "A parent going too fast",
+    "title": "The one field with a rule beyond “not empty”",
+    "caption": "Half a phone number is caught in the browser and marked *on the field*, because a parent scrolling a form needs to know which box rather than that something somewhere is wrong. This is the only field checked for shape, and it earns that: it is the one the kiosk will have to match on for the rest of this family's time at the church, and the last four digits of a wrong number are a login nobody can use. Nothing typed is cleared and nothing was sent — the registration id was minted when this page opened and is reused on the next press, so pressing twice cannot become two families.",
+    "file": "tall-51-the-one-field-with-a-rule-beyond-not-empty.png",
+    "shape": "tall",
+    "device": "phone"
+  },
+  {
+    "act": "When it doesn't go that way",
+    "who": "A parent who is not sure it worked",
+    "title": "Tapped twice, counted once",
+    "caption": "The commonest doubt at a lobby screen: did that go through? So a child already on the register is drawn as a statement rather than a button, and there is nothing here to press twice. Underneath, the attendance document is keyed by the student id rather than a generated one, so two counselors tapping the same child a second apart on different phones address one row instead of inflating a head count. The label printer is held to the same rule — a reprint loop at a door is a queue nobody can clear.",
+    "file": "tall-52-tapped-twice-counted-once.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "When it doesn't go that way",
+    "who": "A family arriving late",
+    "title": "The doors have shut, and it still works",
+    "caption": "A check-in window is a note to the room, not a lock on the glass. The gathering stopped admitting people ten minutes ago and the kiosk says so in the one line under the title — then goes on working exactly as before, because the alternative is a family standing in the building beside a screen that refuses to admit they are there. The same posture runs all the way down: a gathering that has *ended* is still offered to a kiosk if it collects children, since the pickup is the half nobody can skip.",
+    "file": "tall-53-the-doors-have-shut-and-it-still-works.png",
+    "shape": "tall",
+    "device": "kiosk"
   }
 ]
