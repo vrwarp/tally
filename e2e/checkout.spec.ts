@@ -167,12 +167,21 @@ test.describe('check-out', () => {
     await dialog.getByRole('button', { name: /save & check in|save and check in/i }).click();
     await expect(dialog).toBeHidden();
 
-    const students = await firestore.until(
-      'students',
-      (docs) => docs.some((doc) => doc.data.firstName === 'Wren'),
-      'the grade-less child',
-    );
-    const created = students.find((doc) => doc.data.firstName === 'Wren')!;
+    /*
+     * Both names, because one is not unique.
+     *
+     * `kiosk.spec.ts` registers a Wren of its own, in 4th grade, and this
+     * assertion is precisely that a grade-less child has no grade — so matching
+     * on the first name alone found that Wren whenever one survived into this
+     * run and failed with "expected undefined, received 4". A lookup that can
+     * match somebody else's fixture is the bug; narrowing it is the fix, not
+     * renaming until the collision moves.
+     */
+    const isWren = (doc: { data: { firstName?: unknown; lastName?: unknown } }): boolean =>
+      doc.data.firstName === 'Wren' && doc.data.lastName === 'Halloran';
+
+    const students = await firestore.until('students', (docs) => docs.some(isWren), 'the grade-less child');
+    const created = students.find(isWren)!;
     // Absent, not zero: a grade nobody supplied is a claim about a real child.
     expect(created.data.grade).toBeUndefined();
 

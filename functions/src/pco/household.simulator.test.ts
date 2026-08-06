@@ -26,7 +26,7 @@ import { createPcoClient, type PcoClient } from './client.js';
 import { FakeFirestore } from '../testing/fakeFirestore.js';
 import { fetchPersonDetails } from './roster.js';
 import { createTtlCache } from './cache.js';
-import { addParent, type AddParentOptions } from './household.js';
+import { addParent, createFamily, type AddParentOptions } from './household.js';
 
 function config(writeBack: PcoWriteBackMode): PcoConfig {
   return {
@@ -356,5 +356,113 @@ describe('addParent against the simulator', () => {
 
       expect(result.status).toBe('no-student');
     });
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* createFamily — a household nobody has met, and one that already exists      */
+/* -------------------------------------------------------------------------- */
+
+describe('createFamily against the simulator', () => {
+  let h: Harness;
+
+  beforeEach(() => {
+    h = harness();
+  });
+
+  const build = (patch: {
+    studentIds: string[];
+    anchorStudentIds?: string[];
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+  }) =>
+    createFamily({
+      db: h.db,
+      client: h.client,
+      config: config('full'),
+      firstName: 'Dana',
+      lastName: 'Whitfield',
+      ...patch,
+    });
+
+  it('puts every sibling in one household, not one household each', async () => {
+    // Two children Tally pushed a moment ago: linked upstream, in no household.
+    const first = h.store.createPerson({ first_name: 'Robin', last_name: 'Fields', child: true });
+    const second = h.store.createPerson({ first_name: 'Sam', last_name: 'Fields', child: true });
+    h.db.seed('students/t-1', annotation({ pcoPersonId: first.id }));
+    h.db.seed('students/t-2', annotation({ pcoPersonId: second.id }));
+
+    const result = await build({ studentIds: ['t-1', 't-2'] });
+
+    expect(result.status).toBe('created');
+    const households = h.store.householdsForPerson(first.id);
+    expect(households).toHaveLength(1);
+    expect(h.store.householdsForPerson(second.id).map((household) => household.id)).toEqual(
+      households.map((household) => household.id),
+    );
+    // Both children and the adult.
+    expect(h.store.membershipsForHousehold(households[0]!.id)).toHaveLength(3);
+  });
+
+  /*
+   * The bug this exists to keep fixed.
+   *
+   * A parent whose second child is finally old enough used to get a *second*
+   * household: the household was derived from the children in the run, every
+   * one of which had been created seconds earlier and had none — so the answer
+   * was always "none", and the answer to that was always "create one". The
+   * siblings stayed behind in the first household, invisible from the new one,
+   * on a record with no undo.
+   */
+  it('joins the household a sibling is already in rather than founding a second', async () => {
+    const anchorHousehold = h.store.householdsForPerson(FIXTURE_IDS.leilaPhoneOnlyParent)[0]!;
+    const newChild = h.store.createPerson({ first_name: 'Ada', last_name: 'Fields', child: true });
+    h.db.seed(`students/pco_${FIXTURE_IDS.leilaPhoneOnlyParent}`, annotation());
+    h.db.seed('students/t-new', annotation({ pcoPersonId: newChild.id }));
+
+    const before = h.store.householdCount;
+    const result = await build({
+      studentIds: ['t-new'],
+      anchorStudentIds: [`pco_${FIXTURE_IDS.leilaPhoneOnlyParent}`],
+    });
+
+    // The sibling's household already has an adult, so nothing is created at
+    // all — not a person, not a household. The child is simply filed into it.
+    expect(result.status).toBe('already-has-family');
+    expect(h.store.householdCount).toBe(before);
+    expect(h.store.householdsForPerson(newChild.id).map((household) => household.id)).toEqual([
+      anchorHousehold.id,
+    ]);
+  });
+
+  it('uses the sibling’s household even when it has no adult in it yet', async () => {
+    const anchorHousehold = h.store.householdsForPerson(MARCUS)[0]!;
+    const newChild = h.store.createPerson({ first_name: 'Ada', last_name: 'Fields', child: true });
+    h.db.seed(`students/${MARCUS_STUDENT}`, annotation());
+    h.db.seed('students/t-new', annotation({ pcoPersonId: newChild.id }));
+
+    const before = h.store.householdCount;
+    const result = await build({
+      studentIds: ['t-new'],
+      anchorStudentIds: [MARCUS_STUDENT],
+      phone: '(510) 555-0142',
+    });
+
+    // Marcus's household is the family's; the adult joins it and so does Ada.
+    expect(result.status).toBe('created');
+    expect(h.store.householdCount).toBe(before);
+    expect(h.store.householdsForPerson(newChild.id).map((household) => household.id)).toEqual([
+      anchorHousehold.id,
+    ]);
+  });
+
+  it('ignores an anchor that names nobody Planning Center has', async () => {
+    const newChild = h.store.createPerson({ first_name: 'Ada', last_name: 'Fields', child: true });
+    h.db.seed('students/t-new', annotation({ pcoPersonId: newChild.id }));
+
+    const result = await build({ studentIds: ['t-new'], anchorStudentIds: ['t-ghost'] });
+    expect(result.status).toBe('created');
+    expect(h.store.householdsForPerson(newChild.id)).toHaveLength(1);
   });
 });

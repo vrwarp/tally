@@ -64,12 +64,26 @@ function binding(overrides: Partial<KioskBinding> = {}): KioskBinding {
 /** Who the register says is already here. Reassigned per test. */
 let present = new Set<string>();
 let checkedOut = new Set<string>();
+/** Which arrival put each of them here, where the register knows. */
+let arrivals = new Map<string, string>();
+/**
+ * What the nightly aggregate says about this gathering. Empty by default, which
+ * every reader takes as "nothing to scope by" — the behaviour the kiosk had
+ * before it existed, and what most of these tests are about.
+ */
+let scope = { participated: new Set<string>(), recent: new Set<string>() };
 
 const services = {
   restoredUid: vi.fn(async () => 'staff-uid'),
   loadRoster: vi.fn(async () => ROSTER),
   loadPhoneIndex: vi.fn(async () => LAST4),
-  fetchAttendance: vi.fn(async () => ({ present, checkedOut })),
+  loadParticipation: vi.fn(async () => scope),
+  fetchPulse: vi.fn(async () => null),
+  rememberPulse: vi.fn(),
+  refetchRoster: vi.fn(async () => {}),
+  refetchPhoneIndex: vi.fn(async () => {}),
+  refetchParticipation: vi.fn(async () => {}),
+  fetchAttendance: vi.fn(async () => ({ present, checkedOut, arrivals })),
   replayQueue: vi.fn(async () => 0),
   performCheckIn: vi.fn(async () => {}),
   performCheckOut: vi.fn(async () => {}),
@@ -156,12 +170,21 @@ function checkedInIds(): string[] {
     .sort();
 }
 
+function collectedIds(): string[] {
+  return vi
+    .mocked(services.performCheckOut)
+    .mock.calls.map((call) => call[0].studentId)
+    .sort();
+}
+
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.clearAllMocks();
   localStorage.clear();
   present = new Set();
   checkedOut = new Set();
+  arrivals = new Map();
+  scope = { participated: new Set(), recent: new Set() };
 });
 
 afterEach(() => {
@@ -175,7 +198,7 @@ describe('checking a family in together', () => {
     await type('0134');
     await pick('Marcus Osei');
 
-    expect(screen.getByText(/checking in anyone else/i)).toBeTruthy();
+    expect(screen.getByText(/anyone else\?/i)).toBeTruthy();
     expect(screen.getByText('Amara Osei')).toBeTruthy();
 
     await tap(/check in all 2/i);
@@ -191,7 +214,10 @@ describe('checking a family in together', () => {
     await type('0134');
     await pick('Maya Chen');
 
-    expect(screen.queryByText(/anyone else/i)).toBeNull();
+    // The question is asked on every check-in now — what must not appear is a
+    // sibling row for somebody who merely shares a tail.
+    expect(screen.queryByText('Amara Osei')).toBeNull();
+    expect(screen.queryByText('Marcus Osei')).toBeNull();
     await tap('Check in');
 
     expect(checkedInIds()).toEqual(['s-maya']);
@@ -217,7 +243,9 @@ describe('checking a family in together', () => {
     await type('0134');
     await pick('Marcus Osei');
 
-    expect(screen.queryByText(/anyone else/i)).toBeNull();
+    // Amara is offered as no kind of row: a confirm only ever lists people the
+    // button would do the very same thing to.
+    expect(screen.queryByText('Amara Osei')).toBeNull();
     await tap('Check in');
 
     expect(checkedInIds()).toEqual(['s-marcus']);
@@ -242,7 +270,7 @@ describe('collecting a family together', () => {
     await type('0134');
     await pick('Marcus Osei');
 
-    expect(screen.getByText(/collecting anyone else/i)).toBeTruthy();
+    expect(screen.getByText(/Collecting anyone else/i)).toBeTruthy();
 
     // A tap is not enough for a pickup, however many children it covers.
     const button = screen.getByText(/hold to collect all 2/i).closest('button')!;
@@ -277,5 +305,318 @@ describe('collecting a family together', () => {
     expect(vi.mocked(services.performCheckOut).mock.calls.map((call) => call[0].studentId)).toEqual([
       's-marcus',
     ]);
+  });
+});
+
+/**
+ * The register's own answer to "who is going home with them".
+ *
+ * A check-in guesses at a family from four phone digits, because at the front
+ * door that is all there is. By the time somebody comes back for them there is
+ * something better: the set that walked in together, stated by a thumb on this
+ * kiosk's own button and written on the register. These pin that the pickup
+ * screen prefers the fact to the guess, and — the part that matters most —
+ * that it still *shows* the guess, because a family that arrived in two waves
+ * usually leaves in one.
+ */
+describe('collecting the ones who came in together', () => {
+  it('ticks the arrival, and lists a sibling who came separately without ticking them', async () => {
+    present = new Set([AMARA.id, MARCUS.id]);
+    arrivals = new Map([
+      [AMARA.id, 'arrival-morning'],
+      // Dropped off half an hour later, by somebody else. Same family, and the
+      // register knows they were not part of the same act.
+      [MARCUS.id, 'arrival-later'],
+    ]);
+    await mount();
+    await type('0134');
+    await pick('Amara Osei');
+
+    // On the screen, because families do leave together after arriving apart.
+    expect(screen.getByText('Marcus Osei')).toBeTruthy();
+    // Not ticked, and the button counts only the one nobody has to think about.
+    expect(screen.getByText('Marcus Osei').closest('button')!.getAttribute('aria-pressed')).toBe(
+      'false',
+    );
+
+    await hold(/^hold to collect$/i);
+    expect(collectedIds()).toEqual(['s-amara']);
+  });
+
+  it('ticks a child the phone index never called family, when they arrived together', async () => {
+    /*
+     * The half of this the four-digit guess can never do. Maya is a different
+     * family by every number on file — `family.ts` refuses her on purpose — but
+     * she came through the door in the same press, so she is going home in it.
+     * A cousin, a neighbour's boy, a child found through "find a brother or
+     * sister": all of them look exactly like this.
+     */
+    present = new Set([AMARA.id, MAYA.id]);
+    arrivals = new Map([
+      [AMARA.id, 'arrival-together'],
+      [MAYA.id, 'arrival-together'],
+    ]);
+    await mount();
+    await type('0134');
+    await pick('Amara Osei');
+
+    expect(screen.getByText('Maya Chen').closest('button')!.getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+    await hold(/hold to collect all 2/i);
+    expect(collectedIds()).toEqual(['s-amara', 's-maya']);
+  });
+
+  it('falls back to the guess when nothing was ever stated', async () => {
+    // A volunteer checked them in from the roster, one at a time; or the
+    // records predate arrivals. "No claim" is not "came alone", so the screen
+    // does exactly what it did before this existed.
+    present = new Set([AMARA.id, MARCUS.id]);
+    arrivals = new Map();
+    await mount();
+    await type('0134');
+    await pick('Amara Osei');
+
+    expect(screen.getByText('Marcus Osei').closest('button')!.getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+    await hold(/hold to collect all 2/i);
+    expect(collectedIds()).toEqual(['s-amara', 's-marcus']);
+  });
+
+  it('records one arrival per press, shared by everyone it checked in', async () => {
+    await mount();
+    await type('7788');
+    await pick('Amara Osei');
+    await tap(/check in all 2/i);
+
+    const ids = vi.mocked(services.performCheckIn).mock.calls.map((call) => call[0].arrivalId);
+    expect(ids).toHaveLength(2);
+    expect(ids[0]).toBeTruthy();
+    expect(new Set(ids).size).toBe(1);
+  });
+
+  it('gives a child checked in alone an arrival of their own', async () => {
+    /*
+     * Not "no arrival". A solo check-in is a statement, and it is what stops a
+     * sibling dropped off later from arriving pre-ticked for collection —
+     * which is the whole difference between this and a null.
+     */
+    await mount();
+    await type('2200');
+    await pick('Maya Chen');
+    await tap(/^check in$/i);
+
+    const first = vi.mocked(services.performCheckIn).mock.calls[0]![0].arrivalId;
+    expect(first).toBeTruthy();
+  });
+});
+
+/**
+ * The escape hatch the conservative guess creates.
+ *
+ * `family.ts` throws out every coincidence and, with it, some real siblings: a
+ * child on a different number, a family split across two households, somebody
+ * added by hand last week. Those parents are looking at one name and know there
+ * should be two — and the answer used to be a link that took them to a form
+ * asking a *new* child's name, which is not what they meant.
+ */
+describe('finding a brother or sister the kiosk did not offer', () => {
+  it('is offered on a check-in', async () => {
+    await mount();
+    await type('2200');
+    await pick('Maya Chen');
+    expect(screen.getByText(/Another child/i)).toBeTruthy();
+  });
+
+  it('is never offered on a collection', async () => {
+    // A parent taking a child home is answering a different question, and the
+    // roster is read once at boot — so this is a kiosk that started the morning
+    // with Maya already here.
+    present = new Set([MAYA.id]);
+    await mount();
+    await type('2200');
+    await pick('Maya Chen');
+
+    expect(screen.getByText(/hold to collect/i)).toBeTruthy();
+    expect(screen.queryByText(/Another child/i)).toBeNull();
+  });
+
+  it('checks in a sibling found by name, together with the first', async () => {
+    await mount();
+    // Maya's four digits find only Maya; Amara is a sibling this kiosk's
+    // family guess would never have offered.
+    await type('2200');
+    await pick('Maya Chen');
+    await tap(/Another child/i);
+
+    await type('amara');
+    await pick('Amara Osei');
+
+    // Back on the confirm, with both — one group, one button, one count.
+    expect(screen.getByText(/Check in all 2/i)).toBeTruthy();
+    await tap(/Check in all 2/i);
+
+    expect(
+      vi
+        .mocked(services.performCheckIn)
+        .mock.calls.map((call) => call[0].student.id)
+        .sort(),
+    ).toEqual(['s-amara', 's-maya']);
+  });
+
+  it('does not offer somebody already on the confirm screen', async () => {
+    await mount();
+    await type('7788');
+    await pick('Amara Osei');
+    await tap(/Another child/i);
+
+    // Marcus arrived with Amara and is ticked behind this screen; offering him
+    // again would be a row that does nothing.
+    await type('osei');
+    expect(screen.queryByText('Marcus Osei')).toBeNull();
+    expect(screen.queryByText('Amara Osei')).toBeNull();
+  });
+
+  it('leaves the confirm exactly as it was when the search finds nobody', async () => {
+    await mount();
+    await type('7788');
+    await pick('Amara Osei');
+    await untick('Marcus Osei');
+    await tap(/Another child/i);
+
+    await type('zzq');
+    expect(screen.getByText(/are they new/i)).toBeTruthy();
+    await tap('← Back');
+
+    // Marcus is still unticked: going to look for somebody must not silently
+    // re-tick the sibling this parent deliberately left alone.
+    expect(screen.getByText(/^Check in$/)).toBeTruthy();
+  });
+});
+
+/**
+ * Which of the offered names arrive ticked.
+ *
+ * `familyOf` guesses a family from four phone digits, and the guess is often
+ * right about the household and wrong about tonight — the other children may
+ * have come once, or belong to a different programme. So the offer stays as wide
+ * as the guess and the *tick* follows the gathering's own prediction.
+ */
+describe('pre-selecting only the children this gathering expects', () => {
+  it('ticks a sibling the prediction expects and leaves the other offered', async () => {
+    scope = {
+      participated: new Set(['s-amara', 's-marcus', 's-maya']),
+      // Amara comes every week. Marcus came once, months ago.
+      recent: new Set(['s-amara']),
+    };
+    await mount();
+    await type('7788');
+    await pick('Amara Osei');
+
+    // Marcus is on the screen — the parent may well have brought him.
+    expect(screen.getByText('Marcus Osei')).toBeTruthy();
+    // But the button covers one child, not two.
+    expect(screen.getByText(/^Check in$/)).toBeTruthy();
+
+    await tap(/^Check in$/);
+    expect(checkedInIds()).toEqual(['s-amara']);
+  });
+
+  it('includes an unexpected sibling the parent ticks', async () => {
+    scope = {
+      participated: new Set(['s-amara', 's-marcus']),
+      recent: new Set(['s-amara']),
+    };
+    await mount();
+    await type('7788');
+    await pick('Amara Osei');
+
+    // The same tap that unticks a ticked row ticks an unticked one.
+    await untick('Marcus Osei');
+    await tap(/Check in all 2/i);
+
+    expect(checkedInIds()).toEqual(['s-amara', 's-marcus']);
+  });
+
+  it('always includes the child who was tapped, prediction or not', async () => {
+    scope = {
+      participated: new Set(['s-amara', 's-marcus', 's-maya']),
+      // The gathering has regulars, and neither Osei child is one of them.
+      recent: new Set(['s-maya']),
+    };
+    await mount();
+    await type('7788');
+    await pick('Marcus Osei');
+
+    // Amara is offered and unticked; Marcus is on the register regardless,
+    // because a parent pressing a name is not a prediction to be second-guessed.
+    expect(screen.getByText('Amara Osei')).toBeTruthy();
+    await tap(/^Check in$/);
+    expect(checkedInIds()).toEqual(['s-marcus']);
+  });
+
+  it('ticks everybody when the gathering has no prediction to offer', async () => {
+    // A gathering meeting for the first time, a binding written before any of
+    // this existed, a failed read — all of them land here, on the behaviour the
+    // kiosk had before the aggregate existed.
+    await mount();
+    await type('7788');
+    await pick('Amara Osei');
+
+    await tap(/Check in all 2/i);
+    expect(checkedInIds()).toEqual(['s-amara', 's-marcus']);
+  });
+
+  it('ticks a sibling found by name, whatever the prediction thinks', async () => {
+    scope = { participated: new Set(['s-maya']), recent: new Set(['s-maya']) };
+    await mount();
+    await type('2200');
+    await pick('Maya Chen');
+    await tap(/Another child/i);
+
+    // Amara is in no part of this gathering's history. The parent named her.
+    await type('amara');
+    await pick('Amara Osei');
+
+    await tap(/Check in all 2/i);
+    expect(checkedInIds()).toEqual(['s-amara', 's-maya']);
+  });
+
+  it('does not warm a label for a sibling arriving unticked', async () => {
+    scope = {
+      participated: new Set(['s-amara', 's-marcus']),
+      recent: new Set(['s-amara']),
+    };
+    await mount();
+    await type('7788');
+    await pick('Amara Osei');
+
+    const warmed = vi.mocked(services.warmStudentDates).mock.calls.map((call) => call[0]);
+    expect(warmed).toContain('s-amara');
+    expect(warmed).not.toContain('s-marcus');
+
+    // Until the parent says otherwise, at which point it is worth preparing.
+    await untick('Marcus Osei');
+    expect(
+      vi.mocked(services.warmStudentDates).mock.calls.map((call) => call[0]),
+    ).toContain('s-marcus');
+  });
+
+  it('leaves a pickup reading the register, not the prediction', async () => {
+    // Both Osei children came in together an hour ago; neither is a regular.
+    present = new Set(['s-amara', 's-marcus']);
+    arrivals = new Map([
+      ['s-amara', 'arrival-1'],
+      ['s-marcus', 'arrival-1'],
+    ]);
+    scope = { participated: new Set(['s-amara', 's-marcus']), recent: new Set() };
+
+    await mount(binding({ requiresCheckOut: true }));
+    await type('7788');
+    await pick('Amara Osei');
+
+    await hold(/hold to collect all 2/i);
+    expect(collectedIds()).toEqual(['s-amara', 's-marcus']);
   });
 });

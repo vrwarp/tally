@@ -821,7 +821,12 @@ export function StudentDetailPage() {
 
       {/* The record under the analysis: every night on file, reaching past the
           window the card above is derived from. See `EarlierAttendance`. */}
-      <EarlierAttendance studentId={student.id} />
+      <EarlierAttendance
+        studentId={student.id}
+        {...(student.mergedFromStudentIds?.length
+          ? { alsoStudentIds: student.mergedFromStudentIds }
+          : {})}
+      />
 
       <StudentEditorModal
         open={editorOpen}

@@ -203,6 +203,9 @@ export class SimulatorStore {
     return this.org.memberships.filter((m) => m.person_id === personId);
   }
 
+  /** Seeded household keys to the household they made — see `seedStudent`. */
+  private readonly seededHouseholds = new Map<string, string>();
+
   membershipsForHousehold(householdId: string): SimHouseholdMembership[] {
     return this.org.memberships
       .filter((m) => m.household_id === householdId)
@@ -220,6 +223,19 @@ export class SimulatorStore {
 
   memberCount(householdId: string): number {
     return this.membershipsForHousehold(householdId).length;
+  }
+
+  /**
+   * How many households exist, for a test asserting that none were created.
+   *
+   * "Join the sibling's household rather than founding a second" is a claim
+   * about a *count*, and nothing else here could express it — `householdById`
+   * and `householdsForPerson` both start from something you already know about.
+   * The alternative was reaching into the private `org`, which four call sites
+   * were doing until the compiler was finally pointed at them.
+   */
+  get householdCount(): number {
+    return this.org.households.length;
   }
 
   get lists(): readonly SimList[] {
@@ -485,6 +501,16 @@ export class SimulatorStore {
      * definition on first use, exactly like an admin adding the field.
      */
     attendeesUuid?: string | null;
+    /**
+     * Siblings, by sharing one household rather than each getting their own.
+     *
+     * Without it every seeded student gets a parent and a household of their
+     * own, so a seeded organisation contains no families at all — and the
+     * kiosk's whole family half, which reads households through the phone
+     * index, has nothing to read. Two children named against the same key get
+     * one parent, one household and one number.
+     */
+    householdKey?: string | null;
   }): SimPerson {
     const student = this.createPerson({
       first_name: input.firstName,
@@ -516,6 +542,23 @@ export class SimulatorStore {
     // be expressible here.
     if (!input.parentName) return student;
 
+    /*
+     * A sibling arriving at a household that already exists joins it, and does
+     * not mint a second copy of the parent who is already standing in it.
+     */
+    const existing = input.householdKey ? this.seededHouseholds.get(input.householdKey) : undefined;
+    if (existing) {
+      this.org.memberships.push({
+        id: `M${this.org.memberships.length + 1000}`,
+        household_id: existing,
+        person_id: student.id,
+        household_role: 'child',
+        person_name: `${student.first_name} ${student.last_name}`.trim(),
+        pending: false,
+      });
+      return student;
+    }
+
     const [parentFirst, ...rest] = input.parentName.trim().split(/\s+/);
     const parent = this.createPerson({
       first_name: parentFirst ?? input.parentName,
@@ -533,6 +576,7 @@ export class SimulatorStore {
       primary_contact_name: `${parent.first_name} ${parent.last_name}`.trim(),
     };
     this.org.households.push(household);
+    if (input.householdKey) this.seededHouseholds.set(input.householdKey, household.id);
 
     this.org.memberships.push(
       {

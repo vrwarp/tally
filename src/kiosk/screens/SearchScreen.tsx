@@ -13,22 +13,23 @@
  * scrolls — the header, the buffer and the keyboard stay pinned, because a
  * keyboard that scrolls off the bottom is worse than a list that ends early.
  *
+ * The search itself happens in KioskApp, not here — the app owns the scoped
+ * pool, the "Search everyone" widening, and the silent sweep that fires when a
+ * finished search finds nobody anywhere. This screen renders the outcome it is
+ * handed and offers the doors.
+ *
  * The top-left corner hides the staff gate: a three-second hold returns to
  * the event chooser. Invisible on purpose — parents have no business there,
  * and staff are told where it is.
  */
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { gradeDescription, haptic } from '@/lib/utils';
 import { HoldButton } from '../components/HoldButton';
 import { Keyboard, type KioskKey } from '../components/Keyboard';
 import { useTapGuard } from '../components/tapGuard';
 import type { KioskRefresh } from '../KioskApp';
 import { windowHasClosed, type KioskBinding } from '../binding';
-import {
-  searchStudents,
-  MAX_RESULTS,
-  type KioskStudent,
-} from '../search';
+import { MAX_RESULTS, type KioskSearchOutcome, type KioskStudent } from '../search';
 
 function gradeLabel(grade: number | null): string {
   return grade === null ? '' : gradeDescription(grade);
@@ -38,14 +39,14 @@ export function SearchScreen({
   binding,
   buffer,
   onKey,
-  students,
-  last4Index,
+  outcome,
   presentIds,
   checkedOutIds,
   tracksCheckOut,
   printerNeedsAttention,
   refresh,
-  onRefresh,
+  widened,
+  onWiden,
   onPick,
   onRegister,
   justRegisteredRemotely,
@@ -54,14 +55,22 @@ export function SearchScreen({
   binding: KioskBinding;
   buffer: string;
   onKey: (key: KioskKey) => void;
-  students: readonly KioskStudent[];
-  last4Index: Readonly<Record<string, string[]>>;
+  /** The search, already run — over the scoped pool, or everybody once widened. */
+  outcome: KioskSearchOutcome;
   presentIds: ReadonlySet<string>;
   checkedOutIds: ReadonlySet<string>;
   tracksCheckOut: boolean;
   printerNeedsAttention: boolean;
+  /**
+   * How the silent church-wide sweep behind an empty result is doing. No
+   * button drives it any more; what remains on screen is its headline ("Still
+   * no match" once it has landed) and its failure line.
+   */
   refresh: KioskRefresh;
-  onRefresh: () => void;
+  /** Whether this search already covers the whole ministry. */
+  widened: boolean;
+  /** Widens this one search to all of Tally. Resets when the buffer clears. */
+  onWiden: () => void;
   onPick: (student: KioskStudent) => void;
   /** Opens the registration offer — the other door off this screen. */
   onRegister: () => void;
@@ -73,11 +82,37 @@ export function SearchScreen({
   justRegisteredRemotely?: boolean;
   onUnbind: () => void;
 }) {
-  const outcome = useMemo(
-    () => searchStudents(buffer, students as KioskStudent[], last4Index),
-    [buffer, students, last4Index],
-  );
   const closed = windowHasClosed(binding, Date.now());
+
+  /*
+   * The no-match panel is showing this same offer, in the same words, as its
+   * primary button — so the standing one steps aside rather than appearing
+   * twice on one screen a hand's width apart.
+   *
+   * Its *row* stays, empty. This file promises that a keystroke changes text
+   * and never geometry, and a row that vanished the moment a search matched
+   * nobody would move the keyboard under a thumb already on its way down.
+   */
+  const offeredAbove =
+    (outcome.mode === 'phone' || outcome.mode === 'name') && outcome.results.length === 0;
+
+  /*
+   * A match is not proof, and this is the sentence that says so.
+   *
+   * Four digits are a weak credential and a small keyspace: a family nobody has
+   * met can type theirs and be shown somebody else's children, sorted, spelled
+   * correctly, and looking exactly like the answer. A name search is looser
+   * still. Nothing on the screen distinguishes that from a hit, so the door out
+   * has to be open while the rows are up — not only after a search fails, which
+   * is the one state a coincidence guarantees will never happen.
+   *
+   * Only the words change, never the geometry. "First time here?" beside a list
+   * of strangers asks the wrong question: the parent is not wondering whether
+   * they are new, they are wondering what to do about a Ramirez who is not
+   * theirs. And it stays the quiet weight, because most matches are real and a
+   * screen that doubted itself loudly would make a correct answer feel wrong.
+   */
+  const offerPrompt = outcome.results.length > 0 ? 'Not your family?' : 'First time here?';
 
   /*
    * A row commits on lift, not on contact, because this list scrolls — see
@@ -169,26 +204,22 @@ export function SearchScreen({
               Enter all 4 digits of a phone number in your family.
             </div>
           )}
-          {/*
-            * The dead end, opened.
-            *
-            * This used to be "No match — please see a leader", which was true
-            * and was also the whole of what a family nobody had met could do
-            * here. Seeing a leader is still the answer when something is wrong
-            * with the search; it is not the answer to being new, and putting
-            * the two in one sentence made the common case sound like a fault.
-            */}
           {(outcome.mode === 'phone' || outcome.mode === 'name') && outcome.results.length === 0 && (
             /*
-             * Nothing matched, and the answer is two different offers.
+             * Nothing matched, and the answer is three different doors.
              *
-             * The roster on this device is a cache hours old by design, so the
-             * commonest reason a *known* family is missing from it is that
-             * somebody added them while they queued — that is what "check
-             * online" goes and does. The other reason is that nobody has ever
-             * met them, and for that the answer is not a leader but a form.
-             * "See a leader" is the right last word and was never the right
-             * first one.
+             * The commonest reason is being new, so the register door leads.
+             * The second is a child who belongs to a *different* gathering —
+             * the search is scoped to the children who have been to this one,
+             * and "Search everyone" is that scope's honest way out, in the
+             * slot where "I already registered" used to widen as a side effect
+             * of a network read nobody could see. The third reason — somebody
+             * added the family online moments ago — needs no door at all any
+             * more: the kiosk notices registrations by itself (the pulse), and
+             * for the rare backend-direct addition the church-wide sweep now
+             * runs silently the moment a finished search comes up empty. Its
+             * only remaining surfaces are the headline's "Still" and the
+             * network-failure line below.
              *
              * Inside the scrolling results region on purpose: this file
              * promises that typing never moves the keyboard, and a block that
@@ -210,28 +241,31 @@ export function SearchScreen({
                 }}
                 className="flex h-14 items-center justify-center rounded-xl bg-brand-600 px-8 text-lg font-semibold text-white active:bg-brand-500"
               >
-                Register your family
+                Register your child
               </button>
               {refresh === 'failed' && (
                 <div className="text-base text-ink-500">Couldn&apos;t reach the network just now.</div>
               )}
-              {refresh !== 'done' && (
+              {!widened && (
                 <button
                   type="button"
                   tabIndex={-1}
-                  disabled={refresh === 'refreshing'}
                   onPointerDown={(event) => {
                     event.preventDefault();
-                    onRefresh();
+                    haptic();
+                    onWiden();
                   }}
-                  className="rounded-xl px-6 py-3 text-base font-semibold text-brand-300 active:bg-ink-800 disabled:text-ink-500"
+                  className="flex h-14 items-center justify-center rounded-xl bg-ink-800 px-8 text-lg font-semibold text-ink-100 active:bg-ink-700"
                   style={{ touchAction: 'manipulation' }}
                 >
-                  {refresh === 'refreshing'
-                    ? 'Checking…'
-                    : refresh === 'failed'
-                      ? 'Try again'
-                      : 'Just registered? Check online'}
+                  {/*
+                    * Says what it does, unlike its predecessor. The search
+                    * only covers the children who come to *this* gathering;
+                    * a child who belongs to Sunday mornings is one tap away,
+                    * instantly — the wider list is already on the device, so
+                    * nothing loads and nothing waits.
+                    */}
+                  Search everyone
                 </button>
               )}
               <div className="text-base text-ink-500">or see a leader.</div>
@@ -284,26 +318,46 @@ export function SearchScreen({
       </div>
 
       {/*
-        * The standing offer, for the family who never types anything.
+        * The standing offer: the one door off this screen that is never closed.
         *
         * A parent who has been told "just put your name in" types their child's
         * name and gets a list — the no-match state above never fires for them,
-        * because somebody else's Noah is on the roster. So the door has to be
-        * visible without failing a search first. Low-key and fixed-height: it
-        * is one row of the grid, present from the first paint, so it cannot be
-        * the thing that moves when a keystroke lands.
+        * because somebody else's Noah is on the roster. Nor does it fire for the
+        * newcomer whose last four digits happen to belong to a family the church
+        * already has. Both meet a screen full of confident, wrong rows, and for
+        * both the way out is here.
+        *
+        * Tapping it opens the QR screen, whose own largest button is "I've
+        * registered" — so a family who came through this door by mistake, having
+        * already filled the form in on their phone, is offered the way back
+        * before the form rather than a second registration.
+        *
+        * It used to be a line of text with a coloured phrase in it, which read
+        * as a footnote next to the same offer's *button* two hundred pixels
+        * higher up. A family meets whichever of the two happens to fire first,
+        * so they have to be the same object: same shape, same words, one step
+        * quieter here because this one is standing next to a keyboard somebody
+        * is aiming at.
+        *
+        * Still exactly one grid row and still a fixed height, which is the
+        * promise this file makes about geometry: present from the first paint,
+        * so it cannot be the thing that moves when a keystroke lands.
         */}
-      <button
-        type="button"
-        tabIndex={-1}
-        onPointerDown={() => {
-          haptic(8);
-          onRegister();
-        }}
-        className="mx-auto flex h-12 w-full max-w-2xl items-center justify-center text-base text-ink-400 active:text-ink-200"
-      >
-        First time here? <span className="pl-1.5 font-semibold text-brand-300">Register your family</span>
-      </button>
+      <div className="flex h-12 items-center justify-center px-6">
+        {!offeredAbove && (
+          <button
+            type="button"
+            tabIndex={-1}
+            onPointerDown={() => {
+              haptic(8);
+              onRegister();
+            }}
+            className="flex h-11 items-center justify-center rounded-xl bg-brand-600/15 px-6 text-base font-semibold text-brand-300 ring-1 ring-brand-500/40 active:bg-brand-600/30"
+          >
+            {offerPrompt} Register your child
+          </button>
+        )}
+      </div>
 
       <Keyboard onKey={onKey} />
     </div>

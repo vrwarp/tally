@@ -10,10 +10,11 @@
  *     stores no medical notes; the field means "send this to the church's own
  *     database", and where there is no such record to write to, asking for it
  *     would be collecting something with nowhere to go.
- *   - **The ending.** A parent who registers here is not checked in, and the
- *     kiosk searches a local copy of the roster — so the last screen has to say
- *     "tap I've registered" *before* it says "type your digits", or the family
- *     goes and watches a screen tell them there is no match.
+ *   - **The ending.** A parent who registers here is not checked in; the last
+ *     screen sends them straight to their four digits, with no button ritual in
+ *     front of them — the kiosk notices registrations by itself now, and the
+ *     old "tap I've registered first" instruction would teach a step the
+ *     machine has taken over.
  */
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -45,7 +46,6 @@ const CREATED: RegisterFamilyResult = {
   ],
   last4: '3344',
   checkedIn: false,
-  guardian: { upstream: 'created' },
 };
 
 beforeEach(() => {
@@ -153,18 +153,23 @@ describe('filling it in', () => {
     // The field was never shown, so nothing is claimed about it.
     expect(sent.allergies).toBeUndefined();
 
-    // The order is the whole point: the kiosk holds a local copy of the roster
-    // and has to be told to go and look before the digits will find anybody.
-    expect(await screen.findByText(/I’ve registered/)).toBeTruthy();
+    // No button in the instruction any more: the kiosk notices registrations
+    // by itself, so sending a family hunting for "I've registered" would teach
+    // a ritual the machine has taken over. The digits are the whole habit.
+    expect(await screen.findByText(/type the last 4 digits/i)).toBeTruthy();
+    expect(screen.queryByText(/I’ve registered/)).toBeNull();
     expect(screen.getByText('3344')).toBeTruthy();
   });
 
-  it('shows a family who are already on the roster what to do instead', async () => {
-    registerFamily.mockResolvedValue({
-      status: 'duplicate',
-      duplicateIndexes: [0],
-      message: 'Robin is already on our list — search for their name instead.',
-    });
+  /*
+   * A family whose child is already on the roster is registered, not refused.
+   *
+   * The server records the suspicion for the Review screen and answers
+   * normally, so this form has one success path and one failure path — the
+   * failure being the server actually saying no, which it now only does to a
+   * request it cannot parse or a code it will not accept.
+   */
+  it('registers a family whose name already matches somebody', async () => {
     const user = userEvent.setup();
     render(<WelcomeApp />);
     await screen.findByLabelText(/^First name/i);
@@ -176,6 +181,22 @@ describe('filling it in', () => {
     await user.type(screen.getByLabelText(/^Your phone number/i), '5550103344');
     await user.click(screen.getByRole('button', { name: /^Register$/i }));
 
-    expect(await screen.findByText(/already on our list/i)).toBeTruthy();
+    expect(await screen.findByText(/3344/)).toBeTruthy();
+  });
+
+  it('says what went wrong when the server refuses outright', async () => {
+    registerFamily.mockRejectedValue({ message: 'invalid-argument: That code has expired.' });
+    const user = userEvent.setup();
+    render(<WelcomeApp />);
+    await screen.findByLabelText(/^First name/i);
+
+    await user.type(screen.getByLabelText(/^First name/i), 'Robin');
+    await user.type(screen.getByLabelText(/^Last name/i), 'Fields');
+    await user.type(screen.getByLabelText(/^Your first name/i), 'Dana');
+    await user.type(screen.getByLabelText(/^Your last name/i), 'Fields');
+    await user.type(screen.getByLabelText(/^Your phone number/i), '5550103344');
+    await user.click(screen.getByRole('button', { name: /^Register$/i }));
+
+    expect(await screen.findByText(/That code has expired/i)).toBeTruthy();
   });
 });

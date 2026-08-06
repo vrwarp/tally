@@ -583,6 +583,42 @@ describe('attendance', () => {
     );
   });
 
+  /*
+   * `arrivalId` decides which siblings a pickup screen arrives pre-ticked for,
+   * and the only thing that writes it is an unattended screen in a lobby. So
+   * the shape is the database's business: an opaque bounded string, absent, or
+   * refused.
+   */
+  it('takes an arrival id, and takes its absence', async () => {
+    const db = asUser(env, UID.counselor);
+    await assertSucceeds(
+      setDoc(
+        doc(db, paths.attendance(ID.event, ID.otherStudent)),
+        { ...attendanceDoc({ studentId: ID.otherStudent }), arrivalId: 'a-9f0c3d' },
+      ),
+    );
+    await assertSucceeds(
+      setDoc(
+        doc(db, paths.attendance(ID.event, ID.otherStudent)),
+        attendanceDoc({ studentId: ID.otherStudent }),
+      ),
+    );
+  });
+
+  it('refuses an arrival id that is not an opaque bounded string', async () => {
+    const db = asUser(env, UID.counselor);
+    const record = attendanceDoc({ studentId: ID.otherStudent });
+    const at = doc(db, paths.attendance(ID.event, ID.otherStudent));
+
+    // A list here would be a lobby session smuggling structure into a read the
+    // next parent acts on.
+    await assertFails(setDoc(at, { ...record, arrivalId: [ID.student] }));
+    await assertFails(setDoc(at, { ...record, arrivalId: { id: 'a-1' } }));
+    await assertFails(setDoc(at, { ...record, arrivalId: 7 }));
+    await assertFails(setDoc(at, { ...record, arrivalId: '' }));
+    await assertFails(setDoc(at, { ...record, arrivalId: 'a'.repeat(65) }));
+  });
+
   it('lets a counselor read and undo a check-in', async () => {
     const db = asUser(env, UID.counselor);
     await assertSucceeds(getDocs(collection(db, paths.attendanceCollection(ID.event))));
@@ -783,6 +819,58 @@ describe('the check-in freeze (pcoRecordMissing)', () => {
     const db = asUser(env, UID.counselor);
     await assertFails(
       updateDoc(doc(db, paths.student(ID.student)), { pcoRecordMissing: true }),
+    );
+  });
+});
+
+describe('the review hold (pendingReview)', () => {
+  /*
+   * The hold is the *only* thing that keeps a self-registered family out of the
+   * church's people database (functions/src/backends/pendingReview.ts). A
+   * client that could clear it would have a direct, unreviewed line into
+   * Planning Center; one that could set it could quietly freeze a student a
+   * leader added by hand. Neither direction, then — and the database is what
+   * says so, not a reviewer.
+   */
+  async function seedHeldStudent(studentId: string): Promise<void> {
+    await env.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), paths.student(studentId)),
+        studentDoc({ pcoPushPending: true, pendingReview: true }),
+      );
+    });
+  }
+
+  it('rejects a client holding a student it creates', async () => {
+    const db = asUser(env, UID.counselor);
+    await assertFails(
+      setDoc(doc(db, paths.student('forged-hold')), studentDoc({ pendingReview: true })),
+    );
+  });
+
+  it('rejects a client approving a held student itself', async () => {
+    await seedHeldStudent(ID.otherStudent);
+    const db = asUser(env, UID.admin);
+    await assertFails(
+      updateDoc(doc(db, paths.student(ID.otherStudent)), { pendingReview: false }),
+    );
+  });
+
+  it('rejects a kiosk clearing its own registration’s hold', async () => {
+    await seedHeldStudent(ID.otherStudent);
+    const db = asKiosk(env, UID.counselor);
+    await assertFails(
+      updateDoc(doc(db, paths.student(ID.otherStudent)), { pendingReview: false }),
+    );
+  });
+
+  it('still lets an ordinary edit through on a held student', async () => {
+    await seedHeldStudent(ID.otherStudent);
+    const db = asUser(env, UID.counselor);
+    // A counselor correcting a name must not be blocked by the hold: it gates
+    // the push, not the roster.
+    await assertSucceeds(
+      updateDoc(doc(db, paths.student(ID.otherStudent)), { firstName: 'Robin' }),
     );
   });
 });
@@ -1237,6 +1325,26 @@ describe('kiosk', () => {
       );
       await assertFails(
         setDoc(doc(asKiosk(env, UID.counselor), 'kioskIndex/phones'), { last4: {} }),
+      );
+    });
+
+    /*
+     * The pulse rides the same block, pinned by name because its threat is
+     * different: writing it would let a client spoof "a registration landed"
+     * onto every lobby screen, or drive every kiosk into refetch loops.
+     */
+    it('covers the pulse: kiosk sessions read it, nobody writes it', async () => {
+      await assertSucceeds(getDoc(doc(asKiosk(env, UID.counselor), 'kioskIndex/pulse')));
+      await assertSucceeds(getDoc(doc(asUser(env, UID.counselor), 'kioskIndex/pulse')));
+      await assertFails(getDoc(doc(asUser(env, UID.stranger), 'kioskIndex/pulse')));
+      await assertFails(getDoc(doc(asAnonymous(env), 'kioskIndex/pulse')));
+      await assertFails(
+        setDoc(doc(asUser(env, UID.admin), 'kioskIndex/pulse'), { roster: { rev: 999 } }),
+      );
+      await assertFails(
+        setDoc(doc(asKiosk(env, UID.counselor), 'kioskIndex/pulse'), {
+          registration: { rev: 1, eventId: 'spoofed' },
+        }),
       );
     });
   });

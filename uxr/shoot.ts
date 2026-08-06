@@ -43,6 +43,14 @@ const executablePath =
 const VIEWPORTS: Record<string, { width: number; height: number; scale: number; touch: boolean }> = {
   phone: { width: 390, height: 844, scale: 2, touch: true },
   desktop: { width: 1440, height: 900, scale: 1, touch: false },
+  /*
+   * The lobby kiosk, which is a tablet on a shelf and gets no say in which way
+   * up. Both are touch and both are 1× — a kiosk frame is read at arm's length
+   * by somebody standing, not held at reading distance, so the thing being
+   * judged is how big a target is in the room rather than how crisp it is.
+   */
+  kiosktall: { width: 800, height: 1280, scale: 1, touch: true },
+  kioskwide: { width: 1280, height: 800, scale: 1, touch: true },
 };
 
 /** Beyond this the "full page" frame is a strip nobody can read; it is capped. */

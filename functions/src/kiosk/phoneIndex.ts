@@ -18,6 +18,7 @@ import type { BackendRegistry } from '../backends/registry.js';
 import { scanRoster } from '../backends/scan.js';
 import { toDateOrNull, type FirestoreLike, type FunctionLogger } from '../firestore.js';
 import { studentIdFor } from '../generated/backendIds.js';
+import { bumpPulse } from './pulse.js';
 
 export const PHONE_INDEX_DOC = 'kioskIndex/phones';
 
@@ -115,6 +116,46 @@ export async function recordPendingLast4(
     },
     { merge: true },
   );
+}
+
+/**
+ * Which four digits already find these students.
+ *
+ * For the sibling journey: a parent adding a second child typed their four
+ * digits to get here, but the *server* is not told what they typed — a client
+ * that could name the digits could file a child under a stranger's number. So
+ * the digits are read back out of the index instead, from the siblings the
+ * request named and the server verified. Nothing is trusted that was not
+ * already derived from a backend or from a registration the server itself
+ * wrote.
+ *
+ * The overlay is consulted as well as the live map, because a family who
+ * registered this morning is only in the overlay until the nightly rebuild —
+ * which is exactly the family most likely to come back and add somebody.
+ */
+export async function last4ForStudents(
+  db: FirestoreLike,
+  studentIds: readonly string[],
+): Promise<string[]> {
+  if (studentIds.length === 0) return [];
+  const wanted = new Set(studentIds);
+  const found = new Set<string>();
+
+  const live = await db.doc(PHONE_INDEX_DOC).get();
+  for (const [last4, ids] of Object.entries(
+    (live.data()?.last4 ?? {}) as Record<string, unknown>,
+  )) {
+    if (Array.isArray(ids) && ids.some((id) => typeof id === 'string' && wanted.has(id))) {
+      found.add(last4);
+    }
+  }
+
+  const overlay = await db.doc(PENDING_LAST4_DOC).get();
+  for (const entry of readPendingEntries(overlay.data()).values()) {
+    if (entry.studentIds.some((id) => wanted.has(id))) found.add(entry.last4);
+  }
+
+  return [...found].sort();
 }
 
 /**
@@ -281,6 +322,16 @@ export async function buildPhoneIndex(
   }
 
   await db.doc(PHONE_INDEX_DOC).set(payload);
+
+  /*
+   * Both channels, and inside the builder rather than at its call sites: only
+   * the builder knows the document actually changed (a call-site bump after a
+   * build that threw would signal a change that never happened), and any
+   * future caller gets the signal for free. `roster` too, because this sweep
+   * just refreshed the backend people the kiosk's roster read serves — the
+   * kiosks fold in a fresh copy each morning instead of waiting out a TTL.
+   */
+  await bumpPulse(db, ['phones', 'roster'], now, { logger: options.logger });
 
   return {
     students: byStudent.size,

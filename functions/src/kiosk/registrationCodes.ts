@@ -106,6 +106,14 @@ export async function mintCode(
   db: FirestoreLike,
   uid: string,
   now: Date,
+  /**
+   * The gathering the minting kiosk is bound to, or null for a caller that
+   * does not say (an old cached kiosk bundle). The code remembers it so a QR
+   * registration can say which lobby screen to wake — and only that. It never
+   * checks anybody in: a code in a parent's camera roll says nothing about
+   * whether the family has walked through the door.
+   */
+  eventId: string | null = null,
 ): Promise<MintCodeResult | 'busy'> {
   const snapshot = await db.collection(REGISTRATION_CODES_COLLECTION).get();
 
@@ -128,6 +136,7 @@ export async function mintCode(
         createdAt: Timestamp.fromDate(now),
         expiresAt: Timestamp.fromDate(expiresAt),
         mintedBy: uid,
+        eventId,
         submissions: 0,
         maxSubmissions: MAX_CODE_SUBMISSIONS,
       });
@@ -168,6 +177,23 @@ export async function checkCode(
   if (isExpired(record, now)) return 'expired';
   if (record.submissions >= record.maxSubmissions) return 'exhausted';
   return 'ok';
+}
+
+/**
+ * The gathering whose kiosk minted this code, or null — for codes minted
+ * before the field existed, by a stale bundle that sent nothing, or for a code
+ * that never existed at all.
+ *
+ * A separate point read rather than a wider `checkCode` return, because
+ * `checkCode`'s other callers only want the status, and one extra document
+ * read per QR submission is nothing.
+ */
+export async function mintedEventId(db: FirestoreLike, rawCode: string): Promise<string | null> {
+  const code = normalizeCode(rawCode);
+  if (code.length !== CODE_LENGTH) return null;
+  const snapshot = await db.doc(`${REGISTRATION_CODES_COLLECTION}/${code}`).get();
+  const held = snapshot.exists ? snapshot.data()?.eventId : null;
+  return typeof held === 'string' && held.length > 0 ? held : null;
 }
 
 /**

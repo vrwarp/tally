@@ -75,14 +75,26 @@ export function AppShell({ children }: { children: ReactNode }) {
         </span>
       </div>
       {can('core') ? (
-        <NavLink
-          to="/settings"
-          role="menuitem"
-          onClick={() => setMenuOpen(false)}
-          className="block px-3 py-2 text-ink-200 hover:bg-ink-800"
-        >
-          Settings &amp; team
-        </NavLink>
+        <>
+          {/* Not in the thumb bar: it is a weekday job, and the bar is for the
+              four things somebody does at a door. */}
+          <NavLink
+            to="/review"
+            role="menuitem"
+            onClick={() => setMenuOpen(false)}
+            className="block px-3 py-2 text-ink-200 hover:bg-ink-800"
+          >
+            Families to review
+          </NavLink>
+          <NavLink
+            to="/settings"
+            role="menuitem"
+            onClick={() => setMenuOpen(false)}
+            className="block px-3 py-2 text-ink-200 hover:bg-ink-800"
+          >
+            Settings &amp; team
+          </NavLink>
+        </>
       ) : null}
       <button
         type="button"

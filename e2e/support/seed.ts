@@ -1,16 +1,16 @@
 /**
  * Putting the world into a known state.
  *
- * Split out of `globalSetup` because seeding has to happen more than once per
- * invocation. The suite mutates shared state on purpose — checking a student in
- * *is* a write, and the Planning Center spec deliberately imports people who
- * were not there before — so a second browser project running against the
- * database the first one left behind sees a roster that no longer matches what
- * the assertions were written for.
+ * Called once per project, by the worker-scoped `seededWorld` fixture in
+ * `./fixtures.ts`. The suite mutates shared state on purpose — checking a
+ * student in *is* a write, and the Planning Center spec deliberately imports
+ * people who were not there before — so a second browser project running
+ * against the database the first one left behind sees a roster that no longer
+ * matches what the assertions were written for.
  *
  * In CI that never bites, because each browser is its own job with its own
- * emulator. Locally `npx playwright test` runs all four projects in one process,
- * and without this the second one fails in ways that read exactly like
+ * emulator. Locally `npx playwright test` runs all four projects in one
+ * process, and without this the second one fails in ways that read exactly like
  * application bugs.
  */
 import { spawn } from 'node:child_process';

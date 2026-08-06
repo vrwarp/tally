@@ -24,6 +24,7 @@ import {
   splitFirstName,
 } from '../pco/mapping.js';
 import type { PcoPerson } from '../pco/types.js';
+import { HELD_FOR_REVIEW_MESSAGE, isHeldForReview } from '../backends/pendingReview.js';
 import {
   PATHS,
   SILENT_LOGGER,
@@ -271,6 +272,12 @@ export async function pushStudent(options: PushStudentOptions): Promise<PushStud
   const data = snapshot.data() ?? {};
   const pcoPersonId = readString(data, 'pcoPersonId');
 
+  // Before write-back, before names, before anything: a held student is not a
+  // student anybody has agreed to create. See backends/pendingReview.ts.
+  if (isHeldForReview(data)) {
+    return { status: 'skipped', pcoPersonId, message: HELD_FOR_REVIEW_MESSAGE };
+  }
+
   if (config.writeBack === 'off') {
     // The flag stays set on purpose: turning write-back on later must pick these
     // students up without anybody re-editing them.
@@ -483,7 +490,21 @@ export async function pushPendingStudents(options: {
   const pending = snapshot.docs
     .filter((doc: DocumentSnapshotLike) => {
       const data = doc.data() ?? {};
-      return data.pcoPushPending === true && !readString(data, 'pcoPersonId');
+      // Filtered here as well as refused inside `pushStudent`, so that a held
+      // family does not count as a skip against the limit and read back as a
+      // queue somebody needs to unstick.
+      //
+      // `upstreamPersonId` is excluded alongside `pcoPersonId` — the Attendees
+      // sweep has always checked both and this one checked only the legacy
+      // field, so a student the other backend holds was, on paper, a candidate
+      // for a second person over here. Reachable only through a stale
+      // `pcoPushPending`, but the asymmetry was the bug, not the odds.
+      return (
+        data.pcoPushPending === true &&
+        !readString(data, 'pcoPersonId') &&
+        !readString(data, 'upstreamPersonId') &&
+        !isHeldForReview(data)
+      );
     })
     .slice(0, options.limit ?? 100);
 

@@ -55,14 +55,20 @@ import type {
   RegisterFamilyResult,
 } from '@/types';
 import type { KioskBinding } from './binding';
+import { joinKioskRoster } from './roster';
 import type { KioskStudent } from './search';
 import {
   KIOSK_KEYS,
+  participationScope,
   readCachedRoster,
   readCachedRosterOfAnyVersion,
   readJson,
   writeCachedRoster,
+  writeCachedPulse,
   writeJson,
+  type CachedParticipation,
+  type CachedPulse,
+  type KioskParticipationScope,
 } from './storage';
 
 /* -------------------------------------------------------------------------- */
@@ -129,6 +135,8 @@ if (USE_EMULATORS) {
 
 export interface KioskEventEntry {
   chain: string;
+  /** See the server's `KioskEventEntry` — `predictionChain`, not `chainKey`. */
+  predictsFrom: string | null;
   id: string | null;
   title: string;
   startAt: number;
@@ -166,6 +174,10 @@ const refreshKioskPhoneIndex = httpsCallable<
   { force?: boolean } | void,
   { students: number; entries: number; builtAt: string }
 >(functions, 'refreshKioskPhoneIndex');
+const refreshKioskParticipation = httpsCallable<
+  void,
+  { chains: number; instances: number; students: number; builtAt: string }
+>(functions, 'refreshKioskParticipation');
 /**
  * The same callable the check-in screen's allergy badge uses, asked one child at
  * a time. See `fetchAllergyNote`.
@@ -182,7 +194,7 @@ const registerFamilyCallable = httpsCallable<RegisterFamilyRequest, RegisterFami
   'registerFamily',
 );
 const mintRegistrationCodeCallable = httpsCallable<
-  void,
+  { eventId?: string } | void,
   { code: string; expiresAt: number; rotateAfterMs: number }
 >(functions, 'mintRegistrationCode');
 
@@ -237,6 +249,9 @@ export async function bindEntry(entry: KioskEventEntry): Promise<KioskBinding> {
   return {
     eventId,
     seriesId: entry.seriesId,
+    // Carried, not derived: the roster's notion of which chain predicts for a
+    // gathering lives in the app's bundle and the kiosk does not download it.
+    predictsFrom: entry.predictsFrom ?? null,
     title: entry.title,
     startAtMs: entry.startAt,
     endAtMs: entry.endAt,
@@ -256,26 +271,13 @@ export async function bindEntry(entry: KioskEventEntry): Promise<KioskBinding> {
 
 const ROSTER_REFRESH_MS = 6 * 60 * 60_000;
 
-function rosterFromResponse(people: PcoRosterPerson[]): KioskStudent[] {
-  return people
-    .filter((person) => person.status === 'active')
-    .map((person) => ({
-      id: person.id,
-      firstName: person.firstName,
-      lastName: person.lastName,
-      grade: person.grade,
-      searchName: person.searchName,
-      // The flag, never the note — the roster read carries one and not the
-      // other on purpose, and the kiosk is the last place to blur that. What it
-      // buys is the label asking about one child instead of four hundred.
-      hasAllergies: person.hasAllergies === true,
-    }));
-}
-
 /**
  * The searchable roster: the backends' people plus Tally's own documents —
- * the latter cover quick-added visitors no backend holds yet. Backend rows
- * win a collision because names are owned upstream.
+ * the latter cover quick-added visitors no backend holds yet.
+ *
+ * The join itself is in `./roster`, pure and tested: it is by *linkage* rather
+ * than by id, because a pushed visitor is reachable under two of them and this
+ * used to draw both.
  */
 async function fetchRosterNow(force = false): Promise<KioskStudent[]> {
   const [{ data }, docs] = await Promise.all([
@@ -283,31 +285,10 @@ async function fetchRosterNow(force = false): Promise<KioskStudent[]> {
     getDocs(query(collection(db, paths.students()), where('status', '==', 'active'))),
   ]);
 
-  const byId = new Map<string, KioskStudent>();
-  for (const snapshot of docs.docs) {
-    const data = snapshot.data();
-    const firstName = typeof data.firstName === 'string' ? data.firstName : '';
-    const lastName = typeof data.lastName === 'string' ? data.lastName : '';
-    if (!firstName && !lastName) continue;
-    byId.set(snapshot.id, {
-      id: snapshot.id,
-      firstName,
-      lastName,
-      grade: typeof data.grade === 'number' ? data.grade : null,
-      searchName:
-        typeof data.searchName === 'string' && data.searchName
-          ? data.searchName
-          : `${firstName} ${lastName}`.trim().toLowerCase(),
-      // Always false, and not for want of looking: `noMirroredPersonalData` in
-      // firestore.rules refuses an `allergies` key on a student document, so a
-      // visitor no backend holds yet has nowhere for one to be. Once their push
-      // lands they come back through `rosterFromResponse` with the real answer.
-      hasAllergies: false,
-    });
-  }
-  for (const student of rosterFromResponse(data.people)) byId.set(student.id, student);
-
-  return [...byId.values()];
+  return joinKioskRoster(
+    docs.docs.map((snapshot) => ({ id: snapshot.id, data: snapshot.data() })),
+    data.people,
+  );
 }
 
 /**
@@ -435,6 +416,200 @@ export async function loadPhoneIndex(
 }
 
 /* -------------------------------------------------------------------------- */
+/* Participation                                                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Who has been to this gathering, and who comes to it regularly.
+ *
+ * The two answers the lobby screen has never had. Without them the search is
+ * every active student in Tally — a parent at Friday Fellowship typing four
+ * digits can be shown a family who has only ever come to Sunday nursery, or a
+ * stranger who happens to share a phone tail — and every child answering to a
+ * household's number arrives pre-ticked whether or not they come to this.
+ *
+ * Both are computed nightly by `functions/src/kiosk/participation.ts` and read
+ * here as one document. The kiosk cannot work them out for itself: it holds no
+ * event history, and sweeping a year of registers is not something to do with a
+ * parent standing at the screen.
+ */
+export type KioskParticipation = KioskParticipationScope;
+
+const PARTICIPATION_STALE_MS = 24 * 60 * 60_000;
+
+async function fetchParticipationNow(): Promise<CachedParticipation> {
+  const snapshot = await getDoc(doc(db, 'kioskIndex/participation'));
+  const data = snapshot.exists() ? snapshot.data() : null;
+  const builtAt = data?.builtAt;
+  return {
+    fetchedAtMs: Date.now(),
+    builtAtMs:
+      builtAt && typeof (builtAt as { toDate?: unknown }).toDate === 'function'
+        ? (builtAt as { toDate(): Date }).toDate().getTime()
+        : null,
+    chains:
+      data && typeof data.chains === 'object' && data.chains !== null
+        ? (data.chains as CachedParticipation['chains'])
+        : {},
+  };
+}
+
+/**
+ * The scope for one chain, cached-first exactly as `loadPhoneIndex` is.
+ *
+ * Same staleness posture too: when the *stored document* is missing or was built
+ * more than a day ago, the kiosk asks the server to rebuild and refetches — so a
+ * gathering that met for the first time last night scopes correctly tonight
+ * without anybody thinking about it.
+ *
+ * Every failure lands on `NO_PARTICIPATION`, which every caller reads as "search
+ * everybody, tick everybody" — the behaviour the kiosk had before this existed.
+ * That direction is not an accident: a scope that fails closed is a family who
+ * cannot find themselves.
+ */
+export async function loadParticipation(
+  chain: string | null | undefined,
+  onUpdate: (scope: KioskParticipation) => void,
+): Promise<KioskParticipation> {
+  const stored = readJson<CachedParticipation>(KIOSK_KEYS.participation);
+
+  const refresh = async (): Promise<CachedParticipation> => {
+    let index = await fetchParticipationNow();
+    if (index.builtAtMs === null || Date.now() - index.builtAtMs > PARTICIPATION_STALE_MS) {
+      try {
+        await refreshKioskParticipation();
+        index = await fetchParticipationNow();
+      } catch {
+        // Nothing to rebuild from, or no permission. The stored copy still
+        // answers, and an absent one means an unscoped search.
+      }
+    }
+    writeJson(KIOSK_KEYS.participation, index);
+    onUpdate(participationScope(index, chain));
+    return index;
+  };
+
+  if (stored && stored.chains) {
+    if (Date.now() - stored.fetchedAtMs > PARTICIPATION_STALE_MS) void refresh().catch(() => {});
+    return participationScope(stored, chain);
+  }
+  return participationScope(await refresh().catch(() => null), chain);
+}
+
+/* -------------------------------------------------------------------------- */
+/* The pulse                                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The live revisions of the sentinel the functions bump whenever kiosk-visible
+ * data changes — see functions/src/kiosk/pulse.ts for who bumps and when.
+ *
+ * This is what retired the "I've registered" ritual: instead of a parent
+ * pressing a button to force a refetch, the kiosk reads this one small document
+ * on a short cadence and refetches only the channels whose revision moved. The
+ * revisions are opaque change markers — compared with `!==`, never ordered —
+ * and the `registration` channel additionally names the gathering a QR
+ * registration was made against, so the kiosk showing that QR can bring the
+ * search screen up before the family has walked back to it.
+ */
+export interface KioskPulse {
+  roster: number;
+  phones: number;
+  participation: number;
+  registration: { rev: number; eventId: string | null };
+}
+
+function pulseChannel(data: Record<string, unknown> | null, name: string): number {
+  const held = (data?.[name] ?? {}) as Record<string, unknown>;
+  return typeof held.rev === 'number' && Number.isFinite(held.rev) ? held.rev : 0;
+}
+
+/**
+ * One cheap read of the pulse, or null for "no signal".
+ *
+ * Null covers a document nobody has bumped yet, an unreachable network, and a
+ * deployment whose functions predate the pulse — and in every one of those the
+ * TTLs the loaders already run under keep governing. Fail open, always.
+ */
+export async function fetchPulse(): Promise<KioskPulse | null> {
+  try {
+    const snapshot = await getDoc(doc(db, 'kioskIndex/pulse'));
+    if (!snapshot.exists()) return null;
+    const data = snapshot.data();
+    const registration = (data?.registration ?? {}) as Record<string, unknown>;
+    return {
+      roster: pulseChannel(data, 'roster'),
+      phones: pulseChannel(data, 'phones'),
+      participation: pulseChannel(data, 'participation'),
+      registration: {
+        rev: pulseChannel(data, 'registration'),
+        eventId: typeof registration.eventId === 'string' ? registration.eventId : null,
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Remembers which revisions this kiosk has acted on, across reboots. */
+export function rememberPulse(pulse: CachedPulse): void {
+  writeCachedPulse(pulse);
+}
+
+/*
+ * The three soft refetchers the poll routes to, deliberately *unforced*: the
+ * pulse already said the stored data changed, so plain reads suffice — no
+ * rebuild callables, no `force: true`, no sweep of the backends. Each follows
+ * the loaders' shape (write the cache, then tell the screen) and swallows its
+ * errors, because a failed refetch leaves the kiosk exactly where it was and
+ * the next poll tries again.
+ */
+
+/**
+ * Re-reads the roster because the pulse said it moved.
+ *
+ * The `getRoster` half may serve the server's cached backend people, and that
+ * is fine: a just-registered or just-quick-added child's document comes from
+ * the direct students query, which is never cached. The backend half of the
+ * signal only ever follows the nightly index build, which has just swept the
+ * backends itself.
+ */
+export async function refetchRoster(onUpdate: (students: KioskStudent[]) => void): Promise<void> {
+  try {
+    const students = await fetchRosterNow();
+    writeCachedRoster(students);
+    onUpdate(students);
+  } catch {
+    // The kiosk keeps what it had; the next poll tries again.
+  }
+}
+
+export async function refetchPhoneIndex(
+  onUpdate: (last4: Record<string, string[]>) => void,
+): Promise<void> {
+  try {
+    const index = await fetchPhoneIndexNow();
+    writeJson(KIOSK_KEYS.phoneIndex, index);
+    onUpdate(index.last4);
+  } catch {
+    // Same posture as refetchRoster.
+  }
+}
+
+export async function refetchParticipation(
+  chain: string | null | undefined,
+  onUpdate: (scope: KioskParticipation) => void,
+): Promise<void> {
+  try {
+    const index = await fetchParticipationNow();
+    writeJson(KIOSK_KEYS.participation, index);
+    onUpdate(participationScope(index, chain));
+  } catch {
+    // Same posture as refetchRoster.
+  }
+}
+
+/* -------------------------------------------------------------------------- */
 /* Checking again, on demand                                                   */
 /* -------------------------------------------------------------------------- */
 
@@ -533,7 +708,10 @@ export function applyRegistration(result: {
     writeCachedRoster([...byId.values()]);
   }
 
-  const storedIndex = readJson<StoredPhoneIndex>(KIOSK_KEYS.phoneIndex);
+  // Empty for a sibling registration whose family answers to no digits at all
+  // — their household number never reached a backend. Writing it would file
+  // every such child under one nameless bucket that the search can never hit.
+  const storedIndex = result.last4 ? readJson<StoredPhoneIndex>(KIOSK_KEYS.phoneIndex) : null;
   if (storedIndex && storedIndex.last4) {
     const held = storedIndex.last4[result.last4] ?? [];
     writeJson(KIOSK_KEYS.phoneIndex, {
@@ -549,8 +727,13 @@ export function applyRegistration(result: {
 }
 
 /** The short-lived code the kiosk puts in its QR. See functions/src/kiosk/registrationCodes.ts. */
-export async function mintRegistrationCode(): Promise<{ code: string; rotateAfterMs: number }> {
-  const { data } = await mintRegistrationCodeCallable();
+export async function mintRegistrationCode(
+  eventId: string,
+): Promise<{ code: string; rotateAfterMs: number }> {
+  // The code remembers the gathering, so a registration made against it can
+  // wake this kiosk's QR screen — see `fetchPulse` and the auto-advance in
+  // KioskApp. Nothing else about the code changes.
+  const { data } = await mintRegistrationCodeCallable({ eventId });
   return { code: data.code, rotateAfterMs: data.rotateAfterMs };
 }
 
@@ -569,10 +752,23 @@ export async function mintRegistrationCode(): Promise<{ code: string; rotateAfte
 export interface KioskAttendance {
   present: Set<string>;
   checkedOut: Set<string>;
+  /**
+   * Student id -> the arrival that put them here, for the ones that carry one.
+   *
+   * Missing for anything the main app wrote and for everything recorded before
+   * arrivals existed. That absence is meaningful and is not the same as an
+   * arrival of one — see `attendancePayload`.
+   */
+  arrivals: Map<string, string>;
 }
 
 export async function fetchAttendance(eventId: string): Promise<KioskAttendance> {
   const snapshot = await getDocs(collection(db, paths.attendanceCollection(eventId)));
+  const arrivals = new Map<string, string>();
+  for (const docSnapshot of snapshot.docs) {
+    const arrivalId: unknown = docSnapshot.get('arrivalId');
+    if (typeof arrivalId === 'string' && arrivalId) arrivals.set(docSnapshot.id, arrivalId);
+  }
   return {
     present: new Set(snapshot.docs.map((docSnapshot) => docSnapshot.id)),
     checkedOut: new Set(
@@ -580,6 +776,7 @@ export async function fetchAttendance(eventId: string): Promise<KioskAttendance>
         .filter((docSnapshot) => docSnapshot.get('checkedOutAt') != null)
         .map((docSnapshot) => docSnapshot.id),
     ),
+    arrivals,
   };
 }
 
@@ -598,6 +795,12 @@ interface PendingCheckIn {
   studentId: string;
   student: { firstName: string; lastName: string; grade: number | null; searchName: string };
   uid: string;
+  /**
+   * Optional for the same reason `kind` is: a queue written before arrivals
+   * existed still replays, as a check-in that makes no claim about who else
+   * came through the door with them.
+   */
+  arrivalId?: string;
   queuedAtMs: number;
 }
 
@@ -639,8 +842,10 @@ export async function performCheckIn(args: {
   binding: Pick<KioskBinding, 'eventId' | 'seriesId' | 'startAtMs'>;
   student: { id: string; firstName: string; lastName: string; grade: number | null; searchName: string };
   uid: string;
+  /** The arrival this child was part of — see `attendancePayload`. */
+  arrivalId?: string;
 }): Promise<void> {
-  const { binding, student, uid } = args;
+  const { binding, student, uid, arrivalId } = args;
 
   const dates = await studentDates(student.id);
 
@@ -667,6 +872,7 @@ export async function performCheckIn(args: {
       uid,
       method: 'kiosk',
       isFirstEver: isFirstEver(checkInStudent),
+      arrivalId,
     }),
   );
   const patch = studentDatePatch(CLOCK, checkInStudent, event, uid);
@@ -776,6 +982,7 @@ export function enqueueCheckIn(args: {
   binding: Pick<KioskBinding, 'eventId' | 'seriesId' | 'startAtMs'>;
   student: { id: string; firstName: string; lastName: string; grade: number | null; searchName: string };
   uid: string;
+  arrivalId?: string;
 }): void {
   const queue = readQueue().filter(
     (entry) => !(entry.eventId === args.binding.eventId && entry.studentId === args.student.id),
@@ -792,6 +999,7 @@ export function enqueueCheckIn(args: {
       searchName: args.student.searchName,
     },
     uid: args.uid,
+    arrivalId: args.arrivalId,
     queuedAtMs: Date.now(),
   });
   writeJson(KIOSK_KEYS.pending, queue.slice(-MAX_QUEUED));
@@ -812,6 +1020,7 @@ export async function replayQueue(): Promise<number> {
           binding: { eventId: entry.eventId, seriesId: entry.seriesId, startAtMs: entry.startAtMs },
           student: { id: entry.studentId, ...entry.student },
           uid: entry.uid,
+          arrivalId: entry.arrivalId,
         });
       }
     } catch (error) {

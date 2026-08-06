@@ -16,6 +16,7 @@
  */
 import { predictionChain } from '@/lib/gatherings';
 import { chainKey } from '@/lib/materialize';
+import { PARTICIPATION_MAX_AGE_DAYS, thresholdFor } from '@/lib/participation';
 import { wasHeld } from '@/lib/sessionHistory';
 import { createSearchMatcher, sortByName } from '@/lib/utils';
 import type {
@@ -170,14 +171,13 @@ export function countRecentHits(
 /**
  * The threshold actually applied, given how much history exists.
  *
- * A brand-new series has fewer past instances than `ofLastN`. Demanding "2 of
- * 3" when only one Friday has ever happened would leave the Recent list empty
- * and make the feature look broken, so the requirement is clamped to the
- * available window. With no history at all there is nothing to predict from.
+ * The rule itself is in `lib/participation.ts`, because the kiosk's nightly
+ * aggregate applies the very same one on the server and two copies of it would
+ * drift silently — both would go on producing plausible lists. This is the
+ * spelling the roster uses, taking the settings document it already holds.
  */
 export function effectiveThreshold(settings: AppSettings, historyWindow: number): number {
-  if (historyWindow <= 0) return Number.POSITIVE_INFINITY;
-  return Math.max(1, Math.min(settings.predictiveMinAttended, historyWindow));
+  return thresholdFor(settings.predictiveMinAttended, historyWindow);
 }
 
 /**
@@ -226,18 +226,17 @@ export function buildSeriesHistory(
 /**
  * How far back a roster is willing to call somebody one of its own.
  *
- * A ministry turns over: the students who filled the room two years ago have
- * graduated, and a roster that still counts them is back to being a list of
- * everybody the church has ever met — which is the thing the participation
- * filter exists to stop being. A year is the natural unit because a youth
- * ministry's year is one: somebody who came at all last autumn is plausibly
- * coming back this autumn, and somebody who did not is a name, not a student.
+ * Defined in `lib/participation.ts` and re-exported here, where every caller
+ * already looks for it. Shared for the same reason the threshold is: the kiosk's
+ * nightly aggregate has to draw its year from the same place this does, or the
+ * lobby screen and the check-in screen quietly disagree about who belongs to a
+ * gathering.
  *
- * Measured from the gathering being checked into rather than from the wall
+ * Measured here from the gathering being checked into rather than from the wall
  * clock, so back-filling last month's register asks who belonged to the room
  * *that* night, and so the same inputs always give the same roster.
  */
-export const PARTICIPATION_MAX_AGE_DAYS = 365;
+export { PARTICIPATION_MAX_AGE_DAYS };
 
 const DAY_MS = 86_400_000;
 

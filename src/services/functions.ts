@@ -699,3 +699,115 @@ export interface KioskStatus {
  * the reason only ever reaches the function logs.
  */
 export const getKioskStatus = httpsCallable<void, KioskStatus>(functions, 'getKioskStatus');
+
+/* -------------------------------------------------------------------------- */
+/* Reviewing what the kiosk recorded                                           */
+/* -------------------------------------------------------------------------- */
+
+/** Mirrors `ReviewStudentSummary` in functions/src/kiosk/review.ts. */
+export interface ReviewStudentSummary {
+  studentId: string;
+  firstName: string;
+  lastName: string;
+  grade: number | null;
+  /** False when the name lives in a backend rather than in Tally. */
+  known: boolean;
+  status: 'active' | 'inactive';
+}
+
+/** Mirrors `PendingRegistrationChild` in functions/src/kiosk/review.ts. */
+export interface PendingRegistrationChild {
+  firstName: string;
+  lastName: string;
+  grade: number | null;
+  studentId: string | null;
+  pendingReview: boolean;
+  /** Set once a reviewer folded this child into a row that was already there. */
+  mergedIntoStudentId: string | null;
+  allergies: string | null;
+  possibleDuplicates: ReviewStudentSummary[];
+}
+
+/** Mirrors `PendingRegistration` in functions/src/kiosk/review.ts. */
+export interface PendingRegistration {
+  registrationId: string;
+  source: 'kiosk' | 'qr';
+  eventId: string | null;
+  registeredAt: number | null;
+  /** Milliseconds until the record is swept. Negative means overdue. */
+  expiresInMs: number | null;
+  guardian: { firstName: string; lastName: string; phone: string } | null;
+  last4: string;
+  children: PendingRegistrationChild[];
+  anchors: ReviewStudentSummary[];
+  settled: boolean;
+  lastError: string | null;
+}
+
+/**
+ * Families who put themselves on the roster at the kiosk, waiting for somebody
+ * to say yes.
+ *
+ * The one call in Tally that answers with a parent's phone number, which is why
+ * it is core team only and why the collection behind it has no client read path
+ * at all. See functions/src/kiosk/review.ts and docs/data-model.md.
+ */
+export const listPendingRegistrations = httpsCallable<void, PendingRegistration[]>(
+  functions,
+  'listPendingRegistrations',
+);
+
+/** Mirrors `ApproveRegistrationResult` in functions/src/kiosk/review.ts. */
+export interface ApproveRegistrationResult {
+  status: 'approved' | 'partial' | 'not-found';
+  pushed: number;
+  failed: number;
+  guardian: string;
+  message: string;
+}
+
+/**
+ * Puts an approved family into the church's people database — every child, then
+ * one household for the lot. Idempotent: pressing it again finishes a job that
+ * half-finished.
+ */
+export const approveRegistration = httpsCallable<
+  { registrationId: string },
+  ApproveRegistrationResult
+>(functions, 'approveRegistration');
+
+/** Mirrors `DiscardRegistrationResult` in functions/src/kiosk/review.ts. */
+export interface DiscardRegistrationResult {
+  status: 'discarded' | 'not-found';
+  deactivated: number;
+  message: string;
+}
+
+/**
+ * Takes a registration off the roster and forgets the phone number. The
+ * students go inactive rather than away — attendance records point at them.
+ */
+export const discardRegistration = httpsCallable<
+  { registrationId: string },
+  DiscardRegistrationResult
+>(functions, 'discardRegistration');
+
+/** Mirrors `MergeStudentsResult` in functions/src/backends/mergeStudents.ts. */
+export interface MergeStudentsResult {
+  status: 'merged' | 'refused';
+  keeperId: string;
+  foldId: string;
+  message: string;
+}
+
+/**
+ * Two roster rows, one child — or, with `undo`, that decision reversed.
+ *
+ * Tally's roster only. A duplicate that already reached Planning Center is
+ * still there afterwards; merging people in the church's database is done in
+ * the church's database, and Tally follows it on the next read.
+ */
+export const mergeStudents = httpsCallable<
+  { keeperId?: string; foldId: string; undo?: boolean },
+  MergeStudentsResult
+>(functions, 'mergeStudents');

@@ -73,7 +73,10 @@ of these is your child — and for a family arriving for the first time the answ
 them, please see a leader". That is still right when something is wrong with the search; it was never
 right for being new. **First time here?** stands on the search screen from the first paint, because a
 parent told "just put your name in" types a name, gets somebody else's Noah, and never fails a search
-to be offered anything. It asks three questions per child — first name, last name, grade, with "Add
+to be offered anything. It stands there while results are up too, reading **Not your family?** — four
+digits are a small keyspace, and a newcomer who types theirs can be handed a real child, correctly
+spelled, who is not theirs. A successful search is not proof, and the one state a coincidence
+guarantees will never happen is the no-match state. It asks three questions per child — first name, last name, grade, with "Add
 another child" between them and the surname carried forward — then one adult and one phone number,
 and checks the whole family in as a single act with a sticker each. What the last screen says is the
 part that matters next week: *next time, just type 7788* — the last four digits of the number they
@@ -98,22 +101,60 @@ submissions land in a church's real people database; instead the kiosk mints a c
 minutes, carries at most twenty families, and re-mints itself while the screen is up. Registering
 remotely means being in the room.
 
-That form checks nobody in — it cannot know the family walked through the door — so it ends by
-sending them back: *tap "I've registered", then type 7788*. The order is the whole message. The kiosk
-searches a copy of the roster held on the device and refreshes it every six hours, so the button is
-what makes it go and look; telling somebody to type their digits without it is telling them to watch
-a screen say "no match". The same refresh is offered from the no-match state, for the family who took
-ten minutes over the form and came back to a kiosk that had moved on.
+That form checks nobody in — it cannot know the family walked through the door — so it ends with
+the only instruction left: *type 7788*. It used to be two steps — *tap "I've registered", then type*
+— because the kiosk searched a six-hour-old copy of the roster and the button was what made it go
+and look. Now the kiosk notices by itself: the code the form was opened with remembers which
+gathering minted it, the submission bumps a one-document change signal
+([`kioskIndex/pulse`](docs/data-model.md#kioskindexpulse)), and the kiosk — polling that signal
+every thirty seconds — re-reads only what changed and walks its own QR screen back to the search,
+digits line and all, while the family is still crossing the lobby. The button survives behind the QR
+for anyone who will not wait out the half minute. And for the family who took ten minutes over the
+form and came back to a kiosk that had moved on, a finished search that finds nobody anywhere
+re-reads the whole church silently before the screen will say "Still no match".
 
-Nothing here is a lobby screen deciding who somebody is. A child whose name is already on the roster
-stops the whole registration with "search for their name instead" rather than being created twice —
-no half-registered families. Upstream, a parent is joined to a person the church already has only
-when the phone number corroborates the name; anything less certain creates a fresh record, because a
-duplicate adult is a merge somebody performs next month and attaching a child to the wrong family
-shows one household another household's phone number. And a kiosk cannot write any of it directly:
-the security rules pin what a lobby session may put on a student document to the eight keys a
-check-in's date patch touches, which is why registration is a callable that decides every field
-itself.
+**Nothing here is a lobby screen deciding who somebody is**, and that is the design rather than a
+disclaimer. A registration reaches Tally's roster and stops: every child is written held
+(`pendingReview`), which is what keeps them out of Planning Center or Attendees until a named person
+has looked. The first version pushed while the parent stood there and *refused* a registration whose
+child's name already matched somebody — which sounds careful and is not. Nothing upstream is
+reversible (Attendees has no merges at all), the evidence was a stranger's typing, and "search for
+their name instead" points a family at a different child of the same name. Two rows a reviewer merges
+on Tuesday is the cheaper mistake, and the only one anybody notices.
+
+So the door records the suspicion instead, and a core-team screen at `/review` shows the form as the
+family typed it beside the roster rows that share a name: approve, merge, or discard. Approving
+pushes every child and then builds **one** household for the family. The guardian's name and phone
+wait on a functions-only document with a thirty-day TTL until then — the one place in Tally a parent's
+number lives, and [documented as the exception it is](docs/data-model.md#kioskregistrationsregistrationid).
+
+**Journey 2½ — the second child.** A parent whose next child is finally old enough finds their family
+by phone as usual, taps a name, and finds **"Anyone else?"** already asked on the confirm screen —
+the children the kiosk guessed, ending in **"+ Another child"**. Which of them arrive *ticked* is a
+separate question from which are offered, and the two used to be one. `familyOf` guesses a family
+from four phone digits, and the guess is frequently right about the household and wrong about
+tonight: the other children may have come once, or belong to a different programme. So the tick
+follows the gathering's own prediction — the same "2 of the last 3" the check-in screen uses — while
+the offer stays as wide as the guess, every unexpected name listed at full weight and one tap from
+being included. Ticking a child who is not in the building writes them onto a register nobody can
+reconcile; leaving one out costs a tap. That row asks the ambiguous
+question first, because it has two honest answers: the child is often already on the roster and
+simply did not come up under four digits, and searching is a cheaper, safer answer than registering
+a second copy of somebody the church already has. So it opens a name search over the roster — rows
+already on the confirm shown but inert — with **"Not on the list? Add a new child"** standing under
+it. Only that second answer starts a registration, and it asks two questions rather than six: the
+kiosk already knows which family this is, and the household upstream already holds their parent.
+
+Nothing on that path names a relationship, deliberately. Kinship is what `familyOf` *guesses*, from
+four phone digits, and this is the escape hatch for everyone the guess is wrong about — a cousin, a
+neighbour's boy who came in the same car, a child whose number on file is a different one. A parent
+checking in a nephew should not have to decide whether a box labelled "brother or sister" is asking
+about somebody else. The anchors go with the registration, the server re-verifies them, and approval
+joins **their** household rather than founding a second one.
+
+And a kiosk cannot write any of it directly: the security rules pin what a lobby session may put on a
+student document to the eight keys a check-in's date patch touches, which is why registration is a
+callable that decides every field itself.
 
 **Journey 5 — the follow-up list.** The dashboard is a call list, not a report: students who have
 missed three gatherings in a row, first-timers from the last week, profiles with no parent contact,
@@ -652,6 +693,18 @@ label can print the allergy line, because the volunteer holding the child is exa
 read it and is the least likely person to be looking at a roster. Even then the kiosk asks for one
 child's note at the moment they are checked in, keeps it in memory only, and writes nothing down. See
 [docs/label-printing.md](docs/label-printing.md#printing-allergies).
+
+It is also narrow in *who* it will find. The search is scoped to the children who have been to that
+gathering in the last year — the same year the check-in screen uses to decide who belongs to a room
+— rather than to every active student in the ministry, because a parent at Friday Fellowship is not
+standing in front of the Sunday nursery's roster and should not be able to type four digits into
+one. The scope only ever fails open: a gathering with no history behind it searches everything, so
+there is nothing to configure and no way to switch it off by accident, anyone on tonight's register
+is findable whatever last night's aggregate said, and **"Search everyone"** — offered whenever a
+search comes up empty — widens that one search to all of Tally on the spot, with no read behind it.
+The list itself is
+[one precomputed document](docs/data-model.md#kioskindexparticipation) — the kiosk holds no event
+history and could not download the code that reads it.
 
 A student who leaves the ministry is marked inactive in Planning Center and simply stops coming back
 in the roster read. Nothing in Tally deletes them, and that is deliberate: attendance history at

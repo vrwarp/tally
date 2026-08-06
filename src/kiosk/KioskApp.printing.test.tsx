@@ -88,7 +88,16 @@ const services = {
   restoredUid: vi.fn(async () => 'staff-uid'),
   loadRoster: vi.fn(async () => ROSTER),
   loadPhoneIndex: vi.fn(async () => last4),
-  fetchAttendance: vi.fn(async () => ({ present, checkedOut })),
+  loadParticipation: vi.fn(async () => ({
+    participated: new Set<string>(),
+    recent: new Set<string>(),
+  })),
+  fetchAttendance: vi.fn(async () => ({ present, checkedOut, arrivals: new Map<string, string>() })),
+  fetchPulse: vi.fn(async () => null),
+  rememberPulse: vi.fn(),
+  refetchRoster: vi.fn(async () => {}),
+  refetchPhoneIndex: vi.fn(async () => {}),
+  refetchParticipation: vi.fn(async () => {}),
   replayQueue: vi.fn(async () => 0),
   performCheckIn: vi.fn(async () => {
     if (checkInFails) throw checkInFails;

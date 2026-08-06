@@ -25,6 +25,7 @@ import type { AddParentResult, CreateFamilyResult, ExistingPerson } from '../pco
 import type { PushStudentResult } from '../pco/pushStudents.js';
 import type { RecreateStudentResult } from '../pco/recreate.js';
 import { migrateStudentMemberships } from '../backends/studentMigration.js';
+import { HELD_FOR_REVIEW_MESSAGE, isHeldForReview } from '../backends/pendingReview.js';
 import type { PersonCheck } from '../backends/types.js';
 import { isA32GoneError, type A32Client } from './client.js';
 import {
@@ -171,6 +172,12 @@ export async function pushStudent(
   const data = snapshot.data() ?? {};
   const resolved = await resolveA32Person(db, studentId);
   const personId = resolved.personId;
+
+  // See backends/pendingReview.ts — and note that Attendees has no merges at
+  // all, so a person created here in error is created for ever.
+  if (isHeldForReview(data)) {
+    return { status: 'skipped', pcoPersonId: personId, message: HELD_FOR_REVIEW_MESSAGE };
+  }
 
   if (config.writeBack === 'off') {
     return {
@@ -839,6 +846,8 @@ function phoneDigits(value: string | null | undefined): string {
 export async function createFamily(
   options: A32WriteOptions & {
     studentIds: readonly string[];
+    /** Siblings Attendees already has — the folk to join, not one to invent. */
+    anchorStudentIds?: readonly string[];
     firstName: string;
     lastName: string;
     phone?: string | null;
@@ -884,15 +893,22 @@ export async function createFamily(
 
   /* ---- Which children reached Attendees ----------------------------------- */
 
-  const linked: { studentId: string; personId: string; edges: A32FolkAttendee[] }[] = [];
-  for (const studentId of options.studentIds) {
+  type LoadedChild = { studentId: string; personId: string; edges: A32FolkAttendee[] };
+
+  const load = async (studentId: string): Promise<LoadedChild | null> => {
     const resolved = await resolveA32Person(db, studentId);
-    if (!resolved.exists || !resolved.active || !resolved.personId) continue;
-    linked.push({
+    if (!resolved.exists || !resolved.active || !resolved.personId) return null;
+    return {
       studentId,
       personId: resolved.personId,
       edges: await loadFamilyEdges(client, resolved.personId),
-    });
+    };
+  };
+
+  const linked: LoadedChild[] = [];
+  for (const studentId of options.studentIds) {
+    const child = await load(studentId);
+    if (child) linked.push(child);
   }
   if (linked.length === 0) {
     return refuse(
@@ -901,7 +917,78 @@ export async function createFamily(
     );
   }
 
+  /*
+   * Siblings the church already has. Loaded apart from `linked` — they are not
+   * children of this registration and get no new membership — and used only to
+   * say which folk the family actually is. Without them, a second child added
+   * years later founds a second family: `pushStudent` gives every attendee it
+   * creates a brand-new folk (`X-Add-Folk: new`), so "the folk these children
+   * are in" is, for a run of freshly-created children, always the one this run
+   * just made.
+   */
+  const anchors: LoadedChild[] = [];
+  for (const studentId of options.anchorStudentIds ?? []) {
+    if (options.studentIds.includes(studentId)) continue;
+    const sibling = await load(studentId);
+    if (sibling) anchors.push(sibling);
+  }
+
   const relations = await allRelations(options);
+
+  /* ---- A family that already exists, gaining a child ---------------------- */
+
+  const anchorFolkId = anchors
+    .flatMap((child) =>
+      child.edges
+        .filter(
+          (edge) =>
+            edge.attendee === child.personId &&
+            edge.folk.category === A32_FAMILY_CATEGORY &&
+            edge.is_removed !== true,
+        )
+        .map((edge) => edge.folk.id),
+    )
+    .find((id) => id !== undefined);
+  const anchorHasAdult = anchors.some(
+    (child) => findParentCandidates(child.personId, child.edges, relations).length > 0,
+  );
+
+  if (anchorFolkId && anchorHasAdult) {
+    // The sibling journey — see the same block in ../pco/household.ts. The
+    // parent is already on file; there is nothing to create and nothing to
+    // guess, only a child to file into the family that is there.
+    const joined: string[] = [];
+    for (const child of linked) {
+      const alreadyIn = child.edges.some(
+        (edge) =>
+          edge.attendee === child.personId &&
+          edge.folk.id === anchorFolkId &&
+          edge.is_removed !== true,
+      );
+      if (alreadyIn) continue;
+      await client.post<A32FolkAttendee>(
+        API.folkAttendees,
+        { folk: anchorFolkId, attendee: child.personId, role: relationIds.child },
+        { 'X-Target-Attendee-Id': child.personId },
+      );
+      joined.push(child.studentId);
+    }
+    return {
+      status: 'already-has-family',
+      parentName: null,
+      parentPersonId: null,
+      createdPerson: false,
+      createdHousehold: false,
+      linkedChildren: linked.map((entry) => entry.studentId),
+      wrote: [],
+      skipped: [],
+      message:
+        joined.length === 0
+          ? `${linked.length === 1 ? 'That child was' : 'Those children were'} already in the family.`
+          : `Added ${joined.length === 1 ? 'the child' : `all ${joined.length} children`} to the family Attendees already had — no second one was created.`,
+    };
+  }
+
   for (const child of linked) {
     if (findParentCandidates(child.personId, child.edges, relations).length > 0) {
       return refuse('already-has-family', 'This family already has an adult on file.', {
@@ -956,7 +1043,9 @@ export async function createFamily(
   /* ---- One folk for the family -------------------------------------------- */
 
   const anchor = linked[0]!;
-  const existingFolk = linked
+  // Anchors first: a sibling's folk is the family's real one, and a child of
+  // this run has at best the folk `pushStudent` minted for them a moment ago.
+  const existingFolk = [...anchors, ...linked]
     .flatMap((child) =>
       child.edges.filter(
         (edge) =>

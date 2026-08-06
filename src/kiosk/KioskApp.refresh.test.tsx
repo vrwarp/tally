@@ -1,17 +1,18 @@
 /**
- * What the kiosk offers a family it cannot find.
+ * What the kiosk does for a family it cannot find — by itself.
  *
- * The roster on the glass is a cache — hours old by design, so that a lobby
- * screen paints before Firebase has parsed — and the commonest reason a name is
- * missing from it is that somebody added the child while the family queued. So
- * an empty result is not the end of the conversation: it offers one forced read
- * of the church, and only then says to see a leader.
+ * The roster on the glass is a cache, and the commonest reason a name is
+ * missing is that somebody added the child moments ago. The pulse covers every
+ * path that touches Tally; what remains is the family added straight into the
+ * church's backend, and for them the kiosk runs the old church-wide sweep
+ * *silently* the moment a finished search comes up empty — four digits are
+ * finished by construction, a name is finished when the typing stops.
  *
  * Pinned here because the whole feature is invisible until it is needed, and
- * every part of it is one line from being useless: an offer that never appears,
- * a sweep that fires on every keystroke that matches nobody, a "still no match"
- * left standing for the next family, or a network failure that reads as an
- * answer.
+ * every part of it is one line from being harmful instead: a sweep that fires
+ * per keystroke, a "Still no match" left standing for the next family, a
+ * network failure that reads as an answer, or a second sweep for a queue of
+ * latecomers the cooldown should have collapsed into one.
  */
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -40,7 +41,11 @@ const GRACE: KioskStudent = {
   hasAllergies: false,
 };
 
-const OFFER = /just registered\?/i;
+/**
+ * How long a name has to sit still before its empty result is believed.
+ * Mirrors NO_MATCH_SWEEP_DEBOUNCE_MS in KioskApp.
+ */
+const SWEEP_QUIET_MS = 2_000;
 
 function binding(): KioskBinding {
   const now = Date.now();
@@ -67,7 +72,20 @@ const services = {
   restoredUid: vi.fn(async () => 'staff-uid'),
   loadRoster: vi.fn(async () => [ADA]),
   loadPhoneIndex: vi.fn(async () => ({})),
-  fetchAttendance: vi.fn(async () => ({ present: new Set<string>(), checkedOut: new Set<string>() })),
+  loadParticipation: vi.fn(async () => ({
+    participated: new Set<string>(),
+    recent: new Set<string>(),
+  })),
+  fetchAttendance: vi.fn(async () => ({
+    present: new Set<string>(),
+    checkedOut: new Set<string>(),
+    arrivals: new Map<string, string>(),
+  })),
+  fetchPulse: vi.fn(async () => null),
+  rememberPulse: vi.fn(),
+  refetchRoster: vi.fn(async () => {}),
+  refetchPhoneIndex: vi.fn(async () => {}),
+  refetchParticipation: vi.fn(async () => {}),
   replayQueue: vi.fn(async () => 0),
   refreshDirectory: vi.fn((onRoster: OnRoster, onPhoneIndex: OnPhoneIndex) =>
     refreshDirectory(onRoster, onPhoneIndex),
@@ -130,21 +148,44 @@ afterEach(() => {
   localStorage.clear();
 });
 
-describe('looking again for somebody the cached roster does not hold', () => {
-  it('finds a family the cache was too old to know about', async () => {
+describe('the silent sweep for somebody the cached roster does not hold', () => {
+  /** Lets a finished name query's quiet period elapse. */
+  async function quiet(): Promise<void> {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(SWEEP_QUIET_MS);
+    });
+    await settle();
+  }
+
+  it('finds a family the cache was too old to know about, with no button anywhere', async () => {
     await mount();
     await type('grace');
 
     expect(screen.getByText(/No match/)).toBeTruthy();
-    await tap(OFFER);
+    await quiet();
 
     expect(services.refreshDirectory).toHaveBeenCalledTimes(1);
-    // The search re-runs against the fresh roster on its own — a parent who
-    // asked for this must not have to retype the name they just typed.
+    // The search re-runs against the fresh roster on its own — the parent
+    // typed a name, and the name is the whole of what was asked of them.
     expect(screen.getByText('Grace Hopper')).toBeTruthy();
   });
 
-  it('says so while the read is in flight, and does not start a second one', async () => {
+  it('sweeps at once for four digits, which are finished by construction', async () => {
+    refreshDirectory = async (onRoster, onPhoneIndex) => {
+      onRoster([ADA, GRACE]);
+      onPhoneIndex({ '9911': ['student-grace'] });
+    };
+
+    await mount();
+    await type('9911');
+    await settle();
+
+    // No quiet period: nobody types a fifth digit.
+    expect(services.refreshDirectory).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Grace Hopper')).toBeTruthy();
+  });
+
+  it('runs one sweep however the search is reworded while it is in flight', async () => {
     let land = () => {};
     refreshDirectory = (onRoster) =>
       new Promise((resolve) => {
@@ -156,21 +197,15 @@ describe('looking again for somebody the cached roster does not hold', () => {
 
     await mount();
     await type('grace');
-    await tap(OFFER);
-
-    // A sweep of the whole church is not instant, and a screen that says
-    // nothing about it is a screen a parent taps again.
-    expect(screen.getByText(/Checking…/)).toBeTruthy();
-    await tap(/Checking…/);
+    await quiet();
     expect(services.refreshDirectory).toHaveBeenCalledTimes(1);
 
-    // Nor does walking away from it start a second one. A read in flight is the
-    // one thing a cleared buffer does not reset — the cooldown has not been
-    // stamped yet, so there would be nothing else to stop the next tap.
+    // Retyping while the read is in flight must not start a second one — the
+    // cooldown has not been stamped yet, so the in-flight state is the only
+    // thing standing between a queue of parents and a sweep each.
     await tap('Clear');
     await type('grace');
-    expect(screen.getByText(/Checking…/)).toBeTruthy();
-    await tap(/Checking…/);
+    await quiet();
     expect(services.refreshDirectory).toHaveBeenCalledTimes(1);
 
     await act(async () => {
@@ -180,22 +215,18 @@ describe('looking again for somebody the cached roster does not hold', () => {
     expect(screen.getByText('Grace Hopper')).toBeTruthy();
   });
 
-  it('offers a retry when the network refuses, rather than reporting an answer', async () => {
+  it('says the network refused, rather than reporting an answer', async () => {
     refreshDirectory = async () => {
       throw new Error('offline');
     };
 
     await mount();
     await type('grace');
-    await tap(OFFER);
+    await quiet();
 
     expect(screen.getByText(/Couldn.t reach the network/)).toBeTruthy();
     // Emphatically not "still no match": nobody looked.
     expect(screen.queryByText(/Still no match/)).toBeNull();
-
-    refreshDirectory = async (onRoster) => onRoster([ADA, GRACE]);
-    await tap(/Try again/);
-    expect(screen.getByText('Grace Hopper')).toBeTruthy();
   });
 
   it('shows the half of the answer that landed', async () => {
@@ -208,7 +239,7 @@ describe('looking again for somebody the cached roster does not hold', () => {
 
     await mount();
     await type('grace');
-    await tap(OFFER);
+    await quiet();
 
     expect(screen.getByText('Grace Hopper')).toBeTruthy();
   });
@@ -218,45 +249,55 @@ describe('looking again for somebody the cached roster does not hold', () => {
 
     await mount();
     await type('grace');
-    await tap(OFFER);
+    await quiet();
 
+    // "Still" is the sweep's one visible trace: the church has been asked,
+    // and the honest next doors are the register and a leader.
     expect(screen.getByText(/Still no match/)).toBeTruthy();
-    // The offer is spent: tapping it again would sweep the church for the same
-    // answer, and the screen would look identical either way.
-    expect(screen.queryByText(OFFER)).toBeNull();
   });
 
-  it('answers the next family from the read it just did, without sweeping again', async () => {
+  it('answers the next family from the sweep it just ran, without sweeping again', async () => {
     refreshDirectory = async (onRoster) => onRoster([ADA]);
 
     await mount();
     await type('grace');
-    await tap(OFFER);
+    await quiet();
     await tap('Clear');
 
-    // A new person at the kiosk, and a fresh offer — the state describes one
-    // search, not the device.
     await type('noah');
-    expect(screen.getByText(OFFER)).toBeTruthy();
-
-    await tap(OFFER);
-    // Answered from the sweep a minute ago rather than a second one: a queue of
-    // latecomers is one clump, and it must not be one sweep each.
+    await quiet();
+    // Answered from the sweep a minute ago rather than a second one: a queue
+    // of latecomers is one clump, and it must not be one sweep each.
     expect(services.refreshDirectory).toHaveBeenCalledTimes(1);
     expect(screen.getByText(/Still no match/)).toBeTruthy();
   });
 
-  it('stays out of the way of a search that is still being typed', async () => {
+  it('never fires for a search that is still being typed', async () => {
     await mount();
 
-    // Two digits of a phone number match nobody by construction — offering a
-    // read of the church here would fire on the way to every phone search.
+    // Two digits of a phone number match nobody by construction — a sweep
+    // here would fire on the way to every phone search in the building.
     await type('12');
-    expect(screen.queryByText(OFFER)).toBeNull();
+    await quiet();
+    expect(services.refreshDirectory).not.toHaveBeenCalled();
 
+    // A name still being typed gets its quiet period back with each key.
+    await tap('Clear');
+    await type('gra');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(SWEEP_QUIET_MS - 500);
+    });
+    await type('xx');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(SWEEP_QUIET_MS - 500);
+    });
+    expect(services.refreshDirectory).not.toHaveBeenCalled();
+
+    // And never for a name the kiosk already answers.
     await tap('Clear');
     await type('ada');
+    await quiet();
     expect(screen.getByText('Ada Lovelace')).toBeTruthy();
-    expect(screen.queryByText(OFFER)).toBeNull();
+    expect(services.refreshDirectory).not.toHaveBeenCalled();
   });
 });

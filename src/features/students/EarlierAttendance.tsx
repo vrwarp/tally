@@ -18,18 +18,30 @@
  * the beginning. The heading says so, so that a sparse-looking list is not read
  * as a patchy attender.
  *
+ * A student who absorbed a duplicate is one child under two ids, and merging
+ * does not re-key the attendance — so `mergedFromStudentIds` comes along and
+ * the hook reads both. Without it, merging a family's duplicate would make half
+ * a child's history disappear from the only screen that shows all of it.
+ *
  * Nothing loads until somebody presses. See `useStudentHistory`.
  */
+import { useMemo } from 'react';
 import { Button, Card, CardHeader, ErrorBanner, SkeletonRows } from '@/components/ui';
 import { useStudentHistory } from '@/hooks/useStudentHistory';
 import { formatShortDate } from '@/lib/time';
 
 export interface EarlierAttendanceProps {
   studentId: string;
+  /** Rows merged into this one, whose records still carry their own ids. */
+  alsoStudentIds?: readonly string[];
 }
 
-export function EarlierAttendance({ studentId }: EarlierAttendanceProps) {
-  const { entries, started, loading, hasMore, error, loadMore } = useStudentHistory(studentId);
+export function EarlierAttendance({ studentId, alsoStudentIds }: EarlierAttendanceProps) {
+  const ids = useMemo(
+    () => [studentId, ...(alsoStudentIds ?? [])],
+    [studentId, alsoStudentIds],
+  );
+  const { entries, started, loading, hasMore, error, loadMore } = useStudentHistory(ids);
 
   return (
     <Card>

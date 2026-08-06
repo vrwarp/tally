@@ -25,6 +25,21 @@ import { EVENTS, toSource } from '../occurrences.js';
 export interface KioskEventEntry {
   /** The repeat chain, or the event's own id for a one-off. */
   chain: string;
+  /**
+   * The chain whose past instances describe who comes to this, or null when
+   * nothing does.
+   *
+   * Deliberately not `chain`, and the two differ exactly where it matters. A
+   * recurring gathering reads its own chain. A one-off has no chain of its own
+   * to read, so it reads the one a leader pointed it at — `predictFromChain` —
+   * and nothing at all when they pointed it at nothing. That is
+   * `predictionChain` in `src/lib/gatherings.ts`, and the kiosk has to agree
+   * with it or the lobby screen and the check-in screen answer "who belongs to
+   * this gathering" differently about the same evening.
+   *
+   * `chain` stays what it was: the identity `materializeOccurrence` takes.
+   */
+  predictsFrom: string | null;
   /** The document id, or null for a projected occurrence nothing stands for. */
   id: string | null;
   title: string;
@@ -62,9 +77,30 @@ export function clampKioskEventDays(days: unknown): number {
   return Math.max(1, Math.min(MAX_KIOSK_EVENT_DAYS, Math.floor(days)));
 }
 
-function entryFromSource(source: OccurrenceSource): KioskEventEntry {
+/**
+ * `predictionChain`, over what a stored document holds.
+ *
+ * Read off the raw data rather than off `OccurrenceSource`, which does not
+ * carry `predictFromChain` — it is a roster concern and the projection has
+ * never needed it. Only the document path can produce a one-off anyway:
+ * `projectOccurrences` expands recurrence rules, and a one-off has none.
+ */
+function predictsFromOf(
+  source: OccurrenceSource,
+  data: Record<string, unknown> | null,
+): string | null {
+  if (source.mode !== 'oneoff') return chainKey(source);
+  const named = data?.predictFromChain;
+  return typeof named === 'string' && named.length > 0 ? named : null;
+}
+
+function entryFromSource(
+  source: OccurrenceSource,
+  data: Record<string, unknown> | null,
+): KioskEventEntry {
   return {
     chain: chainKey(source),
+    predictsFrom: predictsFromOf(source, data),
     id: source.id,
     title: source.title,
     startAt: source.startAt.getTime(),
@@ -108,6 +144,8 @@ export async function listKioskEvents(
 
   const snapshot = await db.collection(EVENTS).get();
   const sources: OccurrenceSource[] = [];
+  // Kept alongside, for the one field the projection's shape does not carry.
+  const stored = new Map<string, Record<string, unknown>>();
   for (const doc of snapshot.docs) {
     const data = doc.data();
     if (!data) continue;
@@ -117,6 +155,7 @@ export async function listKioskEvents(
       continue;
     }
     sources.push(source);
+    stored.set(doc.id, data);
   }
 
   const entries: KioskEventEntry[] = [];
@@ -125,7 +164,7 @@ export async function listKioskEvents(
     if (source.status === 'cancelled') continue;
     if (offeredUntil(source.endAt, source.checkInClosesAt) <= now.getTime()) continue;
     if (source.startAt.getTime() > horizon.getTime()) continue;
-    entries.push(entryFromSource(source));
+    entries.push(entryFromSource(source, stored.get(source.id) ?? null));
   }
 
   // The projection needs the *whole* window of sources — chains are templated
@@ -136,6 +175,9 @@ export async function listKioskEvents(
     if (offeredUntil(occurrence.endAt, occurrence.checkInClosesAt) <= now.getTime()) continue;
     entries.push({
       chain: chainKey(occurrence.source),
+      // A projection expands a recurrence rule, so it is never a one-off and
+      // its chain always predicts for it.
+      predictsFrom: chainKey(occurrence.source),
       id: null,
       title: occurrence.source.title,
       startAt: occurrence.startAt.getTime(),

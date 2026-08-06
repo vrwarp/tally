@@ -28,7 +28,17 @@ import { haptic } from '@/lib/utils';
 export type KioskKey =
   | { kind: 'char'; value: string }
   | { kind: 'backspace' }
-  | { kind: 'clear' };
+  | { kind: 'clear' }
+  | { kind: 'shift' };
+
+/**
+ * Whether the next letter is a capital, and whether it stays that way.
+ *
+ * The three states every phone keyboard's shift key cycles through. Leaving the
+ * prop off entirely is a fourth thing: no shift key at all, which is what the
+ * search screen wants.
+ */
+export type ShiftState = 'off' | 'on' | 'lock';
 
 const ROWS: string[][] = [
   ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
@@ -41,11 +51,29 @@ const KEY_CLASS =
   'flex h-14 min-w-0 flex-1 select-none items-center justify-center rounded-lg ' +
   'bg-ink-800 text-xl font-semibold text-ink-100 active:bg-ink-600';
 
-export const Keyboard = memo(function Keyboard({ onKey }: { onKey: (key: KioskKey) => void }) {
+export const Keyboard = memo(function Keyboard({
+  onKey,
+  shift,
+}: {
+  onKey: (key: KioskKey) => void;
+  /**
+   * Omitted by the search screen, which has typed in capitals since the kiosk
+   * existed and has no reason to stop: search folds case, and a mode is one
+   * more thing to get wrong at a door.
+   *
+   * Registration passes it, because what is typed there is written to the
+   * roster, pushed into the church's database and printed on a child's sticker
+   * — and no rule short of a dictionary gets McDonald, O'Brien and van der Berg
+   * all right. A parent can see the case as they type and fix it themselves.
+   */
+  shift?: ShiftState;
+}) {
   // The latest handler behind a stable identity, so this subtree's memo holds
   // even if a parent re-creates its callback.
   const handlerRef = useRef(onKey);
   handlerRef.current = onKey;
+
+  const capitals = shift === undefined || shift !== 'off';
 
   const onPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const target = (event.target as HTMLElement).closest<HTMLElement>('[data-key]');
@@ -58,8 +86,19 @@ export const Keyboard = memo(function Keyboard({ onKey }: { onKey: (key: KioskKe
     haptic(8);
     if (key === 'backspace') handlerRef.current({ kind: 'backspace' });
     else if (key === 'clear') handlerRef.current({ kind: 'clear' });
+    else if (key === 'shift') handlerRef.current({ kind: 'shift' });
     else if (key === 'space') handlerRef.current({ kind: 'char', value: ' ' });
-    else handlerRef.current({ kind: 'char', value: key });
+    else {
+      /*
+       * The character in the case the key is *showing*. Read off the label
+       * rather than decided downstream, so what a parent sees on the glass is
+       * exactly what lands in the readout with no second opinion applied on the
+       * way. `data-key` stays the canonical capital, so everything that drives
+       * this keyboard keeps addressing one stable name per key.
+       */
+      const label = target?.textContent ?? key;
+      handlerRef.current({ kind: 'char', value: label.length === 1 ? label : key });
+    }
   }, []);
 
   return (
@@ -72,10 +111,29 @@ export const Keyboard = memo(function Keyboard({ onKey }: { onKey: (key: KioskKe
         <div key={i} className="flex gap-1.5">
           {/* Stagger the letter rows the way every keyboard does. */}
           {i === 2 && <div className="flex-[0.5]" />}
-          {i === 3 && <div className="flex-[1.5]" />}
+          {/* The bottom row's leading slot: a spacer where there is no shift
+              key, the shift key where there is. Same width either way, so the
+              letters under a thumb sit in the same place on both screens. */}
+          {i === 3 &&
+            (shift === undefined ? (
+              <div className="flex-[1.5]" />
+            ) : (
+              <button
+                type="button"
+                tabIndex={-1}
+                data-key="shift"
+                aria-label={shift === 'lock' ? 'Caps lock on' : shift === 'on' ? 'Shift on' : 'Shift'}
+                aria-pressed={shift !== 'off'}
+                className={`${KEY_CLASS} flex-[1.5] text-2xl ${shift === 'off' ? '' : 'bg-ink-600 text-white'}`}
+              >
+                {shift === 'lock' ? '⇪' : '⇧'}
+              </button>
+            ))}
           {row.map((key) => (
             <button key={key} type="button" tabIndex={-1} data-key={key} className={KEY_CLASS}>
-              {key}
+              {/* Digits have no case; a letter wears the shift state, so every
+                  key shows exactly what it will produce. */}
+              {capitals ? key : key.toLowerCase()}
             </button>
           ))}
           {i === 2 && <div className="flex-[0.5]" />}

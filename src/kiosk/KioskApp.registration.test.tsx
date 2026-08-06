@@ -96,10 +96,17 @@ let answer: RegisterFamilyResult = {
   ],
   last4: '3344',
   checkedIn: true,
-  guardian: { upstream: 'created' },
 };
 let sent: RegisterFamilyRequest[] = [];
 let registerFails = false;
+/**
+ * The four-digit index the kiosk searches, seeded per test.
+ *
+ * It has to come through the loader rather than through localStorage: the
+ * stored copy is only the first paint, and the load that follows it a tick
+ * later replaces whatever was there.
+ */
+let phoneIndex: Record<string, string[]> = {};
 /** What a forced refresh finds — a family who registered on their own phone. */
 let refreshedStudents: KioskStudent[] = [];
 let refreshedLast4: Record<string, string[]> = {};
@@ -110,8 +117,21 @@ const services = {
   // the failure these tests are about — so it answers rather than throwing.
   listEvents: vi.fn(async () => []),
   loadRoster: vi.fn(async () => [ADA]),
-  loadPhoneIndex: vi.fn(async () => ({})),
-  fetchAttendance: vi.fn(async () => ({ present: new Set<string>(), checkedOut: new Set<string>() })),
+  loadPhoneIndex: vi.fn(async () => phoneIndex),
+  loadParticipation: vi.fn(async () => ({
+    participated: new Set<string>(),
+    recent: new Set<string>(),
+  })),
+  fetchAttendance: vi.fn(async () => ({
+    present: new Set<string>(),
+    checkedOut: new Set<string>(),
+    arrivals: new Map<string, string>(),
+  })),
+  fetchPulse: vi.fn(async () => null),
+  rememberPulse: vi.fn(),
+  refetchRoster: vi.fn(async () => {}),
+  refetchPhoneIndex: vi.fn(async () => {}),
+  refetchParticipation: vi.fn(async () => {}),
   replayQueue: vi.fn(async () => 0),
   performCheckIn: vi.fn(async () => {}),
   performCheckOut: vi.fn(async () => {}),
@@ -172,6 +192,25 @@ function configurePrinter(): void {
   localStorage.setItem(KIOSK_KEYS.printer, JSON.stringify({ model: 'QL-810W', label: '62x29' }));
 }
 
+/**
+ * Past whichever success screen is up.
+ *
+ * There are two, and they end differently: a tap's success screen has no
+ * button at all and says "tap anywhere", while the wizard's last screen offers
+ * a Done. Both also return on their own after a few seconds, which is why this
+ * looks for what is there rather than insisting on one.
+ */
+async function carryOn(): Promise<void> {
+  const done = screen.queryByText(/^Done$/);
+  const anywhere = screen.queryByText(/tap anywhere to carry on/i);
+  const target = done ?? anywhere;
+  if (!target) throw new Error('No success screen to carry on from.');
+  await act(async () => {
+    fireEvent.pointerDown(target.closest('button') ?? target);
+  });
+  await settle();
+}
+
 async function tap(text: RegExp | string): Promise<void> {
   await act(async () => {
     fireEvent.pointerDown(screen.getByText(text).closest('button')!);
@@ -179,16 +218,19 @@ async function tap(text: RegExp | string): Promise<void> {
   await settle();
 }
 
-/** Types on the kiosk's own keyboard, which listens on glass contact. */
+/**
+ * Types on the kiosk's own keyboard, which listens on glass contact.
+ *
+ * Addressed by `data-key`, never by the label: a letter key now shows its
+ * shift state, so its text changes as you type and its name does not. What
+ * comes out is whatever case the keyboard was showing — which is the point of
+ * the shift key, and why this passes the intended text rather than a cased one.
+ */
 async function type(text: string): Promise<void> {
   for (const key of text.toUpperCase()) {
     await act(async () => {
-      const selector = key === ' ' ? '[data-key="space"]' : '[data-key]';
-      fireEvent.pointerDown(
-        key === ' '
-          ? document.querySelector(selector)!
-          : screen.getByText(key, { selector: '[data-key]' }),
-      );
+      const name = key === ' ' ? 'space' : key;
+      fireEvent.pointerDown(document.querySelector(`[data-key="${name}"]`)!);
     });
   }
   await settle();
@@ -206,7 +248,7 @@ async function enterChild(first: string, last: string, grade: string): Promise<v
 
 /** The whole wizard, up to but not including the final button. */
 async function fillInTheFamily(): Promise<void> {
-  await tap(/Register your family/);
+  await tap(/Register your child/);
   // The QR is offered first; the wizard is behind "no phone".
   await tap(/Register right here/);
   await enterChild('Robin', 'Fields', '4');
@@ -228,6 +270,7 @@ beforeEach(() => {
   localStorage.clear();
   sent = [];
   registerFails = false;
+  phoneIndex = {};
   refreshedStudents = [];
   refreshedLast4 = {};
   answer = {
@@ -238,8 +281,7 @@ beforeEach(() => {
     ],
     last4: '3344',
     checkedIn: true,
-    guardian: { upstream: 'created' },
-  };
+    };
 });
 
 afterEach(() => {
@@ -262,6 +304,31 @@ describe('getting into the wizard', () => {
     expect(screen.getByText(/No match — first time here\?/)).toBeTruthy();
     // Seeing a leader is still offered; it is no longer the whole answer.
     expect(screen.getByText(/or see a leader/)).toBeTruthy();
+  });
+
+  it('keeps the door open when the four digits matched somebody else', async () => {
+    /*
+     * The coincidence, which the no-match state can never catch.
+     *
+     * Four digits are a small keyspace. A family nobody has met types theirs,
+     * and the kiosk answers with a real child, correctly spelled, who is not
+     * theirs — a *successful* search that is the wrong answer. The offer has to
+     * be standing there while those rows are up, and it has to stop asking
+     * whether they are new: what they are looking at is a stranger.
+     */
+    phoneIndex = { '3344': [ADA.id] };
+    await mount();
+    await type('3344');
+
+    expect(screen.getByText('Ada Lovelace')).toBeTruthy();
+    expect(screen.getByText(/Not your family\?/)).toBeTruthy();
+    expect(screen.queryByText(/First time here\?/)).toBeNull();
+
+    await tap(/Register your child/);
+
+    // And it is the same door, landing on the same QR offer — whose own
+    // largest button is the one a family who already registered needs.
+    expect(screen.getByText(/I've registered/)).toBeTruthy();
   });
 });
 
@@ -333,20 +400,97 @@ describe('registering a family', () => {
   });
 });
 
-describe('when it does not work', () => {
-  it('sends a family who are already on the roster to search instead', async () => {
-    answer = {
-      status: 'duplicate',
-      duplicateIndexes: [0],
-      message: 'Robin is already on our list — search for their name instead.',
-    };
+describe('the four things a parent touches', () => {
+  it('names the field it is asking about, on both people', async () => {
+    // "Type here" repeated the shape of the screen back and named nothing. On
+    // the two steps where the answer could belong to either person in the room,
+    // the placeholder is the only thing that says which.
     await mount();
-    await fillInTheFamily();
-    await tap('Check in everyone');
+    await tap(/Register your child/);
+    await tap(/Register right here/);
+    expect(screen.getAllByText("Child's first name").length).toBeGreaterThan(0);
 
-    expect(screen.getByText(/already on our list/)).toBeTruthy();
-    expect(printing.printLabel).not.toHaveBeenCalled();
+    await type('Robin');
+    await tap('Next');
+    expect(screen.getAllByText("Child's last name").length).toBeGreaterThan(0);
+
+    await tap('Clear');
+    await type('Fields');
+    await tap('Next');
+    await tap('4');
+    await tap("That's everyone");
+    expect(screen.getAllByText('Your first name').length).toBeGreaterThan(0);
+    // And the line above it is context, not the same words again.
+    expect(screen.getByText('So we know who brought them.')).toBeTruthy();
   });
+
+  it('offers a shift key, and types what the key is showing', async () => {
+    await mount();
+    await tap(/Register your child/);
+    await tap(/Register right here/);
+
+    // Auto-capitalised at the start, so the first letter needs no thought.
+    await type('Mc');
+    expect(screen.getByText('Mc')).toBeTruthy();
+
+    // And the key is there for the letter no rule would have capitalised.
+    await act(async () => {
+      fireEvent.pointerDown(document.querySelector('[data-key="shift"]')!);
+    });
+    await type('D');
+    await type('onald');
+    expect(screen.getByText('McDonald')).toBeTruthy();
+  });
+
+  it('gives the phone number a dialer rather than a keyboard', async () => {
+    await mount();
+    await tap(/Register your child/);
+    await tap(/Register right here/);
+    await enterChild('Robin', 'Fields', '4');
+    await tap("That's everyone");
+    await type('Dana');
+    await tap('Next');
+    await tap('Clear');
+    await type('Fields');
+    await tap('Next');
+
+    // The letters are gone; the digits are laid out as a phone.
+    expect(document.querySelector('[data-key="Q"]')).toBeNull();
+    expect(document.querySelector('[data-key="7"]')).toBeTruthy();
+    expect(screen.getByText('PQRS')).toBeTruthy();
+  });
+
+  it('shows the children so far when it asks whether there are more', async () => {
+    // The question is "anybody else?", and the parent of four cannot answer it
+    // against their memory of what they typed forty seconds ago.
+    await mount();
+    await tap(/Register your child/);
+    await tap(/Register right here/);
+    await enterChild('Robin', 'Fields', '4');
+
+    expect(screen.getByText('Robin Fields')).toBeTruthy();
+    expect(screen.getByText('4th grade')).toBeTruthy();
+
+    await tap('Add another child');
+    await enterChild('Sam', 'Fields', '2');
+
+    // Both of them, including the one just added.
+    expect(screen.getByText('Robin Fields')).toBeTruthy();
+    expect(screen.getByText('Sam Fields')).toBeTruthy();
+  });
+});
+
+describe('when it does not work', () => {
+  /*
+   * There is deliberately no "already on the roster" case here any more.
+   *
+   * The kiosk used to refuse a registration whose child's name matched
+   * somebody and tell the family to search instead — which is an instruction
+   * to check in a different child of the same name, on a screen with nobody
+   * standing at it. The suspicion is recorded for the Review screen now and
+   * the family is checked in either way. See
+   * functions/src/kiosk/registration.ts.
+   */
 
   it('offers a retry under the same registration id, so nobody is created twice', async () => {
     registerFails = true;
@@ -377,7 +521,7 @@ describe('registering on your own phone', () => {
 
   it('offers a code to scan, and the address in words for a camera that will not', async () => {
     await mount();
-    await tap(/Register your family/);
+    await tap(/Register your child/);
 
     expect(screen.getByLabelText('Registration QR code')).toBeTruthy();
     expect(screen.getByText('ABC234')).toBeTruthy();
@@ -390,7 +534,7 @@ describe('registering on your own phone', () => {
     refreshedLast4 = { '9012': [REMOTE.id] };
 
     await mount();
-    await tap(/Register your family/);
+    await tap(/Register your child/);
     await tap(/I've registered/);
 
     // Back on search, told what to type — the digits are useless without that
@@ -406,12 +550,58 @@ describe('registering on your own phone', () => {
     // of a family who filled a form in on their phone, and there is one right
     // way to go and look — see `refreshDirectory`.
     await mount();
-    await tap(/Register your family/);
+    await tap(/Register your child/);
     await tap(/I've registered/);
 
     expect(services.refreshDirectory).toHaveBeenCalledTimes(1);
   });
 
+  it('collects the family it registered without sweeping up a child who came earlier', async () => {
+    /*
+     * The server writes the arrival on the attendance it creates, but this
+     * kiosk does not read the register again for five minutes — and a parent
+     * who drops two children and comes straight back for a forgotten coat is
+     * well inside that. So the arrival is mirrored locally with the tick.
+     *
+     * Ada is what makes this test say anything. She shares the family's four
+     * digits, so the check-in's guess would happily tick her for collection,
+     * and she came in on her own half an hour earlier. Only the arrival can
+     * tell the difference, so if the mirroring is missing this fails.
+     */
+    phoneIndex = { '3344': [ADA.id] };
+    await mount(binding({ requiresCheckOut: true }));
+
+    // Ada, alone, first — her own arrival.
+    await type('3344');
+    const adaRow = screen.getByText('Ada Lovelace').closest('button')!;
+    await act(async () => {
+      fireEvent.pointerDown(adaRow);
+      fireEvent.pointerUp(adaRow);
+    });
+    await settle();
+    await tap(/^Check in$/);
+    await carryOn();
+
+    await fillInTheFamily();
+    await tap('Check in everyone');
+    await carryOn();
+
+    await type('3344');
+    const robinRow = screen.getByText('Robin Fields').closest('button')!;
+    await act(async () => {
+      fireEvent.pointerDown(robinRow);
+      fireEvent.pointerUp(robinRow);
+    });
+    await settle();
+
+    // Sam, because he was on the same form. Not Ada — she is on the screen,
+    // because families do leave together after arriving apart, and she is left
+    // for somebody to tick on purpose.
+    expect(screen.getByText(/Hold to collect all 2/i)).toBeTruthy();
+    expect(screen.getByText('Ada Lovelace').closest('button')!.getAttribute('aria-pressed')).toBe(
+      'false',
+    );
+  });
 });
 
 describe('the clock', () => {
@@ -425,7 +615,7 @@ describe('the clock', () => {
      */
     const endsSoon = Date.now() + 30_000;
     await mount(binding({ endAtMs: endsSoon, checkInClosesAtMs: endsSoon }));
-    await tap(/Register your family/);
+    await tap(/Register your child/);
     await tap(/Register right here/);
     await type('Robin');
 
@@ -439,7 +629,7 @@ describe('the clock', () => {
   it('puts a half-typed registration away when the family walks off', async () => {
     // Their child's half-typed name must not be what greets the next person.
     await mount();
-    await tap(/Register your family/);
+    await tap(/Register your child/);
     await tap(/Register right here/);
     await type('Robin');
 

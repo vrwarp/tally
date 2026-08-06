@@ -12,12 +12,17 @@
  *
  *   - **It checks nobody in.** A form on a phone cannot know the family walked
  *     into the room. They register here and tap their own children through at
- *     the kiosk, which is the same act every other family performs — and the
- *     last screen says so, because the kiosk holds its roster in local storage
- *     and needs the "I've registered" tap to go and look again.
+ *     the kiosk, which is the same act every other family performs. The last
+ *     screen sends them straight to their four digits — the kiosk notices the
+ *     registration by itself (see kioskIndex/pulse) and has the search screen
+ *     waiting by the time they walk back to it.
  *   - **It may ask about allergies.** Only where there is an upstream record to
  *     put a medical note on, and it is never stored in Tally or shown on any
  *     lobby screen — it goes to the church's own database and stays there.
+ *
+ * This is the one screen in Tally that renders light — `welcome.html` pins
+ * `data-theme="light"`, and the comment above its doctype explains why the ink
+ * ramp makes that easy to get wrong.
  */
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Button, PhoneField, SelectField, TextField } from '@/components/ui';
@@ -131,10 +136,9 @@ export function WelcomeApp() {
         : {}),
     })
       .then((result: RegisterFamilyResult) => {
-        if (result.status === 'duplicate') {
-          setPhase({ kind: 'refused', message: result.message });
-          return;
-        }
+        // No refusal arm any more: a name that already matches the roster is
+        // recorded for a reviewer rather than turned into a dead end on a
+        // parent's phone. Only a thrown error reaches the `catch` below.
         setPhase({
           kind: 'done',
           last4: result.last4,
@@ -154,8 +158,8 @@ export function WelcomeApp() {
   return (
     <div className="mx-auto flex min-h-full w-full max-w-lg flex-col gap-6 px-5 py-8">
       <header className="text-center">
-        <h1 className="text-2xl font-semibold text-ink-900">Welcome!</h1>
-        <p className="pt-1 text-base text-ink-600">
+        <h1 className="text-2xl font-semibold text-ink-50">Welcome!</h1>
+        <p className="pt-1 text-base text-ink-500">
           Tell us who is with you today and we will have them ready at the check-in screen.
         </p>
       </header>
@@ -180,29 +184,37 @@ export function WelcomeApp() {
         <Notice title="We could not finish that" body={phase.message} />
       )}
 
+      {/*
+        `present-50` and `present-100` are not in the palette — the ramp defines
+        400/500/600 and nothing else — so they resolved to no background at all
+        and the success panel was a heading floating on the page. Tinted from
+        the token that does exist.
+      */}
       {phase.kind === 'done' && (
-        <div className="flex flex-col items-center gap-4 rounded-2xl bg-present-50 p-6 text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-present-100 text-3xl">
+        <div className="flex flex-col items-center gap-4 rounded-2xl bg-present-500/10 p-6 text-center ring-1 ring-present-500/25">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-present-500/20 text-3xl text-present-600">
             ✓
           </div>
-          <p className="text-xl font-semibold text-ink-900">
+          <p className="text-xl font-semibold text-ink-50">
             {phase.names.join(' and ')} {phase.names.length === 1 ? 'is' : 'are'} registered.
           </p>
           {/*
-            * The two-step ending, and the order matters.
+            * One step, no button.
             *
-            * The kiosk searches a copy of the roster it keeps on the device and
-            * refreshes on its own slow schedule, so it does not know about this
-            * family yet. The button on its screen is what makes it go and look.
-            * Telling somebody to type their digits without that first is telling
-            * them to watch a screen say "no match".
+            * This used to say "tap 'I've registered', then type" — the kiosk's
+            * roster was a cache only a button-press refreshed, and telling
+            * somebody to type their digits without pressing it first was
+            * telling them to watch a screen say "no match". The kiosk notices
+            * registrations by itself now (it polls a change signal every half
+            * minute — see kioskIndex/pulse), and the one that minted this QR
+            * puts its search screen up on its own. The digits are the whole
+            * instruction, because they are the whole habit being taught.
             */}
-          <p className="text-lg text-ink-700">
-            At the kiosk, tap <strong>&ldquo;I&rsquo;ve registered&rdquo;</strong>, then type the
-            last 4 digits of your phone:
+          <p className="text-lg text-ink-400">
+            At the kiosk, type the last 4 digits of your phone:
           </p>
-          <p className="text-4xl font-semibold tracking-[0.3em] text-ink-900">{phase.last4}</p>
-          <p className="text-base text-ink-600">
+          <p className="text-4xl font-semibold tracking-[0.3em] text-ink-50">{phase.last4}</p>
+          <p className="text-base text-ink-500">
             That is how you will check in every week from now on.
           </p>
         </div>
@@ -211,8 +223,8 @@ export function WelcomeApp() {
       {(phase.kind === 'form' || phase.kind === 'saving') && (
         <form className="flex flex-col gap-6" onSubmit={submit}>
           {children.map((child, index) => (
-            <fieldset key={index} className="flex flex-col gap-3 rounded-2xl border border-ink-200 p-4">
-              <legend className="px-1 text-sm font-semibold text-ink-600">
+            <fieldset key={index} className="flex flex-col gap-3 rounded-2xl border border-ink-800 p-4">
+              <legend className="px-1 text-sm font-semibold text-ink-100">
                 {children.length === 1 ? 'Your child' : `Child ${index + 1}`}
               </legend>
               <TextField
@@ -275,8 +287,8 @@ export function WelcomeApp() {
             </Button>
           )}
 
-          <fieldset className="flex flex-col gap-3 rounded-2xl border border-ink-200 p-4">
-            <legend className="px-1 text-sm font-semibold text-ink-600">And you</legend>
+          <fieldset className="flex flex-col gap-3 rounded-2xl border border-ink-800 p-4">
+            <legend className="px-1 text-sm font-semibold text-ink-100">And you</legend>
             <TextField
               label="Your first name"
               required
@@ -315,9 +327,9 @@ export function WelcomeApp() {
 
 function Notice({ title, body }: { title: string; body: string }) {
   return (
-    <div className="flex flex-col gap-2 rounded-2xl bg-ink-100 p-5 text-center">
-      <p className="text-lg font-semibold text-ink-900">{title}</p>
-      <p className="text-base text-ink-600">{body}</p>
+    <div className="flex flex-col gap-2 rounded-2xl bg-ink-900 p-5 text-center">
+      <p className="text-lg font-semibold text-ink-50">{title}</p>
+      <p className="text-base text-ink-500">{body}</p>
     </div>
   );
 }

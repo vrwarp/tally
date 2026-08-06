@@ -1,0 +1,34 @@
+{
+  "round": 2,
+  "variant_judged": "r1",
+  "majors": [
+    {
+      "from": "usability",
+      "finding": "The label was the registration wizard's own button. RegistrationFlow.tsx:260 is `label=\"Add another child\"` word for word, and SiblingScreen.tsx:178 wears the identical brand-600/15 + ring brand-500/40 + brand-300 costume for its *registration* offer. A parent who pressed a blue tinted ringed pill saying 'Add another child' and landed on a keyboard would press the one blue tinted ringed pill on the new screen — creating a duplicate student record for a child already on the roster. The evening's attendance lands on the duplicate and Tuesday's MIA list phones a family whose child was in the room.",
+      "note": "SiblingScreen's own header records that '+ Add a brother or sister' was removed from this screen for exactly this reason. r1 collapsed both distinctions keeping them apart — grey text vs blue pill, and 'Find' vs 'Add' — in one move. The critic retracted its own round-1 recommendation.",
+      "fixed_by": "The label lost its verb: '+ Another child ›'. A noun phrase cannot collide with 'Add' or fight 'Find'. Fill to brand-600/32 so the two pills are not the same costume either."
+    },
+    {
+      "from": "usability",
+      "finding": "r1 flattened the region and deleted the min-h-0 overflow-y-auto the real component carries — whose own comment says it 'is what lets it shrink instead of pushing the button off a short screen'. At five siblings on the landscape kiosk the student's *name* goes off the top of the glass and Back off the bottom. MAX_FAMILY_OFFER is 7, so eight children is supported. Landscape-only, which is why an N=1 frame hid it.",
+      "fixed_by": "Sibling rows are a scroller again; the add-row hangs below it, inside the region, so the names scroll and the way to add one never does. New `many` scene at five siblings."
+    }
+  ],
+  "design_minors_acted_on": [
+    "40px identity→region was set box-to-box and rendered 43–49 once line-box slack was paid, leaving the region equidistant between name and commit and 'another' without a visible antecedent. Now 32px of ink; column ramps 14/32/48/76.",
+    "The add-row's fill (1.14:1) was fainter than the ink-800 sibling row beside it (1.38:1) — a recipe tuned for a pill a sixth the area, so the box existed on its 1px ring alone. Now brand-600/32.",
+    "The row's right half was 182px of empty tint, which in the list's own grammar reads as an *unticked* sibling. Now a chevron at the right inset — and a chevron is not a state chip, which the tick column is for.",
+    "Five type sizes, three of them one voice. The ask joined Back at 20px.",
+    "The plus could not hold a left edge inline (13px light glyph against a 20px semibold cap). The region gained a 48px leading gutter instead, shared by the ask and the sibling rows, so every line starts on one x."
+  ],
+  "still_open": [
+    "The identity is centred, so the name and commit each move 56px between scenes and there is no fixed spine in either axis. Design wants it anchored; usability praised the compact centred band as reachable. Deliberately not done — carried to round 3 with four scenes to measure against.",
+    "The wide frame is still the tall frame's composition in a landscape hole: 416px of empty page each side, 65% of the width.",
+    "SearchScreen runs a 672px column; this screen runs 448px, with byte-identical row markup."
+  ],
+  "fidelity_gaps_closed": [
+    "The commit hardcoded 'Check in'; the real component says 'Check in all N' whenever a sibling is ticked, and that count is the only place on the screen reporting how many children the tap covers.",
+    "Neither round had shot the outcome the change exists to produce. New `added` scene: the parent came back from the sibling screen with the missed child, ticked."
+  ],
+  "implementation_note": "ConfirmScreen.tsx gates this affordance on intent !== 'check-out'. The prototype's region is unconditional; a collection screen must not grow an 'Another child' row above a blue 'Hold to collect'."
+}

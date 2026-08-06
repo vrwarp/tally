@@ -1,0 +1,181 @@
+/**
+ * The other end of the lobby kiosk — where a recorded family becomes a decision.
+ *
+ * The kiosk stops at Tally's roster on purpose: a family who registered
+ * themselves is checked in and wearing a sticker, and *held*, so nothing about
+ * them has reached the church's people database. That posture is only worth
+ * anything if both halves are true end to end, which is what this spec is for:
+ * the push really does not happen at the door, and the button on `/review`
+ * really does make it happen afterwards.
+ *
+ * Everything runs against the real callables and the real Planning Center
+ * simulator. The claim that "no push happened" is asserted against the
+ * simulator's own request log rather than against a mock, because a mock would
+ * only be re-stating the code under test.
+ */
+import type { Page } from '@playwright/test';
+import { gotoReady } from './support/auth';
+import { readCollection, simulatorPeople } from './support/emulator';
+import { expect, test } from './support/fixtures';
+import { bindTo, openKiosk, pairKiosk, typeOnKiosk } from './support/kiosk';
+
+/**
+ * A different family each run, and each test — the roster is seeded once and
+ * this spec adds to it, so a fixed name would collide with the previous run's
+ * leftovers and make "which Elio" ambiguous.
+ *
+ * Letters only. The kiosk keyboard has a digit row (the search takes phone
+ * digits) but `applyKey` refuses digits into a *name*, so a numbered surname
+ * would be typed and silently dropped, and the assertions would look for a
+ * child the flow never created.
+ */
+const RUN = Array.from({ length: 4 }, () =>
+  'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)],
+).join('');
+const PHONE = '5550163311';
+
+async function enterChild(kiosk: Page, first: string, last: string, grade: string) {
+  await typeOnKiosk(kiosk, first);
+  await kiosk.getByRole('button', { name: /^Next$/ }).click();
+  await kiosk.locator('[data-key="clear"]').click();
+  await typeOnKiosk(kiosk, last);
+  await kiosk.getByRole('button', { name: /^Next$/ }).click();
+  await kiosk.getByRole('button', { name: grade, exact: true }).click();
+}
+
+/** Registers one child through the on-kiosk wizard, start to sticker. */
+async function registerAtKiosk(kiosk: Page, first: string, surname: string): Promise<void> {
+  await kiosk.getByRole('button', { name: /Register your child/i }).click();
+  await kiosk.getByRole('button', { name: /Register right here/i }).click();
+  await enterChild(kiosk, first, surname, '4th grade');
+  await kiosk.getByRole('button', { name: /That's everyone/i }).click();
+
+  await typeOnKiosk(kiosk, 'Renata');
+  await kiosk.getByRole('button', { name: /^Next$/ }).click();
+  await kiosk.locator('[data-key="clear"]').click();
+  await typeOnKiosk(kiosk, surname);
+  await kiosk.getByRole('button', { name: /^Next$/ }).click();
+  await typeOnKiosk(kiosk, PHONE);
+  await kiosk.getByRole('button', { name: /^Next$/ }).click();
+  await kiosk.getByRole('button', { name: /^Check in$/ }).click();
+
+  await expect(kiosk.getByText(/is checked in\. Welcome!/i)).toBeVisible({ timeout: 30_000 });
+}
+
+test.describe('reviewing a family the kiosk recorded', () => {
+  test('records at the door, pushes nothing, and pushes on approval', async ({
+    browser,
+    page,
+    signedInAs,
+  }) => {
+    const SURNAME = `Marchetti${RUN}`;
+    await signedInAs('core');
+    const { context, page: kiosk } = await openKiosk(browser);
+
+    try {
+      await pairKiosk(kiosk, page);
+      await bindTo(kiosk, /nursery/i);
+      await registerAtKiosk(kiosk, 'Elio', SURNAME);
+
+      /* ---- Nothing reached the church's database ------------------------- */
+
+      const students = await readCollection('students');
+      const held = students.find((doc) => doc.data.searchName === `elio ${SURNAME}`.toLowerCase());
+      expect(held, 'the registered child is on Tally’s roster').toBeDefined();
+      // The hold, and the only thing that gates the push.
+      expect(held!.data.pendingReview).toBe(true);
+      expect(held!.data.pcoPersonId).toBeNull();
+
+      // Against the simulator itself, not against a mock of it: no person by
+      // that name exists upstream, however the code got there.
+      const before = await simulatorPeople();
+      expect(before.some((person) => person.last_name === SURNAME)).toBe(false);
+
+      /* ---- The review screen --------------------------------------------- */
+
+      await gotoReady(page, '/review');
+      const card = page.locator('section', { hasText: `Renata ${SURNAME}` }).first();
+      await expect(card).toBeVisible({ timeout: 30_000 });
+      // The one screen in Tally that shows a parent's number. It lives on a
+      // functions-only document with a TTL — see docs/data-model.md.
+      await expect(card.getByText('(555) 016-3311')).toBeVisible();
+      await expect(card.getByText(`Elio ${SURNAME}`)).toBeVisible();
+
+      /* ---- Approving is what pushes -------------------------------------- */
+
+      await card.getByRole('button', { name: /Approve and add/i }).click();
+
+      /*
+       * The child, and only the child.
+       *
+       * This suite runs `PCO_WRITE_BACK=create` (functions/.env.demo-tally),
+       * where there is no household to build and no adult to create — so the
+       * guardian correctly goes nowhere, and approval is *finished* rather than
+       * held open offering a retry that could never do anything. Asserting a
+       * parent here would be asserting a deployment's configuration, not this
+       * flow's behaviour; `review.test.ts` covers both modes against the seam.
+       */
+      await expect
+        .poll(
+          async () => (await simulatorPeople()).filter((p) => p.last_name === SURNAME).length,
+          { timeout: 30_000, message: 'the child reaches Planning Center on approval' },
+        )
+        .toBe(1);
+
+      /*
+       * And *this* registration is gone, phone number and all.
+       *
+       * Deliberately not "the queue is empty": other specs in this suite
+       * register families at the kiosk and leave them waiting, which is not
+       * leftover mess but the exact state `/review` exists for. Asserting the
+       * global empty state made this test a claim about every other spec's
+       * housekeeping, and it failed the moment the suite ran in one go.
+       */
+      await expect(card).toBeHidden({ timeout: 30_000 });
+      const left = await readCollection('kioskRegistrations');
+      expect(left.filter((doc) => JSON.stringify(doc.data).includes(SURNAME))).toHaveLength(0);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('takes a family off the roster, and forgets them, when they are not ours', async ({
+    browser,
+    page,
+    signedInAs,
+  }) => {
+    const SURNAME = `Baragli${RUN}`;
+    await signedInAs('core');
+    const { context, page: kiosk } = await openKiosk(browser);
+
+    try {
+      await pairKiosk(kiosk, page);
+      await bindTo(kiosk, /nursery/i);
+      await registerAtKiosk(kiosk, 'Nino', SURNAME);
+
+      await gotoReady(page, '/review');
+      const card = page.locator('section', { hasText: `Renata ${SURNAME}` }).first();
+      await expect(card).toBeVisible({ timeout: 30_000 });
+
+      // Two presses, because the number goes and the students come off the
+      // roster — the sentence comes before the second one.
+      await card.getByRole('button', { name: /Not ours/i }).click();
+      await expect(card.getByText(/forgets the phone number/i)).toBeVisible();
+      await card.getByRole('button', { name: /Yes, take them off/i }).click();
+
+      // This card, not the whole queue — see the note in the test above.
+      await expect(card).toBeHidden({ timeout: 30_000 });
+
+      const students = await readCollection('students');
+      const discarded = students.find(
+        (doc) => doc.data.searchName === `nino ${SURNAME}`.toLowerCase(),
+      );
+      // Inactive, never deleted: the check-in it already recorded points here.
+      expect(discarded!.data.status).toBe('inactive');
+      expect(discarded!.data.pendingReview).toBe(false);
+      expect((await simulatorPeople()).some((person) => person.first_name === 'Nino')).toBe(false);
+    } finally {
+      await context.close();
+    }
+  });
+});

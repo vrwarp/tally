@@ -499,6 +499,11 @@ export interface CreateFamilyOptions {
   config: PcoConfig;
   /** Every child of this family, as Tally student ids. */
   studentIds: readonly string[];
+  /**
+   * Siblings this family already has upstream — the household to join rather
+   * than the household to invent. See the note in `createFamily`.
+   */
+  anchorStudentIds?: readonly string[];
   firstName: string;
   lastName: string;
   phone?: string | null;
@@ -592,23 +597,109 @@ export async function createFamily(options: CreateFamilyOptions): Promise<Create
 
   /* ---- Which children reached Planning Center ----------------------------- */
 
-  const linked: { studentId: string; personId: string; loaded: NonNullable<Awaited<ReturnType<typeof loadPersonWithHousehold>>> }[] = [];
+  type LoadedChild = {
+    studentId: string;
+    personId: string;
+    loaded: NonNullable<Awaited<ReturnType<typeof loadPersonWithHousehold>>>;
+  };
 
-  for (const studentId of options.studentIds) {
+  const load = async (studentId: string): Promise<LoadedChild | null> => {
     const target = await resolveStudentPerson(db, studentId);
-    if (!target.exists || !target.active || !target.personId) continue;
+    if (!target.exists || !target.active || !target.personId) return null;
 
     const read = await readThroughMerges({ db, client }, studentId, target.personId, (personId) =>
       loadPersonWithHousehold(client, personId),
     );
-    if (read.outcome === 'gone' || !read.value) continue;
-    linked.push({ studentId, personId: read.personId, loaded: read.value });
+    if (read.outcome === 'gone' || !read.value) return null;
+    return { studentId, personId: read.personId, loaded: read.value };
+  };
+
+  const linked: LoadedChild[] = [];
+  for (const studentId of options.studentIds) {
+    const child = await load(studentId);
+    if (child) linked.push(child);
+  }
+
+  /*
+   * The siblings who were already here.
+   *
+   * Loaded separately and never added to `linked`: they are not children of
+   * this registration, must not be counted in what it reports, and must not
+   * have memberships written for them — they already have one. What they are
+   * for is the household, below.
+   */
+  const anchors: LoadedChild[] = [];
+  for (const studentId of options.anchorStudentIds ?? []) {
+    if (options.studentIds.includes(studentId)) continue;
+    const sibling = await load(studentId);
+    if (sibling) anchors.push(sibling);
   }
 
   if (linked.length === 0) {
     return familyResult(
       'no-linked-children',
       'None of these children are in Planning Center yet, so there is no family to build.',
+    );
+  }
+
+  /* ---- A family that already exists, gaining a child ---------------------- */
+
+  /*
+   * The sibling journey, and the only place it differs.
+   *
+   * An anchor is a child the church already has, so their household is the
+   * family's real one and it very probably already holds a parent — that is
+   * what being an established family means. There is no adult to create here
+   * and no household to invent: the new child joins the one that is there, and
+   * nothing else is touched.
+   *
+   * This is deliberately ahead of the general "somebody is already here" check
+   * below, which *refuses* rather than joins. Refusing is right when the only
+   * evidence is that some child in the run happens to share a household with an
+   * adult — the parent at the kiosk may be a different adult, and inventing a
+   * relationship between two people on that basis is not something to do
+   * silently. It is wrong here, because the family said which siblings these
+   * are and the whole request is "add this child to them".
+   */
+  const anchorHouseholdId = anchors
+    .flatMap((child) => householdIdsOf(child.loaded.person))
+    .sort(compareIds)[0];
+  const anchorAdult = anchorHouseholdId
+    ? anchors
+        .map((child) => findParentCandidate(child.loaded.person, child.loaded.index))
+        .find((candidate) => candidate !== null && candidate !== undefined)
+    : null;
+
+  if (anchorHouseholdId && anchorAdult) {
+    const joined: string[] = [];
+    for (const child of linked) {
+      if (householdIdsOf(child.loaded.person).includes(anchorHouseholdId)) continue;
+      await client.post(
+        `/households/${encodeURIComponent(anchorHouseholdId)}/household_memberships`,
+        {
+          data: {
+            type: PCO_TYPES.householdMembership,
+            attributes: { person_id: child.personId, pending: false, household_role: 'child' },
+            relationships: { person: { data: { type: PCO_TYPES.person, id: child.personId } } },
+          },
+        },
+      );
+      joined.push(child.studentId);
+    }
+    logger.info('Added a child to a family Planning Center already had', {
+      children: joined.length,
+      anchors: anchors.length,
+    });
+    return familyResult(
+      'already-has-family',
+      joined.length === 0
+        ? `${linked.length === 1 ? 'That child was' : 'Those children were'} already in ${anchorAdult.name ?? 'the'} household.`
+        : `Added ${joined.length === 1 ? 'the child' : `all ${joined.length} children`} to ${anchorAdult.name ?? 'the existing'} household — no second family was created.`,
+      {
+        parentName: anchorAdult.name,
+        parentPersonId: anchorAdult.id,
+        linkedChildren: linked.map((entry) => entry.studentId),
+      },
     );
   }
 
@@ -675,8 +766,28 @@ export async function createFamily(options: CreateFamilyOptions): Promise<Create
    * siblings arriving together are three memberships in one household, and
    * getting that wrong is not cosmetic — it is what makes a sibling invisible
    * on the family's own record.
+   *
+   * The anchors come first, and that ordering is the whole fix.
+   *
+   * This used to look only at the children *in this run*. Every one of them had
+   * just been created by the push a moment earlier, so none of them had a
+   * household, so the answer was always "none" and the answer to that was
+   * always "create one". For a family nobody has met that is right. For a
+   * parent whose second child is finally old enough it is a second household
+   * for a family that already has one — and the siblings stay behind in the
+   * first, invisible from the new one, on a record with no undo. The bug
+   * survived because the kiosk still found everybody: `pendingLast4` keeps the
+   * digits aligned regardless of what upstream thinks, right up until the new
+   * household gains a number the old one lacks.
+   *
+   * An anchor is a sibling who was already here, so their household is the
+   * family's real one. Falling back to the run's own children keeps the
+   * first-time case working exactly as before.
    */
-  const [householdId] = linked.flatMap((child) => householdIdsOf(child.loaded.person)).sort(compareIds);
+  const householdCandidates = [...anchors, ...linked];
+  const [householdId] = householdCandidates
+    .flatMap((child) => householdIdsOf(child.loaded.person))
+    .sort(compareIds);
   let createdHousehold = false;
 
   if (householdId) {

@@ -175,6 +175,28 @@ export interface StudentDoc {
   upstreamBackend?: BackendId | null;
   upstreamPersonId?: string | null;
 
+  /**
+   * Held out of the church's people database until somebody has approved them.
+   *
+   * Set by the kiosk's self-registration and cleared on the Review screen;
+   * server-written in both directions, and `firestore.rules` refuses a client
+   * that touches it. Every push path consults it, so it — not `pcoPushPending`
+   * — is what actually decides whether a student reaches a backend.
+   */
+  pendingReview?: boolean;
+
+  /* ---- Merged rows ------------------------------------------------------- */
+  /**
+   * Set on the loser of a merge: this row is really the student it names.
+   * The document stays, inactive, because every attendance record points at it.
+   */
+  mergedIntoStudentId?: string | null;
+  /**
+   * Set on the winner: the rows folded into this one. Their attendance is not
+   * re-keyed — the profile unions the histories at read time instead.
+   */
+  mergedFromStudentIds?: string[];
+
   /** Lowercased "first last", used for the substring search fallback. */
   searchName: string;
 
@@ -699,7 +721,18 @@ export interface RegisterFamilyRequest {
    */
   registrationId: string;
   children: RegisterFamilyChild[];
-  guardian: { firstName: string; lastName: string; phone: string };
+  /**
+   * Null only when `anchorStudentIds` names siblings: a family the church
+   * already has does not need a second adult invented from a lobby form, and
+   * the household upstream already holds the one they have.
+   */
+  guardian: { firstName: string; lastName: string; phone: string } | null;
+  /**
+   * Children this family already has on the roster, from the last-4 the kiosk
+   * searched with. Verified server-side before anything is done with them —
+   * they decide which household the new child joins at approval.
+   */
+  anchorStudentIds?: string[];
   /** The gathering to check everybody in against. Kiosk mode only. */
   eventId?: string;
 }
@@ -712,24 +745,23 @@ export interface RegisteredChild {
   searchName: string;
 }
 
-export type RegisterFamilyResult =
-  | {
-      status: 'created';
-      children: RegisteredChild[];
-      /** What the family types at the kiosk from now on. */
-      last4: string;
-      checkedIn: boolean;
-      guardian: { upstream: 'created' | 'joined' | 'skipped' | 'failed' };
-    }
-  | {
-      /**
-       * At least one of these children is already on the roster. Nothing was
-       * written — a family half-registered is worse than one told to search.
-       */
-      status: 'duplicate';
-      duplicateIndexes: number[];
-      message: string;
-    };
+/**
+ * One arm, deliberately.
+ *
+ * There used to be a `duplicate` refusal here, returned when a child's name
+ * already matched the roster. It is gone: the door records and a person decides
+ * afterwards on the Review screen. Refusing at the kiosk meant telling a family
+ * to "search for their name instead", which points them at a different child of
+ * the same name — a worse mistake than the duplicate it was avoiding, and one
+ * nobody would notice. See functions/src/kiosk/registration.ts.
+ */
+export interface RegisterFamilyResult {
+  status: 'created';
+  children: RegisteredChild[];
+  /** What the family types at the kiosk from now on. */
+  last4: string;
+  checkedIn: boolean;
+}
 
 /**
  * One student, as Planning Center describes them.
@@ -891,6 +923,12 @@ export interface PcoStatus {
    * a queue that is not moving is the thing worth seeing.
    */
   queued: number;
+  /**
+   * Active students waiting for somebody to approve them on the Review screen.
+   * Counted apart from `queued` because nothing about them is stuck: a family
+   * who registered themselves is held on purpose until a person has looked.
+   */
+  heldForReview: number;
   /** The settings actually in force, whatever their source. */
   settings: PcoEffectiveSettings;
 }
@@ -931,6 +969,8 @@ export interface BackendStatuses {
   defaultPushBackend: BackendId;
   /** Active students no backend holds yet — a deployment-wide count. */
   queued: number;
+  /** Of those, the ones nobody has approved yet rather than the ones stuck. */
+  heldForReview: number;
 }
 
 /**

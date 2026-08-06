@@ -253,6 +253,33 @@ interface SeedStudent {
   contact?: 'phone' | 'email' | 'both';
   allergies?: string;
   notes?: string;
+  /**
+   * A phone shared with a sibling, which is what makes them one.
+   *
+   * The kiosk has no households — it holds `kioskIndex/phones`, a map of
+   * last-4 to student ids, and `familyOf` calls two children siblings when
+   * their digit sets are equal or nested. Every other student here has a
+   * parent of their own and a number of their own, so before this the whole
+   * family half of the product — the ticked list on the confirm screen, one
+   * tap for three children, one hold to collect them all — could not happen in
+   * a seeded world at all. One household is enough to exercise it.
+   */
+  household?: string;
+  /**
+   * Overrides the random Sunday multiplier, so a student's two chains read the
+   * same way.
+   *
+   * Every other student gets `0.35 + rng() * 0.65`, which is what makes the
+   * Friday and Sunday regulars genuinely different lists — the thing the
+   * predictive roster exists to keep separate. The two households opt out
+   * because the *kiosk's* demo depends on their exact shape: two children the
+   * gathering expects and one it does not, whichever gathering the lobby screen
+   * happens to be bound to. Left to the multiplier, a child who is a Friday
+   * regular by band drifts out of the Sunday prediction on a shuffled RNG
+   * stream, and the confirm screen photographs something other than what the
+   * caption beside it says.
+   */
+  sundayBias?: number;
 }
 
 const SEED_STUDENTS: readonly SeedStudent[] = [
@@ -267,7 +294,20 @@ const SEED_STUDENTS: readonly SeedStudent[] = [
   { first: 'Caleb', last: 'Okafor', grade: 9, band: 'core', parent: 'Chidi Okafor', contact: 'phone' },
   { first: 'Hannah', last: 'Schmidt', grade: 7, band: 'core', parent: 'Ingrid Schmidt', contact: 'both' },
   { first: 'Diego', last: 'Herrera', grade: 10, band: 'core', parent: 'Rosa Herrera', contact: 'phone' },
-  { first: 'Amara', last: 'Osei', grade: 8, band: 'core', parent: 'Kwabena Osei', contact: 'both' },
+  { first: 'Amara', last: 'Osei', grade: 8, band: 'core', parent: 'Kwabena Osei', contact: 'both', household: 'osei', sundayBias: 1 },
+  // Amara's brother and sister. Three children, one number — the family the
+  // kiosk's whole confirm screen is built around, and the only one here.
+  { first: 'Kofi', last: 'Osei', grade: 6, band: 'core', parent: 'Kwabena Osei', contact: 'phone', household: 'osei', sundayBias: 1 },
+  /*
+   * The eldest, and deliberately not a regular any more.
+   *
+   * A household is a guess about a family, not about a Friday: the kiosk offers
+   * every child answering to one phone number, and some of them stopped coming
+   * or only ever came to something else. Before this, every seeded household was
+   * three regulars, so the confirm screen's whole distinction — offered, and
+   * offered-and-expected — could not appear in a seeded world at all.
+   */
+  { first: 'Efua', last: 'Osei', grade: 11, band: 'edge', parent: 'Kwabena Osei', contact: 'phone', household: 'osei', sundayBias: 1 },
 
   /* ---- Steady: most weeks ------------------------------------------------ */
   { first: 'Noah', last: 'Fitzgerald', grade: 6, band: 'steady', parent: 'Erin Fitzgerald', contact: 'phone', allergies: 'Severe tree nut allergy' },
@@ -276,7 +316,14 @@ const SEED_STUDENTS: readonly SeedStudent[] = [
   { first: 'Camila', last: 'Torres', grade: 9, band: 'steady', parent: 'Luis Torres', contact: 'both' },
   { first: 'Tyler', last: 'McAllister', grade: 8, band: 'steady', parent: 'Beth McAllister', contact: 'phone' },
   { first: 'Aisha', last: 'Rahman', grade: 7, band: 'steady', parent: 'Farid Rahman', contact: 'email' },
-  { first: 'Marcus', last: 'Delgado', grade: 10, band: 'steady', parent: 'Elena Delgado', contact: 'phone' },
+  { first: 'Marcus', last: 'Delgado', grade: 10, band: 'steady', parent: 'Elena Delgado', contact: 'phone', household: 'delgado', sundayBias: 1 },
+  // The second household, and there are two for a reason beyond variety: the
+  // walkthrough runs twice against one emulator, and a family the first pass
+  // has already checked in offers the second pass a pickup instead.
+  // The youngest, and the same shape as Efua above for the same reason: one
+  // child per household who is offered but not expected.
+  { first: 'Lucia', last: 'Delgado', grade: 6, band: 'edge', parent: 'Elena Delgado', contact: 'phone', household: 'delgado', sundayBias: 1 },
+  { first: 'Rafael', last: 'Delgado', grade: 9, band: 'core', parent: 'Elena Delgado', contact: 'phone', household: 'delgado', sundayBias: 1 },
   { first: 'Zoe', last: 'Lindqvist', grade: 6, band: 'steady', parent: 'Anders Lindqvist', contact: 'both' },
   { first: 'Andre', last: 'Beaulieu', grade: 11, band: 'steady', parent: 'Marie Beaulieu', contact: 'phone' },
   { first: 'Naomi', last: 'Tanaka', grade: 12, band: 'steady', parent: 'Kenji Tanaka', contact: 'both', allergies: 'Shellfish' },
@@ -432,7 +479,26 @@ function slug(value: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
-function parentPhone(index: number): string {
+/**
+ * One number per student, except where a household says otherwise.
+ *
+ * Siblings have to answer to the *same* digits or they are not siblings as far
+ * as the kiosk is concerned — see `SeedStudent.household` and `src/kiosk/family.ts`.
+ */
+/*
+ * Outside the generated range on purpose. `parentPhone` numbers everybody else
+ * `(555) 555-0100` upward by index, so a household picked from inside that band
+ * would hand its four digits to an unrelated student and invent a sibling —
+ * `familyOf` groups on equal digit sets and would have no way to tell.
+ */
+const HOUSEHOLD_PHONES: Record<string, string> = {
+  osei: '(555) 555-0347',
+  delgado: '(555) 555-0592',
+};
+
+function parentPhone(index: number, seed?: SeedStudent): string {
+  const shared = seed?.household ? HOUSEHOLD_PHONES[seed.household] : undefined;
+  if (shared) return shared;
   // 555-01xx is the reserved fictional range, and ten digits so `formatPhone`
   // renders it the way a real number would look.
   return `(555) 555-${String(100 + index).padStart(4, '0')}`;
@@ -525,8 +591,9 @@ function simulatorPayload(students: readonly BuiltStudent[], now: Date) {
           birthdate: seedBirthdate(seed, index, now),
           status: seed.band === 'inactive' ? ('inactive' as const) : ('active' as const),
           parentName: seed.parent ?? null,
-          parentPhone: contact === 'phone' || contact === 'both' ? parentPhone(index) : null,
+          parentPhone: contact === 'phone' || contact === 'both' ? parentPhone(index, seed) : null,
           parentEmail: contact === 'email' || contact === 'both' ? parentEmail(seed) : null,
+          householdKey: seed.household ?? null,
         };
       }),
     team: SEED_TEAM.map((member) => {
@@ -769,7 +836,7 @@ function buildStudents(now: Date, rng: () => number): BuiltStudent[] {
       id: pcoPersonId ? pcoStudentId(pcoPersonId) : `student-${slug(`${seed.first}-${seed.last}`)}`,
       seed,
       propensity: BASE_PROPENSITY[seed.band],
-      sundayBias: 0.35 + rng() * 0.65,
+      sundayBias: seed.sundayBias ?? 0.35 + rng() * 0.65,
       // Quick-add createdAt is filled in once we know which gathering they
       // walked into; until then the school-year date is a placeholder.
       createdAt: yearStart,
@@ -1002,6 +1069,7 @@ function collectWrites(now: Date): {
   for (const event of events) {
     const isRetreat = event.id === retreat.id;
     const { isOneOff } = event;
+    const isNursery = isOneOff && !isRetreat && event.title === 'Nursery';
     writes.push({
       path: paths.event(event.id),
       data: {
@@ -1024,10 +1092,22 @@ function collectWrites(now: Date): {
               : 'groups',
         mode: isOneOff ? 'oneoff' : 'recurring',
         seriesId: event.seriesId,
-        // The bus to the retreat is largely the Friday night crowd, and saying
-        // so is the only way a trip gets a predicted roster at all. The lock-in
-        // leaves it unset, so both halves of the choice are in the demo data.
-        predictFromChain: isRetreat ? SERIES_IDS.fridayFellowship : null,
+        /*
+         * Which chain's past instances describe who comes to this.
+         *
+         * The bus to the retreat is largely the Friday night crowd, and saying
+         * so is the only way a trip gets a predicted roster at all. The nursery
+         * is the Sunday morning crowd for the same reason: it is a one-off in
+         * the calendar's terms, so it has no history of its own to read, and
+         * without this both the check-in screen and the lobby kiosk would treat
+         * the whole ministry as its roster. The lock-in leaves it unset, so all
+         * three answers are in the demo data.
+         */
+        predictFromChain: isRetreat
+          ? SERIES_IDS.fridayFellowship
+          : isNursery
+            ? SERIES_IDS.sundaySchool
+            : null,
         // A retreat happens once; everything else is the weekly slot its series
         // describes, phrased from the day the instance itself lands on.
         recurrence: isOneOff

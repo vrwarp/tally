@@ -20,6 +20,7 @@ import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { backendFailureStatus, describeBackendFailure } from './backends/errors.js';
+import { isHeldForReview } from './backends/pendingReview.js';
 import {
   a32AliasPairs,
   collapseAliasPair,
@@ -83,18 +84,38 @@ import {
   type StartPairingResult,
 } from './kiosk/pairing.js';
 import { listKioskEvents, type KioskEventEntry } from './kiosk/events.js';
+import {
+  buildParticipationIndex,
+  type ParticipationSummary,
+} from './kiosk/participation.js';
 import { buildPhoneIndex, type PhoneIndexSummary } from './kiosk/phoneIndex.js';
 import { probeSigning, type SigningStatus } from './kiosk/signing.js';
 import {
   parseRegisterFamilyRequest,
   registerFamily as runRegisterFamily,
   RegistrationInputError,
+  sweepRegistrations,
   type RegisterFamilyResult,
 } from './kiosk/registration.js';
+import {
+  approveRegistration as runApproveRegistration,
+  discardRegistration as runDiscardRegistration,
+  listPendingRegistrations as listPending,
+  type ApproveRegistrationResult,
+  type DiscardRegistrationResult,
+  type PendingRegistration,
+} from './kiosk/review.js';
+import {
+  mergeStudents as runMergeStudents,
+  unmergeStudents as runUnmergeStudents,
+  type MergeStudentsResult,
+} from './backends/mergeStudents.js';
+import { bumpPulse, PULSE_DEBOUNCE_MS } from './kiosk/pulse.js';
 import {
   checkCode,
   consumeCode,
   mintCode,
+  mintedEventId,
   type CodeStatus,
   type MintCodeResult,
 } from './kiosk/registrationCodes.js';
@@ -933,6 +954,11 @@ interface PcoStatusResult {
   /** Active students with no Planning Center person yet. */
   queued: number;
   /**
+   * Active students waiting for somebody to approve them, counted apart from
+   * `queued` because nothing is stuck — see `backends/pendingReview.ts`.
+   */
+  heldForReview: number;
+  /**
    * The effective settings, so Settings can both describe the connection and
    * open an editor already filled in with what is actually in force — rather
    * than with what the browser guesses is in force.
@@ -994,6 +1020,7 @@ export const getPlanningCenterStatus = onCall<
       },
       unresolved: 0,
       queued: scan.queued,
+      heldForReview: scan.heldForReview,
     } satisfies Omit<PcoStatusResult, 'configured' | 'reachable' | 'problem' | 'peopleVisible'>;
 
     if (config.configError) {
@@ -1071,6 +1098,8 @@ interface BackendStatusesResponse {
   defaultPushBackend: BackendId;
   /** Active students no backend holds yet — a deployment-wide count. */
   queued: number;
+  /** Of those, the ones nobody has approved yet rather than the ones stuck. */
+  heldForReview: number;
 }
 
 /**
@@ -1159,7 +1188,12 @@ export const getBackendStatuses = onCall<
       }),
     );
 
-    return { backends, defaultPushBackend: registry.defaultPushBackendId, queued: scan.queued };
+    return {
+      backends,
+      defaultPushBackend: registry.defaultPushBackendId,
+      queued: scan.queued,
+      heldForReview: scan.heldForReview,
+    };
   },
 );
 
@@ -1965,8 +1999,23 @@ export const onStudentCreated = onDocumentCreated(
   },
   async (event) => {
     const data = event.data?.data();
+    if (!data) return;
+
+    /*
+     * The kiosk pulse first, BEFORE the push gating below: the early returns
+     * skip held children and backend imports, and those are exactly the
+     * students a lobby kiosk must learn about. Debounced, because this trigger
+     * fires once per document — a 400-person list import must cost a couple of
+     * pulse writes, not 400. `retry: false` above means a bump-then-crash
+     * cannot double anything.
+     *
+     * This is the welcome-desk case: a child quick-added in the main app is
+     * findable on every kiosk within about a minute, with nobody pressing
+     * anything.
+     */
+    await bumpPulse(db(), ['roster'], new Date(), { debounceMs: PULSE_DEBOUNCE_MS, logger });
+
     if (
-      !data ||
       data.pcoPushPending !== true ||
       typeof data.pcoPersonId === 'string' ||
       typeof data.upstreamPersonId === 'string'
@@ -1974,14 +2023,14 @@ export const onStudentCreated = onDocumentCreated(
       return;
     }
     /*
-     * A self-registration pushes its own children, inside the request that
-     * created them — it has to, because the household write that follows has to
-     * be sequenced after every child is upstream. Two pushes racing for one
-     * child would both pass `findExistingPerson` and create two people for
-     * them. A crash before the in-request push leaves `pcoPushPending` set,
-     * which `pushPendingVisitors` sweeps like any other stranded visitor.
+     * A family who registered themselves is held until somebody has looked at
+     * them — see backends/pendingReview.ts. This used to key off
+     * `registrationId`, which was the same set of students by accident rather
+     * than by meaning; `registrationId` is provenance now, and the hold is the
+     * hold. `approveRegistration` clears it and pushes, in the order a
+     * household needs.
      */
-    if (typeof data.registrationId === 'string') return;
+    if (isHeldForReview(data)) return;
 
     const registry = await createRegistry(db());
     const target = registry.defaultPush();
@@ -2265,21 +2314,26 @@ export const registerFamily = onCall<Record<string, unknown>, Promise<RegisterFa
 
     try {
       const parsed = parseRegisterFamilyRequest(request.data, fromKiosk ? 'kiosk' : 'qr');
+      /*
+       * Off the code document, never off the request — a phone form that could
+       * name any event could wake any lobby screen in the building. Null for a
+       * code minted by an old kiosk bundle, which simply wakes nothing.
+       */
+      const qrEventId = fromKiosk ? null : await mintedEventId(database, rawCode as string);
       const result = await runRegisterFamily({
         db: database,
-        registry: await createRegistry(database),
         request: parsed,
         context: fromKiosk
           ? { source: 'kiosk', uid: request.auth!.uid, eventId: (eventId as string).trim() }
-          : { source: 'qr' },
+          : { source: 'qr', qrEventId },
         logger,
       });
       /*
-       * Spent after the work, not before it. A call that failed validation or
-       * met the already-on-the-roster guard has cost the church nothing, and
-       * should not cost the family one of the code's twenty.
+       * Spent after the work, not before it. A call that failed validation has
+       * cost the church nothing and should not cost the family one of the
+       * code's twenty.
        */
-      if (!fromKiosk && result.status === 'created') {
+      if (!fromKiosk) {
         await consumeCode(database, rawCode as string);
       }
       return result;
@@ -2298,11 +2352,119 @@ function codeRefusal(status: CodeStatus): string {
     : 'This code has expired. Ask at the kiosk for a fresh one.';
 }
 
+/* -------------------------------------------------------------------------- */
+/* Reviewing what the door recorded                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The families waiting to be reviewed, with everything needed to judge them.
+ *
+ * A callable rather than a subscription, and core team only, because this is
+ * the one place in Tally that answers with a parent's phone number. The
+ * collection behind it is deny-all in `firestore.rules` in both directions —
+ * there is no client read path at all, and this is the exception, gated on the
+ * same role that may already push a student into the church's database.
+ *
+ * The sweep runs from here for the same reason the pairing sweep runs from the
+ * pairing calls: this is the one call guaranteed to be made by somebody paying
+ * attention, and a registration nobody reviewed still has to expire.
+ */
+export const listPendingRegistrations = onCall<void, Promise<PendingRegistration[]>>(
+  { timeoutSeconds: 120, memory: '256MiB' },
+  async (request) => {
+    await requireCoreTeam(request.auth?.uid);
+    const database = db();
+    const now = new Date();
+    await sweepRegistrations(database, now);
+    return listPending(database, now);
+  },
+);
+
+/**
+ * Yes: put this family in the church's database.
+ *
+ * The one action in Tally that turns a stranger's typing into a permanent
+ * record somewhere else, which is why it is a button a named person presses
+ * rather than something that happened while they were serving coffee.
+ */
+export const approveRegistration = onCall<
+  { registrationId: string },
+  Promise<ApproveRegistrationResult>
+>({ secrets: BACKEND_SECRETS, timeoutSeconds: 300, memory: '256MiB' }, async (request) => {
+  await requireCoreTeam(request.auth?.uid);
+  const registrationId = request.data?.registrationId;
+  if (typeof registrationId !== 'string' || registrationId.trim().length === 0) {
+    throw new HttpsError('invalid-argument', 'registrationId is required.');
+  }
+
+  const database = db();
+  return runApproveRegistration({
+    db: database,
+    registry: await createRegistry(database),
+    registrationId: registrationId.trim(),
+    uid: request.auth!.uid,
+    logger,
+  });
+});
+
+/** No: take them off the roster, and forget the phone number. */
+export const discardRegistration = onCall<
+  { registrationId: string },
+  Promise<DiscardRegistrationResult>
+>({ timeoutSeconds: 120, memory: '256MiB' }, async (request) => {
+  await requireCoreTeam(request.auth?.uid);
+  const registrationId = request.data?.registrationId;
+  if (typeof registrationId !== 'string' || registrationId.trim().length === 0) {
+    throw new HttpsError('invalid-argument', 'registrationId is required.');
+  }
+
+  return runDiscardRegistration({
+    db: db(),
+    registrationId: registrationId.trim(),
+    uid: request.auth!.uid,
+    logger,
+  });
+});
+
+/**
+ * Two roster rows, one child.
+ *
+ * Core team, like every other write that changes what the roster *means* rather
+ * than what it records. See `backends/mergeStudents.ts` for what this does and
+ * does not claim about the church's own database.
+ */
+export const mergeStudents = onCall<
+  { keeperId: string; foldId: string; undo?: boolean },
+  Promise<MergeStudentsResult>
+>({ timeoutSeconds: 120, memory: '256MiB' }, async (request) => {
+  await requireCoreTeam(request.auth?.uid);
+  const foldId = request.data?.foldId;
+  if (typeof foldId !== 'string' || foldId.trim().length === 0) {
+    throw new HttpsError('invalid-argument', 'foldId is required.');
+  }
+
+  if (request.data?.undo === true) {
+    return runUnmergeStudents({ db: db(), foldId: foldId.trim(), uid: request.auth!.uid, logger });
+  }
+
+  const keeperId = request.data?.keeperId;
+  if (typeof keeperId !== 'string' || keeperId.trim().length === 0) {
+    throw new HttpsError('invalid-argument', 'keeperId is required.');
+  }
+  return runMergeStudents({
+    db: db(),
+    keeperId: keeperId.trim(),
+    foldId: foldId.trim(),
+    uid: request.auth!.uid,
+    logger,
+  });
+});
+
 /**
  * The code the kiosk puts in its QR. Kiosk sessions only, so a code cannot be
  * conjured from anywhere but a screen a staff member vouched for.
  */
-export const mintRegistrationCode = onCall<void, Promise<MintCodeResult>>(
+export const mintRegistrationCode = onCall<{ eventId?: unknown } | void, Promise<MintCodeResult>>(
   { timeoutSeconds: 30, memory: '256MiB' },
   async (request) => {
     if (request.auth?.token?.kiosk !== true) {
@@ -2310,7 +2472,14 @@ export const mintRegistrationCode = onCall<void, Promise<MintCodeResult>>(
     }
     await requireMember(request.auth?.uid);
 
-    const result = await mintCode(db(), request.auth!.uid, new Date());
+    // Optional on the wire: an old cached kiosk bundle still calls this bare,
+    // and its codes simply carry no event — they validate and register exactly
+    // as before, they just cannot wake the screen that minted them.
+    const rawEventId = request.data?.eventId;
+    const eventId =
+      typeof rawEventId === 'string' && rawEventId.trim() !== '' ? rawEventId.trim() : null;
+
+    const result = await mintCode(db(), request.auth!.uid, new Date(), eventId);
     if (result === 'busy') {
       throw new HttpsError(
         'resource-exhausted',
@@ -2420,5 +2589,41 @@ export const rebuildKioskPhoneIndex = onSchedule(
       logger: logger,
     });
     logger.info('Rebuilt the kiosk phone index', summary);
+  },
+);
+
+/**
+ * Rebuilds `kioskIndex/participation` on demand: the kiosk itself when it finds
+ * the stored index stale at bind time. Any active member, for the same reason
+ * the phone index is — the output is student ids the caller already reads.
+ *
+ * No backend secrets, because this reads nothing but Tally's own registers.
+ */
+export const refreshKioskParticipation = onCall<undefined, Promise<ParticipationSummary>>(
+  { timeoutSeconds: 300, memory: '512MiB' },
+  async (request) => {
+    await requireMember(request.auth?.uid);
+    return buildParticipationIndex(db(), { builtBy: request.auth!.uid, logger: logger });
+  },
+);
+
+/**
+ * The nightly rebuild, so a kiosk that is never paired still binds to a current
+ * answer. Ten minutes before the phone index, and emphatically its own job:
+ * this build touches no backend and needs no secrets, while `buildPhoneIndex`
+ * deliberately *throws* when one is down. Sharing a schedule would let a
+ * Planning Center outage take the kiosk's idea of who belongs to a gathering
+ * with it.
+ */
+export const rebuildKioskParticipation = onSchedule(
+  {
+    schedule: 'every day 03:20',
+    timeZone: MINISTRY_TIME_ZONE,
+    timeoutSeconds: 300,
+    memory: '512MiB',
+  },
+  async () => {
+    const summary = await buildParticipationIndex(db(), { builtBy: 'schedule', logger: logger });
+    logger.info('Rebuilt the kiosk participation index', summary);
   },
 );

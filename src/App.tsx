@@ -56,6 +56,11 @@ const PairKioskPage = lazy(() =>
     default: m.PairKioskPage,
   })),
 );
+const ReviewPage = lazy(() =>
+  import('@/features/review/ReviewPage').then((m) => ({
+    default: m.ReviewPage,
+  })),
+);
 
 export default function App() {
   return (
@@ -136,6 +141,19 @@ export default function App() {
                                 element={
                                   <RequireRole role="core">
                                     <SettingsPage />
+                                  </RequireRole>
+                                }
+                              />
+                              {/* Where a family the kiosk recorded becomes a
+                                  family the church's database knows. Core team:
+                                  this is the only screen that shows a parent's
+                                  phone number, and the only one that writes
+                                  people upstream. */}
+                              <Route
+                                path="review"
+                                element={
+                                  <RequireRole role="core">
+                                    <ReviewPage />
                                   </RequireRole>
                                 }
                               />

@@ -1,0 +1,479 @@
+[
+  {
+    "act": "At the door",
+    "who": "A family the church already has",
+    "title": "One question, and no keyboard on the glass",
+    "caption": "The kiosk asks for a name or four digits and nothing else — no account, no password, no app to install. The digits are the family's own phone number, which is the only credential a parent reliably has on them, and the keyboard is the kiosk's own: the device's native one is slow to rise and covers half the screen when it does.",
+    "file": "tall-01-one-question-and-no-keyboard-on-the-glass.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "At the door",
+    "who": "Three children, one number",
+    "title": "Four digits, and the whole family answers",
+    "caption": "The digits are a parent's own phone number, and the index behind them is built from household co-membership upstream — so one family types once. This is the arrival a lobby kiosk exists for: three children, a queue behind, and about eight seconds of glass time to spend.",
+    "file": "tall-02-four-digits-and-the-whole-family-answers.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "At the door",
+    "who": "Three children, one number",
+    "title": "Anyone else? Asked once, answered in a list",
+    "caption": "Every child on the number is offered; the ones this gathering actually expects arrive ticked. That distinction is the whole of the screen. A household is a guess made from four phone digits, and it is frequently right about the family and wrong about tonight — the third child here has not been in months, and ticking her would have written a child who is not in the building onto a register nobody can reconcile. So the prediction decides the tick and the guess decides the list: she is still there, at full weight, one tap from being included. The button counts what it will actually do, which is the only place on the screen that says how many.",
+    "file": "tall-03-anyone-else-asked-once-answered-in-a-list.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "At the door",
+    "who": "Three children, one number",
+    "title": "One tap, two children, two stickers",
+    "caption": "One press of one button, one arrival written on the register, and a label rasterising for each of them in a worker that started when the confirm screen came up. They share an arrival id, which is what lets the pickup screen later offer exactly this group back — see Act 5. The sibling nobody ticked is not on the register and has no sticker coming, and no volunteer has to go looking for a child who was never dropped off.",
+    "file": "tall-04-one-tap-two-children-two-stickers.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "At the door",
+    "who": "A family the church already has",
+    "title": "Four keystrokes is usually the whole search",
+    "caption": "Filtering happens on the device against a roster it already holds, so the list narrows with the keystroke rather than after a round trip. That matters more than it sounds: the queue behind is what makes a kiosk worth having, and a search that waits on a network is a search that stops the queue. Note the line under the results: \"Not your family?\" is standing there while a match is showing, because four digits are a small keyspace and a newcomer can type theirs and be handed a real child, correctly spelled, who is not theirs. A successful search is not proof, so the door out is never closed — and it stops asking whether they are new, which is not the question in front of them.",
+    "file": "tall-05-four-keystrokes-is-usually-the-whole-search.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "At the door",
+    "who": "A family the church already has",
+    "title": "Is this you?",
+    "caption": "One name, large, and one button. The check-in is a single tap rather than a hold: speed of confirmation is the whole point of a kiosk, and the worst a mis-tap does is mark somebody present who then walks in anyway. Undo lives with the staff in the main app, deliberately not here.",
+    "file": "tall-06-is-this-you.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "At the door",
+    "who": "A family the church already has",
+    "title": "The tick, and a sticker on its way",
+    "caption": "Painted optimistically — the write is already in flight and the screen does not wait for it, because a parent turning to walk their child in has stopped looking by then. The label rasterises in a worker that started when the confirm screen came up, so it is moving before the tick paints.",
+    "file": "tall-07-the-tick-and-a-sticker-on-its-way.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "At the door",
+    "who": "The same family, at the end of the morning",
+    "title": "A pickup is a hold, not a tap",
+    "caption": "The same row, hours later, offering the only thing left to do with a child who is already here. Three seconds of deliberate pressure rather than one tap, and that is not ceremony: marking a child collected is a claim that somebody took them out of the building, made on an unattended screen in a lobby — and unlike a stray check-in it does not correct itself when the child walks back in. Undoing one needs a volunteer and the main app.",
+    "file": "tall-08-a-pickup-is-a-hold-not-a-tap.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "At the door",
+    "who": "The same family, at the end of the morning",
+    "title": "Signed out, and the count still stands",
+    "caption": "The pickup is its own record rather than an edit to the check-in, so the morning's head count is unchanged by anybody going home. Undoing a collection deletes that record rather than nulling a field — a room that thinks a child is present when they are not is a worse failure than one that has to be asked twice.",
+    "file": "tall-09-signed-out-and-the-count-still-stands.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "Nobody has met us",
+    "who": "A family the church has never seen",
+    "title": "What used to be a dead end",
+    "caption": "This screen once said \"No match — please see a leader\" and nothing else. Seeing a leader is still the right last word when something is wrong with the search; it was never the right first one for being new. Two offers sit under the empty result and they answer different questions: a family somebody added while they queued needs the kiosk to look again, and a family nobody has met needs a form.",
+    "file": "tall-10-what-used-to-be-a-dead-end.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "Nobody has met us",
+    "who": "A family the church has never seen",
+    "title": "Your phone, or this screen",
+    "caption": "The QR comes first because a family with a phone in their hand would nearly always rather type on it, and the ones without one are a single tap from the wizard. The code under it is minted by a real callable under the kiosk's own session, lives twenty minutes, carries at most twenty families, and re-mints itself while the screen is up — a stable public registration URL would be a form on the open internet whose submissions land in a church's people database.",
+    "file": "tall-11-your-phone-or-this-screen.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "Nobody has met us",
+    "who": "A family the church has never seen",
+    "title": "One question per screen",
+    "caption": "The alternative on a lobby tablet is a form with six boxes and an on-screen keyboard that can only fill one of them at a time — a parent tapping between fields, losing their place, with a queue behind. The readout is a div, never an input: nothing here focuses anything, so the device keyboard never rises.",
+    "file": "tall-12-one-question-per-screen.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "Nobody has met us",
+    "who": "A family the church has never seen",
+    "title": "The shift key, and where a capital belongs",
+    "caption": "Capitals are automatic at the start of a name and after each space, hyphen and apostrophe — the boundaries a name actually has, which is what makes Anne-Marie and O'Brien come out right without anybody reaching for shift. It is a default, not a rule: no rule short of a dictionary gets McDonald, van der Berg and O'Sullivan all right, and what is typed here goes on a sticker a child wears.",
+    "file": "tall-13-the-shift-key-and-where-a-capital-belongs.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "Nobody has met us",
+    "who": "A family the church has never seen",
+    "title": "A grade, or honestly none",
+    "caption": "\"No grade\" is an answer rather than a blank. A nursery child has none to type, and a field left empty would either invent a zero or leave the child queued forever behind a validation nobody can satisfy. The chips open on the middle of the gathering's own band, which is one fewer tap for most families.",
+    "file": "tall-14-a-grade-or-honestly-none.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "Nobody has met us",
+    "who": "A family the church has never seen",
+    "title": "Anybody else?",
+    "caption": "The loop that makes this worth doing at a kiosk at all — and the children so far are named above the two buttons, because a parent cannot answer \"anybody else?\" against their own memory of what they typed forty seconds ago. Naming them also catches the mistake this screen is the last chance to catch: a child entered twice, or one whose name went in wrong.",
+    "file": "tall-15-anybody-else.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "Nobody has met us",
+    "who": "A family the church has never seen",
+    "title": "The second child already knows their surname",
+    "caption": "Prefilled from the first child, with the shift key down rather than up — the next keystroke belongs mid-word, not at the start of one. This is the argument for a wizard over a form in one screen: the questions know what the family has already said, and a form cannot. It is one Clear away when the guess is wrong.",
+    "file": "tall-16-the-second-child-already-knows-their-surname.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "Nobody has met us",
+    "who": "A family the church has never seen",
+    "title": "A number pad for a number",
+    "caption": "The letter keyboard would work and would be wrong: everybody already knows what a phone keypad looks like, and the letter groups under the digits are there because a parent reading their own number off muscle memory finds them. The line above says why it is being asked for *before* it is typed, while somebody is still deciding whether to give it.",
+    "file": "tall-17-a-number-pad-for-a-number.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "Nobody has met us",
+    "who": "A family the church has never seen",
+    "title": "Everything, before anything is written",
+    "caption": "Both children, the adult, and the number — the last point at which a correction costs a tap rather than a leader. Six questions in all, and nothing else: allergies, emails and second guardians are not here. That is the same bargain the staff quick-add makes, because a lobby form that asks for everything is a lobby form nobody finishes.",
+    "file": "tall-18-everything-before-anything-is-written.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "Nobody has met us",
+    "who": "A family the church has never seen",
+    "title": "Next time, just type those four digits",
+    "caption": "Both children are on the roster, both are checked in against tonight's gathering, and a sticker is coming out of the printer for each. The sentence under the tick is the part that matters next week: the last four digits of the number they just gave are the search this kiosk already had, and this is where the family learns it. No account, no password, no app.",
+    "file": "tall-19-next-time-just-type-those-four-digits.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "Nobody has met us",
+    "who": "A family the church has never seen",
+    "title": "And it works immediately",
+    "caption": "Typed on the same screen, seconds later, with nothing refetched — the answer came back with the registration and went straight into what this kiosk holds. It survives the nightly rebuild too: that job reads the church's backends, which may not know this number for hours or, on a deployment that cannot write households, ever, so a registration keeps its digits in an overlay the rebuild folds in rather than overwrites.",
+    "file": "tall-20-and-it-works-immediately.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "On their own phone",
+    "who": "The same family, on the device in their hand",
+    "title": "The one unauthenticated write Tally has",
+    "caption": "The page the QR opens, on a real second device holding nothing but the code from the lobby screen. It is deliberately not a link anybody can keep: the code expires, is capped, and is re-minted while the kiosk is up. Registering remotely means being in the room — which is the entire security model, and it is the right one, because the alternative is a public form whose submissions land in a church's people database.",
+    "file": "tall-21-the-one-unauthenticated-write-tally-has.png",
+    "shape": "tall",
+    "device": "phone"
+  },
+  {
+    "act": "On their own phone",
+    "who": "The same family, on the device in their hand",
+    "title": "A real form, because a phone can carry one",
+    "caption": "Ordinary labelled inputs with the phone's own keyboard, which is the opposite of the kiosk's one-question-per-screen and right for the same reason: the constraint on the tablet was the shared glass and the queue, and neither applies here. This is also the only surface that asks about allergies, and only where the church's backend can actually hold them — a lobby screen does not display a child's medical notes, so it does not collect them.",
+    "file": "tall-22-a-real-form-because-a-phone-can-carry-one.png",
+    "shape": "tall",
+    "device": "phone"
+  },
+  {
+    "act": "On their own phone",
+    "who": "The same family, on the device in their hand",
+    "title": "The digits are the whole instruction",
+    "caption": "This form checks nobody in — it cannot know the family walked through the door — so it ends by sending them back to the four digits, and to nothing else. It used to say \"tap I've registered, then type\": the kiosk's roster was a cache only a button refreshed, and skipping the button meant watching a screen say \"no match\". The button has become the machine's job — the code this form was opened with remembers which gathering minted it, and the kiosk is already reacting.",
+    "file": "tall-23-the-digits-are-the-whole-instruction.png",
+    "shape": "tall",
+    "device": "phone"
+  },
+  {
+    "act": "On their own phone",
+    "who": "The same family, back at the lobby screen",
+    "title": "The kiosk noticed by itself",
+    "caption": "No button was pressed on this screen. The phone form's submission bumped a one-document change signal (`kioskIndex/pulse`) naming the gathering whose kiosk minted the code, and the kiosk — which polls that signal every thirty seconds — took its own QR down, refreshed its roster, and put the search screen up with the one instruction that matters. The \"I've registered\" button still exists behind the QR for the family who will not wait half a minute; nobody needs it.",
+    "file": "tall-24-the-kiosk-noticed-by-itself.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "On their own phone",
+    "who": "The same family, back at the lobby screen",
+    "title": "Found, in a copy nobody had to refresh",
+    "caption": "The four digits find the child the phone created a minute ago, in the kiosk's own roster copy — already fresh, because the same pulse that took the QR down told this screen to re-read it. Nothing was forced and nothing was pressed. The family who takes ten minutes over the form and comes back to a kiosk that moved on is covered by the same machinery's last resort: a finished search that finds nobody anywhere runs the church-wide re-read by itself, silently, before the screen will say \"Still no match\".",
+    "file": "tall-25-found-in-a-copy-nobody-had-to-refresh.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "The second child",
+    "who": "A family the church already has, growing",
+    "title": "The other door, in the same slot",
+    "caption": "A parent looking at one name who knows there should be two. \"Anyone else?\" is asked on every check-in, and the answer is a list: the siblings the kiosk guessed, ending with the way to add the one it missed. Five rounds of critique went into that being one slot rather than two — it used to be a ticked list *above* the button when the guess worked and a line of grey text *below* it when it did not, which reserved the quietest thing on the glass for the only parent who needed it. The guess is deliberately conservative and so it misses people: a child on a different number, a household split in two, somebody added by hand last week.",
+    "file": "tall-26-the-other-door-in-the-same-slot.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "The second child",
+    "who": "A family the church already has, growing",
+    "title": "Both readings of the same question",
+    "caption": "This used to be a link straight to the registration form, which read as one thing and did another: \"add a brother or sister\" is plainly an instruction to include another of my children in this check-in, and it answered by asking a new child's name and grade. Both readings are real, so the screen holds both — the search finds the child the kiosk simply failed to associate, and the standing offer underneath registers the one who genuinely is not on the roster. Nothing here names a relationship: kinship is what the four digits *guess*, and this screen exists for everyone that guess is wrong about, so the box asks for a child's name and nothing more.",
+    "file": "tall-27-both-readings-of-the-same-question.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "The second child",
+    "who": "A family the church already has, growing",
+    "title": "Searching the roster, not a form",
+    "caption": "A name search over the whole roster rather than the four digits that just failed — so a child the digits could never have found is reachable anyway. Unscoped, too, unlike the front door two acts ago: the population this screen exists for is precisely the one a scope gets wrong, the daughter who comes on Fridays and the son who is new to it. A parent only reaches here by having already found their family. Anybody already on the confirm screen behind this one, or already checked in, is drawn inert rather than hidden: a parent looking for a name needs to see it and see that it is done. The offer to register somebody genuinely new waits underneath rather than being the destination.",
+    "file": "tall-28-searching-the-roster-not-a-form.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "The second child",
+    "who": "A family the church already has, growing",
+    "title": "Added onto the check-in, not registered",
+    "caption": "Straight back to the confirm with the child appended and ticked, and the button counting them. This is the half of \"a brother or sister\" that costs nothing: they were always on the roster, the four digits just could not prove they belonged together — a different number on file, a household split in two, a cousin, the neighbour's boy who came in the same car. One press now checks both in as one arrival, which is also what makes them one pickup later.",
+    "file": "tall-29-added-onto-the-check-in-not-registered.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "The second child",
+    "who": "A family the church already has, growing",
+    "title": "Two questions, and no adult at all",
+    "caption": "No name, no phone number, no second household invented — the confirm names the siblings this child is joining and that is the whole of it. The kiosk resolved the family from the four digits it searched with; the server re-verifies every one of those ids before believing any of them. At approval the household comes from an existing sibling, which is the fix for a real bug: a family gaining a second child used to gain a second *household*, with the first child left behind in the original and invisible from the new one.",
+    "file": "tall-30-two-questions-and-no-adult-at-all.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "Going home",
+    "who": "The same family, three hours later",
+    "title": "The ones who came in together",
+    "caption": "Three children, one number, and the screen has already decided that two of them are going home and one is a question. Ada is ticked because she and Chidi walked in on the same form — one press of one button, recorded on the register as one arrival — and Zuri is not, because she came separately. Until this existed the only answer available here was the check-in's guess at a family from four phone digits, which would have ticked all three on the strength of a shared number. The guess is what you have at the front door. By the time somebody comes back for them there is a fact.",
+    "file": "tall-31-the-ones-who-came-in-together.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "Going home",
+    "who": "The same family, three hours later",
+    "title": "And she is one tap away, because families do",
+    "caption": "Arriving apart and leaving together is the ordinary case, not the exception — so the sibling the register cannot vouch for is still on the screen, in the list, one tap from ticked. Dropping her name would have been worse than leaving it unticked: a parent taking their family home should never have to go round the flow twice. The arrival decides what is *ticked*; the phone guess decides what is *shown*, and the two are different jobs.",
+    "file": "tall-32-and-she-is-one-tap-away-because-families-do.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "Going home",
+    "who": "The same family, three hours later",
+    "title": "Three seconds, once, for the whole family",
+    "caption": "A pickup holds where a check-in taps, and it still holds for three children at once. The asymmetry is deliberate: a stray check-in is self-correcting when the child walks in anyway, and a stray *collection* is a claim on an unattended lobby screen that somebody took a child out of the building. Undoing one needs a volunteer and the main app. The arrival also works the other way round — a child the four-digit guess would never call family, a cousin or a neighbour's boy who came in the same press, is offered here and ticked.",
+    "file": "tall-33-three-seconds-once-for-the-whole-family.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "Who the door will find",
+    "who": "A child from another programme",
+    "title": "A lobby screen is not the whole ministry",
+    "caption": "Bree is on the roster and is not found here, because she has never been to this gathering. The search is scoped to the children who have — the same year the check-in screen uses to decide who belongs to a room — rather than to every active student in the church. That is not tidiness: four digits are a small keyspace, and a search over the whole ministry can hand a parent a real child, correctly spelled, who is not theirs and is not even in the building. The scope is derived from attendance and rebuilt nightly, so it switches itself on once a gathering has been run and there is nothing to configure.",
+    "file": "tall-34-a-lobby-screen-is-not-the-whole-ministry.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "Who the door will find",
+    "who": "A child from another programme",
+    "title": "And the way back out says what it does",
+    "caption": "Narrowing a search is only safe if the way out is on the screen before it is needed. It used to be \"I already registered\" — a button that meant look harder for me, and swept the whole church to prove it. This one says what it does: it widens this one search to all of Tally, on the spot and without the network, because Bree was on the roster all along and only outside the scope. The offer spends itself when tapped and is back for the next family. It still says nothing about scope — a parent has no model of which children this screen is willing to find, and explaining one in order to ask them to press a button would be the wrong trade. And when the kiosk itself cannot know the scope, it widens on its own: a gathering with no history behind it searches everything, and so does a kiosk that cannot read the list at all.",
+    "file": "tall-35-and-the-way-back-out-says-what-it-does.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "The review",
+    "who": "Core team, on a weekday",
+    "title": "The door records; a person decides",
+    "caption": "Everything the last three acts created is here, and *none* of it has reached Planning Center. Every registered child is written held, and that hold is the only thing gating the push — both backends, both sweeps, the on-create trigger, the re-create repair. The reason is that nothing upstream is reversible: there is no delete anywhere in this codebase, and the second backend has no merges at all. A public screen with a queue behind it should not be settling identity.",
+    "file": "tall-36-the-door-records-a-person-decides.png",
+    "shape": "tall",
+    "device": "app"
+  },
+  {
+    "act": "The review",
+    "who": "Core team, on a weekday",
+    "title": "The form as the family typed it",
+    "caption": "The children with their grades, the guardian, and the four digits — and the phone number, which is the one place in Tally a parent's number lives. It waits on a functions-only document with a thirty-day sweep, deleted the moment a reviewer decides, because deferring the push would otherwise lose the guardian entirely: the security rules forbid a parent's name or number on a student document, deliberately, and there is nowhere else for it to go.",
+    "file": "tall-37-the-form-as-the-family-typed-it.png",
+    "shape": "tall",
+    "device": "app"
+  },
+  {
+    "act": "The review",
+    "who": "Core team, on a weekday",
+    "title": "This might be the Jacob Smith we already have",
+    "caption": "The door recorded the suspicion and did nothing about it, which is the change. It used to refuse the registration and tell the family to \"search for their name instead\" — an instruction to check in a different child of the same name, on an unattended screen. Two rows a reviewer merges on Tuesday is the cheaper mistake, and the only one anybody notices. The grade beside each candidate is what actually tells two children apart.",
+    "file": "tall-38-this-might-be-the-jacob-smith-we-already-have.png",
+    "shape": "tall",
+    "device": "app"
+  },
+  {
+    "act": "The review",
+    "who": "Core team, on a weekday",
+    "title": "Approval is a replay, in the right order",
+    "caption": "Every child first, then **one** call to build the family — approving child by child would mint one household per sibling, the exact failure the family write exists to avoid. The hold comes off before the push rather than after it, which looks like the risky order and is the safe one: a push that fails after approval leaves an ordinary queued student that the Settings sweep already understands.",
+    "file": "tall-39-approval-is-a-replay-in-the-right-order.png",
+    "shape": "tall",
+    "device": "app"
+  },
+  {
+    "act": "The review",
+    "who": "Core team, on a weekday",
+    "title": "And the other answer",
+    "caption": "Discarding takes the children off the roster and forgets the phone number — the sentence comes before the second press, because that half is not reversible. The students go inactive rather than away: every attendance record points at these documents, and deleting one would silently drop a head count somebody has already reported to a room full of parents.",
+    "file": "tall-40-and-the-other-answer.png",
+    "shape": "tall",
+    "device": "app"
+  },
+  {
+    "act": "The rest of the week",
+    "who": "A counselor at a door",
+    "title": "The same job, without a kiosk",
+    "caption": "Check-in is the home screen, because a counselor at a door should never have to navigate to start working. It opens on the regulars rather than the whole ministry — a student who comes every Friday is one tap away, and the rest of the roster is one tap behind that. This is the screen most people who install Tally will only ever see.",
+    "file": "tall-41-the-same-job-without-a-kiosk.png",
+    "shape": "tall",
+    "device": "app"
+  },
+  {
+    "act": "The rest of the week",
+    "who": "Core team",
+    "title": "One student, and the history under them",
+    "caption": "Names, grades and allergies are read live from the church's own database rather than mirrored here — Tally stores the membership and the attendance, and nothing about who somebody is. \"Every night they came\" underneath reaches back as far as the records go, further than the calendar the screens above keep loaded, and it unions the history of any duplicate row merged into this one.",
+    "file": "tall-42-one-student-and-the-history-under-them.png",
+    "shape": "tall",
+    "device": "app"
+  },
+  {
+    "act": "The rest of the week",
+    "who": "Core team",
+    "title": "A call list, not a report",
+    "caption": "Students who have missed three gatherings in a row, first-timers from the last week, profiles nobody can be reached about. Split by gathering, for the same reason prediction is: a student who comes every Sunday and has never been to a Friday has missed nothing, and the pooled version phoned their family about it.",
+    "file": "tall-43-a-call-list-not-a-report.png",
+    "shape": "tall",
+    "device": "app"
+  },
+  {
+    "act": "The rest of the week",
+    "who": "Core team",
+    "title": "Where the church's database is connected",
+    "caption": "Two backends, either or both, with what is queued and what is *waiting to be reviewed* counted separately — a family held for a person is not a stuck push, and saying \"3 queued\" about them would teach somebody to ignore the line that means it. The link from here is how most reviewers will find the screen in Act 5.",
+    "file": "tall-44-where-the-church-s-database-is-connected.png",
+    "shape": "tall",
+    "device": "app"
+  },
+  {
+    "act": "The rest of the week",
+    "who": "Any active member",
+    "title": "How the lobby screen gets its identity",
+    "caption": "The kiosk shows a six-character code and polls; whoever types it here hands the kiosk a session bound to their own account, and every check-in it records from then on carries their name. Open to any active member, not just the core team — the person setting up the lobby screen on a Friday evening is a counselor.",
+    "file": "tall-45-how-the-lobby-screen-gets-its-identity.png",
+    "shape": "tall",
+    "device": "app"
+  },
+  {
+    "act": "When it doesn't go that way",
+    "who": "A parent halfway through their number",
+    "title": "Half a number is not a failed search",
+    "caption": "Two digits match nobody, and saying \"no match\" here would be a lie about an unfinished question — the commonest way a search screen makes somebody think they are not in the system. So a partial number gets its own sentence and none of the doors: no register offer, no way out of the scope, nothing to decide. It also gates the machinery behind the screen. A finished search that finds nobody is what triggers the silent church-wide re-read, and a half-typed number must never spend that.",
+    "file": "tall-46-half-a-number-is-not-a-failed-search.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "When it doesn't go that way",
+    "who": "A family the kiosk cannot look up",
+    "title": "The wifi went, and the screen says so once",
+    "caption": "The kiosk swept for this family by itself, and the sweep could not reach anything — so it says so, in one line, under the doors that still work. What it does *not* do is block: the register button is live, the roster held on the device still answers every other family in the queue, and check-ins recorded while this is on screen queue up and replay when the network returns. A lobby screen that stops working when the wifi does is a lobby screen that stops working, and a church hall is exactly where that happens.",
+    "file": "tall-47-the-wifi-went-and-the-screen-says-so-once.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "When it doesn't go that way",
+    "who": "A family who really are new",
+    "title": "One word, and the whole sweep behind it",
+    "caption": "The only visible trace of the church-wide re-read that used to hide behind a button. The search finished, found nobody in the roster this device holds, and the kiosk went and asked both backends without being told to — and came back with nothing, so the headline gains one word. **Still.** That is deliberately the entire report: a parent standing at a screen needs to know what to do next, not what the device has been doing. The doors underneath are unchanged, because the answer for this family has not changed either.",
+    "file": "tall-48-one-word-and-the-whole-sweep-behind-it.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "When it doesn't go that way",
+    "who": "A family with a phone and no code to scan",
+    "title": "No QR, and the other door is right there",
+    "caption": "The code is minted by a callable, and a callable can fail. What the screen must not do is leave a family standing in front of an empty white square wondering whether to wait — so the failure names the alternative in the same breath, and the alternative is the thing they can do without leaving the kiosk. The wizard was always one tap below the code; here it becomes the answer.",
+    "file": "tall-49-no-qr-and-the-other-door-is-right-there.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "When it doesn't go that way",
+    "who": "Somebody who kept the link",
+    "title": "A code that is no longer a door",
+    "caption": "This is the whole reason the registration link is not a stable URL. A code lives twenty minutes and carries twenty families, so a photograph of the lobby screen, a link forwarded to a friend, or a browser history entry from last Sunday all end here — at the only unauthenticated write surface Tally has, closed. Registering remotely means being in the room, and this screen is where that requirement is actually enforced.",
+    "file": "tall-50-a-code-that-is-no-longer-a-door.png",
+    "shape": "tall",
+    "device": "phone"
+  },
+  {
+    "act": "When it doesn't go that way",
+    "who": "A parent going too fast",
+    "title": "The one field with a rule beyond “not empty”",
+    "caption": "Half a phone number is caught in the browser and marked *on the field*, because a parent scrolling a form needs to know which box rather than that something somewhere is wrong. This is the only field checked for shape, and it earns that: it is the one the kiosk will have to match on for the rest of this family's time at the church, and the last four digits of a wrong number are a login nobody can use. Nothing typed is cleared and nothing was sent — the registration id was minted when this page opened and is reused on the next press, so pressing twice cannot become two families.",
+    "file": "tall-51-the-one-field-with-a-rule-beyond-not-empty.png",
+    "shape": "tall",
+    "device": "phone"
+  },
+  {
+    "act": "When it doesn't go that way",
+    "who": "A parent who is not sure it worked",
+    "title": "Tapped twice, counted once",
+    "caption": "The commonest doubt at a lobby screen: did that go through? So a child already on the register is drawn as a statement rather than a button, and there is nothing here to press twice. Underneath, the attendance document is keyed by the student id rather than a generated one, so two counselors tapping the same child a second apart on different phones address one row instead of inflating a head count. The label printer is held to the same rule — a reprint loop at a door is a queue nobody can clear.",
+    "file": "tall-52-tapped-twice-counted-once.png",
+    "shape": "tall",
+    "device": "kiosk"
+  },
+  {
+    "act": "When it doesn't go that way",
+    "who": "A family arriving late",
+    "title": "The doors have shut, and it still works",
+    "caption": "A check-in window is a note to the room, not a lock on the glass. The gathering stopped admitting people ten minutes ago and the kiosk says so in the one line under the title — then goes on working exactly as before, because the alternative is a family standing in the building beside a screen that refuses to admit they are there. The same posture runs all the way down: a gathering that has *ended* is still offered to a kiosk if it collects children, since the pickup is the half nobody can skip.",
+    "file": "tall-53-the-doors-have-shut-and-it-still-works.png",
+    "shape": "tall",
+    "device": "kiosk"
+  }
+]

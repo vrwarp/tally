@@ -37,6 +37,7 @@ export const SHARED_FILES = [
   'labelTemplate.ts',
   'materialize.ts',
   'phoneDigits.ts',
+  'participation.ts',
 ];
 
 const BANNER = `/*

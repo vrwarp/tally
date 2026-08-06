@@ -21,6 +21,7 @@ import {
   writeDocument,
   type FirestoreDoc,
 } from './emulator';
+import { seedWorld } from './seed';
 
 export interface TallyFixtures {
   signedInAs: (role: TeamRole) => Promise<Page>;
@@ -68,7 +69,37 @@ export interface TallyFixtures {
   };
 }
 
-export const test = base.extend<TallyFixtures>({
+export const test = base.extend<TallyFixtures, { seededWorld: void }>({
+  /**
+   * One reseed per project, before its first test.
+   *
+   * These specs mutate shared state on purpose — checking a student in *is* a
+   * write, the Planning Center spec imports people who were not there before,
+   * and the kiosk spec leaves behind the families it registered. `globalSetup`
+   * seeds once, which is right for whichever project runs first and wrong for
+   * every one after it: the second browser walks up to a child the first
+   * already checked in and waits for a "Check in" button that is correctly not
+   * there. Locally that was three or four failures a run that read exactly like
+   * application bugs.
+   *
+   * Worker-scoped, and that is the whole trick: Playwright never shares a
+   * worker between projects, so a worker fixture runs exactly once per project.
+   * The obvious-looking alternative — a setup project per browser, wired
+   * through `dependencies` — does not work, because dependencies are resolved
+   * as a graph and *all* of them run before any dependent project does. Both
+   * reseeds then land back to back at the start of the run, and the second
+   * browser is no better off than before.
+   *
+   * `auto`, so no spec has to remember to ask for it.
+   */
+  seededWorld: [
+    async ({}, use, workerInfo) => {
+      await seedWorld(`project ${workerInfo.project.name}`);
+      await use();
+    },
+    { scope: 'worker', auto: true },
+  ],
+
   signedInAs: async ({ page }, use) => {
     await use(async (role: TeamRole) => {
       await signIn(page, TEAM[role]);

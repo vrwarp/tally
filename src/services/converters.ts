@@ -149,6 +149,18 @@ export function toStudent(snapshot: DocumentSnapshot<DocumentData>): Student {
     // The generic linkage pair, server-written; `backendOfStudent` reads it.
     upstreamBackend: isBackendId(data.upstreamBackend) ? data.upstreamBackend : null,
     upstreamPersonId: strOrNull(data.upstreamPersonId),
+    pendingReview: bool(data.pendingReview),
+    mergedIntoStudentId: strOrNull(data.mergedIntoStudentId),
+    // Both spellings folded into the list the app reads: `mergedFromStudentId`
+    // predates a keeper being able to absorb more than one duplicate.
+    mergedFromStudentIds: [
+      ...new Set([
+        ...(Array.isArray(data.mergedFromStudentIds)
+          ? data.mergedFromStudentIds.filter((id): id is string => typeof id === 'string')
+          : []),
+        ...(typeof data.mergedFromStudentId === 'string' ? [data.mergedFromStudentId] : []),
+      ]),
+    ],
     // A Tally document describes somebody Planning Center has not told us
     // about, so this is false by construction. When Planning Center *does* know
     // them, the roster entry wins and carries the real value.
