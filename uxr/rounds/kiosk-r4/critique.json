@@ -1,0 +1,32 @@
+{
+  "round": 4,
+  "variant_judged": "r3",
+  "root_cause_found_independently_by_both": {
+    "severity": "blocker",
+    "finding": "Renaming the variant class from r2 to r3 left every rule scoped to `.screen.r2` inert. The list lost its overflow-y:auto, its min-height:0 and its 8px gap; the pill lost its 32% wash and its 48px gutter; the ask lost its 20px. Only the mask, written fresh under `.screen.r3`, carried. Seven of the round's findings were that reversion rather than new work.",
+    "consequences": [
+      "many/wide: the pill and the commit overlap by 16px and the commit paints on top, so elementFromPoint at the pill's bottom edge returns the commit. A parent reaching for 'Another child' checks in six children irreversibly.",
+      "At seven siblings — the supported maximum — the list draws straight through the green button on both orientations. Taps on the commit's top half land on a sibling row, which removes a child. The parent of eight cannot read the button they are about to press.",
+      "Five sibling toggles butted flush at zero pitch: a tap 8px off a boundary unticks a child, with opacity-60 on a dark card as the only feedback."
+    ]
+  },
+  "other_majors": [
+    "The fade was unconditional, so in `family` — the commonest scene — the single sibling dissolved from her own midpoint into the page. A gradient to transparent is the vocabulary of 'this is cut off'; on a complete row it reads as deletion or as a fault. Same wrong-data outcome the fade was added to prevent, running the other way. And `.more`, whose comment is 'what the scroller is hiding, said where it is hidden', was styled but never emitted.",
+    "The grid had no column track, so its implicit one sized to max-content — the rendered width of 'Nia Washington' at 48px bold. Every child got a differently sized commit button: 240px for a five-character name, 448px for a long hyphenated one. Two parents in the same queue see the primary action at different widths. The wide viewport's 576px cap could never bind, so the landscape kiosk was byte-for-byte the portrait column with 850px of black either side.",
+    "`height: min(100%, 51.25rem); margin: auto` — vertical auto margins on a block-level box in normal flow compute to zero, so the band was pinned to the top of the glass for two rounds. The commit sat at 49.5% of a portrait kiosk, not the 72% its own note claimed."
+  ],
+  "confirmed_working": [
+    "The commit is genuinely fixed across all four scenes — the anchor itself works, it was anchored to the wrong place.",
+    "The antecedent fix holds: 'Anyone else?' is a question and the pill answers it, so 'Another child' can no longer be read as 'not this child, show me a different one'.",
+    "`alone` reads as a composed cluster rather than a cluster in a void.",
+    "The parent does know the child they went to find is in — full-luminance name, green tick, and the count moved."
+  ],
+  "fixed_in_r4": [
+    "Every rule rescoped by element rather than by variant, so it cannot silently unhook again.",
+    "The list is the only shrinkable child; the question and the add-row hold their intrinsic height, so the pill can never ride down under the commit.",
+    "The fade is emitted only when the list actually overflows.",
+    "An explicit column track — minmax(0, 28rem), 36rem wide — with the screen at width:100% so justify-content:center has something to centre in.",
+    "body is a flex container, so the band actually centres: the commit's centre lands near 68% of a portrait glass.",
+    "Row pitch back to 8px; chevron down from 28px to 24px; ask back to 20px."
+  ]
+}

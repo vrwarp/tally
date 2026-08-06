@@ -41,6 +41,11 @@ const CSS = `
   *, *::before, *::after { box-sizing: border-box; }
   :root { ${TOKENS} }
   html, body { height: 100%; margin: 0; }
+  /* The band has to be centred by something that can centre it — "margin: auto"
+     on a block-level box in normal flow computes its vertical margins to zero,
+     so r3's 820px band was pinned to the top of a 1280px kiosk and the commit
+     landed at 49% of the glass rather than the 72% its own note claimed. */
+  body { display: flex; align-items: center; }
   body {
     background: var(--ink-950);
     color: var(--ink-100);
@@ -143,7 +148,7 @@ const CSS = `
     display: flex; height: 4rem; flex-shrink: 0; align-items: center;
     gap: 0.625rem; border-radius: 0.75rem; padding: 0 1.25rem; text-align: left;
     font-size: 1.25rem; line-height: 1.75rem; font-weight: 600;
-    background: color-mix(in oklab, var(--brand-600) 15%, transparent);
+    background: color-mix(in oklab, var(--brand-600) 32%, transparent);
     color: var(--brand-300);
     box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--brand-500) 40%, transparent);
   }
@@ -179,12 +184,21 @@ const CSS = `
      "min-height: auto", which refuses to shrink below its content, so a
      scroller nested inside one that has not been told otherwise never
      engages — the column simply overflows the glass instead. */
-  .screen.r2 .whoelse { min-height: 0; }
-  .screen.r2 .rows {
-    display: flex; min-height: 0; flex-direction: column; gap: 0.5rem;
-    overflow-y: auto; margin-bottom: 0.5rem;
+  .whoelse { min-height: 0; }
+  /*
+   * The list is the only element allowed to absorb variation, so it is the only
+   * one that may shrink: the question and the way to add a child hold their
+   * intrinsic height, and the names scroll. Without that the region overflowed
+   * its track and rode the add-row down *under* the commit — two doors to
+   * different places fused into one band of ink, in the one scene where the
+   * commit is most expensive.
+   */
+  .rows {
+    display: flex; flex-direction: column; gap: 0.5rem;
+    flex: 1 1 auto; min-height: 0; overflow-y: auto;
   }
-  .screen.r2 .ask { font-size: 1.25rem; line-height: 1.75rem; }
+  .whoelse .ask, .whoelse .addrow { flex-shrink: 0; }
+  .ask { font-size: 1.25rem; line-height: 1.75rem; }
 
   /*
    * A heavier wash. r1 borrowed the search screen's standing-offer recipe,
@@ -194,10 +208,7 @@ const CSS = `
    * 32% it clears the sibling row and is still four times quieter than the
    * commit, which is the ordering this screen wants.
    */
-  .screen.r2 .addrow {
-    background: color-mix(in oklab, var(--brand-600) 32%, transparent);
-    justify-content: flex-start; gap: 0;
-  }
+  .addrow { justify-content: flex-start; gap: 0; }
   /*
    * A gutter the whole region shares, rather than a glyph hung off the front of
    * one row.
@@ -209,12 +220,11 @@ const CSS = `
    * row that adds one -- every line in the region starts on the same x, and
    * the plus is a mark in a gutter instead of a word competing with words.
    */
-  .screen.r2 .row, .screen.r2 .addrow { padding-left: 3rem; }
-  .screen.r2 .ask { padding-left: 3rem; }
-  .screen.r2 .addrow .plus {
+  .row, .addrow { padding-left: 3rem; }
+  .addrow .plus {
     width: 1.75rem; margin-left: -1.75rem; flex-shrink: 0; text-align: left;
   }
-  .screen.r2 .addrow .go { margin-left: auto; font-weight: 400; opacity: 0.8; }
+  .addrow .go { margin-left: auto; font-weight: 400; opacity: 0.8; }
   /* ---- r3 ---------------------------------------------------------------- */
 
   /*
@@ -233,12 +243,17 @@ const CSS = `
    */
   .screen.r3 {
     display: grid; grid-template-rows: minmax(0, 1fr) auto auto;
+    width: 100%; grid-template-columns: minmax(0, 28rem); justify-content: center;
     justify-items: center; gap: 0;
     /* A band rather than the whole glass: the controls stay in the reachable
        middle of a screen somebody is standing at, and the band itself is a
        constant, so the identity sits at its top and the commit at its bottom
        whatever the guess returned. */
-    height: min(100%, 51.25rem); margin: auto;
+    /* Centring is the flex parent's job now that there is one. The band is
+       820px in a 1280px portrait glass, which puts the commit's centre at about
+       68% — below the middle, where a standing adult's hands are, and clear of
+       the bezel that bottom-anchoring had it touching. */
+    height: min(100%, 51.25rem);
   }
   /*
    * The bottom is what is anchored, and only the bottom.
@@ -280,7 +295,7 @@ const CSS = `
      region's flex gap and got 16px by accident -- double the row pitch, so the
      add-row spaced as a separate control while its gutter, height, radius and
      text edge all said it was the list's last row. */
-  .screen.r3 .rows { margin-bottom: 0; }
+
 
   /*
    * What the scroller is hiding, said where it is hidden.
@@ -291,7 +306,7 @@ const CSS = `
    * undo. The count in the commit cannot carry this -- nothing below a terminal
    * button is read before the decision, which this loop settled in round 1.
    */
-  .screen.r3 .rows { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 2rem), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 2rem), transparent); }
+  .rows.overflowing { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 2rem), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 2rem), transparent); }
   .screen.r3 .more {
     padding: 0.5rem 0 0; font-size: 1.25rem; line-height: 1.75rem;
     color: var(--brand-300); text-align: left;
@@ -300,7 +315,7 @@ const CSS = `
   /* Full opacity and the label's optical size. A 6x9px mark at 80% under a
      36x36 filled chip was four per cent of its weight -- the right inset read
      as empty with a speck in it. */
-  .screen.r3 .addrow .go { margin-left: auto; font-weight: 400; opacity: 1; font-size: 1.75rem; }
+  .screen.r3 .addrow .go { opacity: 1; font-size: 1.5rem; }
 
   /* The tick is state; the commit is the action. Both were present-600 at the
      same value, so at five rows the chip column resolved before the names it
@@ -311,7 +326,9 @@ const CSS = `
   /* The wide kiosk stops being the tall one with more page around it -- it was
      hiding a row on the axis it is short of while two-thirds of its width sat
      empty. */
-  .screen.r3.wide .whoelse, .screen.r3.wide .commit { max-width: 36rem; }
+  .screen.r3.wide { grid-template-columns: minmax(0, 36rem); }
+  .screen.r3 .who { max-width: 100%; }
+  .screen.r3 .whoelse, .screen.r3 .commit, .screen.r3 .upper { max-width: 100%; }
 
 `;
 
@@ -450,7 +467,11 @@ const VARIANTS: Record<string, (scene: Scene) => Variant> = {
     return {
       above: `<div class="whoelse">
       <div class="ask">Anyone else?</div>
-      ${siblings.length > 0 ? `<div class="rows">\n        ${rows}\n      </div>` : ''}
+      ${
+        siblings.length > 0
+          ? `<div class="rows${siblings.length > 4 ? ' overflowing' : ''}">\n        ${rows}\n      </div>`
+          : ''
+      }
       <button class="addrow"><span class="plus">+</span>Another child<span class="go">&rsaquo;</span></button>
     </div>`,
     };
