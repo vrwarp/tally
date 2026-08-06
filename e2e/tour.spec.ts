@@ -210,7 +210,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
         who: 'A family the church already has',
         title: 'Four keystrokes is usually the whole search',
         caption:
-          'Filtering happens on the device against a roster it already holds, so the list narrows with the keystroke rather than after a round trip. That matters more than it sounds: the queue behind is what makes a kiosk worth having, and a search that waits on a network is a search that stops the queue.',
+          'Filtering happens on the device against a roster it already holds, so the list narrows with the keystroke rather than after a round trip. That matters more than it sounds: the queue behind is what makes a kiosk worth having, and a search that waits on a network is a search that stops the queue. Note the line under the results: "Not your family?" is standing there while a match is showing, because four digits are a small keyspace and a newcomer can type theirs and be handed a real child, correctly spelled, who is not theirs. A successful search is not proof, so the door out is never closed — and it stops asking whether they are new, which is not the question in front of them.',
       });
 
       await kiosk.getByRole('button', { name: new RegExp(cast.door, 'i') }).first().click();

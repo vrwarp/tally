@@ -99,6 +99,14 @@ let answer: RegisterFamilyResult = {
 };
 let sent: RegisterFamilyRequest[] = [];
 let registerFails = false;
+/**
+ * The four-digit index the kiosk searches, seeded per test.
+ *
+ * It has to come through the loader rather than through localStorage: the
+ * stored copy is only the first paint, and the load that follows it a tick
+ * later replaces whatever was there.
+ */
+let phoneIndex: Record<string, string[]> = {};
 /** What a forced refresh finds — a family who registered on their own phone. */
 let refreshedStudents: KioskStudent[] = [];
 let refreshedLast4: Record<string, string[]> = {};
@@ -109,7 +117,7 @@ const services = {
   // the failure these tests are about — so it answers rather than throwing.
   listEvents: vi.fn(async () => []),
   loadRoster: vi.fn(async () => [ADA]),
-  loadPhoneIndex: vi.fn(async () => ({})),
+  loadPhoneIndex: vi.fn(async () => phoneIndex),
   fetchAttendance: vi.fn(async () => ({ present: new Set<string>(), checkedOut: new Set<string>() })),
   replayQueue: vi.fn(async () => 0),
   performCheckIn: vi.fn(async () => {}),
@@ -230,6 +238,7 @@ beforeEach(() => {
   localStorage.clear();
   sent = [];
   registerFails = false;
+  phoneIndex = {};
   refreshedStudents = [];
   refreshedLast4 = {};
   answer = {
@@ -263,6 +272,31 @@ describe('getting into the wizard', () => {
     expect(screen.getByText(/No match — first time here\?/)).toBeTruthy();
     // Seeing a leader is still offered; it is no longer the whole answer.
     expect(screen.getByText(/or see a leader/)).toBeTruthy();
+  });
+
+  it('keeps the door open when the four digits matched somebody else', async () => {
+    /*
+     * The coincidence, which the no-match state can never catch.
+     *
+     * Four digits are a small keyspace. A family nobody has met types theirs,
+     * and the kiosk answers with a real child, correctly spelled, who is not
+     * theirs — a *successful* search that is the wrong answer. The offer has to
+     * be standing there while those rows are up, and it has to stop asking
+     * whether they are new: what they are looking at is a stranger.
+     */
+    phoneIndex = { '3344': [ADA.id] };
+    await mount();
+    await type('3344');
+
+    expect(screen.getByText('Ada Lovelace')).toBeTruthy();
+    expect(screen.getByText(/Not your family\?/)).toBeTruthy();
+    expect(screen.queryByText(/First time here\?/)).toBeNull();
+
+    await tap(/Register your child/);
+
+    // And it is the same door, landing on the same QR offer — whose own
+    // largest button is the one a family who already registered needs.
+    expect(screen.getByText(/I've registered/)).toBeTruthy();
   });
 });
 

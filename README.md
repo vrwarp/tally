@@ -73,7 +73,10 @@ of these is your child — and for a family arriving for the first time the answ
 them, please see a leader". That is still right when something is wrong with the search; it was never
 right for being new. **First time here?** stands on the search screen from the first paint, because a
 parent told "just put your name in" types a name, gets somebody else's Noah, and never fails a search
-to be offered anything. It asks three questions per child — first name, last name, grade, with "Add
+to be offered anything. It stands there while results are up too, reading **Not your family?** — four
+digits are a small keyspace, and a newcomer who types theirs can be handed a real child, correctly
+spelled, who is not theirs. A successful search is not proof, and the one state a coincidence
+guarantees will never happen is the no-match state. It asks three questions per child — first name, last name, grade, with "Add
 another child" between them and the surname carried forward — then one adult and one phone number,
 and checks the whole family in as a single act with a sticker each. What the last screen says is the
 part that matters next week: *next time, just type 7788* — the last four digits of the number they

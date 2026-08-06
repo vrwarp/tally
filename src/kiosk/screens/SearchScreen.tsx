@@ -92,6 +92,24 @@ export function SearchScreen({
     (outcome.mode === 'phone' || outcome.mode === 'name') && outcome.results.length === 0;
 
   /*
+   * A match is not proof, and this is the sentence that says so.
+   *
+   * Four digits are a weak credential and a small keyspace: a family nobody has
+   * met can type theirs and be shown somebody else's children, sorted, spelled
+   * correctly, and looking exactly like the answer. A name search is looser
+   * still. Nothing on the screen distinguishes that from a hit, so the door out
+   * has to be open while the rows are up — not only after a search fails, which
+   * is the one state a coincidence guarantees will never happen.
+   *
+   * Only the words change, never the geometry. "First time here?" beside a list
+   * of strangers asks the wrong question: the parent is not wondering whether
+   * they are new, they are wondering what to do about a Ramirez who is not
+   * theirs. And it stays the quiet weight, because most matches are real and a
+   * screen that doubted itself loudly would make a correct answer feel wrong.
+   */
+  const offerPrompt = outcome.results.length > 0 ? 'Not your family?' : 'First time here?';
+
+  /*
    * A row commits on lift, not on contact, because this list scrolls — see
    * components/tapGuard.ts for why that has to be, and what counts as a tap.
    */
@@ -307,12 +325,19 @@ export function SearchScreen({
       </div>
 
       {/*
-        * The standing offer, for the family who never types anything.
+        * The standing offer: the one door off this screen that is never closed.
         *
         * A parent who has been told "just put your name in" types their child's
         * name and gets a list — the no-match state above never fires for them,
-        * because somebody else's Noah is on the roster. So the door has to be
-        * visible without failing a search first.
+        * because somebody else's Noah is on the roster. Nor does it fire for the
+        * newcomer whose last four digits happen to belong to a family the church
+        * already has. Both meet a screen full of confident, wrong rows, and for
+        * both the way out is here.
+        *
+        * Tapping it opens the QR screen, whose own largest button is "I've
+        * registered" — so a family who came through this door by mistake, having
+        * already filled the form in on their phone, is offered the refresh
+        * before the form rather than a second registration.
         *
         * It used to be a line of text with a coloured phrase in it, which read
         * as a footnote next to the same offer's *button* two hundred pixels
@@ -336,7 +361,7 @@ export function SearchScreen({
             }}
             className="flex h-11 items-center justify-center rounded-xl bg-brand-600/15 px-6 text-base font-semibold text-brand-300 ring-1 ring-brand-500/40 active:bg-brand-600/30"
           >
-            First time here? Register your child
+            {offerPrompt} Register your child
           </button>
         )}
       </div>
