@@ -16,7 +16,7 @@
     "postbuild": "node scripts/check-kiosk-budget.mjs",
     "preview": "vite preview",
     "deploy": "tsx scripts/deploy.ts",
-    "typecheck": "tsc -b --noEmit false --emitDeclarationOnly false --pretty",
+    "typecheck": "tsc -b --pretty",
     "lint": "eslint .",
     "test": "vitest run --project unit",
     "test:watch": "vitest --project unit",

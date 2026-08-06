@@ -225,6 +225,19 @@ export class SimulatorStore {
     return this.membershipsForHousehold(householdId).length;
   }
 
+  /**
+   * How many households exist, for a test asserting that none were created.
+   *
+   * "Join the sibling's household rather than founding a second" is a claim
+   * about a *count*, and nothing else here could express it — `householdById`
+   * and `householdsForPerson` both start from something you already know about.
+   * The alternative was reaching into the private `org`, which four call sites
+   * were doing until the compiler was finally pointed at them.
+   */
+  get householdCount(): number {
+    return this.org.households.length;
+  }
+
   get lists(): readonly SimList[] {
     return this.org.lists;
   }

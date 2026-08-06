@@ -421,7 +421,7 @@ describe('createFamily against the simulator', () => {
     h.db.seed(`students/pco_${FIXTURE_IDS.leilaPhoneOnlyParent}`, annotation());
     h.db.seed('students/t-new', annotation({ pcoPersonId: newChild.id }));
 
-    const before = h.store.org.households.length;
+    const before = h.store.householdCount;
     const result = await build({
       studentIds: ['t-new'],
       anchorStudentIds: [`pco_${FIXTURE_IDS.leilaPhoneOnlyParent}`],
@@ -430,7 +430,7 @@ describe('createFamily against the simulator', () => {
     // The sibling's household already has an adult, so nothing is created at
     // all — not a person, not a household. The child is simply filed into it.
     expect(result.status).toBe('already-has-family');
-    expect(h.store.org.households).toHaveLength(before);
+    expect(h.store.householdCount).toBe(before);
     expect(h.store.householdsForPerson(newChild.id).map((household) => household.id)).toEqual([
       anchorHousehold.id,
     ]);
@@ -442,7 +442,7 @@ describe('createFamily against the simulator', () => {
     h.db.seed(`students/${MARCUS_STUDENT}`, annotation());
     h.db.seed('students/t-new', annotation({ pcoPersonId: newChild.id }));
 
-    const before = h.store.org.households.length;
+    const before = h.store.householdCount;
     const result = await build({
       studentIds: ['t-new'],
       anchorStudentIds: [MARCUS_STUDENT],
@@ -451,7 +451,7 @@ describe('createFamily against the simulator', () => {
 
     // Marcus's household is the family's; the adult joins it and so does Ada.
     expect(result.status).toBe('created');
-    expect(h.store.org.households).toHaveLength(before);
+    expect(h.store.householdCount).toBe(before);
     expect(h.store.householdsForPerson(newChild.id).map((household) => household.id)).toEqual([
       anchorHousehold.id,
     ]);

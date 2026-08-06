@@ -16,10 +16,37 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import type { BackendRegistry } from '../backends/registry.js';
-import type { PeopleBackend } from '../backends/types.js';
+import type { CreateFamilyResult, PeopleBackend } from '../backends/types.js';
 import { FakeFirestore } from '../testing/fakeFirestore.js';
 import { REGISTRATIONS_COLLECTION } from './registration.js';
 import { approveRegistration, discardRegistration, listPendingRegistrations } from './review.js';
+
+/**
+ * A whole `CreateFamilyResult`, because a partial one is not a double of
+ * anything.
+ *
+ * Only two of these fields are ever asserted on, and it would be tempting to
+ * return just those — but `backendWith` casts its own literal, so a short
+ * object there typechecks while the same object passed *in* does not, and the
+ * shape a caller may rely on stops being obvious. The real adapter always
+ * returns every field; so does this.
+ */
+function familyResult(
+  status: CreateFamilyResult['status'],
+  message: string,
+): CreateFamilyResult {
+  return {
+    status,
+    parentName: null,
+    parentPersonId: null,
+    createdPerson: false,
+    createdHousehold: false,
+    linkedChildren: [],
+    wrote: [],
+    skipped: [],
+    message,
+  };
+}
 
 const NOW = new Date('2026-08-11T10:00:00Z');
 const REGISTERED_AT = new Date('2026-08-09T19:05:00Z');
@@ -42,7 +69,7 @@ function backendWith(
     capabilities: { writeBack, parentCreatable: true },
     pushStudent: vi.fn(async () => ({ status: 'created' })),
     updateStudentProfile: vi.fn(async () => ({ status: 'updated' })),
-    createFamily: vi.fn(async () => ({ status: 'created', message: 'Added the family.' })),
+    createFamily: vi.fn(async () => familyResult('created', 'Added the family.')),
     resetCache: vi.fn(),
     invalidateReachability: vi.fn(),
     ...rest,
@@ -325,10 +352,9 @@ describe('approving', () => {
      */
     const backend = backendWith({
       writeBack: 'create',
-      createFamily: vi.fn(async () => ({
-        status: 'disabled',
-        message: 'Creating families from Tally is switched off.',
-      })),
+      createFamily: vi.fn(async () =>
+        familyResult('disabled', 'Creating families from Tally is switched off.'),
+      ),
     });
     const result = await approveRegistration({
       db,
