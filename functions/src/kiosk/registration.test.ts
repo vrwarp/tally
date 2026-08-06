@@ -157,6 +157,31 @@ describe('the documents it writes', () => {
     expect(result.checkedIn).toBe(true);
   });
 
+  it('records one arrival for the whole form, so a pickup knows who came together', async () => {
+    /*
+     * One registration is one arrival by definition: these children were typed
+     * into the same form and came through the same door. Without it the
+     * clearest "we arrived together" the kiosk ever gets would reach the pickup
+     * screen with nothing on file and fall through to the four-digit guess.
+     *
+     * The registration's own id, rather than a second one minted here — it is
+     * already unique and already on every child's document as provenance, and
+     * two ids for one act could only ever disagree.
+     */
+    const db = dbWithEvent();
+    const result = await run(db);
+    if (result.status !== 'created') throw new Error('expected created');
+
+    const arrivals = result.children.map(
+      (child) =>
+        (db.get(`events/friday-today/attendance/${child.studentId}`) as { arrivalId?: string })
+          .arrivalId,
+    );
+    expect(arrivals).toHaveLength(2);
+    expect(new Set(arrivals).size).toBe(1);
+    expect(arrivals[0]).toBe('aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee');
+  });
+
   it('makes the family findable by their four digits immediately', async () => {
     const db = dbWithEvent();
     const result = await run(db);

@@ -701,7 +701,13 @@ export function KioskApp() {
    * a tap's label prints on — see `onConfirm`.
    */
   const onRegistered = useCallback(
-    (result: { children: readonly KioskStudent[]; last4: string; checkedIn: boolean }) => {
+    (result: {
+      children: readonly KioskStudent[];
+      last4: string;
+      checkedIn: boolean;
+      /** The arrival the server recorded for them — the registration's own id. */
+      registrationId: string;
+    }) => {
       if (!services || !binding) return;
       const added = services.applyRegistration({
         children: result.children.map((child) => ({
@@ -727,6 +733,18 @@ export function KioskApp() {
       }));
       if (result.checkedIn) {
         setPresentIds((held) => new Set([...held, ...added.map((student) => student.id)]));
+        /*
+         * The same arrival the server wrote on their attendance, mirrored here
+         * so a pickup works before the register has been re-read. A family who
+         * registers two children has made the clearest "we came in together"
+         * statement the kiosk ever gets, and it should not take a poll to hear
+         * it.
+         */
+        setArrivals((held) => {
+          const next = new Map(held);
+          for (const student of added) next.set(student.id, result.registrationId);
+          return next;
+        });
       }
 
       if (prints && result.checkedIn) {
@@ -858,6 +876,10 @@ export function KioskApp() {
               })),
               last4: result.last4,
               checkedIn: result.checkedIn,
+              // The id this run submitted under, which is what the server used
+              // as the arrival — see registration.ts. Read off the overlay
+              // rather than the response so the two cannot drift.
+              registrationId: registering.registrationId,
             })
           }
           onClose={() => {

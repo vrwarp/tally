@@ -183,6 +183,25 @@ function configurePrinter(): void {
   localStorage.setItem(KIOSK_KEYS.printer, JSON.stringify({ model: 'QL-810W', label: '62x29' }));
 }
 
+/**
+ * Past whichever success screen is up.
+ *
+ * There are two, and they end differently: a tap's success screen has no
+ * button at all and says "tap anywhere", while the wizard's last screen offers
+ * a Done. Both also return on their own after a few seconds, which is why this
+ * looks for what is there rather than insisting on one.
+ */
+async function carryOn(): Promise<void> {
+  const done = screen.queryByText(/^Done$/);
+  const anywhere = screen.queryByText(/tap anywhere to carry on/i);
+  const target = done ?? anywhere;
+  if (!target) throw new Error('No success screen to carry on from.');
+  await act(async () => {
+    fireEvent.pointerDown(target.closest('button') ?? target);
+  });
+  await settle();
+}
+
 async function tap(text: RegExp | string): Promise<void> {
   await act(async () => {
     fireEvent.pointerDown(screen.getByText(text).closest('button')!);
@@ -528,6 +547,52 @@ describe('registering on your own phone', () => {
     expect(services.refreshDirectory).toHaveBeenCalledTimes(1);
   });
 
+  it('collects the family it registered without sweeping up a child who came earlier', async () => {
+    /*
+     * The server writes the arrival on the attendance it creates, but this
+     * kiosk does not read the register again for five minutes — and a parent
+     * who drops two children and comes straight back for a forgotten coat is
+     * well inside that. So the arrival is mirrored locally with the tick.
+     *
+     * Ada is what makes this test say anything. She shares the family's four
+     * digits, so the check-in's guess would happily tick her for collection,
+     * and she came in on her own half an hour earlier. Only the arrival can
+     * tell the difference, so if the mirroring is missing this fails.
+     */
+    phoneIndex = { '3344': [ADA.id] };
+    await mount(binding({ requiresCheckOut: true }));
+
+    // Ada, alone, first — her own arrival.
+    await type('3344');
+    const adaRow = screen.getByText('Ada Lovelace').closest('button')!;
+    await act(async () => {
+      fireEvent.pointerDown(adaRow);
+      fireEvent.pointerUp(adaRow);
+    });
+    await settle();
+    await tap(/^Check in$/);
+    await carryOn();
+
+    await fillInTheFamily();
+    await tap('Check in everyone');
+    await carryOn();
+
+    await type('3344');
+    const robinRow = screen.getByText('Robin Fields').closest('button')!;
+    await act(async () => {
+      fireEvent.pointerDown(robinRow);
+      fireEvent.pointerUp(robinRow);
+    });
+    await settle();
+
+    // Sam, because he was on the same form. Not Ada — she is on the screen,
+    // because families do leave together after arriving apart, and she is left
+    // for somebody to tick on purpose.
+    expect(screen.getByText(/Hold to collect all 2/i)).toBeTruthy();
+    expect(screen.getByText('Ada Lovelace').closest('button')!.getAttribute('aria-pressed')).toBe(
+      'false',
+    );
+  });
 });
 
 describe('the clock', () => {

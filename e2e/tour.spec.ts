@@ -9,14 +9,15 @@
  * checked in against real gatherings, and are approved by a real core-team
  * session.
  *
- * Six acts, in the order a Sunday actually happens:
+ * Seven acts, in the order a Sunday actually happens:
  *
  *   1. **At the door** — a family the church already has, and a pickup.
  *   2. **Nobody has met us** — the wizard on the kiosk itself.
  *   3. **On their own phone** — the same thing through the QR.
  *   4. **The second child** — a family gaining a sibling.
- *   5. **The review** — where the door's recordings become decisions.
- *   6. **The rest of the week** — the core team's own screens.
+ *   5. **Going home** — a family that arrived in two waves, leaving in one.
+ *   6. **The review** — where the door's recordings become decisions.
+ *   7. **The rest of the week** — the core team's own screens.
  *
  * Everything runs twice, on a wide device and a tall one, because none of these
  * screens gets to choose its shape: a kiosk is however the shelf it sits on
@@ -528,7 +529,73 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       await backToSearch(kiosk);
 
       /* ================================================================== */
-      /* Act 5 — The review                                                  */
+      /* Act 5 — Going home                                                  */
+      /* ================================================================== */
+
+      /*
+       * The family that arrived in two waves.
+       *
+       * Act 2 registered Chidi and Ada on one form, so the server wrote them a
+       * single arrival — one registration is one arrival by definition. This
+       * third child goes through the front door on their own, under the same
+       * guardian and the same number, which makes them family to the phone
+       * index and a *different* arrival to the register. That difference is the
+       * whole of what the next two frames are about, and there is no way to
+       * photograph it without producing it.
+       */
+      await kiosk.getByRole('button', { name: /Register your child/i }).first().click();
+      await kiosk.getByRole('button', { name: /Register right here/i }).click();
+      await typeOnKiosk(kiosk, 'Zuri');
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await kiosk.locator('[data-key="clear"]').click();
+      await typeOnKiosk(kiosk, cast.surname);
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await kiosk.getByRole('button', { name: '1st grade', exact: true }).click();
+      await kiosk.getByRole('button', { name: /That's everyone/i }).click();
+      await typeOnKiosk(kiosk, 'Ngozi');
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await typeOnKiosk(kiosk, cast.phone);
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await kiosk.getByRole('button', { name: /^Check in$/ }).click();
+      await expect(kiosk.getByText(/is checked in\. Welcome!/i)).toBeVisible({ timeout: 30_000 });
+      await backToSearch(kiosk);
+
+      await typeOnKiosk(kiosk, cast.phone.slice(-4));
+      await kiosk.getByRole('button', { name: /Chidi/i }).first().click();
+      await expect(kiosk.getByText(/Collecting anyone else/i)).toBeVisible({ timeout: 30_000 });
+      await shoot(kiosk, 'kiosk', {
+        act: 'Going home',
+        who: 'The same family, three hours later',
+        title: 'The ones who came in together',
+        caption:
+          'Three children, one number, and the screen has already decided that two of them are going home and one is a question. Ada is ticked because she and Chidi walked in on the same form — one press of one button, recorded on the register as one arrival — and Zuri is not, because she came separately. Until this existed the only answer available here was the check-in\'s guess at a family from four phone digits, which would have ticked all three on the strength of a shared number. The guess is what you have at the front door. By the time somebody comes back for them there is a fact.',
+      });
+
+      await kiosk.getByRole('button', { name: /Zuri/i }).first().click();
+      await expect(kiosk.getByRole('button', { name: /Hold to collect all 3/i })).toBeVisible();
+      await shoot(kiosk, 'kiosk', {
+        act: 'Going home',
+        who: 'The same family, three hours later',
+        title: 'And she is one tap away, because families do',
+        caption:
+          'Arriving apart and leaving together is the ordinary case, not the exception — so the sibling the register cannot vouch for is still on the screen, in the list, one tap from ticked. Dropping her name would have been worse than leaving it unticked: a parent taking their family home should never have to go round the flow twice. The arrival decides what is *ticked*; the phone guess decides what is *shown*, and the two are different jobs.',
+      });
+
+      await hold(kiosk, 'button:has-text("Hold to collect all 3")');
+      await expect(kiosk.getByText(/collected/i).first()).toBeVisible({ timeout: 30_000 });
+      await shoot(kiosk, 'kiosk', {
+        act: 'Going home',
+        who: 'The same family, three hours later',
+        title: 'Three seconds, once, for the whole family',
+        caption:
+          'A pickup holds where a check-in taps, and it still holds for three children at once. The asymmetry is deliberate: a stray check-in is self-correcting when the child walks in anyway, and a stray *collection* is a claim on an unattended lobby screen that somebody took a child out of the building. Undoing one needs a volunteer and the main app. The arrival also works the other way round — a child the four-digit guess would never call family, a cousin or a neighbour\'s boy who came in the same press, is offered here and ticked.',
+      });
+
+      await backToSearch(kiosk);
+
+      /* ================================================================== */
+      /* Act 6 — The review                                                  */
       /* ================================================================== */
 
       await page.setViewportSize(VIEWPORTS[shape].app);
@@ -607,7 +674,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       await page.getByRole('button', { name: /Cancel/i }).first().click();
 
       /* ================================================================== */
-      /* Act 6 — The rest of the week                                        */
+      /* Act 7 — The rest of the week                                        */
       /* ================================================================== */
 
       await gotoReady(page, '/');

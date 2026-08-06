@@ -800,6 +800,19 @@ export async function registerFamily(
         checkedInBy: createdBy,
         method: 'kiosk',
         isFirstEver: true,
+        /*
+         * One registration is one arrival, by definition — these children were
+         * typed into the same form and walked through the same door together,
+         * which is a stronger statement than anything the kiosk's confirm
+         * button makes. The registration's own id is already unique and
+         * already on every child's document as provenance, so it is the
+         * arrival: minting a second id would only invite the two to disagree.
+         *
+         * Without this the clearest "arrived together" there is — a family who
+         * registered two children in one form — would come back at pickup time
+         * with no arrival on file and fall through to the four-digit guess.
+         */
+        arrivalId: request.registrationId,
       });
     }
   }
