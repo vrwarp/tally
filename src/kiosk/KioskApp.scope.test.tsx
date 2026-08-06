@@ -60,7 +60,7 @@ function binding(): KioskBinding {
   return {
     eventId: 'friday-today',
     seriesId: null,
-    chain: 'friday-fellowship',
+    predictsFrom: 'friday-fellowship',
     title: 'Friday Fellowship',
     startAtMs: now - 60_000,
     endAtMs: now + 3_600_000,
@@ -206,6 +206,31 @@ describe('the front door', () => {
     await mount();
     await type('sofia');
     expect(screen.getByText('Sofia Adeyemi')).toBeTruthy();
+  });
+
+  it('is scoped from the first paint on a warm kiosk', async () => {
+    /*
+     * The disk answers before the network does, exactly as it does for the
+     * roster and the phone index. Without this a rebooted kiosk searches the
+     * whole ministry for the first second of every boot — safe, because every
+     * failure here widens rather than narrows, but not something to leave to
+     * whichever promise resolves first.
+     */
+    localStorage.setItem(
+      KIOSK_KEYS.participation,
+      JSON.stringify({
+        fetchedAtMs: Date.now(),
+        builtAtMs: Date.now(),
+        chains: { 'friday-fellowship': { participated: ['s-noah'], recent: ['s-noah'] } },
+      }),
+    );
+    // The network never answers, so anything on screen came off the disk.
+    vi.mocked(services.loadParticipation).mockImplementation(() => new Promise(() => {}));
+
+    await mount();
+    await type('sofia');
+    expect(screen.queryByText('Sofia Adeyemi')).toBeNull();
+    expect(screen.getByText(/first time here/i)).toBeTruthy();
   });
 });
 

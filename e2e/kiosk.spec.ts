@@ -78,8 +78,15 @@ async function seedCollectingGathering(): Promise<string> {
  * ahead of this file, so anyone it collected is already past the point these
  * tests want to start from. Distinct names keep each flow starting from
  * "absent".
+ *
+ * All of them are regulars of the seeded gatherings, which is now a
+ * requirement rather than a coincidence: the kiosk's search is scoped to the
+ * children who have been to the gathering it is bound to, so a name picked
+ * from the wrong end of the roster would fail here for a reason that has
+ * nothing to do with what the test is about. The child the scope *does*
+ * exclude has a test of her own — see "a child this gathering has never seen".
  */
-const CHECKED_IN = 'Bree Sandoval';
+const CHECKED_IN = 'Josiah Mensah';
 const COLLECTED = 'Caleb Okafor';
 /** Checked in on the Nursery, which prints, and then collected. */
 const LABELLED = 'Nia Washington';
@@ -321,6 +328,50 @@ test.describe('the kiosk', () => {
     }
   });
 
+  /**
+   * A child this gathering has never seen.
+   *
+   * The lobby screen used to search every active student in the ministry, which
+   * is not the population standing in front of it. Bree was met on the lock-in
+   * bus and has been to nothing since (see the `oneOffGuest` band in
+   * `scripts/seed.ts`), so a parent at Friday Fellowship typing her name is
+   * asking about somebody who does not come here — and four digits being four
+   * digits, the same search could hand a newcomer a stranger's child, correctly
+   * spelled.
+   *
+   * The two assertions are a pair, and the second is the one that keeps this
+   * honest: narrowing a search is only safe if the way back out is on the
+   * screen already. It is the same button a family who registered while they
+   * queued presses, and it means the same thing to them — look harder for me.
+   */
+  test('scopes the search to the gathering, and widens it on request', async ({
+    browser,
+    page,
+    signedInAs,
+  }) => {
+    await signedInAs('core');
+    const { context, page: kiosk } = await openKiosk(browser);
+
+    try {
+      await pairKiosk(kiosk, page);
+      await bindTo(kiosk, /friday fellowship/i);
+
+      await typeOnKiosk(kiosk, 'bree');
+      await expect(kiosk.getByText(/no match/i)).toBeVisible({ timeout: 15_000 });
+      await expect(kiosk.getByRole('button', { name: /bree sandoval/i })).toHaveCount(0);
+
+      await kiosk.getByRole('button', { name: /I already registered/i }).click();
+
+      // No retyping, and nothing about scope on the screen: the parent presses
+      // the button they were going to press anyway and the name is there.
+      await expect(kiosk.getByRole('button', { name: /bree sandoval/i }).first()).toBeVisible({
+        timeout: 30_000,
+      });
+    } finally {
+      await context.close();
+    }
+  });
+
   /*
    * Label printing, as far as a browser without a printer can take it.
    *
@@ -459,8 +510,14 @@ test.describe('registering a family at the kiosk', () => {
    * Written in the case the wizard produces: the kiosk keyboard is capitals
    * only and the readout title-cases as it goes, so this is what a parent sees
    * and what lands on the roster.
+   *
+   * The stem must not be a prefix of anything another test searches for. These
+   * families are checked in and never cleaned up, and a checked-in child is
+   * findable whatever the search is scoped to — so "Quill" here quietly
+   * answered the "quill marsden" search above whenever the suite ran twice
+   * against one emulator, and the failure read as a broken refresh.
    */
-  const SURNAME = `Quill${'abcdefghijklmnopqrstuvwxyz'
+  const SURNAME = `Vantry${'abcdefghijklmnopqrstuvwxyz'
     .split('')
     .sort(() => Math.random() - 0.5)
     .slice(0, 4)

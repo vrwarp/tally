@@ -59,11 +59,14 @@ import { joinKioskRoster } from './roster';
 import type { KioskStudent } from './search';
 import {
   KIOSK_KEYS,
+  participationScope,
   readCachedRoster,
   readCachedRosterOfAnyVersion,
   readJson,
   writeCachedRoster,
   writeJson,
+  type CachedParticipation,
+  type KioskParticipationScope,
 } from './storage';
 
 /* -------------------------------------------------------------------------- */
@@ -130,6 +133,8 @@ if (USE_EMULATORS) {
 
 export interface KioskEventEntry {
   chain: string;
+  /** See the server's `KioskEventEntry` — `predictionChain`, not `chainKey`. */
+  predictsFrom: string | null;
   id: string | null;
   title: string;
   startAt: number;
@@ -242,9 +247,9 @@ export async function bindEntry(entry: KioskEventEntry): Promise<KioskBinding> {
   return {
     eventId,
     seriesId: entry.seriesId,
-    // Carried, not derived: `chainKey` lives in the app's bundle and the kiosk
-    // does not download it. The chooser row has always had the answer.
-    chain: entry.chain,
+    // Carried, not derived: the roster's notion of which chain predicts for a
+    // gathering lives in the app's bundle and the kiosk does not download it.
+    predictsFrom: entry.predictsFrom ?? null,
     title: entry.title,
     startAtMs: entry.startAt,
     endAtMs: entry.endAt,
@@ -426,37 +431,11 @@ export async function loadPhoneIndex(
  * event history, and sweeping a year of registers is not something to do with a
  * parent standing at the screen.
  */
-export interface KioskParticipation {
-  /** Attended this chain at least once in the last year. Scopes the search. */
-  participated: ReadonlySet<string>;
-  /** Attended enough of the last few instances. Decides which siblings tick. */
-  recent: ReadonlySet<string>;
-}
-
-/** Empty means "nothing to scope by" everywhere this is read. See `KioskApp`. */
-const NO_PARTICIPATION: KioskParticipation = {
-  participated: new Set<string>(),
-  recent: new Set<string>(),
-};
-
-interface StoredParticipation {
-  fetchedAtMs: number;
-  builtAtMs: number | null;
-  chains: Record<string, { participated: string[]; recent: string[] }>;
-}
+export type KioskParticipation = KioskParticipationScope;
 
 const PARTICIPATION_STALE_MS = 24 * 60 * 60_000;
 
-function scopeFor(stored: StoredParticipation | null, chain: string | undefined): KioskParticipation {
-  const held = chain ? stored?.chains?.[chain] : undefined;
-  if (!held) return NO_PARTICIPATION;
-  return {
-    participated: new Set(Array.isArray(held.participated) ? held.participated : []),
-    recent: new Set(Array.isArray(held.recent) ? held.recent : []),
-  };
-}
-
-async function fetchParticipationNow(): Promise<StoredParticipation> {
+async function fetchParticipationNow(): Promise<CachedParticipation> {
   const snapshot = await getDoc(doc(db, 'kioskIndex/participation'));
   const data = snapshot.exists() ? snapshot.data() : null;
   const builtAt = data?.builtAt;
@@ -468,7 +447,7 @@ async function fetchParticipationNow(): Promise<StoredParticipation> {
         : null,
     chains:
       data && typeof data.chains === 'object' && data.chains !== null
-        ? (data.chains as StoredParticipation['chains'])
+        ? (data.chains as CachedParticipation['chains'])
         : {},
   };
 }
@@ -487,12 +466,12 @@ async function fetchParticipationNow(): Promise<StoredParticipation> {
  * cannot find themselves.
  */
 export async function loadParticipation(
-  chain: string | undefined,
+  chain: string | null | undefined,
   onUpdate: (scope: KioskParticipation) => void,
 ): Promise<KioskParticipation> {
-  const stored = readJson<StoredParticipation>(KIOSK_KEYS.participation);
+  const stored = readJson<CachedParticipation>(KIOSK_KEYS.participation);
 
-  const refresh = async (): Promise<StoredParticipation> => {
+  const refresh = async (): Promise<CachedParticipation> => {
     let index = await fetchParticipationNow();
     if (index.builtAtMs === null || Date.now() - index.builtAtMs > PARTICIPATION_STALE_MS) {
       try {
@@ -504,15 +483,15 @@ export async function loadParticipation(
       }
     }
     writeJson(KIOSK_KEYS.participation, index);
-    onUpdate(scopeFor(index, chain));
+    onUpdate(participationScope(index, chain));
     return index;
   };
 
   if (stored && stored.chains) {
     if (Date.now() - stored.fetchedAtMs > PARTICIPATION_STALE_MS) void refresh().catch(() => {});
-    return scopeFor(stored, chain);
+    return participationScope(stored, chain);
   }
-  return scopeFor(await refresh().catch(() => null), chain);
+  return participationScope(await refresh().catch(() => null), chain);
 }
 
 /* -------------------------------------------------------------------------- */

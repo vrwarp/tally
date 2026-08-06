@@ -14,9 +14,9 @@
  * parent with three of them walks the flow once rather than three times.
  *
  * Firebase loads *behind* the first paint: everything persisted — the
- * binding, the roster, the phone index — is read synchronously from
- * localStorage at mount, so a warm kiosk is searchable before the SDK has
- * parsed. Only the write needs the network to have caught up.
+ * binding, the roster, the phone index, who belongs to this gathering — is read
+ * synchronously from localStorage at mount, so a warm kiosk is searchable before
+ * the SDK has parsed. Only the write needs the network to have caught up.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 // Type-only, so the services chunk stays out of this graph — the value import
@@ -43,7 +43,7 @@ import {
   type PrinterConfig,
 } from './printing/device';
 import { type KioskStudent } from './search';
-import { KIOSK_KEYS, readCachedRoster, readJson } from './storage';
+import { KIOSK_KEYS, readCachedParticipation, readCachedRoster, readJson } from './storage';
 import { ConfirmScreen } from './screens/ConfirmScreen';
 import { SiblingScreen } from './screens/SiblingScreen';
 import { EventChooser } from './screens/EventChooser';
@@ -190,15 +190,19 @@ export function KioskApp() {
   /**
    * Who belongs to *this* gathering, and who comes to it regularly.
    *
-   * Empty until the services chunk has loaded, and empty forever on a kiosk
-   * bound before this existed or to a chain nothing has been run for. Every
-   * reader treats empty as "no scope" and falls back to what the kiosk did
-   * before — see `searchable` and `skippedFor`.
+   * Seeded off the disk at mount like the roster and the phone index, so a warm
+   * kiosk is scoped from the first paint rather than for a moment after it. The
+   * gap would be safe — every reader treats empty as "no scope" and falls back
+   * to what the kiosk did before, see `searchable` and `skippedFor` — but a
+   * search that quietly widens for the first second of every boot is not
+   * something to leave to timing.
+   *
+   * Empty, and staying empty, on a kiosk bound before this existed or to a
+   * chain nothing has been run for.
    */
-  const [scope, setScope] = useState<KioskParticipation>(() => ({
-    participated: new Set<string>(),
-    recent: new Set<string>(),
-  }));
+  const [scope, setScope] = useState<KioskParticipation>(() =>
+    readCachedParticipation(readBinding()?.predictsFrom),
+  );
   const [presentIds, setPresentIds] = useState<ReadonlySet<string>>(new Set());
   const [checkedOutIds, setCheckedOutIds] = useState<ReadonlySet<string>>(new Set());
   /**
@@ -334,7 +338,7 @@ export function KioskApp() {
       void loaded.loadPhoneIndex(setLast4Index).then(setLast4Index);
       // Per binding rather than per boot: a kiosk moved from Friday to Sunday
       // is a kiosk asking about a different set of children.
-      void loaded.loadParticipation(bound.chain, setScope).then(setScope).catch(() => {});
+      void loaded.loadParticipation(bound.predictsFrom, setScope).then(setScope).catch(() => {});
       void loaded
         .fetchAttendance(bound.eventId)
         .then((register) => {

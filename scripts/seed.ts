@@ -283,7 +283,16 @@ const SEED_STUDENTS: readonly SeedStudent[] = [
   // Amara's brother and sister. Three children, one number — the family the
   // kiosk's whole confirm screen is built around, and the only one here.
   { first: 'Kofi', last: 'Osei', grade: 6, band: 'core', parent: 'Kwabena Osei', contact: 'phone', household: 'osei' },
-  { first: 'Efua', last: 'Osei', grade: 11, band: 'steady', parent: 'Kwabena Osei', contact: 'phone', household: 'osei' },
+  /*
+   * The eldest, and deliberately not a regular any more.
+   *
+   * A household is a guess about a family, not about a Friday: the kiosk offers
+   * every child answering to one phone number, and some of them stopped coming
+   * or only ever came to something else. Before this, every seeded household was
+   * three regulars, so the confirm screen's whole distinction — offered, and
+   * offered-and-expected — could not appear in a seeded world at all.
+   */
+  { first: 'Efua', last: 'Osei', grade: 11, band: 'edge', parent: 'Kwabena Osei', contact: 'phone', household: 'osei' },
 
   /* ---- Steady: most weeks ------------------------------------------------ */
   { first: 'Noah', last: 'Fitzgerald', grade: 6, band: 'steady', parent: 'Erin Fitzgerald', contact: 'phone', allergies: 'Severe tree nut allergy' },
@@ -296,7 +305,9 @@ const SEED_STUDENTS: readonly SeedStudent[] = [
   // The second household, and there are two for a reason beyond variety: the
   // walkthrough runs twice against one emulator, and a family the first pass
   // has already checked in offers the second pass a pickup instead.
-  { first: 'Lucia', last: 'Delgado', grade: 6, band: 'steady', parent: 'Elena Delgado', contact: 'phone', household: 'delgado' },
+  // The youngest, and the same shape as Efua above for the same reason: one
+  // child per household who is offered but not expected.
+  { first: 'Lucia', last: 'Delgado', grade: 6, band: 'edge', parent: 'Elena Delgado', contact: 'phone', household: 'delgado' },
   { first: 'Rafael', last: 'Delgado', grade: 9, band: 'core', parent: 'Elena Delgado', contact: 'phone', household: 'delgado' },
   { first: 'Zoe', last: 'Lindqvist', grade: 6, band: 'steady', parent: 'Anders Lindqvist', contact: 'both' },
   { first: 'Andre', last: 'Beaulieu', grade: 11, band: 'steady', parent: 'Marie Beaulieu', contact: 'phone' },
@@ -1043,6 +1054,7 @@ function collectWrites(now: Date): {
   for (const event of events) {
     const isRetreat = event.id === retreat.id;
     const { isOneOff } = event;
+    const isNursery = isOneOff && !isRetreat && event.title === 'Nursery';
     writes.push({
       path: paths.event(event.id),
       data: {
@@ -1065,10 +1077,22 @@ function collectWrites(now: Date): {
               : 'groups',
         mode: isOneOff ? 'oneoff' : 'recurring',
         seriesId: event.seriesId,
-        // The bus to the retreat is largely the Friday night crowd, and saying
-        // so is the only way a trip gets a predicted roster at all. The lock-in
-        // leaves it unset, so both halves of the choice are in the demo data.
-        predictFromChain: isRetreat ? SERIES_IDS.fridayFellowship : null,
+        /*
+         * Which chain's past instances describe who comes to this.
+         *
+         * The bus to the retreat is largely the Friday night crowd, and saying
+         * so is the only way a trip gets a predicted roster at all. The nursery
+         * is the Sunday morning crowd for the same reason: it is a one-off in
+         * the calendar's terms, so it has no history of its own to read, and
+         * without this both the check-in screen and the lobby kiosk would treat
+         * the whole ministry as its roster. The lock-in leaves it unset, so all
+         * three answers are in the demo data.
+         */
+        predictFromChain: isRetreat
+          ? SERIES_IDS.fridayFellowship
+          : isNursery
+            ? SERIES_IDS.sundaySchool
+            : null,
         // A retreat happens once; everything else is the weekly slot its series
         // describes, phrased from the day the instance itself lands on.
         recurrence: isOneOff

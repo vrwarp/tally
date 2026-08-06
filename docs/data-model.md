@@ -473,7 +473,60 @@ household or family-folk co-membership, real siblings always land on the same se
 where a child belongs to a second household), while two unrelated families that happen to end a
 number the same way each keep a digit the other lacks. The search can afford that coincidence —
 both families' children appear and a parent picks their own — but an offer cannot, so it is held to
-the stricter test. Everything offered is still ticked on screen, and unticking is a tap.
+the stricter test. What is offered stays as wide as that guess; which of it arrives *ticked* is a
+different question, answered by the document below.
+
+### `kioskIndex/participation`
+
+Who belongs to each gathering, and who comes to it regularly. One document, keyed by chain.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `version` | `1` | |
+| `builtAt`, `builtBy` | — | `builtBy` is a uid, or `'schedule'` for the nightly rebuild. |
+| `maxAgeDays`, `ofLastN`, `minAttended` | numbers | The windows the lists below were drawn with, recorded so a reader need not know the code. |
+| `chains` | map | `chainKey -> { participated: [studentId, …], recent: [studentId, …] }`, both sorted. `recent` is always a subset of `participated`. |
+
+The two answers the kiosk has never had, and both are already the app's. **`participated`** is
+attendance at any instance of the chain in the last
+[`PARTICIPATION_MAX_AGE_DAYS`](../src/lib/participation.ts) — the same year the roster's
+"has been here before" filter uses. **`recent`** is the check-in screen's prediction: at least
+`predictiveMinAttended` of the last `predictiveOfLastN` instances that actually happened, read from
+`config/settings`. Cancelled instances and instances with nobody checked in are dropped before the
+window is taken, so a snowed-out Friday costs it nothing.
+
+The kiosk uses them for two different things, and the difference matters:
+
+- **`participated` scopes the search.** The lobby screen used to search every active student in
+  Tally, which is not the population standing in front of it — a parent at Friday Fellowship typing
+  four digits could be shown a family who has only ever come to Sunday nursery, or, since four
+  digits are four digits, a stranger's children looking exactly like the answer.
+- **`recent` decides which siblings arrive ticked.** The phone guess above is often right about the
+  household and wrong about tonight, and ticking a child who is not in the building writes them onto
+  a register nobody can reconcile. Everyone the guess found is still listed, at full weight, one tap
+  from being included.
+
+Every failure widens rather than narrows — a chain with no history, a missing document, a binding
+written before this existed, a failed read. The kiosk then searches the whole roster and ticks
+everything, which is what it did before this document existed. A scope that failed closed would be a
+family who cannot find themselves.
+
+A gathering reads the chain that *predicts* for it, not simply the chain it is in: a recurring
+gathering reads its own, and a one-off reads whatever `predictFromChain` names and nothing when it
+names nothing. That is [`predictionChain`](../src/lib/gatherings.ts), and the kiosk mirrors it so the
+lobby screen and the check-in screen cannot answer "who belongs here" differently about the same
+evening. The lookup key rides on the kiosk's binding; the identity `materializeOccurrence` takes is
+a separate field and still `chainKey`.
+
+Rebuilt nightly at 03:20 by `rebuildKioskParticipation`, and on demand by a kiosk that finds it
+stale at bind time. Its own scheduled job rather than a passenger on the phone index's: this build
+touches no backend and needs no secrets, while the phone index build deliberately fails when a
+backend is down — sharing one would let a Planning Center outage take the kiosk's idea of a
+gathering with it. It reads a year of attendance subcollections, which is the only thing in this
+codebase that sweeps attendance on a schedule.
+
+**Who writes:** only the functions, like every other `kioskIndex` document. It holds nothing but
+student ids the same readers already see on every roster row.
 
 ### `kioskIndex/pendingLast4`
 
@@ -681,6 +734,13 @@ browser: the Recent filter, MIA students, new visitors, roster warnings, head-co
 in `src/features/roster/predictiveRoster.ts` and `src/features/dashboard/insights.ts` as pure
 functions over data that is already loaded, so a threshold change in Settings takes effect everywhere
 immediately with nothing to backfill.
+
+The one exception is [`kioskIndex/participation`](#kioskindexparticipation), where the same two
+derivations are precomputed nightly and written down — not because they are different, but because
+the kiosk cannot run them: it holds no event history and could not download the code that reads it.
+The rule is shared rather than reimplemented (`src/lib/participation.ts`, copied into
+`functions/src/generated/` by `scripts/sync-functions-shared.mjs`), so the two answers cannot drift.
+A threshold change in Settings reaches the kiosk at the next rebuild rather than immediately.
 
 Both files group history by the same key — `chainKey` in `src/lib/materialize.ts`: the `seriesId` when
 there is one, the recurrence root otherwise. That is what makes "the same gathering" mean one thing

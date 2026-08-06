@@ -228,3 +228,64 @@ describe('listKioskEvents', () => {
     expect(entries[0]?.labelTemplate).toBeNull();
   });
 });
+
+/**
+ * Which chain the kiosk scopes its search to, which is not the same question as
+ * which chain the occurrence belongs to.
+ *
+ * `chain` is identity — what `materializeOccurrence` takes. `predictsFrom` is
+ * evidence: whose past instances say who comes to this. They differ exactly
+ * where `predictionChain` differs from `chainKey`, and the kiosk has to agree
+ * with the check-in screen about the same evening.
+ */
+describe('predictsFrom', () => {
+  const times = {
+    start: '2026-08-09T12:00:00Z',
+    end: '2026-08-09T14:00:00Z',
+    closes: '2026-08-09T15:00:00Z',
+  };
+
+  async function only(db: FakeFirestore) {
+    const entries = await listKioskEvents(db, NOW, logger);
+    return entries[0]!;
+  }
+
+  it('is a recurring gathering’s own chain', async () => {
+    const db = new FakeFirestore();
+    seedEvent(db, 'friday', times, { mode: 'recurring', seriesId: 'friday-fellowship' });
+    const entry = await only(db);
+    expect(entry.chain).toBe('friday-fellowship');
+    expect(entry.predictsFrom).toBe('friday-fellowship');
+  });
+
+  it('follows a recurrence root when there is no series document', async () => {
+    const db = new FakeFirestore();
+    seedEvent(db, 'sat-3', times, { mode: 'recurring', recurrenceRootId: 'sat' });
+    expect(await only(db)).toMatchObject({ chain: 'sat', predictsFrom: 'sat' });
+  });
+
+  it('is null for a one-off pointed at nothing', async () => {
+    const db = new FakeFirestore();
+    // A nursery under a series id is still a one-off: it is not the latest
+    // instance of anything, so nothing predicts for it — and the kiosk searches
+    // the whole roster, exactly as the check-in screen shows all of it.
+    seedEvent(db, 'nursery', times, { seriesId: 'sunday-school' });
+    expect(await only(db)).toMatchObject({ chain: 'sunday-school', predictsFrom: null });
+  });
+
+  it('is the chain a leader pointed a one-off at', async () => {
+    const db = new FakeFirestore();
+    seedEvent(db, 'retreat', times, { predictFromChain: 'friday-fellowship' });
+    // Identity is still its own; the evidence is borrowed.
+    expect(await only(db)).toMatchObject({
+      chain: 'retreat',
+      predictsFrom: 'friday-fellowship',
+    });
+  });
+
+  it('ignores an empty predictFromChain rather than scoping to nothing', async () => {
+    const db = new FakeFirestore();
+    seedEvent(db, 'retreat', times, { predictFromChain: '' });
+    expect(await only(db)).toMatchObject({ predictsFrom: null });
+  });
+});

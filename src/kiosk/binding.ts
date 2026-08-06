@@ -24,20 +24,24 @@ export interface KioskBinding {
   eventId: string;
   seriesId: string | null;
   /**
-   * Which chain of repeats this gathering belongs to — `chainKey`, the identity
-   * every Friday under one series (or one recurrence root) shares.
+   * The chain whose past instances say who comes to this, or null when nothing
+   * does. What `kioskIndex/participation` is keyed by.
    *
-   * Not the same thing as `seriesId`, and that is the whole reason it is here:
-   * a weekly gathering created in the app has a recurrence root and no series
-   * document, so `seriesId` is null for exactly the chains that have the most
-   * history behind them. It is what `kioskIndex/participation` is keyed by.
+   * Not `seriesId`, and that is the whole reason it is here: a weekly gathering
+   * created in the app has a recurrence root and no series document, so
+   * `seriesId` is null for exactly the chains with the most history behind
+   * them. Not plain `chainKey` either — a one-off reads the chain a leader
+   * pointed it at, and nothing at all when they pointed it at nothing. See
+   * `predictionChain` in `src/lib/gatherings.ts`, which this mirrors so the
+   * lobby screen and the check-in screen cannot answer "who belongs here"
+   * differently about the same evening.
    *
    * Optional for the same reason `requiresCheckOut` is: a binding written before
    * this existed has no such key, and a paired lobby screen must not be logged
-   * out by a deploy. Absent reads as "no scope", which searches the whole
-   * roster — the behaviour the kiosk has always had.
+   * out by a deploy. Absent or null reads as "no scope", which searches the
+   * whole roster — the behaviour the kiosk has always had.
    */
-  chain?: string;
+  predictsFrom?: string | null;
   title: string;
   startAtMs: number;
   endAtMs: number;

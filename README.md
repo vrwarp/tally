@@ -125,7 +125,14 @@ number lives, and [documented as the exception it is](docs/data-model.md#kioskre
 
 **Journey 2½ — the second child.** A parent whose next child is finally old enough finds their family
 by phone as usual, taps a name, and finds **"Anyone else?"** already asked on the confirm screen —
-the children the kiosk guessed, ticked, ending in **"+ Another child"**. That row asks the ambiguous
+the children the kiosk guessed, ending in **"+ Another child"**. Which of them arrive *ticked* is a
+separate question from which are offered, and the two used to be one. `familyOf` guesses a family
+from four phone digits, and the guess is frequently right about the household and wrong about
+tonight: the other children may have come once, or belong to a different programme. So the tick
+follows the gathering's own prediction — the same "2 of the last 3" the check-in screen uses — while
+the offer stays as wide as the guess, every unexpected name listed at full weight and one tap from
+being included. Ticking a child who is not in the building writes them onto a register nobody can
+reconcile; leaving one out costs a tap. That row asks the ambiguous
 question first, because it has two honest answers: the child is often already on the roster and
 simply did not come up under four digits, and searching is a cheaper, safer answer than registering
 a second copy of somebody the church already has. So it opens a name search over the roster — rows
@@ -681,6 +688,17 @@ label can print the allergy line, because the volunteer holding the child is exa
 read it and is the least likely person to be looking at a roster. Even then the kiosk asks for one
 child's note at the moment they are checked in, keeps it in memory only, and writes nothing down. See
 [docs/label-printing.md](docs/label-printing.md#printing-allergies).
+
+It is also narrow in *who* it will find. The search is scoped to the children who have been to that
+gathering in the last year — the same year the check-in screen uses to decide who belongs to a room
+— rather than to every active student in the ministry, because a parent at Friday Fellowship is not
+standing in front of the Sunday nursery's roster and should not be able to type four digits into
+one. The scope only ever fails open: a gathering with no history behind it searches everything, so
+there is nothing to configure and no way to switch it off by accident, anyone on tonight's register
+is findable whatever last night's aggregate said, and **"I already registered"** widens the search
+to all of Tally on the press. The list itself is
+[one precomputed document](docs/data-model.md#kioskindexparticipation) — the kiosk holds no event
+history and could not download the code that reads it.
 
 A student who leaves the ministry is marked inactive in Planning Center and simply stops coming back
 in the roster read. Nothing in Tally deletes them, and that is deliberate: attendance history at

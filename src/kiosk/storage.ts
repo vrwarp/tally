@@ -120,3 +120,50 @@ export function writeCachedRoster(students: KioskStudent[]): void {
     students,
   } satisfies CachedRoster);
 }
+
+/* -------------------------------------------------------------------------- */
+/* The participation cache                                                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Who belongs to a gathering, as the kiosk holds it. See `loadParticipation`.
+ *
+ * The reader lives here rather than in `services` so that `KioskApp` can seed
+ * from it synchronously at mount, exactly as it seeds the roster and the phone
+ * index. The alternative is a kiosk that is briefly unscoped on every boot —
+ * safe, because every failure here widens the search rather than narrowing it,
+ * but needlessly non-deterministic for something already on the disk.
+ */
+export interface CachedParticipation {
+  fetchedAtMs: number;
+  builtAtMs: number | null;
+  chains: Record<string, { participated: string[]; recent: string[] }>;
+}
+
+export interface KioskParticipationScope {
+  participated: ReadonlySet<string>;
+  recent: ReadonlySet<string>;
+}
+
+/** Empty means "nothing to scope by" to every reader. */
+export const NO_PARTICIPATION: KioskParticipationScope = {
+  participated: new Set<string>(),
+  recent: new Set<string>(),
+};
+
+export function participationScope(
+  stored: CachedParticipation | null,
+  chain: string | null | undefined,
+): KioskParticipationScope {
+  const held = chain ? stored?.chains?.[chain] : undefined;
+  if (!held) return NO_PARTICIPATION;
+  return {
+    participated: new Set(Array.isArray(held.participated) ? held.participated : []),
+    recent: new Set(Array.isArray(held.recent) ? held.recent : []),
+  };
+}
+
+/** The scope for one chain, straight off the disk. */
+export function readCachedParticipation(chain: string | null | undefined): KioskParticipationScope {
+  return participationScope(readJson<CachedParticipation>(KIOSK_KEYS.participation), chain);
+}
