@@ -1,0 +1,276 @@
+/**
+ * Which children this kiosk is willing to find.
+ *
+ * The search used to run over every active student in Tally, which is not the
+ * population standing in front of a lobby screen. A parent at Friday Fellowship
+ * typing four digits could be shown a family who has only ever come to Sunday
+ * nursery — and because four digits are four digits, a newcomer could be shown
+ * somebody else's children, sorted and spelled correctly and looking exactly
+ * like the answer.
+ *
+ * So the front door is scoped to the children who have been to *this* gathering
+ * in the last year. What is pinned here is the scope's edges, because every one
+ * of them fails towards a family who cannot find themselves: the escape hatch,
+ * the children in the building tonight, the sibling search behind the door, and
+ * the gathering that has no history to scope by at all.
+ */
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { KioskApp, type KioskServices } from '@/kiosk/KioskApp';
+import { KIOSK_KEYS } from '@/kiosk/storage';
+import type { KioskBinding } from '@/kiosk/binding';
+import type { KioskStudent } from '@/kiosk/search';
+
+function student(id: string, firstName: string, lastName: string): KioskStudent {
+  return {
+    id,
+    firstName,
+    lastName,
+    grade: 6,
+    searchName: `${firstName} ${lastName}`.toLowerCase(),
+    hasAllergies: false,
+  };
+}
+
+/** Comes to this gathering every week. */
+const NOAH = student('s-noah', 'Noah', 'Adeyemi');
+/** On the roster, and has only ever come to a different programme. */
+const SOFIA = student('s-sofia', 'Sofia', 'Adeyemi');
+/**
+ * The same, and on nobody's phone number either — a child the family guess
+ * cannot reach at all. She is what the sibling search is for.
+ */
+const MARA = student('s-mara', 'Mara', 'Okonjo');
+
+const ROSTER = [NOAH, SOFIA, MARA];
+
+/** Both children answer to the household's number. */
+const LAST4: Record<string, string[]> = { '5150': ['s-noah', 's-sofia'] };
+
+/** What the nightly aggregate says about this chain. Reassigned per test. */
+let scope = {
+  participated: new Set(['s-noah']),
+  recent: new Set(['s-noah']),
+};
+let present = new Set<string>();
+
+function binding(): KioskBinding {
+  const now = Date.now();
+  return {
+    eventId: 'friday-today',
+    seriesId: null,
+    chain: 'friday-fellowship',
+    title: 'Friday Fellowship',
+    startAtMs: now - 60_000,
+    endAtMs: now + 3_600_000,
+    checkInClosesAtMs: now + 3_600_000,
+    requiresCheckOut: false,
+    labelTemplate: null,
+    boundAtMs: now,
+  };
+}
+
+const services = {
+  restoredUid: vi.fn(async () => 'staff-uid'),
+  loadRoster: vi.fn(async () => ROSTER),
+  loadPhoneIndex: vi.fn(async () => LAST4),
+  loadParticipation: vi.fn(async () => scope),
+  fetchAttendance: vi.fn(async () => ({
+    present,
+    checkedOut: new Set<string>(),
+    arrivals: new Map<string, string>(),
+  })),
+  replayQueue: vi.fn(async () => 0),
+  /*
+   * Deliberately answers with the roster the kiosk already has.
+   *
+   * "I already registered" does two things, and only one of them is a network
+   * read. Widening the search costs nothing and happens on the press; the sweep
+   * of the church is the slow half and is frequently no help at all to the
+   * family pressing it. A no-op here means every widening assertion below is
+   * about the widening.
+   */
+  refreshDirectory: vi.fn(async () => {}),
+  performCheckIn: vi.fn(async () => {}),
+  performCheckOut: vi.fn(async () => {}),
+  warmStudentDates: vi.fn(),
+  forgetStudentDates: vi.fn(),
+  enqueueCheckIn: vi.fn(),
+  enqueueCheckOut: vi.fn(),
+} as unknown as KioskServices;
+
+vi.mock('@/kiosk/services', () => services);
+
+async function settle(): Promise<void> {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
+async function mount(): Promise<void> {
+  localStorage.setItem(KIOSK_KEYS.binding, JSON.stringify(binding()));
+  localStorage.setItem(
+    KIOSK_KEYS.roster,
+    JSON.stringify({ fetchedAtMs: Date.now(), students: ROSTER }),
+  );
+  localStorage.setItem(
+    KIOSK_KEYS.phoneIndex,
+    JSON.stringify({ fetchedAtMs: Date.now(), builtAtMs: Date.now(), last4: LAST4 }),
+  );
+  render(<KioskApp />);
+  await settle();
+}
+
+async function type(text: string): Promise<void> {
+  for (const key of text.toUpperCase()) {
+    await act(async () => {
+      fireEvent.pointerDown(screen.getByText(key, { selector: '[data-key]' }));
+    });
+  }
+  await settle();
+}
+
+async function clear(): Promise<void> {
+  await act(async () => {
+    fireEvent.pointerDown(screen.getByText('⌫', { selector: '[data-key]' }));
+  });
+  await settle();
+}
+
+async function tap(text: RegExp | string): Promise<void> {
+  await act(async () => {
+    fireEvent.pointerDown(screen.getByText(text).closest('button')!);
+  });
+  await settle();
+}
+
+async function pick(name: string): Promise<void> {
+  const row = screen.getByText(name).closest('button')!;
+  await act(async () => {
+    fireEvent.pointerDown(row);
+    fireEvent.pointerUp(row);
+  });
+  await settle();
+}
+
+beforeEach(() => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  vi.clearAllMocks();
+  localStorage.clear();
+  scope = { participated: new Set(['s-noah']), recent: new Set(['s-noah']) };
+  present = new Set();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+  localStorage.clear();
+});
+
+describe('the front door', () => {
+  it('finds a child who comes to this gathering', async () => {
+    await mount();
+    await type('noah');
+    expect(screen.getByText('Noah Adeyemi')).toBeTruthy();
+  });
+
+  it('does not find one who has only ever come to something else', async () => {
+    await mount();
+    await type('sofia');
+    expect(screen.queryByText('Sofia Adeyemi')).toBeNull();
+    expect(screen.getByText(/first time here/i)).toBeTruthy();
+  });
+
+  it('leaves her out of a phone search too', async () => {
+    await mount();
+    await type('5150');
+    expect(screen.getByText('Noah Adeyemi')).toBeTruthy();
+    expect(screen.queryByText('Sofia Adeyemi')).toBeNull();
+  });
+
+  it('finds her once she is on tonight’s register', async () => {
+    // Whatever the aggregate said at 03:20, she is in the building — and on a
+    // gathering that hands children back, a parent has to be able to reach her.
+    present = new Set(['s-sofia']);
+    await mount();
+    await type('sofia');
+    expect(screen.getByText('Sofia Adeyemi')).toBeTruthy();
+  });
+
+  it('finds everybody when the gathering has no history to scope by', async () => {
+    // The first night of a new gathering, a one-off, a binding written before
+    // any of this existed, a failed read of the aggregate — all the same.
+    scope = { participated: new Set(), recent: new Set() };
+    await mount();
+    await type('sofia');
+    expect(screen.getByText('Sofia Adeyemi')).toBeTruthy();
+  });
+});
+
+describe('the escape hatch', () => {
+  it('widens the search to all of Tally', async () => {
+    await mount();
+    await type('sofia');
+    expect(screen.queryByText('Sofia Adeyemi')).toBeNull();
+
+    await tap(/I already registered/i);
+
+    // Found without the sweep answering anything: the wider roster was already
+    // in memory, and this is the family the sweep would not have helped.
+    expect(screen.getByText('Sofia Adeyemi')).toBeTruthy();
+  });
+
+  it('narrows again for the next family at the kiosk', async () => {
+    await mount();
+    await type('sofia');
+    await tap(/I already registered/i);
+    expect(screen.getByText('Sofia Adeyemi')).toBeTruthy();
+
+    // The buffer emptying is the next person walking up. They are owed the
+    // same offer this family got, not the answer this family unlocked.
+    for (let i = 0; i < 'sofia'.length; i += 1) await clear();
+    await type('sofia');
+    expect(screen.queryByText('Sofia Adeyemi')).toBeNull();
+  });
+});
+
+describe('behind the door', () => {
+  it('searches the whole roster for another child', async () => {
+    await mount();
+    await type('noah');
+    await pick('Noah Adeyemi');
+    await tap(/Another child/i);
+
+    /*
+     * The population this screen exists for is exactly the one the scope gets
+     * wrong, twice over: Mara has never been to this gathering and answers to
+     * no number the kiosk holds. A parent only reaches here by having already
+     * found their family, and the child they name is ticked because they named
+     * them.
+     */
+    await type('mara');
+    expect(screen.getByText('Mara Okonjo')).toBeTruthy();
+
+    await pick('Mara Okonjo');
+    await tap(/Check in all 2/i);
+    expect(
+      vi
+        .mocked(services.performCheckIn)
+        .mock.calls.map((call) => call[0].student.id)
+        .sort(),
+    ).toEqual(['s-mara', 's-noah']);
+  });
+
+  it('still offers her on the confirm screen, unticked', async () => {
+    await mount();
+    await type('noah');
+    await pick('Noah Adeyemi');
+
+    // The phone guess is not scoped either — the offer stays as wide as the
+    // household, and only the tick follows the prediction.
+    expect(screen.getByText('Sofia Adeyemi')).toBeTruthy();
+    expect(screen.getByText(/^Check in$/)).toBeTruthy();
+  });
+});

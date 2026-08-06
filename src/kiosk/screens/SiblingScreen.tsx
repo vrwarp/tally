@@ -24,10 +24,18 @@
  * nephew should not have to decide whether a box labelled "brother or sister"
  * is asking about somebody else.
  *
- * The kiosk already offers the siblings it *can* see, ticked, on the confirm
- * screen itself (see family.ts for how much of a guess that is, and why it is
+ * The kiosk already offers the siblings it *can* see on the confirm screen
+ * itself (see family.ts for how much of a guess that is, and why it is
  * deliberately a conservative one). This is the escape hatch for everybody that
  * guess misses, which is exactly the population a conservative guess creates.
+ *
+ * Searched against the *whole* roster, unlike the front door, which is narrowed
+ * to the children who have been to this gathering in the last year. That is not
+ * an oversight: the population this screen exists for is precisely the one that
+ * narrowing gets wrong — the daughter who comes on Fridays and the son who is
+ * new to it, a cousin, a child who has only ever been to a different programme.
+ * A parent only reaches here by having already found their family, and the
+ * child they pick is ticked because they picked them.
  *
  * ## Shape
  *

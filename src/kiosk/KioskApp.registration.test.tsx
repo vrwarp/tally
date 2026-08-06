@@ -118,6 +118,10 @@ const services = {
   listEvents: vi.fn(async () => []),
   loadRoster: vi.fn(async () => [ADA]),
   loadPhoneIndex: vi.fn(async () => phoneIndex),
+  loadParticipation: vi.fn(async () => ({
+    participated: new Set<string>(),
+    recent: new Set<string>(),
+  })),
   fetchAttendance: vi.fn(async () => ({
     present: new Set<string>(),
     checkedOut: new Set<string>(),

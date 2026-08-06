@@ -13,6 +13,13 @@ export const KIOSK_KEYS = {
   binding: 'tally:kiosk:binding',
   roster: 'tally:kiosk:roster',
   phoneIndex: 'tally:kiosk:phoneIndex',
+  /**
+   * Who belongs to the gathering this kiosk is bound to — the scoped search and
+   * the pre-ticked siblings. Cached whole rather than per chain: it is one small
+   * document, and a kiosk moved to a different gathering must not have to go
+   * back to the network before it can find anybody.
+   */
+  participation: 'tally:kiosk:participation',
   pending: 'tally:kiosk:pending',
   pairing: 'tally:kiosk:pairing',
   /**

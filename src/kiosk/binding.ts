@@ -23,6 +23,21 @@ import { KIOSK_KEYS, readJson, removeKey, writeJson } from './storage';
 export interface KioskBinding {
   eventId: string;
   seriesId: string | null;
+  /**
+   * Which chain of repeats this gathering belongs to — `chainKey`, the identity
+   * every Friday under one series (or one recurrence root) shares.
+   *
+   * Not the same thing as `seriesId`, and that is the whole reason it is here:
+   * a weekly gathering created in the app has a recurrence root and no series
+   * document, so `seriesId` is null for exactly the chains that have the most
+   * history behind them. It is what `kioskIndex/participation` is keyed by.
+   *
+   * Optional for the same reason `requiresCheckOut` is: a binding written before
+   * this existed has no such key, and a paired lobby screen must not be logged
+   * out by a deploy. Absent reads as "no scope", which searches the whole
+   * roster — the behaviour the kiosk has always had.
+   */
+  chain?: string;
   title: string;
   startAtMs: number;
   endAtMs: number;

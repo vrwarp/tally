@@ -15,16 +15,23 @@
  * ## The rest of the family
  *
  * When the kiosk can see brothers and sisters who need the same thing (see
- * family.ts for how much of a guess that is), they are listed here, ticked, and
- * the one button does all of them. Ticked rather than waiting to be chosen:
- * a family arrives together, and the parent who tapped the first name is
- * already reaching for the button — an unticked list would be a second thing to
- * do rather than a saved trip through the whole flow.
+ * family.ts for how much of a guess that is), they are listed here and the one
+ * button does all of the ticked ones.
  *
- * What keeps that honest is that every name is on the glass, above the finger
- * that is about to press, and each one unticks with a tap. The kiosk's guess at
- * a family can be wrong; a parent looking at a stranger's child in their own
- * list cannot miss it.
+ * Which arrive ticked is a second question, decided in `skippedFor` and not
+ * here. Everybody used to, on the argument that a family arrives together — and
+ * they usually do, but "everybody who answers to these four digits" is not the
+ * same set as "everybody who comes to this". The other children may have come
+ * once, or belong to a different programme, and ticking them turned a guess
+ * about a household into a silent check-in of a child who is not in the
+ * building. So the tick follows the gathering's own prediction and the *offer*
+ * stays as wide as the guess: an unexpected sibling is listed at full weight,
+ * one tap from being included.
+ *
+ * What keeps both honest is that every name is on the glass, above the finger
+ * that is about to press, and each one toggles with a tap. The kiosk's guess at
+ * a family can be wrong in either direction; a parent looking at their own list
+ * can see which way.
  *
  * ## The one who is not on it
  *
@@ -90,7 +97,8 @@ export function ConfirmScreen({
   onFindSibling?: (anchors: KioskStudent[]) => void;
   onBack: () => void;
 }) {
-  // Empty means everybody: a family arrives together. See the note above.
+  // Whose ticks start off. Decided by the caller — see `skippedFor` — because
+  // it depends on things this screen has no business knowing about.
   const memberTap = useTapGuard(onToggle);
 
   const chosen = [student, ...family.filter((member) => !skipped.has(member.id))];
@@ -186,8 +194,25 @@ export function ConfirmScreen({
                   tabIndex={-1}
                   aria-pressed={taking}
                   {...memberTap(member.id)}
+                  /*
+                   * Unticked means two different things, so it does not look
+                   * the same twice.
+                   *
+                   * At a pickup it means "the register says this child arrived
+                   * separately, so nothing suggests they are going now" — a
+                   * claim, and receding is honest about it. At a check-in it
+                   * means only "the prediction does not expect them tonight",
+                   * which is a guess about a child who may well be standing
+                   * right there. Dimming that row would make the one name the
+                   * parent has to notice the faintest thing on the glass. Same
+                   * row, same weight, empty tick.
+                   */
                   className={`flex h-16 shrink-0 items-center justify-between rounded-xl pr-5 pl-12 text-left ${
-                    taking ? 'bg-ink-800' : 'bg-ink-900 opacity-60'
+                    taking
+                      ? 'bg-ink-800'
+                      : intent === 'check-out'
+                        ? 'bg-ink-900 opacity-60'
+                        : 'bg-ink-900'
                   }`}
                 >
                   <span className="truncate text-xl font-semibold text-ink-100">

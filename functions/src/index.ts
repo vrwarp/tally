@@ -84,6 +84,10 @@ import {
   type StartPairingResult,
 } from './kiosk/pairing.js';
 import { listKioskEvents, type KioskEventEntry } from './kiosk/events.js';
+import {
+  buildParticipationIndex,
+  type ParticipationSummary,
+} from './kiosk/participation.js';
 import { buildPhoneIndex, type PhoneIndexSummary } from './kiosk/phoneIndex.js';
 import { probeSigning, type SigningStatus } from './kiosk/signing.js';
 import {
@@ -2555,5 +2559,41 @@ export const rebuildKioskPhoneIndex = onSchedule(
       logger: logger,
     });
     logger.info('Rebuilt the kiosk phone index', summary);
+  },
+);
+
+/**
+ * Rebuilds `kioskIndex/participation` on demand: the kiosk itself when it finds
+ * the stored index stale at bind time. Any active member, for the same reason
+ * the phone index is — the output is student ids the caller already reads.
+ *
+ * No backend secrets, because this reads nothing but Tally's own registers.
+ */
+export const refreshKioskParticipation = onCall<undefined, Promise<ParticipationSummary>>(
+  { timeoutSeconds: 300, memory: '512MiB' },
+  async (request) => {
+    await requireMember(request.auth?.uid);
+    return buildParticipationIndex(db(), { builtBy: request.auth!.uid, logger: logger });
+  },
+);
+
+/**
+ * The nightly rebuild, so a kiosk that is never paired still binds to a current
+ * answer. Ten minutes before the phone index, and emphatically its own job:
+ * this build touches no backend and needs no secrets, while `buildPhoneIndex`
+ * deliberately *throws* when one is down. Sharing a schedule would let a
+ * Planning Center outage take the kiosk's idea of who belongs to a gathering
+ * with it.
+ */
+export const rebuildKioskParticipation = onSchedule(
+  {
+    schedule: 'every day 03:20',
+    timeZone: MINISTRY_TIME_ZONE,
+    timeoutSeconds: 300,
+    memory: '512MiB',
+  },
+  async () => {
+    const summary = await buildParticipationIndex(db(), { builtBy: 'schedule', logger: logger });
+    logger.info('Rebuilt the kiosk participation index', summary);
   },
 );

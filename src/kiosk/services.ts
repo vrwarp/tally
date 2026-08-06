@@ -167,6 +167,10 @@ const refreshKioskPhoneIndex = httpsCallable<
   { force?: boolean } | void,
   { students: number; entries: number; builtAt: string }
 >(functions, 'refreshKioskPhoneIndex');
+const refreshKioskParticipation = httpsCallable<
+  void,
+  { chains: number; instances: number; students: number; builtAt: string }
+>(functions, 'refreshKioskParticipation');
 /**
  * The same callable the check-in screen's allergy badge uses, asked one child at
  * a time. See `fetchAllergyNote`.
@@ -238,6 +242,9 @@ export async function bindEntry(entry: KioskEventEntry): Promise<KioskBinding> {
   return {
     eventId,
     seriesId: entry.seriesId,
+    // Carried, not derived: `chainKey` lives in the app's bundle and the kiosk
+    // does not download it. The chooser row has always had the answer.
+    chain: entry.chain,
     title: entry.title,
     startAtMs: entry.startAt,
     endAtMs: entry.endAt,
@@ -399,6 +406,113 @@ export async function loadPhoneIndex(
     return stored.last4;
   }
   return (await refresh().catch(() => ({ fetchedAtMs: 0, builtAtMs: null, last4: {} }))).last4;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Participation                                                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Who has been to this gathering, and who comes to it regularly.
+ *
+ * The two answers the lobby screen has never had. Without them the search is
+ * every active student in Tally — a parent at Friday Fellowship typing four
+ * digits can be shown a family who has only ever come to Sunday nursery, or a
+ * stranger who happens to share a phone tail — and every child answering to a
+ * household's number arrives pre-ticked whether or not they come to this.
+ *
+ * Both are computed nightly by `functions/src/kiosk/participation.ts` and read
+ * here as one document. The kiosk cannot work them out for itself: it holds no
+ * event history, and sweeping a year of registers is not something to do with a
+ * parent standing at the screen.
+ */
+export interface KioskParticipation {
+  /** Attended this chain at least once in the last year. Scopes the search. */
+  participated: ReadonlySet<string>;
+  /** Attended enough of the last few instances. Decides which siblings tick. */
+  recent: ReadonlySet<string>;
+}
+
+/** Empty means "nothing to scope by" everywhere this is read. See `KioskApp`. */
+const NO_PARTICIPATION: KioskParticipation = {
+  participated: new Set<string>(),
+  recent: new Set<string>(),
+};
+
+interface StoredParticipation {
+  fetchedAtMs: number;
+  builtAtMs: number | null;
+  chains: Record<string, { participated: string[]; recent: string[] }>;
+}
+
+const PARTICIPATION_STALE_MS = 24 * 60 * 60_000;
+
+function scopeFor(stored: StoredParticipation | null, chain: string | undefined): KioskParticipation {
+  const held = chain ? stored?.chains?.[chain] : undefined;
+  if (!held) return NO_PARTICIPATION;
+  return {
+    participated: new Set(Array.isArray(held.participated) ? held.participated : []),
+    recent: new Set(Array.isArray(held.recent) ? held.recent : []),
+  };
+}
+
+async function fetchParticipationNow(): Promise<StoredParticipation> {
+  const snapshot = await getDoc(doc(db, 'kioskIndex/participation'));
+  const data = snapshot.exists() ? snapshot.data() : null;
+  const builtAt = data?.builtAt;
+  return {
+    fetchedAtMs: Date.now(),
+    builtAtMs:
+      builtAt && typeof (builtAt as { toDate?: unknown }).toDate === 'function'
+        ? (builtAt as { toDate(): Date }).toDate().getTime()
+        : null,
+    chains:
+      data && typeof data.chains === 'object' && data.chains !== null
+        ? (data.chains as StoredParticipation['chains'])
+        : {},
+  };
+}
+
+/**
+ * The scope for one chain, cached-first exactly as `loadPhoneIndex` is.
+ *
+ * Same staleness posture too: when the *stored document* is missing or was built
+ * more than a day ago, the kiosk asks the server to rebuild and refetches — so a
+ * gathering that met for the first time last night scopes correctly tonight
+ * without anybody thinking about it.
+ *
+ * Every failure lands on `NO_PARTICIPATION`, which every caller reads as "search
+ * everybody, tick everybody" — the behaviour the kiosk had before this existed.
+ * That direction is not an accident: a scope that fails closed is a family who
+ * cannot find themselves.
+ */
+export async function loadParticipation(
+  chain: string | undefined,
+  onUpdate: (scope: KioskParticipation) => void,
+): Promise<KioskParticipation> {
+  const stored = readJson<StoredParticipation>(KIOSK_KEYS.participation);
+
+  const refresh = async (): Promise<StoredParticipation> => {
+    let index = await fetchParticipationNow();
+    if (index.builtAtMs === null || Date.now() - index.builtAtMs > PARTICIPATION_STALE_MS) {
+      try {
+        await refreshKioskParticipation();
+        index = await fetchParticipationNow();
+      } catch {
+        // Nothing to rebuild from, or no permission. The stored copy still
+        // answers, and an absent one means an unscoped search.
+      }
+    }
+    writeJson(KIOSK_KEYS.participation, index);
+    onUpdate(scopeFor(index, chain));
+    return index;
+  };
+
+  if (stored && stored.chains) {
+    if (Date.now() - stored.fetchedAtMs > PARTICIPATION_STALE_MS) void refresh().catch(() => {});
+    return scopeFor(stored, chain);
+  }
+  return scopeFor(await refresh().catch(() => null), chain);
 }
 
 /* -------------------------------------------------------------------------- */

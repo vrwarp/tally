@@ -88,6 +88,10 @@ const services = {
   restoredUid: vi.fn(async () => 'staff-uid'),
   loadRoster: vi.fn(async () => ROSTER),
   loadPhoneIndex: vi.fn(async () => last4),
+  loadParticipation: vi.fn(async () => ({
+    participated: new Set<string>(),
+    recent: new Set<string>(),
+  })),
   fetchAttendance: vi.fn(async () => ({ present, checkedOut, arrivals: new Map<string, string>() })),
   replayQueue: vi.fn(async () => 0),
   performCheckIn: vi.fn(async () => {

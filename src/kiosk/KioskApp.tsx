@@ -22,6 +22,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 // Type-only, so the services chunk stays out of this graph — the value import
 // below is dynamic, and that boundary is the whole startup strategy.
 import type * as ServicesModule from './services';
+import type { KioskParticipation } from './services';
 // The same arrangement for printing, with one extra condition: the value import
 // only happens if this device has a printer configured, so a kiosk without one
 // never parses the rasteriser, the worker or the WebUSB transport.
@@ -54,7 +55,7 @@ import { SuccessScreen } from './screens/SuccessScreen';
 export type KioskServices = typeof ServicesModule;
 export type KioskPrinting = typeof PrintingModule;
 export type KioskRegistration = typeof RegistrationModule;
-export type { KioskEventEntry } from './services';
+export type { KioskEventEntry, KioskParticipation } from './services';
 
 /**
  * `printer` is a staff detour off the chooser rather than a phase of its own —
@@ -186,6 +187,18 @@ export function KioskApp() {
   const [last4Index, setLast4Index] = useState<Record<string, string[]>>(
     () => readJson<{ last4: Record<string, string[]> }>(KIOSK_KEYS.phoneIndex)?.last4 ?? {},
   );
+  /**
+   * Who belongs to *this* gathering, and who comes to it regularly.
+   *
+   * Empty until the services chunk has loaded, and empty forever on a kiosk
+   * bound before this existed or to a chain nothing has been run for. Every
+   * reader treats empty as "no scope" and falls back to what the kiosk did
+   * before — see `searchable` and `skippedFor`.
+   */
+  const [scope, setScope] = useState<KioskParticipation>(() => ({
+    participated: new Set<string>(),
+    recent: new Set<string>(),
+  }));
   const [presentIds, setPresentIds] = useState<ReadonlySet<string>>(new Set());
   const [checkedOutIds, setCheckedOutIds] = useState<ReadonlySet<string>>(new Set());
   /**
@@ -319,6 +332,9 @@ export function KioskApp() {
     (loaded: KioskServices, bound: KioskBinding) => {
       void loaded.loadRoster(setStudents).then(setStudents);
       void loaded.loadPhoneIndex(setLast4Index).then(setLast4Index);
+      // Per binding rather than per boot: a kiosk moved from Friday to Sunday
+      // is a kiosk asking about a different set of children.
+      void loaded.loadParticipation(bound.chain, setScope).then(setScope).catch(() => {});
       void loaded
         .fetchAttendance(bound.eventId)
         .then((register) => {
@@ -425,7 +441,15 @@ export function KioskApp() {
   // the one state that must survive them walking away from it, or a second tap
   // would start a second sweep of the church behind the first.
   useEffect(() => {
-    if (buffer === '') setRefresh((current) => (current === 'refreshing' ? current : 'idle'));
+    if (buffer === '') {
+      setRefresh((current) => (current === 'refreshing' ? current : 'idle'));
+      // The same one-family lifetime, for the same reason. Without it the "you
+      // are on the list" line one family earned stays on the empty screen for
+      // every family after them. It survives its own arrival because the buffer
+      // is already empty by the time "I've registered" is pressed — the QR
+      // screen is only reachable through `startRegistration`, which clears it.
+      setJustRefreshed(false);
+    }
   }, [buffer]);
 
   const onRefresh = useCallback(() => {
@@ -483,6 +507,67 @@ export function KioskApp() {
   const familyDigits = useMemo(() => buildFamilyDigits(last4Index), [last4Index]);
 
   /**
+   * The roster the front door searches: the children who belong to *this*
+   * gathering.
+   *
+   * The kiosk used to search every active student in Tally, which is not the
+   * population standing in front of it. A parent at Friday Fellowship typing
+   * four digits could be shown a family who has only ever come to Sunday
+   * nursery, and — because four digits are four digits — a newcomer could be
+   * shown somebody else's children, sorted, spelled correctly, and looking
+   * exactly like the answer.
+   *
+   * The rule is the year look-back the check-in screen already uses to decide
+   * who has been to a gathering (`lib/participation.ts`), not the narrower
+   * "Recent" prediction: a child who came twice last autumn belongs here, and
+   * being asked to register again would be wrong.
+   *
+   * Three ways out, and all of them widen rather than narrow:
+   *
+   * - a chain with no history at all scopes to nothing, so the whole roster is
+   *   searched. That covers a gathering meeting for the first time, a one-off,
+   *   a binding written before this existed, and every kind of failure to read
+   *   the aggregate. Scoping switches itself on once a gathering has been run;
+   *   there is nothing to configure and nothing to turn off.
+   * - anyone on tonight's register is always findable, whatever the aggregate
+   *   said at 03:20. They are in the building — a parent must be able to
+   *   collect them — and it covers the family who registered at this kiosk
+   *   twenty minutes ago.
+   * - `widened`, the button.
+   *
+   * Only the front door is scoped. `familyOf` keeps the whole roster, because
+   * the point of the confirm screen's list is to *offer* the siblings the
+   * prediction does not expect; so does `SiblingScreen`, whose whole population
+   * is the children this scope would wrongly exclude.
+   */
+  /**
+   * Whether this search has been widened past the gathering to all of Tally.
+   *
+   * Derived rather than held, because it has exactly the lifetime `refresh`
+   * already has: the two buttons that mean "look harder for me" — "I already
+   * registered" under an empty result, and "I've registered" on the QR screen —
+   * are the two that widen, and the same cleared buffer that stands the offer
+   * back down for the next family stands this down with it.
+   *
+   * Widening is the free half of that button. The wider roster is already in
+   * memory, so it takes effect on the press rather than several seconds later
+   * when the sweep of the church comes back — which matters, because the family
+   * it is for is usually one the sweep will not help at all.
+   *
+   * Neither button says anything about scope, and neither should: a parent has
+   * no model of which children this screen is willing to find, and telling them
+   * would mean explaining a mechanism in order to ask them to press a button.
+   */
+  const widened = refresh !== 'idle' || justRefreshed;
+
+  const searchable = useMemo(() => {
+    if (widened || scope.participated.size === 0) return students;
+    return students.filter(
+      (student) => scope.participated.has(student.id) || presentIds.has(student.id),
+    );
+  }, [students, scope, presentIds, widened]);
+
+  /**
    * The brothers and sisters this tap could cover.
    *
    * Only the ones the confirm would do the *same* thing to. A screen that
@@ -513,6 +598,10 @@ export function KioskApp() {
        * would drop real children off a screen a parent is using to take their
        * family home. Which of the two are *ticked* is the part that differs;
        * see `skippedFor`.
+       *
+       * The whole roster either way, never `searchable`: the scope narrows the
+       * front door, and the point of this list is to offer the children a
+       * narrower answer would have dropped.
        */
       const mine = arrivals.get(student.id);
       const together = mine
@@ -530,29 +619,51 @@ export function KioskApp() {
   /**
    * Which of the offered names arrive unticked.
    *
-   * Nobody, everywhere except a pickup where the register knows who came in
-   * together — the check-in screen's reasoning is unchanged, and is argued in
-   * ConfirmScreen: a family arrives together, and an unticked list would be a
-   * second thing to do rather than a saved trip through the flow.
+   * The offer and the tick are two different claims, and they used to be one.
+   * `familyOf` is a guess from four phone digits, and it is frequently right
+   * about the *household* and wrong about *tonight*: the other children may have
+   * come once, or belong to a different programme entirely. Ticking all of them
+   * turned that wrong guess into a silent check-in of a child who is not in the
+   * building — a name on a register, a sticker printed, and a room count nobody
+   * can reconcile.
    *
-   * A pickup is the one place a better answer exists. If this child arrived as
-   * part of a stated group, that group is ticked and anyone else the phone
-   * guess turned up is listed but left alone — they are on the screen because
-   * families do leave together after arriving apart, and they are unticked
-   * because nothing says they are going now. With no arrival on file (a
-   * volunteer checked them in from the roster one at a time, or the record
-   * predates arrivals) there is nothing better than the guess, so everything
-   * stays ticked exactly as before.
+   * So each intent ticks whatever it has the best evidence for, and offers the
+   * rest.
+   *
+   * **A check-in** ticks the children the gathering actually expects: the ones
+   * who pass the same "Recent" prediction the check-in screen uses to decide
+   * whose names to put in front of a counselor (see `lib/participation.ts`).
+   * Everyone else the guess turned up is still listed, at full weight, one tap
+   * from being included — because the parent is the only party who knows who
+   * they arrived with, and the screen's job is to make that easy either way.
+   *
+   * **A pickup** has a better answer than any prediction: the set that actually
+   * walked in together, stated by somebody's thumb an hour ago and written on
+   * the register. That group is ticked and anyone else the phone guess turned up
+   * is listed but left alone — they are on the screen because families do leave
+   * together after arriving apart, and unticked because nothing says they are
+   * going now.
+   *
+   * Both fail open. No arrival on file (a volunteer checked them in one at a
+   * time, or the record predates arrivals), or no participation aggregate for
+   * this chain, and there is nothing better than the guess — so everything is
+   * ticked, exactly as it was before either rule existed.
    */
   const skippedFor = useCallback(
     (student: KioskStudent, intent: KioskIntent, family: readonly KioskStudent[]): Set<string> => {
+      if (intent === 'check-in') {
+        if (scope.recent.size === 0) return new Set();
+        return new Set(
+          family.filter((member) => !scope.recent.has(member.id)).map((member) => member.id),
+        );
+      }
       const mine = intent === 'check-out' ? arrivals.get(student.id) : undefined;
       if (!mine) return new Set();
       return new Set(
         family.filter((member) => arrivals.get(member.id) !== mine).map((member) => member.id),
       );
     },
-    [arrivals],
+    [arrivals, scope],
   );
 
   const onConfirm = useCallback(
@@ -942,14 +1053,25 @@ export function KioskApp() {
           intent={overlay.intent}
           family={overlay.family}
           skipped={overlay.skipped}
-          onToggle={(studentId) =>
-            setOverlay((held) => {
-              if (held?.kind !== 'confirm') return held;
-              const next = new Set(held.skipped);
-              if (!next.delete(studentId)) next.add(studentId);
-              return { ...held, skipped: next };
-            })
-          }
+          onToggle={(studentId) => {
+            const next = new Set(overlay.skipped);
+            const ticking = next.delete(studentId);
+            if (!ticking) next.add(studentId);
+            /*
+             * A sibling the prediction did not expect is warmed when the parent
+             * says otherwise, not before — see the pick handler. Still ahead of
+             * the thumb: a tick is followed by a look at the list, and the
+             * commit is a separate press.
+             */
+            if (ticking && overlay.intent === 'check-in') {
+              const member = overlay.family.find((row) => row.id === studentId);
+              if (member) {
+                services?.warmStudentDates(member.id);
+                if (prints) printing?.warmLabel(member, binding);
+              }
+            }
+            setOverlay({ ...overlay, skipped: next });
+          }}
           onConfirm={(chosen) => onConfirm(overlay, chosen)}
           onFindSibling={() => {
             setBuffer('');
@@ -971,7 +1093,9 @@ export function KioskApp() {
         binding={binding}
         buffer={buffer}
         onKey={onKey}
-        students={students}
+        // Scoped to this gathering's own year — see `searchable`. Every other
+        // consumer of the roster on this page keeps all of it.
+        students={searchable}
         last4Index={last4Index}
         presentIds={presentIds}
         checkedOutIds={checkedOutIds}
@@ -986,6 +1110,10 @@ export function KioskApp() {
         onPick={(student) => {
           const intent = intentFor(student);
           const family = familyFor(student, intent);
+          // Before the warming, not after: which siblings arrive ticked is now
+          // a real question, and the answer decides what is worth preparing.
+          const skipped = skippedFor(student, intent, family);
+          const taking = family.filter((member) => !skipped.has(member.id));
           services?.warmStudentDates(student.id);
           /*
            * Start building the label now, while the confirm screen is on its way
@@ -998,22 +1126,19 @@ export function KioskApp() {
            * that tracks check-out, most taps once the room has filled are
            * collections, and rasterising for those is work thrown away.
            *
-           * The siblings are warmed too, because they arrive ticked and are
-           * about to be printed. An unticked one is forgotten again on the way
-           * through the confirm — the same eviction a Back gets.
+           * Only the siblings arriving *ticked*, for the same reason: a child
+           * the prediction does not expect is more likely than not to be
+           * unticked and left, and rasterising for them is a few hundred
+           * thousand pixels of work thrown away — in the worker the ticked
+           * children are queued behind. A sibling the parent does tick is warmed
+           * on the tap, which is still ahead of the thumb reaching the button.
            */
-          for (const member of family) services?.warmStudentDates(member.id);
+          for (const member of taking) services?.warmStudentDates(member.id);
           if (prints && intent === 'check-in') {
             printing?.warmLabel(student, binding);
-            for (const member of family) printing?.warmLabel(member, binding);
+            for (const member of taking) printing?.warmLabel(member, binding);
           }
-          setOverlay({
-            kind: 'confirm',
-            student,
-            intent,
-            family,
-            skipped: skippedFor(student, intent, family),
-          });
+          setOverlay({ kind: 'confirm', student, intent, family, skipped });
         }}
         onUnbind={() => {
           // A kiosk that has left a gathering has no business still holding
