@@ -434,11 +434,14 @@ export function KioskApp() {
        * its QR — the family who just finished the phone form is walking back.
        * Put the search screen up with the "type your last 4 digits" line
        * before they arrive. The roster refetch above is already in flight for
-       * the same bump, so the digits will answer by the time they are typed.
+       * the same bump, and the search is widened for this one family: their
+       * children are minutes old, so no attendance aggregate has them, and a
+       * scoped search would deny the digits this screen is about to ask for.
        */
       setRegistering(null);
       setBuffer('');
       setJustRefreshed(true);
+      setWidened(true);
     }
   }, [services, binding]);
 
@@ -641,12 +644,17 @@ export function KioskApp() {
   /**
    * Whether this search has been widened past the gathering to all of Tally.
    *
-   * Real state now, set by exactly one thing: the **Search everyone** row on
-   * the no-match panel — a control that says what it does, where "I already
-   * registered" used to widen as a side effect of a network read nobody could
-   * see. One family's worth of lifetime, like everything else on this screen:
-   * the buffer-empty effect stands it back down, so the next family at the
-   * kiosk starts scoped again.
+   * Real state now, set by two things and nothing else. The **Search
+   * everyone** row on the no-match panel — a control that says what it does,
+   * where "I already registered" used to widen as a side effect of a network
+   * read nobody could see. And the return from the QR screen, pressed or
+   * automatic, because "You're on the list — type the last 4 digits" is a
+   * promise: a family registered half a minute ago is in the roster copy the
+   * pulse just refetched but cannot be in `scope.participated`, an aggregate
+   * built from attendance they do not have yet, so a scoped search would deny
+   * the exact digits this screen told them to type. One family's worth of
+   * lifetime either way: the buffer-empty effect stands it back down, so the
+   * next family at the kiosk starts scoped again.
    *
    * Free and instant, deliberately — the wider roster is already in memory, so
    * the tap answers before a finger has lifted, with no read behind it.
@@ -1083,6 +1091,10 @@ export function KioskApp() {
               setRegistering(null);
               setBuffer('');
               setJustRefreshed(true);
+              // The same widening the automatic return performs, for the same
+              // family: their digits must not be denied by a scope built from
+              // attendance they do not have yet.
+              setWidened(true);
             }}
             onRegisterHere={startWizard}
             onClose={() => {

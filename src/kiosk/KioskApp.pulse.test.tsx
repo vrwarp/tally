@@ -47,6 +47,13 @@ interface MockPulse {
 let pulse: MockPulse | null = null;
 /** What a roster refetch answers with. */
 let refetchedRoster: KioskStudent[] = [ADA, GRACE];
+/** The gathering's scope. Empty means unscoped, like a chain with no history. */
+let participation: { participated: Set<string>; recent: Set<string> } = {
+  participated: new Set<string>(),
+  recent: new Set<string>(),
+};
+/** The last-4 map hydrate loads. */
+let last4: Record<string, string[]> = {};
 
 function binding(): KioskBinding {
   const now = Date.now();
@@ -67,11 +74,8 @@ function binding(): KioskBinding {
 const services = {
   restoredUid: vi.fn(async () => 'staff-uid'),
   loadRoster: vi.fn(async () => [ADA]),
-  loadPhoneIndex: vi.fn(async () => ({})),
-  loadParticipation: vi.fn(async () => ({
-    participated: new Set<string>(),
-    recent: new Set<string>(),
-  })),
+  loadPhoneIndex: vi.fn(async () => last4),
+  loadParticipation: vi.fn(async () => participation),
   fetchPulse: vi.fn(async () => pulse),
   rememberPulse: vi.fn(),
   refetchRoster: vi.fn(async (onUpdate: (students: KioskStudent[]) => void) => {
@@ -154,6 +158,8 @@ beforeEach(() => {
   localStorage.clear();
   pulse = null;
   refetchedRoster = [ADA, GRACE];
+  participation = { participated: new Set<string>(), recent: new Set<string>() };
+  last4 = {};
 });
 
 afterEach(() => {
@@ -269,6 +275,37 @@ describe('the QR auto-advance', () => {
     await poll();
 
     expect(screen.getByText(/I've registered/i)).toBeTruthy();
+  });
+
+  it('widens the search for the family it advanced, and narrows after them', async () => {
+    /*
+     * The regression the e2e caught: a scope is built from attendance, and a
+     * child registered half a minute ago has none — so the advance must widen
+     * this one search, or "type the last 4 digits" would be a promise the
+     * scoped pool immediately breaks.
+     */
+    participation = { participated: new Set([ADA.id]), recent: new Set<string>() };
+    last4 = { '8822': [GRACE.id] };
+    pulse = revs();
+    await mount();
+    await poll();
+    await openQr();
+
+    // The real bump moves roster, phones and registration together.
+    pulse = revs({ roster: 2, phones: 2, registration: { rev: 2, eventId: 'friday-today' } });
+    await poll();
+
+    await type('8822');
+    expect(screen.getByText('Grace Hopper')).toBeTruthy();
+
+    // One family's worth of widening: cleared, the next search is scoped
+    // again and the same digits stop answering.
+    await act(async () => {
+      fireEvent.pointerDown(screen.getByText('Clear', { selector: '[data-key]' }));
+    });
+    await settle();
+    await type('8822');
+    expect(screen.queryByText('Grace Hopper')).toBeNull();
   });
 
   it('does not yank the search screen when no QR is showing', async () => {

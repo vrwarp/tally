@@ -256,17 +256,24 @@ test.describe('the kiosk', () => {
    * The family who were registered while they queued.
    *
    * The kiosk's roster is a cache that refreshes every six hours — and nobody
-   * presses anything any more. Writing the student document fires the real
-   * `onStudentCreated` trigger in the emulator, the trigger bumps the real
-   * pulse, and the kiosk's thirty-second poll refetches the roster by itself.
-   * This test IS the proof of that chain end to end: if any link breaks, the
-   * row below never appears.
+   * presses anything to *update* it any more. Writing the student document
+   * fires the real `onStudentCreated` trigger in the emulator, the trigger
+   * bumps the real pulse, and the kiosk's thirty-second poll refetches the
+   * roster by itself. Each link is asserted separately: the bump is watched
+   * landing on the sentinel, and then the sweep's "Still no match" headline is
+   * asserted *absent* — the sweep only fires when the full roster comes up
+   * empty, so a quiet sweep is proof the refetch already delivered the child,
+   * and nothing else could have (nothing was typed while the poll worked, and
+   * the refresh buttons no longer exist). The one tap left, "Search everyone",
+   * changes the scope of one search and never the data: a brand-new child has
+   * no attendance, so the gathering's attendance-built pool rightly lacks
+   * them, and the row must appear too fast for any read to be behind it.
    *
    * Written straight into Firestore rather than through the app, because what
    * is being tested is a roster that changed *after* this kiosk cached one —
    * the moment, not the mechanism that made it.
    */
-  test('notices a family the cached roster does not hold, with no button pressed', async ({
+  test('notices a family the cached roster does not hold, with no refresh pressed', async ({
     browser,
     page,
     signedInAs,
@@ -282,8 +289,15 @@ test.describe('the kiosk', () => {
       await pairKiosk(kiosk, page);
       await bindTo(kiosk, /nursery/i);
 
-      await typeOnKiosk(kiosk, 'quill');
-      await expect(kiosk.getByText(/no match/i)).toBeVisible({ timeout: 15_000 });
+      // Where the sentinel stands before the write, so the bump is provable.
+      const rosterRev = async (): Promise<number> => {
+        const docs = await firestore.collection('kioskIndex');
+        const held = docs.find((doc) => doc.id === 'pulse')?.data.roster as
+          | { rev?: number }
+          | undefined;
+        return held?.rev ?? 0;
+      };
+      const before = await rosterRev();
 
       const now = new Date();
       await writeDocument(`students/${studentId}`, {
@@ -304,10 +318,39 @@ test.describe('the kiosk', () => {
         updatedBy: null,
       });
 
-      // No button. The trigger-to-pulse-to-poll chain surfaces the row while
-      // the search the parent already typed stays on the glass.
+      // Link one, server-side: the trigger saw the write and bumped the pulse.
+      await firestore.until(
+        'kioskIndex',
+        (docs) => {
+          const held = docs.find((doc) => doc.id === 'pulse')?.data.roster as
+            | { rev?: number }
+            | undefined;
+          return (held?.rev ?? 0) > before;
+        },
+        "the on-create trigger's bump of the pulse",
+      );
+
+      // Link two, kiosk-side. Nothing is typed while the poll works, so the
+      // silent sweep cannot be the courier: one interval (PULSE_POLL_MS is
+      // thirty seconds) plus slack for the refetch to land.
+      await kiosk.waitForTimeout(40_000);
+
+      await typeOnKiosk(kiosk, 'quill');
+      // The scoped pool rightly lacks a child with no attendance, so the
+      // no-match panel is correct — but its headline must stay plain. "Still
+      // no match" is the sweep's trace, the sweep fires only when the FULL
+      // roster is empty of quill, and the pulse has already delivered him.
+      await expect(kiosk.getByText(/no match — first time here/i)).toBeVisible({
+        timeout: 10_000,
+      });
+      await kiosk.waitForTimeout(3_000);
+      await expect(kiosk.getByText(/Still no match/i)).toHaveCount(0);
+
+      // The one tap left changes scope, not data — and two seconds is no time
+      // to fetch anything: the row can only come from what is already held.
+      await kiosk.getByRole('button', { name: /Search everyone/i }).click();
       const row = kiosk.getByRole('button', { name: /quill marsden/i }).first();
-      await expect(row).toBeVisible({ timeout: 60_000 });
+      await expect(row).toBeVisible({ timeout: 2_000 });
 
       await row.click();
       await kiosk.getByRole('button', { name: /^Check in$/ }).click();
