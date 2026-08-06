@@ -252,7 +252,7 @@ function RegistrationCard({
             version did, accuses a working flow of being broken.
           */
           <p className="text-sm text-ink-400">
-            A brother or sister added to a family already on the roster:{' '}
+            A brother or sister added to a family the church already has:{' '}
             {row.anchors.map((anchor) => summaryLabel(anchor)).join(', ')}. Approving joins that
             household rather than making a second one, and asks for no new adult.
           </p>

@@ -525,7 +525,11 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
        * which produced a photograph of three unrelated cards under a caption
        * about a picker. A frame that claims something has to contain it.
        */
-      const duplicateHint = page.getByText(/already on the roster/i).first();
+      // The button, not the sibling card's sentence — a text-only locator
+      // matched both, and clicking a paragraph does nothing at all.
+      const duplicateHint = page
+        .getByRole('button', { name: /already on the roster/i })
+        .first();
       await duplicateHint.scrollIntoViewIfNeeded();
       await duplicateHint.click();
       await expect(page.getByText(/Which of these is the same child/i)).toBeVisible({
