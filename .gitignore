@@ -92,3 +92,9 @@ uxr/after/
 # inlined as base64. `docs/uxr/before` and `docs/uxr/after` ARE committed; this
 # rebuilds from them with `npm run uxr:walkthrough`.
 docs/uxr/walkthrough.html
+
+# UXR renders — regenerable from the prototypes with `uxr/shoot.ts`, and a round
+# is a few megabytes of PNG. The critiques themselves are the record and are
+# tracked; the frames they were made from are not.
+/uxr/rounds/**/*.png
+/uxr/renders/
