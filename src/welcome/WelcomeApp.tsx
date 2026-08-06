@@ -12,9 +12,10 @@
  *
  *   - **It checks nobody in.** A form on a phone cannot know the family walked
  *     into the room. They register here and tap their own children through at
- *     the kiosk, which is the same act every other family performs — and the
- *     last screen says so, because the kiosk holds its roster in local storage
- *     and needs the "I've registered" tap to go and look again.
+ *     the kiosk, which is the same act every other family performs. The last
+ *     screen sends them straight to their four digits — the kiosk notices the
+ *     registration by itself (see kioskIndex/pulse) and has the search screen
+ *     waiting by the time they walk back to it.
  *   - **It may ask about allergies.** Only where there is an upstream record to
  *     put a medical note on, and it is never stored in Tally or shown on any
  *     lobby screen — it goes to the church's own database and stays there.
@@ -198,17 +199,19 @@ export function WelcomeApp() {
             {phase.names.join(' and ')} {phase.names.length === 1 ? 'is' : 'are'} registered.
           </p>
           {/*
-            * The two-step ending, and the order matters.
+            * One step, no button.
             *
-            * The kiosk searches a copy of the roster it keeps on the device and
-            * refreshes on its own slow schedule, so it does not know about this
-            * family yet. The button on its screen is what makes it go and look.
-            * Telling somebody to type their digits without that first is telling
-            * them to watch a screen say "no match".
+            * This used to say "tap 'I've registered', then type" — the kiosk's
+            * roster was a cache only a button-press refreshed, and telling
+            * somebody to type their digits without pressing it first was
+            * telling them to watch a screen say "no match". The kiosk notices
+            * registrations by itself now (it polls a change signal every half
+            * minute — see kioskIndex/pulse), and the one that minted this QR
+            * puts its search screen up on its own. The digits are the whole
+            * instruction, because they are the whole habit being taught.
             */}
           <p className="text-lg text-ink-400">
-            At the kiosk, tap <strong>&ldquo;I&rsquo;ve registered&rdquo;</strong>, then type the
-            last 4 digits of your phone:
+            At the kiosk, type the last 4 digits of your phone:
           </p>
           <p className="text-4xl font-semibold tracking-[0.3em] text-ink-50">{phase.last4}</p>
           <p className="text-base text-ink-500">

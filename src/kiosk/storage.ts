@@ -20,6 +20,13 @@ export const KIOSK_KEYS = {
    * back to the network before it can find anybody.
    */
   participation: 'tally:kiosk:participation',
+  /**
+   * The last pulse revisions this kiosk acted on — see `fetchPulse` in
+   * services. On disk so that a reboot compares against what this kiosk last
+   * saw: a change that happened while it was powered off is caught on the
+   * first poll instead of waiting out a cache TTL.
+   */
+  pulse: 'tally:kiosk:pulse',
   pending: 'tally:kiosk:pending',
   pairing: 'tally:kiosk:pairing',
   /**
@@ -166,4 +173,42 @@ export function participationScope(
 /** The scope for one chain, straight off the disk. */
 export function readCachedParticipation(chain: string | null | undefined): KioskParticipationScope {
   return participationScope(readJson<CachedParticipation>(KIOSK_KEYS.participation), chain);
+}
+
+/* -------------------------------------------------------------------------- */
+/* The pulse cache                                                             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The revisions this kiosk last acted on, one number per channel.
+ *
+ * Numbers only — the `registration` channel's eventId is not stored, because a
+ * stored one could only ever cause a *stale* auto-advance on reboot. The revs
+ * are opaque change markers: any difference from the live document means
+ * "refetch that channel", nothing more.
+ */
+export interface CachedPulse {
+  roster: number;
+  phones: number;
+  participation: number;
+  registration: number;
+}
+
+function pulseNumber(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+export function readCachedPulse(): CachedPulse | null {
+  const stored = readJson<CachedPulse>(KIOSK_KEYS.pulse);
+  if (!stored || typeof stored !== 'object') return null;
+  return {
+    roster: pulseNumber(stored.roster),
+    phones: pulseNumber(stored.phones),
+    participation: pulseNumber(stored.participation),
+    registration: pulseNumber(stored.registration),
+  };
+}
+
+export function writeCachedPulse(pulse: CachedPulse): void {
+  writeJson(KIOSK_KEYS.pulse, pulse);
 }

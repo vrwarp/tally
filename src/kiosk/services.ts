@@ -64,8 +64,10 @@ import {
   readCachedRosterOfAnyVersion,
   readJson,
   writeCachedRoster,
+  writeCachedPulse,
   writeJson,
   type CachedParticipation,
+  type CachedPulse,
   type KioskParticipationScope,
 } from './storage';
 
@@ -192,7 +194,7 @@ const registerFamilyCallable = httpsCallable<RegisterFamilyRequest, RegisterFami
   'registerFamily',
 );
 const mintRegistrationCodeCallable = httpsCallable<
-  void,
+  { eventId?: string } | void,
   { code: string; expiresAt: number; rotateAfterMs: number }
 >(functions, 'mintRegistrationCode');
 
@@ -495,6 +497,119 @@ export async function loadParticipation(
 }
 
 /* -------------------------------------------------------------------------- */
+/* The pulse                                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The live revisions of the sentinel the functions bump whenever kiosk-visible
+ * data changes — see functions/src/kiosk/pulse.ts for who bumps and when.
+ *
+ * This is what retired the "I've registered" ritual: instead of a parent
+ * pressing a button to force a refetch, the kiosk reads this one small document
+ * on a short cadence and refetches only the channels whose revision moved. The
+ * revisions are opaque change markers — compared with `!==`, never ordered —
+ * and the `registration` channel additionally names the gathering a QR
+ * registration was made against, so the kiosk showing that QR can bring the
+ * search screen up before the family has walked back to it.
+ */
+export interface KioskPulse {
+  roster: number;
+  phones: number;
+  participation: number;
+  registration: { rev: number; eventId: string | null };
+}
+
+function pulseChannel(data: Record<string, unknown> | null, name: string): number {
+  const held = (data?.[name] ?? {}) as Record<string, unknown>;
+  return typeof held.rev === 'number' && Number.isFinite(held.rev) ? held.rev : 0;
+}
+
+/**
+ * One cheap read of the pulse, or null for "no signal".
+ *
+ * Null covers a document nobody has bumped yet, an unreachable network, and a
+ * deployment whose functions predate the pulse — and in every one of those the
+ * TTLs the loaders already run under keep governing. Fail open, always.
+ */
+export async function fetchPulse(): Promise<KioskPulse | null> {
+  try {
+    const snapshot = await getDoc(doc(db, 'kioskIndex/pulse'));
+    if (!snapshot.exists()) return null;
+    const data = snapshot.data();
+    const registration = (data?.registration ?? {}) as Record<string, unknown>;
+    return {
+      roster: pulseChannel(data, 'roster'),
+      phones: pulseChannel(data, 'phones'),
+      participation: pulseChannel(data, 'participation'),
+      registration: {
+        rev: pulseChannel(data, 'registration'),
+        eventId: typeof registration.eventId === 'string' ? registration.eventId : null,
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Remembers which revisions this kiosk has acted on, across reboots. */
+export function rememberPulse(pulse: CachedPulse): void {
+  writeCachedPulse(pulse);
+}
+
+/*
+ * The three soft refetchers the poll routes to, deliberately *unforced*: the
+ * pulse already said the stored data changed, so plain reads suffice — no
+ * rebuild callables, no `force: true`, no sweep of the backends. Each follows
+ * the loaders' shape (write the cache, then tell the screen) and swallows its
+ * errors, because a failed refetch leaves the kiosk exactly where it was and
+ * the next poll tries again.
+ */
+
+/**
+ * Re-reads the roster because the pulse said it moved.
+ *
+ * The `getRoster` half may serve the server's cached backend people, and that
+ * is fine: a just-registered or just-quick-added child's document comes from
+ * the direct students query, which is never cached. The backend half of the
+ * signal only ever follows the nightly index build, which has just swept the
+ * backends itself.
+ */
+export async function refetchRoster(onUpdate: (students: KioskStudent[]) => void): Promise<void> {
+  try {
+    const students = await fetchRosterNow();
+    writeCachedRoster(students);
+    onUpdate(students);
+  } catch {
+    // The kiosk keeps what it had; the next poll tries again.
+  }
+}
+
+export async function refetchPhoneIndex(
+  onUpdate: (last4: Record<string, string[]>) => void,
+): Promise<void> {
+  try {
+    const index = await fetchPhoneIndexNow();
+    writeJson(KIOSK_KEYS.phoneIndex, index);
+    onUpdate(index.last4);
+  } catch {
+    // Same posture as refetchRoster.
+  }
+}
+
+export async function refetchParticipation(
+  chain: string | null | undefined,
+  onUpdate: (scope: KioskParticipation) => void,
+): Promise<void> {
+  try {
+    const index = await fetchParticipationNow();
+    writeJson(KIOSK_KEYS.participation, index);
+    onUpdate(participationScope(index, chain));
+  } catch {
+    // Same posture as refetchRoster.
+  }
+}
+
+/* -------------------------------------------------------------------------- */
 /* Checking again, on demand                                                   */
 /* -------------------------------------------------------------------------- */
 
@@ -612,8 +727,13 @@ export function applyRegistration(result: {
 }
 
 /** The short-lived code the kiosk puts in its QR. See functions/src/kiosk/registrationCodes.ts. */
-export async function mintRegistrationCode(): Promise<{ code: string; rotateAfterMs: number }> {
-  const { data } = await mintRegistrationCodeCallable();
+export async function mintRegistrationCode(
+  eventId: string,
+): Promise<{ code: string; rotateAfterMs: number }> {
+  // The code remembers the gathering, so a registration made against it can
+  // wake this kiosk's QR screen — see `fetchPulse` and the auto-advance in
+  // KioskApp. Nothing else about the code changes.
+  const { data } = await mintRegistrationCodeCallable({ eventId });
   return { code: data.code, rotateAfterMs: data.rotateAfterMs };
 }
 

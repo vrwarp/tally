@@ -10,10 +10,11 @@
  *     stores no medical notes; the field means "send this to the church's own
  *     database", and where there is no such record to write to, asking for it
  *     would be collecting something with nowhere to go.
- *   - **The ending.** A parent who registers here is not checked in, and the
- *     kiosk searches a local copy of the roster — so the last screen has to say
- *     "tap I've registered" *before* it says "type your digits", or the family
- *     goes and watches a screen tell them there is no match.
+ *   - **The ending.** A parent who registers here is not checked in; the last
+ *     screen sends them straight to their four digits, with no button ritual in
+ *     front of them — the kiosk notices registrations by itself now, and the
+ *     old "tap I've registered first" instruction would teach a step the
+ *     machine has taken over.
  */
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -152,9 +153,11 @@ describe('filling it in', () => {
     // The field was never shown, so nothing is claimed about it.
     expect(sent.allergies).toBeUndefined();
 
-    // The order is the whole point: the kiosk holds a local copy of the roster
-    // and has to be told to go and look before the digits will find anybody.
-    expect(await screen.findByText(/I’ve registered/)).toBeTruthy();
+    // No button in the instruction any more: the kiosk notices registrations
+    // by itself, so sending a family hunting for "I've registered" would teach
+    // a ritual the machine has taken over. The digits are the whole habit.
+    expect(await screen.findByText(/type the last 4 digits/i)).toBeTruthy();
+    expect(screen.queryByText(/I’ve registered/)).toBeNull();
     expect(screen.getByText('3344')).toBeTruthy();
   });
 

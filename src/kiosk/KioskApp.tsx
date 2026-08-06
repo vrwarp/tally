@@ -43,7 +43,14 @@ import {
   type PrinterConfig,
 } from './printing/device';
 import { type KioskStudent } from './search';
-import { KIOSK_KEYS, readCachedParticipation, readCachedRoster, readJson } from './storage';
+import {
+  KIOSK_KEYS,
+  readCachedParticipation,
+  readCachedPulse,
+  readCachedRoster,
+  readJson,
+  type CachedPulse,
+} from './storage';
 import { ConfirmScreen } from './screens/ConfirmScreen';
 import { SiblingScreen } from './screens/SiblingScreen';
 import { EventChooser } from './screens/EventChooser';
@@ -127,6 +134,18 @@ type Overlay =
 const MAX_BUFFER = 24;
 const PRESENT_REFRESH_MS = 5 * 60_000;
 const QUEUE_REPLAY_MS = 30_000;
+/**
+ * How often the kiosk asks "did anything I cache change?"
+ *
+ * The QR screen used to argue that polling a lobby screen all evening was a
+ * great deal of traffic to buy a few seconds nobody was waiting on — and that
+ * was right about polling the *data* and wrong about polling a *signal*. This
+ * reads one small document (`kioskIndex/pulse`), ~2,900 reads a day, next to
+ * an attendance poll that already re-reads a whole subcollection every five
+ * minutes. The expensive refetches happen only when a revision moved, and the
+ * two church-wide sweeps a parent used to trigger by button are gone.
+ */
+export const PULSE_POLL_MS = 30_000;
 /**
  * How long a forced refresh answers for.
  *
@@ -252,6 +271,19 @@ export function KioskApp() {
   // not expire under them and the 4am reload must not take the screen away.
   idleRef.current = buffer === '' && overlay === null && registering === null;
 
+  /**
+   * The pulse revisions this kiosk last acted on — seeded from disk, so the
+   * first poll after a reboot compares against what it last *saw* and catches
+   * anything that changed while it was powered off. Null only on a
+   * storage-cold boot, where the first sighting seeds without refetching
+   * (hydrate has just loaded everything anyway).
+   */
+  const pulseRef = useRef<CachedPulse | null>(readCachedPulse());
+  // The interval's view of the QR screen, without re-arming per keystroke —
+  // the same trick `idleRef` plays for the clock.
+  const registeringRef = useRef(registering);
+  registeringRef.current = registering;
+
   /* ---- Boot: load Firebase after first paint, restore the session -------- */
 
   useEffect(() => {
@@ -352,9 +384,61 @@ export function KioskApp() {
     [],
   );
 
+  /**
+   * One poll of the pulse, and the refetches it routes to.
+   *
+   * Revisions are opaque change markers, compared with `!==` and never
+   * ordered. Everything in here is void-and-swallow: a pulse failure must
+   * never surface on the glass, and the next tick tries again. The
+   * `registration` revision is recorded even when no QR screen is open — the
+   * signal is for the screen that is up *now*, not a queue of missed ones.
+   */
+  const onPulse = useCallback(async () => {
+    if (!services || !binding) return;
+    const seen = pulseRef.current;
+    const fresh = await services.fetchPulse();
+    if (!fresh) return; // No signal — the TTLs the loaders run under govern.
+
+    const next = {
+      roster: fresh.roster,
+      phones: fresh.phones,
+      participation: fresh.participation,
+      registration: fresh.registration.rev,
+    };
+    pulseRef.current = next;
+    services.rememberPulse(next);
+    // First sighting ever (storage-cold boot): hydrate has just loaded
+    // everything this could refetch, so seeing the revs is enough.
+    if (!seen) return;
+
+    if (fresh.roster !== seen.roster) void services.refetchRoster(setStudents);
+    if (fresh.phones !== seen.phones) void services.refetchPhoneIndex(setLast4Index);
+    if (fresh.participation !== seen.participation) {
+      void services.refetchParticipation(binding.predictsFrom, setScope);
+    }
+    if (
+      fresh.registration.rev !== seen.registration &&
+      registeringRef.current?.screen === 'qr' &&
+      fresh.registration.eventId === binding.eventId
+    ) {
+      /*
+       * A registration for this gathering landed while this kiosk was showing
+       * its QR — the family who just finished the phone form is walking back.
+       * Put the search screen up with the "type your last 4 digits" line
+       * before they arrive. The roster refetch above is already in flight for
+       * the same bump, so the digits will answer by the time they are typed.
+       */
+      setRegistering(null);
+      setBuffer('');
+      setJustRefreshed(true);
+    }
+  }, [services, binding]);
+
   useEffect(() => {
     if (phase !== 'ready' || !services || !binding) return;
     hydrate(services, binding);
+    // Seed (or catch up) within a tick of binding rather than a poll later.
+    void onPulse();
 
     const present = setInterval(() => {
       void services
@@ -373,15 +457,17 @@ export function KioskApp() {
         .catch(() => {});
     }, PRESENT_REFRESH_MS);
     const replay = setInterval(() => void services.replayQueue().catch(() => {}), QUEUE_REPLAY_MS);
+    const pulse = setInterval(() => void onPulse(), PULSE_POLL_MS);
     const online = () => void services.replayQueue().catch(() => {});
     window.addEventListener('online', online);
 
     return () => {
       clearInterval(present);
       clearInterval(replay);
+      clearInterval(pulse);
       window.removeEventListener('online', online);
     };
-  }, [phase, services, binding, hydrate]);
+  }, [phase, services, binding, hydrate, onPulse]);
 
   /* ---- The clock: binding expiry and the nightly reload ------------------ */
 
@@ -941,7 +1027,7 @@ export function KioskApp() {
       if (registering.screen === 'qr') {
         return (
           <registration.QrScreen
-            mintCode={services.mintRegistrationCode}
+            mintCode={() => services.mintRegistrationCode(binding.eventId)}
             // The same forced read the no-match state offers, and for the same
             // reason: this kiosk holds a roster cache that has never heard of
             // the family who just filled a form in on their phone. Each half

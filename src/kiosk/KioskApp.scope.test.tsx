@@ -76,6 +76,11 @@ const services = {
   loadRoster: vi.fn(async () => ROSTER),
   loadPhoneIndex: vi.fn(async () => LAST4),
   loadParticipation: vi.fn(async () => scope),
+  fetchPulse: vi.fn(async () => null),
+  rememberPulse: vi.fn(),
+  refetchRoster: vi.fn(async () => {}),
+  refetchPhoneIndex: vi.fn(async () => {}),
+  refetchParticipation: vi.fn(async () => {}),
   fetchAttendance: vi.fn(async () => ({
     present,
     checkedOut: new Set<string>(),
