@@ -1,0 +1,32 @@
+{
+  "round": 3,
+  "variant_judged": "r2",
+  "found_independently_by_both": {
+    "severity": "major",
+    "finding": "The scroller r2 restored hides a pre-ticked child. On the landscape kiosk the list viewport is 260px against 352px of rows, so the fifth sibling is entirely off the glass and the fourth is severed square through its card and its tick chip. The hidden child is ticked by default, so the parent commits a name they never saw — on a screen whose own header says undo lives with staff in the main app, deliberately not here. It does not degrade: the viewport is fixed, so at seven siblings it shows three and a half and commits 'all 8'. Portrait is unaffected, which is why an N=1 frame hid it.",
+    "extra_from_design": "The 16px gap after the cut was double the 8px row pitch — an accident of a list margin stacking with the region's flex gap — so the severed edge sat in more air than any row boundary and read as the end of the list rather than a row passing under an edge.",
+    "extra_from_usability": "The only cross-check is the count in the commit, which disagrees with the visible list by exactly one and sits below the decision, where it is read after it is made. That is the finding this loop settled in round 1."
+  },
+  "design_majors": [
+    "The ramp did not exist: 14/35/48/56, two steps of 17% that no reader parses as levels. And r2's own source note claimed 76px before the exit as a deliberate top-of-ramp while r2's CSS cut it to 56 in the same round. Identity→region also rendered 35 in one scene and 41 in the others for one intent, because it was measured in the scene without an ask and the ask's line box hides ~5px of slack.",
+    "A 120px scissor across the one transition the feature exists to produce: alone → sibling screen → added moves the name up 60px and the commit down 60px. Nothing on the screen is fixed; the only invariant is the mid-line of the column, which is not an element. Anchor the bottom — the commit is the irreversible one on a device with no undo and the one a thumb travels toward; the name is read, not tapped."
+  ],
+  "usability_minors": [
+    "Suppressing the question in `alone` left a bare noun phrase whose nearest noun was the child's name, giving the live wrong reading 'not this child, show me a different one' — to precisely the parent this change exists for.",
+    "`added` reports a state, not a change: it differs from `family` on 19 scanlines. Fine at one sibling, where three signals arrive together; useless at five, where the added child may be inside the hidden region. Adding a child also relocates the pill the parent last touched onto a destructive toggle."
+  ],
+  "design_minors": [
+    "`added` was `family` with one string changed — the round had three scenes, not four. It should be family-plus-one, to test an insertion rather than a substitution.",
+    "The add-row's 16px gap was two spacing mechanisms stacking, not a decision.",
+    "The chevron rendered 6x9px at 80% opacity — 4% of the weight of the 36x36 tick chip above it, and the only sub-full-opacity element on the screen. A mark too small to be one.",
+    "At five rows the present-600 tick chips resolve before the names they belong to, and they are the same token at the same value as the commit — the accent meaning 'this row is selected' is indistinguishable from the accent meaning 'this button performs the check-in'.",
+    "The ask's indent went from 20px to 48px with the gutter; at 48 it reads as floating rather than aligned. It labels the blocks, not their contents.",
+    "The wide frame hides a row on the axis it is short of while two-thirds of its width sits empty."
+  ],
+  "confirmed_working": [
+    "The pill is now clearly distinct from SiblingScreen's registration offer: 32% vs 15% fill, 64px vs 48px, 20px semibold vs 16px, left-aligned vs centred, plus and chevron vs neither.",
+    "It does not compete with the commit — 1.45:1 against the page where the green measures 6.13:1 — so the one-child parent is still a single tap.",
+    "The gutter works: ask, sibling names and the add-row's label all start on one x, and the plus in its own column reads as a mark rather than a word competing with words.",
+    "48-49px of clear page above the commit holds in every scene, and the sibling-to-add-row gap doubled, so mis-tap geometry is no worse than round 2 and in one respect twice as good."
+  ]
+}

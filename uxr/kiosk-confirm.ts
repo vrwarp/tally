@@ -215,6 +215,104 @@ const CSS = `
     width: 1.75rem; margin-left: -1.75rem; flex-shrink: 0; text-align: left;
   }
   .screen.r2 .addrow .go { margin-left: auto; font-weight: 400; opacity: 0.8; }
+  /* ---- r3 ---------------------------------------------------------------- */
+
+  /*
+   * The commit stops moving.
+   *
+   * Across the one transition this feature exists to produce -- alone, out to
+   * the sibling screen, back with the child -- the name rose 60px and the
+   * commit fell 60px. A 120px scissor around a centre line that is not an
+   * element: nothing on the screen was fixed. So the bottom is anchored, which
+   * is the right end to anchor. The commit is the irreversible one on a device
+   * with no undo and the one a thumb travels toward; the name floats, and the
+   * name is read rather than tapped, and it now moves half as far as either did
+   * before. Anchored to a band at about 72% of the glass rather than to the
+   * bezel, so the controls stay in the reachable middle of a screen somebody is
+   * standing at.
+   */
+  .screen.r3 {
+    display: grid; grid-template-rows: minmax(0, 1fr) auto auto;
+    justify-items: center; gap: 0;
+    /* A band rather than the whole glass: the controls stay in the reachable
+       middle of a screen somebody is standing at, and the band itself is a
+       constant, so the identity sits at its top and the commit at its bottom
+       whatever the guess returned. */
+    height: min(100%, 51.25rem); margin: auto;
+  }
+  /*
+   * The bottom is what is anchored, and only the bottom.
+   *
+   * Pinning the identity as well left a 300px hole in the scene with no list —
+   * and the name is read rather than tapped, so it is the element that can
+   * afford to move. Identity and region ride one flexible track together,
+   * bottom-aligned against the commit, so the child's name is always directly
+   * above the question that asks who is with her however long the list gets.
+   */
+  .screen.r3 .upper {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: flex-end; align-self: stretch; min-height: 0; width: 100%;
+  }
+  .screen.r3 .whoelse { min-height: 0; }
+  /* Measured in a scene that HAS an ask -- three of the four do, and the ask's
+     line box hides ~5px of slack the box gap knows nothing about, which is why
+     r2 rendered 35 here in one scene and 41 in the others for one intent. */
+  .screen.r3 .who { margin-bottom: 1.75rem; }
+  .screen.r3 .whoelse { min-height: 0; margin-bottom: 3rem; }
+  /* 76px again, and this time the CSS agrees with the note. r2 claimed the
+     exit's isolation as the top of the ramp and cut it to 56 in the same round,
+     which a reader cannot tell from the 48 above it. */
+  .screen.r3 .commit { margin-bottom: 3.25rem; }
+
+  /*
+   * One question, both scenes, and short enough to be a question rather than a
+   * heading. Suppressing it in "alone" left a bare noun phrase whose nearest
+   * noun was the child's name, which reads as "not this child, show me a
+   * different one" -- to precisely the parent this change exists for.
+   *
+   * On the region's box edge, not the rows' text edge: it labels the blocks
+   * rather than their contents, and the 20px inset that read as alignment
+   * became a 48px indent that read as floating once the gutter arrived.
+   */
+  .screen.r3 .ask { padding: 0 0 0.25rem; }
+
+  /* One mechanism owns this gap. r2 stacked a list margin on top of the
+     region's flex gap and got 16px by accident -- double the row pitch, so the
+     add-row spaced as a separate control while its gutter, height, radius and
+     text edge all said it was the list's last row. */
+  .screen.r3 .rows { margin-bottom: 0; }
+
+  /*
+   * What the scroller is hiding, said where it is hidden.
+   *
+   * Both critics found the same blocker independently: on the landscape kiosk
+   * the list clips mid-row and a *pre-ticked* child can be entirely off the
+   * glass, so the parent commits a name they never saw, on a screen with no
+   * undo. The count in the commit cannot carry this -- nothing below a terminal
+   * button is read before the decision, which this loop settled in round 1.
+   */
+  .screen.r3 .rows { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 2rem), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 2rem), transparent); }
+  .screen.r3 .more {
+    padding: 0.5rem 0 0; font-size: 1.25rem; line-height: 1.75rem;
+    color: var(--brand-300); text-align: left;
+  }
+
+  /* Full opacity and the label's optical size. A 6x9px mark at 80% under a
+     36x36 filled chip was four per cent of its weight -- the right inset read
+     as empty with a speck in it. */
+  .screen.r3 .addrow .go { margin-left: auto; font-weight: 400; opacity: 1; font-size: 1.75rem; }
+
+  /* The tick is state; the commit is the action. Both were present-600 at the
+     same value, so at five rows the chip column resolved before the names it
+     belongs to and the screen's loudest accent was spent on its least varying
+     bit. */
+  .screen.r3 .tick { background: color-mix(in oklab, var(--present-600) 55%, transparent); color: var(--ink-50); }
+
+  /* The wide kiosk stops being the tall one with more page around it -- it was
+     hiding a row on the axis it is short of while two-thirds of its width sat
+     empty. */
+  .screen.r3.wide .whoelse, .screen.r3.wide .commit { max-width: 36rem; }
+
 `;
 
 /*
@@ -320,6 +418,44 @@ const VARIANTS: Record<string, (scene: Scene) => Variant> = {
    * screen has four type sizes rather than five, and the commit says what it
    * will actually do.
    */
+  /**
+   * Round 3. Two majors from each critic, and they overlap on the first.
+   *
+   *  - **The scroller hides a ticked child.** Independently found by both. On
+   *    the landscape kiosk it clips mid-row, through the card and through the
+   *    tick chip, with no track, no fade and no count — and the row it hides is
+   *    pre-ticked, so the parent commits a name they never saw on a screen with
+   *    no undo. It does not degrade either: the viewport is fixed, so at seven
+   *    siblings it shows three and a half and commits "all 8".
+   *  - **The commit was moving 60px** while the name moved 60 the other way,
+   *    around a centre line that is not an element. Anchored at the bottom now.
+   *  - **The ramp did not exist**: 14/35/48/56, two steps of 17% that no reader
+   *    parses as levels — and r2's own note claimed 76 before the exit while
+   *    its CSS cut it to 56.
+   *  - **The question is back in both scenes**, short. Suppressing it left a
+   *    noun phrase attaching to the nearest noun, which was the child's name.
+   */
+  r3: (scene) => {
+    const siblings =
+      scene === 'family'
+        ? ['Amara Washington']
+        : scene === 'added'
+          ? ['Amara Washington', 'Malia Washington']
+          : scene === 'many'
+            ? ['Amara Washington', 'Malia Washington', 'Zuri Washington', 'Ike Washington', 'Ada Washington']
+            : [];
+    const rows = siblings
+      .map((name) => `<div class="row"><span class="rname">${name}</span><span class="tick">&#10003;</span></div>`)
+      .join('\n        ');
+    return {
+      above: `<div class="whoelse">
+      <div class="ask">Anyone else?</div>
+      ${siblings.length > 0 ? `<div class="rows">\n        ${rows}\n      </div>` : ''}
+      <button class="addrow"><span class="plus">+</span>Another child<span class="go">&rsaquo;</span></button>
+    </div>`,
+    };
+  },
+
   r2: (scene) => {
     const siblings =
       scene === 'family'
@@ -353,7 +489,7 @@ function page(scene: Scene, variant: string, tall: boolean): string {
    * rounds judged this screen without it.
    */
   const ticked =
-    scene === 'family' || scene === 'added' ? 2 : scene === 'many' ? 6 : 1;
+    scene === 'family' ? 2 : scene === 'added' ? 3 : scene === 'many' ? 6 : 1;
   const commitLabel = ticked > 1 ? `Check in all ${ticked}` : 'Check in';
 
   return `<!doctype html>
@@ -365,12 +501,14 @@ function page(scene: Scene, variant: string, tall: boolean): string {
 <style>${CSS}</style>
 </head>
 <body style="width:${tall ? 800 : 1280}px;height:${tall ? 1280 : 800}px">
-  <div class="screen${variant === 'r0' ? '' : ' ' + variant}">
+  <div class="screen${variant === 'r0' ? '' : ' ' + variant}${tall ? '' : ' wide'}">
+    ${variant === 'r3' ? '<div class="upper">' : ''}
     <div class="who">
       <div class="name">Nia Washington</div>
       <div class="grade">8th grade</div>
     </div>
     ${above}
+    ${variant === 'r3' ? '</div>' : ''}
     <button class="commit">${commitLabel}</button>
     ${below}
     <button class="back">&larr; Back</button>
