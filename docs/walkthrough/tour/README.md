@@ -226,126 +226,136 @@ A forced read past two caches — the kiosk's own roster copy and the server's c
 
 ## Act 4 — The second child
 
-### 22. Add a brother or sister
+### 22. Find a brother or sister
 
 *A family the church already has, growing*
 
-The journey the first design treated as impossible: a parent whose next child is finally old enough to attend. They start here rather than at the front door, because they have already found their family by phone and tapped a name — and this is the one screen where the kiosk knows which family is standing in front of it. The offer sits below the main action in the smaller weight, being the rarer of the two things somebody came here to do.
+A parent looking at one name who knows there should be two. The kiosk offers the siblings it can see, ticked, above the button — but that guess is deliberately conservative and so it misses people: a child on a different number, a family split across two households, somebody added by hand last week, a second child who is finally old enough. All of them arrive here, on the one screen where the kiosk knows which family is standing in front of it. It sits below the main action in the smaller weight, being the rarer of the two things somebody came here to do.
 
-![Add a brother or sister — wide](shots/wide-22-add-a-brother-or-sister.png)
+![Find a brother or sister — wide](shots/wide-22-find-a-brother-or-sister.png)
 
-<img src="shots/tall-22-add-a-brother-or-sister.png" width="320" alt="Add a brother or sister — tall">
+<img src="shots/tall-22-find-a-brother-or-sister.png" width="320" alt="Find a brother or sister — tall">
 
-### 23. Two questions, and no adult at all
+### 23. Both readings of the same question
+
+*A family the church already has, growing*
+
+This used to be a link straight to the registration form, which read as one thing and did another: "add a brother or sister" is plainly an instruction to include another of my children in this check-in, and it answered by asking a new child's name and grade. Both readings are real, so the screen holds both — the search finds the sibling the kiosk simply failed to associate, and the standing offer underneath registers the one who genuinely is not on the roster.
+
+![Both readings of the same question — wide](shots/wide-23-both-readings-of-the-same-question.png)
+
+<img src="shots/tall-23-both-readings-of-the-same-question.png" width="320" alt="Both readings of the same question — tall">
+
+### 24. Two questions, and no adult at all
 
 *A family the church already has, growing*
 
 No name, no phone number, no second household invented — the confirm names the siblings this child is joining and that is the whole of it. The kiosk resolved the family from the four digits it searched with; the server re-verifies every one of those ids before believing any of them. At approval the household comes from an existing sibling, which is the fix for a real bug: a family gaining a second child used to gain a second *household*, with the first child left behind in the original and invisible from the new one.
 
-![Two questions, and no adult at all — wide](shots/wide-23-two-questions-and-no-adult-at-all.png)
+![Two questions, and no adult at all — wide](shots/wide-24-two-questions-and-no-adult-at-all.png)
 
-<img src="shots/tall-23-two-questions-and-no-adult-at-all.png" width="320" alt="Two questions, and no adult at all — tall">
+<img src="shots/tall-24-two-questions-and-no-adult-at-all.png" width="320" alt="Two questions, and no adult at all — tall">
 
 ## Act 5 — The review
 
-### 24. The door records; a person decides
+### 25. The door records; a person decides
 
 *Core team, on a weekday*
 
 Everything the last three acts created is here, and *none* of it has reached Planning Center. Every registered child is written held, and that hold is the only thing gating the push — both backends, both sweeps, the on-create trigger, the re-create repair. The reason is that nothing upstream is reversible: there is no delete anywhere in this codebase, and the second backend has no merges at all. A public screen with a queue behind it should not be settling identity.
 
-![The door records; a person decides — wide](shots/wide-24-the-door-records-a-person-decides.png)
+![The door records; a person decides — wide](shots/wide-25-the-door-records-a-person-decides.png)
 
-<img src="shots/tall-24-the-door-records-a-person-decides.png" width="320" alt="The door records; a person decides — tall">
+<img src="shots/tall-25-the-door-records-a-person-decides.png" width="320" alt="The door records; a person decides — tall">
 
-### 25. The form as the family typed it
+### 26. The form as the family typed it
 
 *Core team, on a weekday*
 
 The children with their grades, the guardian, and the four digits — and the phone number, which is the one place in Tally a parent's number lives. It waits on a functions-only document with a thirty-day sweep, deleted the moment a reviewer decides, because deferring the push would otherwise lose the guardian entirely: the security rules forbid a parent's name or number on a student document, deliberately, and there is nowhere else for it to go.
 
-![The form as the family typed it — wide](shots/wide-25-the-form-as-the-family-typed-it.png)
+![The form as the family typed it — wide](shots/wide-26-the-form-as-the-family-typed-it.png)
 
-<img src="shots/tall-25-the-form-as-the-family-typed-it.png" width="320" alt="The form as the family typed it — tall">
+<img src="shots/tall-26-the-form-as-the-family-typed-it.png" width="320" alt="The form as the family typed it — tall">
 
-### 26. This might be the Jacob Smith we already have
+### 27. This might be the Jacob Smith we already have
 
 *Core team, on a weekday*
 
 The door recorded the suspicion and did nothing about it, which is the change. It used to refuse the registration and tell the family to "search for their name instead" — an instruction to check in a different child of the same name, on an unattended screen. Two rows a reviewer merges on Tuesday is the cheaper mistake, and the only one anybody notices. The grade beside each candidate is what actually tells two children apart.
 
-![This might be the Jacob Smith we already have — wide](shots/wide-26-this-might-be-the-jacob-smith-we-already-have.png)
+![This might be the Jacob Smith we already have — wide](shots/wide-27-this-might-be-the-jacob-smith-we-already-have.png)
 
-<img src="shots/tall-26-this-might-be-the-jacob-smith-we-already-have.png" width="320" alt="This might be the Jacob Smith we already have — tall">
+<img src="shots/tall-27-this-might-be-the-jacob-smith-we-already-have.png" width="320" alt="This might be the Jacob Smith we already have — tall">
 
-### 27. Approval is a replay, in the right order
+### 28. Approval is a replay, in the right order
 
 *Core team, on a weekday*
 
 Every child first, then **one** call to build the family — approving child by child would mint one household per sibling, the exact failure the family write exists to avoid. The hold comes off before the push rather than after it, which looks like the risky order and is the safe one: a push that fails after approval leaves an ordinary queued student that the Settings sweep already understands.
 
-![Approval is a replay, in the right order — wide](shots/wide-27-approval-is-a-replay-in-the-right-order.png)
+![Approval is a replay, in the right order — wide](shots/wide-28-approval-is-a-replay-in-the-right-order.png)
 
-<img src="shots/tall-27-approval-is-a-replay-in-the-right-order.png" width="320" alt="Approval is a replay, in the right order — tall">
+<img src="shots/tall-28-approval-is-a-replay-in-the-right-order.png" width="320" alt="Approval is a replay, in the right order — tall">
 
-### 28. And the other answer
+### 29. And the other answer
 
 *Core team, on a weekday*
 
 Discarding takes the children off the roster and forgets the phone number — the sentence comes before the second press, because that half is not reversible. The students go inactive rather than away: every attendance record points at these documents, and deleting one would silently drop a head count somebody has already reported to a room full of parents.
 
-![And the other answer — wide](shots/wide-28-and-the-other-answer.png)
+![And the other answer — wide](shots/wide-29-and-the-other-answer.png)
 
-<img src="shots/tall-28-and-the-other-answer.png" width="320" alt="And the other answer — tall">
+<img src="shots/tall-29-and-the-other-answer.png" width="320" alt="And the other answer — tall">
 
 ## Act 6 — The rest of the week
 
-### 29. The same job, without a kiosk
+### 30. The same job, without a kiosk
 
 *A counselor at a door*
 
 Check-in is the home screen, because a counselor at a door should never have to navigate to start working. It opens on the regulars rather than the whole ministry — a student who comes every Friday is one tap away, and the rest of the roster is one tap behind that. This is the screen most people who install Tally will only ever see.
 
-![The same job, without a kiosk — wide](shots/wide-29-the-same-job-without-a-kiosk.png)
+![The same job, without a kiosk — wide](shots/wide-30-the-same-job-without-a-kiosk.png)
 
-<img src="shots/tall-29-the-same-job-without-a-kiosk.png" width="320" alt="The same job, without a kiosk — tall">
+<img src="shots/tall-30-the-same-job-without-a-kiosk.png" width="320" alt="The same job, without a kiosk — tall">
 
-### 30. One student, and the history under them
+### 31. One student, and the history under them
 
 *Core team*
 
 Names, grades and allergies are read live from the church's own database rather than mirrored here — Tally stores the membership and the attendance, and nothing about who somebody is. "Every night they came" underneath reaches back as far as the records go, further than the calendar the screens above keep loaded, and it unions the history of any duplicate row merged into this one.
 
-![One student, and the history under them — wide](shots/wide-30-one-student-and-the-history-under-them.png)
+![One student, and the history under them — wide](shots/wide-31-one-student-and-the-history-under-them.png)
 
-<img src="shots/tall-30-one-student-and-the-history-under-them.png" width="320" alt="One student, and the history under them — tall">
+<img src="shots/tall-31-one-student-and-the-history-under-them.png" width="320" alt="One student, and the history under them — tall">
 
-### 31. A call list, not a report
+### 32. A call list, not a report
 
 *Core team*
 
 Students who have missed three gatherings in a row, first-timers from the last week, profiles nobody can be reached about. Split by gathering, for the same reason prediction is: a student who comes every Sunday and has never been to a Friday has missed nothing, and the pooled version phoned their family about it.
 
-![A call list, not a report — wide](shots/wide-31-a-call-list-not-a-report.png)
+![A call list, not a report — wide](shots/wide-32-a-call-list-not-a-report.png)
 
-<img src="shots/tall-31-a-call-list-not-a-report.png" width="320" alt="A call list, not a report — tall">
+<img src="shots/tall-32-a-call-list-not-a-report.png" width="320" alt="A call list, not a report — tall">
 
-### 32. Where the church's database is connected
+### 33. Where the church's database is connected
 
 *Core team*
 
 Two backends, either or both, with what is queued and what is *waiting to be reviewed* counted separately — a family held for a person is not a stuck push, and saying "3 queued" about them would teach somebody to ignore the line that means it. The link from here is how most reviewers will find the screen in Act 5.
 
-![Where the church's database is connected — wide](shots/wide-32-where-the-church-s-database-is-connected.png)
+![Where the church's database is connected — wide](shots/wide-33-where-the-church-s-database-is-connected.png)
 
-<img src="shots/tall-32-where-the-church-s-database-is-connected.png" width="320" alt="Where the church's database is connected — tall">
+<img src="shots/tall-33-where-the-church-s-database-is-connected.png" width="320" alt="Where the church's database is connected — tall">
 
-### 33. How the lobby screen gets its identity
+### 34. How the lobby screen gets its identity
 
 *Any active member*
 
 The kiosk shows a six-character code and polls; whoever types it here hands the kiosk a session bound to their own account, and every check-in it records from then on carries their name. Open to any active member, not just the core team — the person setting up the lobby screen on a Friday evening is a counselor.
 
-![How the lobby screen gets its identity — wide](shots/wide-33-how-the-lobby-screen-gets-its-identity.png)
+![How the lobby screen gets its identity — wide](shots/wide-34-how-the-lobby-screen-gets-its-identity.png)
 
-<img src="shots/tall-33-how-the-lobby-screen-gets-its-identity.png" width="320" alt="How the lobby screen gets its identity — tall">
+<img src="shots/tall-34-how-the-lobby-screen-gets-its-identity.png" width="320" alt="How the lobby screen gets its identity — tall">

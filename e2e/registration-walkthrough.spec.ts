@@ -268,12 +268,27 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
       await shoot({
         flow: 'The second child',
         state: 'On the confirm screen',
-        title: 'Add a brother or sister',
+        title: 'Find a brother or sister',
         caption:
           'A parent whose next child is finally old enough starts here, not at the front door: they have already found their family by phone and tapped a name. The offer sits below the main action in the smaller weight, because it is the rarer of the two things somebody came to this screen to do — and it is on this screen at all because this is where the kiosk knows which family is standing in front of it.',
       });
 
-      await kiosk.getByRole('button', { name: /Add a brother or sister/i }).click();
+      /*
+       * The link asks the ambiguous question first, on purpose. "A brother or
+       * sister" is far more often one the roster already has and four digits
+       * simply failed to associate than one nobody has met — so the search
+       * comes first, and registering is the answer standing underneath it.
+       */
+      await kiosk.getByRole('button', { name: /Find a brother or sister/i }).click();
+      await shoot({
+        flow: 'The second child',
+        state: 'Searching the roster first',
+        title: 'The cheaper answer, offered first',
+        caption:
+          'Both readings of that link are real journeys. The common one is a sibling already on the roster whom the phone search did not surface — the church has them, the family folk simply do not line up — and finding them costs nothing and creates nothing. So this screen searches by name, shows the family\'s own rows greyed and inert so nobody taps a child twice, and keeps "add a new child" as a standing offer rather than the destination. A registration is the expensive answer and it is one tap further away.',
+      });
+
+      await kiosk.getByRole('button', { name: /Not on the list\? Add a new child/i }).click();
       await typeOnKiosk(kiosk, 'Emeka');
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.locator('[data-key="clear"]').click();

@@ -80,6 +80,18 @@ export function SearchScreen({
   const closed = windowHasClosed(binding, Date.now());
 
   /*
+   * The no-match panel is showing this same offer, in the same words, as its
+   * primary button — so the standing one steps aside rather than appearing
+   * twice on one screen a hand's width apart.
+   *
+   * Its *row* stays, empty. This file promises that a keystroke changes text
+   * and never geometry, and a row that vanished the moment a search matched
+   * nobody would move the keyboard under a thumb already on its way down.
+   */
+  const offeredAbove =
+    (outcome.mode === 'phone' || outcome.mode === 'name') && outcome.results.length === 0;
+
+  /*
    * A row commits on lift, not on contact, because this list scrolls — see
    * components/tapGuard.ts for why that has to be, and what counts as a tap.
    */
@@ -313,18 +325,20 @@ export function SearchScreen({
         * promise this file makes about geometry: present from the first paint,
         * so it cannot be the thing that moves when a keystroke lands.
         */}
-      <div className="flex h-14 items-center justify-center px-6 pb-1">
-        <button
-          type="button"
-          tabIndex={-1}
-          onPointerDown={() => {
-            haptic(8);
-            onRegister();
-          }}
-          className="flex h-12 items-center justify-center rounded-xl bg-brand-600/15 px-6 text-base font-semibold text-brand-300 ring-1 ring-brand-500/40 active:bg-brand-600/30"
-        >
-          First time here? Register your child
-        </button>
+      <div className="flex h-12 items-center justify-center px-6">
+        {!offeredAbove && (
+          <button
+            type="button"
+            tabIndex={-1}
+            onPointerDown={() => {
+              haptic(8);
+              onRegister();
+            }}
+            className="flex h-11 items-center justify-center rounded-xl bg-brand-600/15 px-6 text-base font-semibold text-brand-300 ring-1 ring-brand-500/40 active:bg-brand-600/30"
+          >
+            First time here? Register your child
+          </button>
+        )}
       </div>
 
       <Keyboard onKey={onKey} />

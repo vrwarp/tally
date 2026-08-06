@@ -121,9 +121,14 @@ wait on a functions-only document with a thirty-day TTL until then — the one p
 number lives, and [documented as the exception it is](docs/data-model.md#kioskregistrationsregistrationid).
 
 **Journey 2½ — the second child.** A parent whose next child is finally old enough finds their family
-by phone as usual, taps a name, and gets "add a brother or sister" on the confirm screen: two
-questions, because the kiosk already knows which family this is and the household upstream already
-holds their parent. The siblings it names go with the registration, the server re-verifies them, and
+by phone as usual, taps a name, and gets **"Find a brother or sister"** on the confirm screen. That
+link asks the ambiguous question first, because it has two honest answers: the sibling is often
+already on the roster and simply did not come up under four digits, and searching is a cheaper, safer
+answer than registering a second copy of a child the church already has. So it opens a name search
+over the roster — the family's own rows shown but inert — with **"Not on the list? Add a new child"**
+standing under it. Only that second answer starts a registration, and it asks two questions rather
+than six: the kiosk already knows which family this is, and the household upstream already holds
+their parent. The siblings it names go with the registration, the server re-verifies them, and
 approval joins **their** household rather than founding a second one for the same family.
 
 And a kiosk cannot write any of it directly: the security rules pin what a lobby session may put on a
