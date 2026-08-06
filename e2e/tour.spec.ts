@@ -583,7 +583,11 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       });
 
       await hold(kiosk, 'button:has-text("Hold to collect all 3")');
-      await expect(kiosk.getByText(/collected/i).first()).toBeVisible({ timeout: 30_000 });
+      // The words the success screen actually uses for a pickup — it says
+      // "checked out", never "collected", which is what the button said.
+      await expect(kiosk.getByText(/checked out\. See you next time/i)).toBeVisible({
+        timeout: 30_000,
+      });
       await shoot(kiosk, 'kiosk', {
         act: 'Going home',
         who: 'The same family, three hours later',
