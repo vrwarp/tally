@@ -379,10 +379,26 @@ test.describe('when the backend will not take them', () => {
     }
   });
 
-  test('shows the reader an error rather than an empty queue when the list cannot be read', async ({
-    page,
-    signedInAs,
-  }) => {
+});
+
+/*
+ * Its own context, because the only way to cut this one call is to intercept
+ * it, and Tally ships a service worker that registers itself immediately.
+ * `page.route` cannot see a request that has passed through one on WebKit —
+ * Chromium intercepts below the worker and WebKit does not — so the abort
+ * simply never fired there, the callable answered normally, and the spec spent
+ * thirty seconds waiting for a banner the app had no reason to draw. It read
+ * as an app that swallows its errors on Safari, which is worse than useless in
+ * a spec whose whole subject is not lying to a reviewer.
+ *
+ * Blocking the worker is not blocking anything this test is about: the review
+ * screen never asks it for anything, and the request the abort is aimed at is
+ * a cross-origin POST the worker only ever passes through.
+ */
+test.describe('when the list itself cannot be read', () => {
+  test.use({ serviceWorkers: 'block' });
+
+  test('shows the reader an error rather than an empty queue', async ({ page, signedInAs }) => {
     await signedInAs('core');
     // The callable never answers. "Nothing waiting" would be a lie a reviewer
     // acts on by going home.
@@ -470,8 +486,20 @@ test.describe('merges that must be refused', () => {
        * cannot be reached at all, so the click accepts either.
        */
       await expect(card.getByText(/shares this name/i)).toBeVisible();
+      /*
+       * By the evidence line, not by the candidate's name. The name is the one
+       * thing about a candidate this spec cannot predict — it lives upstream,
+       * and the callable prints "A student on the roster" instead whenever the
+       * backend cannot be reached. Matching the child's own first name as the
+       * alternative looked like it covered both spellings and did not: "None of
+       * them — Chidera is new" carries that name too, and is the button the
+       * spec then pressed on any run where the upstream name *did* resolve. It
+       * resolved on WebKit and not on Chromium, so the suite disagreed with
+       * itself about a merge that had never happened. Only a candidate chip
+       * says anything about phone digits.
+       */
       await card
-        .getByRole('button', { name: new RegExp(`Chidera|A student on the roster`, 'i') })
+        .getByRole('button', { name: /phone digits on file/i })
         .first()
         .click();
 
@@ -513,8 +541,15 @@ test.describe('merges that must be refused', () => {
       await gotoReady(page, '/review');
       const card = cardFor(page, `Elsa ${surname}`);
       await expect(card).toBeVisible({ timeout: 30_000 });
-      // No offer at all: a child cannot be a duplicate of themselves.
-      await expect(card.getByRole('button', { name: /already on the roster/i })).toHaveCount(0);
+      /*
+       * No offer at all: a child cannot be a duplicate of themselves. Asserted
+       * against what the screen actually prints — the heading above the picker
+       * and the evidence line inside a chip. The phrase this used to look for,
+       * "already on the roster", is nowhere in the review screen, so the
+       * assertion passed on every page including one that offered the merge.
+       */
+      await expect(card.getByText(/shares this name/i)).toHaveCount(0);
+      await expect(card.getByRole('button', { name: /phone digits on file/i })).toHaveCount(0);
     } finally {
       await removeRegistration(registrationId, 1);
     }
@@ -523,6 +558,17 @@ test.describe('merges that must be refused', () => {
 
 test.describe('shapes the screen has to survive', () => {
   test('a family of ten children stays decidable', async ({ page, signedInAs }) => {
+    /*
+     * The heaviest spec in the suite, and the only one that has to wait for ten
+     * separate upstream creations: the approval replays the children one at a
+     * time on purpose, so the wall clock here is ten round trips to a backend
+     * plus the ten `onStudentCreated` invocations behind them. On an idle
+     * machine that fits inside the default minute; on a loaded CI runner it
+     * does not, and the failure it produced was a bare "test timeout" that said
+     * nothing about which of the two halves was slow. Slow by nature, declared
+     * rather than discovered.
+     */
+    test.slow();
     const surname = `Achterberg${RUN}`;
     const registrationId = `stress-many-${RUN}`;
     await signedInAs('core');

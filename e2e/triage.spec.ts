@@ -185,7 +185,11 @@ test.describe('deciding a family', () => {
       // No door to open: the candidates are the comparison, so they are on the
       // screen before anybody presses anything.
       await expect(card.getByText(/shares this name/i)).toBeVisible();
-      await card.getByRole('button', { name: new RegExp(existing.firstName, 'i') }).first().click();
+      // By the evidence line, which only a candidate chip carries. The child's
+      // own first name reaches the escape hatch too — "None of them — Amara is
+      // new" — and which of the two `.first()` returned depended on whether the
+      // candidate's name had resolved upstream that run.
+      await card.getByRole('button', { name: /phone digits on file/i }).first().click();
 
       // Named, not just "Merged": a reviewer inheriting this queue has to be
       // able to see which row the child is now part of.

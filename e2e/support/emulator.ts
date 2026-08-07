@@ -39,14 +39,40 @@ export async function waitForHttp(url: string, label: string, timeoutMs = 120_00
   throw new Error(`${label} never became ready at ${url} (last error: ${lastError}).`);
 }
 
-/** Wipes every document. The emulator exposes this; production has no equivalent. */
+/**
+ * Wipes every document. The emulator exposes this; production has no equivalent.
+ *
+ * The retry on 409 is not defensiveness for its own sake. The emulator refuses
+ * to clear while it is still winding down work from before — a listener stream
+ * belonging to a browser that was killed rather than closed, most often — and
+ * it lets go a second or two later. That is exactly the state a timed-out test
+ * leaves behind, and Playwright's answer to a timed-out test is to discard the
+ * worker and start a new one, which runs this again from the `seededWorld`
+ * fixture. Without the wait, one slow test failed the four tests after it, one
+ * of them in a different file, each in 0ms and none of them for its own
+ * reasons.
+ */
 export async function clearFirestore(): Promise<void> {
-  const response = await fetch(
-    `http://127.0.0.1:${E2E.firestore}/emulator/v1/projects/${E2E.projectId}/databases/(default)/documents`,
-    { method: 'DELETE', headers: ADMIN },
-  );
-  if (!response.ok) {
-    throw new Error(`Could not clear Firestore: HTTP ${response.status}.`);
+  const deadline = Date.now() + 30_000;
+  let attempts = 0;
+
+  for (;;) {
+    const response = await fetch(
+      `http://127.0.0.1:${E2E.firestore}/emulator/v1/projects/${E2E.projectId}/databases/(default)/documents`,
+      { method: 'DELETE', headers: ADMIN },
+    );
+    if (response.ok) return;
+    attempts += 1;
+
+    // Anything other than "busy" is a real answer, and repeating it will not
+    // change it.
+    if (response.status !== 409 || Date.now() >= deadline) {
+      throw new Error(
+        `Could not clear Firestore: HTTP ${response.status}` +
+          (attempts > 1 ? `, still after ${attempts} attempts over 30s.` : '.'),
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
   }
 }
 
