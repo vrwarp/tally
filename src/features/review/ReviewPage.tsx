@@ -753,12 +753,21 @@ function ChildRow({
       */}
       {child.mergedIntoStudentId && child.studentId ? (
         <div className="mt-2 ml-12 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          {/*
+            The emphasis belongs to the name, not to the slot. Lifting "a row
+            on the roster" a step up the ramp put the brightest run in the row
+            on a phrase that names nobody — the treatment reserved for a person,
+            applied to the absence of one.
+          */}
           <span className={CAPTION}>
-            Merged into{' '}
-            <span className="text-ink-300">
-              {keeperLabel(child) ?? 'a row on the roster'}
-            </span>
-            . Their check-ins are kept together.
+            {keeperLabel(child) ? (
+              <>
+                Merged into <span className="text-ink-300">{keeperLabel(child)}</span>. Their
+                check-ins are kept together.
+              </>
+            ) : (
+              'Merged into another row on the roster. Their check-ins are kept together.'
+            )}
           </span>
           {/*
             A real target, not an inline link: this is the control that
