@@ -594,9 +594,23 @@ test.describe('shapes the screen has to survive', () => {
       }
       // And the decision is still reachable without leaving the card.
       await approve(card);
+      /*
+       * Two minutes, not the default one, and `test.slow()` above is what pays
+       * for it: declaring the *test* slow tripled its budget to three minutes
+       * but left this poll on its own minute, so the thing that actually
+       * expired on a loaded runner was the poll — two of the ten children
+       * upstream when it gave up, with the other eight still in flight behind
+       * ten sequential round trips. Raising the test timeout without raising
+       * this one bought nothing.
+       *
+       * Still bounded well inside the test's budget rather than left to run
+       * out with it: a poll that outlives its test fails with a bare timeout
+       * that names neither half, which is the failure this spec was already
+       * once rewritten to stop producing.
+       */
       await expect
         .poll(async () => (await simulatorPeople()).filter((p) => p.last_name === surname).length, {
-          timeout: 60_000,
+          timeout: 120_000,
           message: 'all ten children reach Planning Center',
         })
         .toBe(10);
