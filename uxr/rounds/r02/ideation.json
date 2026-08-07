@@ -1,0 +1,114 @@
+{
+  "changes": [
+    {
+      "scene": "review",
+      "viewport": "both",
+      "addresses": [
+        "blocker (phone): the commit target is the same rectangle as the arm target and arming causes no layout movement, so a repeat tap on an apparently-unresponsive control is the irreversible one",
+        "major (desktop): 100% of the arm rectangle is inside the commit rectangle, and nothing above the foot marks the card as armed"
+      ],
+      "change": "Arming now rebuilds the foot instead of relabelling it. The armed foot is a warn-tinted, warn-ringed block containing, top to bottom: Cancel (48px, full width on touch), the consequence sentence at text-sm text-warn-400, then the commit. On the phone the arm button sat at the block's y; Cancel now occupies y+12 to y+60, so the repeat tap lands on the safe control, and the commit is 132px lower with the sentence between. On the desktop the repeat click's centre falls inside Cancel and the commit is 100px below. The armed card also carries a card-level state legible across the two-column page: ring-ink-800 → ring-warn-500/50 on the section, and a warn 'Confirm to add' badge in the header slot the other cards use. The card grows ~90px on arming, so the state is visible as movement too.",
+      "rationale": "The only shape where the previous tap point is occupied by something safe rather than by nothing. The sentence above the commit means eye and thumb cross it; Cancel above the sentence means a doubled tap cancels rather than commits, which is the correct failure. Not simply a gap: a gap is a number that survives until the next copy change, whereas swapping the slots is a fact about the state.",
+      "breakpoint": "both — the armed foot is a column at every width, unlike the resting foot which becomes a row at lg. The commit must never sit at the arm's coordinates on a pointer either.",
+      "implementation": "ReviewPage.tsx, RegistrationCard. Add confirmingApprove beside confirmingDiscard; the primary's onClick arms, only the commit calls onApprove. When armed: Card className ring-warn-500/50, CardHeader action Badge tone=warn 'Confirm to add', and the foot renders a warn-tinted block holding ghost Cancel → warn sentence → primary commit, each min-h-12 w-full lg:w-auto. Same treatment for the existing discard confirm."
+    },
+    {
+      "scene": "review",
+      "viewport": "both",
+      "addresses": [
+        "blocker (desktop): the push-failed card offers two controls, neither of which touches the guardian collision it diagnoses"
+      ],
+      "change": "The push-failed card's foot now matches its diagnosis. 'Approve and add' is gone from this card — retrying is what failed. In its place three captioned instruments: (1) 'Use the <parent> already there', primary, spanning the card at lg, captioned as putting the children in the household the backend already holds and making no second parent; (2) 'Add <child> without a parent', the deliberate parentless path, captioned with the outcome the old primary hid; (3) 'Not ours', captioned to say which child is already upstream and cannot be removed by it. The danger strip stops being a raw error string and names the collision and the split state.",
+      "rationale": "Of the three instruments the critic would accept, the first is the one a reviewer actually wants — the collision is almost always the same adult under an older household record, and naming them is what lets a person judge it. The other two remain because naming the person is not always enough: sometimes it is a spouse or a stranger. Editing the phone number and retrying was a fourth option, left out: it makes this the one screen where a reviewer alters a family's data, and the collision is usually not a typo.",
+      "breakpoint": "both. At lg the resolution spans both foot columns and the other two share the row below; on the phone all three stack with their sentences between.",
+      "implementation": "Server: listPendingRegistrations should return lastError structured — { code: 'guardian_conflict' | …, message, conflict?: { personId, name, householdName } }. Without conflict.name the first control cannot be labelled and should not render. approveRegistration needs a guardian directive: { mode: 'existing', personId } attaches the held children to that person's household and creates no new person; { mode: 'none' } pushes the children with no household, recorded deliberately. NOTE (implementer): the 'none' half of this is already shipped as `withoutGuardian`, tested, with the record and the number released on success; the 'existing' half and the structured error are not."
+    },
+    {
+      "scene": "review",
+      "viewport": "both",
+      "addresses": [
+        "major (phone): 'Not ours' is the lowest, easiest target on every card, fires destructively, and the only sentence near it describes the other button",
+        "major (phone): the first card's primary is the most thumb-reachable target at scroll 0 and its warning sentence is sliced in half by the sticky tab bar",
+        "minor (desktop): the caption's measure is whatever width is left over, so four of five feet end on an orphaned 'back.' beside a 350px void"
+      ],
+      "change": "The foot is a set of decisions, each a sentence over the control that causes it. 'Not ours' is captioned like the primary and the caption sits above its button on both controls. Below lg the decisions stack with gap-5 between and gap-1.5 inside, so a caption cannot be read as belonging to the button above it; at lg they become a two-column grid with the buttons bottom-aligned. At scroll 0 on the phone the sentence is now fully legible above the nav and the button is what is clipped, instead of the other way round.",
+      "rationale": "Caption-above answers three findings with one move: the sentence is no longer the element that falls off the end of the screen, no longer inside the patch a right thumb occludes, and its measure is decided by a grid column rather than by what the buttons left over. Head-room was not added — that only moves which card is cut, and what matters is that the thing cut is the control, not the warning. The controls were not reordered to put the safe one lowest: neither is safe, and both now arm.",
+      "breakpoint": "both. Stack below lg, two columns at lg.",
+      "implementation": "ReviewPage.tsx: replace the flex-wrap foot and trailing confirm <p> with a column that becomes lg:grid lg:grid-cols-2, containing a local Decision({caption, children}) = caption <p> over the Button, each Button mt-auto min-h-12 w-full lg:w-auto. The discard caption names the children still held and formatPhone(row.guardian.phone), and drops the number when there is no guardian. The longer discard sentence moves to the confirmingDiscard step."
+    },
+    {
+      "scene": "review",
+      "viewport": "both",
+      "addresses": [
+        "design major: the reason a card is in the queue is told in four registers — badge+strip restating each other on one card, badge only on another, an undecorated paragraph in the same slot on a third, nothing on two more"
+      ],
+      "change": "One object in that slot, in one register, present or absent — and every card with a state has both halves. The sibling-join card gains a neutral badge ('Joins a family on file') and its bare paragraph becomes a tinted, ringed block in the same shape as the warn and danger strips. The duplicate card gains the strip its badge could not carry. The expiring card's strip stops repeating its badge and carries the consequence instead. The one genuinely routine card still has neither, so absence stays meaningful.",
+      "rationale": "Badge = the state in two or three words; strip = the consequence the badge cannot fit; row = the local fact and the local control. Three levels, three jobs, no sentence said twice. The neutral register for the sibling card is deliberate: approving it does the right thing automatically, so it is a fact and not a warning, and giving it warn would break the rule that colour means severity.",
+      "breakpoint": "both",
+      "implementation": "ReviewPage.tsx: pass action to CardHeader for every stateful branch — warn '{daysLeft} days left' when expiringSoon, warn 'Possible duplicate' when any child has unresolved possibleDuplicates, danger 'Push failed' on lastError, neutral 'Joins a family on file' when row.anchors.length > 0. The anchors paragraph gets the strip shape (bg-ink-800/50, ring-ink-700, text-ink-300). Add the duplicate strip alongside the existing ones."
+    },
+    {
+      "scene": "review",
+      "viewport": "both",
+      "addresses": [
+        "blocker (both): the second merge option is labelled 'A student on the roster' and identifies nobody",
+        "design minor: the three merge options promise a parallel list and do not deliver one"
+      ],
+      "change": "The label is a real name and grade, same construction as the first option, with a grade that matches the registering child's so the picker has a discoverable right answer rather than a coin toss. The escape hatch moved out of the candidate list: candidates live in the <ul>, 'None of them — <child> is new' sits full width below it, so the set the reader compares is records of one kind rather than records and a verb.",
+      "rationale": "The naming is fixed in the backend, so the prototype only has to stop showing the placeholder. Separating the escape hatch is the other half of the same finding: it was pixel-identical to a candidate and it is not one.",
+      "breakpoint": "both",
+      "implementation": "summaryLabel() keeps its !summary.known fallback as a genuine last resort — with listPendingRegistrations batching name lookups it should not fire. Move the 'None of them' button out of the <ul>, keeping its quieter chrome against the candidates'."
+    },
+    {
+      "scene": "review",
+      "viewport": "desktop",
+      "addresses": [
+        "major (desktop): the merge options stack when a 568px column does not require it",
+        "minor (desktop): the right column stops at y≈1035 while the left runs to 1590, leaving 568×555 of page with nothing closing it",
+        "minor (desktop): the 16px gutter between two independent irreversible decisions is the same as a card's own internal padding"
+      ],
+      "change": "Candidate options go two-up at lg when there is more than one; a single candidate stays full width, because one button in a two-track grid reads as a missing option. The page gutter goes gap-4 → lg:gap-8, so the outer gap is the biggest in the composition. The grid's trailing empty cell is filled by an end-of-queue note, self-stretched so the grid ends on a straight edge: 'That is all 5. Nothing else is waiting to be reviewed.'",
+      "rationale": "The end cap is the cheapest option and the only one that does not make the layout depend on the parity of the queue length; letting the last card span both columns when the count is odd changes card width as families are cleared. The note is useful on the phone too, so it is not gated — it is the one thing the queue never said.",
+      "breakpoint": "lg and up for the two-up options and the gutter; the end note renders at both widths.",
+      "implementation": "PageFrame gains lg:gap-8. In ChildRow the candidate <ul> becomes lg:grid lg:grid-cols-2 when candidates.length > 1. After queue.map(...), render a dashed end-of-queue note, lg:self-stretch."
+    },
+    {
+      "scene": "review",
+      "viewport": "both",
+      "addresses": [
+        "design minor: the merge block starts at the child row's padding edge, so the candidate name sits 36px left of the child's own name",
+        "design minor: the header state badge and the child-row badge are the same object, and 'Merged' grey beside 'Added' green splits one class of fact across two registers"
+      ],
+      "change": "The merge block gains ml-9, which puts its divider at the avatar's right edge and lands the candidate label at the same x as the child's own name, so the two names being compared are on one axis. Both row badges are now neutral: 'Merged' and 'Added' are settled facts, so colour in the badge vocabulary means severity at every scope — coloured badges are header badges and mean 'needs attention', neutral means 'nothing to decide'.",
+      "rationale": "Both are one-token changes that were obviously right. The 'Added' green carried real weight on the push-failed card — it is the child already upstream — but that fact is now stated in prose in the danger strip and in the discard caption, which is where a reviewer needs it, and it no longer has to be inferred from a green chip 115px from a red one of the same shape.",
+      "breakpoint": "both",
+      "implementation": "ChildRow: the picker wrapper becomes mt-3 ml-9 border-t border-ink-800 pt-3. Badge tone success → neutral on 'Added'."
+    }
+  ],
+  "declined": [
+    {
+      "finding": "give every card that has a state a badge — including the expiring card, which has a deadline badge and an unmarked duplicate in its second child's row",
+      "why": "Tried and backed out. Two badges leave 150px for the title in a 358px phone header, which wraps the guardian's name onto two lines on the card the queue is sorted to put first. The badge shows the governing state; the second is carried by the warn heading in the child row where its control lives. Worth revisiting if CardHeader ever gets a badge lane that wraps below the title."
+    },
+    {
+      "finding": "put the grade inline with the name in child rows — roughly 85px comes off row 1 and lifts a third card above the fold",
+      "why": "Measured, and it saves 2px, not 16. The row's floor is the 36px avatar, not the text: the two-line name/grade stack is 38px, so pulling the grade up leaves the avatar setting the same height. It would also undo round 1's split of the allergy onto its own line. The two-up picker is the part of that direction that pays, and it is done."
+    },
+    {
+      "finding": "the leader can act on two families without scrolling; three would be better",
+      "why": "Still two, and the arithmetic went the other way: row 1 grew because the duplicate card gained the strip the design major asked for and every foot gained a captioned second control the phone major asked for. A third card above 900px needs ~110px off row 1, which can now only come out of the captions or the strips — the two things this round exists to add. Desktop page 1629 → 1931px, carrying three new instruments and four new sentences."
+    },
+    {
+      "finding": "'Not ours' is legible as a ghost through the translucent nav; an opaque nav would at least fail honestly",
+      "why": "Real, and shell-level: the translucency is in AppShell's bottom nav and would change all seven scenes on a finding raised against one. The half that is this scene's problem — the sentence being what is sliced — is fixed by putting the caption above its button, so what peeks under the nav is a solid rectangle nobody mistakes for complete."
+    },
+    {
+      "finding": "watch-line: the tallest card sat 25px inside the usable band, and the next thing that adds a line breaks 'a family fits a screen'",
+      "why": "Broken, deliberately, and worth saying plainly: cards are now 512–841px (phone page 3325 → 3982px). The growth is the captioned discard, the duplicate strip, the armed block and the third instrument — all mechanism the blockers and majors required. If height is to be reclaimed next round, the card header spends 64px stacking a name over 'Registered N ago' in a 358px row, and the dl spends 32px on a single Phone line."
+    },
+    {
+      "finding": "in row one the two cards end 8px apart, which looks like a misalignment; let the pair stretch to a common bottom",
+      "why": "The gap is now 34px, which reads as a difference rather than a near-miss, so the complaint is answered by content. Stretching to a common bottom would make card height a function of its neighbour — worse than an honest step."
+    }
+  ]
+}
