@@ -425,6 +425,8 @@ export interface RegistrationRecord {
   anchorStudentIds: string[];
   /** Why the last approval attempt did not finish, if one did not. */
   lastError: string | null;
+  /** Which half of the last approval failed — see `PendingRegistration`. */
+  lastErrorKind: 'children' | 'guardian' | 'both' | null;
 }
 
 function readStringArray(raw: unknown): string[] {
@@ -469,6 +471,12 @@ export function readRegistration(data: Record<string, unknown>): RegistrationRec
     ),
     anchorStudentIds: readStringArray(data.anchorStudentIds),
     lastError: typeof data.lastError === 'string' ? data.lastError : null,
+    lastErrorKind:
+      data.lastErrorKind === 'children' ||
+      data.lastErrorKind === 'guardian' ||
+      data.lastErrorKind === 'both'
+        ? data.lastErrorKind
+        : null,
   };
 }
 
@@ -723,6 +731,7 @@ export async function registerFamily(
     anchorStudentIds,
     possibleDuplicateOf: {},
     lastError: null,
+    lastErrorKind: null,
   };
 
   try {

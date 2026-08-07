@@ -742,6 +742,16 @@ export interface PendingRegistration {
   anchors: ReviewStudentSummary[];
   settled: boolean;
   lastError: string | null;
+  /**
+   * Which half of the last approval did not finish.
+   *
+   * The two halves want opposite instruments: children a backend refused are
+   * worth retrying, since the usual cause is an outage that has passed; an
+   * adult it refused usually cannot be retried into working, and the move that
+   * ends the job is to finish without them. Null on older records, which the
+   * screen reads as "offer both".
+   */
+  lastErrorKind?: 'children' | 'guardian' | 'both' | null;
 }
 
 /**

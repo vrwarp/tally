@@ -93,6 +93,20 @@ export interface PendingRegistration {
   settled: boolean;
   /** Why the last approval did not finish, if one did not. */
   lastError: string | null;
+  /**
+   * *Which half* did not finish, so a screen can offer the move that fits.
+   *
+   * A prose reason cannot be branched on, and the two halves want opposite
+   * instruments: children the backend refused are worth retrying, because the
+   * usual cause is an outage that has since passed. An adult it refused is
+   * usually refused for a reason no retry can fix — a number it already holds
+   * for somebody outside this household — and the move that ends the job is to
+   * finish without them. Offering "try again" for that is how a record reaches
+   * its thirtieth day still holding a phone number.
+   *
+   * Null when nothing has failed, `'children'`, `'guardian'`, or `'both'`.
+   */
+  lastErrorKind: 'children' | 'guardian' | 'both' | null;
 }
 
 /**
@@ -234,6 +248,7 @@ export async function listPendingRegistrations(
       anchors: await Promise.all(record.anchorStudentIds.map((id) => summarise(db, id))),
       settled: children.length > 0 && children.every((child) => !child.pendingReview),
       lastError: record.lastError,
+      lastErrorKind: record.lastErrorKind,
     });
   }
 
@@ -525,11 +540,16 @@ export async function approveRegistration(options: {
   const unfinished = failed > 0 || (record.guardian !== null && !guardianSettled);
 
   if (unfinished) {
+    const guardianFailed = record.guardian !== null && !guardianSettled;
     await ref.set(
       {
         lastError:
           guardianMessage ||
           `${failed} of ${live.length} children could not be added to ${backend.displayName}.`,
+        // Which half, so the screen can offer the move that fits rather than a
+        // retry for a refusal no retry can change. See `lastErrorKind`.
+        lastErrorKind:
+          failed > 0 && guardianFailed ? 'both' : guardianFailed ? 'guardian' : 'children',
         lastAttemptAt: at,
       },
       { merge: true },

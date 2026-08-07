@@ -334,6 +334,25 @@ describe('approving', () => {
     expect(record.lastError).toMatch(/Planning Center is down/);
     // Retryable: the guardian's details are still here to try again with.
     expect(record.guardian).toMatchObject({ phone: '5550103344' });
+    // And *which* half failed, so the screen offers finishing-without-the-adult
+    // rather than a retry of the refusal.
+    expect(record.lastErrorKind).toBe('guardian');
+  });
+
+  it('records which half failed when the children are the ones the backend refused', async () => {
+    const db = dbWithRegistration();
+    const pushStudent = vi.fn(async () => ({ status: 'skipped' as const }));
+    await approveRegistration({
+      db,
+      registry: registryOf(backendWith({ pushStudent } as unknown as Partial<PeopleBackend>)),
+      registrationId: ID,
+      uid: 'core-uid',
+      now: NOW,
+    });
+
+    // Worth retrying — the usual cause is an outage that has since passed —
+    // which is the opposite of the guardian case above.
+    expect(db.get(`${REGISTRATIONS_COLLECTION}/${ID}`)!.lastErrorKind).toBe('children');
   });
 
   it('can finish without the adult, for a household the backend will not build', async () => {
