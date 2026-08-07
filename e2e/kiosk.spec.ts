@@ -536,6 +536,47 @@ test.describe('the kiosk', () => {
       await context.close();
     }
   });
+
+  /**
+   * The staff gate, in a real browser — the only place its progress is real.
+   *
+   * The unit tests own the behaviour: a tap clears, a hold asks, a slide-off
+   * cancels. What they cannot see is the thing that decides whether anybody
+   * ever completes the gesture, because jsdom computes no pixels. The fill is
+   * CSS on `:active` (the keyboard subtree must not re-render), so it is
+   * invisible to every assertion except a screenshot — and a fill that
+   * composites to the pressed key's own colour is precisely the bug
+   * `expectProgressShows` was written for, which `hold` runs here.
+   */
+  test('changes event on a held Clear key, after asking', async ({
+    browser,
+    page,
+    signedInAs,
+  }) => {
+    await signedInAs('core');
+    const { context, page: kiosk } = await openKiosk(browser);
+
+    try {
+      await pairKiosk(kiosk, page);
+      await bindTo(kiosk, /nursery/i);
+
+      // The hold is the gate; the question is what makes a findable gate safe.
+      await hold(kiosk, '[data-key="clear"]');
+      await expect(kiosk.getByText(/Change event\?/i)).toBeVisible();
+      await expect(kiosk.getByText(/Nobody can check in here/i)).toBeVisible();
+
+      // Declining lands back on the search screen, still on the gathering —
+      // the queue standing at the kiosk loses the seconds and nothing else.
+      await kiosk.getByRole('button', { name: /Keep checking in/i }).click();
+      await expect(kiosk.getByText(/type a name, or the last 4 digits/i)).toBeVisible();
+
+      await hold(kiosk, '[data-key="clear"]');
+      await kiosk.getByRole('button', { name: /^Leave /i }).click();
+      await expect(kiosk.getByText(/which gathering/i)).toBeVisible();
+    } finally {
+      await context.close();
+    }
+  });
 });
 
 /**

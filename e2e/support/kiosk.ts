@@ -55,17 +55,19 @@ export async function openKiosk(
 /**
  * Presses and holds, the way a thumb does.
  *
- * `HoldButton` listens for pointer events and cancels on leave, so this has to
- * be a real press at a real position rather than a synthesised click.
+ * Both holds on the kiosk cancel on pointer-leave — `HoldButton` in JavaScript,
+ * the Clear key's staff gate in CSS `:active` — so this has to be a real press
+ * at a real position rather than a synthesised click.
  *
- * Half way through, the progress bar is checked in *pixels* — see
- * `expectProgressShows`. Pass `invisible` for the staff gate, which is drawn at
- * `opacity-0` on purpose.
+ * Half way through, the progress is checked in *pixels* — see
+ * `expectProgressShows`. Unconditionally: this used to take an `invisible`
+ * escape hatch for the old staff gate, a transparent square in the corner of
+ * the header, and the gate that replaced it draws progress like everything
+ * else. Every hold a person can find is a hold they can watch.
  */
 export async function hold(
   page: Page,
   selector: Parameters<Page['locator']>[0],
-  options: { invisible?: boolean } = {},
 ): Promise<void> {
   const target = page.locator(selector);
   const box = await target.boundingBox();
@@ -74,7 +76,7 @@ export async function hold(
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
   await page.waitForTimeout(HOLD_MS / 2);
-  if (!options.invisible) await expectProgressShows(page, box);
+  await expectProgressShows(page, box);
   await page.waitForTimeout(HOLD_MS / 2 + HOLD_SLACK_MS);
   await page.mouse.up();
 }
@@ -91,8 +93,12 @@ export async function hold(
  * was tried on while the specs stayed green. What reaches the screen is the
  * only thing that distinguishes that from working, so that is what is asserted.
  *
- * At the half-way point the bar covers half the button, so a sample near the
- * left edge is filled and one near the right edge is not.
+ * At the half-way point the fill covers somewhere between a third and a half of
+ * the control — `HoldButton` starts drawing immediately, the Clear key waits
+ * 400ms so an ordinary tap never flashes a bar — so a sample near the left edge
+ * is filled and one near the right edge is not, on either of them. The 6% and
+ * 94% margins are what keep that true for both, and they also keep the samples
+ * clear of the label in the middle and the rounded corners at the ends.
  */
 async function expectProgressShows(
   page: Page,

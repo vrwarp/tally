@@ -22,8 +22,9 @@
  * parent is watching the readout rather than their thumb, it is the only
  * confirmation that the glass took the press at all.
  */
-import { memo, useCallback, useRef } from 'react';
+import { memo, useCallback, useEffect, useRef } from 'react';
 import { haptic } from '@/lib/utils';
+import { HOLD_MS } from './HoldButton';
 
 export type KioskKey =
   | { kind: 'char'; value: string }
@@ -54,6 +55,7 @@ const KEY_CLASS =
 export const Keyboard = memo(function Keyboard({
   onKey,
   shift,
+  onClearHeld,
 }: {
   onKey: (key: KioskKey) => void;
   /**
@@ -67,11 +69,57 @@ export const Keyboard = memo(function Keyboard({
    * all right. A parent can see the case as they type and fix it themselves.
    */
   shift?: ShiftState;
+  /**
+   * The staff gate: **Clear**, held.
+   *
+   * Passed only by the search screen. A tap still clears the buffer and always
+   * will — that is the key's job and the reason it is the right host for a
+   * second meaning. It is a labelled key in a fixed place that staff can be
+   * told about over the phone, which the gate this replaced was not: an
+   * invisible sixteen-pixel square in a corner is findable by the person who
+   * wrote it and nobody else.
+   *
+   * Held on the key rather than delegated at the container, unlike every other
+   * press here, so that sliding a thumb off Clear cancels the hold the way it
+   * cancels the `:active` fill. Two handlers on one button is cheaper than a
+   * gesture that fires from the key next door.
+   */
+  onClearHeld?: () => void;
 }) {
   // The latest handler behind a stable identity, so this subtree's memo holds
   // even if a parent re-creates its callback.
   const handlerRef = useRef(onKey);
   handlerRef.current = onKey;
+  const heldRef = useRef(onClearHeld);
+  heldRef.current = onClearHeld;
+
+  /*
+   * The hold, in a ref rather than in state.
+   *
+   * State here would repaint forty buttons on every press of Clear, which is
+   * exactly what this file's memo exists to prevent. The progress the finger
+   * needs is a CSS animation bound to `:active` (see `kiosk-hold-key` in
+   * index.css) — no JavaScript, no re-render, and it stops the instant the
+   * press does.
+   */
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelHold = useCallback(() => {
+    if (timerRef.current === null) return;
+    clearTimeout(timerRef.current);
+    timerRef.current = null;
+  }, []);
+  const startHold = useCallback(() => {
+    if (!heldRef.current) return;
+    cancelHold();
+    timerRef.current = setTimeout(() => {
+      timerRef.current = null;
+      // The one press on this keyboard that is not reporting contact but
+      // completion, so it buzzes longer than the 8ms every key gets.
+      haptic(24);
+      heldRef.current?.();
+    }, HOLD_MS);
+  }, [cancelHold]);
+  useEffect(() => cancelHold, [cancelHold]);
 
   const capitals = shift === undefined || shift !== 'off';
 
@@ -155,7 +203,14 @@ export const Keyboard = memo(function Keyboard({
           type="button"
           tabIndex={-1}
           data-key="clear"
-          className={`${KEY_CLASS} flex-[1.5] text-base font-medium text-ink-300`}
+          onPointerDown={onClearHeld ? startHold : undefined}
+          onPointerUp={onClearHeld ? cancelHold : undefined}
+          onPointerLeave={onClearHeld ? cancelHold : undefined}
+          onPointerCancel={onClearHeld ? cancelHold : undefined}
+          className={`${KEY_CLASS} flex-[1.5] text-base font-medium text-ink-300 ${
+            onClearHeld ? 'kiosk-hold-key' : ''
+          }`}
+          style={onClearHeld ? ({ '--hold-ms': `${HOLD_MS}ms` } as React.CSSProperties) : undefined}
         >
           Clear
         </button>

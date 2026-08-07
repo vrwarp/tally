@@ -9,9 +9,9 @@
  * These pin the deliberate asymmetry between the two. Keys buzz on contact,
  * every one of them, including the presses the buffer refuses — a key reports
  * that the glass took the press, not that the press meant anything. A hold
- * buzzes only when it completes, and that is the more important half: one of
- * the two holds is the invisible staff gate in the corner of the search screen,
- * and a buzz on contact would announce it to whoever brushed past.
+ * buzzes only when it completes, and that is the more important half: a hold
+ * that buzzed on contact would tell a thumb the gesture had happened when it
+ * had only started.
  */
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -160,7 +160,7 @@ describe('the press-and-hold gate', () => {
     vi.advanceTimersByTime(HOLD_MS);
 
     // Three seconds is long enough that a thumb needs telling when it may
-    // leave, and the staff gate has no other feedback at all.
+    // leave, and a buzz on contact would say the gesture had already happened.
     expect(vibrate).toHaveBeenCalledTimes(1);
     expect(onHeld).toHaveBeenCalledTimes(1);
   });
