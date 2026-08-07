@@ -100,7 +100,54 @@ describe('what a reviewer sees', () => {
       data: [registration({ expiresInMs: 2 * DAY })],
     });
     mount();
-    expect(await screen.findByText(/about to be cleared/i)).toBeInTheDocument();
+    // The number, not "soon": two days is worth phoning the family before the
+    // record goes, two hours is not, and a reviewer can only weigh one of those.
+    expect(await screen.findByText(/Clears in 2 days/i)).toBeInTheDocument();
+    expect(screen.getByText(/takes the phone number with it/i)).toBeInTheDocument();
+  });
+
+  it('puts the family closest to being swept first, whatever the server sorted by', async () => {
+    /*
+     * The queue arrives newest-first, which buries the one card where doing
+     * nothing is itself irreversible. On a phone, where one card fills the
+     * screen, the order is the whole triage.
+     */
+    listPendingRegistrations.mockResolvedValue({
+      data: [
+        registration({
+          registrationId: 'fresh',
+          guardian: { firstName: 'Nadia', lastName: 'Fresh', phone: '5550100001' },
+          registeredAt: Date.now(),
+          expiresInMs: 29 * DAY,
+        }),
+        registration({
+          registrationId: 'expiring',
+          guardian: { firstName: 'Omar', lastName: 'Expiring', phone: '5550100002' },
+          registeredAt: Date.now() - 26 * DAY,
+          expiresInMs: 3 * DAY,
+        }),
+      ],
+    });
+    mount();
+
+    const headings = await screen.findAllByRole('heading', { level: 2 });
+    expect(headings[0]).toHaveTextContent('Omar Expiring');
+    expect(headings[1]).toHaveTextContent('Nadia Fresh');
+  });
+
+  it('counts the queue in the heading, so the size of the job is answered first', async () => {
+    listPendingRegistrations.mockResolvedValue({
+      data: [
+        registration({ registrationId: 'one' }),
+        registration({
+          registrationId: 'two',
+          guardian: { firstName: 'Sam', lastName: 'Two', phone: '5550100003' },
+        }),
+      ],
+    });
+    mount();
+    const heading = await screen.findByRole('heading', { name: /Families to review/i });
+    expect(heading).toHaveTextContent('2');
   });
 });
 

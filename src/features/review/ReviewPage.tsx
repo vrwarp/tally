@@ -49,8 +49,9 @@ import {
   type ReviewStudentSummary,
 } from '@/services/functions';
 
+const DAY_MS = 24 * 60 * 60_000;
 /** Under a week left before the sweep takes the record. */
-const EXPIRING_SOON_MS = 7 * 24 * 60 * 60_000;
+const EXPIRING_SOON_MS = 7 * DAY_MS;
 
 function formatPhone(digits: string): string {
   const clean = digits.replace(/\D/g, '');
@@ -97,6 +98,32 @@ export function ReviewPage() {
     return (eventId: string | null) => (eventId ? (byId.get(eventId) ?? null) : null);
   }, [events]);
 
+  /**
+   * The order of the queue is the triage.
+   *
+   * The callable answers newest-first, which is the right default and the
+   * wrong first screen: the one card where *doing nothing* is itself
+   * irreversible — a record days from the sweep that deletes the only phone
+   * number Tally holds for that family — was arriving last, under four
+   * families that can wait a fortnight. On a phone, where one card fills the
+   * screen, that is the difference between the deadline being seen and not.
+   *
+   * Only the expiring class is hoisted. Everything else keeps the recency the
+   * server sorted by, so nothing about the rest of the queue moves.
+   */
+  const queue = useMemo(() => {
+    const expiring = (row: PendingRegistration) =>
+      row.expiresInMs !== null && row.expiresInMs < EXPIRING_SOON_MS;
+    return [...(rows ?? [])].sort(
+      (a, b) =>
+        Number(expiring(b)) - Number(expiring(a)) ||
+        // Soonest to go first within the class, so the deadline itself orders
+        // the cards that have one.
+        (expiring(a) ? (a.expiresInMs ?? 0) - (b.expiresInMs ?? 0) : 0) ||
+        (b.registeredAt ?? 0) - (a.registeredAt ?? 0),
+    );
+  }, [rows]);
+
   const act = async (registrationId: string, run: () => Promise<string>) => {
     if (busy) return;
     setBusy(registrationId);
@@ -113,10 +140,16 @@ export function ReviewPage() {
   return (
     <PageFrame width="lg">
       <header>
-        <h1 className="text-xl font-bold text-ink-50">Families to review</h1>
-        <p className="mt-0.5 text-sm text-ink-500">
+        <h1 className="flex items-center gap-2 text-xl font-bold text-ink-50">
+          Families to review
+          {/* The size of the job, before the first scroll. A reviewer with three
+              minutes needs to know whether this is a two-minute Tuesday. */}
+          {rows !== null && rows.length > 0 ? <Badge tone="neutral">{rows.length}</Badge> : null}
+        </h1>
+        <p className="mt-0.5 max-w-2xl text-sm text-ink-500">
           Registered at the kiosk by the family themselves. They are on the roster and were
-          checked in — nothing has gone into the church&rsquo;s database yet.
+          checked in — nothing has gone into the church&rsquo;s database yet. Soonest to be
+          cleared first.
         </p>
       </header>
 
@@ -145,7 +178,7 @@ export function ReviewPage() {
           />
         </Card>
       ) : (
-        rows.map((row) => (
+        queue.map((row) => (
           <RegistrationCard
             key={row.registrationId}
             row={row}
@@ -207,6 +240,9 @@ function RegistrationCard({
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
   const when = row.registeredAt === null ? null : new Date(row.registeredAt);
   const expiringSoon = row.expiresInMs !== null && row.expiresInMs < EXPIRING_SOON_MS;
+  // Rounded up, and floored at one: a record with six hours left has "1 day",
+  // never "0 days", which reads as already gone.
+  const daysLeft = Math.max(1, Math.ceil((row.expiresInMs ?? 0) / DAY_MS));
 
   return (
     <Card>
@@ -228,21 +264,42 @@ function RegistrationCard({
         count={row.children.length}
       />
 
-      <div className="flex flex-col gap-3 px-4 pb-4">
+      {/*
+        `pt-4` rather than nothing: without it the header's rule sat one pixel
+        above the body's first line and twelve below the header's last, so it
+        read as opening the body rather than closing the header — and on the two
+        cards that start with a coloured strip, the rule ran into the strip's
+        rounded corner and survived as a stub poking out each side.
+      */}
+      <div className="flex flex-col gap-3 px-4 pt-4 pb-4">
         {/*
           The ageing signal. A record that is about to be swept is the one case
           where doing nothing is itself a decision — the guardian's number goes
           and the children stay held, invisible to the church for ever.
+
+          The day count is the point of it. "About to be cleared" cannot be
+          weighed against anything: four days is worth phoning the number
+          before it goes, four hours is not, and every other age on this screen
+          is stated precisely.
         */}
         {expiringSoon ? (
-          <p className="rounded-lg bg-warn-500/10 px-3 py-2 text-xs text-warn-400 ring-1 ring-warn-500/30">
-            This registration is about to be cleared. After that the children stay on Tally&rsquo;s
-            roster but nobody will know who brought them.
+          <p className="rounded-xl bg-warn-500/10 px-3 py-2 text-sm text-warn-400 ring-1 ring-warn-500/30">
+            Clears in {daysLeft} {daysLeft === 1 ? 'day' : 'days'} and takes the phone number with
+            it. The children stay on Tally&rsquo;s roster with nobody attached to them.
           </p>
         ) : null}
 
+        {/*
+          `danger-400`, not `danger-300`, and that was a real bug rather than a
+          preference: the ramp holds 400/500/600 only, so Tailwind emitted no
+          rule for `-300` and this strip inherited the card's near-white ink.
+          The one notice on the screen that reports an actual failure has been
+          rendering as neutral text — quieter than the amber beside it, which
+          inverts the severity the tokens exist to express. 400 is the rung
+          `warn-400` already sits on, so hue is the only difference now.
+        */}
         {row.lastError ? (
-          <p className="rounded-lg bg-danger-500/10 px-3 py-2 text-xs text-danger-300 ring-1 ring-danger-500/30">
+          <p className="rounded-xl bg-danger-500/10 px-3 py-2 text-sm text-danger-400 ring-1 ring-danger-500/30">
             Last attempt did not finish: {row.lastError}
           </p>
         ) : null}
