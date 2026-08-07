@@ -4,8 +4,8 @@ Captured from the running app by `e2e/registration-walkthrough.spec.ts`. Rebuild
 `npx tsx scripts/build-registration-walkthrough.ts`.
 
 Every frame is the real lobby screen driving the real callable against a seeded emulator: the
-pairing handshake happens, the QR code is minted by `mintRegistrationCode`, and the family at the
-end exists in Firestore and is checked in against a real gathering.
+pairing handshake happens, and the family at the end exists in Firestore and is checked in
+against a real gathering.
 
 ## Finding the door
 
@@ -29,49 +29,47 @@ The door is also on the screen before anybody types, in the row above the keyboa
 
 <img src="shots/portrait-02-the-standing-offer.png" width="320" alt="The standing offer — portrait">
 
-## On your own phone
-
-### 3. Scan this
-
-*Choosing a door*
-
-The first thing offered, because a parent holding a phone would rather type on it than on a tablet bolted to a shelf — their keyboard, their autocorrect, and the queue behind them does not have to watch. The code under it is minted by the kiosk and lives twenty minutes: a stable public registration URL would be a form on the open internet whose submissions land in a church's real people database, so registering remotely means being in the room. The address is spelled out in words too, for a camera that will not focus.
-
-![Scan this — landscape](shots/landscape-03-scan-this.png)
-
-<img src="shots/portrait-03-scan-this.png" width="320" alt="Scan this — portrait">
-
 ## Right here
 
-### 4. The field says what it is
+### 3. The field says what it is
 
 *Registering*
 
-For the family without a phone, one tap behind the QR — the right way round, because this is the longer of the two flows on the harder keyboard. One question per screen in the frame the search already uses. The readout names the field rather than saying "type here", which matters most on the two steps where the answer could belong to either person in the room: "Child's last name" and "Your last name" are the same box until one of them says which.
+One tap from the offer and the first question is up — the QR screen that used to stand between them retired with the phone form it pointed at. One question per screen in the frame the search already uses. The readout names the field rather than saying "type here", which matters most on the two steps where the answer could belong to either person in the room: "Child's last name" and "Your last name" are the same box until one of them says which.
 
-![The field says what it is — landscape](shots/landscape-04-the-field-says-what-it-is.png)
+![The field says what it is — landscape](shots/landscape-03-the-field-says-what-it-is.png)
 
-<img src="shots/portrait-04-the-field-says-what-it-is.png" width="320" alt="The field says what it is — portrait">
+<img src="shots/portrait-03-the-field-says-what-it-is.png" width="320" alt="The field says what it is — portrait">
 
-### 5. Capitals, and a key to argue with them
+### 4. Capitals, and a key to argue with them
 
 *Registering*
 
 The first letter is a capital without anybody asking, and so is the letter after every space, hyphen and apostrophe — the boundaries a name actually has, which is what makes Anne-Marie and O'Brien come out right on their own. But no rule short of a dictionary gets McDonald and van der Berg too, so the shift key is there beside them: it cycles off, on and locked the way every phone does, and the letters wear the state so a key shows exactly what it will produce.
 
-![Capitals, and a key to argue with them — landscape](shots/landscape-05-capitals-and-a-key-to-argue-with-them.png)
+![Capitals, and a key to argue with them — landscape](shots/landscape-04-capitals-and-a-key-to-argue-with-them.png)
 
-<img src="shots/portrait-05-capitals-and-a-key-to-argue-with-them.png" width="320" alt="Capitals, and a key to argue with them — portrait">
+<img src="shots/portrait-04-capitals-and-a-key-to-argue-with-them.png" width="320" alt="Capitals, and a key to argue with them — portrait">
 
-### 6. Grade, or none
+### 5. Grade, or none
 
 *Registering*
 
 Thirteen chips and "No grade", which is an answer rather than a blank somebody fills in later: a child too young for a grade has none. On a gathering that hands children back the question opens on "No grade" for the same reason — making a parent clear a field is the same mistake as making a volunteer reach for undo.
 
-![Grade, or none — landscape](shots/landscape-06-grade-or-none.png)
+![Grade, or none — landscape](shots/landscape-05-grade-or-none.png)
 
-<img src="shots/portrait-06-grade-or-none.png" width="320" alt="Grade, or none — portrait">
+<img src="shots/portrait-05-grade-or-none.png" width="320" alt="Grade, or none — portrait">
+
+### 6. Allergies, only where they can land
+
+*One child*
+
+The fourth question, and it only exists when the church's own database takes full write-back — the same gate the retired phone form kept, because collecting a medical note into a screen that silently drops it is worse than never asking. The common answer is the button itself: "No allergies" until a letter is typed, Next the moment one is. The note goes to the reviewer and then upstream; the kiosk keeps a marker, never the text.
+
+![Allergies, only where they can land — landscape](shots/landscape-06-allergies-only-where-they-can-land.png)
+
+<img src="shots/portrait-06-allergies-only-where-they-can-land.png" width="320" alt="Allergies, only where they can land — portrait">
 
 ### 7. Anybody else?
 
@@ -153,14 +151,44 @@ Typed on the same screen, seconds later. Nothing was refetched: the answer came 
 
 <img src="shots/portrait-14-and-it-works-immediately.png" width="320" alt="And it works immediately — portrait">
 
-## What it will not do
+## The second child
 
-### 15. Already on our list
+### 15. The other door, in the same slot
 
-*Refused, nothing written*
+*On the confirm screen*
 
-The same family again, five minutes later — the child who wandered off, the parent who was not sure it saved. Nothing is created. Not one of the two, either: a half-registered family is worse than one told to search, so a name already on the roster stops the whole thing. This is also what a retry meets, and why the server takes its claim on the registration before it reads the roster — otherwise a retried call would find the children it created a second ago and report them as duplicates of themselves.
+A parent whose next child is finally old enough starts here, not at the front door: they have already found their family by phone and tapped a name. The offer sits below the main action in the smaller weight, because it is the rarer of the two things somebody came to this screen to do — and it is on this screen at all because this is where the kiosk knows which family is standing in front of it.
 
-![Already on our list — landscape](shots/landscape-15-already-on-our-list.png)
+![The other door, in the same slot — landscape](shots/landscape-15-the-other-door-in-the-same-slot.png)
 
-<img src="shots/portrait-15-already-on-our-list.png" width="320" alt="Already on our list — portrait">
+<img src="shots/portrait-15-the-other-door-in-the-same-slot.png" width="320" alt="The other door, in the same slot — portrait">
+
+### 16. The cheaper answer, offered first
+
+*Searching the roster first*
+
+Both readings of that link are real journeys. The common one is a sibling already on the roster whom the phone search did not surface — the church has them, the family folk simply do not line up — and finding them costs nothing and creates nothing. So this screen searches by name, shows the family's own rows greyed and inert so nobody taps a child twice, and keeps "add a new child" as a standing offer rather than the destination. A registration is the expensive answer and it is one tap further away.
+
+![The cheaper answer, offered first — landscape](shots/landscape-16-the-cheaper-answer-offered-first.png)
+
+<img src="shots/portrait-16-the-cheaper-answer-offered-first.png" width="320" alt="The cheaper answer, offered first — portrait">
+
+### 17. Joining the family that exists
+
+*Two questions, no adult*
+
+No name, no phone number, no second household invented — the confirm names the siblings this child is being added to and that is the whole of it. The kiosk resolved the family from the four digits it searched with; the server re-verifies every one of those ids before it believes any of them, and at approval the household comes from an existing sibling rather than from the children in the run. That last part is the fix for a real bug: a family gaining a second child used to gain a second household, with the first child left behind in the original and invisible from the new one.
+
+![Joining the family that exists — landscape](shots/landscape-17-joining-the-family-that-exists.png)
+
+<img src="shots/portrait-17-joining-the-family-that-exists.png" width="320" alt="Joining the family that exists — portrait">
+
+### 18. Recorded, not decided
+
+*Checked in, held for review*
+
+Nothing reached Planning Center. Every child a family registers is written held, and the hold is the only thing that gates the push — both backends, both sweeps, the on-create trigger and the re-create repair all consult it. What happens next happens on a weekday, on a core-team screen, with the form as the family typed it beside any roster row that shares a name: approve, merge, or discard. The door records; a person decides.
+
+![Recorded, not decided — landscape](shots/landscape-18-recorded-not-decided.png)
+
+<img src="shots/portrait-18-recorded-not-decided.png" width="320" alt="Recorded, not decided — portrait">

@@ -92,6 +92,29 @@ const FAMILY: Record<Orientation, { surname: string; phone: string }> = {
   portrait: { surname: `Adeyemi${RUN}`, phone: '5550178866' },
 };
 
+/**
+ * The family the sibling frames join — seeded, and deliberately *not* the one
+ * this walkthrough registers four frames earlier.
+ *
+ * "Another child" only stands on a check-in: `askSibling` in ConfirmScreen is
+ * gated on `intent === 'check-in'`, because a parent collecting a child is
+ * answering a different question and a child already on the register has no
+ * button for the offer to sit above. A registration checks its own children in
+ * as part of the act, so the family that has just been through the wizard is
+ * on a pickup screen by the time these frames want them.
+ *
+ * A household the church has had for years is the truer subject anyway: the
+ * parent whose next child is finally old enough has been coming for a decade.
+ * Each is a child the seeded prediction leaves unticked, so she is on the
+ * roster and not yet present — and one per orientation, because the two passes
+ * share an emulator and the second would otherwise walk up to a child the
+ * first checked in.
+ */
+const SIBLING: Record<Orientation, { digits: string; child: string; surname: string }> = {
+  landscape: { digits: '0347', child: 'Efua Osei', surname: 'Osei' },
+  portrait: { digits: '0592', child: 'Lucia Delgado', surname: 'Delgado' },
+};
+
 test('capture the registration walkthrough', async ({ browser, page, signedInAs }) => {
   /*
    * Full write-back, so the wizard asks its allergies question — the binding
@@ -108,6 +131,7 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
       viewport: VIEWPORTS[orientation],
     });
     const { surname: SURNAME, phone: PHONE } = FAMILY[orientation];
+    const SIB = SIBLING[orientation];
     let n = 0;
     const shoot = (shot: { title: string; flow: string; state: string; caption: string }) =>
       capture(kiosk, orientation, (n += 1), shot);
@@ -268,8 +292,12 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
        * the kiosk already knows which family this is — so the sibling costs two
        * questions, not six, and joins the household upstream rather than
        * founding a second one for the same family.
+       *
+       * A seeded family rather than the one above, and `SIBLING` says why.
        */
-      await kiosk.getByRole('button', { name: /Chidi/i }).first().click();
+      await kiosk.locator('[data-key="clear"]').click();
+      await typeOnKiosk(kiosk, SIB.digits);
+      await kiosk.getByRole('button', { name: new RegExp(SIB.child, 'i') }).first().click();
       await shoot({
         flow: 'The second child',
         state: 'On the confirm screen',
@@ -296,8 +324,11 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
       await kiosk.getByRole('button', { name: /Not on the list\? Add a new child/i }).click();
       await typeOnKiosk(kiosk, 'Emeka');
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      // Typed, not carried: the wizard offers the surname of the previous child
+      // *in this run*, and a sibling run has none — the family being joined is
+      // on the confirm screen behind it, not in the draft.
       await kiosk.locator('[data-key="clear"]').click();
-      await typeOnKiosk(kiosk, SURNAME);
+      await typeOnKiosk(kiosk, SIB.surname);
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: 'Kindergarten', exact: true }).click();
       await kiosk.getByRole('button', { name: /No allergies/i }).click();
