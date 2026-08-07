@@ -126,6 +126,17 @@ export function ReviewPage() {
         <Card>
           <SkeletonRows count={3} />
         </Card>
+      ) : error ? (
+        /*
+          Nothing to say beyond the banner above.
+
+          A failed read used to fall through to "Nothing waiting", which is the
+          one sentence on this screen a reviewer acts on by closing the tab —
+          and it was rendered *because* the read failed, since the catch empties
+          the list. An empty queue and an unreadable one look identical from
+          here and mean opposite things.
+        */
+        null
       ) : rows.length === 0 ? (
         <Card>
           <EmptyState

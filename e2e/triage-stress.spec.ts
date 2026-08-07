@@ -464,17 +464,18 @@ test.describe('shapes the screen has to survive', () => {
 
     try {
       await gotoReady(page, '/review');
-      await expect(page.getByText(`Guardian0 ${surname}`)).toBeVisible({ timeout: 30_000 });
+      // By heading, not by text: the guardian's name appears twice per card —
+      // once as the card's title and once as the "Brought by" value.
+      const headingFor = (index: number) =>
+        page.getByRole('heading', { name: `Guardian${index} ${surname}` });
+      await expect(headingFor(0)).toBeVisible({ timeout: 30_000 });
       for (let index = 0; index < 12; index += 1) {
-        await expect(page.getByText(`Guardian${index} ${surname}`)).toBeVisible();
+        await expect(headingFor(index)).toBeVisible();
       }
 
       // Newest first: the hour-old family is above the twelve-hour-old one.
       const positions = await Promise.all(
-        [0, 11].map(async (index) => {
-          const box = await page.getByText(`Guardian${index} ${surname}`).first().boundingBox();
-          return box?.y ?? 0;
-        }),
+        [0, 11].map(async (index) => (await headingFor(index).first().boundingBox())?.y ?? 0),
       );
       expect(positions[0]!).toBeLessThan(positions[1]!);
     } finally {
