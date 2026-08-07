@@ -64,11 +64,23 @@ reproduces there but not on your machine is the container being right.
 
 ## What CI deploys
 
-Merging to `main` ships everything: Hosting from the two `firebase-hosting-*`
-workflows, and Cloud Functions, Firestore security rules and Firestore indexes
-from `firebase-backend.yml`. A pull request gets a Hosting preview channel and a
-`--dry-run` of the backend. See
-[Deployment](../README.md#deployment) for the secrets and roles.
+Merging to `main` ships everything. Three workflows, split by what they can reach:
+
+| Workflow | On a pull request | On merge to `main` |
+| --- | --- | --- |
+| `firebase-hosting-pull-request.yml` | Deploys a preview channel, posts the link on the PR | — |
+| `firebase-hosting-merge.yml` | — | Publishes the Hosting live channel |
+| `firebase-backend.yml` | Builds the functions, then `firebase deploy --dry-run` validates rules and indexes without deploying | Deploys Cloud Functions, Firestore rules and Firestore indexes |
+
+Both pull-request jobs are skipped for forked PRs (`head.repo.full_name == github.repository`),
+because a fork cannot read repository secrets. Until the
+[repository secrets](deployment-setup.md#repository-secrets) exist the backend dry run skips itself
+with a notice rather than failing the PR — the functions build and the emulator-based rules suite in
+`ci.yml` need no credentials, so they still gate every pull request. The merge-time deploy has no
+such escape hatch: without its key it fails loudly rather than silently doing nothing. The secrets
+and roles all of this assumes are in
+[Setting up deployment](deployment-setup.md); deploying by hand is
+[`npm run deploy`](deployment-setup.md#deploying).
 
 The two halves are deliberately separate, because they carry different risk.
 Hosting is a static bundle; a bad one is fixed by redeploying, and its key is
@@ -85,13 +97,16 @@ Three things guard that, and all three are load-bearing:
    `npm run test:rules` there is what makes "rules never deploy while their
    tests fail" a guarantee rather than a coincidence of timing.
 2. **The deploy job targets the `production` environment**, so adding required
-   reviewers to that environment turns a merge into an approval prompt.
+   reviewers to it under Settings → Environments turns every backend deploy into
+   an approval prompt. This is recommended and not the default: without
+   protection rules on that environment, a merge deploys with no prompt at all.
 3. **The backend key is a second, separate secret** from the Hosting one. The
    privileged credential is only ever exposed to the gated merge job, never to
    the preview deploy that runs on every pull request.
 
 What is still a human action: **deleting** a Cloud Function (the deploy runs
-without `--force`, so a function missing from the source is left alone),
+without `--force`, so a function missing from the source is left running rather
+than torn down by a robot — remove one with `npx firebase functions:delete`),
 anything touching production *data*, which no workflow does, and **granting
 project IAM** — enabling APIs and giving Google's service agents their roles are
 owner-only, one-time steps in

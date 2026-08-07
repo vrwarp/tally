@@ -757,7 +757,7 @@ the ones who should be making it.
 
 No birthdates, addresses, photographs, student phone numbers or emails, medical information beyond a
 single allergy line, and nothing financial whatsoever — not a card number, not a fee, not a record of
-who has paid. See the data-handling note in the [README](../README.md#handling-minors-data).
+who has paid. See [Handling minors' data](minors-data.md).
 
 There are exactly two deliberate brushes with contact data, and both are bounded on purpose.
 

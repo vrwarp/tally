@@ -70,7 +70,7 @@ One-off events cannot print yet.
 
 That is the whole list, and it is bounded by what the kiosk holds. Parent
 contacts and photographs do not reach a lobby screen — see
-[Handling minors' data](../README.md#handling-minors-data) — so putting either of
+[Handling minors' data](minors-data.md) — so putting either of
 them on a label is a change to what a screen in a public room is allowed to
 display, not a new token.
 
