@@ -57,6 +57,7 @@ import { EventChooser } from './screens/EventChooser';
 import { PairingScreen } from './screens/PairingScreen';
 import { PrinterScreen } from './screens/PrinterScreen';
 import { SearchScreen } from './screens/SearchScreen';
+import { ChangeEventScreen } from './screens/ChangeEventScreen';
 import { SuccessScreen } from './screens/SuccessScreen';
 
 export type KioskServices = typeof ServicesModule;
@@ -129,6 +130,14 @@ type Overlay =
   | ConfirmOverlay
   | SiblingOverlay
   | { kind: 'success'; students: KioskStudent[]; intent: KioskIntent }
+  /**
+   * The staff gate's question — see ChangeEventScreen.
+   *
+   * An overlay like the others, which is what keeps `idleRef` honest: a kiosk
+   * with a question on it is not idle, so the binding cannot expire and the
+   * nightly reload cannot fire while somebody stands there deciding.
+   */
+  | { kind: 'unbind' }
   | null;
 
 const MAX_BUFFER = 24;
@@ -1293,6 +1302,26 @@ export function KioskApp() {
         />
       );
     }
+    if (overlay?.kind === 'unbind') {
+      return (
+        <ChangeEventScreen
+          title={binding.title}
+          onStay={() => setOverlay(null)}
+          onLeave={() => {
+            // A kiosk that has left a gathering has no business still holding
+            // notes about the children who were at it.
+            printing?.forgetAllergies();
+            clearBinding();
+            setBinding(null);
+            setBuffer('');
+            setOverlay(null);
+            setPresentIds(new Set());
+            setPhase('choosing');
+          }}
+        />
+      );
+    }
+
     return (
       <SearchScreen
         binding={binding}
@@ -1344,17 +1373,7 @@ export function KioskApp() {
           }
           setOverlay({ kind: 'confirm', student, intent, family, skipped });
         }}
-        onUnbind={() => {
-          // A kiosk that has left a gathering has no business still holding
-          // notes about the children who were at it.
-          printing?.forgetAllergies();
-          clearBinding();
-          setBinding(null);
-          setBuffer('');
-          setOverlay(null);
-          setPresentIds(new Set());
-          setPhase('choosing');
-        }}
+        onStaffGate={() => setOverlay({ kind: 'unbind' })}
       />
     );
   }

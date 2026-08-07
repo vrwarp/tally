@@ -30,8 +30,9 @@ What follows is what that person has to do.
 ## Setting one up
 
 1. Plug the printer into the kiosk and turn it on.
-2. On the kiosk, **hold the top-left corner of the search screen for three
-   seconds**. That is the existing staff gate — it returns to the event chooser.
+2. On the kiosk, **hold the Clear key on the search screen for three seconds**,
+   then answer **Leave …**. That is the staff gate — it returns to the event
+   chooser. A tap on Clear still just clears the search box; only the hold asks.
 3. Press **Set up a label printer**.
 4. Pick the **model**. This cannot be detected: the USB product id does not map
    reliably to a model and the status packet's model byte is only a bring-up

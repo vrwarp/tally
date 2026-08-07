@@ -18,13 +18,14 @@
  * finished search finds nobody anywhere. This screen renders the outcome it is
  * handed and offers the doors.
  *
- * The top-left corner hides the staff gate: a three-second hold returns to
- * the event chooser. Invisible on purpose — parents have no business there,
- * and staff are told where it is.
+ * The staff gate is a three-second hold on **Clear**, which opens the prompt
+ * that leaves the gathering. It used to be an invisible square over the top-left
+ * corner of the header — unfindable by anybody who had not been shown it, and
+ * in the wrong place besides. A labelled key in a fixed position can be
+ * described over the phone; the prompt is what makes it safe to be findable.
  */
 import { useEffect, useRef } from 'react';
 import { gradeDescription, haptic } from '@/lib/utils';
-import { HoldButton } from '../components/HoldButton';
 import { Keyboard, type KioskKey } from '../components/Keyboard';
 import { useTapGuard } from '../components/tapGuard';
 import type { KioskRefresh } from '../KioskApp';
@@ -108,7 +109,7 @@ export function SearchScreen({
   onWiden,
   onPick,
   onRegister,
-  onUnbind,
+  onStaffGate,
 }: {
   binding: KioskBinding;
   buffer: string;
@@ -140,7 +141,14 @@ export function SearchScreen({
   onPick: (student: KioskStudent) => void;
   /** Opens the registration offer — the other door off this screen. */
   onRegister: () => void;
-  onUnbind: () => void;
+  /**
+   * The staff gate fired — **Clear**, held for three seconds.
+   *
+   * Named for the gesture rather than for unbinding, because this screen no
+   * longer decides what it means: it opens a prompt, and the prompt is what
+   * leaves the gathering. A screen that unbound on a hold could not ask first.
+   */
+  onStaffGate: () => void;
 }) {
   const closed = windowHasClosed(binding, Date.now());
 
@@ -203,15 +211,9 @@ export function SearchScreen({
 
   return (
     <div className="grid h-full grid-rows-[auto_auto_1fr_auto_auto]">
-      {/* Header — with the invisible staff gate over its left corner. */}
+      {/* Header. The staff gate used to be an invisible square over its left
+          corner; it is a hold on **Clear** now — see `onStaffGate`. */}
       <div className="relative px-6 pt-[max(1rem,var(--spacing-safe-top))] pb-2 text-center">
-        <HoldButton
-          onHeld={onUnbind}
-          className="absolute top-0 left-0 h-16 w-16 opacity-0"
-          aria-label="Change event (staff)"
-        >
-          {''}
-        </HoldButton>
         {/*
           * The printer, when it has stopped working.
           *
@@ -442,7 +444,7 @@ export function SearchScreen({
         )}
       </div>
 
-      <Keyboard onKey={onKey} />
+      <Keyboard onKey={onKey} onClearHeld={onStaffGate} />
     </div>
   );
 }

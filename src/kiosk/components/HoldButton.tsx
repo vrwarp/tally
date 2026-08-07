@@ -1,5 +1,5 @@
 /**
- * A press-and-hold control — the kiosk's one staff gate.
+ * A press-and-hold control, for the presses worth being sure about.
  *
  * Three seconds of continuous contact, with visible progress, cancelled by
  * lifting or leaving. Not authentication: the kiosk belongs to a small church
@@ -11,18 +11,22 @@
  * pointer handlers that arm and cancel it.
  *
  * The bar is a white wash, and has to be something like it. Every caller draws
- * this control on a dark surface — `bg-brand-600` at both visible call sites —
+ * this control on a dark surface — `bg-brand-600` at both call sites —
  * so a fill tinted in the brand ramp composites to within nothing of the button
  * it covers, and the hold becomes three seconds of a button doing visibly
  * nothing. Which is not a subtle bug: nobody keeps their thumb down for three
  * seconds against no feedback, so the control reads as broken rather than as
  * slow. Whatever this fill is, it must contrast with the button under it.
  *
- * Completion buzzes; arming does not. Three seconds is long enough that a
- * thumb wants to be told when it may leave, and one of the two holds — the
- * staff gate in the corner of the search screen — is invisible, so the buzz is
- * the only thing that says the gesture worked. A buzz on contact would instead
- * announce that invisible corner to whoever brushed it.
+ * Completion buzzes; arming does not. Three seconds is long enough that a thumb
+ * wants to be told when it may leave, and a buzz on contact would say the
+ * gesture had happened when it had only started.
+ *
+ * `HOLD_MS` is exported and reused rather than restated. The staff gate no
+ * longer draws this control — it is a hold on the keyboard's Clear key, whose
+ * progress is CSS bound to `:active` because that subtree must not re-render
+ * (see components/Keyboard.tsx) — but a kiosk with two hold gestures of
+ * different lengths would be a kiosk that teaches its staff nothing.
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { haptic } from '@/lib/utils';

@@ -132,9 +132,21 @@ async function type(text: string): Promise<void> {
   await settle();
 }
 
+/**
+ * A tap: contact *and* release.
+ *
+ * Every control here commits on `pointerdown`, so the lift changes nothing for
+ * them — but a finger that never leaves the glass is not a tap, and one key on
+ * this keyboard now cares. Holding **Clear** is the staff gate (see
+ * KioskApp.staffGate.test.tsx), so a synthetic press that never lifts leaves
+ * that timer armed, and the next test that advances the clock opens a screen
+ * nobody asked for.
+ */
 async function tap(text: RegExp | string): Promise<void> {
+  const button = screen.getByText(text).closest('button')!;
   await act(async () => {
-    fireEvent.pointerDown(screen.getByText(text).closest('button')!);
+    fireEvent.pointerDown(button);
+    fireEvent.pointerUp(button);
   });
   await settle();
 }
