@@ -62,6 +62,14 @@ async function recordIsGone(registrationId: string): Promise<void> {
  */
 async function approve(card: ReturnType<typeof cardFor>): Promise<void> {
   await card.getByRole('button', { name: /Approve and add|Finish adding them/i }).click();
+  /*
+   * Wait for the armed foot before committing, and not only for tidiness:
+   * arming re-renders the same two slots, so a commit click fired in the same
+   * tick can land on a node React is in the middle of updating — the press
+   * registers with the browser and never reaches the new handler. Observing
+   * the state first is also what a person does.
+   */
+  await expect(card.getByRole('button', { name: /^Cancel$/ })).toBeVisible();
   await card.getByRole('button', { name: /^Yes — add/i }).click();
 }
 
@@ -293,7 +301,9 @@ test.describe('deciding a family', () => {
       await gotoReady(page, '/review');
       const card = cardFor(page, `Lia ${surname}`);
       await expect(card).toBeVisible({ timeout: 30_000 });
-      await expect(card.getByText(/about to be cleared/i)).toBeVisible();
+      // The badge carries the number of days; the strip carries what is lost.
+      await expect(card.getByText(/days left/i)).toBeVisible();
+      await expect(card.getByText(/the phone number goes with it/i)).toBeVisible();
     } finally {
       await removeRegistration(registrationId, 1);
     }

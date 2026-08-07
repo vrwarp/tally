@@ -39,6 +39,14 @@ function cardFor(page: Page, title: string) {
  */
 async function approve(card: ReturnType<typeof cardFor>): Promise<void> {
   await card.getByRole('button', { name: /Approve and add|Finish adding them/i }).click();
+  /*
+   * Wait for the armed foot before committing, and not only for tidiness:
+   * arming re-renders the same two slots, so a commit click fired in the same
+   * tick can land on a node React is in the middle of updating — the press
+   * registers with the browser and never reaches the new handler. Observing
+   * the state first is also what a person does.
+   */
+  await expect(card.getByRole('button', { name: /^Cancel$/ })).toBeVisible();
   await card.getByRole('button', { name: /^Yes — add/i }).click();
 }
 
