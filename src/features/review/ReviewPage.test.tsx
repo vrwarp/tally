@@ -306,14 +306,33 @@ describe('once a child has been merged', () => {
       settled: true,
     });
 
-  it('says merged rather than added, and stops offering the picker', async () => {
+  it('names who they were folded into, and stops offering the picker', async () => {
     listPendingRegistrations.mockResolvedValue({ data: [merged()] });
     mount();
 
-    expect(await screen.findByText('Merged')).toBeInTheDocument();
+    // "Merged" alone named nobody: a reviewer inheriting this queue could not
+    // see which row the child is now part of.
+    expect(await screen.findByText(/Merged into/i)).toBeInTheDocument();
+    expect(screen.getByText(/Robin Fields · 9th grade/)).toBeInTheDocument();
     expect(screen.queryByText('Added')).not.toBeInTheDocument();
     // Offering it again would invite folding the same child a second time.
     expect(screen.queryByText(/shares this name/i)).not.toBeInTheDocument();
+  });
+
+  it('offers the undo the picker promises, because the callable has always had one', async () => {
+    /*
+     * The screen argues for merging on the grounds that it can be taken back —
+     * and then never offered the taking back, while approval bakes the
+     * association into a push that cannot be undone.
+     */
+    listPendingRegistrations.mockResolvedValue({ data: [merged()] });
+    const user = userEvent.setup();
+    mount();
+
+    await user.click(await screen.findByRole('button', { name: /^Undo$/ }));
+    await waitFor(() =>
+      expect(mergeStudents).toHaveBeenCalledWith({ foldId: 'held-1', undo: true }),
+    );
   });
 });
 
@@ -374,6 +393,31 @@ describe('the two decisions', () => {
 
     expect(await screen.findByText(/Planning Center is down/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Finish adding them/i })).toBeInTheDocument();
+  });
+
+  it('stops calling the retry the right answer when the adult is what was refused', async () => {
+    /*
+     * On every other card the blue button is the move. On this one it
+     * reattempts the refusal that put the card here — so it says so, it stops
+     * being the primary, and the instrument that can actually end the job
+     * takes the weight.
+     */
+    listPendingRegistrations.mockResolvedValue({
+      data: [
+        registration({
+          lastError: 'That number already belongs to somebody else.',
+          lastErrorKind: 'guardian',
+        }),
+      ],
+    });
+    mount();
+
+    expect(await screen.findByRole('button', { name: /Try Dana again/i })).toBeInTheDocument();
+    expect(screen.getByText(/nothing about the refusal has changed/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /without Dana/i })).toBeInTheDocument();
+    // And the generic caption is gone: it described an outcome this press
+    // cannot reach.
+    expect(screen.queryByText(/^Adds Robin to the church/i)).not.toBeInTheDocument();
   });
 
   it('says so rather than failing silently when the server cannot be reached', async () => {

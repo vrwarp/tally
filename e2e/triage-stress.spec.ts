@@ -47,7 +47,16 @@ async function approve(card: ReturnType<typeof cardFor>): Promise<void> {
    * the state first is also what a person does.
    */
   await expect(card.getByRole('button', { name: /^Cancel$/ })).toBeVisible();
-  await card.getByRole('button', { name: /^Yes — add/i }).click();
+  /*
+   * Scrolled into view before the press, and the press aimed at the button
+   * rather than at a point: inside a multi-column container a card that sits
+   * below the fold reports coordinates the hit test then disagrees with, and
+   * the click lands on nothing. The symptom is silent — the callable is never
+   * invoked and the card simply stays armed.
+   */
+  const commit = card.getByRole('button', { name: /^Yes — add/i });
+  await commit.scrollIntoViewIfNeeded();
+  await commit.click();
 }
 
 test.describe('two people, one family', () => {

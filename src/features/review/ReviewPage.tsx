@@ -220,6 +220,12 @@ export function ReviewPage() {
                     return data.message;
                   })
                 }
+                onUnmerge={(foldId) =>
+                  void act(row.registrationId, async () => {
+                    const { data } = await mergeStudents({ foldId, undo: true });
+                    return data.message;
+                  })
+                }
               />
             ))}
           </div>
@@ -245,6 +251,7 @@ interface RegistrationCardProps {
   onApprove: (withoutGuardian?: boolean) => void;
   onDiscard: () => void;
   onMerge: (keeperId: string, foldId: string) => void;
+  onUnmerge: (foldId: string) => void;
 }
 
 /**
@@ -307,6 +314,7 @@ function RegistrationCard({
   onApprove,
   onDiscard,
   onMerge,
+  onUnmerge,
 }: RegistrationCardProps) {
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
   const [confirmingApprove, setConfirmingApprove] = useState(false);
@@ -326,6 +334,13 @@ function RegistrationCard({
   const daysLeft = Math.max(1, Math.ceil((row.expiresInMs ?? 0) / DAY_MS));
 
   const held = stillHeld(row);
+  /*
+   * The adult is what the backend refused, which is usually refused for a
+   * reason no retry can fix. `lastErrorKind` is null on records written before
+   * it existed, and those get the ordinary foot rather than a guess.
+   */
+  const guardianRefused =
+    row.lastError !== null && (row.lastErrorKind === 'guardian' || row.lastErrorKind === 'both');
   /*
    * The children whose name collision nobody has decided yet.
    *
@@ -468,6 +483,7 @@ function RegistrationCard({
               key={child.studentId ?? `${child.firstName}:${index}`}
               child={child}
               disabled={disabled}
+              onUnmerge={onUnmerge}
               resolution={child.studentId ? resolution[child.studentId] : undefined}
               onResolve={(choice) => {
                 if (!child.studentId) return;
@@ -530,16 +546,31 @@ function RegistrationCard({
                 caption={
                   unsettled.length > 0
                     ? `Waiting on ${listNames(unsettled)}’s row. Choose who they already are, or say they are new — then this adds ${listNames(held)} for good.`
-                    : `Adds ${listNames(held)} to the church’s database. Nothing added there can be taken back.`
+                    : guardianRefused
+                      ? /*
+                          An honest caption on the one card where the blue
+                          button is the wrong answer. Every other card's
+                          primary is the right move; here it reattempts the
+                          refusal that put the card in this state, so it says
+                          so — and it stops being the primary, because the
+                          instrument that ends the job is below it.
+                        */
+                        `Tries ${row.guardian?.firstName ?? 'the parent'} again. The last attempt was refused, and nothing about the refusal has changed on its own.`
+                      : `Adds ${listNames(held)} to the church’s database. Nothing added there can be taken back.`
                 }
               >
                 <Button
+                  variant={guardianRefused ? 'secondary' : 'primary'}
                   className="mt-auto min-h-12 w-full lg:w-auto"
                   onClick={() => setConfirmingApprove(true)}
                   disabled={disabled || unsettled.length > 0}
                   aria-busy={busy || undefined}
                 >
-                  {row.settled ? 'Finish adding them' : 'Approve and add'}
+                  {guardianRefused
+                    ? `Try ${row.guardian?.firstName ?? 'the parent'} again`
+                    : row.settled
+                      ? 'Finish adding them'
+                      : 'Approve and add'}
                 </Button>
               </Decision>
 
@@ -604,19 +635,28 @@ function RegistrationCard({
           children are already upstream" has no way to end the job. A child-side
           failure is left alone, because retrying that one usually works.
         */}
-        {row.lastError && row.lastErrorKind !== 'children' && row.guardian ? (
-          <Decision
-            caption={`Adds ${listNames(held)} with no adult attached, and forgets ${formatPhone(row.guardian.phone)}. Somebody has to join them to a household in the church’s database afterwards.`}
-          >
-            <Button
-              variant="secondary"
-              className="min-h-12 w-full lg:w-auto"
-              onClick={() => onApprove(true)}
-              disabled={disabled}
+        {/*
+          The move that ends the job, in the foot's own grammar rather than
+          loose beneath it — its own rule, its own row, one caption bound to
+          one control. It carries the primary's weight here because on this
+          card it is the answer: the retry above cannot succeed on its own, and
+          the two neutral buttons it used to sit between were the two furthest
+          apart outcomes in the queue told apart by a word.
+        */}
+        {guardianRefused && row.guardian ? (
+          <div className="flex flex-col gap-5 border-t border-ink-800 pt-4">
+            <Decision
+              caption={`Adds ${listNames(held)} with no adult attached, and forgets ${formatPhone(row.guardian.phone)}. Somebody has to join them to a household in the church’s database afterwards.`}
             >
-              Add the children without {row.guardian.firstName}
-            </Button>
-          </Decision>
+              <Button
+                className="min-h-12 w-full lg:w-auto"
+                onClick={() => onApprove(true)}
+                disabled={disabled}
+              >
+                Add the children without {row.guardian.firstName}
+              </Button>
+            </Decision>
+          </div>
         ) : null}
       </div>
     </Card>
@@ -641,12 +681,14 @@ function ChildRow({
   disabled,
   resolution,
   onResolve,
+  onUnmerge,
 }: {
   child: PendingRegistrationChild;
   disabled: boolean;
   /** A candidate id, `'new'`, or nothing decided yet. */
   resolution: string | 'new' | undefined;
   onResolve: (choice: string | 'new') => void;
+  onUnmerge: (foldId: string) => void;
 }) {
   const candidates = candidatesFor(child);
 
@@ -687,12 +729,40 @@ function ChildRow({
           identical form at two scopes made position the only thing carrying the
           difference.
         */}
-        {child.mergedIntoStudentId ? (
-          <span className="shrink-0 text-xs text-ink-400">Merged</span>
-        ) : child.pendingReview ? null : (
+        {child.mergedIntoStudentId ? null : child.pendingReview ? null : (
           <span className="shrink-0 text-xs text-ink-400">Added</span>
         )}
       </div>
+
+      {/*
+        A merge is the one decision on this screen that can be taken back, and
+        the picker above says so in as many words — "merging can be undone, a
+        duplicate in the church's database cannot" — while the result of one was
+        a dead grey word that named nobody. A reviewer inheriting this queue on
+        Tuesday could not see who the child had been folded into, could not
+        correct it, and then approved, which bakes the association into a push
+        that has no delete. Both halves are cheap: the keeper is already in the
+        payload, and the callable already takes `undo`.
+      */}
+      {child.mergedIntoStudentId && child.studentId ? (
+        <div className="mt-2 ml-12 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span className={CAPTION}>
+            Merged into{' '}
+            <span className="text-ink-300">
+              {keeperLabel(child) ?? 'a row on the roster'}
+            </span>
+            . Their check-ins are kept together.
+          </span>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => onUnmerge(child.studentId!)}
+            className="text-sm text-brand-400 underline-offset-2 hover:underline disabled:opacity-60 lg:text-xs"
+          >
+            Undo
+          </button>
+        </div>
+      ) : null}
 
       {candidates.length > 0 && child.studentId ? (
         /*
@@ -711,8 +781,15 @@ function ChildRow({
           </p>
 
           <ul
+            /*
+              `gap-3` rather than `gap-1.5`: these are adjacent targets with
+              different consequences, and on a phone the boundary between two
+              candidates is the boundary between folding a child into one row
+              and folding them into another. Six pixels was the tightest gap on
+              a page whose two primary decisions sit sixty-six apart.
+            */
             className={cn(
-              'mt-2 flex flex-col gap-1.5',
+              'mt-2 flex flex-col gap-3',
               candidates.length > 1 && 'lg:grid lg:grid-cols-2 lg:gap-x-6',
             )}
           >
@@ -740,11 +817,18 @@ function ChildRow({
             disabled={disabled}
             aria-pressed={resolution === 'new'}
             onClick={() => onResolve('new')}
+            /*
+              Further from the candidates than they are from each other, and
+              narrower than the group: it is a different kind of answer, not a
+              third candidate, and it was reading as the recommended one by
+              being the widest object in the block while carrying the dimmest
+              label.
+            */
             className={cn(
-              'mt-1.5 flex min-h-12 w-full items-center rounded-lg px-3 py-2 text-left text-sm ring-1 transition-colors disabled:opacity-60 pointer-fine:min-h-9',
+              'mt-4 flex min-h-12 items-center rounded-lg px-3 py-2 text-left text-sm ring-1 transition-colors disabled:opacity-60 pointer-fine:min-h-9',
               resolution === 'new'
                 ? 'bg-brand-500/15 text-brand-300 ring-brand-500/40'
-                : 'text-ink-400 ring-ink-800 active:bg-ink-900',
+                : 'text-ink-400 ring-ink-800 hover:bg-ink-900 active:bg-ink-900',
             )}
           >
             {resolution === 'new' ? '✓ ' : ''}
@@ -789,9 +873,15 @@ function CandidateButton({
       onClick={onChoose}
       className={cn(
         'flex min-h-12 w-full flex-col justify-center rounded-lg px-3 py-2 text-left ring-1 transition-colors disabled:opacity-60 pointer-fine:min-h-9',
+        /*
+          Raised, not recessed. These wore the card's own background with the
+          same ring the read-only consequence strip wears, so a paragraph, a
+          candidate and a button were one material and pressability was
+          invisible. `ink-800` is a step *up* from the row they sit in.
+        */
         chosen
           ? 'bg-brand-500/15 text-brand-300 ring-brand-500/40'
-          : 'bg-ink-900 text-ink-200 ring-ink-700 active:bg-ink-800',
+          : 'bg-ink-800 text-ink-100 ring-ink-600 hover:bg-ink-700 active:bg-ink-700',
       )}
     >
       <span className="truncate text-sm">
@@ -809,6 +899,15 @@ function CandidateButton({
       </span>
     </button>
   );
+}
+
+/** Who a merged child was folded into, when the payload can say. */
+function keeperLabel(child: PendingRegistrationChild): string | null {
+  const keeper = child.possibleDuplicates.find(
+    (candidate) => candidate.studentId === child.mergedIntoStudentId,
+  );
+  if (!keeper) return null;
+  return keeper.known ? `${nameOf(keeper)}${gradeSentence(keeper) ? ` · ${gradeSentence(keeper)}` : ''}` : null;
 }
 
 /**
