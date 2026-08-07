@@ -772,7 +772,20 @@ export interface ApproveRegistrationResult {
  * half-finished.
  */
 export const approveRegistration = httpsCallable<
-  { registrationId: string },
+  {
+    registrationId: string;
+    /**
+     * Finish without the adult.
+     *
+     * For the family whose guardian write the backend refuses for a reason no
+     * retry can fix — usually a number it already holds for somebody outside
+     * this household. Without this the record can only be retried for ever or
+     * discarded, and discarding a family whose children are already upstream
+     * leaves them there with nothing attached. Never sent by default: the
+     * parent's details are lost with the record.
+     */
+    withoutGuardian?: boolean;
+  },
   ApproveRegistrationResult
 >(functions, 'approveRegistration');
 

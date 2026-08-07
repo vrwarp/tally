@@ -2396,7 +2396,7 @@ export const listPendingRegistrations = onCall<void, Promise<PendingRegistration
  * rather than something that happened while they were serving coffee.
  */
 export const approveRegistration = onCall<
-  { registrationId: string },
+  { registrationId: string; withoutGuardian?: boolean },
   Promise<ApproveRegistrationResult>
 >({ secrets: BACKEND_SECRETS, timeoutSeconds: 300, memory: '256MiB' }, async (request) => {
   await requireCoreTeam(request.auth?.uid);
@@ -2410,6 +2410,9 @@ export const approveRegistration = onCall<
     db: database,
     registry: await createRegistry(database),
     registrationId: registrationId.trim(),
+    // Optional on the wire, and absent means the ordinary approval — an old
+    // bundle cannot accidentally discard a guardian by omission.
+    withoutGuardian: request.data?.withoutGuardian === true,
     uid: request.auth!.uid,
     logger,
   });

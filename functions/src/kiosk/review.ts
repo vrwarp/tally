@@ -299,16 +299,33 @@ export interface ApproveRegistrationResult {
  * `pushStudent` skips a child it has already linked, and `createFamily` refuses
  * to invent a second adult for a family that has one. Pressing the button twice
  * is a supported way to finish a job that half-finished.
+ *
+ * ## The dead end this used to have
+ *
+ * A guardian write can fail for a reason no retry can fix — commonly that the
+ * number belongs to a person the backend already has, outside this household.
+ * The record then survived for ever, offering a button that reattempted the
+ * same refusal every time, and a reviewer's only alternative was **Not ours**,
+ * which discards a family whose children may already be upstream where nothing
+ * can delete them. Neither move ends the job, and the screen had no third.
+ *
+ * `withoutGuardian` is that third: push the children, deliberately skip the
+ * adult, and let the record go. It is a decision rather than a retry — the
+ * parent's name and number are lost with the record, which is the whole point
+ * of taking it, so the caller is expected to have said so on screen first.
  */
 export async function approveRegistration(options: {
   db: FirestoreLike;
   registry: BackendRegistry;
   registrationId: string;
   uid: string;
+  /** Finish without the adult, for a household the backend will not build. */
+  withoutGuardian?: boolean;
   now?: Date;
   logger?: FunctionLogger;
 }): Promise<ApproveRegistrationResult> {
   const { db, registry, registrationId, uid } = options;
+  const withoutGuardian = options.withoutGuardian === true;
   const now = options.now ?? new Date();
   const logger = options.logger ?? SILENT_LOGGER;
 
@@ -438,7 +455,21 @@ export async function approveRegistration(options: {
    */
   const buildFamily = backend.capabilities.parentCreatable ? backend.createFamily : undefined;
 
-  if (record.guardian && buildFamily === undefined) {
+  if (record.guardian && withoutGuardian) {
+    /*
+     * Asked for deliberately, so not attempted at all — and reported as its own
+     * outcome rather than as `disabled`, which means "this deployment could
+     * never". This one could have; a person decided it should not, and the
+     * message says whose details are going nowhere so the sentence a reviewer
+     * reads afterwards matches the sentence they agreed to.
+     */
+    guardian = 'skipped';
+    guardianMessage = `Added the children only. ${record.guardian.firstName} ${record.guardian.lastName}'s details were not recorded in ${backend.displayName}, and the number is gone from Tally.`;
+    logger.info('Approved a registration without its guardian, at a reviewer’s request', {
+      registrationId,
+      children: live.length,
+    });
+  } else if (record.guardian && buildFamily === undefined) {
     guardian = 'disabled';
     guardianMessage = `${backend.displayName} cannot take a parent's details from Tally, so ${record.guardian.firstName}'s name and number were not recorded there.`;
   } else if (record.guardian && buildFamily !== undefined) {
@@ -486,7 +517,11 @@ export async function approveRegistration(options: {
     guardian === 'created' ||
     guardian === 'joined' ||
     guardian === 'already-has-family' ||
-    guardian === 'disabled';
+    guardian === 'disabled' ||
+    // A guardian a reviewer chose to skip is settled by that choice. Holding
+    // the record open would keep offering the retry they just declined, and
+    // keep the number for thirty days to serve it.
+    withoutGuardian;
   const unfinished = failed > 0 || (record.guardian !== null && !guardianSettled);
 
   if (unfinished) {

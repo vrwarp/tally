@@ -336,6 +336,58 @@ describe('approving', () => {
     expect(record.guardian).toMatchObject({ phone: '5550103344' });
   });
 
+  it('can finish without the adult, for a household the backend will not build', async () => {
+    /*
+     * The dead end this exists to end: a guardian write refused for a reason no
+     * retry can fix. Before, the record survived for ever offering a button
+     * that reattempted the same refusal, and the only alternative was
+     * discarding a family whose children may already be upstream where nothing
+     * deletes them.
+     */
+    const db = dbWithRegistration();
+    const createFamily = vi.fn(async () => familyResult('created', 'Added the family.'));
+    const backend = backendWith({ createFamily });
+
+    const result = await approveRegistration({
+      db,
+      registry: registryOf(backend),
+      registrationId: ID,
+      uid: 'core-uid',
+      withoutGuardian: true,
+      now: NOW,
+    });
+
+    // The children land; the adult is never attempted, not merely failed.
+    expect(result.status).toBe('approved');
+    expect(result.pushed).toBe(2);
+    expect(createFamily).not.toHaveBeenCalled();
+    expect(result.message).toMatch(/were not recorded in Planning Center/i);
+    // And the job is over: the record goes, and the number with it, rather
+    // than being held thirty days to serve a retry the reviewer declined.
+    expect(db.get(`${REGISTRATIONS_COLLECTION}/${ID}`)).toBeUndefined();
+  });
+
+  it('still pushes nobody twice when finishing without the adult', async () => {
+    // The children are already upstream from the attempt that half-failed;
+    // finishing must not create second people for them.
+    const db = dbWithRegistration({ lastError: 'That number is already on file.' });
+    const pushStudent = vi.fn(async () => ({ status: 'skipped' as const }));
+    const result = await approveRegistration({
+      db,
+      registry: registryOf(backendWith({ pushStudent } as unknown as Partial<PeopleBackend>)),
+      registrationId: ID,
+      uid: 'core-uid',
+      withoutGuardian: true,
+      now: NOW,
+    });
+
+    expect(pushStudent).toHaveBeenCalledTimes(2);
+    // A skip is not a landing, so the record stays and says so — finishing
+    // without the adult is not a licence to declare the children done.
+    expect(result.status).toBe('partial');
+    expect(db.get(`${REGISTRATIONS_COLLECTION}/${ID}`)).toBeDefined();
+  });
+
   it('finishes, and forgets the number, when there is nowhere to push', async () => {
     const db = dbWithRegistration();
     const result = await approveRegistration({
