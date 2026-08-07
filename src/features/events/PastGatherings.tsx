@@ -19,6 +19,7 @@ import { format } from 'date-fns';
 import { Badge, ErrorBanner } from '@/components/ui';
 import { EventIcon } from '@/components/ui/EventIcon';
 import { useEventSnapshots } from '@/hooks/useEventSnapshots';
+import { useData } from '@/context/dataContext';
 import { usePastEvents } from '@/hooks/usePastEvents';
 import { formatEventWindow } from '@/lib/time';
 import type { TallyEvent } from '@/types';
@@ -157,7 +158,19 @@ export interface PastGatheringsProps {
 
 export function PastGatherings({ before }: PastGatheringsProps) {
   const { events, loading, hasMore, error, loadMore, retry } = usePastEvents(before);
-  const { snapshots } = useEventSnapshots(events);
+  const { canWork } = useData();
+  /*
+   * Narrowed to the gatherings this counselor may actually work, before the
+   * read rather than after.
+   *
+   * Not an optimisation. `fetchAttendanceByEvent` tolerates a refusal per
+   * event, but a refusal is still a round trip and still a console error on a
+   * screen that has nothing to say about it — and asking at all for a register
+   * the reader cannot have is asking a question whose answer would be
+   * misleading if it arrived.
+   */
+  const workable = useMemo(() => events.filter(canWork), [events, canWork]);
+  const { snapshots } = useEventSnapshots(workable);
 
   const counts = useMemo(
     () => new Map(snapshots.map((snapshot) => [snapshot.event.id, snapshot.presentStudentIds.size])),

@@ -86,7 +86,8 @@ const MAX_EVENTS = 24;
 const ALL = 'all';
 
 export function DashboardPage() {
-  const { students, events, series, settings, loading, rosterLoading, rosterSettled } = useData();
+  const { students, events, series, settings, loading, rosterLoading, rosterSettled, canWork } =
+    useData();
   const now = useNow(60_000);
   const [selected, setSelected] = useState<string>(ALL);
 
@@ -136,7 +137,27 @@ export function DashboardPage() {
     return lastWindow.current;
   }, [events, now]);
 
-  const { snapshots, loading: snapshotsLoading, error } = useEventSnapshots(recentEvents);
+  /*
+   * Narrowed to the gatherings this reader may work, before the read.
+   *
+   * This is where restriction stops being cosmetic for the core team: the
+   * numbers on this screen come from registers, so a gathering the reader is
+   * not on cannot appear in them at all. Silently shrinking would be the worst
+   * failure available on a screen whose job is "who is missing" — a leader
+   * would read a smaller MIA list as good news. So what was left out is named
+   * under the tabs.
+   */
+  const workable = useMemo(() => recentEvents.filter(canWork), [recentEvents, canWork]);
+  const { snapshots, loading: snapshotsLoading, error } = useEventSnapshots(workable);
+
+  /** The gatherings excluded from every number on this screen, by title. */
+  const excluded = useMemo(() => {
+    const titles = new Map<string, string>();
+    for (const event of recentEvents) {
+      if (!canWork(event)) titles.set(chainKey(event), event.title);
+    }
+    return [...titles.values()].sort((a, b) => a.localeCompare(b));
+  }, [recentEvents, canWork]);
 
   /*
    * The gatherings that actually happened, grouped by the chain they belong to.
@@ -352,6 +373,14 @@ export function DashboardPage() {
           selected={active}
           onSelect={setSelected}
         />
+      ) : null}
+
+      {excluded.length > 0 ? (
+        <p className="text-xs text-ink-500">
+          {excluded.length === 1
+            ? `${excluded[0]} is not shown — you're not on it.`
+            : `${excluded.slice(0, -1).join(', ')} and ${excluded[excluded.length - 1]} are not shown — you're not on them.`}
+        </p>
       ) : null}
 
       {error ? <ErrorBanner message={`Could not load attendance history. ${error}`} /> : null}

@@ -17,6 +17,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { act, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthContext, type AuthContextValue } from '@/context/authContext';
+import { DataContext, type DataContextValue } from '@/context/dataContext';
 import { ChooseEvent } from '@/features/checkin/ChooseEvent';
 import { invalidateSnapshotCache } from '@/hooks/useEventSnapshots';
 import { makeEvent } from '../../../tests/factories';
@@ -65,16 +66,36 @@ function auth(role: 'counselor' | 'core'): AuthContextValue {
   } as AuthContextValue;
 }
 
-function wrap(children: ReactNode, role: 'counselor' | 'core') {
+/**
+ * Which gatherings are this counselor's.
+ *
+ * Everything is, unless a test says otherwise — that is the state Tally ships
+ * in, and the thing most of this file is about.
+ */
+function data(canWork: (event: TallyEvent) => boolean = () => true): DataContextValue {
+  return { access: new Map(), canWork } as unknown as DataContextValue;
+}
+
+function wrap(
+  children: ReactNode,
+  role: 'counselor' | 'core',
+  canWork?: (event: TallyEvent) => boolean,
+) {
   return (
     <AuthContext.Provider value={auth(role)}>
-      <MemoryRouter>{children}</MemoryRouter>
+      <DataContext.Provider value={data(canWork)}>
+        <MemoryRouter>{children}</MemoryRouter>
+      </DataContext.Provider>
     </AuthContext.Provider>
   );
 }
 
-function show(events: readonly TallyEvent[], role: 'counselor' | 'core' = 'core') {
-  return render(wrap(<ChooseEvent events={events} now={NOW} />, role));
+function show(
+  events: readonly TallyEvent[],
+  role: 'counselor' | 'core' = 'core',
+  canWork?: (event: TallyEvent) => boolean,
+) {
+  return render(wrap(<ChooseEvent events={events} now={NOW} />, role, canWork));
 }
 
 /** The same, at an hour of the caller's choosing — for the night that runs late. */

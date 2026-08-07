@@ -26,6 +26,7 @@ import { useAuth } from '@/context/authContext';
 import { EventHeroCard } from '@/features/events/EventHeroCard';
 import { PastEventRow } from '@/features/events/PastGatherings';
 import { useEventSnapshots } from '@/hooks/useEventSnapshots';
+import { useData } from '@/context/dataContext';
 import { usePastEvents } from '@/hooks/usePastEvents';
 import { isCheckInOpen, startOfDay } from '@/lib/time';
 import type { TallyEvent } from '@/types';
@@ -49,6 +50,7 @@ export interface ChooseEventProps {
 
 function CatchUp({ before, now }: { before: Date; now: Date }) {
   const { events, loading } = usePastEvents(before, CATCH_UP);
+  const { canWork } = useData();
 
   /*
    * "Before midnight" and "finished" are not the same thing.
@@ -66,7 +68,18 @@ function CatchUp({ before, now }: { before: Date; now: Date }) {
     [events, now],
   );
 
-  const { snapshots } = useEventSnapshots(finished);
+  /*
+   * Narrowed to the gatherings this counselor may actually work, before the
+   * read rather than after.
+   *
+   * Not an optimisation. `fetchAttendanceByEvent` tolerates a refusal per
+   * event, but a refusal is still a round trip and still a console error on a
+   * screen that has nothing to say about it — and asking at all for a register
+   * the reader cannot have is asking a question whose answer would be
+   * misleading if it arrived.
+   */
+  const workable = useMemo(() => finished.filter(canWork), [finished, canWork]);
+  const { snapshots } = useEventSnapshots(workable);
 
   const counts = useMemo(
     () => new Map(snapshots.map((s) => [s.event.id, s.presentStudentIds.size])),

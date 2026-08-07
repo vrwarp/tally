@@ -190,13 +190,25 @@ function RowSection({
 /* -------------------------------------------------------------------------- */
 
 function Today({ events, now }: { events: readonly TallyEvent[]; now: Date }) {
+  const { canWork } = useData();
   // Head counts, but only for the gatherings that have finished. See the note
   // on `present` in `EventHeroCard`.
   const finished = useMemo(
     () => events.filter((event) => event.checkInClosesAt < now),
     [events, now],
   );
-  const { snapshots } = useEventSnapshots(finished);
+  /*
+   * Narrowed to the gatherings this counselor may actually work, before the
+   * read rather than after.
+   *
+   * Not an optimisation. `fetchAttendanceByEvent` tolerates a refusal per
+   * event, but a refusal is still a round trip and still a console error on a
+   * screen that has nothing to say about it — and asking at all for a register
+   * the reader cannot have is asking a question whose answer would be
+   * misleading if it arrived.
+   */
+  const workable = useMemo(() => finished.filter(canWork), [finished, canWork]);
+  const { snapshots } = useEventSnapshots(workable);
   const present = useMemo(
     () => new Map(snapshots.map((s) => [s.event.id, s.presentStudentIds.size])),
     [snapshots],
