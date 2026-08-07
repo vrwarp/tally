@@ -238,7 +238,7 @@ test.describe('deciding a family', () => {
       await gotoReady(page, '/review');
       const card = cardFor(page, `Odile ${surname}`);
       await expect(card).toBeVisible({ timeout: 30_000 });
-      await card.getByRole('button', { name: /Approve and add/i }).click();
+      await approve(card);
 
       await expect
         .poll(async () => (await simulatorPeople()).filter((p) => p.last_name === surname).length, {
@@ -281,7 +281,7 @@ test.describe('deciding a family', () => {
       await expect(card.getByText(/did not finish/i)).toHaveCount(0);
       await expect(card.getByText(/Approving joins that household/i)).toBeVisible();
 
-      await card.getByRole('button', { name: /Approve and add/i }).click();
+      await approve(card);
 
       await expect
         .poll(async () => (await simulatorPeople()).filter((p) => p.last_name === surname).length, {
