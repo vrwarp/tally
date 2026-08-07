@@ -35,6 +35,15 @@ vi.mock('@/services/attendance', () => ({
   fetchAttendanceByEvent: (...args: unknown[]) => fetchAttendanceByEvent(...args),
 }));
 
+// The locked section names who can let you in, which is the only thing on this
+// screen that needs the team directory. Nobody here has a name to look up.
+vi.mock('@/services/users', () => ({
+  subscribeUsers: (next: (value: never[]) => void) => {
+    next([]);
+    return () => {};
+  },
+}));
+
 /** Wednesday 29 July 2026, quarter past four in the afternoon. */
 const NOW = new Date(2026, 6, 29, 16, 15);
 
@@ -283,6 +292,65 @@ describe('choosing a gathering', () => {
 /* -------------------------------------------------------------------------- */
 /* Nothing on                                                                  */
 /* -------------------------------------------------------------------------- */
+
+describe('a gathering the counselor is not on', () => {
+  /*
+   * The whole feature, from the door. `mine` is what they came for; `locked` is
+   * demoted below a divider rather than removed, because a counselor at 6:59pm
+   * looking at an empty screen concludes the app is broken and files forty
+   * check-ins against the wrong thing.
+   */
+  const FRIDAY = event({
+    id: 'friday',
+    title: 'Friday Fellowship',
+    startAt: at(29, 19),
+    endAt: at(29, 21),
+  });
+  const SUNDAY = event({
+    id: 'sunday',
+    title: 'Sunday School',
+    startAt: at(29, 9),
+    endAt: at(29, 10, 30),
+  });
+
+  const mineOnly = (e: TallyEvent) => e.id !== 'sunday';
+
+  it('keeps it on the screen, below the divider, and off the cards', async () => {
+    show([FRIDAY, SUNDAY], 'counselor', mineOnly);
+
+    // Theirs is still a hero card with a route into the register.
+    expect(screen.getByRole('link', { name: /friday fellowship/i })).toBeInTheDocument();
+
+    const notYours = screen.getByRole('region', { name: /not yours/i });
+    expect(within(notYours).getByText('Sunday School')).toBeInTheDocument();
+    // Demoted, not promoted: no route in, because the gathering's own page
+    // would refuse them too.
+    expect(within(notYours).queryByRole('link')).not.toBeInTheDocument();
+
+    await settle();
+  });
+
+  it('says nothing is *yours*, rather than nothing is on', async () => {
+    // The difference between an app that is empty and one that is refusing.
+    // A counselor who reads the first goes and asks somebody.
+    show([SUNDAY], 'counselor', mineOnly);
+
+    expect(screen.getByText(/nothing you’re on today|nothing you're on today/i)).toBeInTheDocument();
+    expect(screen.queryByText(/^nothing on today$/i)).not.toBeInTheDocument();
+
+    await settle();
+  });
+
+  it('leaves it out of the picture entirely when nothing is restricted', async () => {
+    // The state Tally ships in, and the one that must look exactly like before.
+    show([FRIDAY, SUNDAY], 'counselor');
+
+    expect(screen.queryByRole('region', { name: /not yours/i })).not.toBeInTheDocument();
+    expect(cardLinks()).toHaveLength(2);
+
+    await settle();
+  });
+});
 
 describe('when nothing is on', () => {
   it('points the core team at the calendar', async () => {

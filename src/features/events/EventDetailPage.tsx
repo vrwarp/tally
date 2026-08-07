@@ -24,6 +24,7 @@ import {
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useEvent } from '@/hooks/useEvent';
+import { LockedGathering } from '@/features/events/LockedGathering';
 import { useToast } from '@/context/toastContext';
 import { EventDangerZone } from '@/features/events/EventDangerZone';
 import { EventEditorModal } from '@/features/events/EventEditorModal';
@@ -48,7 +49,7 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 
 export function EventDetailPage() {
   const { eventId } = useParams();
-  const { events, series, students, loading } = useData();
+  const { events, series, students, loading, canWork } = useData();
   const { user } = useAuth();
   const { show } = useToast();
   const navigate = useNavigate();
@@ -57,7 +58,14 @@ export function EventDetailPage() {
   // The calendar holds a fixed window; a leader paging the past can reach well
   // past it, and every row down there names a real night. See `useEvent`.
   const { event, loading: eventLoading } = useEvent(eventId);
-  const { attendance, error: attendanceError } = useAttendance(event?.id ?? null);
+  // `null` rather than a branch below: the register must not be listened for at
+  // all on a gathering this reader is not on. See `CheckInPage` for the whole
+  // argument — hooks cannot be skipped, so the way to not mount one is to give
+  // it nothing.
+  const locked = event ? !canWork(event) : false;
+  const { attendance, error: attendanceError } = useAttendance(
+    locked ? null : (event?.id ?? null),
+  );
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
@@ -88,6 +96,19 @@ export function EventDetailPage() {
         />
       </div>
     );
+  }
+
+  /*
+   * Branched before anything reads `attendance`, and that ordering is the bug
+   * this fixes rather than a tidiness preference.
+   *
+   * A refused listener leaves `attendance` empty, and `readsAsCancelled` below
+   * asks exactly that question — so a restricted gathering that ran perfectly
+   * well, with forty students in the room, rendered as "reads as cancelled"
+   * with an empty register underneath it presented as fact.
+   */
+  if (locked) {
+    return <LockedGathering event={event} now={now} backTo="/events" backLabel="Events" />;
   }
 
   const cancelled = event.status === 'cancelled';
