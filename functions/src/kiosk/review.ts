@@ -86,6 +86,18 @@ export interface PendingRegistrationChild extends RegistrationChild {
   pendingReview: boolean;
   /** Set once a reviewer folded this child into a row that was already there. */
   mergedIntoStudentId: string | null;
+  /**
+   * *Who* they were folded into, named.
+   *
+   * Resolved here rather than inferred on the screen from this child's
+   * duplicate hints, because a merge is not always made through those: a
+   * reviewer can fold a row from the directory, and a "wrong person" correction
+   * names somebody the hints never carried. The screen was left printing
+   * "merged into a row on the roster", which is a sentence that names nobody
+   * to a reviewer whose next press bakes the association into a push with no
+   * delete.
+   */
+  mergedInto: ReviewStudentSummary | null;
   /** Only ever set from the QR form; the kiosk does not ask. */
   allergies: string | null;
   /** Active students who already have this name. Suspicion, not a verdict. */
@@ -272,6 +284,10 @@ export async function listPendingRegistrations(
             typeof student?.data.mergedIntoStudentId === 'string'
               ? student.data.mergedIntoStudentId
               : null,
+          mergedInto:
+            typeof student?.data.mergedIntoStudentId === 'string'
+              ? await summarise(db, student.data.mergedIntoStudentId)
+              : null,
           allergies: record.allergies[index] ?? null,
           possibleDuplicates: await Promise.all(
             (record.possibleDuplicateOf[String(index)] ?? []).map((id) => summarise(db, id)),
@@ -311,7 +327,13 @@ export async function listPendingRegistrations(
    */
   await namesFromBackends(
     options.registry,
-    rows.flatMap((row) => [...row.anchors, ...row.children.flatMap((c) => c.possibleDuplicates)]),
+    rows.flatMap((row) => [
+      ...row.anchors,
+      ...row.children.flatMap((child) => [
+        ...child.possibleDuplicates,
+        ...(child.mergedInto ? [child.mergedInto] : []),
+      ]),
+    ]),
     logger,
   );
 

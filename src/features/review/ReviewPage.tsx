@@ -336,11 +336,18 @@ function RegistrationCard({
   const held = stillHeld(row);
   /*
    * The adult is what the backend refused, which is usually refused for a
-   * reason no retry can fix. `lastErrorKind` is null on records written before
-   * it existed, and those get the ordinary foot rather than a guess.
+   * reason no retry can fix.
+   *
+   * An *unknown* kind — a record written before the field existed — is read
+   * the safe way round, and the asymmetry is the argument. Offering the escape
+   * hatch when the children were actually the problem costs a reviewer one
+   * extra sentence to read. Withholding it when the adult was the problem
+   * leaves a family whose only moves are a retry that reattempts the refusal
+   * and a discard that cannot reach the children already upstream — which is
+   * to say no move at all, on a record the sweep will eventually take along
+   * with the only phone number Tally holds for them.
    */
-  const guardianRefused =
-    row.lastError !== null && (row.lastErrorKind === 'guardian' || row.lastErrorKind === 'both');
+  const guardianRefused = row.lastError !== null && row.lastErrorKind !== 'children';
   /*
    * The children whose name collision nobody has decided yet.
    *
@@ -753,11 +760,18 @@ function ChildRow({
             </span>
             . Their check-ins are kept together.
           </span>
+          {/*
+            A real target, not an inline link: this is the control that
+            reverses the only reversible decision on the screen, and it was the
+            one thing on a page of 48px buttons that a thumb had to aim at. A
+            reviewer who cannot land it reliably is a reviewer likelier to
+            approve the merge as it stands, which is the irreversible branch.
+          */}
           <button
             type="button"
             disabled={disabled}
             onClick={() => onUnmerge(child.studentId!)}
-            className="text-sm text-brand-400 underline-offset-2 hover:underline disabled:opacity-60 lg:text-xs"
+            className="flex min-h-11 items-center rounded-lg px-3 text-sm text-brand-400 ring-1 ring-ink-800 transition-colors hover:bg-ink-900 disabled:opacity-60 pointer-fine:min-h-8"
           >
             Undo
           </button>
@@ -901,13 +915,24 @@ function CandidateButton({
   );
 }
 
-/** Who a merged child was folded into, when the payload can say. */
+/**
+ * Who a merged child was folded into, named.
+ *
+ * The callable resolves this now, because inferring it from *this child's*
+ * duplicate hints only worked when the merge had been made through this card's
+ * own picker — a fold from the directory, or a "wrong person" correction, named
+ * nobody, and the row printed "merged into a row on the roster" to a reviewer
+ * whose next press bakes the association into a push with no delete. The hints
+ * remain the fallback for a payload from an older callable.
+ */
 function keeperLabel(child: PendingRegistrationChild): string | null {
-  const keeper = child.possibleDuplicates.find(
-    (candidate) => candidate.studentId === child.mergedIntoStudentId,
-  );
-  if (!keeper) return null;
-  return keeper.known ? `${nameOf(keeper)}${gradeSentence(keeper) ? ` · ${gradeSentence(keeper)}` : ''}` : null;
+  const keeper =
+    child.mergedInto ??
+    child.possibleDuplicates.find(
+      (candidate) => candidate.studentId === child.mergedIntoStudentId,
+    );
+  if (!keeper || !keeper.known) return null;
+  return summaryLabel(keeper);
 }
 
 /**

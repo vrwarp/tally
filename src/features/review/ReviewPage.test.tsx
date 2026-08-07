@@ -319,6 +319,45 @@ describe('once a child has been merged', () => {
     expect(screen.queryByText(/shares this name/i)).not.toBeInTheDocument();
   });
 
+  it('names a keeper the duplicate hints never carried', async () => {
+    /*
+     * A merge made anywhere but this card's own picker — a fold from the
+     * directory, a "wrong person" correction — left the row printing "merged
+     * into a row on the roster", which names nobody to a reviewer whose next
+     * press bakes the association into a push with no delete.
+     */
+    listPendingRegistrations.mockResolvedValue({
+      data: [
+        registration({
+          children: [
+            {
+              firstName: 'Robin',
+              lastName: 'Fields',
+              grade: 4,
+              studentId: 'held-1',
+              pendingReview: false,
+              mergedIntoStudentId: 'pco_99',
+              mergedInto: {
+                studentId: 'pco_99',
+                firstName: 'Robin',
+                lastName: 'Fieldes',
+                grade: 5,
+                known: true,
+                status: 'active',
+              },
+              allergies: null,
+              possibleDuplicates: [],
+            },
+          ],
+          settled: true,
+        }),
+      ],
+    });
+    mount();
+
+    expect(await screen.findByText(/Robin Fieldes · 5th grade/)).toBeInTheDocument();
+  });
+
   it('offers the undo the picker promises, because the callable has always had one', async () => {
     /*
      * The screen argues for merging on the grounds that it can be taken back —
@@ -385,14 +424,23 @@ describe('the two decisions', () => {
     );
   });
 
-  it('offers to finish a registration whose push half-landed', async () => {
+  it('offers the escape hatch on an old record that does not say which half failed', async () => {
+    /*
+     * Records written before `lastErrorKind` existed carry a reason and no
+     * kind, and the two readings of that are not symmetrical. Offering the
+     * escape hatch when the children were the problem costs a reviewer a
+     * sentence to read. Withholding it when the *adult* was the problem leaves
+     * a family whose only moves are a retry that reattempts the refusal and a
+     * discard that cannot reach children already upstream — no move at all, on
+     * a record the sweep will take along with their phone number.
+     */
     listPendingRegistrations.mockResolvedValue({
       data: [registration({ settled: true, lastError: 'Planning Center is down' })],
     });
     mount();
 
     expect(await screen.findByText(/Planning Center is down/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Finish adding them/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /without Dana/i })).toBeInTheDocument();
   });
 
   it('stops calling the retry the right answer when the adult is what was refused', async () => {

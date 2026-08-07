@@ -731,6 +731,8 @@ export interface PendingRegistrationChild {
   pendingReview: boolean;
   /** Set once a reviewer folded this child into a row that was already there. */
   mergedIntoStudentId: string | null;
+  /** Who they were folded into, named — resolved by the callable, not inferred. */
+  mergedInto?: ReviewStudentSummary | null;
   allergies: string | null;
   possibleDuplicates: ReviewStudentSummary[];
 }
