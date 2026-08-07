@@ -149,11 +149,23 @@ export async function readCollection(path: string): Promise<FirestoreDoc[]> {
  * runs one worker against one dataset, so a spec that leaves the Planning
  * Center configuration pointing at a different list does not fail — it makes
  * some later spec fail instead, which is the worst kind of flake to chase.
+ *
+ * 409 is retried for the same reason `clearFirestore` retries it: the emulator
+ * answers "busy" while it is still winding down the Listen streams a closed
+ * browser left behind, and this is usually called from a cleanup step after a
+ * spec that opened several contexts. A teardown that throws there fails a test
+ * whose assertions all passed.
  */
 export async function deleteDocument(path: string): Promise<void> {
-  const response = await fetch(`${FIRESTORE_ROOT}/${path}`, { method: 'DELETE', headers: ADMIN });
-  if (!response.ok && response.status !== 404) {
-    throw new Error(`Deleting ${path} failed: HTTP ${response.status}.`);
+  const deadline = Date.now() + 10_000;
+
+  for (;;) {
+    const response = await fetch(`${FIRESTORE_ROOT}/${path}`, { method: 'DELETE', headers: ADMIN });
+    if (response.ok || response.status === 404) return;
+    if (response.status !== 409 || Date.now() >= deadline) {
+      throw new Error(`Deleting ${path} failed: HTTP ${response.status}.`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
   }
 }
 
