@@ -727,9 +727,11 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       /*
        * Last of the kiosk acts by tradition — the escape hatch here used to
        * sweep the whole church at both backends and replace the roster this
-       * screen was holding. "Search everyone" costs nothing now (it only
-       * widens the pool this one search is handed), but the closing question
-       * — who will this door find? — still reads best at the end.
+       * screen was holding, on every press, whether or not there was anything
+       * to find. "Search everyone" widens the pool this one search is handed
+       * first, and only reaches for the church when that comes up empty — as
+       * it does not for Bree. The closing question — who will this door find?
+       * — still reads best at the end.
        *
        * Bree was met on the lock-in bus and has been to nothing since (the
        * `oneOffGuest` band in scripts/seed.ts), so she is exactly who the scope

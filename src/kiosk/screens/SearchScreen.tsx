@@ -45,7 +45,7 @@ export function SearchScreen({
   tracksCheckOut,
   printerNeedsAttention,
   refresh,
-  widened,
+  widening,
   onWiden,
   onPick,
   onRegister,
@@ -67,9 +67,17 @@ export function SearchScreen({
    * no match" once it has landed) and its failure line.
    */
   refresh: KioskRefresh;
-  /** Whether this search already covers the whole ministry. */
-  widened: boolean;
-  /** Widens this one search to all of Tally. Resets when the buffer clears. */
+  /**
+   * Whether the **Search everyone** press is still working. It is the button's
+   * only feedback, so it is the button's face while it is true.
+   */
+  widening: boolean;
+  /**
+   * Widens this one search to all of Tally *and* re-reads the church. Both
+   * halves are wanted: the first finds a child who belongs to another
+   * gathering, the second finds one who was added since this kiosk last
+   * looked. Resets when the buffer clears.
+   */
   onWiden: () => void;
   onPick: (student: KioskStudent) => void;
   /** Opens the registration offer — the other door off this screen. */
@@ -214,12 +222,14 @@ export function SearchScreen({
              * and "Search everyone" is that scope's honest way out, in the
              * slot where "I already registered" used to widen as a side effect
              * of a network read nobody could see. The third reason — somebody
-             * added the family online moments ago — needs no door at all any
-             * more: the kiosk notices registrations by itself (the pulse), and
-             * for the rare backend-direct addition the church-wide sweep now
-             * runs silently the moment a finished search comes up empty. Its
-             * only remaining surfaces are the headline's "Still" and the
-             * network-failure line below.
+             * added the family online moments ago — needs no door of its own:
+             * the kiosk notices registrations by itself (the pulse), and for
+             * the rare backend-direct addition the church-wide sweep runs
+             * silently the moment a finished search comes up empty. "Search
+             * everyone" is also how a parent asks for that read again by hand,
+             * which is what its spinner is spinning about; the sweep's other
+             * surfaces are the headline's "Still" and the network-failure line
+             * below.
              *
              * Inside the scrolling results region on purpose: this file
              * promises that typing never moves the keyboard, and a block that
@@ -228,9 +238,23 @@ export function SearchScreen({
              */
             <div className="flex flex-col items-center gap-3 pt-6 text-center">
               <div className="text-lg text-ink-400">
-                {refresh === 'done'
-                  ? 'Still no match — first time here?'
-                  : 'No match — first time here?'}
+                {refresh === 'done' ? (
+                  <>
+                    {/*
+                      * The one word that carries the whole answer, and the one
+                      * a parent watching their own finger did not see change.
+                      * It brightens three times and stops: long enough to
+                      * catch an eye coming back up from the button, short
+                      * enough that a lobby screen is not blinking at anybody.
+                      * The word is what changed, so the word is what moves —
+                      * animating the sentence would say the sentence is new.
+                      */}
+                    <span className="animate-word-pulse text-ink-100">Still</span> no match — first
+                    time here?
+                  </>
+                ) : (
+                  'No match — first time here?'
+                )}
               </div>
               <button
                 type="button"
@@ -246,28 +270,58 @@ export function SearchScreen({
               {refresh === 'failed' && (
                 <div className="text-base text-ink-500">Couldn&apos;t reach the network just now.</div>
               )}
-              {!widened && (
-                <button
-                  type="button"
-                  tabIndex={-1}
-                  onPointerDown={(event) => {
-                    event.preventDefault();
-                    haptic();
-                    onWiden();
-                  }}
-                  className="flex h-14 items-center justify-center rounded-xl bg-ink-800 px-8 text-lg font-semibold text-ink-100 active:bg-ink-700"
-                  style={{ touchAction: 'manipulation' }}
-                >
-                  {/*
-                    * Says what it does, unlike its predecessor. The search
-                    * only covers the children who come to *this* gathering;
-                    * a child who belongs to Sunday mornings is one tap away,
-                    * instantly — the wider list is already on the device, so
-                    * nothing loads and nothing waits.
-                    */}
-                  Search everyone
-                </button>
-              )}
+              {/*
+                * Stays, and reports.
+                *
+                * It used to remove itself the moment it was pressed, which
+                * left a parent looking at the place a button had been with
+                * no more evidence of the press than one word changing in the
+                * line above. And it left the family it had failed with
+                * nothing to press: four digits are a small keyspace and
+                * names collide, so "widened and still not mine" is a real
+                * state, and the answer to it — look again, the church may
+                * have added them since — is this control.
+                *
+                * `aria-label` rather than the label alone, so it keeps its
+                * name while its face is a spinner: the button a parent is
+                * waiting on is still the same button.
+                */}
+              <button
+                type="button"
+                tabIndex={-1}
+                aria-label="Search everyone"
+                aria-busy={widening}
+                onPointerDown={(event) => {
+                  event.preventDefault();
+                  haptic();
+                  onWiden();
+                }}
+                className="flex h-14 items-center justify-center rounded-xl bg-ink-800 px-8 text-lg font-semibold text-ink-100 active:bg-ink-700"
+                style={{ touchAction: 'manipulation' }}
+              >
+                {/*
+                  * The spinner sits *over* the label rather than instead of
+                  * it, and the label goes invisible rather than away. The
+                  * button then has exactly one width in both states, set by
+                  * its own words rather than by a guess at how wide they are
+                  * — and a control that changed size under the finger still
+                  * resting on it is a control that reads as pressed by
+                  * accident.
+                  *
+                  * The label itself says what it does, unlike its
+                  * predecessor: the search only covers the children who come
+                  * to *this* gathering, and a child who belongs to Sunday
+                  * mornings is one tap away. Behind it now is also the
+                  * church-wide re-read, which is the half that can take a
+                  * moment and the reason there is anything to spin about.
+                  */}
+                <span className="relative flex items-center justify-center">
+                  <span className={widening ? 'invisible' : undefined}>Search everyone</span>
+                  {widening && (
+                    <span className="absolute block h-6 w-6 animate-spin rounded-full border-2 border-ink-600 border-t-ink-100" />
+                  )}
+                </span>
+              </button>
               <div className="text-base text-ink-500">or see a leader.</div>
             </div>
           )}

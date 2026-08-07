@@ -244,12 +244,23 @@ describe('the escape hatch', () => {
 
     await tap(/Search everyone/i);
 
-    // Instantly, with no read behind it: the wider roster was already in
-    // memory, and the control finally says what it does — where "I already
-    // registered" used to widen as a side effect of a network sweep.
+    // The widening half is instant, and does not wait on the church-wide
+    // re-read the same press starts: the wider roster is already in memory,
+    // and a child who belongs to another gathering is on this device now.
     expect(screen.getByText('Sofia Adeyemi')).toBeTruthy();
-    // Spent: this search already covers everybody, so the offer stands down.
+    // The button is gone because the panel it lives in is gone — a result
+    // ends the no-match state and takes its three doors with it. It is not
+    // gone because it was spent; a press that finds nobody leaves it standing,
+    // which is `KioskApp.refresh.test.tsx`.
     expect(screen.queryByText(/Search everyone/i)).toBeNull();
+    /*
+     * And no church-wide read behind it. The press does start one when the
+     * wider pool comes up empty — that is the half a spinner is spinning
+     * about — but this child was on the device, so reading the whole church
+     * would be spent on a question already answered, in front of a panel that
+     * has left the screen.
+     */
+    expect(services.refreshDirectory).not.toHaveBeenCalled();
   });
 
   it('narrows again for the next family at the kiosk', async () => {

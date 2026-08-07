@@ -165,6 +165,18 @@ const REFRESH_COOLDOWN_MS = 2 * 60_000;
  * finding, it is a keystroke.
  */
 const NO_MATCH_SWEEP_DEBOUNCE_MS = 2_000;
+/**
+ * The shortest a **Search everyone** press is allowed to look like work.
+ *
+ * Two of the three things behind that button can answer in no time at all: the
+ * widening is a re-search of memory, and a sweep inside the two-minute cooldown
+ * is answered from the read that already happened. A control that searches an
+ * entire church and returns before the finger is off it does not read as fast,
+ * it reads as broken, and the parent's next move is to press it again or to
+ * stop trusting the answer. Only ever felt when the answer is "nobody" — a
+ * press that finds somebody takes the whole panel off the screen.
+ */
+const MIN_WIDEN_SPINNER_MS = 1_500;
 
 /**
  * The id one run of the registration wizard submits under, for as many attempts
@@ -553,26 +565,45 @@ export function KioskApp() {
     }
   }, [buffer]);
 
-  const runSweep = useCallback(() => {
-    if (!services || refresh === 'refreshing') return;
+  /**
+   * The sweep in flight, if there is one.
+   *
+   * A ref rather than the `refresh` state it used to be guarded by, for two
+   * reasons. It is synchronous, so two calls in the same tick cannot both find
+   * "not refreshing" and start two sweeps of the church. And it is a promise,
+   * so a second asker can *wait on the first one's read* rather than being
+   * told there is nothing to wait for — which is what the button now needs:
+   * pressing it while the silent sweep is already running has to keep the
+   * spinner up until that read lands, not for a token second and a half.
+   */
+  const sweepRef = useRef<Promise<void> | null>(null);
+
+  const runSweep = useCallback((): Promise<void> => {
+    if (!services) return Promise.resolve();
+    if (sweepRef.current) return sweepRef.current;
     // Already answered, for anybody who asks inside the window. The read that
     // matters happened; saying so costs nothing and skips the sweep.
     if (Date.now() - refreshedAtRef.current < REFRESH_COOLDOWN_MS) {
       setRefresh('done');
-      return;
+      return Promise.resolve();
     }
     setRefresh('refreshing');
     // Each half lands on its own: a name that has arrived shows up without
     // waiting behind a rebuild of every phone number in the church, and a half
     // that failed leaves what the kiosk already held alone.
-    void services
+    const sweep = services
       .refreshDirectory(setStudents, setLast4Index)
       .then(() => {
         refreshedAtRef.current = Date.now();
         setRefresh('done');
       })
-      .catch(() => setRefresh('failed'));
-  }, [services, refresh]);
+      .catch(() => setRefresh('failed'))
+      .finally(() => {
+        sweepRef.current = null;
+      });
+    sweepRef.current = sweep;
+    return sweep;
+  }, [services]);
 
   /* ---- Check-in and pickup ------------------------------------------------ */
 
@@ -656,13 +687,95 @@ export function KioskApp() {
    * lifetime either way: the buffer-empty effect stands it back down, so the
    * next family at the kiosk starts scoped again.
    *
-   * Free and instant, deliberately — the wider roster is already in memory, so
-   * the tap answers before a finger has lifted, with no read behind it.
+   * The widening itself is free and instant — the wider roster is already in
+   * memory — but the tap that asks for it is not only a widening any more; see
+   * `widening` below.
    */
   const [widened, setWidened] = useState(false);
   useEffect(() => {
     if (buffer === '') setWidened(false);
   }, [buffer]);
+
+  /**
+   * Whether **Search everyone** is working, which is the whole of its feedback.
+   *
+   * The button used to widen the pool and then vanish, on the reasoning that a
+   * control which has done its job is clutter. What a parent saw was a button
+   * disappearing under their finger and a list that still said nothing, with
+   * the only evidence of the press being one word changing in the line above —
+   * a change nobody watching their own finger is looking at. A press that
+   * produces no visible work reads as a press that did not register, and the
+   * next thing a parent does about that is find a leader.
+   *
+   * So it stays on screen and reports instead: its label becomes a spinner
+   * while the work runs and comes back when it is done. Staying is not only
+   * for the feedback, either — four digits are a small keyspace and names
+   * collide, so a family who widened and still sees nobody theirs has a second
+   * reason to press it, and a control that removed itself after one use had
+   * nothing to offer them.
+   *
+   * The work behind it is the church-wide re-read: widening only re-searches
+   * what this device already holds, and a family added at the welcome desk two
+   * minutes ago is not in it. The read is shared with the silent sweep through
+   * `sweepRef`, so pressing during one waits on that one rather than starting
+   * a second.
+   */
+  const [widening, setWidening] = useState(false);
+  const wideningRef = useRef(false);
+
+  // A spinner belonging to the family who walked away. The read it was waiting
+  // on carries on and still lands — `runSweep` owns that, and the next family
+  // gets the benefit of it — but the next person's screen must not open on
+  // somebody else's busy button.
+  useEffect(() => {
+    if (buffer !== '') return;
+    wideningRef.current = false;
+    setWidening(false);
+  }, [buffer]);
+
+  const onWiden = useCallback(async () => {
+    // A second press while the spinner is up is the same request, not a new
+    // one. The button is allowed to be pressed again — it is still there, and
+    // a spinner is not a disabled state — it just has nothing new to do.
+    if (wideningRef.current) return;
+    setWidened(true);
+    /*
+     * When the wider pool answers, that is the whole of the press.
+     *
+     * The child who belongs to Sunday mornings is on this device already, the
+     * results are about to replace the no-match panel, and the button and its
+     * spinner leave the screen with it — so a church-wide read here would be
+     * spent on a question already answered, in front of nobody. Computed from
+     * the full roster rather than from `outcome`, which is a memo this render
+     * has not recomputed yet.
+     */
+    if (searchStudents(buffer, students, last4Index).results.length > 0) return;
+
+    wideningRef.current = true;
+    setWidening(true);
+
+    const started = Date.now();
+    try {
+      await runSweep();
+    } finally {
+      /*
+       * Held to a floor, deliberately, and only ever felt when the answer is
+       * "nobody". An instant return from a search of an entire church is not
+       * read as fast, it is read as broken — the same reflex that makes a
+       * card reader that beeps immediately feel like it did not read the
+       * card. A second and a half is long enough to look like a search and
+       * short enough not to be a wait.
+       *
+       * When the read *does* turn somebody up, nobody sees the end of this:
+       * the no-match panel only exists while there are no results, so the
+       * button and its spinner leave the screen with it.
+       */
+      const held = MIN_WIDEN_SPINNER_MS - (Date.now() - started);
+      if (held > 0) await new Promise((resolve) => setTimeout(resolve, held));
+      wideningRef.current = false;
+      setWidening(false);
+    }
+  }, [runSweep, buffer, students, last4Index]);
 
   const searchable = useMemo(() => {
     if (widened || scope.participated.size === 0) return students;
@@ -1250,8 +1363,8 @@ export function KioskApp() {
         // one, and neither is one whose printer is simply unpaired.
         printerNeedsAttention={printerState?.kind === 'trouble'}
         refresh={refresh}
-        widened={widened}
-        onWiden={() => setWidened(true)}
+        widening={widening}
+        onWiden={() => void onWiden()}
         onRegister={startRegistration}
         justRegisteredRemotely={justRefreshed}
         onPick={(student) => {

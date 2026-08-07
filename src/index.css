@@ -338,6 +338,34 @@
 }
 
 /*
+ * One word, brightening, three times.
+ *
+ * The kiosk's no-match line changes by a single word when the church-wide
+ * re-read lands — "No match" becomes "Still no match" — and that word is the
+ * whole answer to the button a parent has just pressed. A parent watching
+ * their own finger does not see a word change in the line above it. This is
+ * what makes them look: three cycles and done, because a lobby screen that
+ * blinks indefinitely is a lobby screen everybody stops reading.
+ *
+ * Colour rather than opacity: the sentence around it is `ink-400`, so
+ * brightening to `ink-100` and back reads as emphasis on a word rather than
+ * as text struggling to load.
+ */
+@keyframes tally-word-pulse {
+  0%,
+  100% {
+    color: var(--color-ink-100);
+  }
+  50% {
+    color: var(--color-ink-500);
+  }
+}
+
+.animate-word-pulse {
+  animation: tally-word-pulse 700ms ease-in-out 3;
+}
+
+/*
  * Dialog entrances. `<dialog>` is `display: none` while closed, so both of
  * these run on open without any mount/unmount bookkeeping in React.
  */

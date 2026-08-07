@@ -265,9 +265,11 @@ test.describe('the kiosk', () => {
    * empty, so a quiet sweep is proof the refetch already delivered the child,
    * and nothing else could have (nothing was typed while the poll worked, and
    * the refresh buttons no longer exist). The one tap left, "Search everyone",
-   * changes the scope of one search and never the data: a brand-new child has
-   * no attendance, so the gathering's attendance-built pool rightly lacks
-   * them, and the row must appear too fast for any read to be behind it.
+   * is scope first: a brand-new child has no attendance, so the gathering's
+   * attendance-built pool rightly lacks them, and the row must appear too fast
+   * for any read to be behind it. That tap *can* also re-read the church, but
+   * only when widening comes up empty — which here it does not, and the
+   * argument above stands on the absent "Still no match" either way.
    *
    * Written straight into Firestore rather than through the app, because what
    * is being tested is a roster that changed *after* this kiosk cached one —
@@ -346,8 +348,9 @@ test.describe('the kiosk', () => {
       await kiosk.waitForTimeout(3_000);
       await expect(kiosk.getByText(/Still no match/i)).toHaveCount(0);
 
-      // The one tap left changes scope, not data — and two seconds is no time
-      // to fetch anything: the row can only come from what is already held.
+      // Scope first, and scope alone here: the widening answers, so the press
+      // never reaches its church-wide read. Two seconds is no time to fetch
+      // anything — the row can only come from what is already held.
       await kiosk.getByRole('button', { name: /Search everyone/i }).click();
       const row = kiosk.getByRole('button', { name: /quill marsden/i }).first();
       await expect(row).toBeVisible({ timeout: 2_000 });
