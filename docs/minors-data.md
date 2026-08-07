@@ -42,12 +42,15 @@ gathering in the last year — the same year the check-in screen uses to decide 
 standing in front of the Sunday nursery's roster and should not be able to type four digits into
 one. The scope only ever fails open: a gathering with no history behind it searches everything, so
 there is nothing to configure and no way to switch it off by accident, anyone on tonight's register
-is findable whatever last night's aggregate said, and **"Search everyone"** — standing on the panel
-for as long as a search comes up empty, however many times it is pressed — widens that one search to
-all of Tally on the spot, with no read behind it. Only if the wider pool is empty too does the press
-go on to re-read the church, which is the one thing on that panel that takes any time; it wears a
-spinner while it does, held to a floor of a second and a half, because a search of an entire church
-that answers instantly is read as a search that did not happen.
+is findable whatever last night's aggregate said, and **"Search everyone"** widens that one search to
+all of Tally on the spot, with no read behind it. It stands on the no-match panel and, in a quieter
+weight, in the row beneath a list of results — because the state that most needs it is the one where
+the scope handed somebody *an* answer: a family whose child comes to another gathering types their
+own name and gets a stranger's, correctly spelled, with nothing on the screen saying the search was
+narrowed. Only if widening changes nothing does the press go on to re-read the church, which is the
+one thing here that takes any time; it wears a spinner while it does, held to a floor of a second and
+a half, because a search of an entire church that answers instantly is read as a search that did not
+happen.
 The list itself is
 [one precomputed document](data-model.md#kioskindexparticipation) — the kiosk holds no event
 history and could not download the code that reads it.

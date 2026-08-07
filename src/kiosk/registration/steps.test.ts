@@ -21,6 +21,7 @@ import {
   goBack,
   initialState,
   PHONE_LENGTH,
+  toggleNoAllergies,
   type RegistrationState,
 } from './steps';
 
@@ -358,6 +359,55 @@ describe('the allergies question', () => {
     expect(reopened.buffer).toBe('Bee stings');
     // And one more step back is the grade, not a skipped-over hole.
     expect(goBack(reopened)!.step).toBe('child-grade');
+  });
+
+  it('empties the box when the tick goes on, and leaves it empty coming off', () => {
+    const typed = typeText(throughGrade(startAsking()), 'Peanuts');
+    const ticked = toggleNoAllergies(typed);
+    expect(ticked.noAllergies).toBe(true);
+    expect(ticked.buffer).toBe('');
+
+    /*
+     * Unticking does not resurrect it. The box is the record of what will be
+     * sent, and text that reappeared after being hidden behind a grey panel is
+     * text nobody agreed to send.
+     */
+    const untutored = toggleNoAllergies(ticked);
+    expect(untutored.noAllergies).toBe(false);
+    expect(untutored.buffer).toBe('');
+  });
+
+  it('makes every key inert while it is ticked', () => {
+    const ticked = toggleNoAllergies(throughGrade(startAsking()));
+    // Not only the letters: clearing or backspacing an emptied, greyed box is
+    // a press that would do nothing, and it says so by being grey.
+    expect(typeText(ticked, 'Peanuts').buffer).toBe('');
+    expect(applyKey(ticked, { kind: 'clear' })).toBe(ticked);
+    expect(applyKey(ticked, { kind: 'backspace' })).toBe(ticked);
+    expect(applyKey(ticked, { kind: 'shift' })).toBe(ticked);
+  });
+
+  it('records none when ticked, whatever had been typed before', () => {
+    const answered = advance(toggleNoAllergies(typeText(throughGrade(startAsking()), 'Peanuts')));
+    expect(answered.step).toBe('another');
+    expect(answered.draft.allergies).toBe('');
+  });
+
+  it('starts each child unticked, so one answer cannot serve two', () => {
+    let held = advance(toggleNoAllergies(throughGrade(startAsking())));
+    held = answerAnother(held, true, false);
+    held = advance(typeText(held, 'Byron'));
+    held = advance(held); // prefilled surname
+    held = chooseGrade(held, 1 as Grade);
+
+    expect(held.step).toBe('child-allergies');
+    expect(held.noAllergies).toBe(false);
+  });
+
+  it('only applies on its own step', () => {
+    const naming = throughGrade(startAsking());
+    const elsewhere = goBack(naming)!; // child-grade
+    expect(toggleNoAllergies(elsewhere)).toBe(elsewhere);
   });
 
   it('is asked for a sibling too — the gate is the binding, not the mode', () => {

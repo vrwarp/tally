@@ -91,10 +91,13 @@ than overwrites, and a rebuild can only ever *add* to what a registration made f
 
 **And where the church's database can carry it, one more question: allergies.** The wizard asks it
 only when the people backend takes full write-back — the same gate the retired phone form kept, so a
-family is never asked for a medical note the backend would silently drop. "No allergies" is one tap
-on the same button Next lives on, the answer waits on the review record for the person who decides
-the family, and approval pushes it upstream where such notes belong. Tally itself keeps only a
-boolean.
+family is never asked for a medical note the backend would silently drop. **"No allergies" is a tick
+directly under the box**, where the typing would otherwise start — a medical field with a keyboard
+under it and no visible way to say "nothing" collects "None", "N/A" and "no allergies" as free text,
+three spellings of a blank bound for the church's database as though they were notes. Ticking it
+empties the box and puts it out of use. The answer waits on the review record for the person who
+decides the family, and approval pushes it upstream where such notes belong. Tally itself keeps only
+a boolean.
 
 There used to be a second door: a QR code that opened a registration form on the parent's own phone,
 with minted codes, a twenty-minute TTL and a change signal to walk the kiosk back when the form

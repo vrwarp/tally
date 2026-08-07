@@ -199,9 +199,10 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
         state: 'One child',
         title: 'Allergies, only where they can land',
         caption:
-          'The fourth question, and it only exists when the church\'s own database takes full write-back — the same gate the retired phone form kept, because collecting a medical note into a screen that silently drops it is worse than never asking. The common answer is the button itself: "No allergies" until a letter is typed, Next the moment one is. The note goes to the reviewer and then upstream; the kiosk keeps a marker, never the text.',
+          'The fourth question, and it only exists when the church\'s own database takes full write-back — the same gate the retired phone form kept, because collecting a medical note into a screen that silently drops it is worse than never asking. The common answer is the tick under the box rather than anything typed into it: a medical field with a keyboard under it and no visible way to say "nothing" collects "None" and "N/A" as though they were notes. Ticking empties the box and greys it out. The note goes to the reviewer and then upstream; the kiosk keeps a marker, never the text.',
       });
       await kiosk.getByRole('button', { name: /No allergies/i }).click();
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await shoot({
         flow: 'Right here',
         state: 'One child',
@@ -224,6 +225,7 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: '2nd grade', exact: true }).click();
       await kiosk.getByRole('button', { name: /No allergies/i }).click();
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await shoot({
         flow: 'Right here',
         state: 'Two children',
@@ -332,6 +334,7 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: 'Kindergarten', exact: true }).click();
       await kiosk.getByRole('button', { name: /No allergies/i }).click();
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: /That's everyone/i }).click();
       await shoot({
         flow: 'The second child',

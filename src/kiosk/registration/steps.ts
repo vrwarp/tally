@@ -76,6 +76,20 @@ export interface RegistrationState {
    * advances internally and every caller would have to carry it.
    */
   allergiesSupported: boolean;
+  /**
+   * Whether "No allergies" is ticked on the allergies step.
+   *
+   * An empty buffer already means none, so this is not what *records* the
+   * answer — it is what stops the answer being typed. A medical field with a
+   * keyboard under it and no visible way to say "nothing" invites "None",
+   * "N/A" and "no allergies" as free text, three spellings of a blank that
+   * then travel to the church's database as though they were notes. The tick
+   * sits where the typing would have started and empties the box instead.
+   *
+   * One child's worth of lifetime: every entry to the step clears it, so the
+   * second child is never silently answered by the first.
+   */
+  noAllergies: boolean;
   /** Minted once per run and re-sent on every retry — see the callable. */
   registrationId: string;
   /** Children whose three questions are answered. */
@@ -123,6 +137,7 @@ export function initialState(args: {
     step: 'child-first',
     registrationId: args.registrationId,
     allergiesSupported: args.allergiesSupported === true,
+    noAllergies: false,
     children: [],
     draft: {
       firstName: '',
@@ -206,6 +221,13 @@ export function applyKey(
   key: KioskKey,
 ): RegistrationState {
   if (!isTypingStep(state.step)) return state;
+  /*
+   * The box is inert while "No allergies" is ticked, and every key is — not
+   * only the letters. Clearing or backspacing an empty greyed-out box is a
+   * press that does nothing, and the screen says so by being grey rather than
+   * by swallowing keystrokes silently. Untick to type.
+   */
+  if (state.step === 'child-allergies' && state.noAllergies) return state;
   if (key.kind === 'shift') return { ...state, shift: cycleShift(state.shift) };
   if (key.kind === 'clear') return { ...state, buffer: '', shift: 'on' };
   if (key.kind === 'backspace') {
@@ -311,14 +333,19 @@ export function advance(state: RegistrationState): RegistrationState {
         step: state.allergiesSupported ? 'child-allergies' : 'another',
         buffer: '',
         shift: 'on',
+        // Each child answers for themselves — see `noAllergies`.
+        noAllergies: false,
       };
     case 'child-allergies':
       return {
         ...state,
-        draft: { ...state.draft, allergies: value },
+        // The tick and an empty box record the same answer, and the tick wins
+        // where they could disagree: it is the one the parent can see.
+        draft: { ...state.draft, allergies: state.noAllergies ? '' : value },
         step: 'another',
         buffer: '',
         shift: 'on',
+        noAllergies: false,
       };
     case 'guardian-first':
       return {
@@ -353,6 +380,21 @@ function lastNameSoFar(state: RegistrationState): string {
   return state.children.length > 0
     ? state.children[state.children.length - 1]!.lastName
     : '';
+}
+
+/**
+ * Ticks or unticks "No allergies", and empties the box when it goes on.
+ *
+ * Emptying is the point rather than a side effect: a parent who typed
+ * "peanuts", thought better of it and ticked the box must not leave "peanuts"
+ * behind a grey panel to be committed by the next press. Unticking does not
+ * put it back — the box is the record of what will be sent, and a control that
+ * resurrected text nobody could see while it was hidden would be worse.
+ */
+export function toggleNoAllergies(state: RegistrationState): RegistrationState {
+  if (state.step !== 'child-allergies') return state;
+  const noAllergies = !state.noAllergies;
+  return { ...state, noAllergies, buffer: noAllergies ? '' : state.buffer, shift: 'on' };
 }
 
 /** The grade chips. `null` is 'No grade' — an answer, not a skip. */
@@ -446,9 +488,12 @@ export function goBack(state: RegistrationState): RegistrationState | null {
             ...state,
             step: 'child-allergies',
             // The note as answered, reopened for editing — the same contract
-            // every other reopened question keeps.
+            // every other reopened question keeps. Unticked whatever was
+            // answered: an empty box is the honest reopening of "none", and it
+            // is one tap from ticked again.
             buffer: state.draft.allergies,
             shift: autoShiftAfter(state.draft.allergies),
+            noAllergies: false,
           }
         : { ...state, step: 'child-grade', buffer: '', shift: 'on' };
     case 'guardian-first':

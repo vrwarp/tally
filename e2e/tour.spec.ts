@@ -340,7 +340,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
         who: 'A family the church already has',
         title: 'Four keystrokes is usually the whole search',
         caption:
-          'Filtering happens on the device against a roster it already holds, so the list narrows with the keystroke rather than after a round trip. That matters more than it sounds: the queue behind is what makes a kiosk worth having, and a search that waits on a network is a search that stops the queue. Note the line under the results: "Not your family?" is standing there while a match is showing, because four digits are a small keyspace and a newcomer can type theirs and be handed a real child, correctly spelled, who is not theirs. A successful search is not proof, so the door out is never closed — and it stops asking whether they are new, which is not the question in front of them.',
+          'Filtering happens on the device against a roster it already holds, so the list narrows with the keystroke rather than after a round trip. That matters more than it sounds: the queue behind is what makes a kiosk worth having, and a search that waits on a network is a search that stops the queue. Note the row under the results: both doors are standing there *while a match is showing*, because a successful search is not proof. Four digits are a small keyspace and names collide, so a family can be handed a real child, correctly spelled, who is not theirs — "Not your family?" is for the one who has never been here, and "Search everyone" is for the one whose child is on the roster but belongs to another gathering. Neither of them used to be reachable from a screen with rows on it, which is the state that produces both mistakes.',
       });
 
       await kiosk.getByRole('button', { name: new RegExp(cast.door, 'i') }).first().click();
@@ -467,7 +467,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
         who: 'A family the church has never seen',
         title: 'A fourth question, only where it can land',
         caption:
-          'The wizard asks about allergies exactly when the church\'s own database can hold the answer — the same write-back gate the retired phone form kept, because collecting a family\'s medical note into a screen that silently drops it is worse than never asking. The common answer costs one tap: the button under the keyboard reads "No allergies" until a letter is typed, and becomes Next the moment one is. What is typed here goes to the person who reviews the family, then upstream; the kiosk itself keeps only a marker.',
+          'The wizard asks about allergies exactly when the church\'s own database can hold the answer — the same write-back gate the retired phone form kept, because collecting a family\'s medical note into a screen that silently drops it is worse than never asking. **No allergies** is a tick directly under the box, where the typing would otherwise start: a medical field with a keyboard under it and no visible way to say "nothing" collects "None", "N/A" and "no allergies" as free text — three spellings of a blank, bound for the church\'s database as though they were notes. Ticking it empties the box and puts it out of use. What is typed here goes to the person who reviews the family, then upstream; the kiosk itself keeps only a marker.',
       });
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await shoot(kiosk, 'kiosk', {
@@ -492,6 +492,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: 'Kindergarten', exact: true }).click();
       await kiosk.getByRole('button', { name: /No allergies/i }).click();
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: /That's everyone/i }).click();
       await typeOnKiosk(kiosk, 'Ngozi');
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
@@ -550,6 +551,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: '3rd grade', exact: true }).click();
       await kiosk.getByRole('button', { name: /No allergies/i }).click();
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: /That's everyone/i }).click();
       await typeOnKiosk(kiosk, 'Mira');
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
@@ -713,6 +715,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: '2nd grade', exact: true }).click();
       await kiosk.getByRole('button', { name: /No allergies/i }).click();
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: /That's everyone/i }).click();
       await shoot(kiosk, 'kiosk', {
         act: 'The second child',
@@ -749,6 +752,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: '1st grade', exact: true }).click();
       await kiosk.getByRole('button', { name: /No allergies/i }).click();
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: /That's everyone/i }).click();
       await typeOnKiosk(kiosk, 'Ngozi');
       await kiosk.getByRole('button', { name: /^Next$/ }).click();

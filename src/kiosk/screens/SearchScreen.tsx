@@ -35,6 +35,65 @@ function gradeLabel(grade: number | null): string {
   return grade === null ? '' : gradeDescription(grade);
 }
 
+/**
+ * **Search everyone**, in the two places it has to be.
+ *
+ * One component rather than two copies, because the pair must not drift: a
+ * parent meets whichever of them their search happens to produce, and a
+ * spinner that only one of them wore would make the other look broken.
+ *
+ * The spinner sits *over* the label rather than instead of it, and the label
+ * goes invisible rather than away. The button then has exactly one width in
+ * both states, set by its own words rather than by a guess at how wide they
+ * are — and a control that changed size under the finger still resting on it
+ * is a control that reads as pressed by accident.
+ *
+ * `aria-label` rather than the label alone, so it keeps its name while its
+ * face is a spinner: the button a parent is waiting on is still the same
+ * button.
+ */
+function WidenButton({
+  widening,
+  onWiden,
+  quiet,
+}: {
+  widening: boolean;
+  onWiden: () => void;
+  /** The standing row's weight, beside a keyboard somebody is aiming at. */
+  quiet?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      tabIndex={-1}
+      aria-label="Search everyone"
+      aria-busy={widening}
+      onPointerDown={(event) => {
+        event.preventDefault();
+        haptic(quiet ? 8 : undefined);
+        onWiden();
+      }}
+      className={
+        quiet
+          ? 'flex h-11 items-center justify-center rounded-xl bg-ink-800/70 px-5 text-base font-semibold text-ink-200 ring-1 ring-ink-600/60 active:bg-ink-700'
+          : 'flex h-14 items-center justify-center rounded-xl bg-ink-800 px-8 text-lg font-semibold text-ink-100 active:bg-ink-700'
+      }
+      style={{ touchAction: 'manipulation' }}
+    >
+      <span className="relative flex items-center justify-center">
+        <span className={widening ? 'invisible' : undefined}>Search everyone</span>
+        {widening && (
+          <span
+            className={`absolute block animate-spin rounded-full border-2 border-ink-600 border-t-ink-100 ${
+              quiet ? 'h-5 w-5' : 'h-6 w-6'
+            }`}
+          />
+        )}
+      </span>
+    </button>
+  );
+}
+
 export function SearchScreen({
   binding,
   buffer,
@@ -96,6 +155,16 @@ export function SearchScreen({
    */
   const offeredAbove =
     (outcome.mode === 'phone' || outcome.mode === 'name') && outcome.results.length === 0;
+
+  /*
+   * Whether there is a search here to widen at all.
+   *
+   * Rows on screen means a finished search that found somebody, which is
+   * exactly the state the standing button exists for. An empty buffer has
+   * nothing to widen, and a half-typed number is not a question yet — the same
+   * reason that state gets none of the other doors either.
+   */
+  const canWiden = outcome.results.length > 0;
 
   /*
    * A match is not proof, and this is the sentence that says so.
@@ -268,42 +337,7 @@ export function SearchScreen({
                 * name while its face is a spinner: the button a parent is
                 * waiting on is still the same button.
                 */}
-              <button
-                type="button"
-                tabIndex={-1}
-                aria-label="Search everyone"
-                aria-busy={widening}
-                onPointerDown={(event) => {
-                  event.preventDefault();
-                  haptic();
-                  onWiden();
-                }}
-                className="flex h-14 items-center justify-center rounded-xl bg-ink-800 px-8 text-lg font-semibold text-ink-100 active:bg-ink-700"
-                style={{ touchAction: 'manipulation' }}
-              >
-                {/*
-                  * The spinner sits *over* the label rather than instead of
-                  * it, and the label goes invisible rather than away. The
-                  * button then has exactly one width in both states, set by
-                  * its own words rather than by a guess at how wide they are
-                  * — and a control that changed size under the finger still
-                  * resting on it is a control that reads as pressed by
-                  * accident.
-                  *
-                  * The label itself says what it does, unlike its
-                  * predecessor: the search only covers the children who come
-                  * to *this* gathering, and a child who belongs to Sunday
-                  * mornings is one tap away. Behind it now is also the
-                  * church-wide re-read, which is the half that can take a
-                  * moment and the reason there is anything to spin about.
-                  */}
-                <span className="relative flex items-center justify-center">
-                  <span className={widening ? 'invisible' : undefined}>Search everyone</span>
-                  {widening && (
-                    <span className="absolute block h-6 w-6 animate-spin rounded-full border-2 border-ink-600 border-t-ink-100" />
-                  )}
-                </span>
-              </button>
+              <WidenButton widening={widening} onWiden={onWiden} />
               <div className="text-base text-ink-500">or see a leader.</div>
             </div>
           )}
@@ -377,7 +411,22 @@ export function SearchScreen({
         * promise this file makes about geometry: present from the first paint,
         * so it cannot be the thing that moves when a keystroke lands.
         */}
-      <div className="flex h-12 items-center justify-center px-6">
+      <div className="flex h-12 items-center justify-center gap-2 px-6">
+        {/*
+          * The way out of the scope, standing beside the way out of the search.
+          *
+          * It used to live only on the no-match panel, which meant it appeared
+          * for exactly the family who did not need it and was missing for the
+          * one who did. A scoped search that returns *somebody* — the other
+          * Noah, the Ramirez who is not theirs — is the commonest way a parent
+          * is shown confident, wrong rows, and until now the only door open to
+          * them was the one that registers a child the church already has.
+          *
+          * Hidden only while the no-match panel is up, because that panel is
+          * showing this same control in its primary weight a hand's width
+          * higher: the standing pair steps aside rather than appearing twice.
+          */}
+        {!offeredAbove && canWiden && <WidenButton widening={widening} onWiden={onWiden} quiet />}
         {!offeredAbove && (
           <button
             type="button"

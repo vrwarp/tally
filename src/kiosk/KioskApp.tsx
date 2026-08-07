@@ -688,18 +688,28 @@ export function KioskApp() {
     // one. The button is allowed to be pressed again — it is still there, and
     // a spinner is not a disabled state — it just has nothing new to do.
     if (wideningRef.current) return;
+    const alreadyWidened = widened;
     setWidened(true);
     /*
-     * When the wider pool answers, that is the whole of the press.
+     * When the *widening* answers, that is the whole of the press.
      *
-     * The child who belongs to Sunday mornings is on this device already, the
-     * results are about to replace the no-match panel, and the button and its
-     * spinner leave the screen with it — so a church-wide read here would be
-     * spent on a question already answered, in front of nobody. Computed from
-     * the full roster rather than from `outcome`, which is a memo this render
-     * has not recomputed yet.
+     * The child who belongs to Sunday mornings is on this device already, so a
+     * church-wide read here would be spent on a question the free half just
+     * answered. Computed from the full roster rather than from `outcome`,
+     * which is a memo this render has not recomputed yet.
+     *
+     * Only the press that turns widening *on* gets that exemption, and the
+     * `alreadyWidened` check is what makes the button honest now that it also
+     * stands beside a list of results. Pressing it a second time cannot widen
+     * anything — the pool is already everybody — so if the exemption applied
+     * there too, the press would do nothing at all and say nothing about it.
+     * That is the state a parent holding a common name is in: rows on screen,
+     * none of them theirs, and the only thing left worth doing is asking the
+     * church whether their child was added since this device last looked.
      */
-    if (searchStudents(buffer, students, last4Index).results.length > 0) return;
+    if (!alreadyWidened && searchStudents(buffer, students, last4Index).results.length > 0) {
+      return;
+    }
 
     wideningRef.current = true;
     setWidening(true);
@@ -725,7 +735,7 @@ export function KioskApp() {
       wideningRef.current = false;
       setWidening(false);
     }
-  }, [runSweep, buffer, students, last4Index]);
+  }, [runSweep, buffer, students, last4Index, widened]);
 
   const searchable = useMemo(() => {
     if (widened || scope.participated.size === 0) return students;

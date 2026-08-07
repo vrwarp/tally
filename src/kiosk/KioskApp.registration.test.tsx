@@ -522,24 +522,70 @@ describe('the clock', () => {
  * The allergies question, as a family meets it.
  *
  * The step machine's rules are pinned in steps.test.ts; what belongs here is
- * the rendered contract — the one-tap "No allergies" button that is also the
- * Next button, the note echoed on the confirm list, and the wire shape: notes
- * ride beside the children only when the binding said the backend can carry
- * them, and never at all when nobody typed one.
+ * the rendered contract — the "No allergies" tick under the box, the note
+ * echoed on the confirm list, and the wire shape: notes ride beside the
+ * children only when the binding said the backend can carry them, and never at
+ * all when nobody typed one.
  */
 describe('the allergies question, where the backend can carry it', () => {
   const asking = () => binding({ allergiesSupported: true });
 
-  it('asks after the grade, and one tap answers "none"', async () => {
+  const tick = () => screen.getByRole('checkbox', { name: /No allergies/i });
+
+  it('asks after the grade, and the tick answers "none"', async () => {
     await mount(asking());
     await tap(/Register your child/);
     await enterChild('Robin', 'Fields', '4');
 
     expect(screen.getByText(/Any allergies we should know about/i)).toBeTruthy();
-    // The skip and the advance are one control: "No allergies" on an empty
-    // buffer, so the common case costs one tap and nothing on the screen
-    // moves.
+    expect(tick().getAttribute('aria-checked')).toBe('false');
+
     await tap('No allergies');
+    expect(tick().getAttribute('aria-checked')).toBe('true');
+    await tap('Next');
+    expect(screen.getByText('Anybody else?')).toBeTruthy();
+  });
+
+  it('still takes an empty box as none, because the question is optional', async () => {
+    await mount(asking());
+    await tap(/Register your child/);
+    await enterChild('Robin', 'Fields', '4');
+
+    // Nothing typed and nothing ticked. Pressing on has always been an answer
+    // rather than a skip, and the tick did not change that — it only gave the
+    // answer somewhere to be *said*, so nobody types it into the box.
+    await tap('Next');
+    expect(screen.getByText('Anybody else?')).toBeTruthy();
+  });
+
+  it('empties the box and stops the keys when the tick goes on', async () => {
+    await mount(asking());
+    await tap(/Register your child/);
+    await enterChild('Robin', 'Fields', '4');
+
+    await type('Peanuts');
+    expect(screen.getByText('Peanuts')).toBeTruthy();
+
+    // Ticking clears what was typed rather than hiding it behind a grey panel
+    // for the next press to commit.
+    await tap('No allergies');
+    expect(screen.queryByText('Peanuts')).toBeNull();
+
+    /*
+     * And the keyboard is out of use: keys pressed now must not refill the box
+     * the tick just emptied.
+     *
+     * Two letters rather than one, because every single letter is also the
+     * face of a key — `queryByText('X')` finds the keyboard whether or not
+     * anything was typed. A pair can only be the readout. Asserted through the
+     * state machine rather than through CSS, too: jsdom does not enforce
+     * `pointer-events-none`, so this proves `applyKey` refuses the keystroke
+     * rather than proving the class name is present.
+     */
+    await type('XY');
+    expect(screen.queryByText(/^XY$/i)).toBeNull();
+
+    await tap('Next');
     expect(screen.getByText('Anybody else?')).toBeTruthy();
   });
 
@@ -551,13 +597,15 @@ describe('the allergies question, where the backend can carry it', () => {
     expect(screen.getByText('Anybody else?')).toBeTruthy();
   });
 
-  it('relabels to Next the moment a note is typed, and shows it on the confirm', async () => {
+  it('carries a typed note through to the confirm', async () => {
     await mount(asking());
     await tap(/Register your child/);
     await enterChild('Robin', 'Fields', '4');
 
     await type('Peanuts');
-    expect(screen.queryByText('No allergies')).toBeNull();
+    // The tick stays put and stays off while a note is being typed — it is a
+    // state to read, not a button that has been spent.
+    expect(tick().getAttribute('aria-checked')).toBe('false');
     await tap('Next');
     await tap("That's everyone");
     await type('Dana');
@@ -582,6 +630,7 @@ describe('the allergies question, where the backend can carry it', () => {
     await tap('Add another child');
     await enterChild('Sam', 'Fields', '2');
     await tap('No allergies');
+    await tap('Next');
     await tap("That's everyone");
     await type('Dana');
     await tap('Next');
@@ -606,6 +655,7 @@ describe('the allergies question, where the backend can carry it', () => {
     await tap(/Register your child/);
     await enterChild('Robin', 'Fields', '4');
     await tap('No allergies');
+    await tap('Next');
     await tap("That's everyone");
     await type('Dana');
     await tap('Next');
