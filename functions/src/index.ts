@@ -2254,13 +2254,29 @@ export const claimKioskToken = onCall<
 export const getKioskEvents = onCall<
   { days?: unknown } | undefined,
   Promise<{ events: KioskEventEntry[] }>
->({ timeoutSeconds: 30, memory: '256MiB' }, async (request) => {
+>({ secrets: BACKEND_SECRETS, timeoutSeconds: 30, memory: '256MiB' }, async (request) => {
   await requireMember(request.auth?.uid);
 
   process.env.TZ = MINISTRY_TIME_ZONE;
 
+  const database = db();
+  /*
+   * Whether the registration wizard should ask about allergies rides on every
+   * row (see KioskEventEntry) — the same write-back test the retired phone
+   * form's code check performed, moved to bind time because the binding is the
+   * only thing a kiosk keeps. Computing it needs the registry, and the
+   * registry's notion of "enabled" needs the secret bindings, which is why
+   * this callable mounts BACKEND_SECRETS now.
+   */
+  const registry = await createRegistry(database);
+  const target = registry.defaultPush();
+  const allergiesSupported =
+    !('error' in target) && target.backend.capabilities.writeBack === 'full';
+
   const days = typeof request.data?.days === 'number' ? request.data.days : undefined;
-  return { events: await listKioskEvents(db(), new Date(), logger, { days }) };
+  return {
+    events: await listKioskEvents(database, new Date(), logger, { days, allergiesSupported }),
+  };
 });
 
 /**

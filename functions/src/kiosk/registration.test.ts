@@ -101,15 +101,21 @@ describe('what it refuses', () => {
     expect(parsed.guardian?.phone).toBe('5550103344');
   });
 
-  it('refuses allergies from a kiosk, where nothing would ever display them', () => {
-    expect(() => parseRegisterFamilyRequest(goodRequest({ allergies: ['peanuts', null] }), 'kiosk')).toThrow(
-      RegistrationInputError,
-    );
-    // The same request from a phone is fine — that form has the field.
+  it('accepts allergies from either source, now that the wizard asks', () => {
+    // The kiosk used to be refused outright — its wizard had no field. It has
+    // one now, gated on the same write-back capability the phone form used,
+    // so the parse stops caring where the note was typed.
+    expect(parseRegisterFamilyRequest(goodRequest({ allergies: ['peanuts', null] }), 'kiosk').allergies).toEqual([
+      'peanuts',
+      null,
+    ]);
     expect(parseRegisterFamilyRequest(goodRequest({ allergies: ['peanuts', null] }), 'qr').allergies).toEqual([
       'peanuts',
       null,
     ]);
+    // Absent stays absent: a wizard whose binding says "don't ask" sends no
+    // key at all, and every child parses as note-less.
+    expect(parseRegisterFamilyRequest(goodRequest(), 'kiosk').allergies).toEqual([null, null]);
   });
 });
 
@@ -352,6 +358,28 @@ describe('what reaches the church database', () => {
     // one layer up. It waits on the registration document or nowhere.
     const [studentPath] = db.writtenPaths('students/');
     expect(db.get(studentPath!)).not.toHaveProperty('allergies');
+  });
+
+  it('keeps a kiosk-typed allergy note the same way, and says which child has one', async () => {
+    // The wizard's note takes the identical path the phone form's did: on the
+    // registration record for the reviewer, never on a student document. The
+    // result names the child so the kiosk can mark the row it just added.
+    const db = dbWithEvent();
+    const result = await run(db, { data: goodRequest({ allergies: [null, 'bee stings'] }) });
+
+    expect(recordFor(db).allergies).toEqual([null, 'bee stings']);
+    expect(result.children.map((child) => child.hasAllergies)).toEqual([false, true]);
+    const [studentPath] = db.writtenPaths('students/');
+    expect(db.get(studentPath!)).not.toHaveProperty('allergies');
+  });
+
+  it('answers a replay with the notes it kept, not the ones it was just sent', async () => {
+    const db = dbWithEvent();
+    await run(db, { data: goodRequest({ allergies: ['peanuts', null] }) });
+    // The retry arrives note-less — a kiosk that lost its state mid-submit
+    // re-sends what it still holds. The record is the truth.
+    const replay = await run(db, { data: goodRequest() });
+    expect(replay.children.map((child) => child.hasAllergies)).toEqual([true, false]);
   });
 });
 

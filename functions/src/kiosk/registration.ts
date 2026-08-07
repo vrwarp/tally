@@ -85,7 +85,7 @@ export const MAX_REGISTRATION_CHILDREN = 6;
 /** Long enough for any real name, short enough that nothing is a paragraph. */
 export const NAME_MAX_LENGTH = 40;
 
-/** Only used in code mode. Held for the reviewer, then sent upstream. */
+/** Held for the reviewer on the registration record, then sent upstream. */
 export const ALLERGIES_MAX_LENGTH = 200;
 
 /**
@@ -153,6 +153,17 @@ export interface RegisteredChild {
   lastName: string;
   grade: number | null;
   searchName: string;
+  /**
+   * Whether an allergy note was recorded with this registration.
+   *
+   * The boolean, never the note: the kiosk shows a marker so a leader glances
+   * at the right child, and the note itself stays on the registration record
+   * for the reviewer. Echoed here because the kiosk otherwise could not know —
+   * the roster read reports `false` for every Tally-owned student by rule
+   * (student documents refuse an allergies key), so until approval pushes the
+   * note upstream, this echo is the only source.
+   */
+  hasAllergies: boolean;
 }
 
 /**
@@ -254,10 +265,11 @@ function parseAllergies(raw: unknown, childCount: number): (string | null)[] {
 /**
  * The whole request, checked before anything is read from the database.
  *
- * `allergies` is refused outside code mode rather than ignored: the kiosk has
- * no field for it and never will — a lobby screen does not display a child's
- * medical notes, so it does not collect them either — and a request carrying
- * them is a client doing something this flow has not agreed to.
+ * `allergies` is accepted from either source now. The kiosk wizard asks the
+ * question when the binding says the backend can carry the answer — the same
+ * write-back gate the retired phone form used — and a lobby screen still never
+ * *displays* a stored note; it holds one for the reviewer, exactly as the
+ * phone form did.
  */
 export function parseRegisterFamilyRequest(
   data: unknown,
@@ -341,15 +353,11 @@ export function parseRegisterFamilyRequest(
           phone: parseRegistrationPhone(rawGuardian?.phone),
         };
 
-  if (source !== 'qr' && body.allergies !== undefined) {
-    refuse('allergies cannot be registered from the kiosk.');
-  }
-
   return {
     registrationId,
     children,
     guardian,
-    allergies: source === 'qr' ? parseAllergies(body.allergies, children.length) : [],
+    allergies: parseAllergies(body.allergies, children.length),
     anchorStudentIds,
   };
 }
@@ -759,6 +767,9 @@ export async function registerFamily(
           lastName: child.lastName,
           grade: child.grade,
           searchName: buildSearchName(child.firstName, child.lastName),
+          // From the record, not the request: the replay answers with what
+          // was actually kept, and both were parsed from the same body.
+          hasAllergies: (held.allergies[index] ?? null) !== null,
         })),
         last4: held.last4 || last4,
         checkedIn: held.checkedIn,
@@ -774,6 +785,7 @@ export async function registerFamily(
     lastName: child.lastName,
     grade: child.grade,
     searchName: buildSearchName(child.firstName, child.lastName),
+    hasAllergies: (request.allergies[index] ?? null) !== null,
   }));
 
   const batch = db.batch();

@@ -67,6 +67,22 @@ export interface KioskEventEntry {
    * read from there for the rest of the evening.
    */
   labelTemplate: LabelTemplate | null;
+  /**
+   * Whether the registration wizard should ask about allergies.
+   *
+   * True exactly when the church's people backend can carry the answer — the
+   * same write-back test the retired phone form used, asked at bind time
+   * instead of code-validation time. On this row for the reason everything
+   * else is: the kiosk never reads config, so a capability that is not on the
+   * row is a question the wizard cannot know whether to ask. Asking without
+   * knowing would be worse than not asking — a family's medical note typed
+   * into a screen that silently drops it.
+   *
+   * Not per-gathering in any real sense (every row in one answer carries the
+   * same value), but carried per-row because the binding persists a row, not
+   * an answer.
+   */
+  allergiesSupported: boolean;
 }
 
 export const DEFAULT_KIOSK_EVENT_DAYS = 7;
@@ -97,6 +113,7 @@ function predictsFromOf(
 function entryFromSource(
   source: OccurrenceSource,
   data: Record<string, unknown> | null,
+  allergiesSupported: boolean,
 ): KioskEventEntry {
   return {
     chain: chainKey(source),
@@ -111,6 +128,7 @@ function entryFromSource(
     location: source.location,
     requiresCheckOut: source.requiresCheckOut,
     labelTemplate: source.labelTemplate,
+    allergiesSupported,
   };
 }
 
@@ -137,8 +155,9 @@ export async function listKioskEvents(
   db: FirestoreLike,
   now: Date,
   logger: FunctionLogger,
-  options: { days?: number } = {},
+  options: { days?: number; allergiesSupported?: boolean } = {},
 ): Promise<KioskEventEntry[]> {
+  const allergiesSupported = options.allergiesSupported === true;
   const days = clampKioskEventDays(options.days);
   const horizon = new Date(now.getTime() + days * 86_400_000);
 
@@ -164,7 +183,7 @@ export async function listKioskEvents(
     if (source.status === 'cancelled') continue;
     if (offeredUntil(source.endAt, source.checkInClosesAt) <= now.getTime()) continue;
     if (source.startAt.getTime() > horizon.getTime()) continue;
-    entries.push(entryFromSource(source, stored.get(source.id) ?? null));
+    entries.push(entryFromSource(source, stored.get(source.id) ?? null, allergiesSupported));
   }
 
   // The projection needs the *whole* window of sources — chains are templated
@@ -188,6 +207,7 @@ export async function listKioskEvents(
       location: occurrence.source.location,
       requiresCheckOut: occurrence.source.requiresCheckOut,
       labelTemplate: occurrence.source.labelTemplate,
+      allergiesSupported,
     });
   }
 
