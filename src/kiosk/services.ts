@@ -201,10 +201,6 @@ const registerFamilyCallable = httpsCallable<RegisterFamilyRequest, RegisterFami
   functions,
   'registerFamily',
 );
-const mintRegistrationCodeCallable = httpsCallable<
-  { eventId?: string } | void,
-  { code: string; expiresAt: number; rotateAfterMs: number }
->(functions, 'mintRegistrationCode');
 
 /* -------------------------------------------------------------------------- */
 /* Auth & pairing                                                              */
@@ -515,19 +511,17 @@ export async function loadParticipation(
  * The live revisions of the sentinel the functions bump whenever kiosk-visible
  * data changes — see functions/src/kiosk/pulse.ts for who bumps and when.
  *
- * This is what retired the "I've registered" ritual: instead of a parent
- * pressing a button to force a refetch, the kiosk reads this one small document
- * on a short cadence and refetches only the channels whose revision moved. The
- * revisions are opaque change markers — compared with `!==`, never ordered —
- * and the `registration` channel additionally names the gathering a QR
- * registration was made against, so the kiosk showing that QR can bring the
- * search screen up before the family has walked back to it.
+ * This is what retired the refresh rituals: instead of a person pressing a
+ * button to force a refetch, the kiosk reads this one small document on a
+ * short cadence and refetches only the channels whose revision moved. The
+ * revisions are opaque change markers — compared with `!==`, never ordered.
+ * (A live document may still carry a stale `registration` map from the
+ * retired QR flow; nothing reads it.)
  */
 export interface KioskPulse {
   roster: number;
   phones: number;
   participation: number;
-  registration: { rev: number; eventId: string | null };
 }
 
 function pulseChannel(data: Record<string, unknown> | null, name: string): number {
@@ -547,15 +541,10 @@ export async function fetchPulse(): Promise<KioskPulse | null> {
     const snapshot = await getDoc(doc(db, 'kioskIndex/pulse'));
     if (!snapshot.exists()) return null;
     const data = snapshot.data();
-    const registration = (data?.registration ?? {}) as Record<string, unknown>;
     return {
       roster: pulseChannel(data, 'roster'),
       phones: pulseChannel(data, 'phones'),
       participation: pulseChannel(data, 'participation'),
-      registration: {
-        rev: pulseChannel(data, 'registration'),
-        eventId: typeof registration.eventId === 'string' ? registration.eventId : null,
-      },
     };
   } catch {
     return null;
@@ -744,17 +733,6 @@ export function applyRegistration(result: {
   }
 
   return students;
-}
-
-/** The short-lived code the kiosk puts in its QR. See functions/src/kiosk/registrationCodes.ts. */
-export async function mintRegistrationCode(
-  eventId: string,
-): Promise<{ code: string; rotateAfterMs: number }> {
-  // The code remembers the gathering, so a registration made against it can
-  // wake this kiosk's QR screen — see `fetchPulse` and the auto-advance in
-  // KioskApp. Nothing else about the code changes.
-  const { data } = await mintRegistrationCodeCallable({ eventId });
-  return { code: data.code, rotateAfterMs: data.rotateAfterMs };
 }
 
 /* -------------------------------------------------------------------------- */

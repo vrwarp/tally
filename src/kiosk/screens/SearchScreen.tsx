@@ -49,7 +49,6 @@ export function SearchScreen({
   onWiden,
   onPick,
   onRegister,
-  justRegisteredRemotely,
   onUnbind,
 }: {
   binding: KioskBinding;
@@ -82,12 +81,6 @@ export function SearchScreen({
   onPick: (student: KioskStudent) => void;
   /** Opens the registration offer — the other door off this screen. */
   onRegister: () => void;
-  /**
-   * Set when a family has just come back from registering on their phone, until
-   * they start typing. The kiosk has re-read the roster for them; what is left
-   * is telling them which four digits to type, on the screen where they type it.
-   */
-  justRegisteredRemotely?: boolean;
   onUnbind: () => void;
 }) {
   const closed = windowHasClosed(binding, Date.now());
@@ -198,15 +191,6 @@ export function SearchScreen({
         {/* The bottom padding rides on the column, not the scroller: end
             padding on a scroll container is not reliably scrollable to. */}
         <div className="mx-auto flex max-w-2xl flex-col gap-2 pb-2">
-          {/*
-            * Inside the scrolling region, like every other message here, so the
-            * frame's geometry is the same with it and without it.
-            */}
-          {justRegisteredRemotely && outcome.mode === 'idle' && (
-            <div className="pt-6 text-center text-lg text-brand-300">
-              You&rsquo;re on the list — type the last 4 digits of your phone.
-            </div>
-          )}
           {outcome.mode === 'phone-partial' && (
             <div className="pt-6 text-center text-lg text-ink-400">
               Enter all 4 digits of a phone number in your family.
@@ -216,20 +200,18 @@ export function SearchScreen({
             /*
              * Nothing matched, and the answer is three different doors.
              *
-             * The commonest reason is being new, so the register door leads.
-             * The second is a child who belongs to a *different* gathering —
-             * the search is scoped to the children who have been to this one,
-             * and "Search everyone" is that scope's honest way out, in the
-             * slot where "I already registered" used to widen as a side effect
-             * of a network read nobody could see. The third reason — somebody
-             * added the family online moments ago — needs no door of its own:
-             * the kiosk notices registrations by itself (the pulse), and for
-             * the rare backend-direct addition the church-wide sweep runs
-             * silently the moment a finished search comes up empty. "Search
-             * everyone" is also how a parent asks for that read again by hand,
-             * which is what its spinner is spinning about; the sweep's other
-             * surfaces are the headline's "Still" and the network-failure line
-             * below.
+             * The commonest reason is being new, so the register door leads —
+             * straight into the wizard now, one tap. The second is a child who
+             * belongs to a *different* gathering — the search is scoped to the
+             * children who have been to this one, and "Search everyone" is
+             * that scope's honest way out. The third reason — somebody added
+             * the family minutes ago, at the welcome desk or in the main app —
+             * needs no door of its own: the pulse delivers additions within a
+             * minute, and the church-wide sweep runs silently the moment a
+             * finished search comes up empty. "Search everyone" is also how a
+             * greeter asks for that read by hand, which is what its spinner is
+             * spinning about; the sweep's other surfaces are the headline's
+             * "Still" and the network-failure line below.
              *
              * Inside the scrolling results region on purpose: this file
              * promises that typing never moves the keyboard, and a block that
@@ -381,10 +363,8 @@ export function SearchScreen({
         * already has. Both meet a screen full of confident, wrong rows, and for
         * both the way out is here.
         *
-        * Tapping it opens the QR screen, whose own largest button is "I've
-        * registered" — so a family who came through this door by mistake, having
-        * already filled the form in on their phone, is offered the way back
-        * before the form rather than a second registration.
+        * Tapping it opens the registration wizard directly — one tap from the
+        * question to the first question.
         *
         * It used to be a line of text with a coloured phrase in it, which read
         * as a footnote next to the same offer's *button* two hundred pixels

@@ -1,18 +1,15 @@
 /**
  * The kiosk noticing changes by itself.
  *
- * These are the claims that retired the "I've registered" ritual: a revision
- * moving on the pulse refetches exactly one cache, a registration for this
- * gathering puts the search screen up while the family is still walking back,
- * and every failure leaves the kiosk exactly where it was. The pulse itself is
- * a mocked services call — what is under test is the routing in KioskApp.
+ * These are the claims that retired the refresh rituals: a revision moving on
+ * the pulse refetches exactly one cache and no other, and every failure
+ * leaves the kiosk exactly where it was. The pulse itself is a mocked
+ * services call — what is under test is the routing in KioskApp.
  */
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { KioskApp, PULSE_POLL_MS, type KioskServices } from '@/kiosk/KioskApp';
-// Warms the dynamic-import graph so the QR screen resolves within a turn.
-import '@/kiosk/registration';
 import { KIOSK_KEYS } from '@/kiosk/storage';
 import type { KioskBinding } from '@/kiosk/binding';
 import type { KioskStudent } from '@/kiosk/search';
@@ -26,7 +23,7 @@ const ADA: KioskStudent = {
   hasAllergies: false,
 };
 
-/** Registered while the kiosk was showing its QR — the pulse's whole point. */
+/** Registered at the welcome desk moments ago — the pulse's whole point. */
 const GRACE: KioskStudent = {
   id: 'student-grace',
   firstName: 'Grace',
@@ -40,7 +37,6 @@ interface MockPulse {
   roster: number;
   phones: number;
   participation: number;
-  registration: { rev: number; eventId: string | null };
 }
 
 /** What the sentinel currently says. Reassigned per test. */
@@ -90,7 +86,6 @@ const services = {
   })),
   replayQueue: vi.fn(async () => 0),
   refreshDirectory: vi.fn(async () => {}),
-  mintRegistrationCode: vi.fn(async () => ({ code: 'ABC234', rotateAfterMs: 600_000 })),
   performCheckIn: vi.fn(async () => {}),
   performCheckOut: vi.fn(async () => {}),
   warmStudentDates: vi.fn(),
@@ -135,19 +130,12 @@ async function type(text: string): Promise<void> {
   await settle();
 }
 
-async function tap(text: RegExp | string): Promise<void> {
-  await act(async () => {
-    fireEvent.pointerDown(screen.getByText(text).closest('button')!);
-  });
-  await settle();
-}
 
 function revs(overrides: Partial<MockPulse> = {}): MockPulse {
   return {
     roster: 1,
     phones: 1,
     participation: 1,
-    registration: { rev: 1, eventId: null },
     ...overrides,
   };
 }
@@ -216,6 +204,8 @@ describe('the poll', () => {
 
   it('catches up across a reboot from the revs on disk', async () => {
     // The kiosk saw rev 1 before it was powered off; the world moved to 2.
+    // The stored copy carries a stray `registration` number — a bundle from
+    // before the QR flow was retired wrote it — and it is simply ignored.
     localStorage.setItem(
       KIOSK_KEYS.pulse,
       JSON.stringify({ roster: 1, phones: 1, participation: 1, registration: 1 }),
@@ -244,80 +234,3 @@ describe('the poll', () => {
   });
 });
 
-describe('the QR auto-advance', () => {
-  async function openQr(): Promise<void> {
-    await tap(/First time here\? Register your child/i);
-    await settle();
-    expect(await screen.findByText(/I've registered/i)).toBeTruthy();
-  }
-
-  it('returns to search with the digits line when a registration for this gathering lands', async () => {
-    pulse = revs();
-    await mount();
-    await poll();
-    await openQr();
-
-    pulse = revs({ registration: { rev: 2, eventId: 'friday-today' } });
-    await poll();
-
-    // Off the QR screen, onto search, saying what to do next.
-    expect(screen.queryByText(/I've registered/i)).toBeNull();
-    expect(screen.getByText(/type the last 4 digits/i)).toBeTruthy();
-  });
-
-  it('stays put for a registration against some other gathering', async () => {
-    pulse = revs();
-    await mount();
-    await poll();
-    await openQr();
-
-    pulse = revs({ registration: { rev: 2, eventId: 'sunday-nursery' } });
-    await poll();
-
-    expect(screen.getByText(/I've registered/i)).toBeTruthy();
-  });
-
-  it('widens the search for the family it advanced, and narrows after them', async () => {
-    /*
-     * The regression the e2e caught: a scope is built from attendance, and a
-     * child registered half a minute ago has none — so the advance must widen
-     * this one search, or "type the last 4 digits" would be a promise the
-     * scoped pool immediately breaks.
-     */
-    participation = { participated: new Set([ADA.id]), recent: new Set<string>() };
-    last4 = { '8822': [GRACE.id] };
-    pulse = revs();
-    await mount();
-    await poll();
-    await openQr();
-
-    // The real bump moves roster, phones and registration together.
-    pulse = revs({ roster: 2, phones: 2, registration: { rev: 2, eventId: 'friday-today' } });
-    await poll();
-
-    await type('8822');
-    expect(screen.getByText('Grace Hopper')).toBeTruthy();
-
-    // One family's worth of widening: cleared, the next search is scoped
-    // again and the same digits stop answering.
-    await act(async () => {
-      fireEvent.pointerDown(screen.getByText('Clear', { selector: '[data-key]' }));
-    });
-    await settle();
-    await type('8822');
-    expect(screen.queryByText('Grace Hopper')).toBeNull();
-  });
-
-  it('does not yank the search screen when no QR is showing', async () => {
-    pulse = revs();
-    await mount();
-    await poll();
-    await type('ada');
-
-    pulse = revs({ registration: { rev: 2, eventId: 'friday-today' } });
-    await poll();
-
-    // The signal is consumed silently; the family mid-search keeps their rows.
-    expect(screen.getByText('Ada Lovelace')).toBeTruthy();
-  });
-});

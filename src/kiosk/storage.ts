@@ -182,16 +182,15 @@ export function readCachedParticipation(chain: string | null | undefined): Kiosk
 /**
  * The revisions this kiosk last acted on, one number per channel.
  *
- * Numbers only — the `registration` channel's eventId is not stored, because a
- * stored one could only ever cause a *stale* auto-advance on reboot. The revs
- * are opaque change markers: any difference from the live document means
- * "refetch that channel", nothing more.
+ * Numbers only. The revs are opaque change markers: any difference from the
+ * live document means "refetch that channel", nothing more. (A copy written
+ * by a pre-retirement bundle may carry a `registration` number; it is ignored
+ * on read and dropped on the next write.)
  */
 export interface CachedPulse {
   roster: number;
   phones: number;
   participation: number;
-  registration: number;
 }
 
 function pulseNumber(value: unknown): number {
@@ -205,7 +204,6 @@ export function readCachedPulse(): CachedPulse | null {
     roster: pulseNumber(stored.roster),
     phones: pulseNumber(stored.phones),
     participation: pulseNumber(stored.participation),
-    registration: pulseNumber(stored.registration),
   };
 }
 

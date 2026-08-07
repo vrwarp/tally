@@ -601,8 +601,6 @@ test.describe('registering a family at the kiosk', () => {
       await bindTo(kiosk, /nursery/i);
 
       await kiosk.getByRole('button', { name: /Register your child/i }).click();
-      // The QR is offered first; the on-kiosk wizard is behind "no phone".
-      await kiosk.getByRole('button', { name: /Register right here/i }).click();
       await enterChild(kiosk, 'Wren', SURNAME, '4th grade');
       await kiosk.getByRole('button', { name: /Add another child/i }).click();
       // The second child's surname arrives already filled in from the first —
@@ -654,29 +652,6 @@ test.describe('registering a family at the kiosk', () => {
     }
   });
 
-  test('offers a scannable code, and the address in words beside it', async ({
-    browser,
-    page,
-    signedInAs,
-  }) => {
-    await signedInAs('core');
-    const { context, page: kiosk } = await openKiosk(browser);
-
-    try {
-      await pairKiosk(kiosk, page);
-      await bindTo(kiosk, /nursery/i);
-
-      await kiosk.getByRole('button', { name: /Register your child/i }).click();
-
-      // Minted by the real callable under the kiosk's own session: a code
-      // cannot be conjured from anywhere but a screen staff vouched for.
-      await expect(kiosk.getByLabel('Registration QR code')).toBeVisible({ timeout: 20_000 });
-      await expect(kiosk.getByText(/[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}/)).toBeVisible();
-      await expect(kiosk.getByRole('button', { name: /I've registered/i })).toBeVisible();
-    } finally {
-      await context.close();
-    }
-  });
 
   test('offers the door where the dead end used to be', async ({ browser, page, signedInAs }) => {
     await signedInAs('core');
@@ -717,8 +692,6 @@ test.describe('registering a family at the kiosk', () => {
       await bindTo(kiosk, /nursery/i);
 
       await kiosk.getByRole('button', { name: /Register your child/i }).click();
-      // The QR is offered first; the on-kiosk wizard is behind "no phone".
-      await kiosk.getByRole('button', { name: /Register right here/i }).click();
       // Somebody the seed already put on the roster.
       const [first, last] = CHECKED_IN.split(' ') as [string, string];
       await enterChild(kiosk, first, last, '4th grade');
@@ -771,8 +744,6 @@ test.describe('registering a family at the kiosk', () => {
       await bindTo(kiosk, /nursery/i);
 
       await kiosk.getByRole('button', { name: /Register your child/i }).click();
-      // The QR is offered first; the on-kiosk wizard is behind "no phone".
-      await kiosk.getByRole('button', { name: /Register right here/i }).click();
 
       await enterChild(kiosk, 'Juniper', 'Aldercroft', '4th grade');
       // The fourth question, which the write-back capability just unlocked.
@@ -836,76 +807,6 @@ test.describe('registering a family at the kiosk', () => {
     }
   });
 
-  /**
-   * The flagship of the pulse: a family registers on their phone and the kiosk
-   * reacts with nobody touching it.
-   *
-   * Every link is real — the code the kiosk minted carries the gathering, the
-   * phone form submits through the real callable, the callable bumps the real
-   * pulse naming that gathering, and the kiosk's own thirty-second poll takes
-   * the QR screen down and puts the digits line up. The parent walks back to a
-   * screen that is already asking for the only thing they need to type.
-   *
-   * The last third proves the other half of the QR contract: the children
-   * arrived checked-OUT (a phone form cannot know the family walked in), so
-   * the digits must find them and the confirm must offer a check-in.
-   */
-  test('a QR registration walks back to a kiosk that already knows', async ({
-    browser,
-    page,
-    signedInAs,
-  }) => {
-    test.setTimeout(120_000);
-    await signedInAs('core');
-    const { context, page: kiosk } = await openKiosk(browser);
-
-    try {
-      await pairKiosk(kiosk, page);
-      await bindTo(kiosk, /nursery/i);
-
-      await kiosk.getByRole('button', { name: /Register your child/i }).click();
-      const code = ((await kiosk
-        .getByText(/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/)
-        .first()
-        .textContent()) ?? '').trim();
-      expect(code).toHaveLength(6);
-
-      const phoneContext = await browser.newContext();
-      try {
-        const phone = await phoneContext.newPage();
-        await phone.goto(`/welcome?c=${code}`);
-        await phone.getByLabel(/^First name/i).waitFor({ timeout: 30_000 });
-        await phone.getByLabel(/^First name/i).fill('Isla');
-        await phone.getByLabel(/^Last name/i).fill('Dovetail');
-        await phone.getByLabel(/^Your first name/i).fill('Rowan');
-        await phone.getByLabel(/^Your last name/i).fill('Dovetail');
-        await phone.getByLabel(/^Your phone number/i).fill('5550198822');
-        await phone.getByRole('button', { name: /^Register$/i }).click();
-        // The success copy no longer mentions any button — the digits are the
-        // whole instruction, because the kiosk needs nothing else pressed.
-        await expect(phone.getByText(/type the last 4 digits/i)).toBeVisible({ timeout: 30_000 });
-        await expect(phone.getByText(/I've registered/)).toHaveCount(0);
-      } finally {
-        await phoneContext.close();
-      }
-
-      // Nothing is pressed on the kiosk from here on. The pulse takes the QR
-      // screen down and the search screen greets the family by itself.
-      await expect(kiosk.getByRole('button', { name: /I've registered/i })).toHaveCount(0, {
-        timeout: 60_000,
-      });
-      await expect(kiosk.getByText(/type the last 4 digits/i)).toBeVisible({ timeout: 15_000 });
-
-      await typeOnKiosk(kiosk, '8822');
-      const row = kiosk.getByRole('button', { name: /Isla Dovetail/i }).first();
-      await expect(row).toBeVisible({ timeout: 30_000 });
-      await row.click();
-      await kiosk.getByRole('button', { name: /^Check in$/ }).click();
-      await expect(kiosk.getByText(/is checked in\. Welcome!/i)).toBeVisible({ timeout: 20_000 });
-    } finally {
-      await context.close();
-    }
-  });
 });
 
 test.describe('pairing', () => {
