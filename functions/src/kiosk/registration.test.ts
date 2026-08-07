@@ -125,7 +125,7 @@ describe('the documents it writes', () => {
       isVisitor: true,
       searchName: 'robin fields',
       pcoPersonId: null,
-      pcoPushPending: true,
+      upstreamPushPending: true,
       createdBy: 'staff-uid',
     });
     // The one field a quick-add has not got: what tells `onStudentCreated` to
@@ -318,7 +318,7 @@ describe('what reaches the church database', () => {
       // queued, and what the hold adds is that the queue does not drain on its
       // own. See backends/pendingReview.ts.
       expect(document.pendingReview).toBe(true);
-      expect(document.pcoPushPending).toBe(true);
+      expect(document.upstreamPushPending).toBe(true);
     }
   });
 

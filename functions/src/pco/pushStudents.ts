@@ -347,7 +347,7 @@ export async function pushStudent(options: PushStudentOptions): Promise<PushStud
     await client.patch(`/people/${encodeURIComponent(linkedId)}`, {
       data: { type: 'Person', id: linkedId, attributes },
     });
-    await ref.update({ pcoSyncedAt: nowTs, pcoPushPending: false, updatedAt: nowTs });
+    await ref.update({ pcoSyncedAt: nowTs, upstreamPushPending: false, updatedAt: nowTs });
     return {
       status: 'updated',
       pcoPersonId: linkedId,
@@ -356,7 +356,7 @@ export async function pushStudent(options: PushStudentOptions): Promise<PushStud
   }
 
   /* ---- Not linked yet ---------------------------------------------------- */
-  if (data.pcoPushPending !== true) {
+  if (data.upstreamPushPending !== true) {
     return { status: 'skipped', pcoPersonId: null, message: 'Student is not queued for Planning Center.' };
   }
 
@@ -366,7 +366,7 @@ export async function pushStudent(options: PushStudentOptions): Promise<PushStud
    * It used to refuse one, on the reasoning that every student queued for a
    * create had a grade typed at quick-add. A nursery does not: a child too
    * young for a grade has none to type, and the refusal left them queued on
-   * `pcoPushPending` for ever — a queue that never drains rather than a visible
+   * `upstreamPushPending` for ever — a queue that never drains rather than a visible
    * failure. `createAttributes` omits the field rather than sending a zero, and
    * the duplicate check above leans on `child` instead.
    */
@@ -376,7 +376,7 @@ export async function pushStudent(options: PushStudentOptions): Promise<PushStud
       pcoPersonId: existing.id,
       upstreamBackend: 'pco',
       upstreamPersonId: existing.id,
-      pcoPushPending: false,
+      upstreamPushPending: false,
       pcoSyncedAt: nowTs,
       updatedAt: nowTs,
     });
@@ -406,7 +406,7 @@ export async function pushStudent(options: PushStudentOptions): Promise<PushStud
     pcoPersonId: createdId,
     upstreamBackend: 'pco',
     upstreamPersonId: createdId,
-    pcoPushPending: false,
+    upstreamPushPending: false,
     pcoSyncedAt: nowTs,
     updatedAt: nowTs,
   });
@@ -498,9 +498,9 @@ export async function pushPendingStudents(options: {
       // sweep has always checked both and this one checked only the legacy
       // field, so a student the other backend holds was, on paper, a candidate
       // for a second person over here. Reachable only through a stale
-      // `pcoPushPending`, but the asymmetry was the bug, not the odds.
+      // `upstreamPushPending`, but the asymmetry was the bug, not the odds.
       return (
-        data.pcoPushPending === true &&
+        data.upstreamPushPending === true &&
         !readString(data, 'pcoPersonId') &&
         !readString(data, 'upstreamPersonId') &&
         !isHeldForReview(data)

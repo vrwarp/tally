@@ -69,7 +69,7 @@ function harness(): Harness {
  * person from Planning Center rather than from here.
  */
 function annotation(overrides: Record<string, unknown> = {}): Record<string, unknown> {
-  return { notes: null, status: 'active', pcoPushPending: false, ...overrides };
+  return { notes: null, status: 'active', upstreamPushPending: false, ...overrides };
 }
 
 describe('updateStudentProfile against the simulator', () => {
@@ -437,7 +437,7 @@ describe('updateStudentProfile against the simulator', () => {
 
     it('refuses a student who is not upstream yet rather than creating one', async () => {
       const before = h.store.people.length;
-      h.db.seed('students/s1', annotation({ pcoPersonId: null, pcoPushPending: true }));
+      h.db.seed('students/s1', annotation({ pcoPersonId: null, upstreamPushPending: true }));
 
       const result = await save('s1', { firstName: 'Nia', lastName: 'Fontaine' });
 

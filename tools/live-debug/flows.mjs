@@ -40,7 +40,7 @@ const DOC_ID = `visitor_${RUN_ID}`;
 async function studentCreate() {
   await db.doc(`students/${DOC_ID}`).set({
     firstName: KID_FIRST, lastName: KID_LAST, grade: 8,
-    notes: null, status: 'active', pcoPushPending: true,
+    notes: null, status: 'active', upstreamPushPending: true,
   });
   const result = await pushStudent({ db, client: clients.mirror, config, studentId: DOC_ID, logger });
   check('pushStudent created', result.status === 'created', result.message);
@@ -52,7 +52,7 @@ async function studentCreate() {
   // complete — id written, queue flag cleared, sync stamped.
   const doc = (await db.doc(`students/${DOC_ID}`).get()).data();
   check('doc holds the pco id', doc?.pcoPersonId === pid, String(doc?.pcoPersonId));
-  check('doc push flag cleared', doc?.pcoPushPending === false, String(doc?.pcoPushPending));
+  check('doc push flag cleared', doc?.upstreamPushPending === false, String(doc?.upstreamPushPending));
   check('doc sync stamped', Boolean(doc?.pcoSyncedAt));
 
   const { mirror, pco } = await personBothSides(clients, pid);

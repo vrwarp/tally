@@ -222,7 +222,7 @@ const SHAPES = ((process.env.TOUR_SHAPES?.split(',').map((value) => value.trim()
 /**
  * Waits for the seed's push queue to drain before anything is photographed.
  *
- * The seed writes quick-added visitors with `pcoPushPending`, and
+ * The seed writes quick-added visitors with `upstreamPushPending`, and
  * `onStudentCreated` pushes them the moment they land — creating the person
  * upstream, re-sending whatever the create dropped, and only then stamping the
  * document with the id that links the two. A kiosk reading its roster inside
@@ -237,7 +237,7 @@ async function pushQueueDrained(): Promise<void> {
   await expect
     .poll(
       async () =>
-        (await readCollection('students')).filter((doc) => doc.data.pcoPushPending === true).length,
+        (await readCollection('students')).filter((doc) => doc.data.upstreamPushPending === true).length,
       { timeout: 120_000, message: 'the seeded visitors finish reaching Planning Center' },
     )
     .toBe(0);

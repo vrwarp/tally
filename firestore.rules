@@ -216,7 +216,7 @@ service cloud.firestore {
 
       /**
        * The backend owns the linkage. A client may declare a student as
-       * "mine, not yet pushed" (`pcoPersonId: null`, `pcoPushPending: true`)
+       * "mine, not yet pushed" (`pcoPersonId: null`, `upstreamPushPending: true`)
        * but may never assert an id — forging one would let a browser rebind a
        * Tally student onto an arbitrary person in the church's database.
        *
@@ -249,18 +249,17 @@ service cloud.firestore {
       }
 
       /**
-       * `pcoRecordMissing` is what freezes a student's check-ins when their
-       * backend record dies — whichever backend holds them; the name predates
-       * the second one — and it is set and cleared server-side from what the
-       * backend actually answers. A client that could flip it would be a
-       * client that can thaw a frozen student by asserting the record came
-       * back — so, like the linkage it rides on, it is not a client's to
-       * write.
+       * `upstreamRecordMissing` is what freezes a student's attendance when
+       * their backend record dies — whichever backend holds them — and it is
+       * set and cleared server-side from what the backend actually answers. A
+       * client that could flip it would be a client that can thaw a frozen
+       * student by asserting the record came back — so, like the linkage it
+       * rides on, it is not a client's to write.
        */
-      function pcoRecordFlagUnchanged() {
+      function recordMissingUnchanged() {
         let after = request.resource.data;
         let before = resource == null ? {} : resource.data;
-        return after.get('pcoRecordMissing', false) == before.get('pcoRecordMissing', false);
+        return after.get('upstreamRecordMissing', false) == before.get('upstreamRecordMissing', false);
       }
 
       /**
@@ -311,14 +310,14 @@ service cloud.firestore {
                     && upstreamLinkageUnclaimed()
                     && kioskWriteAllowed()
                     && reviewHoldUnchanged()
-                    && request.resource.data.get('pcoRecordMissing', false) == false;
+                    && request.resource.data.get('upstreamRecordMissing', false) == false;
       allow update: if isCounselor()
                     && validStudent()
                     && noMirroredPersonalData()
                     && pcoLinkageUnchanged()
                     && upstreamLinkageUnchanged()
                     && kioskWriteAllowed()
-                    && pcoRecordFlagUnchanged()
+                    && recordMissingUnchanged()
                     && reviewHoldUnchanged();
 
       // Never. Attendance documents reference students by id; deleting one
@@ -447,19 +446,23 @@ service cloud.firestore {
         }
 
         /**
-         * A student whose Planning Center record died is frozen: no check-in,
-         * no un-check-in, past events included, until somebody removes them
-         * from the roster or re-creates the record. The flag lives on the
-         * membership document and only the server writes it, so this is not a
-         * client honour system — a stale tab back-filling a deleted student
-         * into last month's gathering is refused by the database. The
-         * `exists()` guard keeps the historical behaviour for a student with
-         * no document yet: check-in is frequently what creates it.
+         * A student whose upstream record died is frozen: no check-in, no
+         * un-check-in, no pickup, past events included, until somebody removes
+         * them from the roster or re-creates the record. Named for the whole
+         * document rather than for check-in, because it gates all three verbs
+         * below — a pickup for a student the system of record no longer holds
+         * is as unreconcilable as an arrival.
+         *
+         * The flag lives on the membership document and only the server writes
+         * it, so this is not a client honour system — a stale tab back-filling
+         * a deleted student into last month's gathering is refused by the
+         * database. The `exists()` guard keeps the historical behaviour for a
+         * student with no document yet: check-in is frequently what creates it.
          */
-        function checkInFrozen() {
+        function attendanceFrozen() {
           return exists(/databases/$(database)/documents/students/$(studentId))
             && get(/databases/$(database)/documents/students/$(studentId))
-                 .data.get('pcoRecordMissing', false) == true;
+                 .data.get('upstreamRecordMissing', false) == true;
         }
 
         function checkOutKeys() { return ['checkedOutAt', 'checkedOutBy']; }
@@ -504,7 +507,7 @@ service cloud.firestore {
         }
 
         allow get, list: if isActive();
-        allow create: if isCounselor() && validAttendance() && !checkInFrozen();
+        allow create: if isCounselor() && validAttendance() && !attendanceFrozen();
         /**
          * A kiosk may add a record, and may record a first pickup. It may not
          * overwrite the moment and method a counselor recorded, and it may not
@@ -512,11 +515,11 @@ service cloud.firestore {
          * this and renders an already-collected student as done rather than
          * re-writing them.
          */
-        allow update: if isCounselor() && !checkInFrozen()
+        allow update: if isCounselor() && !attendanceFrozen()
                       && (isKioskSession()
                             ? kioskCheckOutAllowed()
                             : (validAttendance() || validCheckOut()));
-        allow delete: if isCounselor() && !checkInFrozen() && !isKioskSession();
+        allow delete: if isCounselor() && !attendanceFrozen() && !isKioskSession();
       }
 
       /**

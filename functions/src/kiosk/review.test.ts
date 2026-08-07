@@ -99,7 +99,7 @@ function dbWithRegistration(
       status: 'active',
       isVisitor: true,
       pcoPersonId: null,
-      pcoPushPending: true,
+      upstreamPushPending: true,
       pendingReview: true,
       registrationId: ID,
     });
@@ -455,7 +455,7 @@ describe('approving', () => {
     expect(result.status).toBe('approved');
     // Approved and queued in the ordinary way; the record cannot help them.
     expect(db.get('students/held-1')!.pendingReview).toBe(false);
-    expect(db.get('students/held-1')!.pcoPushPending).toBe(true);
+    expect(db.get('students/held-1')!.upstreamPushPending).toBe(true);
     expect(db.get(`${REGISTRATIONS_COLLECTION}/${ID}`)).toBeUndefined();
   });
 
@@ -557,7 +557,7 @@ describe('discarding', () => {
     expect(db.get('students/held-1')).toMatchObject({
       status: 'inactive',
       pendingReview: false,
-      pcoPushPending: false,
+      upstreamPushPending: false,
     });
     expect(db.get(`${REGISTRATIONS_COLLECTION}/${ID}`)).toBeUndefined();
     // The lobby screens are told, so the kiosk stops offering a check-in for

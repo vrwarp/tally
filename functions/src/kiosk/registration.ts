@@ -10,7 +10,7 @@
  * Why a callable rather than a write from the shelf. A kiosk session is the
  * approver's, narrowed: `firestore.rules` pins the student keys it may write to
  * the eight the check-in date patch touches, so a browser in a lobby cannot
- * create a student carrying `status`, `isVisitor` or `pcoPushPending` — and a
+ * create a student carrying `status`, `isVisitor` or `upstreamPushPending` — and a
  * document without those is invisible to the kiosk's own roster query and never
  * pushed upstream. Widening the pin would hand a public screen the ability to
  * write arbitrary roster documents; the pin stays and the registration comes
@@ -791,10 +791,10 @@ export async function registerFamily(
       firstAttendedAt: event?.startAt ?? null,
       lastAttendedAt: event?.startAt ?? null,
       pcoPersonId: null,
-      pcoPushPending: true,
+      upstreamPushPending: true,
       /*
        * The hold. Nothing pushes this child anywhere until a reviewer clears
-       * it — see backends/pendingReview.ts. `pcoPushPending` stays true
+       * it — see backends/pendingReview.ts. `upstreamPushPending` stays true
        * alongside it because the child genuinely is queued; what the hold adds
        * is that the queue does not drain on its own.
        */

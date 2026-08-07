@@ -82,7 +82,7 @@ export interface RosterScan {
    */
   studentIdByLinkedPersonId: Record<BackendId, Record<string, string>>;
   /**
-   * Which active documents currently carry `pcoRecordMissing: true`, so the
+   * Which active documents currently carry `upstreamRecordMissing: true`, so the
    * roster read writes the flag only when the answer *changed* — four hundred
    * students must not cost four hundred writes per read.
    */
@@ -149,7 +149,7 @@ export async function scanRoster(database: FirestoreLike): Promise<RosterScan> {
         scan.queued += 1;
       }
     }
-    if (data.pcoRecordMissing === true) scan.recordMissing[document.id] = true;
+    if (data.upstreamRecordMissing === true) scan.recordMissing[document.id] = true;
   }
 
   return scan;

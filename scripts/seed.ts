@@ -1172,7 +1172,7 @@ function collectWrites(now: Date): {
       pcoPersonId: student.pcoPersonId,
       // A Tally-only student is queued for write-back, which is exactly the
       // state a quick-added visitor is left in.
-      pcoPushPending: student.pcoPersonId === null,
+      upstreamPushPending: student.pcoPersonId === null,
       createdAt: student.createdAt,
       updatedAt: student.createdAt,
       createdBy: student.pcoPersonId ? 'planning-center' : SEED_AUTHOR,
@@ -1200,7 +1200,7 @@ function collectWrites(now: Date): {
           status: owned.status,
           notes: seed.notes ?? null,
           isVisitor: false,
-          pcoPushPending: false,
+          upstreamPushPending: false,
           firstAttendedAt: student.firstAttendedAt,
           lastAttendedAt: student.lastAttendedAt,
           // No `addedToRosterBy`: nobody pressed a button for these. The field

@@ -307,7 +307,7 @@ describe('pushing a linked visitor whose person was merged', () => {
   it('follows the merge, repoints the document, and syncs against the keeper', async () => {
     const { dupId, keptId } = seedDuplicatePair(h);
     h.db.seed('students/tally-v1', {
-      status: 'active', pcoPersonId: dupId, pcoPushPending: false,
+      status: 'active', pcoPersonId: dupId, upstreamPushPending: false,
       firstName: 'Rowan', lastName: 'Vasquez', grade: 9,
     });
     h.store.buryPerson(dupId, keptId);
@@ -327,7 +327,7 @@ describe('pushing a linked visitor whose person was merged', () => {
   it('reports a dead-ended link as a skip a leader can act on', async () => {
     const { dupId, keptId } = seedDuplicatePair(h);
     h.db.seed('students/tally-v2', {
-      status: 'active', pcoPersonId: dupId, pcoPushPending: false,
+      status: 'active', pcoPersonId: dupId, upstreamPushPending: false,
       firstName: 'Rowan', lastName: 'Vasquez', grade: 9,
     });
     h.store.buryPerson(dupId, keptId);

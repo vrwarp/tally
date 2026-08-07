@@ -57,7 +57,7 @@ export function a32AliasPairs(
  */
 export async function collapseAliasPair(db: FirestoreLike, pair: AliasPair): Promise<void> {
   await db.doc(`${PATHS.students}/${pair.keeperDoc}`).set(
-    { status: 'active', pcoRecordMissing: false, mergedFromStudentId: pair.foldDoc },
+    { status: 'active', upstreamRecordMissing: false, mergedFromStudentId: pair.foldDoc },
     { merge: true },
   );
   await db.doc(`${PATHS.students}/${pair.foldDoc}`).set(

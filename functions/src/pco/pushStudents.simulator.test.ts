@@ -77,7 +77,7 @@ function tallyOnlyStudent(overrides: Record<string, unknown> = {}): Record<strin
     pcoPersonId: null,
     pcoUpdatedAt: null,
     pcoSyncedAt: null,
-    pcoPushPending: true,
+    upstreamPushPending: true,
     createdAt: OLD,
     updatedAt: OLD,
     createdBy: 'counselor-1',
@@ -117,7 +117,7 @@ describe('pushStudent against the simulator', () => {
 
       const stored = h.db.get('students/s1')!;
       expect(stored.pcoPersonId).toBe(result.pcoPersonId);
-      expect(stored.pcoPushPending).toBe(false);
+      expect(stored.upstreamPushPending).toBe(false);
     });
 
     it('sends allergies through as medical notes', async () => {
@@ -238,7 +238,7 @@ describe('pushStudent against the simulator', () => {
     it('leaves an already-linked student alone', async () => {
       h.db.seed(
         'students/s1',
-        tallyOnlyStudent({ pcoPersonId: FIXTURE_IDS.amara, pcoPushPending: false }),
+        tallyOnlyStudent({ pcoPersonId: FIXTURE_IDS.amara, upstreamPushPending: false }),
       );
       const before = h.store.people.length;
 
@@ -261,7 +261,7 @@ describe('pushStudent against the simulator', () => {
       expect(h.store.people).toHaveLength(before);
       // Turning write-back on later must pick this student up without anybody
       // re-editing them.
-      expect(h.db.get('students/s1')?.pcoPushPending).toBe(true);
+      expect(h.db.get('students/s1')?.upstreamPushPending).toBe(true);
     });
   });
 
@@ -274,7 +274,7 @@ describe('pushStudent against the simulator', () => {
           lastName: 'Okonkwo',
           grade: 9,
           pcoPersonId: FIXTURE_IDS.amara,
-          pcoPushPending: false,
+          upstreamPushPending: false,
         }),
       );
       expect(h.store.personById(FIXTURE_IDS.amara)?.grade).toBe(8);
@@ -291,7 +291,7 @@ describe('pushStudent against the simulator', () => {
       const person = h.store.createPerson({ first_name: 'Nia', last_name: 'Fontaine' });
       h.db.seed(
         'students/s1',
-        tallyOnlyStudent({ pcoPersonId: person.id, pcoPushPending: false, grade: 9 }),
+        tallyOnlyStudent({ pcoPersonId: person.id, upstreamPushPending: false, grade: 9 }),
       );
 
       const result = await push('s1', 'full');
@@ -311,7 +311,7 @@ describe('pushStudent against the simulator', () => {
       });
       h.db.seed(
         'students/s1',
-        tallyOnlyStudent({ pcoPersonId: person.id, pcoPushPending: false, grade: 12 }),
+        tallyOnlyStudent({ pcoPersonId: person.id, upstreamPushPending: false, grade: 12 }),
       );
 
       const result = await push('s1', 'full');
@@ -330,7 +330,7 @@ describe('pushStudent against the simulator', () => {
           lastName: 'Okonkwo',
           grade: 6,
           pcoPersonId: FIXTURE_IDS.benjiWithNickname,
-          pcoPushPending: false,
+          upstreamPushPending: false,
         }),
       );
 
@@ -351,7 +351,7 @@ describe('pushStudent against the simulator', () => {
           lastName: 'Okonkwo',
           grade: 6,
           pcoPersonId: FIXTURE_IDS.benjiWithNickname,
-          pcoPushPending: false,
+          upstreamPushPending: false,
         }),
       );
 
@@ -378,7 +378,7 @@ describe('pushStudent against the simulator', () => {
         lastName: 'Delgado',
         grade: 11,
         pcoPersonId: FIXTURE_IDS.sofiaWithAllergy,
-        pcoPushPending: false,
+        upstreamPushPending: false,
       });
       h.db.seed('students/s1', withoutAllergies);
 
@@ -397,7 +397,7 @@ describe('pushStudent against the simulator', () => {
           grade: 8,
           allergies: 'Bee stings — carries an EpiPen',
           pcoPersonId: FIXTURE_IDS.amara,
-          pcoPushPending: false,
+          upstreamPushPending: false,
         }),
       );
 
@@ -415,7 +415,7 @@ describe('pushStudent against the simulator', () => {
           lastName: 'Okonkwo',
           grade: 8,
           pcoPersonId: FIXTURE_IDS.amara,
-          pcoPushPending: false,
+          upstreamPushPending: false,
         }),
       );
 
@@ -443,7 +443,7 @@ describe('pushStudent against the simulator', () => {
           lastName: 'Okonkwo',
           grade: undefined,
           pcoPersonId: FIXTURE_IDS.amara,
-          pcoPushPending: false,
+          upstreamPushPending: false,
         }),
       );
       const held = h.store.personById(FIXTURE_IDS.amara)?.grade;
@@ -456,7 +456,7 @@ describe('pushStudent against the simulator', () => {
 
     it('creates a grade-less child rather than sending a grade nobody supplied', async () => {
       // A nursery child has no grade to type at quick-add. This used to be
-      // refused outright, which left them queued on `pcoPushPending` for ever.
+      // refused outright, which left them queued on `upstreamPushPending` for ever.
       h.db.seed('students/s1', tallyOnlyStudent({ grade: undefined }));
 
       const result = await push('s1', 'create');
@@ -519,7 +519,7 @@ describe('pushStudent against the simulator', () => {
     it('catches up everything the immediate push missed', async () => {
       h.db.seed('students/s1', tallyOnlyStudent({ firstName: 'Nia', searchName: 'nia fontaine' }));
       h.db.seed('students/s2', tallyOnlyStudent({ firstName: 'Theo', searchName: 'theo fontaine' }));
-      h.db.seed('students/s3', tallyOnlyStudent({ pcoPersonId: 'X', pcoPushPending: false }));
+      h.db.seed('students/s3', tallyOnlyStudent({ pcoPersonId: 'X', upstreamPushPending: false }));
 
       const result = await pushPendingStudents({
         db: h.db,

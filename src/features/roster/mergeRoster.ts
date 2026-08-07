@@ -121,7 +121,7 @@ export function mergeRoster(
         isVisitor: document.isVisitor && !target.profileComplete,
         firstAttendedAt: document.firstAttendedAt,
         lastAttendedAt: document.lastAttendedAt,
-        pcoPushPending: document.pcoPushPending,
+        upstreamPushPending: document.upstreamPushPending,
         createdAt: document.createdAt,
         updatedBy: document.updatedBy,
       });
@@ -137,7 +137,7 @@ export function mergeRoster(
       isVisitor: document.isVisitor && !target.profileComplete,
       firstAttendedAt: document.firstAttendedAt,
       lastAttendedAt: document.lastAttendedAt,
-      pcoPushPending: document.pcoPushPending,
+      upstreamPushPending: document.upstreamPushPending,
       // A student Tally has recorded something about has a real creation date,
       // which is what stops a visitor added last Friday being reported as
       // having missed the three Fridays before they existed.

@@ -22,9 +22,9 @@ function seeded(): FakeFirestore {
   });
   db.seed('students/vis-legacy', { status: 'active', pcoPersonId: '202' });
   // Queued, inactive, and frozen rows.
-  db.seed('students/vis-queued', { status: 'active', pcoPushPending: true });
+  db.seed('students/vis-queued', { status: 'active', upstreamPushPending: true });
   db.seed('students/pco_999', { status: 'inactive' });
-  db.seed('students/pco_303', { status: 'active', pcoRecordMissing: true });
+  db.seed('students/pco_303', { status: 'active', upstreamRecordMissing: true });
   return db;
 }
 

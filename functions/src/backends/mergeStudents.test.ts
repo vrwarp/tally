@@ -31,7 +31,7 @@ describe('merging', () => {
       firstName: 'Robin',
       lastName: 'Fields',
       pendingReview: true,
-      pcoPushPending: true,
+      upstreamPushPending: true,
     });
 
     const result = await merge(store, 'pco_7', 'held-1');
@@ -43,7 +43,7 @@ describe('merging', () => {
       mergedIntoStudentId: 'pco_7',
       // Not waiting for anything any more, in either sense.
       pendingReview: false,
-      pcoPushPending: false,
+      upstreamPushPending: false,
     });
     expect(store.get('students/pco_7')!.mergedFromStudentIds).toEqual(['held-1']);
     // And the lobby screens are told: the folded row must leave the kiosk

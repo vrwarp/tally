@@ -424,7 +424,7 @@ export function CheckInPage() {
    */
   const refuseFrozen = useCallback(
     (entry: RosterEntry): boolean => {
-      if (entry.student.pcoRecordMissing !== true) return false;
+      if (entry.student.upstreamRecordMissing !== true) return false;
       const frozen = `${studentFullName(entry.student)} is frozen — their Planning Center record was deleted or merged away. Fix it from their student page first.`;
       setAnnouncement(frozen);
       show(frozen, { tone: 'error' });

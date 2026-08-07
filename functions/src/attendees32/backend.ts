@@ -82,7 +82,7 @@ export function createA32Backend(args: BackendContext & { config: A32Config }): 
         .filter((doc) => {
           const data = doc.data() ?? {};
           return (
-            data.pcoPushPending === true &&
+            data.upstreamPushPending === true &&
             typeof data.pcoPersonId !== 'string' &&
             typeof data.upstreamPersonId !== 'string' &&
             // The same exclusion the Planning Center sweep makes: a family

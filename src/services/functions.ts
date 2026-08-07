@@ -410,7 +410,7 @@ export interface RecreateStudentResult {
 
 /**
  * Puts a person back in Planning Center for a student whose record died there
- * — the sanctioned thaw for a check-in freeze. Careful by design: a record
+ * — the sanctioned thaw for an attendance freeze. Careful by design: a record
  * that still exists only clears the flag, and a merge with a living survivor
  * relinks instead of creating the duplicate the admin just cleaned up. A
  * `pco_…` student's document holds no name, so `needs-details` asks the

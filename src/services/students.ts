@@ -88,9 +88,9 @@ export function buildStudentPayload(draft: StudentDraft, uid: string) {
     lastAttendedAt: null,
 
     // Created in Tally, not read from Planning Center. `onStudentCreated` picks
-    // `pcoPushPending` up and creates the matching Person there.
+    // `upstreamPushPending` up and creates the matching Person there.
     pcoPersonId: null,
-    pcoPushPending: true,
+    upstreamPushPending: true,
 
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),

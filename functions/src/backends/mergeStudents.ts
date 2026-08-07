@@ -146,7 +146,7 @@ export async function mergeStudents(options: {
       // A merged-away duplicate is not waiting for anything. Both flags come
       // off so no sweep and no reviewer picks the row up again.
       pendingReview: false,
-      pcoPushPending: false,
+      upstreamPushPending: false,
       mergedIntoStudentId: keeperId,
       mergedAt: at,
       mergedBy: uid,

@@ -313,7 +313,7 @@ test.describe('the kiosk', () => {
         firstAttendedAt: null,
         lastAttendedAt: null,
         pcoPersonId: null,
-        pcoPushPending: false,
+        upstreamPushPending: false,
         createdAt: now,
         updatedAt: now,
         createdBy: 'e2e',

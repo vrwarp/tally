@@ -35,7 +35,7 @@ function dbWithHeldStudent(overrides: Record<string, unknown> = {}): FakeFiresto
     status: 'active',
     isVisitor: true,
     pcoPersonId: null,
-    pcoPushPending: true,
+    upstreamPushPending: true,
     pendingReview: true,
     ...overrides,
   });
@@ -63,7 +63,7 @@ describe('a student held for review', () => {
       lastName: 'Kim',
       grade: 6,
       status: 'active',
-      pcoPushPending: true,
+      upstreamPushPending: true,
     });
 
     /*

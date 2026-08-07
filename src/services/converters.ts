@@ -144,8 +144,8 @@ export function toStudent(snapshot: DocumentSnapshot<DocumentData>): Student {
     status: data.status === 'inactive' ? 'inactive' : 'active',
     isVisitor: bool(data.isVisitor),
     pcoPersonId,
-    pcoPushPending: bool(data.pcoPushPending),
-    pcoRecordMissing: bool(data.pcoRecordMissing),
+    upstreamPushPending: bool(data.upstreamPushPending),
+    upstreamRecordMissing: bool(data.upstreamRecordMissing),
     // The generic linkage pair, server-written; `backendOfStudent` reads it.
     upstreamBackend: isBackendId(data.upstreamBackend) ? data.upstreamBackend : null,
     upstreamPersonId: strOrNull(data.upstreamPersonId),
@@ -447,7 +447,7 @@ export function fromRosterPerson(person: PcoRosterPerson, now: Date): Student {
     status: person.status,
     isVisitor: false,
     pcoPersonId: person.pcoPersonId,
-    pcoPushPending: false,
+    upstreamPushPending: false,
     /*
      * The linkage travels on the row itself, so screens can name the right
      * backend even after `mergeRoster` moves this row under a visitor

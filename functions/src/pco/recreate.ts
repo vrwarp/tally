@@ -3,7 +3,7 @@
  *
  * The situation this exists for: an admin deletes (or merges away, with the
  * trail ending dead) the person behind a roster student. The student is then
- * frozen — `pcoRecordMissing` on their document blocks check-ins at the rules
+ * frozen — `upstreamRecordMissing` on their document blocks check-ins at the rules
  * — and a leader has exactly two ways out: take them off the roster, or put a
  * person back in Planning Center. This is the second way.
  *
@@ -117,7 +117,7 @@ export async function recreateStudent(
     const body = await client.get<PcoPerson>(`/people/${encodeURIComponent(linkedId)}`);
     const person = Array.isArray(body.data) ? body.data[0] : body.data;
     if (person?.id) {
-      await ref.set({ pcoRecordMissing: false }, { merge: true });
+      await ref.set({ upstreamRecordMissing: false }, { merge: true });
       return result(
         'still-there',
         'Planning Center still has this person — nothing needed re-creating. Check-ins are unfrozen.',
@@ -149,12 +149,12 @@ export async function recreateStudent(
     // The document holds the name a human typed at the door; clearing the dead
     // link and queueing the push re-creates through the path that already
     // matches duplicates, verifies attributes, and links the document.
-    await ref.set({ pcoPersonId: null, pcoPushPending: true }, { merge: true });
+    await ref.set({ pcoPersonId: null, upstreamPushPending: true }, { merge: true });
     const pushed = await pushStudent({ db, client, config, studentId, logger });
     if (!pushed.pcoPersonId) {
       return result('no-student', pushed.message, { studentId });
     }
-    await ref.set({ pcoRecordMissing: false }, { merge: true });
+    await ref.set({ upstreamRecordMissing: false }, { merge: true });
     logger.info('Re-created a Planning Center person for a visitor student', {
       studentId,
       pcoPersonId: pushed.pcoPersonId,
@@ -201,7 +201,7 @@ export async function recreateStudent(
     {
       pcoPersonId: createdId,
       status: 'active',
-      pcoRecordMissing: false,
+      upstreamRecordMissing: false,
       recreatedFromStudentId: studentId,
       ...(data.addedToRosterAt !== undefined ? { addedToRosterAt: data.addedToRosterAt } : {}),
       ...(data.createdAt !== undefined ? { createdAt: data.createdAt } : {}),

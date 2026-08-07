@@ -153,17 +153,21 @@ export interface StudentDoc {
    * one created while write-back is disabled.
    */
   pcoPersonId: string | null;
-  /** A Tally-created student still waiting to be pushed to Planning Center. */
-  pcoPushPending: boolean;
+  /**
+   * A Tally-created student still waiting to be pushed — to whichever backend
+   * `config/backends` names as the default at push time, which is why this
+   * does not name one.
+   */
+  upstreamPushPending: boolean;
   /**
    * True while the linked upstream record is known gone — deleted, or merged
    * with the trail ending dead. Written only by the server, from what the
-   * backend actually answered; the rules refuse it from a client and refuse
-   * check-ins while it stands. A leader thaws the student by removing them
-   * from the roster or re-creating the record. Named for the first backend
-   * Tally had; it freezes for every backend.
+   * backend actually answered; the rules refuse it from a client, and while it
+   * stands they freeze the student's attendance outright — no check-in, no
+   * un-check-in, no pickup, past nights included. A leader thaws the student by
+   * removing them from the roster or re-creating the record.
    */
-  pcoRecordMissing?: boolean;
+  upstreamRecordMissing?: boolean;
 
   /**
    * The generic linkage pair, written by the server alongside (or instead of)
@@ -180,7 +184,7 @@ export interface StudentDoc {
    *
    * Set by the kiosk's self-registration and cleared on the Review screen;
    * server-written in both directions, and `firestore.rules` refuses a client
-   * that touches it. Every push path consults it, so it — not `pcoPushPending`
+   * that touches it. Every push path consults it, so it — not `upstreamPushPending`
    * — is what actually decides whether a student reaches a backend.
    */
   pendingReview?: boolean;

@@ -143,7 +143,7 @@ test.describe('check-out', () => {
    *
    * A child too young for a grade has none to type, and both backends used to
    * refuse to create one — so a volunteer adding a three-year-old at the door
-   * left them queued on `pcoPushPending` for ever, which is a queue that never
+   * left them queued on `upstreamPushPending` for ever, which is a queue that never
    * drains rather than a visible failure.
    */
   test('quick-adds a child with no grade, and pushes them upstream', async ({

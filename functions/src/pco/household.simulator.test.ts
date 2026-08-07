@@ -63,7 +63,7 @@ function harness(): Harness {
 
 /** A roster student's document: an annotation, holding no name of its own. */
 function annotation(overrides: Record<string, unknown> = {}): Record<string, unknown> {
-  return { notes: null, status: 'active', pcoPushPending: false, ...overrides };
+  return { notes: null, status: 'active', upstreamPushPending: false, ...overrides };
 }
 
 /** Marcus is in a household of his own with no adult in it — the dead end. */
@@ -336,7 +336,7 @@ describe('addParent against the simulator', () => {
     });
 
     it('refuses a student who is not in Planning Center yet', async () => {
-      h.db.seed('students/s1', annotation({ pcoPersonId: null, pcoPushPending: true }));
+      h.db.seed('students/s1', annotation({ pcoPersonId: null, upstreamPushPending: true }));
 
       const result = await addParent({
         db: h.db,
