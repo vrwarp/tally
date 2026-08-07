@@ -102,11 +102,16 @@ landed. It was retired — it optimised a thing each family does exactly once, a
 unauthenticated write surface Tally had and the fiddliest synchronisation machinery in the kiosk.
 What it genuinely offered — a native keyboard for names the glass cannot type, and parallelism when
 a queue forms — now belongs to the greeters: any leader can quick-add a child from their own phone,
-and every kiosk finds that child within about a minute by itself
-([`kioskIndex/pulse`](data-model.md#kioskindexpulse)), or instantly under the family's own
-"Search everyone" tap. For the family who arrives mid-evening to a kiosk whose roster copy predates
-them, a finished search that finds nobody anywhere still re-reads the whole church silently before
-the screen will say "Still no match".
+and a one-document change signal ([`kioskIndex/pulse`](data-model.md#kioskindexpulse)) puts that
+child on every kiosk within about a minute with nobody pressing anything. Being on the device is not
+yet being in the search, though: the front door is scoped to the children who have been to *this*
+gathering, and a child created four minutes ago has been to nothing. They come into scope on their
+own once the kiosk's register poll sees them checked in — and before that, **"Search everyone"** is
+the one tap that finds them. That is the gesture greeters are trained on, and it is the same tap
+whether the signal arrived or never fired: it widens past the gathering instantly, and re-reads the
+whole church behind a spinner when the wider pool is empty too. For the family who arrives
+mid-evening to a kiosk whose roster copy predates them, a finished search that finds nobody anywhere
+runs that same re-read silently before the screen will say "Still no match".
 
 **Nothing here is a lobby screen deciding who somebody is**, and that is the design rather than a
 disclaimer. A registration reaches Tally's roster and stops: every child is written held
