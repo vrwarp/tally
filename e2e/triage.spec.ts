@@ -331,7 +331,15 @@ test.describe('deciding a family', () => {
     await seedRegistration({
       registrationId,
       guardian: { firstName: 'Vera', lastName: surname, phone: '5550122914' },
-      lastError: 'Planning Center refused the parent: that phone number is already on file.',
+      /*
+       * The *children* half, explicitly. A record that says only "something
+       * failed" is now read the safe way round and offered the guardian
+       * instrument, because withholding that one costs a family every move
+       * they have — so a spec about retrying has to say which half it means.
+       * The guardian half is driven in triage-stress.spec.ts.
+       */
+      lastError: '1 of 2 children could not be added to Planning Center.',
+      lastErrorKind: 'children',
       children: [
         { firstName: 'Duarte', lastName: surname, grade: 7, approved: true },
         { firstName: 'Inês', lastName: surname, grade: 5 },
@@ -342,8 +350,9 @@ test.describe('deciding a family', () => {
       await gotoReady(page, '/review');
       const card = cardFor(page, `Vera ${surname}`);
       await expect(card).toBeVisible({ timeout: 30_000 });
-      // The reason the record survived is on the record, and the button says
-      // finishing rather than approving.
+      // The reason the record survived is on the record, and a child-side
+      // failure keeps the ordinary retry — that one usually works, because the
+      // usual cause is an outage that has since passed.
       await expect(card.getByText(/Last attempt did not finish/i)).toBeVisible();
       await approve(card);
 
