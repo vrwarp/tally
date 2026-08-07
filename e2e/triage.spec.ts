@@ -16,6 +16,7 @@
  * like too.
  */
 import type { Page } from '@playwright/test';
+import { parseStudentId } from '../src/lib/backendIds';
 import { gotoReady } from './support/auth';
 import { readCollection, simulatorPeople } from './support/emulator';
 import { expect, test } from './support/fixtures';
@@ -59,9 +60,10 @@ async function anExistingStudent(): Promise<{ id: string; firstName: string; las
       doc.data.status === 'active' &&
       typeof doc.data.firstName === 'string' &&
       (doc.data.firstName as string).length > 0 &&
-      // Native to Tally: a backend-linked row cannot be the keeper of a merge
-      // in the direction this screen offers.
-      !doc.id.includes(':'),
+      // Native to Tally. A prefixed id (`pco_…`, `a32_…`) is a *backend* person,
+      // and two of those cannot be merged here at all — that merge belongs
+      // upstream, where it can actually be performed.
+      parseStudentId(doc.id) === null,
   );
   if (!named) throw new Error('The seeded roster holds no Tally-native student.');
   return {

@@ -128,9 +128,20 @@ export async function seedTriageQueue(): Promise<SeededTriageQueue> {
       registrationId: 'uxr-triage-expiring',
       agoMs: 26 * DAY,
       guardian: { firstName: 'Beatriz', lastName: 'Salgado', phone: '5550193318' },
+      /*
+       * No duplicate hint on Elena, deliberately.
+       *
+       * The hint is written by the door from a *name* match, so pointing one at
+       * a roster row with a different name is a shape the product never
+       * produces. It was invisible while the candidates sat behind a click and
+       * became nonsense the moment the picker opened by default: a panel
+       * headed "which of these is the same child?" listing somebody with an
+       * unrelated name. The collision case is card one's job; this card's job
+       * is the deadline and the already-merged child.
+       */
       children: [
         { firstName: 'Tomás', lastName: 'Salgado', grade: 9, mergedInto: named.id },
-        { firstName: 'Elena', lastName: 'Salgado', grade: 7, possibleDuplicateOf: [named.id] },
+        { firstName: 'Elena', lastName: 'Salgado', grade: 7 },
       ],
     },
   ];
