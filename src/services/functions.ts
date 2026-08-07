@@ -740,6 +740,7 @@ export interface PendingRegistrationChild {
 /** Mirrors `PendingRegistration` in functions/src/kiosk/review.ts. */
 export interface PendingRegistration {
   registrationId: string;
+  /** 'qr' is legacy — the retired phone form's records, draining on the 30-day TTL. */
   source: 'kiosk' | 'qr';
   eventId: string | null;
   registeredAt: number | null;

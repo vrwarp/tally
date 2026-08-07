@@ -4,7 +4,7 @@
  *
  * A kiosk is `firebase/firestore/lite` by construction: no sockets, no
  * listeners, and caches with TTLs measured in hours. Until this existed, the
- * only way past those TTLs was a parent pressing "I've registered" — a person
+ * only way past those TTLs was a person pressing a refresh button — a person
  * doing a machine's job, and doing it only when they happened to know the
  * button mattered. The kiosk now polls this document instead: one small read
  * every thirty seconds, and the expensive refetches happen only when a
@@ -15,9 +15,12 @@
  *   roster        — a student document appeared (or left, via discard/merge)
  *   phones        — `kioskIndex/phones` changed
  *   participation — `kioskIndex/participation` changed
- *   registration  — a QR registration landed, with the gathering it targeted,
- *                   so the kiosk showing that QR can put the search screen up
- *                   before the family has walked back to it
+ *
+ * (A live document may still carry a fourth, `registration`, written for the
+ * retired QR flow's auto-advance. Nothing bumps or reads it; its rev is
+ * simply frozen. It is left in place because bumps merge whole channel
+ * objects and never delete keys — which is also what keeps pre-retirement
+ * kiosk bundles parsing this document.)
  *
  * ## Why revisions, and why not `FieldValue.increment`
  *
@@ -45,7 +48,7 @@ import { toDateOrNull, type FirestoreLike, type FunctionLogger } from '../firest
 
 export const PULSE_DOC = 'kioskIndex/pulse';
 
-export type PulseChannel = 'roster' | 'phones' | 'participation' | 'registration';
+export type PulseChannel = 'roster' | 'phones' | 'participation';
 
 /**
  * The debounce for high-frequency writers.
@@ -58,8 +61,6 @@ export type PulseChannel = 'roster' | 'phones' | 'participation' | 'registration
 export const PULSE_DEBOUNCE_MS = 30_000;
 
 export interface PulseBumpOptions {
-  /** Only meaningful on the `registration` channel: the gathering the QR code was minted for. */
-  eventId?: string | null;
   /** Skip the write when every requested channel's `at` is within this of `now`. */
   debounceMs?: number;
   logger?: FunctionLogger;
@@ -79,9 +80,9 @@ function atOf(data: Record<string, unknown> | undefined, channel: PulseChannel):
  * Marks the named channels as changed.
  *
  * One read, one merge write. Every bump writes the **complete** channel object
- * — `{rev, at}`, plus `eventId` on `registration` — never a partial. That is
- * deliberate: the test double's merge is shallow where real Firestore's is
- * deep, and whole-object channel values are the shape on which the two agree.
+ * — `{rev, at}` — never a partial. That is deliberate: the test double's merge
+ * is shallow where real Firestore's is deep, and whole-object channel values
+ * are the shape on which the two agree.
  */
 export async function bumpPulse(
   db: FirestoreLike,
@@ -104,12 +105,10 @@ export async function bumpPulse(
 
     const payload: Record<string, unknown> = { version: 1 };
     for (const channel of channels) {
-      const entry: Record<string, unknown> = {
+      payload[channel] = {
         rev: Math.max(revOf(data, channel) + 1, now.getTime()),
         at: Timestamp.fromDate(now),
       };
-      if (channel === 'registration') entry.eventId = options.eventId ?? null;
-      payload[channel] = entry;
     }
 
     await ref.set(payload, { merge: true });

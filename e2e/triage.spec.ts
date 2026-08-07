@@ -104,10 +104,17 @@ async function anExistingStudent(): Promise<{ id: string; firstName: string; las
 }
 
 test.describe('deciding a family', () => {
-  test('approves a QR registration, and the children reach the church database', async ({
+  test('approves a record the retired phone form left, and the children reach the church database', async ({
     page,
     signedInAs,
   }) => {
+    /*
+     * A legacy shape, on purpose. The QR/phone form was retired in Aug 2026,
+     * but the records it wrote live for 30 days and this screen has to decide
+     * them to the end: source 'qr', checkedIn false, and an allergy note —
+     * which kiosk records now carry too, so the note assertion is current
+     * behaviour pinned on the shape that first carried it.
+     */
     const surname = `Quilliam${RUN}`;
     const registrationId = `triage-approve-${RUN}`;
     await signedInAs('core');
@@ -125,8 +132,8 @@ test.describe('deciding a family', () => {
       await gotoReady(page, '/review');
       const card = cardFor(page, `Sofia ${surname}`);
       await expect(card).toBeVisible({ timeout: 30_000 });
-      // The allergy line is only ever collected by the phone form, and this is
-      // the one screen that shows it before it goes upstream.
+      // The allergy note, shown to the one person who decides the family
+      // before it goes upstream.
       await expect(card.getByText(/Latex/)).toBeVisible();
 
       // Arms, then commits. The first press must send nothing: this is the
@@ -278,7 +285,14 @@ test.describe('deciding a family', () => {
 
     try {
       await gotoReady(page, '/review');
-      const card = cardFor(page, new RegExp(`Wren|Nico ${surname}|added alongside`, 'i'));
+      /*
+       * By the child, which is the only text on this card a spec can predict.
+       * The card's own title is the anchor family's surname — whichever
+       * student `anExistingStudent` returned — and matching looser than the
+       * per-run child name once picked up an unrelated family that happened
+       * to sort newer in the queue.
+       */
+      const card = cardFor(page, `Nico ${surname}`);
       await expect(card).toBeVisible({ timeout: 30_000 });
       // A registration with no guardian is not a broken one — it is a parent
       // adding a child to a family the church already has.

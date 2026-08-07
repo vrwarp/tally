@@ -54,16 +54,12 @@ function dbWithEvent(): FakeFirestore {
 
 async function run(
   db: FakeFirestore,
-  args: { data?: Record<string, unknown>; source?: 'kiosk' | 'qr'; qrEventId?: string | null } = {},
+  args: { data?: Record<string, unknown> } = {},
 ): Promise<RegisterFamilyResult> {
-  const source = args.source ?? 'kiosk';
   return registerFamily({
     db,
-    request: parseRegisterFamilyRequest(args.data ?? goodRequest(), source),
-    context:
-      source === 'kiosk'
-        ? { source, uid: 'staff-uid', eventId: 'friday-today' }
-        : { source, qrEventId: args.qrEventId ?? null },
+    request: parseRegisterFamilyRequest(args.data ?? goodRequest()),
+    context: { uid: 'staff-uid', eventId: 'friday-today' },
     now: NOW,
   });
 }
@@ -88,7 +84,7 @@ describe('what it refuses', () => {
   ];
 
   it.each(refusals)('refuses %s', (_label, overrides) => {
-    expect(() => parseRegisterFamilyRequest(goodRequest(overrides), 'kiosk')).toThrow(
+    expect(() => parseRegisterFamilyRequest(goodRequest(overrides))).toThrow(
       RegistrationInputError,
     );
   });
@@ -96,26 +92,21 @@ describe('what it refuses', () => {
   it('accepts a number written the way people write one', () => {
     const parsed = parseRegisterFamilyRequest(
       goodRequest({ guardian: { firstName: 'Dana', lastName: 'Fields', phone: '+1 (555) 010-3344' } }),
-      'kiosk',
     );
     expect(parsed.guardian?.phone).toBe('5550103344');
   });
 
-  it('accepts allergies from either source, now that the wizard asks', () => {
+  it('accepts allergies, now that the wizard asks', () => {
     // The kiosk used to be refused outright — its wizard had no field. It has
-    // one now, gated on the same write-back capability the phone form used,
-    // so the parse stops caring where the note was typed.
-    expect(parseRegisterFamilyRequest(goodRequest({ allergies: ['peanuts', null] }), 'kiosk').allergies).toEqual([
-      'peanuts',
-      null,
-    ]);
-    expect(parseRegisterFamilyRequest(goodRequest({ allergies: ['peanuts', null] }), 'qr').allergies).toEqual([
+    // one now, gated on the same write-back capability the retired phone form
+    // used.
+    expect(parseRegisterFamilyRequest(goodRequest({ allergies: ['peanuts', null] })).allergies).toEqual([
       'peanuts',
       null,
     ]);
     // Absent stays absent: a wizard whose binding says "don't ask" sends no
     // key at all, and every child parses as note-less.
-    expect(parseRegisterFamilyRequest(goodRequest(), 'kiosk').allergies).toEqual([null, null]);
+    expect(parseRegisterFamilyRequest(goodRequest()).allergies).toEqual([null, null]);
   });
 });
 
@@ -203,17 +194,6 @@ describe('the documents it writes', () => {
     expect(entries['aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee']).toMatchObject({ last4: '3344' });
   });
 
-  it('creates without checking anybody in when the request came from a phone', async () => {
-    const db = dbWithEvent();
-    const result = await run(db, { source: 'qr' });
-    if (result.status !== 'created') throw new Error('expected created');
-
-    expect(result.checkedIn).toBe(false);
-    expect(db.writtenPaths('events/')).toEqual([]);
-    // Nobody was signed in, so the record says so rather than borrowing a uid.
-    expect(db.get(`students/${result.children[0]!.studentId}`)!.createdBy).toBe('kiosk-registration');
-    expect(db.get(`students/${result.children[0]!.studentId}`)!.firstAttendedAt).toBeNull();
-  });
 });
 
 describe('a family already on the roster', () => {
@@ -281,7 +261,6 @@ describe('a family already on the roster', () => {
             { firstName: 'robin', lastName: 'FIELDS', grade: 6 },
           ],
         }),
-        'kiosk',
       ),
     ).toThrow(RegistrationInputError);
   });
@@ -345,7 +324,7 @@ describe('what reaches the church database', () => {
 
   it('keeps the guardian and the allergies for the reviewer', async () => {
     const db = dbWithEvent();
-    await run(db, { source: 'qr', data: goodRequest({ allergies: ['peanuts', null] }) });
+    await run(db, { data: goodRequest({ allergies: ['peanuts', null] }) });
 
     const record = recordFor(db);
     expect(record.guardian).toEqual({
@@ -427,17 +406,9 @@ describe('adding a sibling', () => {
     );
   });
 
-  it('refuses siblings claimed from the phone form, which never searched', () => {
-    expect(
-      parseRegisterFamilyRequest(
-        { ...siblingRequest(), guardian: { firstName: 'Dana', lastName: 'Fields', phone: '5550103344' } },
-        'qr',
-      ).anchorStudentIds,
-    ).toEqual([]);
-  });
 
   it('still needs an adult when no siblings are claimed', () => {
-    expect(() => parseRegisterFamilyRequest(siblingRequest({ anchorStudentIds: [] }), 'kiosk')).toThrow(
+    expect(() => parseRegisterFamilyRequest(siblingRequest({ anchorStudentIds: [] }))).toThrow(
       RegistrationInputError,
     );
   });
@@ -488,43 +459,18 @@ describe('the pulse', () => {
     };
   }
 
-  it('announces a kiosk registration on roster and phones, never registration', async () => {
+  it('announces a registration on roster and phones, and nothing else', async () => {
     const db = dbWithEvent();
     await run(db);
 
     const revs = channelRevs(db);
     expect(revs.roster).toBeDefined();
     expect(revs.phones).toBeDefined();
-    // A wizard registration resolves locally on the kiosk it happened at;
-    // waking another kiosk's QR screen for it would yank a different family's
-    // code mid-scan.
+    // The retired QR flow's channel is never written by anything again.
     expect(revs.registration).toBeUndefined();
   });
 
-  it('announces a QR registration on all three channels, naming the gathering', async () => {
-    const db = dbWithEvent();
-    await run(db, { source: 'qr', qrEventId: 'friday-today' });
 
-    const revs = channelRevs(db);
-    expect(revs.roster).toBeDefined();
-    expect(revs.phones).toBeDefined();
-    expect(revs.registration).toBeDefined();
-    expect((db.get(PULSE_DOC)!.registration as { eventId?: string }).eventId).toBe('friday-today');
-  });
-
-  it('records the code’s gathering on the review record without checking anybody in', async () => {
-    const db = dbWithEvent();
-    await run(db, { source: 'qr', qrEventId: 'friday-today' });
-
-    // The record knows which lobby the code came from; the family is still
-    // checked out — knowing which kiosk printed a QR is not evidence anybody
-    // walked through a door.
-    expect(recordFor(db)).toMatchObject({ eventId: 'friday-today', checkedIn: false });
-    const attendance = db
-      .writtenPaths('events/friday-today/attendance')
-      .filter((path) => !path.endsWith('deleted'));
-    expect(attendance).toHaveLength(0);
-  });
 
   it('does not re-announce a replay of a completed registration', async () => {
     const db = dbWithEvent();

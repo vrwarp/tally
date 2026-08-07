@@ -98,7 +98,7 @@ export interface PendingRegistrationChild extends RegistrationChild {
    * delete.
    */
   mergedInto: ReviewStudentSummary | null;
-  /** Only ever set from the QR form; the kiosk does not ask. */
+  /** From the wizard's allergies question, or a legacy phone-form record. */
   allergies: string | null;
   /** Active students who already have this name. Suspicion, not a verdict. */
   possibleDuplicates: ReviewStudentSummary[];

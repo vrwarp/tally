@@ -375,6 +375,8 @@ function RegistrationCard({
         description={[
           when ? `Registered ${formatRelative(when)}` : null,
           gatheringTitle ? `at ${gatheringTitle}` : null,
+          // Legacy: the phone form was retired, but its records live 30 days
+          // and a reviewer deciding one still deserves to know how it arrived.
           row.source === 'qr' ? 'from their own phone' : null,
         ]
           .filter(Boolean)

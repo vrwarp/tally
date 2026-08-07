@@ -610,9 +610,11 @@ test.describe('shapes the screen has to survive', () => {
     signedInAs,
   }) => {
     /*
-     * The phone form uses the device's own keyboard, so a surname the kiosk
-     * glass could never type arrives here anyway — and the screen has to print
-     * it, fit it, and push it without mangling it.
+     * Names with diacritics arrive from backend imports and from legacy
+     * phone-form records — the kiosk glass cannot type them, and the accent-
+     * folding in nameKey is what makes a door-typed "Jose" still collide with
+     * an upstream José at review time. The screen has to print such a name,
+     * fit it, and push it without mangling it.
      */
     const surname = `Þórsdóttir-Nakagawa${RUN}`;
     const registrationId = `stress-unicode-${RUN}`;

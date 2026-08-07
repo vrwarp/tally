@@ -104,9 +104,6 @@ export const ALLERGIES_MAX_LENGTH = 200;
  */
 export const REGISTRATION_DOC_TTL_MS = 30 * 24 * 60 * 60_000;
 
-/** `createdBy` for a registration nobody was signed in for. */
-export const REMOTE_REGISTRATION_SENTINEL = 'kiosk-registration';
-
 export interface RegistrationChild {
   firstName: string;
   lastName: string;
@@ -145,6 +142,16 @@ export interface ParsedRegistration {
   anchorStudentIds: string[];
 }
 
+/**
+ * Where a registration record came from.
+ *
+ * `'qr'` is legacy: the phone form that wrote it was retired in Aug 2026, and
+ * nothing writes it any more — but records live 30 days, and the read side
+ * (this union, `readRegistration`, the review card's "from their own phone"
+ * subtitle, the allergy push on approval) stays tolerant for as long as any
+ * exist. Tolerant reads of old shapes are this codebase's standing posture;
+ * the union costs three lines.
+ */
 export type RegistrationSource = 'kiosk' | 'qr';
 
 export interface RegisteredChild {
@@ -265,16 +272,12 @@ function parseAllergies(raw: unknown, childCount: number): (string | null)[] {
 /**
  * The whole request, checked before anything is read from the database.
  *
- * `allergies` is accepted from either source now. The kiosk wizard asks the
- * question when the binding says the backend can carry the answer — the same
- * write-back gate the retired phone form used — and a lobby screen still never
- * *displays* a stored note; it holds one for the reviewer, exactly as the
- * phone form did.
+ * One caller now: the kiosk wizard, under the kiosk's own token. The retired
+ * phone form used to arrive here too, which is why the record still reads a
+ * `source` back (see readRegistration) — records it wrote outlive it by up to
+ * the 30-day TTL.
  */
-export function parseRegisterFamilyRequest(
-  data: unknown,
-  source: RegistrationSource,
-): ParsedRegistration {
+export function parseRegisterFamilyRequest(data: unknown): ParsedRegistration {
   const body = (data ?? {}) as Record<string, unknown>;
 
   const registrationId = typeof body.registrationId === 'string' ? body.registrationId.trim() : '';
@@ -325,15 +328,9 @@ export function parseRegisterFamilyRequest(
     seen.set(key, index);
   });
 
-  /*
-   * Anchors are a kiosk claim and only a kiosk claim.
-   *
-   * The phone form is opened from a QR by somebody who has not searched the
-   * roster and cannot have: the sibling ids come from a last-4 search the kiosk
-   * ran, so a request carrying them from anywhere else is a client asserting a
-   * family relationship it has no basis for.
-   */
-  const anchorStudentIds = source === 'kiosk' ? parseAnchors(body.anchorStudentIds) : [];
+  // Sibling ids from the last-4 search the kiosk ran. Verified server-side
+  // before anything is done with them, as ever.
+  const anchorStudentIds = parseAnchors(body.anchorStudentIds);
 
   /*
    * The adult, unless siblings already say who this family is.
@@ -597,18 +594,10 @@ async function readEvent(db: FirestoreLike, eventId: string): Promise<EventFacts
 }
 
 export interface RegisterFamilyContext {
-  source: RegistrationSource;
-  /** The approver's uid, in kiosk mode. Absent for a remote registration. */
-  uid?: string;
-  /** Required in kiosk mode; everybody registered is checked in against it. */
-  eventId?: string;
-  /**
-   * The gathering whose kiosk minted the QR code, in remote mode — read off
-   * the code document, never off the request. A hint for the pulse and the
-   * review record, and emphatically NOT a check-in: a family may register from
-   * the car park, or the sofa, before they have arrived at all.
-   */
-  qrEventId?: string | null;
+  /** The approver's uid — the member whose approval paired this kiosk. */
+  uid: string;
+  /** Everybody registered is checked in against it. */
+  eventId: string;
 }
 
 export interface RegisterFamilyOptions {
@@ -671,11 +660,8 @@ export async function registerFamily(
   const now = options.now ?? new Date();
   const logger = options.logger ?? SILENT_LOGGER;
 
-  const event =
-    context.source === 'kiosk'
-      ? await readEvent(db, context.eventId ?? refuse('eventId is required.'))
-      : null;
-  const createdBy = context.uid ?? REMOTE_REGISTRATION_SENTINEL;
+  const event = await readEvent(db, context.eventId);
+  const createdBy = context.uid;
   const anchorStudentIds = await verifyAnchors(db, request.anchorStudentIds);
   if (request.guardian === null && anchorStudentIds.length === 0) {
     /*
@@ -716,15 +702,13 @@ export async function registerFamily(
 
   const pending = {
     status: 'pending' as const,
-    source: context.source,
-    // For a QR registration this is the gathering whose kiosk minted the code
-    // — the review record stops being event-blind, and the pulse can wake the
-    // right screen. `checkedIn` below stays tied to `event`, which is null in
-    // QR mode: knowing which kiosk printed the code is not evidence that the
-    // family has walked in.
-    eventId: event?.id ?? context.qrEventId ?? null,
+    source: 'kiosk' as const,
+    eventId: event?.id ?? null,
     childCount: request.children.length,
     last4,
+    // Tied to the event actually read, not asserted: a kiosk registration is
+    // made by a family standing at the door, and the attendance rows below
+    // are written under the same condition.
     checkedIn: event !== null,
     createdAt: Timestamp.fromDate(now),
     /*
@@ -888,20 +872,10 @@ export async function registerFamily(
   /*
    * Tell the other kiosks. Outside the try above on purpose: a failed phone
    * patch is exactly when the roster half of the signal matters most.
-   *
-   * The `registration` channel is QR-only, and that is not an economy. Its one
-   * consumer is "auto-advance an open QR screen for this gathering", and a
-   * wizard registration on kiosk A resolving locally must not yank kiosk B's QR
-   * screen out from under a different family mid-scan. The roster and phones
-   * channels still carry a wizard registration to every other kiosk.
    */
   const bumped: PulseChannel[] = ['roster'];
   if (last4 !== '') bumped.push('phones');
-  if (context.source === 'qr') bumped.push('registration');
-  await bumpPulse(db, bumped, now, {
-    eventId: event?.id ?? context.qrEventId ?? null,
-    logger,
-  });
+  await bumpPulse(db, bumped, now, { logger });
 
   /* ---- What a reviewer will want to know ---------------------------------- */
 
@@ -939,7 +913,6 @@ export async function registerFamily(
   // line is about; they are not going into a log as well.
   logger.info('Registered a family at the kiosk; held for review', {
     registrationId: request.registrationId,
-    source: context.source,
     children: children.length,
     checkedIn: event !== null,
     siblingsClaimed: anchorStudentIds.length,

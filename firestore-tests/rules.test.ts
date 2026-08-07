@@ -1330,8 +1330,8 @@ describe('kiosk', () => {
 
     /*
      * The pulse rides the same block, pinned by name because its threat is
-     * different: writing it would let a client spoof "a registration landed"
-     * onto every lobby screen, or drive every kiosk into refetch loops.
+     * different: writing it would let a client spoof "your caches changed"
+     * onto every lobby screen and drive every kiosk into refetch loops.
      */
     it('covers the pulse: kiosk sessions read it, nobody writes it', async () => {
       await assertSucceeds(getDoc(doc(asKiosk(env, UID.counselor), 'kioskIndex/pulse')));
@@ -1343,7 +1343,7 @@ describe('kiosk', () => {
       );
       await assertFails(
         setDoc(doc(asKiosk(env, UID.counselor), 'kioskIndex/pulse'), {
-          registration: { rev: 1, eventId: 'spoofed' },
+          roster: { rev: 999 },
         }),
       );
     });
@@ -1368,20 +1368,6 @@ describe('kiosk', () => {
         await assertFails(setDoc(doc(db, 'kioskRegistrations/reg-1'), { status: 'complete' }));
       }
       await assertFails(getDocs(collection(asUser(env, UID.admin), 'kioskRegistrations')));
-    });
-  });
-
-  describe('kioskRegistrationCodes', () => {
-    it('is invisible and untouchable, kiosks included', async () => {
-      // Readable, a client could register against a code it never saw on a
-      // screen — which is the one thing the code exists to require. Writable,
-      // it could mint itself an unauthenticated path into the church's people
-      // database.
-      for (const db of [asUser(env, UID.admin), asKiosk(env, UID.counselor), asAnonymous(env)]) {
-        await assertFails(getDoc(doc(db, 'kioskRegistrationCodes/ABC234')));
-        await assertFails(setDoc(doc(db, 'kioskRegistrationCodes/ABC234'), { submissions: 0 }));
-      }
-      await assertFails(getDocs(collection(asUser(env, UID.admin), 'kioskRegistrationCodes')));
     });
   });
 

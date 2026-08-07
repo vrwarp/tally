@@ -21,7 +21,7 @@ export interface SeededChild {
   firstName: string;
   lastName: string;
   grade?: number | null;
-  /** Only the QR form asks; the kiosk has no field for it. */
+  /** From the wizard's allergies question — or a legacy phone-form record. */
   allergies?: string | null;
   /** Roster rows the door thought this child might already be. */
   possibleDuplicateOf?: string[];
@@ -107,6 +107,9 @@ export async function seedRegistration(row: SeededRegistration): Promise<string[
     studentIds,
     childCount: row.children.length,
     last4: row.last4 ?? (row.guardian ? row.guardian.phone.slice(-4) : ''),
+    // 'qr' is the retired phone form's shape, seedable until its records
+    // drain from production (30-day TTL): those families arrived checked out,
+    // and the screen still has to decide them to the end.
     checkedIn: row.source !== 'qr',
     createdAt: when,
     completedAt: when,
