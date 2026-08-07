@@ -22,6 +22,7 @@ import {
   query,
   deleteField,
   serverTimestamp,
+  writeBatch,
   setDoc,
   updateDoc,
   where,
@@ -1662,6 +1663,232 @@ describe('eventAccess', () => {
           updatedBy: UID.admin,
         }),
       );
+    });
+  });
+});
+
+/**
+ * The gates themselves — what an access list actually closes.
+ *
+ * Everything above tests the fence; this tests what stands behind it. The
+ * shape of every case is the same pair: `outsider` is refused on
+ * `sunday-school`, and the identical operation on `event-1` — which nobody has
+ * restricted — still succeeds. The second half is the one that matters most. A
+ * feature that protects a restricted gathering by breaking every open one is
+ * not a feature.
+ */
+describe('working a restricted gathering', () => {
+  const locked = ID.restrictedEvent;
+  const open = ID.event;
+
+  describe('the register', () => {
+    it('refuses somebody who is not on the gathering', async () => {
+      const db = asUser(env, UID.outsider);
+
+      await assertFails(getDoc(doc(db, paths.attendance(locked, ID.student))));
+      await assertFails(
+        setDoc(
+          doc(db, paths.attendance(locked, ID.otherStudent)),
+          attendanceDoc({
+            studentId: ID.otherStudent,
+            eventId: locked,
+            checkedInBy: UID.outsider,
+          }),
+        ),
+      );
+      await assertFails(deleteDoc(doc(db, paths.attendance(locked, ID.student))));
+    });
+
+    it('admits somebody who is', async () => {
+      const db = asUser(env, UID.counselor);
+
+      await assertSucceeds(getDocs(collection(db, paths.attendanceCollection(locked))));
+      await assertSucceeds(
+        setDoc(
+          doc(db, paths.attendance(locked, ID.otherStudent)),
+          attendanceDoc({
+            studentId: ID.otherStudent,
+            eventId: locked,
+            checkedInBy: UID.counselor,
+          }),
+        ),
+      );
+    });
+
+    it('leaves an unrestricted gathering exactly as it was', async () => {
+      // The regression that matters most in the whole feature.
+      const db = asUser(env, UID.outsider);
+
+      await assertSucceeds(getDocs(collection(db, paths.attendanceCollection(open))));
+      await assertSucceeds(
+        setDoc(
+          doc(db, paths.attendance(open, ID.otherStudent)),
+          attendanceDoc({ studentId: ID.otherStudent, checkedInBy: UID.outsider }),
+        ),
+      );
+    });
+
+    it('lets an admin through regardless', async () => {
+      await assertSucceeds(
+        getDocs(collection(asUser(env, UID.admin), paths.attendanceCollection(locked))),
+      );
+    });
+
+    it('KNOWN GAP: a list of the register is still let through', async () => {
+      /*
+       * Not the behaviour anybody wants, and pinned here so it cannot be
+       * mistaken for working.
+       *
+       * `match /{path=**}/attendance/{studentId}` — the rule at the bottom of
+       * the file that exists so a student's profile can run one collection-group
+       * query instead of a read per night — also matches an ordinary
+       * subcollection query at `events/{id}/attendance`. Rules are OR'd across
+       * every matching path, so its `allow list: if isActive()` grants what the
+       * nested rule directly above denies. `get` is refused because the wildcard
+       * rule allows only `list`; that asymmetry is the whole shape of the hole.
+       *
+       * Rules cannot tell a collection-group query from a subcollection one —
+       * that is exactly why the wildcard rule has to exist — so this cannot be
+       * fixed by narrowing it. The fix is to deny the wildcard outright and
+       * answer the profile's two questions through a callable that filters
+       * server-side, which is the next commit. This assertion flips to
+       * `assertFails` there.
+       *
+       * Until then the honest description of the feature is: a restricted
+       * gathering is closed for *working* — check-in, undo, RSVPs, editing, and
+       * reading any single record — and its register is still enumerable in one
+       * query by anybody on the team.
+       */
+      await assertSucceeds(
+        getDocs(collection(asUser(env, UID.outsider), paths.attendanceCollection(locked))),
+      );
+    });
+  });
+
+  describe('the RSVP list', () => {
+    it('refuses an outsider and admits a member', async () => {
+      await assertFails(getDoc(doc(asUser(env, UID.outsider), paths.rsvp(locked, ID.student))));
+      await assertSucceeds(getDoc(doc(asUser(env, UID.core), paths.rsvp(locked, ID.student))));
+    });
+
+    it('refuses a core member who is not on it', async () => {
+      // RSVP writes are core-only, so this is the case where rank alone would
+      // have been enough before.
+      await assertFails(
+        setDoc(
+          doc(asUser(env, UID.outsiderCore), paths.rsvp(locked, ID.otherStudent)),
+          rsvpDoc({ studentId: ID.otherStudent, eventId: locked, updatedBy: UID.outsiderCore }),
+        ),
+      );
+    });
+  });
+
+  describe('the skipped-nights registry', () => {
+    it('is gated on the chain, without an event lookup', async () => {
+      // The chain *is* the document id here, which is why this one costs one
+      // billed read rather than two.
+      const registry = {
+        chainKey: ID.restrictedSeries,
+        skipped: [],
+        examinedFrom: Timestamp.fromDate(new Date('2025-08-02T00:00:00Z')),
+        updatedAt: serverTimestamp(),
+      };
+
+      await assertFails(
+        setDoc(doc(asUser(env, UID.outsider), paths.skippedNights(ID.restrictedSeries)), registry),
+      );
+      await assertFails(
+        getDoc(doc(asUser(env, UID.outsider), paths.skippedNights(ID.restrictedSeries))),
+      );
+      await assertSucceeds(
+        setDoc(doc(asUser(env, UID.counselor), paths.skippedNights(ID.restrictedSeries)), registry),
+      );
+    });
+  });
+
+  describe('editing the gathering', () => {
+    it('refuses a core member who is not on it', async () => {
+      await assertFails(
+        setDoc(
+          doc(asUser(env, UID.outsiderCore), paths.event(locked)),
+          eventDoc({ title: 'Renamed', seriesId: ID.restrictedSeries }),
+        ),
+      );
+    });
+
+    it('refuses escaping the ACL by switching the gathering to a one-off', async () => {
+      /*
+       * The front door this closes. `buildEventPayload` nulls `seriesId` and
+       * `recurrenceRootId` when `mode` becomes `'oneoff'` — a supported action
+       * in the event editor. Without checking the *old* chain too, a core
+       * member outside the gathering could collapse its `chainKey` to its own
+       * event id, for which no access document exists, and walk out with the
+       * gathering and its whole register.
+       */
+      await assertFails(
+        setDoc(
+          doc(asUser(env, UID.outsiderCore), paths.event(locked)),
+          eventDoc({
+            title: 'Sunday School',
+            mode: 'oneoff',
+            seriesId: null,
+            recurrenceRootId: null,
+            recurrence: null,
+          }),
+        ),
+      );
+    });
+
+    it('refuses repointing it at a chain the writer can read', async () => {
+      // The same escape by a different verb: keep the event, change which
+      // gathering it claims to belong to.
+      await assertFails(
+        setDoc(
+          doc(asUser(env, UID.outsiderCore), paths.event(locked)),
+          eventDoc({ title: 'Sunday School', seriesId: ID.series }),
+        ),
+      );
+    });
+
+    it('lets somebody on the gathering edit it', async () => {
+      await assertSucceeds(
+        setDoc(
+          doc(asUser(env, UID.core), paths.event(locked)),
+          eventDoc({ title: 'Sunday School, 9am', seriesId: ID.restrictedSeries }),
+        ),
+      );
+    });
+
+    it('still lets a core member create an ordinary gathering', async () => {
+      // `create` has no old chain to leave, and an unrestricted new one waves
+      // straight through — which is every event anybody makes.
+      await assertSucceeds(
+        setDoc(doc(asUser(env, UID.outsiderCore), paths.event('event-new')), eventDoc()),
+      );
+    });
+  });
+
+  describe('the lookup budget', () => {
+    it('still commits a batch the size the RSVP screen writes', async () => {
+      /*
+       * `addRsvps` writes up to 400 documents in one batch, and every one of
+       * them now costs an `eventAccess` lookup on top of the profile and the
+       * event. Rules cache accesses by path within a request, so this should be
+       * three lookups rather than twelve hundred — and if that ever stops being
+       * true, this is the test that says so rather than a leader discovering it
+       * on a retreat sign-up sheet.
+       */
+      const db = asUser(env, UID.core);
+      const batch = writeBatch(db as never);
+
+      for (let index = 0; index < 400; index += 1) {
+        batch.set(
+          doc(db, paths.rsvp(open, `bulk-student-${index}`)),
+          rsvpDoc({ studentId: `bulk-student-${index}` }),
+        );
+      }
+
+      await assertSucceeds(batch.commit());
     });
   });
 });

@@ -55,6 +55,68 @@ service cloud.firestore {
     function isCore() { return hasRole('core'); }
     function isAdmin() { return hasRole('admin'); }
 
+    /* ---------------------------------------------------------------- */
+    /* Per-gathering access                                              */
+    /* ---------------------------------------------------------------- */
+
+    /**
+     * Whether the caller may *work* one gathering.
+     *
+     * See `match /eventAccess/{chainKey}` below for what that means and why it
+     * is keyed on the chain. This is the restatement of `canWorkChain` in
+     * `src/lib/eventAccess.ts` — rules cannot import, so there are two copies,
+     * and these are the ones an attacker cannot skip.
+     *
+     * **`exists()` before `get()`, and the `||` carries the lookup.** A `get()`
+     * at a path with no document raises rather than returning null, and a
+     * raised lookup denies — so the natural `a == null || …` form would have
+     * denied every gathering nobody had restricted, which is all of them on the
+     * day this deploys. `firestore-tests/getSemantics.test.ts` is that fact,
+     * pinned.
+     *
+     * Repeating the lookup rather than binding it to a `let` is deliberate:
+     * `let` would evaluate it before the `exists()` guard could stop it. Rules
+     * cache accesses by path within a request, so the repetition costs nothing
+     * a `let` would have saved.
+     */
+    function accessPath(key) {
+      return /databases/$(database)/documents/eventAccess/$(key);
+    }
+
+    function onChain(key) {
+      return isAdmin()
+        || !exists(accessPath(key))
+        || get(accessPath(key)).data.get('restricted', false) != true
+        || request.auth.uid in get(accessPath(key)).data.get('members', []);
+    }
+
+    /** `chainKey()` from `src/lib/materialize.ts`, over a document's data. */
+    function chainOfData(d, id) {
+      return d.get('seriesId', null) != null
+        ? d.seriesId
+        : (d.get('recurrenceRootId', null) != null ? d.recurrenceRootId : id);
+    }
+
+    /**
+     * Which gathering an event belongs to.
+     *
+     * The fallback when the parent event has no document is its own id, which
+     * is what `chainKey()` would say for a one-off — and it is also a gap worth
+     * naming rather than hiding. A projected occurrence of a restricted chain
+     * has no document until `materializeOccurrence` writes one, and its derived
+     * id (`{chain}-{date}`) has no `eventAccess` document of its own, so an
+     * attendance write aimed at that path before materialisation is not caught
+     * here. What catches it is the callable: `materializeOccurrence` is gated on
+     * the chain, so the occurrence never becomes real for somebody outside it,
+     * and `getKioskEvents` refuses to bind a kiosk to a gathering its approver
+     * cannot work. Rules cannot parse the chain back out of the derived id —
+     * chain keys may themselves contain the separator — so this is the seam.
+     */
+    function eventChain(eventId) {
+      let p = /databases/$(database)/documents/events/$(eventId);
+      return exists(p) ? chainOfData(get(p).data, eventId) : eventId;
+    }
+
     /**
      * A session minted by the kiosk pairing flow: a real staff member's uid,
      * carrying a `kiosk: true` custom claim.
@@ -431,7 +493,28 @@ service cloud.firestore {
 
       // Core and up only: moving an event's date mid-check-in would swap the
       // active event out from under every counselor's phone at once.
-      allow create, update: if isCore() && validEvent();
+      /**
+       * Both chains, and the second one is not paranoia.
+       *
+       * `buildEventPayload` nulls `seriesId` and `recurrenceRootId` when `mode`
+       * becomes `'oneoff'` — a supported action in the event editor, not an
+       * exotic attack. Without the second check, a core member outside a
+       * restricted gathering could switch one of its instances to a one-off,
+       * collapsing its `chainKey` to its own event id, for which no
+       * `eventAccess` document exists — and the gathering plus its whole
+       * register would be open. Editing `seriesId` to point at an open chain
+       * does the same thing.
+       *
+       * On create, `resource` is null and there is no old chain to leave.
+       */
+      allow create: if isCore()
+        && validEvent()
+        && onChain(chainOfData(request.resource.data, eventId));
+
+      allow update: if isCore()
+        && validEvent()
+        && onChain(chainOfData(resource.data, eventId))
+        && onChain(chainOfData(request.resource.data, eventId));
 
       /**
        * Never from a client, even for the core team who may do everything else
@@ -541,8 +624,16 @@ service cloud.firestore {
             && request.resource.data.get('checkedOutAt', null) != null;
         }
 
-        allow get, list: if isActive();
-        allow create: if isCounselor() && validAttendance() && !attendanceFrozen();
+        /*
+         * `onChain` never mentions `resource`, so it is constant with respect
+         * to the result set and a `list` over this collection stays statically
+         * satisfiable — `eventId` is bound by the query path. That property is
+         * exactly what the collection-group wildcard does not have, which is
+         * why the rule down there had to be denied outright instead.
+         */
+        allow get, list: if isActive() && onChain(eventChain(eventId));
+        allow create: if isCounselor() && validAttendance() && !attendanceFrozen()
+                      && onChain(eventChain(eventId));
         /**
          * A kiosk may add a record, and may record a first pickup. It may not
          * overwrite the moment and method a counselor recorded, and it may not
@@ -551,10 +642,12 @@ service cloud.firestore {
          * re-writing them.
          */
         allow update: if isCounselor() && !attendanceFrozen()
+                      && onChain(eventChain(eventId))
                       && (isKioskSession()
                             ? kioskCheckOutAllowed()
                             : (validAttendance() || validCheckOut()));
-        allow delete: if isCounselor() && !attendanceFrozen() && !isKioskSession();
+        allow delete: if isCounselor() && !attendanceFrozen() && !isKioskSession()
+                      && onChain(eventChain(eventId));
       }
 
       /**
@@ -570,9 +663,9 @@ service cloud.firestore {
           return d.studentId == studentId && d.eventId == eventId;
         }
 
-        allow get, list: if isActive();
-        allow create, update: if isCore() && validRsvp();
-        allow delete: if isCore();
+        allow get, list: if isActive() && onChain(eventChain(eventId));
+        allow create, update: if isCore() && validRsvp() && onChain(eventChain(eventId));
+        allow delete: if isCore() && onChain(eventChain(eventId));
       }
     }
 
@@ -618,8 +711,10 @@ service cloud.firestore {
           && (!('examinedFrom' in d) || d.examinedFrom is timestamp);
       }
 
-      allow get, list: if isActive();
-      allow create, update: if isCounselor() && validSkippedNights();
+      // The chain *is* the document id here, so no event lookup is needed —
+      // one billed read instead of two.
+      allow get, list: if isActive() && onChain(chainKey);
+      allow create, update: if isCounselor() && validSkippedNights() && onChain(chainKey);
       allow delete: if false;
     }
 
