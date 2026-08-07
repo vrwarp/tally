@@ -165,6 +165,18 @@ const REFRESH_COOLDOWN_MS = 2 * 60_000;
  * finding, it is a keystroke.
  */
 const NO_MATCH_SWEEP_DEBOUNCE_MS = 2_000;
+/**
+ * The shortest a **Search everyone** press is allowed to look like work.
+ *
+ * Two of the three things behind that button can answer in no time at all: the
+ * widening is a re-search of memory, and a sweep inside the two-minute cooldown
+ * is answered from the read that already happened. A control that searches an
+ * entire church and returns before the finger is off it does not read as fast,
+ * it reads as broken, and the parent's next move is to press it again or to
+ * stop trusting the answer. Only ever felt when the answer is "nobody" — a
+ * press that finds somebody takes the whole panel off the screen.
+ */
+const MIN_WIDEN_SPINNER_MS = 1_500;
 
 /**
  * The id one run of the registration wizard submits under, for as many attempts
@@ -245,34 +257,22 @@ export function KioskApp() {
   const [overlay, setOverlay] = useState<Overlay>(null);
   const [refresh, setRefresh] = useState<KioskRefresh>('idle');
   /**
-   * A registration in progress: the QR offer, or the wizard itself with the id
-   * it will submit under.
+   * A registration in progress: the wizard, with the id it will submit under.
    *
    * The id is minted here rather than inside the wizard so that a re-render of
    * the flow cannot mint a second one: it is what makes a retried call answer
    * instead of creating the family twice.
    */
-  const [registering, setRegistering] = useState<
-    | { screen: 'qr' }
-    | {
-        screen: 'wizard';
-        registrationId: string;
-        /**
-         * The family a sibling is being added to, when the wizard was opened
-         * from a confirm screen rather than from the front door. Empty means
-         * the six-question form for a family nobody has met.
-         */
-        anchors: KioskStudent[];
-      }
-    | null
-  >(null);
+  const [registering, setRegistering] = useState<{
+    registrationId: string;
+    /**
+     * The family a sibling is being added to, when the wizard was opened
+     * from a confirm screen rather than from the front door. Empty means
+     * the six-question form for a family nobody has met.
+     */
+    anchors: KioskStudent[];
+  } | null>(null);
   const [registration, setRegistration] = useState<KioskRegistration | null>(null);
-  /**
-   * Set by "I've registered": the search screen says so until the parent types.
-   * A family who has just filled a form in on their phone needs telling that
-   * the digits are the next step, on the screen where they will type them.
-   */
-  const [justRefreshed, setJustRefreshed] = useState(false);
 
   const idleRef = useRef(true);
   // A family halfway through the wizard is not an idle kiosk: the binding must
@@ -287,10 +287,6 @@ export function KioskApp() {
    * (hydrate has just loaded everything anyway).
    */
   const pulseRef = useRef<CachedPulse | null>(readCachedPulse());
-  // The interval's view of the QR screen, without re-arming per keystroke —
-  // the same trick `idleRef` plays for the clock.
-  const registeringRef = useRef(registering);
-  registeringRef.current = registering;
 
   /* ---- Boot: load Firebase after first paint, restore the session -------- */
 
@@ -397,9 +393,7 @@ export function KioskApp() {
    *
    * Revisions are opaque change markers, compared with `!==` and never
    * ordered. Everything in here is void-and-swallow: a pulse failure must
-   * never surface on the glass, and the next tick tries again. The
-   * `registration` revision is recorded even when no QR screen is open — the
-   * signal is for the screen that is up *now*, not a queue of missed ones.
+   * never surface on the glass, and the next tick tries again.
    */
   const onPulse = useCallback(async () => {
     if (!services || !binding) return;
@@ -411,7 +405,6 @@ export function KioskApp() {
       roster: fresh.roster,
       phones: fresh.phones,
       participation: fresh.participation,
-      registration: fresh.registration.rev,
     };
     pulseRef.current = next;
     services.rememberPulse(next);
@@ -423,25 +416,6 @@ export function KioskApp() {
     if (fresh.phones !== seen.phones) void services.refetchPhoneIndex(setLast4Index);
     if (fresh.participation !== seen.participation) {
       void services.refetchParticipation(binding.predictsFrom, setScope);
-    }
-    if (
-      fresh.registration.rev !== seen.registration &&
-      registeringRef.current?.screen === 'qr' &&
-      fresh.registration.eventId === binding.eventId
-    ) {
-      /*
-       * A registration for this gathering landed while this kiosk was showing
-       * its QR — the family who just finished the phone form is walking back.
-       * Put the search screen up with the "type your last 4 digits" line
-       * before they arrive. The roster refetch above is already in flight for
-       * the same bump, and the search is widened for this one family: their
-       * children are minutes old, so no attendance aggregate has them, and a
-       * scoped search would deny the digits this screen is about to ask for.
-       */
-      setRegistering(null);
-      setBuffer('');
-      setJustRefreshed(true);
-      setWidened(true);
     }
   }, [services, binding]);
 
@@ -544,35 +518,48 @@ export function KioskApp() {
   useEffect(() => {
     if (buffer === '') {
       setRefresh((current) => (current === 'refreshing' ? current : 'idle'));
-      // The same one-family lifetime, for the same reason. Without it the "you
-      // are on the list" line one family earned stays on the empty screen for
-      // every family after them. It survives its own arrival because the buffer
-      // is already empty by the time "I've registered" is pressed — the QR
-      // screen is only reachable through `startRegistration`, which clears it.
-      setJustRefreshed(false);
     }
   }, [buffer]);
 
-  const runSweep = useCallback(() => {
-    if (!services || refresh === 'refreshing') return;
+  /**
+   * The sweep in flight, if there is one.
+   *
+   * A ref rather than the `refresh` state it used to be guarded by, for two
+   * reasons. It is synchronous, so two calls in the same tick cannot both find
+   * "not refreshing" and start two sweeps of the church. And it is a promise,
+   * so a second asker can *wait on the first one's read* rather than being
+   * told there is nothing to wait for — which is what the button now needs:
+   * pressing it while the silent sweep is already running has to keep the
+   * spinner up until that read lands, not for a token second and a half.
+   */
+  const sweepRef = useRef<Promise<void> | null>(null);
+
+  const runSweep = useCallback((): Promise<void> => {
+    if (!services) return Promise.resolve();
+    if (sweepRef.current) return sweepRef.current;
     // Already answered, for anybody who asks inside the window. The read that
     // matters happened; saying so costs nothing and skips the sweep.
     if (Date.now() - refreshedAtRef.current < REFRESH_COOLDOWN_MS) {
       setRefresh('done');
-      return;
+      return Promise.resolve();
     }
     setRefresh('refreshing');
     // Each half lands on its own: a name that has arrived shows up without
     // waiting behind a rebuild of every phone number in the church, and a half
     // that failed leaves what the kiosk already held alone.
-    void services
+    const sweep = services
       .refreshDirectory(setStudents, setLast4Index)
       .then(() => {
         refreshedAtRef.current = Date.now();
         setRefresh('done');
       })
-      .catch(() => setRefresh('failed'));
-  }, [services, refresh]);
+      .catch(() => setRefresh('failed'))
+      .finally(() => {
+        sweepRef.current = null;
+      });
+    sweepRef.current = sweep;
+    return sweep;
+  }, [services]);
 
   /* ---- Check-in and pickup ------------------------------------------------ */
 
@@ -644,25 +631,111 @@ export function KioskApp() {
   /**
    * Whether this search has been widened past the gathering to all of Tally.
    *
-   * Real state now, set by two things and nothing else. The **Search
-   * everyone** row on the no-match panel — a control that says what it does,
-   * where "I already registered" used to widen as a side effect of a network
-   * read nobody could see. And the return from the QR screen, pressed or
-   * automatic, because "You're on the list — type the last 4 digits" is a
-   * promise: a family registered half a minute ago is in the roster copy the
-   * pulse just refetched but cannot be in `scope.participated`, an aggregate
-   * built from attendance they do not have yet, so a scoped search would deny
-   * the exact digits this screen told them to type. One family's worth of
-   * lifetime either way: the buffer-empty effect stands it back down, so the
-   * next family at the kiosk starts scoped again.
+   * Real state, set by exactly one thing: the **Search everyone** row on the
+   * no-match panel — a control that says what it does, where "I already
+   * registered" used to widen as a side effect of a network read nobody could
+   * see. One family's worth of lifetime: the buffer-empty effect stands it
+   * back down, so the next family at the kiosk starts scoped again.
    *
-   * Free and instant, deliberately — the wider roster is already in memory, so
-   * the tap answers before a finger has lifted, with no read behind it.
+   * The widening itself is free and instant — the wider roster is already in
+   * memory — but the tap that asks for it is not only a widening any more; see
+   * `widening` below.
    */
   const [widened, setWidened] = useState(false);
   useEffect(() => {
     if (buffer === '') setWidened(false);
   }, [buffer]);
+
+  /**
+   * Whether **Search everyone** is working, which is the whole of its feedback.
+   *
+   * The button used to widen the pool and then vanish, on the reasoning that a
+   * control which has done its job is clutter. What a parent saw was a button
+   * disappearing under their finger and a list that still said nothing, with
+   * the only evidence of the press being one word changing in the line above —
+   * a change nobody watching their own finger is looking at. A press that
+   * produces no visible work reads as a press that did not register, and the
+   * next thing a parent does about that is find a leader.
+   *
+   * So it stays on screen and reports instead: its label becomes a spinner
+   * while the work runs and comes back when it is done. Staying is not only
+   * for the feedback, either — four digits are a small keyspace and names
+   * collide, so a family who widened and still sees nobody theirs has a second
+   * reason to press it, and a control that removed itself after one use had
+   * nothing to offer them.
+   *
+   * The work behind it is the church-wide re-read: widening only re-searches
+   * what this device already holds, and a family added at the welcome desk two
+   * minutes ago is not in it. The read is shared with the silent sweep through
+   * `sweepRef`, so pressing during one waits on that one rather than starting
+   * a second.
+   */
+  const [widening, setWidening] = useState(false);
+  const wideningRef = useRef(false);
+
+  // A spinner belonging to the family who walked away. The read it was waiting
+  // on carries on and still lands — `runSweep` owns that, and the next family
+  // gets the benefit of it — but the next person's screen must not open on
+  // somebody else's busy button.
+  useEffect(() => {
+    if (buffer !== '') return;
+    wideningRef.current = false;
+    setWidening(false);
+  }, [buffer]);
+
+  const onWiden = useCallback(async () => {
+    // A second press while the spinner is up is the same request, not a new
+    // one. The button is allowed to be pressed again — it is still there, and
+    // a spinner is not a disabled state — it just has nothing new to do.
+    if (wideningRef.current) return;
+    const alreadyWidened = widened;
+    setWidened(true);
+    /*
+     * When the *widening* answers, that is the whole of the press.
+     *
+     * The child who belongs to Sunday mornings is on this device already, so a
+     * church-wide read here would be spent on a question the free half just
+     * answered. Computed from the full roster rather than from `outcome`,
+     * which is a memo this render has not recomputed yet.
+     *
+     * Only the press that turns widening *on* gets that exemption, and the
+     * `alreadyWidened` check is what makes the button honest now that it also
+     * stands beside a list of results. Pressing it a second time cannot widen
+     * anything — the pool is already everybody — so if the exemption applied
+     * there too, the press would do nothing at all and say nothing about it.
+     * That is the state a parent holding a common name is in: rows on screen,
+     * none of them theirs, and the only thing left worth doing is asking the
+     * church whether their child was added since this device last looked.
+     */
+    if (!alreadyWidened && searchStudents(buffer, students, last4Index).results.length > 0) {
+      return;
+    }
+
+    wideningRef.current = true;
+    setWidening(true);
+
+    const started = Date.now();
+    try {
+      await runSweep();
+    } finally {
+      /*
+       * Held to a floor, deliberately, and only ever felt when the answer is
+       * "nobody". An instant return from a search of an entire church is not
+       * read as fast, it is read as broken — the same reflex that makes a
+       * card reader that beeps immediately feel like it did not read the
+       * card. A second and a half is long enough to look like a search and
+       * short enough not to be a wait.
+       *
+       * When the read *does* turn somebody up, nobody sees the end of this:
+       * the no-match panel only exists while there are no results, so the
+       * button and its spinner leave the screen with it.
+       */
+      const held = MIN_WIDEN_SPINNER_MS - (Date.now() - started);
+      if (held > 0) await new Promise((resolve) => setTimeout(resolve, held));
+      wideningRef.current = false;
+      setWidening(false);
+    }
+  }, [runSweep, buffer, students, last4Index, widened]);
 
   const searchable = useMemo(() => {
     if (widened || scope.participated.size === 0) return students;
@@ -913,20 +986,15 @@ export function KioskApp() {
   /* ---- Registration ------------------------------------------------------- */
 
   /*
-   * The QR first, and the wizard behind it.
-   *
-   * A family with a phone in their hand will nearly always rather use it, and
-   * the ones without one are one tap from the wizard — which is the right way
-   * round, because the wizard is the longer of the two on the harder keyboard.
+   * "First time here?" opens the wizard directly — one tap from the question
+   * to the first question. The QR screen that used to stand between them (a
+   * phone form, codes, a pulse channel to walk the kiosk back) is retired:
+   * once-per-family work did not earn a standing second door, and the wizard
+   * asks everything the phone form asked.
    */
-  const startRegistration = useCallback(() => {
-    setBuffer('');
-    setJustRefreshed(false);
-    setRegistering({ screen: 'qr' });
-  }, []);
-
   const startWizard = useCallback(() => {
-    setRegistering({ screen: 'wizard', registrationId: newRegistrationId(), anchors: [] });
+    setBuffer('');
+    setRegistering({ registrationId: newRegistrationId(), anchors: [] });
   }, []);
 
   /**
@@ -941,7 +1009,7 @@ export function KioskApp() {
   const startSiblingWizard = useCallback((anchors: KioskStudent[]) => {
     setOverlay(null);
     setBuffer('');
-    setRegistering({ screen: 'wizard', registrationId: newRegistrationId(), anchors });
+    setRegistering({ registrationId: newRegistrationId(), anchors });
   }, []);
 
   /**
@@ -1077,48 +1145,38 @@ export function KioskApp() {
       if (!registration) {
         return <div className="flex h-full items-center justify-center text-ink-500">Loading…</div>;
       }
-      if (registering.screen === 'qr') {
-        return (
-          <registration.QrScreen
-            mintCode={() => services.mintRegistrationCode(binding.eventId)}
-            // The same forced read the no-match state offers, and for the same
-            // reason: this kiosk holds a roster cache that has never heard of
-            // the family who just filled a form in on their phone. Each half
-            // lands on its own and a half that fails leaves what was already
-            // held alone — see `refreshDirectory`.
-            refresh={() => services.refreshDirectory(setStudents, setLast4Index)}
-            onRefreshed={() => {
-              setRegistering(null);
-              setBuffer('');
-              setJustRefreshed(true);
-              // The same widening the automatic return performs, for the same
-              // family: their digits must not be denied by a scope built from
-              // attendance they do not have yet.
-              setWidened(true);
-            }}
-            onRegisterHere={startWizard}
-            onClose={() => {
-              setRegistering(null);
-              setBuffer('');
-            }}
-          />
-        );
-      }
       return (
         <registration.RegistrationFlow
           binding={binding}
           registrationId={registering.registrationId}
           mode={registering.anchors.length > 0 ? 'sibling' : 'family'}
           anchors={registering.anchors}
-          submit={({ registrationId, children, guardian, anchorStudentIds }) =>
-            services.registerFamily({
+          submit={({ registrationId, children, guardian, anchorStudentIds }) => {
+            /*
+             * The notes ride beside the children, not inside them: the wire
+             * shape is the index-aligned array the phone form used, and the
+             * key is only sent at all when the binding said the backend can
+             * carry it AND somebody typed one. Omitting an all-null array
+             * costs nothing (the server fills nulls) and keeps every
+             * "No allergies" run working across a functions rollback to a
+             * version that refuses the key.
+             */
+            const notes = children.map((child) => (child.allergies === '' ? null : child.allergies));
+            const carryNotes =
+              (binding.allergiesSupported ?? false) && notes.some((note) => note !== null);
+            return services.registerFamily({
               registrationId,
-              children,
+              children: children.map((child) => ({
+                firstName: child.firstName,
+                lastName: child.lastName,
+                grade: child.grade,
+              })),
               guardian,
               anchorStudentIds,
               eventId: binding.eventId,
-            })
-          }
+              ...(carryNotes ? { allergies: notes } : {}),
+            });
+          }}
           onRegistered={(result) =>
             onRegistered({
               children: result.children.map((child) => ({
@@ -1127,10 +1185,10 @@ export function KioskApp() {
                 lastName: child.lastName,
                 grade: child.grade,
                 searchName: child.searchName,
-                // Nothing is on file for a child registered a second ago; an
-                // allergy note only ever arrives on the phone form, lands
-                // upstream, and reaches this screen through a later read.
-                hasAllergies: false,
+                // The callable's echo — the one place tonight's truth lives;
+                // the roster read answers false for Tally-owned students by
+                // rule until approval pushes the note upstream.
+                hasAllergies: child.hasAllergies === true,
               })),
               last4: result.last4,
               checkedIn: result.checkedIn,
@@ -1250,10 +1308,9 @@ export function KioskApp() {
         // one, and neither is one whose printer is simply unpaired.
         printerNeedsAttention={printerState?.kind === 'trouble'}
         refresh={refresh}
-        widened={widened}
-        onWiden={() => setWidened(true)}
-        onRegister={startRegistration}
-        justRegisteredRemotely={justRefreshed}
+        widening={widening}
+        onWiden={() => void onWiden()}
+        onRegister={startWizard}
         onPick={(student) => {
           const intent = intentFor(student);
           const family = familyFor(student, intent);

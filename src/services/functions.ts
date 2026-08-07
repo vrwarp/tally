@@ -713,6 +713,13 @@ export interface ReviewStudentSummary {
   /** False when the name lives in a backend rather than in Tally. */
   known: boolean;
   status: 'active' | 'inactive';
+  /**
+   * Whether the church already finds this roster row under the family's own
+   * four digits — the strongest evidence the screen can offer that two rows
+   * are one child, and evidence rather than a verdict. Optional so an older
+   * callable's answer still typechecks; absent reads as "no signal".
+   */
+  sharesFamilyDigits?: boolean;
 }
 
 /** Mirrors `PendingRegistrationChild` in functions/src/kiosk/review.ts. */
@@ -724,6 +731,8 @@ export interface PendingRegistrationChild {
   pendingReview: boolean;
   /** Set once a reviewer folded this child into a row that was already there. */
   mergedIntoStudentId: string | null;
+  /** Who they were folded into, named — resolved by the callable, not inferred. */
+  mergedInto?: ReviewStudentSummary | null;
   allergies: string | null;
   possibleDuplicates: ReviewStudentSummary[];
 }
@@ -731,6 +740,7 @@ export interface PendingRegistrationChild {
 /** Mirrors `PendingRegistration` in functions/src/kiosk/review.ts. */
 export interface PendingRegistration {
   registrationId: string;
+  /** 'qr' is legacy — the retired phone form's records, draining on the 30-day TTL. */
   source: 'kiosk' | 'qr';
   eventId: string | null;
   registeredAt: number | null;
@@ -742,6 +752,16 @@ export interface PendingRegistration {
   anchors: ReviewStudentSummary[];
   settled: boolean;
   lastError: string | null;
+  /**
+   * Which half of the last approval did not finish.
+   *
+   * The two halves want opposite instruments: children a backend refused are
+   * worth retrying, since the usual cause is an outage that has passed; an
+   * adult it refused usually cannot be retried into working, and the move that
+   * ends the job is to finish without them. Null on older records, which the
+   * screen reads as "offer both".
+   */
+  lastErrorKind?: 'children' | 'guardian' | 'both' | null;
 }
 
 /**
@@ -772,7 +792,20 @@ export interface ApproveRegistrationResult {
  * half-finished.
  */
 export const approveRegistration = httpsCallable<
-  { registrationId: string },
+  {
+    registrationId: string;
+    /**
+     * Finish without the adult.
+     *
+     * For the family whose guardian write the backend refuses for a reason no
+     * retry can fix — usually a number it already holds for somebody outside
+     * this household. Without this the record can only be retried for ever or
+     * discarded, and discarding a family whose children are already upstream
+     * leaves them there with nothing attached. Never sent by default: the
+     * parent's details are lost with the record.
+     */
+    withoutGuardian?: boolean;
+  },
   ApproveRegistrationResult
 >(functions, 'approveRegistration');
 

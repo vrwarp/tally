@@ -401,10 +401,11 @@ const html = `<title>Registering a family — Tally</title>
     <p class="eyebrow">Tally · lobby kiosk</p>
     <h1>A family nobody has met</h1>
     <p class="standfirst">
-      Fourteen frames from the running app. The kiosk pairs itself against a live
-      emulator, the QR code is minted by the real callable, and the family at the
-      end exists on the roster and is checked in against a real gathering. Nothing
-      here is a mockup, and no frame has been scrolled or staged to flatter it.
+      Frames from the running app. The kiosk pairs itself against a live
+      emulator, the wizard is the door a new family walks through, and the family
+      at the end exists on the roster and is checked in against a real gathering.
+      Nothing here is a mockup, and no frame has been scrolled or staged to
+      flatter it.
     </p>
     <p class="provenance">
       <span>${frames.length} frames × 2 orientations</span>
@@ -443,8 +444,8 @@ const md: string[] = [
   '`npx tsx scripts/build-registration-walkthrough.ts`.',
   '',
   'Every frame is the real lobby screen driving the real callable against a seeded emulator: the',
-  'pairing handshake happens, the QR code is minted by `mintRegistrationCode`, and the family at the',
-  'end exists in Firestore and is checked in against a real gathering.',
+  'pairing handshake happens, and the family at the end exists in Firestore and is checked in',
+  'against a real gathering.',
   '',
 ];
 

@@ -244,12 +244,61 @@ describe('the escape hatch', () => {
 
     await tap(/Search everyone/i);
 
-    // Instantly, with no read behind it: the wider roster was already in
-    // memory, and the control finally says what it does — where "I already
-    // registered" used to widen as a side effect of a network sweep.
+    // The widening half is instant, and does not wait on the church-wide
+    // re-read the same press starts: the wider roster is already in memory,
+    // and a child who belongs to another gathering is on this device now.
     expect(screen.getByText('Sofia Adeyemi')).toBeTruthy();
-    // Spent: this search already covers everybody, so the offer stands down.
-    expect(screen.queryByText(/Search everyone/i)).toBeNull();
+    /*
+     * The button is still there, in the standing row beside the register
+     * offer, because the no-match panel it was living in has gone.
+     *
+     * It used to leave with that panel, which meant it was on screen for
+     * exactly the family who did not need it. A parent whose child's name is
+     * common gets rows back — somebody else's Noah — and is in the one state
+     * where the scope is hiding their child behind a confident wrong answer.
+     */
+    expect(screen.getByRole('button', { name: 'Search everyone' })).toBeTruthy();
+    /*
+     * And no church-wide read behind that first press. Widening is free and
+     * already answered: this child was on the device, so reading the whole
+     * church would be spent on a question the free half settled.
+     */
+    expect(services.refreshDirectory).not.toHaveBeenCalled();
+
+    /*
+     * The second press is the one that reads, and this is what makes the
+     * button worth keeping on screen. There is nothing left to widen — the
+     * pool is already everybody — so the only thing that could still find a
+     * missing child is asking the church whether they were added since this
+     * device last looked.
+     */
+    await tap(/Search everyone/i);
+    expect(services.refreshDirectory).toHaveBeenCalled();
+  });
+
+  it('stands while a match is showing, for the family the match is not', async () => {
+    /*
+     * The state the button used to be missing from, and the commonest one it
+     * is needed in.
+     *
+     * A surname the gathering already has: Noah comes every week, Sofia has
+     * only ever come to another programme. A parent searching for Sofia types
+     * their own name and is handed Noah — a real child, correctly spelled,
+     * who is not theirs. Nothing on the screen says the search was narrowed,
+     * so a rows-on-screen result reads as *the* answer, and the only door the
+     * screen used to leave open here was the one that registers a child the
+     * church already has.
+     */
+    await mount();
+    await type('adeyemi');
+    expect(screen.getByText('Noah Adeyemi')).toBeTruthy();
+    expect(screen.queryByText('Sofia Adeyemi')).toBeNull();
+    // No no-match panel — this is a successful search, which is the point.
+    expect(screen.queryByText(/first time here/i)).toBeNull();
+
+    await tap(/Search everyone/i);
+    expect(screen.getByText('Sofia Adeyemi')).toBeTruthy();
+    expect(screen.getByText('Noah Adeyemi')).toBeTruthy();
   });
 
   it('narrows again for the next family at the kiosk', async () => {

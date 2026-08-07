@@ -1,0 +1,125 @@
+{
+  "changes": [
+    {
+      "scene": "review",
+      "viewport": "both",
+      "addresses": [
+        "blocker: the approve button is live and full-weight on a card with an unresolved name collision — the screen names the mistake, explains it, then offers it in brand blue"
+      ],
+      "change": "Settled is now a precondition. On the duplicate card the primary carries disabled — the app's own disabled:opacity-50 disabled:cursor-not-allowed — and its caption stops describing the outcome and states the block: 'Waiting on Ethan's row. Choose who he already is, or say he is new — then this adds Ethan and Ishaan for good.' 'Not ours' beside it is untouched and full weight. The expiring card shows the other half: its child's row has been settled with the escape hatch, which now renders chosen (bg-brand-500/15 text-brand-300 ring-brand-500/40 with a ✓ — the sidebar's existing active-item treatment, no new colour), and that card's primary is live. So one page shows held and released side by side. The duplicate card's strip was rewritten from the hypothetical to the rule.",
+      "rationale": "Held rather than dropped-to-secondary: a held primary that changed variant on settling would be nearly indistinguishable from 'Not ours' beside it, and would say the button is a different button rather than the same one that cannot fire yet. The caption does the explaining, which is the contract this scene already runs on. Showing a chosen escape hatch was the cheapest way to prove nobody is trapped: 'None of them' is a settling answer, not a dismissal.",
+      "breakpoint": "both",
+      "implementation": "ReviewPage.tsx. ChildRow currently owns `picking` and calls onMerge directly; the merge decision must become a card-level decision so RegistrationCard can gate on it. Lift it: RegistrationCard holds resolution: Record<string, string | 'new'> keyed by child.studentId, passing resolution[id] and onResolve(id, choice) into ChildRow. onResolve with a candidate id calls onMerge(candidateId, child.studentId); 'None of them' currently has NO handler at all — give it onResolve(id, 'new'), purely local state (a reviewer's assertion, reversible until approve, so it must not round-trip). Then unsettled = children still held, unmerged, with candidates, and unresolved; Button disabled={disabled || unsettled.length > 0}. The approve caption branches on unsettled and names unsettled[0].firstName. The discard Button never reads unsettled."
+    },
+    {
+      "scene": "review",
+      "viewport": "both",
+      "addresses": [
+        "design major: the armed block opens with Cancel, then the sentence, then the commit — so the sentence saying the action cannot be taken back is positioned as a caption of the button above it",
+        "round 2 visual blocker (must not regress): the commit must not occupy the arm control's coordinates"
+      ],
+      "change": "The armed foot is the resting foot with different contents, rather than a different component. Same flex-col gap-5 … lg:grid lg:grid-cols-2 foot holding two captioned decisions: slot one is 'Leaves this family in the queue. Nothing is sent to Planning Center and nothing is lost.' over Cancel; slot two is the consequence sentence over 'Yes — add 3 children'. The tinted ringed panel is gone; both captions are at the resting caption class. Measured against a resting version of the same card: on phone the arm button occupied y 2349–2397 and Cancel now occupies y 2349–2397 exactly, with the commit 86px below, zero overlap; on desktop Cancel sits at the arm's x/y and the commit has zero horizontal overlap.",
+      "rationale": "The shape that satisfies both critics rather than averaging them. Giving Cancel its own caption dissolves the ambiguity: the consequence sentence can no longer be read as a caption of the retreat, because the retreat already has one. Assigning Cancel to the primary's slot and the commit to the second — rather than the other way round, which is what the design critic literally proposed — is the only assignment where the commit is not under the point the finger or cursor just left. The swap is the safety mechanism. On phone this means primary-last on this one card; the inversion is deliberate and legible because the state inverted (chip reads 'Confirm to add', the card ring is warn).",
+      "breakpoint": "both — stacked below lg, two columns at lg, the resting foot's own split",
+      "implementation": "Add confirmingApprove beside confirmingDiscard; the primary arms, only the commit calls onApprove. Render the SAME foot element in both states and swap only the slot contents: resting [Approve | Not ours], armed [Cancel | Yes — add N children]. No tinted wrapper. Both captions use the shared caption class; the commit's takes text-warn-400. Keep the card-level ring-warn-500/50 and the warn 'Confirm to add' badge. The discard confirm gets the identical treatment."
+    },
+    {
+      "scene": "review",
+      "viewport": "both",
+      "addresses": [
+        "visual major: the merge decision is the one call with a right answer, and the card gives the triager nothing but a name and a grade",
+        "backend: candidates now carry sharesFamilyDigits"
+      ],
+      "change": "Each candidate button became two lines: name and grade, and beneath it the household fact — 'Same phone digits on file.' (ink-300) where sharesFamilyDigits is true, 'Different phone digits on file.' (ink-500) where false. Both states render, so absence is never ambiguous. Independently the grade token is weighted when it equals the incoming child's grade and dropped a step when it does not. On the duplicate card that turns two identical strings into a pair with two independent discriminators; on the expiring card the single candidate now says 'Different phone digits on file.' against a grade that already disagreed, which makes the settled 'None of them' read as reasoned rather than arbitrary.",
+      "rationale": "Evidence, not verdict: nothing is sorted, pre-selected or recommended, and the negative is stated as plainly as the positive so 'different on both' is a visible outcome rather than a blank. The phrasing never renders a number — it reports a lookup the kiosk already performs on the guardian record. Weight rather than colour for the grade match, because a new accent would collide with the chip that owns the card's one colour.",
+      "breakpoint": "both; the evidence line is text-sm lg:text-xs like every other caption",
+      "implementation": "summaryLabel() splits into a label span and a grade span so the grade can be weighted against gradeSentence(child). The candidate button becomes flex-col justify-center holding the label and the evidence line. If sharesFamilyDigits can be absent for a roster row with no number on file, render a third string ('No number on file.') rather than falling through to 'Different' — the tri-state matters and the false branch must not absorb the unknown one."
+    },
+    {
+      "scene": "review",
+      "viewport": "both",
+      "addresses": [
+        "design major: all three tiers are painted in the same accent, so a card reads as one alarm restated three times"
+      ],
+      "change": "The chip is the only coloured object on each card. All three consequence strips — expiring, duplicate, push-failed — now use the sibling-join card's neutral panel (bg-ink-800/50 ring-ink-700 text-ink-300). Both merge-picker headings go from warn to text-ink-200 font-semibold, the row's own voice. The header chips keep their accents.",
+      "rationale": "The sibling-join card was already the proof, so this levels to a treatment the scene contains rather than inventing one. It also makes the blocker's fix coherent: the screen no longer relies on the reader taking amber as a stop, because on the one card where approving would be a mistake, the button cannot fire. Colour retreats to saying what kind of card this is; the container and the control say what may be done.",
+      "breakpoint": "both",
+      "implementation": "The expiringSoon, lastError and duplicate strips all take one shared className — the same string the anchors paragraph uses. The picker heading becomes text-sm font-semibold text-ink-200 lg:text-xs. Tone stays on CardHeader's action Badge only."
+    },
+    {
+      "scene": "review",
+      "viewport": "desktop",
+      "addresses": [
+        "visual major: two-fifths of the page is an empty right column, and the dashed end-of-queue box is 98.8% empty pixels"
+      ],
+      "change": "The two-column grid on the page frame is gone. Cards live in lg:columns-2 lg:gap-8, each mb-4 lg:mb-8 lg:break-inside-avoid, so the columns pack by height instead of aligning to rows. Below lg the wrapper is a plain block. The end-of-queue note lost its border, padding and cell: a centred quiet line beneath both columns. Desktop page 1931px → 1656px, the push-failed card rides up beside its neighbour, and no card reserves space it does not use. Reading order is preserved: column one is families 1–2, column two is 3–5, so the priority sort reads straight down.",
+      "rationale": "Multi-column is the one primitive that fixes the packing without making card width depend on the parity of the queue length, and it preserves DOM order, which masonry-by-reordering would not. The dashed box was doing two jobs badly — terminating the queue and filling a cell — and only the first was real.",
+      "breakpoint": "lg and up for the columns; the quiet end note renders at both widths",
+      "implementation": "Drop lg:grid lg:grid-cols-2 lg:items-start from PageFrame and the col-span from the header. Wrap queue.map(...) in a lg:columns-2 lg:gap-8 div and give the Card mb-4 lg:mb-8 lg:break-inside-avoid. Card needs a className passthrough if it does not already have one."
+    },
+    {
+      "scene": "review",
+      "viewport": "phone",
+      "addresses": [
+        "visual minor: the captions are the whole mechanism rounds 1 and 2 built, and on the phone they are the same size as the decorative grade sublabel"
+      ],
+      "change": "Every consequence caption is text-sm text-ink-400 lg:text-xs — the foot captions, both picker sublines and headings, and the new candidate evidence lines. Desktop unchanged at 12px. The grade sublabel stays text-xs at both widths, so on a phone the caption is a step above the decoration it used to match.",
+      "rationale": "The straight responsive split the brief points at, safe because the same critic ruled the page height is the right trade and asked not to compress. Phone page 3983px → 4179px; the growth is captions, two-line candidates and picker text, all findings from this round.",
+      "breakpoint": "below lg only",
+      "implementation": "One shared caption class constant — text-sm text-ink-400 lg:text-xs — used by the Decision caption, the picker subline and the candidate evidence line; the picker heading is the same scale with font-semibold text-ink-200."
+    },
+    {
+      "scene": "review",
+      "viewport": "both",
+      "addresses": [
+        "design minor: the picker lands twelve pixels short of the name column, giving the row three left edges",
+        "design minor: the two-up candidates keep the stacked gap, so the pair reads as one wide control with a seam"
+      ],
+      "change": "The picker wrapper goes ml-9 → ml-12: 36px was the avatar's width, 48px is the avatar plus the gap-3 that follows it, which is where the child's name actually starts. The two-up candidate grid gains lg:gap-x-6, so the gutter between two competing choices is the foot's column gutter instead of the 6px inherited from the stacked case.",
+      "rationale": "Both one-token changes and obviously right. The candidate labels sit 12px inside their own boxes, which is a container inset rather than a third text edge — the heading no longer pokes left of anything it belongs to, which was the actual complaint.",
+      "breakpoint": "the indent at both; the 24px gutter at lg and up",
+      "implementation": "Picker wrapper mt-3 ml-12 border-t border-ink-800 pt-3; candidate ul gains lg:gap-x-6 when candidates.length > 1."
+    },
+    {
+      "scene": "review",
+      "viewport": "both",
+      "addresses": [
+        "design minor: the header state badge and the row fact badge are the same object",
+        "design minor: the first instrument spans the foot, so its caption is set at twice the measure of the two beneath it"
+      ],
+      "change": "Two form separations. The row's settled fact ('Merged', 'Added') drops its container and becomes a plain quiet label, shrink-0 text-xs text-ink-400; the filled ringed pill is now exclusively the header's. And on the push-failed card the first decision loses lg:col-span-2, so all three instruments sit in the same two-column grid at one measure; the primary's label was shortened so it fits a column on one line.",
+      "rationale": "Dropping the container rather than restyling it: the row already owns its own control and its own rule, so it does not need to borrow the header's shape to be read, and a plain label at ink-400 between the grade at ink-500 and the name at ink-100 is the ramp's own answer for 'quieter than the subject, louder than the decoration'.",
+      "breakpoint": "both for the label; the foot measure is lg-and-up",
+      "implementation": "Replace the neutral Badges in ChildRow with a plain span. The lastError foot's first Decision drops lg:col-span-2. That foot's contents key off lastErrorKind: 'guardian' (and 'both') renders the two guardian instruments — attach to the household the backend already holds, or withoutGuardian, which is shipped; 'children' renders a single plain retry primary instead, since a failed child push is usually a passed outage and the guardian instruments do not apply."
+    },
+    {
+      "scene": "review",
+      "viewport": "phone",
+      "addresses": [
+        "visual major: a core-team member on a phone cannot get to this screen, and is never told there is anything on it"
+      ],
+      "change": "A fifth item in the sticky bottom bar — glyph ▣, label 'Review', and the count as a neutral pill beside the label — active here in text-brand-400 like every other current tab. Five tabs at 390px is 78px each, so every target keeps well over 48px of width and the full bar height.",
+      "rationale": "The counter-argument that the thumb bar belongs to the door does not survive Insights, Events and Students already being in it. The count travels with the destination rather than living somewhere new: five waiting is a size, not an alarm, and the urgency stays on the card that can be specific about it.",
+      "breakpoint": "below lg only — the bar is lg:hidden and the sidebar already carries Review at lg and up",
+      "implementation": "Belongs in the shell, not in ReviewPage: the same nav list that renders the bottom tabs, gated on the same role check that gates the sidebar's Review entry and /review itself. Only the two review prototypes were edited, so the other twelve frozen pages still show four tabs."
+    }
+  ],
+  "declined": [
+    {
+      "finding": "a compact family name in the sticky top bar while a card is in view",
+      "why": "The same finding calls it optional polish and rules the height right. It means the scene reaching into AppShell and tracking which card is in view with a scroll observer — new mechanism in a shared component for a residual priced at 44–103px. The captions already name the people and the number beside every control, which is what makes the header's absence survivable."
+    },
+    {
+      "finding": "put the retreat after the commit in the armed foot",
+      "why": "Taken in spirit, not literally, because of the round-2 blocker. Cancel is in the primary's slot precisely because that is the rectangle the finger or cursor just left — measured, Cancel lands on the arm button's exact coordinates on phone and inside them on desktop, and the commit has zero overlap with either. Putting the commit in slot one would put it back under the previous tap. Everything else the finding asked for is done: the sentence is immediately above the commit, at the resting caption size, in the resting foot's grid, and the retreat has its own caption so the sentence cannot be read as belonging to it."
+    },
+    {
+      "finding": "the phone page grew again, 3983px → 4179px",
+      "why": "Flagged rather than fixed: every pixel was requested this round — the phone type step, the sharesFamilyDigits evidence line, and the picker text moving with its subline. The same critic ruled the height is the right trade. If it has to come back, the two places left are the card header's name-over-timestamp stack and the definition list's single Phone line, neither of which is a mechanism this round built."
+    },
+    {
+      "finding": "the armed sentence should name the collision on cards that have one",
+      "why": "That was the critic's fallback 'if the primary must stay pressable'. It does not stay pressable, so the fallback is moot — a card with an open collision can no longer be armed at all, and the sentence naming the collision is the caption on the held button, where it is read before the arm rather than after it."
+    }
+  ]
+}

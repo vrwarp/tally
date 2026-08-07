@@ -20,12 +20,16 @@ export const MAX_CHILDREN = 6;
 /** Long enough for any real name; the same ceiling the callable enforces. */
 export const NAME_MAX_LENGTH = 40;
 
+/** Room for a real note; the same ceiling the callable enforces. */
+export const ALLERGIES_MAX_LENGTH = 200;
+
 export const PHONE_LENGTH = 10;
 
 export type StepKind =
   | 'child-first'
   | 'child-last'
   | 'child-grade'
+  | 'child-allergies'
   | 'another'
   | 'guardian-first'
   | 'guardian-last'
@@ -54,11 +58,38 @@ export interface DraftChild {
   firstName: string;
   lastName: string;
   grade: Grade | null;
+  /** The allergy note as typed, or '' for none — which is the common answer. */
+  allergies: string;
 }
 
 export interface RegistrationState {
   mode: RegistrationMode;
   step: StepKind;
+  /**
+   * Whether the allergies question exists in this run at all.
+   *
+   * From the binding, which carried it from the server: true exactly when the
+   * church's people backend can hold the answer. Asking without that would be
+   * collecting a family's medical note into a screen that silently drops it —
+   * the retired phone form made the same check before showing its field. On
+   * the state rather than threaded as a parameter, because `chooseGrade`
+   * advances internally and every caller would have to carry it.
+   */
+  allergiesSupported: boolean;
+  /**
+   * Whether "No allergies" is ticked on the allergies step.
+   *
+   * An empty buffer already means none, so this is not what *records* the
+   * answer — it is what stops the answer being typed. A medical field with a
+   * keyboard under it and no visible way to say "nothing" invites "None",
+   * "N/A" and "no allergies" as free text, three spellings of a blank that
+   * then travel to the church's database as though they were notes. The tick
+   * sits where the typing would have started and empties the box instead.
+   *
+   * One child's worth of lifetime: every entry to the step clears it, so the
+   * second child is never silently answered by the first.
+   */
+  noAllergies: boolean;
   /** Minted once per run and re-sent on every retry — see the callable. */
   registrationId: string;
   /** Children whose three questions are answered. */
@@ -99,16 +130,20 @@ export function initialState(args: {
   registrationId: string;
   requiresCheckOut: boolean;
   mode?: RegistrationMode;
+  allergiesSupported?: boolean;
 }): RegistrationState {
   return {
     mode: args.mode ?? 'family',
     step: 'child-first',
     registrationId: args.registrationId,
+    allergiesSupported: args.allergiesSupported === true,
+    noAllergies: false,
     children: [],
     draft: {
       firstName: '',
       lastName: '',
       grade: defaultGrade(args.requiresCheckOut),
+      allergies: '',
     },
     guardian: { firstName: '', lastName: '', phone: '' },
     buffer: '',
@@ -127,6 +162,7 @@ export function isTypingStep(step: StepKind): boolean {
   return (
     step === 'child-first' ||
     step === 'child-last' ||
+    step === 'child-allergies' ||
     step === 'guardian-first' ||
     step === 'guardian-last' ||
     step === 'guardian-phone'
@@ -134,6 +170,17 @@ export function isTypingStep(step: StepKind): boolean {
 }
 
 const NAME_CHARACTER = /[\p{L}' -]/u;
+
+/**
+ * What an allergy note may contain: everything the glass keyboard can produce.
+ *
+ * Wider than a name on purpose — digits are legitimate medical text ("Type 1
+ * diabetes", "EpiPen 0.3") — and no wider, deliberately: the keyboard has no
+ * comma or period, and growing it two keys would change its geometry on every
+ * screen including search. "Peanuts tree nuts EpiPen in bag" reads fine to the
+ * human this note is for, and the upstream editor refines it after approval.
+ */
+const ALLERGY_CHARACTER = /[\p{L}\p{N}' -]/u;
 
 /**
  * Where a capital belongs in a name, if nobody says otherwise.
@@ -174,6 +221,13 @@ export function applyKey(
   key: KioskKey,
 ): RegistrationState {
   if (!isTypingStep(state.step)) return state;
+  /*
+   * The box is inert while "No allergies" is ticked, and every key is — not
+   * only the letters. Clearing or backspacing an empty greyed-out box is a
+   * press that does nothing, and the screen says so by being grey rather than
+   * by swallowing keystrokes silently. Untick to type.
+   */
+  if (state.step === 'child-allergies' && state.noAllergies) return state;
   if (key.kind === 'shift') return { ...state, shift: cycleShift(state.shift) };
   if (key.kind === 'clear') return { ...state, buffer: '', shift: 'on' };
   if (key.kind === 'backspace') {
@@ -189,6 +243,19 @@ export function applyKey(
     if (!/^\d$/.test(key.value)) return state;
     if (state.buffer.length >= PHONE_LENGTH) return state;
     return { ...state, buffer: state.buffer + key.value };
+  }
+
+  if (state.step === 'child-allergies') {
+    if (!ALLERGY_CHARACTER.test(key.value)) return state;
+    const next = (
+      state.buffer + (state.buffer === '' ? key.value.trimStart() : key.value)
+    ).replace(/\s{2,}/g, ' ');
+    if (next.length > ALLERGIES_MAX_LENGTH) return state;
+    return {
+      ...state,
+      buffer: next,
+      shift: state.shift === 'lock' ? 'lock' : autoShiftAfter(next),
+    };
   }
 
   if (!NAME_CHARACTER.test(key.value)) return state;
@@ -210,6 +277,9 @@ export function applyKey(
 export function canAdvance(state: RegistrationState): boolean {
   if (state.step === 'guardian-phone')
     return state.buffer.length === PHONE_LENGTH;
+  // An empty allergies buffer is not an unanswered question — it is the
+  // answer most families give.
+  if (state.step === 'child-allergies') return true;
   if (isTypingStep(state.step)) return state.buffer.trim().length > 0;
   return true;
 }
@@ -258,7 +328,25 @@ export function advance(state: RegistrationState): RegistrationState {
         shift: 'on',
       };
     case 'child-grade':
-      return { ...state, step: 'another', buffer: '', shift: 'on' };
+      return {
+        ...state,
+        step: state.allergiesSupported ? 'child-allergies' : 'another',
+        buffer: '',
+        shift: 'on',
+        // Each child answers for themselves — see `noAllergies`.
+        noAllergies: false,
+      };
+    case 'child-allergies':
+      return {
+        ...state,
+        // The tick and an empty box record the same answer, and the tick wins
+        // where they could disagree: it is the one the parent can see.
+        draft: { ...state.draft, allergies: state.noAllergies ? '' : value },
+        step: 'another',
+        buffer: '',
+        shift: 'on',
+        noAllergies: false,
+      };
     case 'guardian-first':
       return {
         ...state,
@@ -294,6 +382,21 @@ function lastNameSoFar(state: RegistrationState): string {
     : '';
 }
 
+/**
+ * Ticks or unticks "No allergies", and empties the box when it goes on.
+ *
+ * Emptying is the point rather than a side effect: a parent who typed
+ * "peanuts", thought better of it and ticked the box must not leave "peanuts"
+ * behind a grey panel to be committed by the next press. Unticking does not
+ * put it back — the box is the record of what will be sent, and a control that
+ * resurrected text nobody could see while it was hidden would be worse.
+ */
+export function toggleNoAllergies(state: RegistrationState): RegistrationState {
+  if (state.step !== 'child-allergies') return state;
+  const noAllergies = !state.noAllergies;
+  return { ...state, noAllergies, buffer: noAllergies ? '' : state.buffer, shift: 'on' };
+}
+
 /** The grade chips. `null` is 'No grade' — an answer, not a skip. */
 export function chooseGrade(
   state: RegistrationState,
@@ -325,6 +428,7 @@ export function answerAnother(
         firstName: '',
         lastName: '',
         grade: defaultGrade(requiresCheckOut),
+        allergies: '',
       },
       step: 'child-first',
       buffer: '',
@@ -339,6 +443,7 @@ export function answerAnother(
       firstName: '',
       lastName: '',
       grade: defaultGrade(requiresCheckOut),
+      allergies: '',
     },
     // A sibling registration has no adult to ask about: the family is already
     // identified, and the household upstream already holds their parent.
@@ -375,8 +480,22 @@ export function goBack(state: RegistrationState): RegistrationState | null {
         buffer: state.draft.lastName,
         shift: autoShiftAfter(state.draft.lastName),
       };
-    case 'another':
+    case 'child-allergies':
       return { ...state, step: 'child-grade', buffer: '', shift: 'on' };
+    case 'another':
+      return state.allergiesSupported
+        ? {
+            ...state,
+            step: 'child-allergies',
+            // The note as answered, reopened for editing — the same contract
+            // every other reopened question keeps. Unticked whatever was
+            // answered: an empty box is the honest reopening of "none", and it
+            // is one tap from ticked again.
+            buffer: state.draft.allergies,
+            shift: autoShiftAfter(state.draft.allergies),
+            noAllergies: false,
+          }
+        : { ...state, step: 'child-grade', buffer: '', shift: 'on' };
     case 'guardian-first':
       return { ...state, step: 'another', buffer: '', shift: 'on' };
     case 'guardian-last':

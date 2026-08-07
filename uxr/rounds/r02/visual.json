@@ -1,0 +1,74 @@
+[
+  {
+    "scene": "review",
+    "viewport": "phone",
+    "severity": "blocker",
+    "where": "the card foot of every family card — the brand-blue primary button and the caption directly beneath it; rendered in the armed state on the Marta Okonjo card at CSS y 1958–2006",
+    "finding": "Round 1's arm-then-commit protection gives the reviewer nothing on a phone, because the commit target is the same rectangle as the arm target and the tap causes no layout movement at all. A core-team member taps 'Approve and add', sees no motion, and taps again — the second tap is the irreversible push into Planning Center. The two states are geometrically identical, so the habit that most often produces an accidental commit (a repeat tap when a control seems unresponsive) is the one the design does not defend against, on the only action in the app that cannot be taken back.",
+    "evidence": "Unarmed foot on Beatriz Salgado: primary at CSS y 717–765, x 16–342 (326×48). Armed foot on Marta Okonjo: primary at CSS y 1958–2006, same 326×48, same left edge, same bg-brand-500. Both feet measure 146px tall (48 button + 6 gap + 32 caption + 12 gap + 48 secondary), so pressing arm shifts nothing on the page by even one pixel. The only three differences are the button label, the caption wording, and the caption colour going ink-400 → warn-400 — and the caption sits 6px *below* the button, i.e. inside the patch a right thumb occludes when tapping a full-width control from beneath. The caption is text-xs = 12px, the smallest type on the card, carrying the sentence 'Planning Center has no undo and no delete.'",
+    "direction": "The commit control must not be reachable at the arm control's coordinates. Simplest shape that keeps the pattern: on arming, the primary swaps down below the caption (secondary takes the top slot), so the reader's eye and thumb must cross the sentence to reach the commit, and the same tap point now lands on the safe control. Pair it with a card-level armed marker — the design system already has `danger` and `warn` tokens — so the armed card is not the same blue as the four routine ones, and lift the caption off 12px."
+  },
+  {
+    "scene": "review",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "bottom of the fold at scroll 0 — Beatriz Salgado's 'Approve and add' button at CSS y 717–765, the sticky bottom tab bar from CSS y 773–844",
+    "finding": "At page load the single most thumb-reachable target on the screen is the button that begins the irreversible push, and the sentence explaining that it is irreversible is sliced in half by the tab bar. The reviewer's first available action is the dangerous one, presented without its warning. Worse, 'Not ours' — which discards the family and forgets the guardian's number — is legible as a ghost through the translucent nav, so a reader who aims at it hits 'Events' or 'Students' and loses their place in the queue.",
+    "evidence": "Phone fold measures 390×844 CSS. Sticky header occupies 0–48; sticky nav occupies 773–844 (min-h-14 links, bg-ink-950/95 with backdrop-blur). Beatriz's primary sits at 717–765, ending 8px above the nav — dead centre of the thumb arc. Its caption ('Adds Elena to Planning Center. Nothing added there can be taken back.') begins at 771: the crop shows the top halves of the letterforms of line one visible and line two entirely gone, and 'Not ours' visible but untappable behind the blurred nav. Nothing else on the fold is interactive except the two merge-picker options at 570–670 and the account chip in the top-right.",
+    "direction": "Give the first card enough head room that its foot never lands flush against the nav — a scroll-margin or a taller bottom pad on `main` so the foot arrives as a unit — and treat the caption as part of the control rather than something that can fall off the end of it. The nav's translucency is what makes the clipped state read as legible-but-broken; an opaque nav would at least fail honestly."
+  },
+  {
+    "scene": "review",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "the 'Not ours' button, bottom-most control of all five cards (e.g. Beatriz at CSS y 815–861, Dov at CSS y 3078–3126)",
+    "finding": "'Not ours' deactivates the family and forgets the guardian's phone number, it fires on a single tap with no arming, it is 326×48 full-width, and it is the lowest — therefore easiest — control on every card. Round 1 gave the reversible-upstream action a caption naming its consequence and left the destructive-in-Tally one with three words and no explanation. The reviewer working the queue on a phone gets no statement of what they lose, on the control their thumb finds first.",
+    "evidence": "Markup for the secondary carries no sibling `<p>`: only the primary sits inside a `flex-col gap-1.5` with a caption. The gap between the caption's last line and the 'Not ours' top edge is 13px, so the sentence directly above the button ('Adds Elena to Planning Center…') describes the *other* button — a reader glancing down attaches it to the wrong control. On Beatriz's card the loss 'Not ours' causes is exactly what the amber strip at CSS y 255–332 warns the sweep will cause ('takes the phone number with it'), 483px higher up the same card.",
+    "direction": "Caption it the way the primary is captioned — name the number that goes, name who can still get the family back — so the two controls are symmetrical in explanation even though only one is armed. Ordering may also be wrong: the safest control being the lowest is the phone convention, and here the lowest is the one that destroys a phone number."
+  },
+  {
+    "scene": "review",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "whole page — 3325 CSS px for five cards (Beatriz 695, Priya 700, Marta 486, Nguyen 438, Dov 530)",
+    "finding": "Verdict on the growth round 1 flagged: the trade is right, and it is right up to about here. Nearly all of the +977px is mechanism, not padding — the seated merge pickers (~+290px) are what stop a permanent upstream duplicate, and the vertical foot (~+510px) is the destination caption plus a thumb-width secondary. This is a judgement queue, not a throughput queue; one family per screen is the correct rhythm and the page length is the honest cost of it. The watch-line is that the tallest card now sits 25px inside the usable band, so the next feature that adds a line to a card breaks the rule that a family fits a screen.",
+    "evidence": "844 viewport − 48 sticky header − 71 sticky nav = 725px of usable band. Priya's card is 700px, Beatriz's 695px — they fit only when the 165px page heading has been scrolled fully off and the card is aligned to the band's top, with no scroll-snap to make that happen. In practice the reviewer holds a partial card. Baseline for comparison: 2348px page, footers of 44px, merge candidates behind a text link.",
+    "direction": "No change asked for. If anything is to be reclaimed later, take it from the card header (name and 'Registered N ago' stacked over 64px when a 358px row holds both) rather than from the pickers or the captions, which are the parts doing the work."
+  },
+  {
+    "scene": "review",
+    "viewport": "desktop",
+    "severity": "blocker",
+    "where": "the Dov Halevy card, left column, y 1147–1569 — the red 'Push failed' strip and the card foot below it",
+    "finding": "The one family in the queue whose push half-failed cannot be finished on this screen. The strip diagnoses a guardian-side collision — a person with (555) 011-7742 already exists outside this household — and then offers two controls, neither of which touches the guardian. 'Approve and add' pushes Yael upstream permanently into a household that still has no adult attached, and its caption does not say so. 'Not ours' discards a family whose first child, Noa, is already marked Added in Planning Center, which has no delete. The reviewer's only correct move is to leave this card alone and go do something else, and the screen never tells them that.",
+    "evidence": "Card foot at y 1483–1518: 'Approve and add' (x 272–438) with caption 'Adds Yael to Planning Center. Nothing added there can be taken back.' — it names only the child, never the parent and never the resulting parentless household. 'Not ours' at x 707–809. Noa Halevy's row carries a green 'Added' badge at y ~1330; Yael's carries none. The phone number is displayed as read-only text in the definition list at y ~1307 with no affordance to edit it, and nothing on the card identifies who upstream already holds it. No third control exists.",
+    "direction": "A push-failed card needs an instrument that matches its diagnosis: a way to reach the colliding person, a way to correct the number and retry, or an explicit 'add the children without the parent, deliberately' with a caption that names the parentless outcome. Failing all three, the card should say the failure cannot be resolved here and what to do instead, rather than presenting two controls that both leave upstream inconsistent."
+  },
+  {
+    "scene": "review",
+    "viewport": "desktop",
+    "severity": "blocker",
+    "where": "Priya Nguyen card, right column — the second merge option, 'A student on the roster', at y ~404–440, x 866–1380 (identical on phone at CSS y ~1263–1311)",
+    "finding": "The merge picker exists to stop a permanent duplicate in Planning Center, and on the one card where it matters most it asks the reviewer to choose between two candidates while naming only one of them. The strip above says two roster students share the name Ethan Nguyen; option one is 'Ethan Nguyen · 9th grade' and option two is 'A student on the roster' — a label that identifies nobody and cannot be told apart from option one by anything the screen shows. The reviewer either guesses, picks 'None of them — Ethan is new' to escape the choice, or leaves the card. Guessing wrong and then approving is exactly the permanent upstream error the picker was built to prevent.",
+    "evidence": "The three options are 514px-wide buttons at 42px pitch, 6px apart, y 366–408 / 408–450 / 450–492 on desktop and min-h-12 with gap-1.5 on phone. Option one carries name and grade; option two carries neither. The label does not exist in `uxr/baseline/review--phone.html` (zero occurrences) — it was introduced when the picker was seated in round 1, and reads as a placeholder that shipped. The heading two lines above ('Two students on the roster share this name') is what makes the omission decisive: the difference between the two candidates is precisely what the second label withholds.",
+    "direction": "Name the second candidate exactly as the first is named — name plus grade. The 'nothing about minors beyond what is already shown' constraint does not block this: name and grade are already on screen for candidate one and for every child row on the page. If two candidates genuinely collide on both name and grade, separate them with a fact the app already renders (which one is checked in, which one has a guardian) rather than leaving one anonymous."
+  },
+  {
+    "scene": "review",
+    "viewport": "desktop",
+    "severity": "major",
+    "where": "Marta Okonjo card foot, left column — 'Yes — add 3 children' at y 1037–1072, x 272–467, against the unarmed 'Approve and add' at x 272–438 on the other four cards",
+    "finding": "Same defect as the phone, weaker mechanism, still real: the commit button covers every pixel of the arm button. A leader who double-clicks — or clicks a second time because the two-column page gave them no obvious response — commits the irreversible push. And nothing above the card foot marks Marta's card as armed, so a leader who scrolls off to read Dov and comes back sees a card that looks like the other four.",
+    "evidence": "Arm target measures 167×36 at x 272, y offset from the card foot's top-left. Commit target measures 196×36 at the identical x 272 and the identical height — 100% of the arm rectangle is inside the commit rectangle. Both are bg-brand-500, the same blue as the three routine 'Approve and add' buttons at y 595, 587 and 1483. Marta's card is also the only card in the queue with no header badge, so the one card that is one click from a permanent write carries less header signal than the three that are not. The only armed cue is a 12px warn-400 caption at y 1080–1108.",
+    "direction": "Move the commit control off the arm control's coordinates, and give the armed card a chrome-level state — a warn or danger ring on the section, a header badge in the slot the other cards use — so 'armed' is legible from across a 1152px two-column page, not only from the 12px line under the button."
+  },
+  {
+    "scene": "review",
+    "viewport": "desktop",
+    "severity": "major",
+    "where": "the two-column grid as a whole — the blank right column below y 1035, and the stacked merge options inside every card",
+    "finding": "The leader came to clear five families and can act on two without scrolling; the rest of the 1440×900 window is spent on stacking a 568px column does not require. The reading path is also broken by the grid being row-aligned rather than balanced: below y 1035 the right half of the page is empty for 594px while the last family sits alone on the left, so the queue looks finished while a third of it is still unread.",
+    "evidence": "Content column is 1152px (1440 − 224 sidebar − 64 padding) split into two 568px cards. Above the 900px fold: Beatriz ends at 681 and Priya at 672 — both decidable. Marta's foot is at y 1037 and Nguyen's at 949, both below. Inside the cards, the merge options are 514px-wide buttons whose longest label ends around x 250 — roughly 264px of unused width per option, three of them stacked on Priya for 138px of height. Card headers spend 66px stacking a name over 'Registered 26 days ago' with the badge floated right in a 514px row. Child rows spend 50px stacking a name over a grade using about 200px of the width. Card heights: 568 / 559 / 419 / 330 / 423 against a 1629px page whose right column is dead from 1035 down.",
+    "direction": "Lay the picker options two-up and put the grade inline with the name — layout, not smaller type. Roughly 85px comes off row 1 that way, which lifts the Nguyen card's foot above the 900px fold and takes the queue from two answered to three, and about 300px comes off the page overall. Let the grid balance columns rather than align rows so the fifth card fills the void instead of extending the page beneath it."
+  }
+]

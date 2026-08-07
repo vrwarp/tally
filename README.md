@@ -22,8 +22,9 @@ also get the dashboard, the roster, event and RSVP management, and settings.
 - **Check-out**, per gathering, for rooms where children are handed back: absent, in the room,
   collected. Attendance is never touched by it.
 - **A lobby kiosk** where a parent finds their family by the last four digits of a phone number,
-  checks their children in, and prints a label. A family nobody has met can register there — or on
-  their own phone via a QR code — and lands on a review queue rather than in the church's database.
+  checks their children in, and prints a label. A family nobody has met registers right there — a
+  short wizard, one question at a time — and lands on a review queue rather than in the church's
+  database.
 - **A dashboard that is a call list**, not a report: who has missed three in a row, who is new this
   week, whose profile has no way to reach a parent, and how the head count is trending.
 - **A calendar** that pages back through every gathering already held, and can cancel a night, delete

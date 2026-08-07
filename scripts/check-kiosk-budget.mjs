@@ -126,30 +126,6 @@ if (fullFirestore.length > 0) {
 }
 
 /*
- * The welcome page reaches no Firestore at all — neither the full SDK nor the
- * lite one.
- *
- * It is a form and two callables: `firebase/app` and `firebase/functions`, no
- * session and no documents. That is a claim about what an unauthenticated page
- * may read as much as it is a budget, and it is one careless import away from
- * being false — and one chunking change away, which is how it was false to
- * begin with: `initializeApp` was hoisted into the lite-Firestore chunk, so a
- * parent in a foyer downloaded 111 kB of a database client to fill in four
- * fields. See the `firebase-core` group in vite.config.ts.
- */
-const welcomeReachable = walk(new Set(), staticRefsOf('welcome.html'));
-const welcomeFirestore = [...welcomeReachable].filter((name) => /^firestore-/.test(name));
-if (welcomeFirestore.length > 0) {
-  console.error(
-    `The welcome graph reaches a Firestore chunk: ${welcomeFirestore.join(', ')}\n` +
-      'src/welcome/ must import firebase/app and firebase/functions only. If nothing ' +
-      'there changed, check the chunk groups in vite.config.ts — the SDK core is ' +
-      'easily hoisted into a product chunk that happens to claim it first.',
-  );
-  process.exit(1);
-}
-
-/*
  * The printing subgraph: what a kiosk downloads *only* because it has a printer.
  *
  * Found by walking the graph a second time without traversing into the printing

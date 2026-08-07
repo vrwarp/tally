@@ -47,6 +47,12 @@ const GRACE: KioskStudent = {
  */
 const SWEEP_QUIET_MS = 2_000;
 
+/**
+ * The shortest a **Search everyone** press is allowed to look like work.
+ * Mirrors MIN_WIDEN_SPINNER_MS in KioskApp.
+ */
+const SPINNER_FLOOR_MS = 1_500;
+
 function binding(): KioskBinding {
   const now = Date.now();
   return {
@@ -131,6 +137,25 @@ async function tap(text: RegExp | string): Promise<void> {
     fireEvent.pointerDown(screen.getByText(text).closest('button')!);
   });
   await settle();
+}
+
+/** The **Search everyone** button, which keeps its name while its face is a spinner. */
+function searchEveryone(): HTMLElement {
+  return screen.getByRole('button', { name: 'Search everyone' });
+}
+
+/**
+ * The no-match headline, read whole.
+ *
+ * One sentence in two elements now: the word that changes when the sweep lands
+ * sits in its own span so it can be animated, and Testing Library reads only
+ * an element's own text nodes. Asked about the line rather than about the
+ * word, because "Still" on its own would pass on a screen that had lost the
+ * sentence around it.
+ */
+function noMatchLine(): string | null {
+  const line = screen.queryByText(/no match — first time here\?/i);
+  return line ? line.textContent!.replace(/\s+/g, ' ').trim() : null;
 }
 
 beforeEach(() => {
@@ -226,7 +251,7 @@ describe('the silent sweep for somebody the cached roster does not hold', () => 
 
     expect(screen.getByText(/Couldn.t reach the network/)).toBeTruthy();
     // Emphatically not "still no match": nobody looked.
-    expect(screen.queryByText(/Still no match/)).toBeNull();
+    expect(noMatchLine()).toBe('No match — first time here?');
   });
 
   it('shows the half of the answer that landed', async () => {
@@ -253,7 +278,7 @@ describe('the silent sweep for somebody the cached roster does not hold', () => 
 
     // "Still" is the sweep's one visible trace: the church has been asked,
     // and the honest next doors are the register and a leader.
-    expect(screen.getByText(/Still no match/)).toBeTruthy();
+    expect(noMatchLine()).toBe('Still no match — first time here?');
   });
 
   it('answers the next family from the sweep it just ran, without sweeping again', async () => {
@@ -269,7 +294,7 @@ describe('the silent sweep for somebody the cached roster does not hold', () => 
     // Answered from the sweep a minute ago rather than a second one: a queue
     // of latecomers is one clump, and it must not be one sweep each.
     expect(services.refreshDirectory).toHaveBeenCalledTimes(1);
-    expect(screen.getByText(/Still no match/)).toBeTruthy();
+    expect(noMatchLine()).toBe('Still no match — first time here?');
   });
 
   it('never fires for a search that is still being typed', async () => {
@@ -299,5 +324,146 @@ describe('the silent sweep for somebody the cached roster does not hold', () => 
     await quiet();
     expect(screen.getByText('Ada Lovelace')).toBeTruthy();
     expect(services.refreshDirectory).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The one control on this screen, and the only feedback it has.
+ *
+ * "Search everyone" is two things a parent cannot tell apart: a re-search of
+ * what this device already holds, and a re-read of the whole church. Both can
+ * answer in no time — the first always does, the second whenever the silent
+ * sweep has run in the last two minutes — and a button that searches a church
+ * and comes back before the finger is off it reads as a button that did
+ * nothing. It used to also remove itself on the way, leaving the press with no
+ * trace at all except one word changing in the line above it.
+ */
+describe('the Search everyone button', () => {
+  it('stays on the screen, and wears a spinner while it works', async () => {
+    let land = () => {};
+    refreshDirectory = () =>
+      new Promise((resolve) => {
+        land = () => resolve();
+      });
+
+    await mount();
+    await type('grace');
+    expect(searchEveryone().getAttribute('aria-busy')).toBe('false');
+
+    await tap(/Search everyone/i);
+
+    // Still there — a control that vanishes under the finger that pressed it
+    // is a control a parent concludes did not register.
+    expect(searchEveryone().getAttribute('aria-busy')).toBe('true');
+    // And wearing the spinner in place of its label, which is the whole of
+    // what a parent has to go on while the church is being read. The label
+    // stays in the box holding the button's width — hidden rather than
+    // removed, so the button cannot change size under the finger on it.
+    // Asserted by class: jsdom has no stylesheet, so there is no computed
+    // visibility here to ask about.
+    expect(screen.getByText('Search everyone').className).toContain('invisible');
+    expect(searchEveryone().querySelector('.animate-spin')).toBeTruthy();
+
+    await act(async () => {
+      land();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(SPINNER_FLOOR_MS);
+    });
+    await settle();
+
+    // Back to itself, and still on the screen: four digits are a small
+    // keyspace and names collide, so "widened and still not mine" is a real
+    // state and this is the control that answers it.
+    expect(searchEveryone().getAttribute('aria-busy')).toBe('false');
+    expect(screen.getByText('Search everyone').className).not.toContain('invisible');
+    expect(searchEveryone().querySelector('.animate-spin')).toBeNull();
+    expect(noMatchLine()).toBe('Still no match — first time here?');
+  });
+
+  it('looks like work even when the answer was already in hand', async () => {
+    // Resolves in the same tick — which is what the cooldown path does too.
+    refreshDirectory = async (onRoster) => onRoster([ADA]);
+
+    await mount();
+    await type('grace');
+    await tap(/Search everyone/i);
+
+    // Half a second later, still working. Not theatre for its own sake: an
+    // instant "no" to a search of an entire church is read as a failure to
+    // search, and the next thing a parent does about it is press again.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+    expect(searchEveryone().getAttribute('aria-busy')).toBe('true');
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(SPINNER_FLOOR_MS);
+    });
+    await settle();
+    expect(searchEveryone().getAttribute('aria-busy')).toBe('false');
+  });
+
+  it('is one read however many times it is pressed', async () => {
+    let land = () => {};
+    refreshDirectory = () =>
+      new Promise((resolve) => {
+        land = () => resolve();
+      });
+
+    await mount();
+    await type('grace');
+    await tap(/Search everyone/i);
+
+    // Pressing a spinner is exactly what an impatient parent does, and the
+    // button is deliberately not disabled — it is still a real target, it
+    // simply has nothing new to ask for.
+    await act(async () => {
+      fireEvent.pointerDown(searchEveryone());
+    });
+    await settle();
+    expect(services.refreshDirectory).toHaveBeenCalledTimes(1);
+
+    // The silent sweep behind the same empty search joins the read in flight
+    // rather than starting a second one.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(SWEEP_QUIET_MS);
+    });
+    await settle();
+    expect(services.refreshDirectory).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      land();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(SPINNER_FLOOR_MS);
+    });
+    await settle();
+    expect(searchEveryone().getAttribute('aria-busy')).toBe('false');
+  });
+
+  it('hands the next family a button that is not still spinning', async () => {
+    let land = () => {};
+    refreshDirectory = () =>
+      new Promise((resolve) => {
+        land = () => resolve();
+      });
+
+    await mount();
+    await type('grace');
+    await tap(/Search everyone/i);
+    expect(searchEveryone().getAttribute('aria-busy')).toBe('true');
+
+    // The buffer emptying is the next person walking up. The read carries on
+    // and still lands — they get the benefit of it — but they must not open
+    // on somebody else's busy button.
+    await tap('Clear');
+    await type('noah');
+    expect(searchEveryone().getAttribute('aria-busy')).toBe('false');
+
+    await act(async () => {
+      land();
+    });
+    await settle();
   });
 });

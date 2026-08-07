@@ -1,0 +1,65 @@
+[
+  {
+    "scene": "review",
+    "viewport": "desktop",
+    "severity": "major",
+    "where": "the slot directly under each card header — the coloured strip on Beatriz and Dov, the bare paragraph on Nguyen family, nothing on Priya and Marta — read together with the new header state badges",
+    "finding": "Every card is supposed to answer 'why is this one in the queue', and after this round that answer is told in four different registers depending on the card. Beatriz gets a warn badge AND a warn strip that restate each other; Dov gets a danger badge plus a danger strip that elaborates; Priya gets a badge only and hides her reason inside a child row; Nguyen family gets no badge at all and its reason set as undecorated ink-400 running text in the exact slot where the other two cards have a tinted, ringed block. Scanning the column, the reader never learns where to look for the reason, and the badge rail now silently sorts the queue into 'three cards with a state, two routine ones' — which is false, because the Nguyen card's sentence ('approving joins that household rather than making a second one') is the most consequential fact on the screen and is the quietest thing in its card.",
+    "evidence": "In review--desktop-full: Beatriz's badge 'You have 4 days left' and the amber strip 'Clears in 4 days and takes the phone number with it' are the same token, 60px apart, saying the same thing twice. Nguyen family's three-line paragraph sits at the same y-offset and the same text-sm as Beatriz's and Dov's strips, but with no ring, no tint and no badge above it, so at a squint that card reads as having nothing wrong. Marta's card opens straight onto 'Phone' with no slot at all.",
+    "direction": "Make the slot one object with one register, present or absent. Let the header badge name the state in two or three words and let the strip below carry the consequence in a sentence, and give every card that has a state both — including the sibling-join card, which currently has neither. Where a card's badge and its strip say the same thing (Beatriz), one of them is redundant: the strip should add the consequence the badge cannot fit, not repeat it in the same colour."
+  },
+  {
+    "scene": "review",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the merge picker inside the Ethan Nguyen and Elena Salgado child rows",
+    "finding": "The picker block starts at the child row's own padding edge, ignoring the name column the row established two lines above. So the candidate 'Ethan Nguyen · 9th grade' sits 36px to the left of 'Ethan Nguyen' — the same person's name, twice, on two left edges that are close enough to read as a slip rather than a level change. The stagger also breaks the one comparison the picker exists to support: the reader is being asked 'is this child the same as that record?' and the two names are not on a common axis to compare.",
+    "evidence": "Measured on review--desktop-full: in the Priya card the child's name begins at x=917 and the candidate button's label at x=881; identical 36px offset in the Beatriz card (332 vs 296). At 2x on phone the stagger is 72px and plainly visible under 'Elena Salgado' / 'Elena Salgado · 8th grade'.",
+    "direction": "Put the merge block on the name column so the candidates hang directly under the child they would be merged into — or, if the block is meant to belong to the whole row rather than the name, push it far enough left (drop the divider inset too) that the offset reads as a deliberate outdent instead of a near-miss."
+  },
+  {
+    "scene": "review",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the three merge options in the Priya Nguyen card",
+    "finding": "The three buttons are a set the reader is meant to scan down and compare, but no two are built the same way: 'Ethan Nguyen · 9th grade' is a record, 'A student on the roster' is a description of a record, and 'None of them — Ethan is new' is an escape hatch. The middle one identifies nobody, so it offers nothing to compare against its sibling and reads as an unfinished label sitting in a finished control. Because all three share one button shape, the set promises a parallel list and does not deliver one.",
+    "evidence": "review--desktop-full, Priya card: the first and second options are pixel-identical controls whose labels have completely different grammatical shapes, and the second carries no name, no grade and no distinguishing fact.",
+    "direction": "The candidate list needs one construction repeated — each row a record identified the same way, with whatever distinguishes it (grade, last seen, guardian) in a consistent second slot. If the second match genuinely cannot be named, it does not belong in the same list as one that can; it belongs behind the 'more' path, not as a peer button."
+  },
+  {
+    "scene": "review",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the card foot's caption, in the row layout at lg",
+    "finding": "The caption's measure is whatever width is left over after the primary button and 'Not ours' have taken theirs, which is 418px — just narrow enough to push one word onto a second line. The result is a foot shaped like a ragged L: a button, a 350px void, a button, then a two-line caption whose second line is the single word 'back.' The consequence sentence is the one thing in the foot the reader must actually read, and it is the only element whose width nothing decided.",
+    "evidence": "In review--desktop-full, four of five captions break short: Beatriz, Nguyen family and Dov all end on the orphan 'back.', Priya on 'be taken back.' Only the armed Marta card, whose sentence is longer, breaks cleanly.",
+    "direction": "Stop letting the caption inherit the leftover. Either give it the full card width on its own line beneath the two controls — it is a note about the card, not a label pinned to the button — or bring the two controls closer together so the caption sits on one line. Right now the foot's widest element is empty space."
+  },
+  {
+    "scene": "review",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the two-column card grid — the gutter between the columns and the top edges of the first row",
+    "finding": "The gutter between two cards is 16px, exactly the same as each card's own internal padding and half the 32px page margin. So the space separating two independent, irreversible decisions is no larger than the space between a card's edge and its own text: proximity does no grouping work. It is made worse by the header rules landing at the same y in both columns, which welds the pair into one banded table row rather than two separable families. And where the cards genuinely differ in height they differ by too little to read as a difference: in row one, Beatriz ends at y=685 and Priya at y=677 — an 8px step that looks like a misalignment, while row two's 86px step reads correctly as a choice.",
+    "evidence": "Measured on review--desktop-full: left card ring at x=824, right card ring at x=839 (15px gutter); content edge at x=272 against a card ring at x=255 (16px padding); both header rules at y=180.",
+    "direction": "The gutter between cards must be clearly larger than the padding inside them — the outer gap should be the biggest gap in the composition, not the same one. And in the top row, either let the pair stretch to a common bottom so the row closes cleanly, or accept that heights differ but not by 8px; the near-match is the worst of both."
+  },
+  {
+    "scene": "review",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the bottom of the grid, right of the Dov Halevy card",
+    "finding": "The right column stops at y≈1035 while the left runs to y≈1590, leaving roughly 568×555 of empty page at the bottom right with nothing in it and nothing closing it. On a screen whose whole argument is density, the composition simply runs out mid-row: the queue does not end, it stops. The reader is left unsure whether they have reached the bottom of five families or whether something failed to load into that cell.",
+    "evidence": "review--desktop-full: the last row of the grid holds one card in the left column and an empty cell to its right, and the page's bottom edge is a notch rather than an edge.",
+    "direction": "Give the last row a bottom. The simplest is to let the final card run the full width so the grid ends on a straight edge; alternatively put something terminal in the empty cell — the fact that these are all five and nothing else is waiting is worth stating, and it would close the composition instead of leaving a hole."
+  },
+  {
+    "scene": "review",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the badge family — the header state badges against the Merged/Added badges in the child rows",
+    "finding": "The header state badge and the child-row badge are the same object: identical radius, padding, size and weight. Only their y-position tells the reader that one describes the whole family and one describes one child. On the Dov Halevy card that collapses into a visible contradiction — a danger 'Push failed' and a present-green 'Added', same shape, flush to the same right rail, about the same push. And the two row badges themselves split the same class of fact ('this child is already done') across two registers: 'Merged' neutral grey, 'Added' in the app's checked-in green. The reader has no way to learn what the colour is encoding, because it encodes two different axes in one view.",
+    "evidence": "review--phone-full, Dov Halevy: 'Push failed' at the header's right edge and 'Added' at the row's right edge, ~115 CSS px apart, same badge geometry, opposite accents. Beatriz's 'Merged' one card up is the same geometry again in neutral.",
+    "direction": "Pick one axis for badge colour and hold it across both scopes — either colour means outcome everywhere, or it means severity everywhere — and give the two scopes a form difference so position is not the only cue. The row badges in particular should either both be neutral (they are both settled facts) or both take an accent that means the same thing; grey next to green currently implies a difference in kind that nothing on the card explains."
+  }
+]

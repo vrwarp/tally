@@ -35,6 +35,65 @@ function gradeLabel(grade: number | null): string {
   return grade === null ? '' : gradeDescription(grade);
 }
 
+/**
+ * **Search everyone**, in the two places it has to be.
+ *
+ * One component rather than two copies, because the pair must not drift: a
+ * parent meets whichever of them their search happens to produce, and a
+ * spinner that only one of them wore would make the other look broken.
+ *
+ * The spinner sits *over* the label rather than instead of it, and the label
+ * goes invisible rather than away. The button then has exactly one width in
+ * both states, set by its own words rather than by a guess at how wide they
+ * are — and a control that changed size under the finger still resting on it
+ * is a control that reads as pressed by accident.
+ *
+ * `aria-label` rather than the label alone, so it keeps its name while its
+ * face is a spinner: the button a parent is waiting on is still the same
+ * button.
+ */
+function WidenButton({
+  widening,
+  onWiden,
+  quiet,
+}: {
+  widening: boolean;
+  onWiden: () => void;
+  /** The standing row's weight, beside a keyboard somebody is aiming at. */
+  quiet?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      tabIndex={-1}
+      aria-label="Search everyone"
+      aria-busy={widening}
+      onPointerDown={(event) => {
+        event.preventDefault();
+        haptic(quiet ? 8 : undefined);
+        onWiden();
+      }}
+      className={
+        quiet
+          ? 'flex h-11 items-center justify-center rounded-xl bg-ink-800/70 px-5 text-base font-semibold text-ink-200 ring-1 ring-ink-600/60 active:bg-ink-700'
+          : 'flex h-14 items-center justify-center rounded-xl bg-ink-800 px-8 text-lg font-semibold text-ink-100 active:bg-ink-700'
+      }
+      style={{ touchAction: 'manipulation' }}
+    >
+      <span className="relative flex items-center justify-center">
+        <span className={widening ? 'invisible' : undefined}>Search everyone</span>
+        {widening && (
+          <span
+            className={`absolute block animate-spin rounded-full border-2 border-ink-600 border-t-ink-100 ${
+              quiet ? 'h-5 w-5' : 'h-6 w-6'
+            }`}
+          />
+        )}
+      </span>
+    </button>
+  );
+}
+
 export function SearchScreen({
   binding,
   buffer,
@@ -45,11 +104,10 @@ export function SearchScreen({
   tracksCheckOut,
   printerNeedsAttention,
   refresh,
-  widened,
+  widening,
   onWiden,
   onPick,
   onRegister,
-  justRegisteredRemotely,
   onUnbind,
 }: {
   binding: KioskBinding;
@@ -67,19 +125,21 @@ export function SearchScreen({
    * no match" once it has landed) and its failure line.
    */
   refresh: KioskRefresh;
-  /** Whether this search already covers the whole ministry. */
-  widened: boolean;
-  /** Widens this one search to all of Tally. Resets when the buffer clears. */
+  /**
+   * Whether the **Search everyone** press is still working. It is the button's
+   * only feedback, so it is the button's face while it is true.
+   */
+  widening: boolean;
+  /**
+   * Widens this one search to all of Tally *and* re-reads the church. Both
+   * halves are wanted: the first finds a child who belongs to another
+   * gathering, the second finds one who was added since this kiosk last
+   * looked. Resets when the buffer clears.
+   */
   onWiden: () => void;
   onPick: (student: KioskStudent) => void;
   /** Opens the registration offer — the other door off this screen. */
   onRegister: () => void;
-  /**
-   * Set when a family has just come back from registering on their phone, until
-   * they start typing. The kiosk has re-read the roster for them; what is left
-   * is telling them which four digits to type, on the screen where they type it.
-   */
-  justRegisteredRemotely?: boolean;
   onUnbind: () => void;
 }) {
   const closed = windowHasClosed(binding, Date.now());
@@ -95,6 +155,16 @@ export function SearchScreen({
    */
   const offeredAbove =
     (outcome.mode === 'phone' || outcome.mode === 'name') && outcome.results.length === 0;
+
+  /*
+   * Whether there is a search here to widen at all.
+   *
+   * Rows on screen means a finished search that found somebody, which is
+   * exactly the state the standing button exists for. An empty buffer has
+   * nothing to widen, and a half-typed number is not a question yet — the same
+   * reason that state gets none of the other doors either.
+   */
+  const canWiden = outcome.results.length > 0;
 
   /*
    * A match is not proof, and this is the sentence that says so.
@@ -190,15 +260,6 @@ export function SearchScreen({
         {/* The bottom padding rides on the column, not the scroller: end
             padding on a scroll container is not reliably scrollable to. */}
         <div className="mx-auto flex max-w-2xl flex-col gap-2 pb-2">
-          {/*
-            * Inside the scrolling region, like every other message here, so the
-            * frame's geometry is the same with it and without it.
-            */}
-          {justRegisteredRemotely && outcome.mode === 'idle' && (
-            <div className="pt-6 text-center text-lg text-brand-300">
-              You&rsquo;re on the list — type the last 4 digits of your phone.
-            </div>
-          )}
           {outcome.mode === 'phone-partial' && (
             <div className="pt-6 text-center text-lg text-ink-400">
               Enter all 4 digits of a phone number in your family.
@@ -208,18 +269,18 @@ export function SearchScreen({
             /*
              * Nothing matched, and the answer is three different doors.
              *
-             * The commonest reason is being new, so the register door leads.
-             * The second is a child who belongs to a *different* gathering —
-             * the search is scoped to the children who have been to this one,
-             * and "Search everyone" is that scope's honest way out, in the
-             * slot where "I already registered" used to widen as a side effect
-             * of a network read nobody could see. The third reason — somebody
-             * added the family online moments ago — needs no door at all any
-             * more: the kiosk notices registrations by itself (the pulse), and
-             * for the rare backend-direct addition the church-wide sweep now
-             * runs silently the moment a finished search comes up empty. Its
-             * only remaining surfaces are the headline's "Still" and the
-             * network-failure line below.
+             * The commonest reason is being new, so the register door leads —
+             * straight into the wizard now, one tap. The second is a child who
+             * belongs to a *different* gathering — the search is scoped to the
+             * children who have been to this one, and "Search everyone" is
+             * that scope's honest way out. The third reason — somebody added
+             * the family minutes ago, at the welcome desk or in the main app —
+             * needs no door of its own: the pulse delivers additions within a
+             * minute, and the church-wide sweep runs silently the moment a
+             * finished search comes up empty. "Search everyone" is also how a
+             * greeter asks for that read by hand, which is what its spinner is
+             * spinning about; the sweep's other surfaces are the headline's
+             * "Still" and the network-failure line below.
              *
              * Inside the scrolling results region on purpose: this file
              * promises that typing never moves the keyboard, and a block that
@@ -228,9 +289,23 @@ export function SearchScreen({
              */
             <div className="flex flex-col items-center gap-3 pt-6 text-center">
               <div className="text-lg text-ink-400">
-                {refresh === 'done'
-                  ? 'Still no match — first time here?'
-                  : 'No match — first time here?'}
+                {refresh === 'done' ? (
+                  <>
+                    {/*
+                      * The one word that carries the whole answer, and the one
+                      * a parent watching their own finger did not see change.
+                      * It brightens three times and stops: long enough to
+                      * catch an eye coming back up from the button, short
+                      * enough that a lobby screen is not blinking at anybody.
+                      * The word is what changed, so the word is what moves —
+                      * animating the sentence would say the sentence is new.
+                      */}
+                    <span className="animate-word-pulse text-ink-100">Still</span> no match — first
+                    time here?
+                  </>
+                ) : (
+                  'No match — first time here?'
+                )}
               </div>
               <button
                 type="button"
@@ -246,28 +321,23 @@ export function SearchScreen({
               {refresh === 'failed' && (
                 <div className="text-base text-ink-500">Couldn&apos;t reach the network just now.</div>
               )}
-              {!widened && (
-                <button
-                  type="button"
-                  tabIndex={-1}
-                  onPointerDown={(event) => {
-                    event.preventDefault();
-                    haptic();
-                    onWiden();
-                  }}
-                  className="flex h-14 items-center justify-center rounded-xl bg-ink-800 px-8 text-lg font-semibold text-ink-100 active:bg-ink-700"
-                  style={{ touchAction: 'manipulation' }}
-                >
-                  {/*
-                    * Says what it does, unlike its predecessor. The search
-                    * only covers the children who come to *this* gathering;
-                    * a child who belongs to Sunday mornings is one tap away,
-                    * instantly — the wider list is already on the device, so
-                    * nothing loads and nothing waits.
-                    */}
-                  Search everyone
-                </button>
-              )}
+              {/*
+                * Stays, and reports.
+                *
+                * It used to remove itself the moment it was pressed, which
+                * left a parent looking at the place a button had been with
+                * no more evidence of the press than one word changing in the
+                * line above. And it left the family it had failed with
+                * nothing to press: four digits are a small keyspace and
+                * names collide, so "widened and still not mine" is a real
+                * state, and the answer to it — look again, the church may
+                * have added them since — is this control.
+                *
+                * `aria-label` rather than the label alone, so it keeps its
+                * name while its face is a spinner: the button a parent is
+                * waiting on is still the same button.
+                */}
+              <WidenButton widening={widening} onWiden={onWiden} />
               <div className="text-base text-ink-500">or see a leader.</div>
             </div>
           )}
@@ -327,10 +397,8 @@ export function SearchScreen({
         * already has. Both meet a screen full of confident, wrong rows, and for
         * both the way out is here.
         *
-        * Tapping it opens the QR screen, whose own largest button is "I've
-        * registered" — so a family who came through this door by mistake, having
-        * already filled the form in on their phone, is offered the way back
-        * before the form rather than a second registration.
+        * Tapping it opens the registration wizard directly — one tap from the
+        * question to the first question.
         *
         * It used to be a line of text with a coloured phrase in it, which read
         * as a footnote next to the same offer's *button* two hundred pixels
@@ -343,7 +411,22 @@ export function SearchScreen({
         * promise this file makes about geometry: present from the first paint,
         * so it cannot be the thing that moves when a keystroke lands.
         */}
-      <div className="flex h-12 items-center justify-center px-6">
+      <div className="flex h-12 items-center justify-center gap-2 px-6">
+        {/*
+          * The way out of the scope, standing beside the way out of the search.
+          *
+          * It used to live only on the no-match panel, which meant it appeared
+          * for exactly the family who did not need it and was missing for the
+          * one who did. A scoped search that returns *somebody* — the other
+          * Noah, the Ramirez who is not theirs — is the commonest way a parent
+          * is shown confident, wrong rows, and until now the only door open to
+          * them was the one that registers a child the church already has.
+          *
+          * Hidden only while the no-match panel is up, because that panel is
+          * showing this same control in its primary weight a hand's width
+          * higher: the standing pair steps aside rather than appearing twice.
+          */}
+        {!offeredAbove && canWiden && <WidenButton widening={widening} onWiden={onWiden} quiet />}
         {!offeredAbove && (
           <button
             type="button"

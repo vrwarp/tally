@@ -111,14 +111,6 @@ import {
   type MergeStudentsResult,
 } from './backends/mergeStudents.js';
 import { bumpPulse, PULSE_DEBOUNCE_MS } from './kiosk/pulse.js';
-import {
-  checkCode,
-  consumeCode,
-  mintCode,
-  mintedEventId,
-  type CodeStatus,
-  type MintCodeResult,
-} from './kiosk/registrationCodes.js';
 import { materializeOccurrence as materializeOne, MINISTRY_TIME_ZONE } from './occurrences.js';
 // Imported for its registration side effect and nothing else: pulling the
 // adapter package in is what makes the Attendees backend available to the
@@ -2254,13 +2246,29 @@ export const claimKioskToken = onCall<
 export const getKioskEvents = onCall<
   { days?: unknown } | undefined,
   Promise<{ events: KioskEventEntry[] }>
->({ timeoutSeconds: 30, memory: '256MiB' }, async (request) => {
+>({ secrets: BACKEND_SECRETS, timeoutSeconds: 30, memory: '256MiB' }, async (request) => {
   await requireMember(request.auth?.uid);
 
   process.env.TZ = MINISTRY_TIME_ZONE;
 
+  const database = db();
+  /*
+   * Whether the registration wizard should ask about allergies rides on every
+   * row (see KioskEventEntry) — the same write-back test the retired phone
+   * form's code check performed, moved to bind time because the binding is the
+   * only thing a kiosk keeps. Computing it needs the registry, and the
+   * registry's notion of "enabled" needs the secret bindings, which is why
+   * this callable mounts BACKEND_SECRETS now.
+   */
+  const registry = await createRegistry(database);
+  const target = registry.defaultPush();
+  const allergiesSupported =
+    !('error' in target) && target.backend.capabilities.writeBack === 'full';
+
   const days = typeof request.data?.days === 'number' ? request.data.days : undefined;
-  return { events: await listKioskEvents(db(), new Date(), logger, { days }) };
+  return {
+    events: await listKioskEvents(database, new Date(), logger, { days, allergiesSupported }),
+  };
 });
 
 /**
@@ -2277,66 +2285,32 @@ export const getKioskEvents = onCall<
  * else. `requireMember` rather than `requireCoreTeam` for the same reason
  * `getKioskEvents` uses it: the identity is the approver's, and a counselor who
  * may quick-add a visitor at a door may certainly let a family do it themselves.
+ *
+ * Kiosk-token-only since the phone form was retired. The anonymous-with-a-code
+ * way in went with it, which closed the one semi-open door Tally had: the
+ * pairing pair (`startKioskPairing`/`claimKioskToken`) are now the only
+ * intentionally-unauthenticated callables.
  */
 export const registerFamily = onCall<Record<string, unknown>, Promise<RegisterFamilyResult>>(
   { secrets: BACKEND_SECRETS, timeoutSeconds: 120, memory: '256MiB' },
   async (request) => {
-    const database = db();
-    const fromKiosk = request.auth?.token?.kiosk === true;
-    const rawCode = request.data?.code;
-
-    /*
-     * Two ways in, and the difference between them is what the caller is
-     * allowed to say. A kiosk names a gathering and everybody it registers is
-     * checked in against it. A phone holds only a code the kiosk minted and put
-     * in a QR, so it may create a family and nothing more — the parent walks
-     * back to the screen and taps their own children through, which is the same
-     * act any other family performs.
-     */
-    if (fromKiosk) {
-      await requireMember(request.auth?.uid);
-    } else {
-      if (typeof rawCode !== 'string' || rawCode.trim().length === 0) {
-        throw new HttpsError('permission-denied', 'Registration happens at a kiosk.');
-      }
-      const status = await checkCode(database, rawCode, new Date());
-      if (status !== 'ok') {
-        // The page turns this into "ask at the kiosk for a fresh code", which is
-        // the only remedy and needs somebody to be in the room to perform it.
-        throw new HttpsError('permission-denied', codeRefusal(status));
-      }
+    if (request.auth?.token?.kiosk !== true) {
+      throw new HttpsError('permission-denied', 'Registration happens at a kiosk.');
     }
+    await requireMember(request.auth?.uid);
 
     const eventId = request.data?.eventId;
-    if (fromKiosk && (typeof eventId !== 'string' || eventId.trim().length === 0)) {
+    if (typeof eventId !== 'string' || eventId.trim().length === 0) {
       throw new HttpsError('invalid-argument', 'eventId is required.');
     }
 
     try {
-      const parsed = parseRegisterFamilyRequest(request.data, fromKiosk ? 'kiosk' : 'qr');
-      /*
-       * Off the code document, never off the request — a phone form that could
-       * name any event could wake any lobby screen in the building. Null for a
-       * code minted by an old kiosk bundle, which simply wakes nothing.
-       */
-      const qrEventId = fromKiosk ? null : await mintedEventId(database, rawCode as string);
-      const result = await runRegisterFamily({
-        db: database,
-        request: parsed,
-        context: fromKiosk
-          ? { source: 'kiosk', uid: request.auth!.uid, eventId: (eventId as string).trim() }
-          : { source: 'qr', qrEventId },
+      return await runRegisterFamily({
+        db: db(),
+        request: parseRegisterFamilyRequest(request.data),
+        context: { uid: request.auth.uid, eventId: eventId.trim() },
         logger,
       });
-      /*
-       * Spent after the work, not before it. A call that failed validation has
-       * cost the church nothing and should not cost the family one of the
-       * code's twenty.
-       */
-      if (!fromKiosk) {
-        await consumeCode(database, rawCode as string);
-      }
-      return result;
     } catch (error) {
       if (error instanceof RegistrationInputError) {
         throw new HttpsError('invalid-argument', error.message);
@@ -2345,12 +2319,6 @@ export const registerFamily = onCall<Record<string, unknown>, Promise<RegisterFa
     }
   },
 );
-
-function codeRefusal(status: CodeStatus): string {
-  return status === 'exhausted'
-    ? 'This code has been used too many times. Ask at the kiosk for a fresh one.'
-    : 'This code has expired. Ask at the kiosk for a fresh one.';
-}
 
 /* -------------------------------------------------------------------------- */
 /* Reviewing what the door recorded                                            */
@@ -2376,7 +2344,15 @@ export const listPendingRegistrations = onCall<void, Promise<PendingRegistration
     const database = db();
     const now = new Date();
     await sweepRegistrations(database, now);
-    return listPending(database, now);
+    /*
+     * The registry is here to *name* things, not to write them: a duplicate
+     * candidate whose name lives in a backend is a row the screen would
+     * otherwise render as "a student on the roster", which is unusable in a
+     * list where the reviewer is being asked which of two rows is the same
+     * child. A backend that cannot be reached simply leaves those labels as
+     * they were.
+     */
+    return listPending(database, now, { registry: await createRegistry(database), logger });
   },
 );
 
@@ -2388,7 +2364,7 @@ export const listPendingRegistrations = onCall<void, Promise<PendingRegistration
  * rather than something that happened while they were serving coffee.
  */
 export const approveRegistration = onCall<
-  { registrationId: string },
+  { registrationId: string; withoutGuardian?: boolean },
   Promise<ApproveRegistrationResult>
 >({ secrets: BACKEND_SECRETS, timeoutSeconds: 300, memory: '256MiB' }, async (request) => {
   await requireCoreTeam(request.auth?.uid);
@@ -2402,6 +2378,9 @@ export const approveRegistration = onCall<
     db: database,
     registry: await createRegistry(database),
     registrationId: registrationId.trim(),
+    // Optional on the wire, and absent means the ordinary approval — an old
+    // bundle cannot accidentally discard a guardian by omission.
+    withoutGuardian: request.data?.withoutGuardian === true,
     uid: request.auth!.uid,
     logger,
   });
@@ -2460,66 +2439,6 @@ export const mergeStudents = onCall<
   });
 });
 
-/**
- * The code the kiosk puts in its QR. Kiosk sessions only, so a code cannot be
- * conjured from anywhere but a screen a staff member vouched for.
- */
-export const mintRegistrationCode = onCall<{ eventId?: unknown } | void, Promise<MintCodeResult>>(
-  { timeoutSeconds: 30, memory: '256MiB' },
-  async (request) => {
-    if (request.auth?.token?.kiosk !== true) {
-      throw new HttpsError('permission-denied', 'Only a kiosk can offer a registration code.');
-    }
-    await requireMember(request.auth?.uid);
-
-    // Optional on the wire: an old cached kiosk bundle still calls this bare,
-    // and its codes simply carry no event — they validate and register exactly
-    // as before, they just cannot wake the screen that minted them.
-    const rawEventId = request.data?.eventId;
-    const eventId =
-      typeof rawEventId === 'string' && rawEventId.trim() !== '' ? rawEventId.trim() : null;
-
-    const result = await mintCode(db(), request.auth!.uid, new Date(), eventId);
-    if (result === 'busy') {
-      throw new HttpsError(
-        'resource-exhausted',
-        'Too many registration codes are open right now. Try again in a few minutes.',
-      );
-    }
-    return result;
-  },
-);
-
-/**
- * UNAUTHENTICATED — the phone form, asking whether the code it was opened with
- * is still worth filling in.
- *
- * Answered before somebody types their children's names rather than after, and
- * it reveals nothing: whether a code is live is what the QR on the screen next
- * to them already says. `allergiesSupported` rides along because the field only
- * makes sense where there is an upstream record to put a medical note on —
- * Tally stores none — and the browser cannot see the write-back setting.
- */
-export const validateRegistrationCode = onCall<
-  { code?: unknown },
-  Promise<{ valid: boolean; reason?: CodeStatus; allergiesSupported: boolean }>
->({ secrets: BACKEND_SECRETS, timeoutSeconds: 30, memory: '256MiB' }, async (request) => {
-  const code = request.data?.code;
-  if (typeof code !== 'string') {
-    throw new HttpsError('invalid-argument', 'code is required.');
-  }
-
-  const database = db();
-  const status = await checkCode(database, code, new Date());
-  if (status !== 'ok') return { valid: false, reason: status, allergiesSupported: false };
-
-  const registry = await createRegistry(database);
-  const target = registry.defaultPush();
-  return {
-    valid: true,
-    allergiesSupported: !('error' in target) && target.backend.capabilities.writeBack === 'full',
-  };
-});
 
 /**
  * Rebuilds `kioskIndex/phones` on demand: the Settings button, and the kiosk

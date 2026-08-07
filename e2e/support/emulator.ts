@@ -39,14 +39,40 @@ export async function waitForHttp(url: string, label: string, timeoutMs = 120_00
   throw new Error(`${label} never became ready at ${url} (last error: ${lastError}).`);
 }
 
-/** Wipes every document. The emulator exposes this; production has no equivalent. */
+/**
+ * Wipes every document. The emulator exposes this; production has no equivalent.
+ *
+ * The retry on 409 is not defensiveness for its own sake. The emulator refuses
+ * to clear while it is still winding down work from before — a listener stream
+ * belonging to a browser that was killed rather than closed, most often — and
+ * it lets go a second or two later. That is exactly the state a timed-out test
+ * leaves behind, and Playwright's answer to a timed-out test is to discard the
+ * worker and start a new one, which runs this again from the `seededWorld`
+ * fixture. Without the wait, one slow test failed the four tests after it, one
+ * of them in a different file, each in 0ms and none of them for its own
+ * reasons.
+ */
 export async function clearFirestore(): Promise<void> {
-  const response = await fetch(
-    `http://127.0.0.1:${E2E.firestore}/emulator/v1/projects/${E2E.projectId}/databases/(default)/documents`,
-    { method: 'DELETE', headers: ADMIN },
-  );
-  if (!response.ok) {
-    throw new Error(`Could not clear Firestore: HTTP ${response.status}.`);
+  const deadline = Date.now() + 30_000;
+  let attempts = 0;
+
+  for (;;) {
+    const response = await fetch(
+      `http://127.0.0.1:${E2E.firestore}/emulator/v1/projects/${E2E.projectId}/databases/(default)/documents`,
+      { method: 'DELETE', headers: ADMIN },
+    );
+    if (response.ok) return;
+    attempts += 1;
+
+    // Anything other than "busy" is a real answer, and repeating it will not
+    // change it.
+    if (response.status !== 409 || Date.now() >= deadline) {
+      throw new Error(
+        `Could not clear Firestore: HTTP ${response.status}` +
+          (attempts > 1 ? `, still after ${attempts} attempts over 30s.` : '.'),
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
   }
 }
 
@@ -123,11 +149,23 @@ export async function readCollection(path: string): Promise<FirestoreDoc[]> {
  * runs one worker against one dataset, so a spec that leaves the Planning
  * Center configuration pointing at a different list does not fail — it makes
  * some later spec fail instead, which is the worst kind of flake to chase.
+ *
+ * 409 is retried for the same reason `clearFirestore` retries it: the emulator
+ * answers "busy" while it is still winding down the Listen streams a closed
+ * browser left behind, and this is usually called from a cleanup step after a
+ * spec that opened several contexts. A teardown that throws there fails a test
+ * whose assertions all passed.
  */
 export async function deleteDocument(path: string): Promise<void> {
-  const response = await fetch(`${FIRESTORE_ROOT}/${path}`, { method: 'DELETE', headers: ADMIN });
-  if (!response.ok && response.status !== 404) {
-    throw new Error(`Deleting ${path} failed: HTTP ${response.status}.`);
+  const deadline = Date.now() + 10_000;
+
+  for (;;) {
+    const response = await fetch(`${FIRESTORE_ROOT}/${path}`, { method: 'DELETE', headers: ADMIN });
+    if (response.ok || response.status === 404) return;
+    if (response.status !== 409 || Date.now() >= deadline) {
+      throw new Error(`Deleting ${path} failed: HTTP ${response.status}.`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
   }
 }
 
@@ -142,8 +180,31 @@ function encode(value: unknown): RestValue {
     return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
   }
   if (Array.isArray(value)) return { arrayValue: { values: value.map(encode) } };
+  /*
+   * Maps, because the documents worth arranging by hand are the ones with shape
+   * — a `kioskRegistrations` record holds a guardian object, a list of children
+   * objects and a duplicate-hint map keyed by child index, and a spec that
+   * cannot write those can only arrange the easy half of the triage screen.
+   */
+  if (typeof value === 'object') {
+    return { mapValue: { fields: encodeFields(value as Record<string, unknown>) } };
+  }
   throw new Error(`No encoding for ${typeof value} in a test-written document.`);
 }
+
+function encodeFields(data: Record<string, unknown>): Record<string, RestValue> {
+  return Object.fromEntries(Object.entries(data).map(([key, value]) => [key, encode(value)]));
+}
+
+/** What `writeDocument` will take: JSON, plus the Dates that become timestamps. */
+export type WritableValue =
+  | string
+  | number
+  | boolean
+  | null
+  | Date
+  | readonly WritableValue[]
+  | { readonly [key: string]: WritableValue };
 
 /**
  * Writes one document whole, through the admin channel — for the settings a
@@ -152,9 +213,9 @@ function encode(value: unknown): RestValue {
  */
 export async function writeDocument(
   path: string,
-  data: Record<string, string | number | boolean | null | Date>,
+  data: Record<string, WritableValue>,
 ): Promise<void> {
-  const fields = Object.fromEntries(Object.entries(data).map(([key, value]) => [key, encode(value)]));
+  const fields = encodeFields(data);
   const response = await fetch(`${FIRESTORE_ROOT}/${path}`, {
     method: 'PATCH',
     headers: { ...ADMIN, 'content-type': 'application/json' },

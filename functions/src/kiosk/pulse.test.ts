@@ -63,13 +63,20 @@ describe('bumpPulse', () => {
     expect(channel(db, 'phones').rev).toBeDefined();
   });
 
-  it('carries the gathering on the registration channel, null when unstated', async () => {
+  it('leaves a retired channel exactly as the old writer left it', async () => {
+    // A live document can still carry `registration`, written for the retired
+    // QR flow. Bumps merge whole channel objects and never delete keys, so
+    // the stale entry stays byte-for-byte — which is what keeps
+    // pre-retirement kiosk bundles parsing this document.
     const db = new FakeFirestore();
-    await bumpPulse(db, ['registration'], NOW, { eventId: 'friday-today' });
-    expect(channel(db, 'registration').eventId).toBe('friday-today');
+    db.seed(PULSE_DOC, {
+      version: 1,
+      registration: { rev: 7, eventId: 'friday-today' },
+    });
 
-    await bumpPulse(db, ['registration'], later(1_000));
-    expect(channel(db, 'registration').eventId).toBeNull();
+    await bumpPulse(db, ['roster'], NOW);
+    const held = db.get(PULSE_DOC)! as Record<string, Record<string, unknown>>;
+    expect(held.registration).toEqual({ rev: 7, eventId: 'friday-today' });
   });
 
   describe('the debounce', () => {

@@ -45,8 +45,8 @@ async function enterChild(kiosk: Page, first: string, last: string, grade: strin
 
 /** Registers one child through the on-kiosk wizard, start to sticker. */
 async function registerAtKiosk(kiosk: Page, first: string, surname: string): Promise<void> {
+  // One tap: the wizard is the front door now that the QR screen is retired.
   await kiosk.getByRole('button', { name: /Register your child/i }).click();
-  await kiosk.getByRole('button', { name: /Register right here/i }).click();
   await enterChild(kiosk, first, surname, '4th grade');
   await kiosk.getByRole('button', { name: /That's everyone/i }).click();
 
@@ -97,13 +97,22 @@ test.describe('reviewing a family the kiosk recorded', () => {
       const card = page.locator('section', { hasText: `Renata ${SURNAME}` }).first();
       await expect(card).toBeVisible({ timeout: 30_000 });
       // The one screen in Tally that shows a parent's number. It lives on a
-      // functions-only document with a TTL — see docs/data-model.md.
-      await expect(card.getByText('(555) 016-3311')).toBeVisible();
+      // functions-only document with a TTL — see docs/data-model.md. Matched
+      // exactly, because the discard caption now names the number too — it
+      // says what pressing it forgets.
+      await expect(card.getByText('(555) 016-3311', { exact: true })).toBeVisible();
       await expect(card.getByText(`Elio ${SURNAME}`)).toBeVisible();
 
       /* ---- Approving is what pushes -------------------------------------- */
 
+      /*
+       * Two presses: the first arms and sends nothing, the second commits.
+       * The commit deliberately does not sit where the arm button was, so a
+       * repeat press on an apparently unresponsive control cancels rather than
+       * pushing into a database with no delete.
+       */
       await card.getByRole('button', { name: /Approve and add/i }).click();
+      await card.getByRole('button', { name: /^Yes — add/i }).click();
 
       /*
        * The child, and only the child.
@@ -160,7 +169,8 @@ test.describe('reviewing a family the kiosk recorded', () => {
       // Two presses, because the number goes and the students come off the
       // roster — the sentence comes before the second one.
       await card.getByRole('button', { name: /Not ours/i }).click();
-      await expect(card.getByText(/forgets the phone number/i)).toBeVisible();
+      // The sentence names the number it forgets rather than referring to it.
+      await expect(card.getByText(/forgets \(555\) 016-3311 for good/i)).toBeVisible();
       await card.getByRole('button', { name: /Yes, take them off/i }).click();
 
       // This card, not the whole queue — see the note in the test above.

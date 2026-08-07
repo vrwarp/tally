@@ -198,6 +198,52 @@ describe('listKioskEvents', () => {
     }
   });
 
+  /*
+   * The write-back answer rides every row for the same reason the template
+   * does: the binding is the only thing a kiosk keeps, so a capability that
+   * misses a row — either branch — is a wizard that cannot know whether the
+   * allergies question is safe to ask. Both branches asserted, like the
+   * template above, and the default asserted false: a caller that says
+   * nothing must produce a wizard that asks nothing.
+   */
+  it('stamps the write-back answer on every row, projected occurrences included', async () => {
+    const db = new FakeFirestore();
+    seedEvent(db, 'friday', {
+      start: '2026-08-09T10:00:00Z',
+      end: '2026-08-09T12:00:00Z',
+      closes: '2026-08-09T13:00:00Z',
+    });
+    db.seed('events/sunday-nursery', {
+      title: 'Sunday Nursery',
+      mode: 'recurring',
+      seriesId: 'sunday-nursery',
+      recurrence: {
+        frequency: 'weekly',
+        interval: 1,
+        weekdays: [0],
+        monthlyMode: 'dayOfMonth',
+        until: null,
+        count: null,
+      },
+      recurrenceRootId: null,
+      status: 'scheduled',
+      startAt: at('2026-08-02T10:00:00Z'),
+      endAt: at('2026-08-02T12:00:00Z'),
+      checkInOpensAt: at('2026-08-02T10:00:00Z'),
+      checkInClosesAt: at('2026-08-02T13:00:00Z'),
+      location: null,
+      notes: null,
+    });
+
+    const supported = await listKioskEvents(db, NOW, logger, { allergiesSupported: true });
+    expect(supported.length).toBeGreaterThan(1);
+    expect(supported.some((entry) => entry.id === null)).toBe(true);
+    for (const entry of supported) expect(entry.allergiesSupported).toBe(true);
+
+    const unstated = await listKioskEvents(db, NOW, logger);
+    for (const entry of unstated) expect(entry.allergiesSupported).toBe(false);
+  });
+
   it('reads a gathering with no template as printing nothing', async () => {
     const db = new FakeFirestore();
     seedEvent(db, 'friday', {

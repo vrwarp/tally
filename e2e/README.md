@@ -172,3 +172,18 @@ Two things to know before adding assertions:
 - **Match Planning Center people by id, not name.** The seed contains an
   unrelated "Amara Osei"; a test matching on `firstName === 'Amara'` would pass
   for the wrong reason.
+- **`page.route` cannot see a request that went through the service worker.**
+  Tally registers one immediately, and the production build these tests run
+  against ships it. Chromium intercepts below the worker; WebKit does not — so
+  an `abort()` that works in Chrome does nothing at all in Safari, the call
+  succeeds, and the spec waits out its timeout for an error the app had no
+  reason to draw. It reads like an app that swallows errors on Safari. A test
+  that has to break one call belongs in its own `describe` with
+  `test.use({ serviceWorkers: 'block' })`.
+- **A name two buttons share is not a locator.** The review screen's escape
+  hatch reads "None of them — Chidera is new", so a candidate chosen by
+  `getByRole('button', { name: /Chidera/ }).first()` is whichever of the two
+  the DOM happens to reach first — and on that screen the candidate's own name
+  comes from a backend and is not always there to match. Pick the phrase that
+  belongs to one control only: `/phone digits on file/` is on candidate chips
+  and nothing else.

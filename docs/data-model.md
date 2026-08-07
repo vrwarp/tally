@@ -476,6 +476,16 @@ both families' children appear and a parent picks their own — but an offer can
 the stricter test. What is offered stays as wide as that guess; which of it arrives *ticked* is a
 different question, answered by the document below.
 
+**Its third reader is the review screen**, and for the same reason a parent types digits: to tell
+two children of the same name apart. A merge is the one decision on that screen with a right
+answer, and a name and a grade are often not enough to make it — two children can share both, and a
+grade rolls over between terms, so "Elena Salgado · 8th grade" against an incoming "Elena Salgado ·
+7th grade" is either the same girl a year later or a different girl. `listPendingRegistrations`
+reads this map once per call and marks each duplicate candidate the church already finds under the
+registering family's own four digits (`sharesFamilyDigits`). It is evidence and never a verdict:
+the negative is rendered as plainly as the positive, so "different on both" is a visible answer
+rather than a blank, and the reviewer still chooses.
+
 ### `kioskIndex/participation`
 
 Who belongs to each gathering, and who comes to it regularly. One document, keyed by chain.
@@ -568,7 +578,11 @@ The change signal every kiosk polls, so the caches above stop waiting out their 
 | `roster` | map | `{ rev, at }` — bumped by anything that changes who the roster read returns: a registration, a student created by quick-add or import, a discarded registration, a merge, the nightly phone-index rebuild. |
 | `phones` | map | `{ rev, at }` — bumped when the four-digit index changed: a registration that carried digits, the nightly rebuild. |
 | `participation` | map | `{ rev, at }` — bumped when the participation document above is rebuilt. |
-| `registration` | map | `{ rev, at, eventId }` — bumped by a **QR** registration only, naming the gathering whose kiosk minted the code, so exactly that kiosk's QR screen walks itself back to the search. A kiosk-wizard registration already resolves on the glass it happened on and must not advance somebody else's. |
+
+A live document may also carry a `registration` map — the retired phone form's auto-advance channel.
+Nothing bumps or reads it any more; bumps merge whole channel objects and never delete keys, so the
+stale entry simply sits with its revision frozen, which is also what keeps pre-retirement kiosk
+bundles parsing this document until their nightly reload.
 
 The revisions are **opaque change counters, not versions**. A kiosk remembers the last value it saw
 per channel and refetches that channel when the value merely *differs* (`!==`, never `>`), so
@@ -597,9 +611,9 @@ couple of bumps rather than four hundred.
 It holds no names, no digits, no student ids — nothing but counters, timestamps and a gathering id.
 
 **Who writes:** only the functions, like every other `kioskIndex` document — and here that is also
-the security argument: the attack on a client-writable pulse is spoofing the signal (walking every
-open QR screen back to search for a stranger's registration) or forcing refetch loops, so `set`
-fails even for an admin. The rules test pins both.
+the security argument: the attack on a client-writable pulse is spoofing "your caches changed" at
+every kiosk and driving the fleet into refetch loops, so `set` fails even for an admin. The rules
+test pins it.
 
 ### `kioskRegistrations/{registrationId}`
 
@@ -618,14 +632,15 @@ what make every write downstream safe to repeat.
 | --- | --- | --- |
 | `status` | `'pending' \| 'complete'` | A `pending` document is resumed rather than restarted: every write downstream is keyed by the ids below, so replaying is repeating, not duplicating. |
 | `studentIds` | string[] | Pre-allocated before the batch, which is the whole mechanism. |
-| `source` | `'kiosk' \| 'qr'` | |
+| `source` | `'kiosk' \| 'qr'` | `'qr'` is legacy — the retired phone form wrote it until Aug 2026; such records drain on the 30-day sweep. The read side (this table's parsers, the review card's "from their own phone" subtitle) stays tolerant until they are gone. |
 | `eventId`, `checkedIn`, `childCount`, `last4` | — | Enough to answer a completed call again. |
 | `guardian` | `{ firstName, lastName, phone }` \| null | **The exception below.** Null only on a sibling registration, where the family is already identified. |
 | `children` | `{ firstName, lastName, grade }[]` | The form as typed, so a reviewer sees what the family wrote and not only what the roster now says. |
-| `allergies` | `(string \| null)[]` | Index-aligned with `children`, and only ever non-empty from the `/welcome` form — the kiosk has no field for it. Sent upstream on approval and held nowhere else. |
+| `allergies` | `(string \| null)[]` | Index-aligned with `children`, from the wizard's allergies question — asked only where the backend takes full write-back, exactly the gate the retired phone form kept. Sent upstream on approval and held nowhere else. |
 | `possibleDuplicateOf` | map | Child index → active student ids with the same name. Recorded, never acted on: it is what puts "this might be the Jacob Smith we have" in front of a human. |
 | `anchorStudentIds` | string[] | Verified siblings, when a parent added a second child to a family the church already has. Decides which household is joined at approval. |
 | `lastError` | string \| null | Why the last approval attempt did not finish. |
+| `lastErrorKind` | `'children' \| 'guardian' \| 'both'` \| null | *Which half* did not finish, because the two halves want opposite moves. Children a backend refused are worth retrying — the usual cause is an outage that has passed. An adult it refused usually cannot be retried into working, since the usual cause is a number it already holds for somebody outside this household, and retrying reattempts exactly that refusal. The review screen reads this to decide whether to offer a retry or to offer finishing without the adult (`approveRegistration({ withoutGuardian: true })`, which pushes the children, never attempts the parent, and releases the record — number included — rather than holding it thirty days to serve a retry the reviewer declined). Null on records written before this existed, which the screen reads as "offer the ordinary foot". |
 | `createdAt`, `completedAt` | — | Swept after **30 days**, or deleted the moment a reviewer approves or discards. |
 
 #### The one place Tally holds a parent's phone number
@@ -653,36 +668,6 @@ So it waits here, and "waits" is enforced rather than asserted:
 **Who writes: nobody, from a client.** Readable, it would say which families registered today, how
 many children each brought, and how to ring them; writable, somebody could pre-claim an id and make a
 family's registration hand them a stranger's students.
-
-### `kioskRegistrationCodes/{code}`
-
-The short-lived code behind the kiosk's QR — the thing that makes "register on your own phone" mean
-"register while standing in the room".
-
-A family with a phone would rather type on it than on a tablet bolted to a shelf, so the kiosk offers
-a code to scan and the page it points at (`/welcome`) is the only unauthenticated **write** surface
-Tally has. That is exactly why the link is not one anybody can keep: a stable public registration URL
-is a form on the open internet whose submissions land in a church's real people database, and it
-would live on in browser history, in a screenshot, on whatever the QR was photographed onto. Instead
-a kiosk mints a code, shows it, and re-mints every ten minutes while the screen is up — rotation
-overlaps deliberately, so a code scanned just before one still has ten-odd minutes of form-filling
-left on it.
-
-| Field | Type | Notes |
-| --- | --- | --- |
-| `createdAt`, `expiresAt` | — | Twenty minutes. Long enough to walk away, find the camera app and mistype a name; short enough that a photograph of the lobby screen is worth nothing by the end of the service. |
-| `mintedBy` | string | The approver's uid, inherited by the kiosk that asked. |
-| `eventId` | string \| null | The gathering bound to the kiosk that minted the code. `registerFamily` reads it back server-side — never from the request — so a QR registration's review record names its gathering and the [pulse](#kioskindexpulse) can walk exactly that kiosk's QR screen back to the search. `null` on codes minted by an old kiosk bundle, which simply means nobody auto-advances. |
-| `submissions`, `maxSubmissions` | number | Twenty families through one QR in twenty minutes is not a busy lobby, it is somebody replaying the form. Spent *after* a registration lands, so a call that failed validation costs the family nothing. |
-
-Same guardrails as the pairings, for the same reasons: a TTL, a cap of ten live codes at once, and a
-sweep run from the mint. What is deliberately **not** borrowed is the device secret — a pairing
-secret exists so that seeing a code on a lobby screen is not enough to claim a staff identity,
-whereas here seeing the code is the entire point, and what it buys is only what a family standing at
-the kiosk could already do.
-
-**Who writes: nobody, from a client.** Readable, a client could register against a code it never saw
-on a screen — the one thing the code exists to require.
 
 ### `config/settings`
 

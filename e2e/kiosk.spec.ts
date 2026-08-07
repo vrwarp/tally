@@ -265,9 +265,11 @@ test.describe('the kiosk', () => {
    * empty, so a quiet sweep is proof the refetch already delivered the child,
    * and nothing else could have (nothing was typed while the poll worked, and
    * the refresh buttons no longer exist). The one tap left, "Search everyone",
-   * changes the scope of one search and never the data: a brand-new child has
-   * no attendance, so the gathering's attendance-built pool rightly lacks
-   * them, and the row must appear too fast for any read to be behind it.
+   * is scope first: a brand-new child has no attendance, so the gathering's
+   * attendance-built pool rightly lacks them, and the row must appear too fast
+   * for any read to be behind it. That tap *can* also re-read the church, but
+   * only when widening comes up empty — which here it does not, and the
+   * argument above stands on the absent "Still no match" either way.
    *
    * Written straight into Firestore rather than through the app, because what
    * is being tested is a roster that changed *after* this kiosk cached one —
@@ -346,8 +348,9 @@ test.describe('the kiosk', () => {
       await kiosk.waitForTimeout(3_000);
       await expect(kiosk.getByText(/Still no match/i)).toHaveCount(0);
 
-      // The one tap left changes scope, not data — and two seconds is no time
-      // to fetch anything: the row can only come from what is already held.
+      // Scope first, and scope alone here: the widening answers, so the press
+      // never reaches its church-wide read. Two seconds is no time to fetch
+      // anything — the row can only come from what is already held.
       await kiosk.getByRole('button', { name: /Search everyone/i }).click();
       const row = kiosk.getByRole('button', { name: /quill marsden/i }).first();
       await expect(row).toBeVisible({ timeout: 2_000 });
@@ -598,8 +601,6 @@ test.describe('registering a family at the kiosk', () => {
       await bindTo(kiosk, /nursery/i);
 
       await kiosk.getByRole('button', { name: /Register your child/i }).click();
-      // The QR is offered first; the on-kiosk wizard is behind "no phone".
-      await kiosk.getByRole('button', { name: /Register right here/i }).click();
       await enterChild(kiosk, 'Wren', SURNAME, '4th grade');
       await kiosk.getByRole('button', { name: /Add another child/i }).click();
       // The second child's surname arrives already filled in from the first —
@@ -651,29 +652,6 @@ test.describe('registering a family at the kiosk', () => {
     }
   });
 
-  test('offers a scannable code, and the address in words beside it', async ({
-    browser,
-    page,
-    signedInAs,
-  }) => {
-    await signedInAs('core');
-    const { context, page: kiosk } = await openKiosk(browser);
-
-    try {
-      await pairKiosk(kiosk, page);
-      await bindTo(kiosk, /nursery/i);
-
-      await kiosk.getByRole('button', { name: /Register your child/i }).click();
-
-      // Minted by the real callable under the kiosk's own session: a code
-      // cannot be conjured from anywhere but a screen staff vouched for.
-      await expect(kiosk.getByLabel('Registration QR code')).toBeVisible({ timeout: 20_000 });
-      await expect(kiosk.getByText(/[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}/)).toBeVisible();
-      await expect(kiosk.getByRole('button', { name: /I've registered/i })).toBeVisible();
-    } finally {
-      await context.close();
-    }
-  });
 
   test('offers the door where the dead end used to be', async ({ browser, page, signedInAs }) => {
     await signedInAs('core');
@@ -714,8 +692,6 @@ test.describe('registering a family at the kiosk', () => {
       await bindTo(kiosk, /nursery/i);
 
       await kiosk.getByRole('button', { name: /Register your child/i }).click();
-      // The QR is offered first; the on-kiosk wizard is behind "no phone".
-      await kiosk.getByRole('button', { name: /Register right here/i }).click();
       // Somebody the seed already put on the roster.
       const [first, last] = CHECKED_IN.split(' ') as [string, string];
       await enterChild(kiosk, first, last, '4th grade');
@@ -737,27 +713,30 @@ test.describe('registering a family at the kiosk', () => {
     }
   });
 
-  /**
-   * The flagship of the pulse: a family registers on their phone and the kiosk
-   * reacts with nobody touching it.
+  /*
+   * The allergies question exists exactly where the answer can land.
    *
-   * Every link is real — the code the kiosk minted carries the gathering, the
-   * phone form submits through the real callable, the callable bumps the real
-   * pulse naming that gathering, and the kiosk's own thirty-second poll takes
-   * the QR screen down and puts the digits line up. The parent walks back to a
-   * screen that is already asking for the only thing they need to type.
+   * The wizard asks it only when the binding says the people backend takes
+   * full write-back — the same gate the retired phone form kept — and the
+   * binding learns that at bind time, which is why the config is written
+   * before the kiosk binds. The note travels the whole way: typed on the
+   * glass, echoed on the confirm, held on the review record for the person
+   * who decides the family.
    *
-   * The last third proves the other half of the QR contract: the children
-   * arrived checked-OUT (a phone form cannot know the family walked in), so
-   * the digits must find them and the confirm must offer a check-in.
+   * The suite's own default (PCO_WRITE_BACK=create) is what every other
+   * wizard spec runs under, so "the step never appears" is already pinned by
+   * each of them; this is the one world where it does.
    */
-  test('a QR registration walks back to a kiosk that already knows', async ({
+  test('asks about allergies only where the church database can hold the answer', async ({
     browser,
     page,
     signedInAs,
+    firestore,
   }) => {
-    test.setTimeout(120_000);
     await signedInAs('core');
+    // Before the kiosk binds: the capability rides the event row into the
+    // binding, so a config written after binding would not be seen tonight.
+    await writeDocument('config/planningCenter', { writeBack: 'full' });
     const { context, page: kiosk } = await openKiosk(browser);
 
     try {
@@ -765,48 +744,70 @@ test.describe('registering a family at the kiosk', () => {
       await bindTo(kiosk, /nursery/i);
 
       await kiosk.getByRole('button', { name: /Register your child/i }).click();
-      const code = ((await kiosk
-        .getByText(/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/)
-        .first()
-        .textContent()) ?? '').trim();
-      expect(code).toHaveLength(6);
 
-      const phoneContext = await browser.newContext();
-      try {
-        const phone = await phoneContext.newPage();
-        await phone.goto(`/welcome?c=${code}`);
-        await phone.getByLabel(/^First name/i).waitFor({ timeout: 30_000 });
-        await phone.getByLabel(/^First name/i).fill('Isla');
-        await phone.getByLabel(/^Last name/i).fill('Dovetail');
-        await phone.getByLabel(/^Your first name/i).fill('Rowan');
-        await phone.getByLabel(/^Your last name/i).fill('Dovetail');
-        await phone.getByLabel(/^Your phone number/i).fill('5550198822');
-        await phone.getByRole('button', { name: /^Register$/i }).click();
-        // The success copy no longer mentions any button — the digits are the
-        // whole instruction, because the kiosk needs nothing else pressed.
-        await expect(phone.getByText(/type the last 4 digits/i)).toBeVisible({ timeout: 30_000 });
-        await expect(phone.getByText(/I've registered/)).toHaveCount(0);
-      } finally {
-        await phoneContext.close();
-      }
+      await enterChild(kiosk, 'Juniper', 'Aldercroft', '4th grade');
+      // The fourth question, which the write-back capability just unlocked.
+      await expect(kiosk.getByText(/Any allergies we should know about/i)).toBeVisible();
+      /*
+       * Typed lowercase; stored capped. The step shares the name keyboard's
+       * auto-shift, which capitalises at every word boundary — so what the
+       * family reads back, and what the record holds, is "Peanuts And Bee
+       * Stings". The assertions below use that form on purpose: the record
+       * equality is exact, and it is the one check the screen's
+       * case-insensitive text matching cannot quietly pass for the wrong
+       * string.
+       */
+      await typeOnKiosk(kiosk, 'peanuts and bee stings');
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
 
-      // Nothing is pressed on the kiosk from here on. The pulse takes the QR
-      // screen down and the search screen greets the family by itself.
-      await expect(kiosk.getByRole('button', { name: /I've registered/i })).toHaveCount(0, {
-        timeout: 60_000,
+      await kiosk.getByRole('button', { name: /Add another child/i }).click();
+      await enterChild(kiosk, 'Rowan', 'Aldercroft', '2nd grade');
+      // The common answer is the tick under the box, not typed into it.
+      await kiosk.getByRole('checkbox', { name: /No allergies/i }).click();
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await kiosk.getByRole('button', { name: /That's everyone/i }).click();
+
+      await typeOnKiosk(kiosk, 'Dana');
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await kiosk.locator('[data-key="clear"]').click();
+      await typeOnKiosk(kiosk, 'Aldercroft');
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await typeOnKiosk(kiosk, '5550142299');
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+
+      // The family checking their own typing, before it becomes a record.
+      await expect(kiosk.getByText('Allergies: Peanuts And Bee Stings')).toBeVisible();
+      await kiosk.getByRole('button', { name: /Check in everyone/i }).click();
+      await expect(kiosk.getByText(/are checked in\. Welcome!/i)).toBeVisible({
+        timeout: 20_000,
       });
-      await expect(kiosk.getByText(/type the last 4 digits/i)).toBeVisible({ timeout: 15_000 });
 
-      await typeOnKiosk(kiosk, '8822');
-      const row = kiosk.getByRole('button', { name: /Isla Dovetail/i }).first();
-      await expect(row).toBeVisible({ timeout: 30_000 });
-      await row.click();
-      await kiosk.getByRole('button', { name: /^Check in$/ }).click();
-      await expect(kiosk.getByText(/is checked in\. Welcome!/i)).toBeVisible({ timeout: 20_000 });
+      // The note landed on the registration record — for the reviewer, and
+      // nowhere else. Student documents refuse the key by rule. Matched by
+      // the note, not by "has an allergies array": every registration carries
+      // the array now (nulls for none), so the earlier specs' records qualify
+      // too, and this suite shares one emulator.
+      const carriesNote = (doc: { data: Record<string, unknown> }) =>
+        Array.isArray(doc.data.allergies) && doc.data.allergies[0] === 'Peanuts And Bee Stings';
+      const records = await firestore.until(
+        'kioskRegistrations',
+        (docs) => docs.some(carriesNote),
+        'the registration record carrying the allergy note',
+      );
+      expect(records.find(carriesNote)!.data.allergies).toEqual(['Peanuts And Bee Stings', null]);
+
+      // And the reviewer sees it on the card, beside the child it belongs to.
+      await gotoReady(page, '/review');
+      await expect(page.getByText('Peanuts And Bee Stings')).toBeVisible({ timeout: 30_000 });
     } finally {
+      // The suite is serial on one emulator: a leaked write-back=full would
+      // flip this question on (and contact-writing behaviour) for every spec
+      // after this one.
+      await deleteDocument('config/planningCenter');
       await context.close();
     }
   });
+
 });
 
 test.describe('pairing', () => {

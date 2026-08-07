@@ -18,6 +18,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { BackendRegistry } from '../backends/registry.js';
 import type { CreateFamilyResult, PeopleBackend } from '../backends/types.js';
 import { FakeFirestore } from '../testing/fakeFirestore.js';
+import { PHONE_INDEX_DOC } from './phoneIndex.js';
 import { PULSE_DOC } from './pulse.js';
 import { REGISTRATIONS_COLLECTION } from './registration.js';
 import { approveRegistration, discardRegistration, listPendingRegistrations } from './review.js';
@@ -160,6 +161,9 @@ describe('what a reviewer is shown', () => {
         grade: 9,
         known: true,
         status: 'active',
+        // No phone index seeded here, so no signal either way — see the two
+        // tests below for what this field is for.
+        sharesFamilyDigits: false,
       },
     ]);
     expect(row!.children[1]!.possibleDuplicates).toEqual([]);
@@ -170,6 +174,91 @@ describe('what a reviewer is shown', () => {
     db.seed('students/pco_9', { status: 'active' });
 
     const [row] = await listPendingRegistrations(db, NOW);
+    expect(row!.children[0]!.possibleDuplicates[0]!.known).toBe(false);
+  });
+
+  it('marks the candidate the church already finds under the family’s own digits', async () => {
+    /*
+     * A name and a grade are often not enough: two children can share both, and
+     * a grade rolls over between terms. The phone index settles it — if the
+     * church already answers for that roster row under the number this family
+     * typed, they are almost certainly the same household.
+     */
+    const db = dbWithRegistration({
+      last4: '3344',
+      possibleDuplicateOf: { '0': ['roster-same-family', 'roster-stranger'] },
+    });
+    db.seed('students/roster-same-family', { firstName: 'Robin', lastName: 'Fields', status: 'active' });
+    db.seed('students/roster-stranger', { firstName: 'Robin', lastName: 'Fields', status: 'active' });
+    db.seed(PHONE_INDEX_DOC, { last4: { '3344': ['roster-same-family'] } });
+
+    const [row] = await listPendingRegistrations(db, NOW);
+    const [sameFamily, stranger] = row!.children[0]!.possibleDuplicates;
+    expect(sameFamily!.sharesFamilyDigits).toBe(true);
+    // Two rows with the same name and the same grade, and only one of them is
+    // this family's — which is the whole reason the flag exists.
+    expect(stranger!.sharesFamilyDigits).toBe(false);
+  });
+
+  it('treats a missing phone index as no signal rather than as no match', async () => {
+    const db = dbWithRegistration({ possibleDuplicateOf: { '0': ['roster-1'] } });
+    db.seed('students/roster-1', { firstName: 'Robin', lastName: 'Fields', status: 'active' });
+
+    const [row] = await listPendingRegistrations(db, NOW);
+    expect(row!.children[0]!.possibleDuplicates[0]!.sharesFamilyDigits).toBe(false);
+  });
+
+  it('asks the backend for the names it holds, so a candidate is never anonymous', async () => {
+    /*
+     * The screen lists candidates side by side and asks which of them is the
+     * same child. An option reading "a student on the roster" cannot be told
+     * from the one above it, and the wrong answer is a duplicate in a database
+     * with no delete — so the names are fetched rather than shrugged at.
+     */
+    const db = dbWithRegistration({ possibleDuplicateOf: { '0': ['pco_9'] } });
+    db.seed('students/pco_9', { status: 'active' });
+    const fetchRoster = vi.fn(async () => ({
+      people: [
+        {
+          id: 'pco_9',
+          pcoPersonId: '9',
+          backendId: 'pco' as const,
+          firstName: 'Ethan',
+          lastName: 'Nguyen',
+          grade: 9,
+          status: 'active' as const,
+          searchName: 'ethan nguyen',
+        },
+      ],
+      unresolved: [],
+    }));
+
+    const [row] = await listPendingRegistrations(db, NOW, {
+      registry: registryOf(backendWith({ fetchRoster } as unknown as Partial<PeopleBackend>)),
+    });
+
+    const candidate = row!.children[0]!.possibleDuplicates[0]!;
+    expect(candidate.known).toBe(true);
+    expect(candidate.firstName).toBe('Ethan');
+    expect(candidate.grade).toBe(9);
+    // One call for the page, not one per candidate: a queue of a dozen
+    // families would otherwise walk the backend's rate limit on page load.
+    expect(fetchRoster).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves the labels alone when the backend cannot be reached', async () => {
+    const db = dbWithRegistration({ possibleDuplicateOf: { '0': ['pco_9'] } });
+    db.seed('students/pco_9', { status: 'active' });
+    const fetchRoster = vi.fn(async () => {
+      throw new Error('Planning Center is unavailable');
+    });
+
+    const [row] = await listPendingRegistrations(db, NOW, {
+      registry: registryOf(backendWith({ fetchRoster } as unknown as Partial<PeopleBackend>)),
+    });
+
+    // Degraded and honest: the same screen this shipped with, never an empty
+    // line and never a thrown page.
     expect(row!.children[0]!.possibleDuplicates[0]!.known).toBe(false);
   });
 });
@@ -280,6 +369,77 @@ describe('approving', () => {
     expect(record.lastError).toMatch(/Planning Center is down/);
     // Retryable: the guardian's details are still here to try again with.
     expect(record.guardian).toMatchObject({ phone: '5550103344' });
+    // And *which* half failed, so the screen offers finishing-without-the-adult
+    // rather than a retry of the refusal.
+    expect(record.lastErrorKind).toBe('guardian');
+  });
+
+  it('records which half failed when the children are the ones the backend refused', async () => {
+    const db = dbWithRegistration();
+    const pushStudent = vi.fn(async () => ({ status: 'skipped' as const }));
+    await approveRegistration({
+      db,
+      registry: registryOf(backendWith({ pushStudent } as unknown as Partial<PeopleBackend>)),
+      registrationId: ID,
+      uid: 'core-uid',
+      now: NOW,
+    });
+
+    // Worth retrying — the usual cause is an outage that has since passed —
+    // which is the opposite of the guardian case above.
+    expect(db.get(`${REGISTRATIONS_COLLECTION}/${ID}`)!.lastErrorKind).toBe('children');
+  });
+
+  it('can finish without the adult, for a household the backend will not build', async () => {
+    /*
+     * The dead end this exists to end: a guardian write refused for a reason no
+     * retry can fix. Before, the record survived for ever offering a button
+     * that reattempted the same refusal, and the only alternative was
+     * discarding a family whose children may already be upstream where nothing
+     * deletes them.
+     */
+    const db = dbWithRegistration();
+    const createFamily = vi.fn(async () => familyResult('created', 'Added the family.'));
+    const backend = backendWith({ createFamily });
+
+    const result = await approveRegistration({
+      db,
+      registry: registryOf(backend),
+      registrationId: ID,
+      uid: 'core-uid',
+      withoutGuardian: true,
+      now: NOW,
+    });
+
+    // The children land; the adult is never attempted, not merely failed.
+    expect(result.status).toBe('approved');
+    expect(result.pushed).toBe(2);
+    expect(createFamily).not.toHaveBeenCalled();
+    expect(result.message).toMatch(/were not recorded in Planning Center/i);
+    // And the job is over: the record goes, and the number with it, rather
+    // than being held thirty days to serve a retry the reviewer declined.
+    expect(db.get(`${REGISTRATIONS_COLLECTION}/${ID}`)).toBeUndefined();
+  });
+
+  it('still pushes nobody twice when finishing without the adult', async () => {
+    // The children are already upstream from the attempt that half-failed;
+    // finishing must not create second people for them.
+    const db = dbWithRegistration({ lastError: 'That number is already on file.' });
+    const pushStudent = vi.fn(async () => ({ status: 'skipped' as const }));
+    const result = await approveRegistration({
+      db,
+      registry: registryOf(backendWith({ pushStudent } as unknown as Partial<PeopleBackend>)),
+      registrationId: ID,
+      uid: 'core-uid',
+      withoutGuardian: true,
+      now: NOW,
+    });
+
+    expect(pushStudent).toHaveBeenCalledTimes(2);
+    // A skip is not a landing, so the record stays and says so — finishing
+    // without the adult is not a licence to declare the children done.
+    expect(result.status).toBe('partial');
+    expect(db.get(`${REGISTRATIONS_COLLECTION}/${ID}`)).toBeDefined();
   });
 
   it('finishes, and forgets the number, when there is nowhere to push', async () => {

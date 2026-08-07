@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 import type { Page } from '@playwright/test';
 import { gotoReady, openCheckIn, signOut } from '../e2e/support/auth';
 import { test } from '../e2e/support/fixtures';
+import { seedTriageQueue } from '../e2e/support/triageQueue';
 import { freeze } from './snapshot';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -74,6 +75,12 @@ export const SCENES: Scene[] = [
     title: 'The student directory',
     audience: 'core team',
     job: 'Find one student among forty-five, see at a glance who is missing a parent contact, and open their record.',
+  },
+  {
+    id: 'review',
+    title: 'Families to review — triage and merging',
+    audience: 'core team',
+    job: 'On a Tuesday, decide five families the lobby screen recorded and could not judge: which children are already on the roster under another row, which family is real, which record is about to be swept, and which push half-failed — knowing every "approve" is irreversible upstream.',
   },
 ];
 
@@ -148,4 +155,31 @@ test('capture the UXR scene suite', async ({ page, signedInAs }) => {
   await gotoReady(page, '/students');
   await page.waitForTimeout(1200);
   await capture(page, 'students');
+
+  /*
+   * The triage screen, arranged rather than driven.
+   *
+   * Every state on it is a *state* and not a journey — a push that half-failed,
+   * a record a fortnight from being swept, a child a reviewer already merged
+   * away — and several of them cannot be produced through the kiosk without
+   * breaking a backend first. So the five families below are written straight
+   * into Firestore in the shape `registerFamily` writes, which is also what the
+   * error-case specs do; see e2e/support/registrations.ts.
+   *
+   * Five, because the thing worth critiquing here is not one card: it is a
+   * queue of decisions where three are routine and two are the ones that matter,
+   * and whether the screen makes those two findable is the whole job.
+   */
+  const seeded = await seedTriageQueue();
+  try {
+    await gotoReady(page, '/review');
+    await page
+      .getByRole('button', { name: /Approve and add/i })
+      .first()
+      .waitFor({ timeout: 30_000 });
+    await page.waitForTimeout(800);
+    await capture(page, 'review');
+  } finally {
+    await seeded.remove();
+  }
 });

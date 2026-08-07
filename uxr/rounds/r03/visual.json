@@ -1,0 +1,56 @@
+[
+  {
+    "scene": "review",
+    "viewport": "desktop",
+    "severity": "blocker",
+    "where": "the duplicate card — the merge block and the live 'Approve and add' below it; the same pattern on the expiring card, whose second child has an unresolved candidate",
+    "finding": "On the one card where the app has already worked out that a permanent upstream duplicate is about to be made, the button that makes it is fully live. The card says, in its own words, 'Two students on the roster share this name' and 'Approving before Ethan's row is settled makes a second Ethan in Planning Center' — and then offers 'Approve and add' in the same full brand-500 blue, same size, same position in the foot, as the Approve on the routine cards. The triager who reads the amber strip as a note rather than a stop, presses Approve and presses the confirm, gets exactly the outcome the whole scene exists to prevent, and it cannot be taken back. Nothing in the arm step catches it either: the armed sentence names children and irreversibility, not the open duplicate decision. So the second press confirms a fact the reader has already been told and is silent about the one that matters.",
+    "evidence": "The duplicate card carries a 'Possible duplicate' header badge, an amber consequence strip, a warn-coloured heading, two named candidates and an escape hatch — none selected in this frame — and directly below it a foot caption reading only 'Adds Ethan and Ishaan to Planning Center. Nothing added there can be taken back.' That caption is true and neutral about an outcome the card has separately called a mistake. In the markup the primary is bg-brand-500 with no disabled state and no dependency on the merge selection. Contrast the already-merged row, which carries a 'Merged' badge — so the app clearly does model 'settled' and simply does not gate on it.",
+    "direction": "Make 'settled' a precondition of the primary on any card that has flagged a name collision: while a flagged child's row is unresolved the Approve is unavailable (or drops out of primary weight) and says what it is waiting for; choosing a candidate OR choosing 'None of them — Ethan is new' both count as settling, so nobody is trapped, and 'Not ours' stays live throughout. If the primary must stay pressable, then the armed sentence has to change on these cards specifically — it should name the collision rather than repeat the generic irreversibility line."
+  },
+  {
+    "scene": "review",
+    "viewport": "desktop",
+    "severity": "major",
+    "where": "the merge candidate lists — the expiring card's single candidate, and the duplicate card's two-up pair",
+    "finding": "The merge decision is the one call on this screen that has a right answer, and the card gives the triager nothing to make it with except a name and a grade. On the expiring card the grade does not even agree: the kiosk recorded 'Elena Salgado · 7th grade' and the only candidate is 'Elena Salgado · 8th grade'. Is that the same girl a year rolled over, or two different Elena Salgados? The card cannot answer, so the person guesses. On the duplicate card the opposite problem: the two candidates are the same twenty-four-character string differing in one glyph — '9th' versus '6th' — sitting 5px apart, and the token that resolves them is the incoming child's grade rendered 40px above in 12px ink-500. Under either failure the person falls back on the card's own advice ('Merging can be undone. A duplicate in Planning Center cannot') and merges — which quietly files one real child's attendance under another child's record whenever the guess is wrong.",
+    "evidence": "Expiring card: incoming child '7th grade', candidate '8th grade', no other distinguishing fact. Duplicate card: candidates as half-width chips with identical styling; on phone the same two are stacked full-width with a 6px gap, so the only difference visible at a glance in poor light is one digit. The system demonstrably holds the fact that would settle it — the sibling-join card already reasons across households — but the candidate rows do not use it.",
+    "direction": "Give each candidate row the household fact the system already holds rather than anything new about the child: whether the guardian phone on the incoming record matches the number already on that roster row. 'Same number on file' on one candidate ends the decision; 'different number' on both is the honest signal to look harder. Where a grade matches the incoming child exactly, mark that row so the discriminating token does the work instead of the reader's short-term memory. Note the adjacency to the 'nothing about minors beyond what is already shown' constraint — a phone-match flag is about the guardian record, not a richer student card, but hold that line deliberately."
+  },
+  {
+    "scene": "review",
+    "viewport": "desktop",
+    "severity": "major",
+    "where": "the right-hand grid column below the sibling-join card, and the dashed end-of-queue note",
+    "finding": "Two-fifths of this page is an empty right column. The right column's last real content ends at y 1121; the page runs to 1931. The 810px below it holds one sentence centred in a dashed rectangle 562px wide and 564px tall that is 98.8% empty pixels — a screen-sized bordered void. Scrolled into view it reads as a card that failed to load, not as a queue terminator, and it is the last thing a leader sees after working five irreversible decisions. The cause is a fixed two-column grid whose rows align to the tallest card: the 342px sibling-join card reserves a 502px row, and the push-failed card — red strip, three instruments, arguably the hardest call in the queue — is pushed entirely below the fold, alone in a 1154px content area using 562px of it.",
+    "evidence": "Measured card bounds: 563px, 597px, 502px, 342px, 552px. Right-column ink between y 1121 and y 1874: 1.2% of pixels. Packing the same five cards by height instead of by row lands the taller column at roughly 1480–1500px, ending the page near y 1630 — about 300px shorter, and with no half-screen void to scroll through. Separately, on the fold verdict asked about: two families fully actionable above 900px is the right trade and not worth attacking. The fold already carries the count, four of five family names and all four state badges, which is the 'what kind of week is this' question answered without scrolling. Deciding five irreversible things is a read-then-act task; compressing it would undo the captions round 2 added. The page height is not the problem; the packing is.",
+    "direction": "Let the lg grid pack by height rather than by row (columns/masonry), so the push-failed card rides up beside its neighbour and no card reserves space it does not use. Let the end-of-queue note be a single quiet line closing the full content width — it does not need a box, a border, or a grid cell of its own."
+  },
+  {
+    "scene": "review",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "the sticky bottom tab bar — 'Check in / Insights / Events / Students', four items and no Review",
+    "finding": "A core-team member on a phone cannot get to this screen, and is never told there is anything on it. The bottom bar carries the other three core-team destinations but omits Review, and the sidebar that does carry it (with the count badge reading 5) is hidden below lg. This queue is the one screen in the app with a clock running against it whether or not anyone looks: the first card is already at '4 days left', after which the phone number is deleted and two children are stranded on Tally's roster with nobody attached to them. The one place a leader would plausibly glance mid-week — their phone — is the one place that will not tell them.",
+    "evidence": "Bottom nav markup is sticky bottom-0 … lg:hidden with exactly four items, none pointing at /review; the sidebar's Review link with its count sits inside an aside hidden below lg. The counter-argument — that the tab bar is the counselor's bar and Review is core-only — does not hold, because Insights, Events and Students are all core-team scenes and all three are in it; Review is the only core scene left out, and the only one with a deadline.",
+    "direction": "Give Review a phone destination and carry its count there, so the number of waiting families is visible before anyone goes looking. If a fifth tab is genuinely more than the bar can hold, the count belongs somewhere else persistent on the phone rather than nowhere at all."
+  },
+  {
+    "scene": "review",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the whole page — 3983px tall, five cards of 514–843px, inside a 723px visible window",
+    "finding": "The verdict asked for: the page growth is the right trade, and the reason is the round-2 caption pattern rather than the height itself. Because every control carries its cost immediately above it, and because those captions name the people and the number, a control never appears on screen without its consequence and its subject beside it — so a card being taller than the screen costs nothing that matters. Do not compress this. The one measured residual is real but small: on the two tallest cards the family name and the last instrument cannot be co-visible, so the final option is chosen with the header off-screen.",
+    "evidence": "Card bounds 771px, 843px, 558px, 514px, 784px. The push-failed card's header-to-'Not ours' span is 767px against a 723px window; the duplicate card is worse at 826px. But its header-to-Approve is 720px and does fit, and every button's caption is within 60px of the button it belongs to. The armed foot also checks out on both viewports: the pre-arm Approve would occupy roughly y 2191–2239 and the armed Cancel lands at 2161–2210, so a stray second tap hits Cancel, not the commit 84px below it. That is the mechanism working.",
+    "direction": "Leave the height. If the residual is worth anything, it is a compact family name carried in the sticky top bar while a card is the one in view — but that is optional polish, not a fix."
+  },
+  {
+    "scene": "review",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "every consequence caption",
+    "finding": "The captions are the whole mechanism rounds 1 and 2 built, and on the phone they are set at 12px — the same size as the decorative grade sublabel under each child's name, and two steps quieter than the strips. A reader scanning a 390px screen gets no size cue that one of these lines is the irreversibility warning and the other is a grade. The text is legible; what is missing is rank.",
+    "evidence": "text-xs text-ink-400 on every caption, the same text-xs used for the grade sublabel; header and row badges are text-[11px]. Two caption lines occupy 32 CSS px. The strips above them are text-sm in warn or danger — so on two cards there is a loud version, but on the sibling-join card, which carries no consequence strip by design, these 12px lines are the only statement of what Approve and Not ours actually do.",
+    "direction": "Raise the captions one step on phone only and leave desktop alone — the responsive split the brief points at (text-sm lg:text-xs). A seated reader at 562px column width does not need the extra size; a standing one at 390px does."
+  }
+]

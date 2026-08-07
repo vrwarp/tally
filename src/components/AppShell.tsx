@@ -19,6 +19,16 @@ const NAV: NavItem[] = [
   { to: '/dashboard', label: 'Insights', icon: '◎', core: true },
   { to: '/events', label: 'Events', icon: '▤', core: true },
   { to: '/students', label: 'Students', icon: '☰', core: true },
+  /*
+   * Review used to live only inside the account menu, on the argument that the
+   * thumb bar is for the four things somebody does at a door. That argument
+   * does not survive the bar's own contents: Insights, Events and Students are
+   * all weekday core-team screens and all three are in it. Review was the only
+   * core screen left out — and the only one with a clock running against it,
+   * since a registration nobody looks at loses the family's phone number after
+   * thirty days whether or not anyone knew it was waiting.
+   */
+  { to: '/review', label: 'Review', icon: '▣', core: true },
 ];
 
 /**
@@ -76,16 +86,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
       {can('core') ? (
         <>
-          {/* Not in the thumb bar: it is a weekday job, and the bar is for the
-              four things somebody does at a door. */}
-          <NavLink
-            to="/review"
-            role="menuitem"
-            onClick={() => setMenuOpen(false)}
-            className="block px-3 py-2 text-ink-200 hover:bg-ink-800"
-          >
-            Families to review
-          </NavLink>
+          {/* Review moved into the nav itself; Settings stays here, because it
+              is a thing somebody does twice a year rather than every week. */}
           <NavLink
             to="/settings"
             role="menuitem"

@@ -89,28 +89,32 @@ a deployment with write-back turned down, an upstream that was offline — would
 by morning. They do not: the registration keeps its digits in an overlay the rebuild folds in rather
 than overwrites, and a rebuild can only ever *add* to what a registration made findable.
 
-**Or on their own phone.** The first thing "First time here?" offers is a QR code, because a parent
-holding a phone would rather type on it than on a tablet bolted to a shelf — their keyboard, their
-autocorrect, and the queue behind them does not have to watch. "No phone? Register right here" is one
-tap away, which is the right way round: the wizard is the longer of the two on the harder keyboard.
+**And where the church's database can carry it, one more question: allergies.** The wizard asks it
+only when the people backend takes full write-back — the same gate the retired phone form kept, so a
+family is never asked for a medical note the backend would silently drop. **"No allergies" is a tick
+directly under the box**, where the typing would otherwise start — a medical field with a keyboard
+under it and no visible way to say "nothing" collects "None", "N/A" and "no allergies" as free text,
+three spellings of a blank bound for the church's database as though they were notes. Ticking it
+empties the box and puts it out of use. The answer waits on the review record for the person who
+decides the family, and approval pushes it upstream where such notes belong. Tally itself keeps only
+a boolean.
 
-The page it opens (`/welcome`) is the only unauthenticated write surface Tally has, and it is not a
-link anybody can keep. A stable public registration URL is a form on the open internet whose
-submissions land in a church's real people database; instead the kiosk mints a code that lives twenty
-minutes, carries at most twenty families, and re-mints itself while the screen is up. Registering
-remotely means being in the room.
-
-That form checks nobody in — it cannot know the family walked through the door — so it ends with
-the only instruction left: *type 7788*. It used to be two steps — *tap "I've registered", then type*
-— because the kiosk searched a six-hour-old copy of the roster and the button was what made it go
-and look. Now the kiosk notices by itself: the code the form was opened with remembers which
-gathering minted it, the submission bumps a one-document change signal
-([`kioskIndex/pulse`](data-model.md#kioskindexpulse)), and the kiosk — polling that signal
-every thirty seconds — re-reads only what changed and walks its own QR screen back to the search,
-digits line and all, while the family is still crossing the lobby. The button survives behind the QR
-for anyone who will not wait out the half minute. And for the family who took ten minutes over the
-form and came back to a kiosk that had moved on, a finished search that finds nobody anywhere
-re-reads the whole church silently before the screen will say "Still no match".
+There used to be a second door: a QR code that opened a registration form on the parent's own phone,
+with minted codes, a twenty-minute TTL and a change signal to walk the kiosk back when the form
+landed. It was retired — it optimised a thing each family does exactly once, at the cost of the only
+unauthenticated write surface Tally had and the fiddliest synchronisation machinery in the kiosk.
+What it genuinely offered — a native keyboard for names the glass cannot type, and parallelism when
+a queue forms — now belongs to the greeters: any leader can quick-add a child from their own phone,
+and a one-document change signal ([`kioskIndex/pulse`](data-model.md#kioskindexpulse)) puts that
+child on every kiosk within about a minute with nobody pressing anything. Being on the device is not
+yet being in the search, though: the front door is scoped to the children who have been to *this*
+gathering, and a child created four minutes ago has been to nothing. They come into scope on their
+own once the kiosk's register poll sees them checked in — and before that, **"Search everyone"** is
+the one tap that finds them. That is the gesture greeters are trained on, and it is the same tap
+whether the signal arrived or never fired: it widens past the gathering instantly, and re-reads the
+whole church behind a spinner when the wider pool is empty too. For the family who arrives
+mid-evening to a kiosk whose roster copy predates them, a finished search that finds nobody anywhere
+runs that same re-read silently before the screen will say "Still no match".
 
 **Nothing here is a lobby screen deciding who somebody is**, and that is the design rather than a
 disclaimer. A registration reaches Tally's roster and stops: every child is written held
@@ -126,6 +130,19 @@ family typed it beside the roster rows that share a name: approve, merge, or dis
 pushes every child and then builds **one** household for the family. The guardian's name and phone
 wait on a functions-only document with a thirty-day TTL until then — the one place in Tally a parent's
 number lives, and [documented as the exception it is](data-model.md#kioskregistrationsregistrationid).
+
+That screen is built around one asymmetry: **merging can be undone; a duplicate in the church's
+database cannot.** So every control carries a sentence above it naming the children by name and what
+the press costs, approving arms before it commits — with the commit deliberately *not* where the arm
+button was, so a repeat press on an apparently unresponsive control cancels — and a card whose child
+collides with a roster row cannot be approved at all until somebody settles which they are. The
+candidates are on the screen rather than behind a link, each carrying the two facts that separate two
+children of one name: whether the church already finds that row under this family's own four digits,
+and whether the grade matches. A merge names who the child was folded into and offers the undo
+Tally has always had. And a family whose *parent* the backend refuses — usually for a reason no
+retry can fix — can be finished without them rather than retried for ever or discarded with children
+already upstream. Five rounds of critique are recorded in [`uxr/rounds/`](../uxr/rounds/); the last
+two judged the shipping screen rather than a prototype.
 
 **Journey 2½ — the second child.** A parent whose next child is finally old enough finds their family
 by phone as usual, taps a name, and finds **"Anyone else?"** already asked on the confirm screen —

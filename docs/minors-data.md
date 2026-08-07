@@ -25,12 +25,16 @@ The field-by-field version of all of this, including the two deliberate brushes 
 ## The kiosk is the narrowest surface
 
 The narrowest surface is the lobby kiosk, because it is the one screen the public stands in front of.
-It holds names, grades and *that* a child has an allergy — never the note, never a parent's contact
-details, never a photograph. The one exception is deliberate and opt-in per gathering: a check-in
-label can print the allergy line, because the volunteer holding the child is exactly who needs to
-read it and is the least likely person to be looking at a roster. Even then the kiosk asks for one
-child's note at the moment they are checked in, keeps it in memory only, and writes nothing down. See
-[docs/label-printing.md](label-printing.md#printing-allergies).
+It holds names, grades and *that* a child has an allergy — never a stored note, never a parent's
+contact details, never a photograph. Two deliberate exceptions. A check-in label can print the
+allergy line, opt-in per gathering, because the volunteer holding the child is exactly who needs to
+read it and is the least likely person to be looking at a roster — even then the kiosk asks for one
+child's note at the moment they are checked in, keeps it in memory only, and writes nothing down
+(see [docs/label-printing.md](label-printing.md#printing-allergies)). And the registration wizard
+*collects* a note where the church's database can carry one — what the family is reading back there
+is their own typing, not a record; the note travels on the review record and reaches the kiosk
+after approval only the way any other upstream note does. See
+[the data model](data-model.md#kioskregistrationsregistrationid).
 
 It is also narrow in *who* it will find. The search is scoped to the children who have been to that
 gathering in the last year — the same year the check-in screen uses to decide who belongs to a room
@@ -38,8 +42,15 @@ gathering in the last year — the same year the check-in screen uses to decide 
 standing in front of the Sunday nursery's roster and should not be able to type four digits into
 one. The scope only ever fails open: a gathering with no history behind it searches everything, so
 there is nothing to configure and no way to switch it off by accident, anyone on tonight's register
-is findable whatever last night's aggregate said, and **"Search everyone"** — offered whenever a
-search comes up empty — widens that one search to all of Tally on the spot, with no read behind it.
+is findable whatever last night's aggregate said, and **"Search everyone"** widens that one search to
+all of Tally on the spot, with no read behind it. It stands on the no-match panel and, in a quieter
+weight, in the row beneath a list of results — because the state that most needs it is the one where
+the scope handed somebody *an* answer: a family whose child comes to another gathering types their
+own name and gets a stranger's, correctly spelled, with nothing on the screen saying the search was
+narrowed. Only if widening changes nothing does the press go on to re-read the church, which is the
+one thing here that takes any time; it wears a spinner while it does, held to a floor of a second and
+a half, because a search of an entire church that answers instantly is read as a search that did not
+happen.
 The list itself is
 [one precomputed document](data-model.md#kioskindexparticipation) — the kiosk holds no event
 history and could not download the code that reads it.
