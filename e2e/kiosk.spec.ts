@@ -802,14 +802,18 @@ test.describe('registering a family at the kiosk', () => {
       });
 
       // The note landed on the registration record — for the reviewer, and
-      // nowhere else. Student documents refuse the key by rule.
+      // nowhere else. Student documents refuse the key by rule. Matched by
+      // the note, not by "has an allergies array": every registration carries
+      // the array now (nulls for none), so the earlier specs' records qualify
+      // too, and this suite shares one emulator.
+      const carriesNote = (doc: { data: Record<string, unknown> }) =>
+        Array.isArray(doc.data.allergies) && doc.data.allergies[0] === 'Peanuts and bee stings';
       const records = await firestore.until(
         'kioskRegistrations',
-        (docs) => docs.some((doc) => Array.isArray(doc.data.allergies)),
+        (docs) => docs.some(carriesNote),
         'the registration record carrying the allergy note',
       );
-      const record = records.find((doc) => Array.isArray(doc.data.allergies))!;
-      expect(record.data.allergies).toEqual(['Peanuts and bee stings', null]);
+      expect(records.find(carriesNote)!.data.allergies).toEqual(['Peanuts and bee stings', null]);
 
       // And the reviewer sees it on the card, beside the child it belongs to.
       await gotoReady(page, '/review');
