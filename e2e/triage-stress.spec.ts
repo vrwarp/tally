@@ -130,8 +130,17 @@ test.describe('when the backend will not take them', () => {
     });
 
     try {
-      // The church's database is down for exactly one write.
-      await planningCenter.fail(503, 'Planning Center is unavailable', 2);
+      /*
+       * Every request, not a budget of two.
+       *
+       * A count was the obvious way to say "down for this one write" and it
+       * failed the wrong requests: the push's own preflight reads
+       * `/field_definitions` first, so a budget of two was spent before the
+       * person write was attempted and the approval finished cleanly. What the
+       * test means is "the backend is down", and the reset below is what ends
+       * the outage.
+       */
+      await planningCenter.fail(503, 'Planning Center is unavailable');
 
       await gotoReady(page, '/review');
       const card = cardFor(page, `Paz ${surname}`);

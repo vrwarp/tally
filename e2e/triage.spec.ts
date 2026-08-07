@@ -33,6 +33,24 @@ function cardFor(page: Page, title: string | RegExp) {
   return page.locator('section', { hasText: title }).first();
 }
 
+/**
+ * Waits for the registration record to go.
+ *
+ * Polled, not read once: approval pushes the children *before* it deletes the
+ * record, so a test that has just watched somebody appear in the simulator is
+ * watching a callable that has not finished yet. Reading the collection at that
+ * moment is a race the test loses about half the time — and loses in the shape
+ * of "the record survived", which is exactly what a real failure looks like.
+ */
+async function recordIsGone(registrationId: string): Promise<void> {
+  await expect
+    .poll(
+      async () => (await readCollection('kioskRegistrations')).some((d) => d.id === registrationId),
+      { timeout: 30_000, message: 'the registration record — and the phone number — is deleted' },
+    )
+    .toBe(false);
+}
+
 /** A roster row the seeded ministry already holds, to point duplicate hints at. */
 async function anExistingStudent(): Promise<{ id: string; firstName: string; lastName: string }> {
   const students = await readCollection('students');
@@ -96,8 +114,7 @@ test.describe('deciding a family', () => {
       expect(ours.every((doc) => doc.data.pendingReview === false)).toBe(true);
 
       // And the record is gone, phone number with it.
-      const left = await readCollection('kioskRegistrations');
-      expect(left.some((doc) => doc.id === registrationId)).toBe(false);
+      await recordIsGone(registrationId);
     } finally {
       await removeRegistration(registrationId, 2);
     }
@@ -232,8 +249,7 @@ test.describe('deciding a family', () => {
           message: 'the sibling reaches Planning Center',
         })
         .toBe(1);
-      const left = await readCollection('kioskRegistrations');
-      expect(left.some((doc) => doc.id === registrationId)).toBe(false);
+      await recordIsGone(registrationId);
     } finally {
       await removeRegistration(registrationId, 1);
     }
