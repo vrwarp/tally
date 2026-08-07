@@ -464,7 +464,7 @@ test.describe('merges that must be refused', () => {
       await expect(card.getByText(/A student on the roster/i)).toBeVisible();
       await card.getByRole('button', { name: /A student on the roster/i }).first().click();
 
-      await expect(card.getByText(/^Merged$/)).toBeVisible({ timeout: 30_000 });
+      await expect(card.getByText(/Merged into/i)).toBeVisible({ timeout: 30_000 });
       const after = await readCollection('students');
       const fold = after.find((doc) => doc.id === `${registrationId}-child-0`);
       expect(fold!.data.mergedIntoStudentId).toBe(upstream!.id);

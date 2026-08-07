@@ -187,7 +187,10 @@ test.describe('deciding a family', () => {
       await expect(card.getByText(/shares this name/i)).toBeVisible();
       await card.getByRole('button', { name: new RegExp(existing.firstName, 'i') }).first().click();
 
-      await expect(card.getByText(/^Merged$/)).toBeVisible({ timeout: 30_000 });
+      // Named, not just "Merged": a reviewer inheriting this queue has to be
+      // able to see which row the child is now part of.
+      await expect(card.getByText(/Merged into/i)).toBeVisible({ timeout: 30_000 });
+      await expect(card.getByRole('button', { name: /^Undo$/ })).toBeVisible();
 
       const students = await readCollection('students');
       const fold = students.find((doc) => doc.id === duplicateId);
