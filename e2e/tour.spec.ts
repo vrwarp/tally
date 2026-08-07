@@ -3,29 +3,30 @@
  *
  * Not a test — a documentation build, like the other `*-walkthrough` specs.
  * Every frame is the real screen driving the real callables against a seeded
- * emulator: the kiosk pairing handshake actually happens, the QR code is minted
- * by `mintRegistrationCode`, the phone form is opened on a second device with
- * that code in the URL, and the families at the end exist in Firestore, are
- * checked in against real gatherings, and are approved by a real core-team
- * session.
+ * emulator: the kiosk pairing handshake actually happens, the greeter's
+ * quick-add fires the real `onStudentCreated` trigger and the real pulse, and
+ * the families at the end exist in Firestore, are checked in against real
+ * gatherings, and are approved by a real core-team session.
  *
- * Ten acts: eight in the order a Sunday actually happens, then the two that
- * photograph the evenings it does not:
+ * Nine acts: eight in the order a Sunday actually happens, then the one that
+ * photographs the evenings it does not:
  *
  *   1. **At the door** — a family the church already has, and a pickup.
- *   2. **Nobody has met us** — the wizard on the kiosk itself.
- *   3. **On their own phone** — the same thing through the QR.
+ *   2. **Nobody has met us** — the wizard on the kiosk, which is the front
+ *      door for a new family since the QR/phone form was retired.
+ *   3. **On the greeter's phone** — the off-device path: a leader quick-adds
+ *      a child from their own phone, the change signal carries them to every
+ *      kiosk, and one press brings them inside the search.
  *   4. **The second child** — a family gaining a sibling.
  *   5. **Going home** — a family that arrived in two waves, leaving in one.
  *   6. **Who the door will find** — the search's scope, and its way out.
  *   7. **The review** — where the door's recordings become decisions.
  *   8. **The rest of the week** — the core team's own screens.
- *   9. **When it doesn't go that way** — half a search, a dead network, a code
- *      that would not mint, a double tap, a gathering whose doors have shut.
- *  10. …and the same for the phone form: a spent code, and a form submitted
- *      empty. The failures are driven for real — the network frames abort the
- *      callables the screen depends on, so what is photographed is the screen
- *      reacting rather than a mock of it.
+ *   9. **When it doesn't go that way** — half a search, a dead network, a
+ *      double tap, a gathering whose doors have shut. The failures are driven
+ *      for real — the network frames abort the callables the screen depends
+ *      on, so what is photographed is the screen reacting rather than a mock
+ *      of it.
  *
  * Everything runs twice, on a wide device and a tall one, because none of these
  * screens gets to choose its shape: a kiosk is however the shelf it sits on
@@ -40,7 +41,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
-import { gotoReady } from './support/auth';
+import { gotoReady, openCheckIn, signIn, TEAM } from './support/auth';
 import { deleteDocument, readCollection, writeDocument } from './support/emulator';
 import { test } from './support/fixtures';
 import { bindTo, hold, openKiosk, pairKiosk, typeOnKiosk } from './support/kiosk';
@@ -132,8 +133,8 @@ function slugOf(title: string): string {
  * digit row but a name field refuses digits, so a numbered surname is typed and
  * silently dropped. And it has no accented keys at all — a surname with an ö in
  * it cannot be typed on the lobby glass, so the add-a-child wizard waits forever
- * for a key that is not there. A parent who needs one gets it through the phone
- * form, which uses the device's own keyboard.
+ * for a key that is not there. A family who needs one is added by a greeter from
+ * their own phone, which has the keyboard the glass does not — Act 3.
  */
 const CAST: Record<
   Shape,
@@ -143,10 +144,15 @@ const CAST: Record<
     doorLast: string;
     familyDigits: string;
     familyChild: string;
+    /** The sibling Act 1's prediction leaves unticked — Act 4 starts on her row. */
+    edgeChild: string;
     guestChild: string;
+    /** The child a greeter quick-adds from their own phone in Act 3. */
+    greeterChild: { first: string; last: string };
     surname: string;
     phone: string;
-    qrPhone: string;
+    /** The number under which Act 2's second run re-registers the door child. */
+    duplicatePhone: string;
   }
 > = {
   wide: {
@@ -177,10 +183,12 @@ const CAST: Record<
      * the point: this path exists for the cousin, the neighbour's boy, and the
      * sibling whose number on file is a different one.
      */
+    edgeChild: 'Efua Osei',
     guestChild: 'Maya Adebayo',
+    greeterChild: { first: 'Xiomara', last: 'Reyes' },
     surname: 'Okonkwo',
     phone: '5550172244',
-    qrPhone: '5550179911',
+    duplicatePhone: '5550179911',
   },
   tall: {
     door: 'Nia Washington',
@@ -190,10 +198,12 @@ const CAST: Record<
     // family the wide pass checked in would offer this one a pickup.
     familyDigits: '0592',
     familyChild: 'Marcus Delgado',
+    edgeChild: 'Lucia Delgado',
     guestChild: 'Ethan Nguyen',
+    greeterChild: { first: 'Corin', last: 'Ashby' },
     surname: 'Adeyemi',
     phone: '5550178866',
-    qrPhone: '5550176655',
+    duplicatePhone: '5550176655',
   },
 };
 
@@ -238,6 +248,17 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
   await signedInAs('core');
   await pushQueueDrained();
 
+  /*
+   * Full write-back for the whole tour, written before any kiosk binds: the
+   * binding is where a kiosk learns whether the wizard may ask about
+   * allergies, and the capability is computed at bind time. This also makes
+   * the review act's approval push the note upstream for real — the simulator
+   * takes the PATCH. Deleted in the finally below; the suite's own default is
+   * 'create', and a leaked 'full' would change what later specs photograph.
+   */
+  await writeDocument('config/planningCenter', { writeBack: 'full' });
+
+  try {
   for (const shape of SHAPES) {
     let n = 0;
 
@@ -384,23 +405,35 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
           'This screen once said "No match — please see a leader" and nothing else. Seeing a leader is still the right last word when something is wrong with the search; it was never the right first one for being new. Two offers sit under the empty result and they answer different questions: a family somebody added while they queued needs the kiosk to look again, and a family nobody has met needs a form.',
       });
 
-      await kiosk.getByRole('button', { name: /Register your child/i }).first().click();
-      await expect(kiosk.getByLabel('Registration QR code')).toBeVisible({ timeout: 30_000 });
+      /*
+       * The other offer, pressed — and photographed mid-press, which is the
+       * only moment it has anything to show.
+       *
+       * Deterministic without any timing luck: the church-wide read behind
+       * this button is floored at a second and a half whether or not it does
+       * any work, so the shutter at +450ms always finds the spinner up.
+       */
+      await kiosk.getByRole('button', { name: 'Search everyone' }).click();
       await shoot(kiosk, 'kiosk', {
         act: 'Nobody has met us',
         who: 'A family the church has never seen',
-        title: 'Your phone, or this screen',
+        title: 'A button that stays and says it is working',
         caption:
-          'The QR comes first because a family with a phone in their hand would nearly always rather type on it, and the ones without one are a single tap from the wizard. The code under it is minted by a real callable under the kiosk\'s own session, lives twenty minutes, carries at most twenty families, and re-mints itself while the screen is up — a stable public registration URL would be a form on the open internet whose submissions land in a church\'s people database.',
+          'The search only covers the children who come to *this* gathering, so "Search everyone" is that scope\'s way out — and behind it, a re-read of the whole church for the family somebody added at the welcome desk two minutes ago. It used to widen and then vanish, which left a parent looking at the gap where a button had been; now its label becomes a spinner in place, at exactly the same width, and comes back when the work lands. The spin is held to a floor of a second and a half even when the answer is instant: a search of an entire church that returns immediately is not read as fast, it is read as broken.',
       });
+      await expect(kiosk.getByRole('button', { name: 'Search everyone' })).toHaveAttribute(
+        'aria-busy',
+        'false',
+        { timeout: 30_000 },
+      );
 
-      await kiosk.getByRole('button', { name: /Register right here/i }).click();
+      await kiosk.getByRole('button', { name: /Register your child/i }).first().click();
       await shoot(kiosk, 'kiosk', {
         act: 'Nobody has met us',
         who: 'A family the church has never seen',
         title: 'One question per screen',
         caption:
-          'The alternative on a lobby tablet is a form with six boxes and an on-screen keyboard that can only fill one of them at a time — a parent tapping between fields, losing their place, with a queue behind. The readout is a div, never an input: nothing here focuses anything, so the device keyboard never rises.',
+          'One tap from the no-match panel and the first question is already up — there used to be a QR screen between them, retired with the phone form it pointed at. The alternative on a lobby tablet is a form with six boxes and an on-screen keyboard that can only fill one of them at a time — a parent tapping between fields, losing their place, with a queue behind. The readout is a div, never an input: nothing here focuses anything, so the device keyboard never rises.',
       });
 
       await typeOnKiosk(kiosk, 'Chidi');
@@ -425,6 +458,18 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       });
 
       await kiosk.getByRole('button', { name: '4th grade', exact: true }).click();
+      await expect(kiosk.getByText(/Any allergies we should know about/i)).toBeVisible({
+        timeout: 15_000,
+      });
+      await typeOnKiosk(kiosk, 'peanuts')
+      await shoot(kiosk, 'kiosk', {
+        act: 'Nobody has met us',
+        who: 'A family the church has never seen',
+        title: 'A fourth question, only where it can land',
+        caption:
+          'The wizard asks about allergies exactly when the church\'s own database can hold the answer — the same write-back gate the retired phone form kept, because collecting a family\'s medical note into a screen that silently drops it is worse than never asking. The common answer costs one tap: the button under the keyboard reads "No allergies" until a letter is typed, and becomes Next the moment one is. What is typed here goes to the person who reviews the family, then upstream; the kiosk itself keeps only a marker.',
+      });
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await shoot(kiosk, 'kiosk', {
         act: 'Nobody has met us',
         who: 'A family the church has never seen',
@@ -446,6 +491,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
 
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: 'Kindergarten', exact: true }).click();
+      await kiosk.getByRole('button', { name: /No allergies/i }).click();
       await kiosk.getByRole('button', { name: /That's everyone/i }).click();
       await typeOnKiosk(kiosk, 'Ngozi');
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
@@ -465,7 +511,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
         who: 'A family the church has never seen',
         title: 'Everything, before anything is written',
         caption:
-          'Both children, the adult, and the number — the last point at which a correction costs a tap rather than a leader. Six questions in all, and nothing else: allergies, emails and second guardians are not here. That is the same bargain the staff quick-add makes, because a lobby form that asks for everything is a lobby form nobody finishes.',
+          'Both children, the adult, the number — and the one allergy note, under the child it belongs to. This is the last point at which a correction costs a tap rather than a leader, and the family reading it is reading their own typing before it becomes a record a reviewer acts on. Emails and second guardians are still not here: a lobby form that asks for everything is a lobby form nobody finishes.',
       });
 
       await kiosk.getByRole('button', { name: /Check in everyone/i }).click();
@@ -489,105 +535,127 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       });
       await kiosk.locator('[data-key="clear"]').click();
 
-      /* ================================================================== */
-      /* Act 3 — Nobody has met us, on their own phone                       */
-      /* ================================================================== */
-
+      /*
+       * One more run, driven without frames: a parent re-registers a child
+       * the church already has, under a different number. It is the commonest
+       * way a duplicate is born — nobody told them somebody added their child
+       * last term — and it is what makes the review act's duplicate frame a
+       * real screenshot rather than a claim about one.
+       */
       await kiosk.getByRole('button', { name: /Register your child/i }).first().click();
-      const code = ((await kiosk
-        .getByText(/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/)
-        .first()
-        .textContent()) ?? '').trim();
+      await typeOnKiosk(kiosk, cast.doorFirst);
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await kiosk.locator('[data-key="clear"]').click();
+      await typeOnKiosk(kiosk, cast.doorLast);
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await kiosk.getByRole('button', { name: '3rd grade', exact: true }).click();
+      await kiosk.getByRole('button', { name: /No allergies/i }).click();
+      await kiosk.getByRole('button', { name: /That's everyone/i }).click();
+      await typeOnKiosk(kiosk, 'Mira');
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await kiosk.locator('[data-key="clear"]').click();
+      await typeOnKiosk(kiosk, cast.doorLast);
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await typeOnKiosk(kiosk, cast.duplicatePhone);
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await kiosk.getByRole('button', { name: /^Check in$/ }).click();
+      await expect(kiosk.getByText(/is checked in\. Welcome!/i)).toBeVisible({ timeout: 30_000 });
+      await backToSearch(kiosk);
 
-      const phoneContext = await browser.newContext({ viewport: VIEWPORTS[shape].phone });
-      const phone = await phoneContext.newPage();
+      /* ================================================================== */
+      /* Act 3 — On the greeter's phone                                      */
+      /* ================================================================== */
+
+      /*
+       * A child arrives who is not on the roster at all, and no parent is at
+       * the kiosk — a greeter met the family at the door and typed the child
+       * into their own phone. Nothing on the lobby screen is touched from
+       * here to the frame where it finds them.
+       */
+      const greeterContext = await browser.newContext({
+        viewport: VIEWPORTS[shape].phone,
+      });
       try {
-        await phone.goto(`/welcome?c=${code}`);
-        await phone.getByLabel(/^First name/i).waitFor({ timeout: 30_000 });
-        await shoot(phone, 'phone', {
-          act: 'On their own phone',
-          who: 'The same family, on the device in their hand',
-          title: 'The one unauthenticated write Tally has',
+        const greeter = await greeterContext.newPage();
+        await signIn(greeter, TEAM.counselor);
+        await openCheckIn(greeter);
+        await greeter.getByRole('button', { name: /quick add a visitor/i }).click();
+        const dialog = greeter.getByRole('dialog', { name: /add a visitor/i });
+        await dialog.getByLabel(/first name/i).fill(cast.greeterChild.first);
+        await dialog.getByLabel(/last name/i).fill(cast.greeterChild.last);
+        await shoot(greeter, 'phone', {
+          act: "On the greeter's phone",
+          who: 'A leader who met the family at the door',
+          title: 'Three fields, on the phone already in hand',
           caption:
-            'The page the QR opens, on a real second device holding nothing but the code from the lobby screen. It is deliberately not a link anybody can keep: the code expires, is capped, and is re-minted while the kiosk is up. Registering remotely means being in the room — which is the entire security model, and it is the right one, because the alternative is a public form whose submissions land in a church\'s people database.',
+            'The off-device path since the phone form was retired is a person with a session, not a code with a form: any active member can add a child from the device in their pocket, with the native keyboard — which is also the answer for José and Nguyễn, names the kiosk\'s glass keyboard cannot spell. Three fields and nothing else, the same bargain the kiosk wizard makes: enough to put somebody on the roster, with the incomplete profile as the handoff to whoever follows up.',
         });
-
-        /*
-         * Deliberately a child the church already has.
-         *
-         * A parent who does not know somebody put their child on the roster
-         * last term types them in again — which is the commonest way a
-         * duplicate is born, and the exact case the door used to *refuse* and
-         * now records instead. It makes Act 5's duplicate frame a real
-         * screenshot rather than a claim about one.
-         */
-        await phone.getByLabel(/^First name/i).fill(cast.doorFirst);
-        await phone.getByLabel(/^Last name/i).fill(cast.doorLast);
-        await phone.getByLabel(/^Your first name/i).fill('Mira');
-        await phone.getByLabel(/^Your last name/i).fill(cast.doorLast);
-        await phone.getByLabel(/^Your phone number/i).fill(cast.qrPhone);
-        await shoot(phone, 'phone', {
-          act: 'On their own phone',
-          who: 'The same family, on the device in their hand',
-          title: 'A real form, because a phone can carry one',
+        await dialog.getByRole('button', { name: /save & check in|save and check in/i }).click();
+        await expect(
+          greeter.getByRole('button', {
+            name: new RegExp(`Undo check-in for ${cast.greeterChild.first}`),
+          }),
+        ).toBeVisible({ timeout: 30_000 });
+        await shoot(greeter, 'phone', {
+          act: "On the greeter's phone",
+          who: 'A leader who met the family at the door',
+          title: 'Saved, checked in, and already travelling',
           caption:
-            'Ordinary labelled inputs with the phone\'s own keyboard, which is the opposite of the kiosk\'s one-question-per-screen and right for the same reason: the constraint on the tablet was the shared glass and the queue, and neither applies here. This is also the only surface that asks about allergies, and only where the church\'s backend can actually hold them — a lobby screen does not display a child\'s medical notes, so it does not collect them.',
-        });
-
-        await phone.getByRole('button', { name: /^Register$/i }).click();
-        await expect(phone.getByText(new RegExp(cast.qrPhone.slice(-4)))).toBeVisible({
-          timeout: 30_000,
-        });
-        await shoot(phone, 'phone', {
-          act: 'On their own phone',
-          who: 'The same family, on the device in their hand',
-          title: 'The digits are the whole instruction',
-          caption:
-            'This form checks nobody in — it cannot know the family walked through the door — so it ends by sending them back to the four digits, and to nothing else. It used to say "tap I\'ve registered, then type": the kiosk\'s roster was a cache only a button refreshed, and skipping the button meant watching a screen say "no match". The button has become the machine\'s job — the code this form was opened with remembers which gathering minted it, and the kiosk is already reacting.',
+            'One press created the student, checked them in, and queued the push into the church\'s database — and the same write fired the change signal every kiosk polls. The greeter is done: no handoff, no "now go tell the kiosk", nothing to remember. The lobby screens learn about this child the same way they learn about everything now, by noticing.',
         });
       } finally {
-        await phoneContext.close();
+        await greeterContext.close();
       }
 
       /*
-       * Nobody touches the kiosk. The registration bumped the pulse naming
-       * this gathering; the kiosk's own poll takes the QR down and puts the
-       * digits line up while the family is still walking back.
+       * Nobody touches the kiosk while the greeter works. The quick-add's
+       * `onStudentCreated` trigger bumped the pulse's roster channel
+       * (debounced ~30s) and the kiosk's own thirty-second poll re-reads the
+       * roster when that revision moves, so the child is *on this device*
+       * about a minute later — which is what the wait is for.
+       *
+       * Being on the device is not the same as being in the search, and this
+       * is the frame that says so: the front door is scoped to the children
+       * who have been to this gathering, and a child created four minutes ago
+       * has been to nothing. So the press is the point. "Search everyone"
+       * widens past the scope instantly, and the read behind it is the
+       * backstop for the case where the pulse never fired at all — which is
+       * exactly the gesture greeters are trained on.
        */
-      await expect(kiosk.getByRole('button', { name: /I've registered/i })).toHaveCount(0, {
-        timeout: 60_000,
-      });
+      await kiosk.waitForTimeout(65_000);
+      await typeOnKiosk(kiosk, cast.greeterChild.first);
+      await kiosk.getByRole('button', { name: 'Search everyone' }).click();
+      await expect(
+        kiosk
+          .getByRole('button', {
+            name: new RegExp(`${cast.greeterChild.first} ${cast.greeterChild.last}`, 'i'),
+          })
+          .first(),
+      ).toBeVisible({ timeout: 30_000 });
       await shoot(kiosk, 'kiosk', {
-        act: 'On their own phone',
-        who: 'The same family, back at the lobby screen',
-        title: 'The kiosk noticed by itself',
+        act: "On the greeter's phone",
+        who: 'The same child, at the lobby screen',
+        title: 'One press, and the lobby screen has them',
         caption:
-          'No button was pressed on this screen. The phone form\'s submission bumped a one-document change signal (`kioskIndex/pulse`) naming the gathering whose kiosk minted the code, and the kiosk — which polls that signal every thirty seconds — took its own QR down, refreshed its roster, and put the search screen up with the one instruction that matters. The "I\'ve registered" button still exists behind the QR for the family who will not wait half a minute; nobody needs it.',
+          'Nobody carried anything from the phone to the glass. Creating the student bumped a one-document change signal (`kioskIndex/pulse`) that every kiosk polls every thirty seconds, so this device already held the child before a finger touched it — but the front door is scoped to the children who have been to *this* gathering, and somebody added four minutes ago has been to nothing yet. That is what the press is for, and why the button stands there on every empty search rather than appearing once: it widens past the gathering on the spot, and if the wider pool is empty too it re-reads the church behind the spinner. One gesture, and it is the same one whether the signal arrived or never fired.',
       });
-      await typeOnKiosk(kiosk, cast.qrPhone.slice(-4));
-      await expect(kiosk.getByRole('button', { name: new RegExp(cast.door, 'i') }).first())
-        .toBeVisible({ timeout: 30_000 });
-      await shoot(kiosk, 'kiosk', {
-        act: 'On their own phone',
-        who: 'The same family, back at the lobby screen',
-        title: 'Found, in a copy nobody had to refresh',
-        caption:
-          'The four digits find the child the phone created a minute ago, in the kiosk\'s own roster copy — already fresh, because the same pulse that took the QR down told this screen to re-read it. Nothing was forced and nothing was pressed. The family who takes ten minutes over the form and comes back to a kiosk that moved on is covered by the same machinery\'s last resort: a finished search that finds nobody anywhere runs the church-wide re-read by itself, silently, before the screen will say "Still no match".',
-      });
+      await kiosk.locator('[data-key="clear"]').click();
 
       /* ================================================================== */
       /* Act 4 — The second child                                            */
       /* ================================================================== */
 
       /*
-       * Straight on from the frame above, without checking her in first.
+       * The sibling Act 1's prediction left unticked, arriving on her own.
        *
-       * The offer is deliberately absent on a *collection* — the seeded Nursery
-       * tracks check-out, so a child who is already present gets a pickup
-       * screen, and a pickup is not the moment to add somebody to the roster.
-       * A family arriving is.
+       * She has to be somebody *not yet checked in*: the offer is
+       * deliberately absent on a collection — the seeded Nursery tracks
+       * check-out, so a child who is already present gets a pickup screen,
+       * and a pickup is not the moment to add somebody to the roster. A
+       * family arriving is.
        */
-      await kiosk.getByRole('button', { name: new RegExp(cast.door, 'i') }).first().click();
+      await typeOnKiosk(kiosk, cast.familyDigits);
+      await kiosk.getByRole('button', { name: new RegExp(cast.edgeChild, 'i') }).first().click();
       await shoot(kiosk, 'kiosk', {
         act: 'The second child',
         who: 'A family the church already has, growing',
@@ -633,17 +701,25 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       await kiosk.getByRole('button', { name: /Add a new child/i }).click();
       await typeOnKiosk(kiosk, 'Emil');
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      /*
+       * Typed, not carried. The wizard offers the surname of the previous
+       * child *in this run*, and a sibling run has none — the family it is
+       * joining is on the confirm screen behind it, not in the draft. So the
+       * box is empty here, which is also why the frame below no longer claims
+       * otherwise.
+       */
       await kiosk.locator('[data-key="clear"]').click();
-      await typeOnKiosk(kiosk, cast.doorLast);
+      await typeOnKiosk(kiosk, cast.edgeChild.split(' ')[1]!);
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: '2nd grade', exact: true }).click();
+      await kiosk.getByRole('button', { name: /No allergies/i }).click();
       await kiosk.getByRole('button', { name: /That's everyone/i }).click();
       await shoot(kiosk, 'kiosk', {
         act: 'The second child',
         who: 'A family the church already has, growing',
-        title: 'Two questions, and no adult at all',
+        title: 'A name, a grade, and no adult at all',
         caption:
-          'No name, no phone number, no second household invented — the confirm names the siblings this child is joining and that is the whole of it. The kiosk resolved the family from the four digits it searched with; the server re-verifies every one of those ids before believing any of them. At approval the household comes from an existing sibling, which is the fix for a real bug: a family gaining a second child used to gain a second *household*, with the first child left behind in the original and invisible from the new one.',
+          'No adult\'s name, no phone number, no second household invented — a name, a grade, one tap for allergies, and a confirm that names the siblings this child is joining. That is the whole of it. The kiosk resolved the family from the four digits it searched with; the server re-verifies every one of those ids before believing any of them. At approval the household comes from an existing sibling, which is the fix for a real bug: a family gaining a second child used to gain a second *household*, with the first child left behind in the original and invisible from the new one.',
       });
 
       await kiosk.getByRole('button', { name: /^Check in$/ }).click();
@@ -666,13 +742,13 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
        * photograph it without producing it.
        */
       await kiosk.getByRole('button', { name: /Register your child/i }).first().click();
-      await kiosk.getByRole('button', { name: /Register right here/i }).click();
       await typeOnKiosk(kiosk, 'Zuri');
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.locator('[data-key="clear"]').click();
       await typeOnKiosk(kiosk, cast.surname);
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: '1st grade', exact: true }).click();
+      await kiosk.getByRole('button', { name: /No allergies/i }).click();
       await kiosk.getByRole('button', { name: /That's everyone/i }).click();
       await typeOnKiosk(kiosk, 'Ngozi');
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
@@ -755,7 +831,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
         who: 'A child from another programme',
         title: 'And the way back out says what it does',
         caption:
-          'Narrowing a search is only safe if the way out is on the screen before it is needed. It used to be "I already registered" — a button that meant look harder for me, and swept the whole church to prove it. This one says what it does: it widens this one search to all of Tally, on the spot and without the network, because Bree was on the roster all along and only outside the scope. The offer spends itself when tapped and is back for the next family. It still says nothing about scope — a parent has no model of which children this screen is willing to find, and explaining one in order to ask them to press a button would be the wrong trade. And when the kiosk itself cannot know the scope, it widens on its own: a gathering with no history behind it searches everything, and so does a kiosk that cannot read the list at all.',
+          'Narrowing a search is only safe if the way out is on the screen before it is needed. It used to be "I already registered" — a button that meant look harder for me, and swept the whole church to prove it. This one says what it does: it widens this one search to all of Tally, on the spot and without the network, because Bree was on the roster all along and only outside the scope — there is nothing to spin about, so nothing spins. It does not leave when it is tapped, either: names collide and four digits are a small keyspace, so "widened and still not mine" is a real state and the family in it needs the button to still be there. The widening lasts one family, and clearing the buffer stands it back down. It still says nothing about scope — a parent has no model of which children this screen is willing to find, and explaining one in order to ask them to press a button would be the wrong trade. And when the kiosk itself cannot know the scope, it widens on its own: a gathering with no history behind it searches everything, and so does a kiosk that cannot read the list at all.',
       });
       await kiosk.locator('[data-key="clear"]').click();
 
@@ -792,31 +868,27 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       });
 
       /*
-       * Scrolled to, opened, and asserted before the shutter.
+       * Scrolled to and asserted before the shutter.
        *
-       * An earlier version shot this frame whenever the hint merely existed —
-       * which produced a photograph of three unrelated cards under a caption
-       * about a picker. A frame that claims something has to contain it.
+       * There is nothing to open any more: the candidates used to hide behind
+       * a picker this frame clicked, and the triage rounds brought them out
+       * onto the card. So the locator is the sentence that introduces them and
+       * the assertion is on a candidate's own line — a frame that claims
+       * something has to contain it, and an earlier version of this shot three
+       * unrelated cards under a caption about a picker.
        */
-      // The button, not the sibling card's sentence — a text-only locator
-      // matched both, and clicking a paragraph does nothing at all.
-      const duplicateHint = page
-        .getByRole('button', { name: /already on the roster/i })
-        .first();
+      const duplicateHint = page.getByText(/shares? this name/i).first();
       await duplicateHint.scrollIntoViewIfNeeded();
-      await duplicateHint.click();
-      await expect(page.getByText(/Which of these is the same child/i)).toBeVisible({
+      await expect(page.getByText(/phone digits on file/i).first()).toBeVisible({
         timeout: 10_000,
       });
-      {
-        await shoot(page, 'app', {
-          act: 'The review',
-          who: 'Core team, on a weekday',
-          title: 'This might be the Jacob Smith we already have',
-          caption:
-            'The door recorded the suspicion and did nothing about it, which is the change. It used to refuse the registration and tell the family to "search for their name instead" — an instruction to check in a different child of the same name, on an unattended screen. Two rows a reviewer merges on Tuesday is the cheaper mistake, and the only one anybody notices. The grade beside each candidate is what actually tells two children apart.',
-        });
-      }
+      await shoot(page, 'app', {
+        act: 'The review',
+        who: 'Core team, on a weekday',
+        title: 'This might be the Jacob Smith we already have',
+        caption:
+          'The door recorded the suspicion and did nothing about it, which is the change. It used to refuse the registration and tell the family to "search for their name instead" — an instruction to check in a different child of the same name, on an unattended screen. Two rows a reviewer merges on Tuesday is the cheaper mistake, and the only one anybody notices. The candidates sit open under the child rather than behind a control that has to be found and pressed: a duplicate a reviewer has to go looking for is a duplicate a reviewer skips. Each one states both of its discriminators — the grade, and whether the church already holds that row under the number this family typed — and states the negative as plainly as the positive, so "different on both" is an answer rather than a blank.',
+      });
 
       await page.getByRole('button', { name: /Approve and add/i }).first().click();
       await page.waitForTimeout(2500);
@@ -883,7 +955,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
         who: 'Core team',
         title: 'Where the church\'s database is connected',
         caption:
-          'Two backends, either or both, with what is queued and what is *waiting to be reviewed* counted separately — a family held for a person is not a stuck push, and saying "3 queued" about them would teach somebody to ignore the line that means it. The link from here is how most reviewers will find the screen in Act 5.',
+          'Two backends, either or both, with what is queued and what is *waiting to be reviewed* counted separately — a family held for a person is not a stuck push, and saying "3 queued" about them would teach somebody to ignore the line that means it. The link from here is how most reviewers will find the review screen two acts ago.',
       });
 
       await gotoReady(page, '/pair-kiosk');
@@ -975,89 +1047,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       });
       await clearKiosk();
 
-      await kiosk.route('**/mintRegistrationCode', (route) => route.abort());
-      await kiosk.getByRole('button', { name: /First time here\? Register your child/i }).click();
-      await expect(kiosk.getByText(/The code could not be fetched/i)).toBeVisible({
-        timeout: 60_000,
-      });
-      await shoot(kiosk, 'kiosk', {
-        act: "When it doesn't go that way",
-        who: 'A family with a phone and no code to scan',
-        title: 'No QR, and the other door is right there',
-        caption:
-          'The code is minted by a callable, and a callable can fail. What the screen must not do is leave a family standing in front of an empty white square wondering whether to wait — so the failure names the alternative in the same breath, and the alternative is the thing they can do without leaving the kiosk. The wizard was always one tap below the code; here it becomes the answer.',
-      });
-      await kiosk.getByRole('button', { name: /Back/i }).click();
-      await kiosk.unroute('**/mintRegistrationCode');
-      await expect(kiosk.getByText(/type a name, or the last 4 digits/i)).toBeVisible({
-        timeout: 15_000,
-      });
-
-      /* ================================================================== */
-      /* Act 10 — The phone form, when the phone form fails                  */
-      /* ================================================================== */
-
-      await kiosk.getByRole('button', { name: /First time here\? Register your child/i }).click();
-      const sadCode = ((await kiosk
-        .getByText(/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/)
-        .first()
-        .textContent()) ?? '').trim();
-
-      const sadPhoneContext = await browser.newContext({ viewport: VIEWPORTS[shape].phone });
-      try {
-        const sadPhone = await sadPhoneContext.newPage();
-
-        await sadPhone.goto('/welcome?c=ZZZZZZ');
-        await expect(sadPhone.getByText(/That code has (expired|been used)/i)).toBeVisible({
-          timeout: 60_000,
-        });
-        await shoot(sadPhone, 'phone', {
-          act: "When it doesn't go that way",
-          who: 'Somebody who kept the link',
-          title: 'A code that is no longer a door',
-          caption:
-            'This is the whole reason the registration link is not a stable URL. A code lives twenty minutes and carries twenty families, so a photograph of the lobby screen, a link forwarded to a friend, or a browser history entry from last Sunday all end here — at the only unauthenticated write surface Tally has, closed. Registering remotely means being in the room, and this screen is where that requirement is actually enforced.',
-        });
-
-        if (sadCode.length === 6) {
-          await sadPhone.goto(`/welcome?c=${sadCode}`);
-          await sadPhone.getByLabel(/^First name/i).waitFor({ timeout: 60_000 });
-          /*
-           * Every field filled but the number, and the number filled wrongly.
-           *
-           * Submitting the form *empty* photographs nothing: the fields carry
-           * `required`, so the browser blocks the submit with its own bubble
-           * and the app's validation never runs. The number is the only field
-           * with a rule beyond "not empty" anyway, which makes this the frame
-           * that was worth having.
-           */
-          await sadPhone.getByLabel(/^First name/i).fill('Tomas');
-          await sadPhone.getByLabel(/^Last name/i).fill('Halloran');
-          await sadPhone.getByLabel(/^Your first name/i).fill('Beata');
-          await sadPhone.getByLabel(/^Your last name/i).fill('Halloran');
-          await sadPhone.getByLabel(/^Your phone number/i).fill('5550');
-          await sadPhone.getByRole('button', { name: /^Register$/i }).click();
-          await expect(sadPhone.getByText(/Enter a 10-digit number/i)).toBeVisible({
-            timeout: 15_000,
-          });
-          await shoot(sadPhone, 'phone', {
-            act: "When it doesn't go that way",
-            who: 'A parent going too fast',
-            title: 'The one field with a rule beyond “not empty”',
-            caption:
-              'Half a phone number is caught in the browser and marked *on the field*, because a parent scrolling a form needs to know which box rather than that something somewhere is wrong. This is the only field checked for shape, and it earns that: it is the one the kiosk will have to match on for the rest of this family\'s time at the church, and the last four digits of a wrong number are a login nobody can use. Nothing typed is cleared and nothing was sent — the registration id was minted when this page opened and is reused on the next press, so pressing twice cannot become two families.',
-          });
-        }
-      } finally {
-        await sadPhoneContext.close();
-      }
-
-      await kiosk.getByRole('button', { name: /Back/i }).click();
-      await expect(kiosk.getByText(/type a name, or the last 4 digits/i)).toBeVisible({
-        timeout: 15_000,
-      });
-
-      /* ---- Back on the kiosk: two states of a child, and a closed door ---- */
+      /* ---- Two states of a child, and a closed door ---------------------- */
 
       /*
        * Tried in order rather than named outright: by this point in the tour
@@ -1160,5 +1150,8 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       )}\n`,
       'utf8',
     );
+  }
+  } finally {
+    await deleteDocument('config/planningCenter');
   }
 });

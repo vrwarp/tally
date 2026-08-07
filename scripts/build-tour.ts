@@ -132,7 +132,7 @@ for (const frame of frames) {
 
 const DEVICE_LABEL: Record<Device, { wide: string; tall: string }> = {
   kiosk: { wide: 'Kiosk, landscape · 1280 × 800', tall: 'Kiosk, portrait · 800 × 1280' },
-  phone: { wide: 'Phone, landscape · 844 × 420', tall: 'Phone, portrait · 400 × 860' },
+  phone: { wide: "Greeter's phone, landscape · 844 × 420", tall: "Greeter's phone, portrait · 400 × 860" },
   app: { wide: 'Desktop · 1280 × 900', tall: 'Phone · 430 × 932' },
 };
 
@@ -514,19 +514,19 @@ const html = `<title>Tally — every journey, end to end</title>
     <p class="eyebrow">Tally · the whole ministry's week</p>
     <h1>Every journey, photographed from the running app</h1>
     <p class="standfirst">
-      ${frames.length} moments across six acts — a family the church already has, a family
-      nobody has met arriving two different ways, a family gaining a second child,
-      and the core team's own week afterwards. Every frame is the real screen
-      driving the real callables against a seeded emulator: the kiosk pairing
-      handshake happens, the QR code is minted by the live callable and opened on a
-      second device, and the families at the end exist in Firestore, are checked in
-      against real gatherings, and are approved by a real core-team session.
-      Nothing here is a mockup, and no frame has been scrolled or staged to
-      flatter it.
+      ${frames.length} moments across nine acts — a family the church already has, a family
+      nobody has met at the wizard, a greeter adding a child from their own phone,
+      a family gaining a second child, and the core team's own week afterwards.
+      Every frame is the real screen driving the real callables against a seeded
+      emulator: the kiosk pairing handshake happens, the greeter's quick-add fires
+      the real trigger and the real change signal, and the families at the end
+      exist in Firestore, are checked in against real gatherings, and are approved
+      by a real core-team session. Nothing here is a mockup, and no frame has been
+      scrolled or staged to flatter it.
     </p>
     <p class="provenance">
       <span>${frames.length} frames × 2 device shapes</span>
-      <span>kiosk · phone · staff app</span>
+      <span>kiosk · greeter's phone · staff app</span>
       <span>captured by e2e/tour.spec.ts</span>
     </p>
   </header>
@@ -569,10 +569,10 @@ const md: string[] = [
   'Captured from the running app by `e2e/tour.spec.ts`. Rebuild the page with',
   '`npx tsx scripts/build-tour.ts`.',
   '',
-  'Six acts: a family the church already has, a family nobody has met arriving through the kiosk',
-  'and through the QR, a family gaining a second child, the review that turns any of it into a',
-  "record in the church's database, and the core team's own week. Each frame is shown on a wide",
-  'device and a tall one.',
+  'Nine acts: a family the church already has, a family nobody has met at the kiosk wizard, a',
+  "greeter adding a child from their own phone, a family gaining a second child, the review that",
+  "turns any of it into a record in the church's database, and the core team's own week. Each",
+  'frame is shown on a wide device and a tall one.',
   '',
 ];
 

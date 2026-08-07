@@ -4,8 +4,8 @@
  * Not a test — a documentation build, like `walkthrough.spec.ts` and
  * `parent-walkthrough.spec.ts`. Every frame is the real lobby screen driving
  * the real callable against a seeded emulator: the pairing handshake actually
- * happens, the QR code is minted by `mintRegistrationCode`, and the family at
- * the end exists in Firestore and is checked in against a real gathering.
+ * happens, and the family at the end exists in Firestore and is checked in
+ * against a real gathering.
  *
  * The whole tour runs twice, on the two shapes a kiosk is actually built in —
  * a tablet lying in a stand and one standing up in it. Neither is a phone, and
@@ -22,6 +22,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
+import { deleteDocument, writeDocument } from './support/emulator';
 import { test } from './support/fixtures';
 import { bindTo, openKiosk, pairKiosk, typeOnKiosk } from './support/kiosk';
 
@@ -92,6 +93,13 @@ const FAMILY: Record<Orientation, { surname: string; phone: string }> = {
 };
 
 test('capture the registration walkthrough', async ({ browser, page, signedInAs }) => {
+  /*
+   * Full write-back, so the wizard asks its allergies question — the binding
+   * learns the capability at bind time, which is why this precedes pairing.
+   * Deleted in the finally: the suite's default is 'create'.
+   */
+  await writeDocument('config/planningCenter', { writeBack: 'full' });
+  try {
   test.setTimeout(600_000);
   await signedInAs('core');
 
@@ -129,27 +137,15 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
           'The door is also on the screen before anybody types, in the row above the keyboard. It has to be: a parent told "just put your name in" types their child\'s name, gets somebody else\'s Noah back, and never fails a search to be offered anything. Low-key and fixed-height, so a keystroke still never moves the keyboard.',
       });
 
-      /* ---- Door one: the QR --------------------------------------------- */
+      /* ---- The wizard ----------------------------------------------------- */
 
       await kiosk.getByRole('button', { name: /Register your child/i }).click();
-      await expect(kiosk.getByLabel('Registration QR code')).toBeVisible({ timeout: 20_000 });
-      await shoot({
-        flow: 'On your own phone',
-        state: 'Choosing a door',
-        title: 'Scan this',
-        caption:
-          'The first thing offered, because a parent holding a phone would rather type on it than on a tablet bolted to a shelf — their keyboard, their autocorrect, and the queue behind them does not have to watch. The code under it is minted by the kiosk and lives twenty minutes: a stable public registration URL would be a form on the open internet whose submissions land in a church\'s real people database, so registering remotely means being in the room. The address is spelled out in words too, for a camera that will not focus.',
-      });
-
-      /* ---- Door two: the wizard ------------------------------------------ */
-
-      await kiosk.getByRole('button', { name: /Register right here/i }).click();
       await shoot({
         flow: 'Right here',
         state: 'Registering',
         title: 'The field says what it is',
         caption:
-          'For the family without a phone, one tap behind the QR — the right way round, because this is the longer of the two flows on the harder keyboard. One question per screen in the frame the search already uses. The readout names the field rather than saying "type here", which matters most on the two steps where the answer could belong to either person in the room: "Child\'s last name" and "Your last name" are the same box until one of them says which.',
+          'One tap from the offer and the first question is up — the QR screen that used to stand between them retired with the phone form it pointed at. One question per screen in the frame the search already uses. The readout names the field rather than saying "type here", which matters most on the two steps where the answer could belong to either person in the room: "Child\'s last name" and "Your last name" are the same box until one of them says which.',
       });
 
       await typeOnKiosk(kiosk, 'Chidi');
@@ -177,6 +173,14 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
       await shoot({
         flow: 'Right here',
         state: 'One child',
+        title: 'Allergies, only where they can land',
+        caption:
+          'The fourth question, and it only exists when the church\'s own database takes full write-back — the same gate the retired phone form kept, because collecting a medical note into a screen that silently drops it is worse than never asking. The common answer is the button itself: "No allergies" until a letter is typed, Next the moment one is. The note goes to the reviewer and then upstream; the kiosk keeps a marker, never the text.',
+      });
+      await kiosk.getByRole('button', { name: /No allergies/i }).click();
+      await shoot({
+        flow: 'Right here',
+        state: 'One child',
         title: 'Anybody else?',
         caption:
           'The fork that makes this worth doing at a kiosk at all: a parent with three children walks the loop three times rather than queueing three times. Who is on the list so far is named above the buttons, because the question cannot be answered against a parent\'s memory of what they typed forty seconds ago — least of all the parent of four, who is exactly who this loop is for. It is also the last chance to catch a child entered twice, or one whose name went in wrong.',
@@ -195,6 +199,7 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
 
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: '2nd grade', exact: true }).click();
+      await kiosk.getByRole('button', { name: /No allergies/i }).click();
       await shoot({
         flow: 'Right here',
         state: 'Two children',
@@ -295,6 +300,7 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
       await typeOnKiosk(kiosk, SURNAME);
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: 'Kindergarten', exact: true }).click();
+      await kiosk.getByRole('button', { name: /No allergies/i }).click();
       await kiosk.getByRole('button', { name: /That's everyone/i }).click();
       await shoot({
         flow: 'The second child',
@@ -324,4 +330,7 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
     `${JSON.stringify(shots, null, 2)}\n`,
     'utf8',
   );
+  } finally {
+    await deleteDocument('config/planningCenter');
+  }
 });
