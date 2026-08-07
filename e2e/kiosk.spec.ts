@@ -777,7 +777,16 @@ test.describe('registering a family at the kiosk', () => {
       await enterChild(kiosk, 'Juniper', 'Aldercroft', '4th grade');
       // The fourth question, which the write-back capability just unlocked.
       await expect(kiosk.getByText(/Any allergies we should know about/i)).toBeVisible();
-      await typeOnKiosk(kiosk, 'Peanuts and bee stings');
+      /*
+       * Typed lowercase; stored capped. The step shares the name keyboard's
+       * auto-shift, which capitalises at every word boundary — so what the
+       * family reads back, and what the record holds, is "Peanuts And Bee
+       * Stings". The assertions below use that form on purpose: the record
+       * equality is exact, and it is the one check the screen's
+       * case-insensitive text matching cannot quietly pass for the wrong
+       * string.
+       */
+      await typeOnKiosk(kiosk, 'peanuts and bee stings');
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
 
       await kiosk.getByRole('button', { name: /Add another child/i }).click();
@@ -795,7 +804,7 @@ test.describe('registering a family at the kiosk', () => {
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
 
       // The family checking their own typing, before it becomes a record.
-      await expect(kiosk.getByText('Allergies: Peanuts and bee stings')).toBeVisible();
+      await expect(kiosk.getByText('Allergies: Peanuts And Bee Stings')).toBeVisible();
       await kiosk.getByRole('button', { name: /Check in everyone/i }).click();
       await expect(kiosk.getByText(/are checked in\. Welcome!/i)).toBeVisible({
         timeout: 20_000,
@@ -807,17 +816,17 @@ test.describe('registering a family at the kiosk', () => {
       // the array now (nulls for none), so the earlier specs' records qualify
       // too, and this suite shares one emulator.
       const carriesNote = (doc: { data: Record<string, unknown> }) =>
-        Array.isArray(doc.data.allergies) && doc.data.allergies[0] === 'Peanuts and bee stings';
+        Array.isArray(doc.data.allergies) && doc.data.allergies[0] === 'Peanuts And Bee Stings';
       const records = await firestore.until(
         'kioskRegistrations',
         (docs) => docs.some(carriesNote),
         'the registration record carrying the allergy note',
       );
-      expect(records.find(carriesNote)!.data.allergies).toEqual(['Peanuts and bee stings', null]);
+      expect(records.find(carriesNote)!.data.allergies).toEqual(['Peanuts And Bee Stings', null]);
 
       // And the reviewer sees it on the card, beside the child it belongs to.
       await gotoReady(page, '/review');
-      await expect(page.getByText('Peanuts and bee stings')).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByText('Peanuts And Bee Stings')).toBeVisible({ timeout: 30_000 });
     } finally {
       // The suite is serial on one emulator: a leaked write-back=full would
       // flip this question on (and contact-writing behaviour) for every spec
