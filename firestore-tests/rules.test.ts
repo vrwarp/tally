@@ -540,6 +540,90 @@ describe('events', () => {
       );
     }
   });
+
+  describe('the chain references', () => {
+    /*
+     * `seriesId`, `recurrenceRootId` and `predictFromChain` are the three
+     * fields `chainKey()` chooses between, and whichever it picks becomes a
+     * document id — `skippedNights/{chainKey}`, `eventAccess/{chainKey}`, and
+     * the path these rules interpolate to find a gathering's access list.
+     *
+     * Nothing here is an escalation: every malformed value fails closed. What
+     * they are is an outage one core member can write from the event editor,
+     * on the one gathering whose ACL then cannot be found.
+     */
+    it('accepts null, which is what most gatherings carry', async () => {
+      const db = asUser(env, UID.core);
+      await assertSucceeds(
+        setDoc(doc(db, paths.event('event-no-chain')), {
+          ...eventDoc(),
+          seriesId: null,
+          recurrenceRootId: null,
+          predictFromChain: null,
+        }),
+      );
+    });
+
+    it('accepts an ordinary chain id', async () => {
+      const db = asUser(env, UID.core);
+      await assertSucceeds(
+        setDoc(doc(db, paths.event('event-chained')), {
+          ...eventDoc(),
+          seriesId: 'sunday-school',
+          recurrenceRootId: 'event-root-1',
+          predictFromChain: 'friday-fellowship',
+        }),
+      );
+    });
+
+    it('rejects a value that would slice into a different path', async () => {
+      const db = asUser(env, UID.core);
+
+      for (const seriesId of [
+        // The one that matters: a slash makes `eventAccess/$(key)` name a
+        // document two levels down that the writer chose.
+        'sunday/school',
+        '../events/event-1',
+        // Relative-path names: legal strings, illegal document ids.
+        '.',
+        '..',
+        // Non-strings do not interpolate at all.
+        42,
+        true,
+        { seriesId: 'sunday-school' },
+        ['sunday-school'],
+        // Empty is not a document id either, and `?? ` would not fall through
+        // it — `chainKey()` uses `??`, so '' wins over the root and the id.
+        '',
+        'x'.repeat(201),
+      ]) {
+        await assertFails(
+          setDoc(doc(db, paths.event('event-bad-chain')), { ...eventDoc(), seriesId }),
+        );
+      }
+    });
+
+    it('rejects it on recurrenceRootId and predictFromChain too', async () => {
+      // Same field, three names. `chainKey()` falls through seriesId to the
+      // root, and the roster reads `predictFromChain` to borrow another
+      // gathering's history — all three end up as ids.
+      const db = asUser(env, UID.core);
+
+      await assertFails(
+        setDoc(doc(db, paths.event('event-bad-root')), {
+          ...eventDoc(),
+          seriesId: null,
+          recurrenceRootId: 'sunday/school',
+        }),
+      );
+      await assertFails(
+        setDoc(doc(db, paths.event('event-bad-predict')), {
+          ...eventDoc(),
+          predictFromChain: 'sunday/school',
+        }),
+      );
+    });
+  });
 });
 
 describe('attendance', () => {

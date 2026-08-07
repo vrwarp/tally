@@ -379,6 +379,38 @@ service cloud.firestore {
           && t.copies <= 3;
       }
 
+      /**
+       * A reference to a chain: `seriesId`, `recurrenceRootId`,
+       * `predictFromChain`.
+       *
+       * These are not ordinary strings. `chainKey()` picks one of them
+       * (`src/lib/materialize.ts`) and the result becomes a *document id* — in
+       * `skippedNights/{chainKey}`, in `eventAccess/{chainKey}`, and inside
+       * these rules, where it is interpolated into a path to find the
+       * gathering's access list. A value carrying a `/` would slice into a
+       * different path than the one it names, and a non-string would not
+       * interpolate at all.
+       *
+       * Both fail closed, so this is not a way in. It is a way to a
+       * *self-inflicted outage*: one core member writing `seriesId: 42` in the
+       * editor takes that gathering — and, once the ACL lookup depends on it,
+       * its whole register — offline until somebody hand-repairs the document
+       * in the console. The four timestamps below have always been validated
+       * for the same reason. These never were.
+       *
+       * Kept to what a Firestore document id can actually be, minus the two
+       * relative-path names, which are legal strings and illegal ids.
+       */
+      function validChainRef(v) {
+        return v == null
+          || (v is string
+              && v.size() > 0
+              && v.size() <= 200
+              && !v.matches('.*/.*')
+              && v != '.'
+              && v != '..');
+      }
+
       function validEvent() {
         let d = request.resource.data;
         let recurrence = d.get('recurrence', null);
@@ -389,7 +421,10 @@ service cloud.firestore {
           && d.checkInClosesAt is timestamp
           && d.mode in ['recurring', 'oneoff']
           && (recurrence == null || validRecurrence(recurrence))
-          && (labelTemplate == null || validLabelTemplate(labelTemplate));
+          && (labelTemplate == null || validLabelTemplate(labelTemplate))
+          && validChainRef(d.get('seriesId', null))
+          && validChainRef(d.get('recurrenceRootId', null))
+          && validChainRef(d.get('predictFromChain', null));
       }
 
       allow get, list: if isActive();
