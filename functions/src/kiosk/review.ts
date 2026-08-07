@@ -38,6 +38,7 @@ import type { BackendRegistry } from '../backends/registry.js';
 import type { CreateFamilyResult } from '../backends/types.js';
 import { PATHS, SILENT_LOGGER, type FirestoreLike, type FunctionLogger } from '../firestore.js';
 import { parseStudentId, type BackendId } from '../generated/backendIds.js';
+import { PHONE_INDEX_DOC } from './phoneIndex.js';
 import { bumpPulse } from './pulse.js';
 import {
   REGISTRATIONS_COLLECTION,
@@ -59,6 +60,22 @@ export interface ReviewStudentSummary {
   /** Absent for a student whose name lives in a backend rather than here. */
   known: boolean;
   status: 'active' | 'inactive';
+  /**
+   * Whether this roster row already answers to the family's four digits.
+   *
+   * The merge decision is the one call on this screen with a right answer, and
+   * a name and a grade are often not enough to make it: two children can share
+   * both, and one child's grade rolls over between terms, so "Elena Salgado ·
+   * 8th grade" against an incoming "Elena Salgado · 7th grade" is either the
+   * same girl a year later or a different girl, and the screen could not say
+   * which. The phone index can: if the church already finds this row under the
+   * number the family just typed, they are almost certainly the same household.
+   *
+   * A fact about the guardian's record rather than a new fact about a child —
+   * the kiosk has searched on exactly these digits since it shipped — and it
+   * never *decides*, it only tells the reviewer which row to look at first.
+   */
+  sharesFamilyDigits: boolean;
 }
 
 /** One child of one registration, as typed and as it landed. */
@@ -163,6 +180,34 @@ async function namesFromBackends(
   }
 }
 
+/**
+ * The roster rows the church already finds under one set of four digits.
+ *
+ * Read once per call rather than per candidate: `kioskIndex/phones` is a single
+ * document holding the whole map, and a queue of a dozen families would
+ * otherwise re-read it thirty times. An unreadable index is simply no signal —
+ * every candidate reports `sharesFamilyDigits: false` and the screen is exactly
+ * what it was before this existed.
+ */
+async function rowsUnderDigits(db: FirestoreLike, logger: FunctionLogger): Promise<Record<string, Set<string>>> {
+  try {
+    const snapshot = await db.doc(PHONE_INDEX_DOC).get();
+    const last4 = (snapshot.exists ? (snapshot.data() ?? {}) : {}).last4;
+    if (typeof last4 !== 'object' || last4 === null) return {};
+    return Object.fromEntries(
+      Object.entries(last4 as Record<string, unknown>).map(([digits, ids]) => [
+        digits,
+        new Set(Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : []),
+      ]),
+    );
+  } catch (error) {
+    logger.warn('Could not read the phone index while listing registrations', {
+      error: String(error),
+    });
+    return {};
+  }
+}
+
 async function summarise(db: FirestoreLike, studentId: string): Promise<ReviewStudentSummary> {
   const snapshot = await db.doc(`${PATHS.students}/${studentId}`).get();
   const data = snapshot.exists ? (snapshot.data() ?? {}) : {};
@@ -181,6 +226,8 @@ async function summarise(db: FirestoreLike, studentId: string): Promise<ReviewSt
      * dependency on every backend to answer a duplicate hint.
      */
     known: firstName.length > 0 || lastName.length > 0,
+    // Filled in by the caller, which holds the digits and the index.
+    sharesFamilyDigits: false,
     status: data.status === 'inactive' ? 'inactive' : 'active',
   };
 }
@@ -200,6 +247,7 @@ export async function listPendingRegistrations(
   options: { registry?: BackendRegistry; logger?: FunctionLogger } = {},
 ): Promise<PendingRegistration[]> {
   const logger = options.logger ?? SILENT_LOGGER;
+  const underDigits = await rowsUnderDigits(db, logger);
   const snapshot = await db.collection(REGISTRATIONS_COLLECTION).get();
   const rows: PendingRegistration[] = [];
 
@@ -266,6 +314,24 @@ export async function listPendingRegistrations(
     rows.flatMap((row) => [...row.anchors, ...row.children.flatMap((c) => c.possibleDuplicates)]),
     logger,
   );
+
+  /*
+   * Which candidates the church already finds under this family's own digits.
+   *
+   * The strongest evidence the screen can offer for "these two rows are one
+   * child", and it is evidence rather than a verdict: the reviewer still
+   * chooses. Anchors are deliberately left alone — a verified sibling is not a
+   * duplicate, and marking them would put a hint on a row nobody is judging.
+   */
+  for (const row of rows) {
+    const family = underDigits[row.last4];
+    if (!family) continue;
+    for (const child of row.children) {
+      for (const candidate of child.possibleDuplicates) {
+        candidate.sharesFamilyDigits = family.has(candidate.studentId);
+      }
+    }
+  }
 
   return rows.sort((a, b) => (b.registeredAt ?? 0) - (a.registeredAt ?? 0));
 }

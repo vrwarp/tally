@@ -18,6 +18,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { BackendRegistry } from '../backends/registry.js';
 import type { CreateFamilyResult, PeopleBackend } from '../backends/types.js';
 import { FakeFirestore } from '../testing/fakeFirestore.js';
+import { PHONE_INDEX_DOC } from './phoneIndex.js';
 import { PULSE_DOC } from './pulse.js';
 import { REGISTRATIONS_COLLECTION } from './registration.js';
 import { approveRegistration, discardRegistration, listPendingRegistrations } from './review.js';
@@ -160,6 +161,9 @@ describe('what a reviewer is shown', () => {
         grade: 9,
         known: true,
         status: 'active',
+        // No phone index seeded here, so no signal either way — see the two
+        // tests below for what this field is for.
+        sharesFamilyDigits: false,
       },
     ]);
     expect(row!.children[1]!.possibleDuplicates).toEqual([]);
@@ -171,6 +175,37 @@ describe('what a reviewer is shown', () => {
 
     const [row] = await listPendingRegistrations(db, NOW);
     expect(row!.children[0]!.possibleDuplicates[0]!.known).toBe(false);
+  });
+
+  it('marks the candidate the church already finds under the family’s own digits', async () => {
+    /*
+     * A name and a grade are often not enough: two children can share both, and
+     * a grade rolls over between terms. The phone index settles it — if the
+     * church already answers for that roster row under the number this family
+     * typed, they are almost certainly the same household.
+     */
+    const db = dbWithRegistration({
+      last4: '3344',
+      possibleDuplicateOf: { '0': ['roster-same-family', 'roster-stranger'] },
+    });
+    db.seed('students/roster-same-family', { firstName: 'Robin', lastName: 'Fields', status: 'active' });
+    db.seed('students/roster-stranger', { firstName: 'Robin', lastName: 'Fields', status: 'active' });
+    db.seed(PHONE_INDEX_DOC, { last4: { '3344': ['roster-same-family'] } });
+
+    const [row] = await listPendingRegistrations(db, NOW);
+    const [sameFamily, stranger] = row!.children[0]!.possibleDuplicates;
+    expect(sameFamily!.sharesFamilyDigits).toBe(true);
+    // Two rows with the same name and the same grade, and only one of them is
+    // this family's — which is the whole reason the flag exists.
+    expect(stranger!.sharesFamilyDigits).toBe(false);
+  });
+
+  it('treats a missing phone index as no signal rather than as no match', async () => {
+    const db = dbWithRegistration({ possibleDuplicateOf: { '0': ['roster-1'] } });
+    db.seed('students/roster-1', { firstName: 'Robin', lastName: 'Fields', status: 'active' });
+
+    const [row] = await listPendingRegistrations(db, NOW);
+    expect(row!.children[0]!.possibleDuplicates[0]!.sharesFamilyDigits).toBe(false);
   });
 
   it('asks the backend for the names it holds, so a candidate is never anonymous', async () => {

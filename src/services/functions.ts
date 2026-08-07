@@ -713,6 +713,13 @@ export interface ReviewStudentSummary {
   /** False when the name lives in a backend rather than in Tally. */
   known: boolean;
   status: 'active' | 'inactive';
+  /**
+   * Whether the church already finds this roster row under the family's own
+   * four digits — the strongest evidence the screen can offer that two rows
+   * are one child, and evidence rather than a verdict. Optional so an older
+   * callable's answer still typechecks; absent reads as "no signal".
+   */
+  sharesFamilyDigits?: boolean;
 }
 
 /** Mirrors `PendingRegistrationChild` in functions/src/kiosk/review.ts. */
