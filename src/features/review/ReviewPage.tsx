@@ -23,7 +23,7 @@
  * family. **Merge** folds a child into the roster row they duplicate. **Not
  * ours** takes the whole registration off the roster and forgets the number.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { PageFrame } from '@/components/PageFrame';
 import {
@@ -38,7 +38,7 @@ import {
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { formatRelative } from '@/lib/time';
-import { gradeSentence, initials } from '@/lib/utils';
+import { cn, gradeSentence, initials } from '@/lib/utils';
 import {
   approveRegistration,
   discardRegistration,
@@ -178,37 +178,56 @@ export function ReviewPage() {
           />
         </Card>
       ) : (
-        queue.map((row) => (
-          <RegistrationCard
-            key={row.registrationId}
-            row={row}
-            gatheringTitle={titleOf(row.eventId)}
-            busy={busy === row.registrationId}
-            disabled={busy !== null}
-            onApprove={() =>
-              void act(row.registrationId, async () => {
-                const { data } = await approveRegistration({
-                  registrationId: row.registrationId,
-                });
-                return data.message;
-              })
-            }
-            onDiscard={() =>
-              void act(row.registrationId, async () => {
-                const { data } = await discardRegistration({
-                  registrationId: row.registrationId,
-                });
-                return data.message;
-              })
-            }
-            onMerge={(keeperId, foldId) =>
-              void act(row.registrationId, async () => {
-                const { data } = await mergeStudents({ keeperId, foldId });
-                return data.message;
-              })
-            }
-          />
-        ))
+        <>
+          {/*
+            Columns rather than a grid, at pointer widths.
+
+            A two-track *grid* aligns its rows to the tallest card in each, so a
+            short family reserved the height of the tall one beside it and the
+            hardest card in the queue — the one whose push half-failed — was
+            pushed alone below the fold with half a screen of empty column next
+            to it. Columns pack by height and keep the document order, so the
+            deadline-first sort still reads straight down.
+          */}
+          <div className="flex flex-col gap-4 lg:block lg:columns-2 lg:gap-8">
+            {queue.map((row) => (
+              <RegistrationCard
+                key={row.registrationId}
+                row={row}
+                gatheringTitle={titleOf(row.eventId)}
+                busy={busy === row.registrationId}
+                disabled={busy !== null}
+                onApprove={(withoutGuardian) =>
+                  void act(row.registrationId, async () => {
+                    const { data } = await approveRegistration({
+                      registrationId: row.registrationId,
+                      ...(withoutGuardian ? { withoutGuardian: true } : {}),
+                    });
+                    return data.message;
+                  })
+                }
+                onDiscard={() =>
+                  void act(row.registrationId, async () => {
+                    const { data } = await discardRegistration({
+                      registrationId: row.registrationId,
+                    });
+                    return data.message;
+                  })
+                }
+                onMerge={(keeperId, foldId) =>
+                  void act(row.registrationId, async () => {
+                    const { data } = await mergeStudents({ keeperId, foldId });
+                    return data.message;
+                  })
+                }
+              />
+            ))}
+          </div>
+          {/* The one thing the queue never said: that this is all of it. */}
+          <p className="text-center text-sm text-ink-500">
+            That is all {rows.length}. Nothing else is waiting to be reviewed.
+          </p>
+        </>
       )}
     </PageFrame>
   );
@@ -223,9 +242,61 @@ interface RegistrationCardProps {
   gatheringTitle: string | null;
   busy: boolean;
   disabled: boolean;
-  onApprove: () => void;
+  onApprove: (withoutGuardian?: boolean) => void;
   onDiscard: () => void;
   onMerge: (keeperId: string, foldId: string) => void;
+}
+
+/**
+ * A decision, which on this screen means a sentence and then the control.
+ *
+ * Above rather than below, and that is the whole point: a caption under a
+ * full-width button on a phone sits in the patch a right thumb covers while
+ * pressing it, and it is the half that falls off the bottom of the screen
+ * behind the tab bar. The sentence is the mechanism — every control here
+ * either writes somewhere with no undo or forgets a phone number — so the
+ * sentence is what must survive.
+ */
+function Decision({ caption, children }: { caption: ReactNode; children: ReactNode }) {
+  return (
+    <div className="flex min-w-0 flex-col items-start gap-1.5">
+      <p className={CAPTION}>{caption}</p>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * One step up on a phone, unchanged on a laptop.
+ *
+ * These lines used to be the same size as the grade under a child's name, so
+ * a standing reader got no rank cue between "9th grade" and the sentence
+ * saying a push cannot be undone. A seated reader at a 568px column does not
+ * need the extra size; a standing one at 390px does.
+ */
+const CAPTION = 'text-sm text-ink-400 lg:text-xs';
+
+/**
+ * The state's consequence, in one voice for every state.
+ *
+ * Deliberately not tinted. The header badge owns the card's one colour and
+ * says *what* the state is; this says what it costs. When both were coloured a
+ * card read as one alarm restated twice, and the eye took the pair as a single
+ * amber region rather than as a chain.
+ */
+const STRIP = 'rounded-xl bg-ink-800/50 px-3 py-2 text-sm text-ink-300 ring-1 ring-ink-700';
+
+/** The children a reviewer's decision would still act on. */
+function stillHeld(row: PendingRegistration): PendingRegistrationChild[] {
+  return row.children.filter((child) => child.pendingReview && !child.mergedIntoStudentId);
+}
+
+/** "Ade, Chidi and Ngozi" — names, because a count is not a person. */
+function listNames(children: PendingRegistrationChild[]): string {
+  const names = children.map((child) => child.firstName).filter(Boolean);
+  if (names.length === 0) return 'these children';
+  if (names.length === 1) return names[0]!;
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 }
 
 function RegistrationCard({
@@ -238,14 +309,39 @@ function RegistrationCard({
   onMerge,
 }: RegistrationCardProps) {
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
+  const [confirmingApprove, setConfirmingApprove] = useState(false);
+  /**
+   * What a reviewer has said about each flagged child, this session.
+   *
+   * A candidate id means "this is that child" and has already been sent; the
+   * literal `'new'` means "none of these is them", which is an assertion by a
+   * person and not a fact about the world — so it stays local and reversible
+   * until they approve, and never round-trips to the server.
+   */
+  const [resolution, setResolution] = useState<Record<string, string | 'new'>>({});
   const when = row.registeredAt === null ? null : new Date(row.registeredAt);
   const expiringSoon = row.expiresInMs !== null && row.expiresInMs < EXPIRING_SOON_MS;
   // Rounded up, and floored at one: a record with six hours left has "1 day",
   // never "0 days", which reads as already gone.
   const daysLeft = Math.max(1, Math.ceil((row.expiresInMs ?? 0) / DAY_MS));
 
+  const held = stillHeld(row);
+  /*
+   * The children whose name collision nobody has decided yet.
+   *
+   * This is what holds the approve button. The card names the mistake —
+   * "somebody with this name is already on the roster" — and used to offer, in
+   * the same brand blue as a routine family, the button that makes a second
+   * one permanently in a database with no delete. Choosing a candidate settles
+   * it and so does saying the child is new; "Not ours" is never held, so
+   * nobody is stuck on a card they cannot decide.
+   */
+  const unsettled = held.filter(
+    (child) => child.studentId && candidatesFor(child).length > 0 && !resolution[child.studentId],
+  );
+
   return (
-    <Card>
+    <Card className={cn('mb-4 lg:mb-8 lg:break-inside-avoid', confirmingApprove && 'ring-warn-500/50')}>
       <CardHeader
         title={
           row.guardian
@@ -262,6 +358,26 @@ function RegistrationCard({
           .filter(Boolean)
           .join(' ')}
         count={row.children.length}
+        /*
+          The state, in two or three words, and the only coloured thing on the
+          card. Absence is the signal for the routine family: no badge means
+          nothing here needs a judgement, only a yes.
+        */
+        action={
+          confirmingApprove ? (
+            <Badge tone="warn">Confirm to add</Badge>
+          ) : row.lastError ? (
+            <Badge tone="danger">Push failed</Badge>
+          ) : expiringSoon ? (
+            <Badge tone="warn">
+              {daysLeft} {daysLeft === 1 ? 'day' : 'days'} left
+            </Badge>
+          ) : unsettled.length > 0 ? (
+            <Badge tone="warn">Possible duplicate</Badge>
+          ) : row.anchors.length > 0 ? (
+            <Badge tone="neutral">Joins a family on file</Badge>
+          ) : undefined
+        }
       />
 
       {/*
@@ -283,9 +399,20 @@ function RegistrationCard({
           is stated precisely.
         */}
         {expiringSoon ? (
-          <p className="rounded-xl bg-warn-500/10 px-3 py-2 text-sm text-warn-400 ring-1 ring-warn-500/30">
-            Clears in {daysLeft} {daysLeft === 1 ? 'day' : 'days'} and takes the phone number with
-            it. The children stay on Tally&rsquo;s roster with nobody attached to them.
+          <p className={STRIP}>
+            When it clears, the phone number goes with it — and the children stay on
+            Tally&rsquo;s roster with nobody attached to them.
+          </p>
+        ) : null}
+
+        {/*
+          The collision, stated as the rule rather than as a hypothetical,
+          because the button below is held until it is settled.
+        */}
+        {unsettled.length > 0 ? (
+          <p className={STRIP}>
+            Nothing here can be added until {listNames(unsettled)}&rsquo;s row is settled below: a
+            second {unsettled[0]!.firstName} in the church&rsquo;s database could not be removed.
           </p>
         ) : null}
 
@@ -298,19 +425,19 @@ function RegistrationCard({
           inverts the severity the tokens exist to express. 400 is the rung
           `warn-400` already sits on, so hue is the only difference now.
         */}
-        {row.lastError ? (
-          <p className="rounded-xl bg-danger-500/10 px-3 py-2 text-sm text-danger-400 ring-1 ring-danger-500/30">
-            Last attempt did not finish: {row.lastError}
-          </p>
-        ) : null}
+        {row.lastError ? <p className={STRIP}>Last attempt did not finish: {row.lastError}</p> : null}
 
         {row.guardian ? (
-          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-            <dt className="text-ink-500">Brought by</dt>
-            <dd className="text-ink-200">{nameOf(row.guardian)}</dd>
-            <dt className="text-ink-500">Phone</dt>
-            <dd className="tabular-nums text-ink-200">{formatPhone(row.guardian.phone)}</dd>
-          </dl>
+          /*
+            The number, and only the number. The guardian's name is the card's
+            own title one line above, so a two-row grid was carrying one new
+            fact and a label column whose width pushed the values onto a fourth
+            left edge that lined up with nothing.
+          */
+          <p className="flex flex-wrap items-baseline gap-x-3 text-sm">
+            <span className="text-ink-500">Phone</span>
+            <span className="tabular-nums text-ink-200">{formatPhone(row.guardian.phone)}</span>
+          </p>
         ) : row.anchors.length > 0 ? (
           /*
             No guardian, and nothing wrong with that: this is a parent adding a
@@ -319,7 +446,7 @@ function RegistrationCard({
             saying "this registration did not finish" here, as an earlier
             version did, accuses a working flow of being broken.
           */
-          <p className="text-sm text-ink-400">
+          <p className={STRIP}>
             {/* Not "a brother or sister": what the kiosk verified is that these
                 children arrived with those roster members, and it inferred the
                 family from four phone digits. A reviewer deciding on a Tuesday
@@ -341,39 +468,155 @@ function RegistrationCard({
               key={child.studentId ?? `${child.firstName}:${index}`}
               child={child}
               disabled={disabled}
-              onMerge={onMerge}
+              resolution={child.studentId ? resolution[child.studentId] : undefined}
+              onResolve={(choice) => {
+                if (!child.studentId) return;
+                setResolution((held) => ({ ...held, [child.studentId!]: choice }));
+                // A candidate is a real decision about the roster and goes to
+                // the server; "new" is a reviewer's assertion and stays here.
+                if (choice !== 'new') onMerge(choice, child.studentId);
+              }}
             />
           ))}
         </ul>
 
-        <div className="flex flex-wrap gap-2">
-          <Button onClick={onApprove} disabled={disabled} aria-busy={busy || undefined}>
-            {row.settled ? 'Finish adding them' : 'Approve and add'}
-          </Button>
-          {confirmingDiscard ? (
+        {/*
+          The foot: two decisions, and the same two slots whether the card is
+          resting or armed.
+
+          Arming swaps what is *in* the slots rather than building a different
+          object — Cancel takes the slot the approve button was in, which is the
+          rectangle a finger or cursor has just left, and the commit takes the
+          second slot with its sentence immediately above it. A repeat press on
+          an apparently-unresponsive control therefore cancels, which is the
+          correct failure for the only action in this app that cannot be undone.
+        */}
+        <div className="mt-1 flex flex-col gap-5 border-t border-ink-800 pt-4 lg:grid lg:grid-cols-2 lg:gap-6">
+          {confirmingApprove ? (
             <>
-              <Button variant="danger" onClick={onDiscard} disabled={disabled}>
-                Yes, take them off
-              </Button>
-              <Button variant="ghost" onClick={() => setConfirmingDiscard(false)}>
-                Cancel
-              </Button>
+              <Decision caption="Leaves this family in the queue. Nothing is sent to the church’s database and nothing is lost.">
+                <Button
+                  variant="secondary"
+                  className="mt-auto min-h-12 w-full lg:w-auto"
+                  onClick={() => setConfirmingApprove(false)}
+                >
+                  Cancel
+                </Button>
+              </Decision>
+              <Decision
+                caption={
+                  <span className="text-warn-400">
+                    {listNames(held)} {held.length === 1 ? 'goes' : 'go'} into the church&rsquo;s
+                    database now. Nothing added there can be deleted or taken back.
+                  </span>
+                }
+              >
+                <Button
+                  className="mt-auto min-h-12 w-full lg:w-auto"
+                  onClick={() => {
+                    setConfirmingApprove(false);
+                    onApprove();
+                  }}
+                  disabled={disabled}
+                  aria-busy={busy || undefined}
+                >
+                  Yes — add {held.length === 1 ? listNames(held) : `${held.length} children`}
+                </Button>
+              </Decision>
             </>
           ) : (
-            <Button
-              variant="secondary"
-              onClick={() => setConfirmingDiscard(true)}
-              disabled={disabled}
-            >
-              Not ours
-            </Button>
+            <>
+              <Decision
+                caption={
+                  unsettled.length > 0
+                    ? `Waiting on ${listNames(unsettled)}’s row. Choose who they already are, or say they are new — then this adds ${listNames(held)} for good.`
+                    : `Adds ${listNames(held)} to the church’s database. Nothing added there can be taken back.`
+                }
+              >
+                <Button
+                  className="mt-auto min-h-12 w-full lg:w-auto"
+                  onClick={() => setConfirmingApprove(true)}
+                  disabled={disabled || unsettled.length > 0}
+                  aria-busy={busy || undefined}
+                >
+                  {row.settled ? 'Finish adding them' : 'Approve and add'}
+                </Button>
+              </Decision>
+
+              {confirmingDiscard ? (
+                <Decision
+                  caption={
+                    <span className="text-warn-400">
+                      Takes {listNames(held)} off the roster
+                      {row.guardian ? ` and forgets ${formatPhone(row.guardian.phone)}` : ''} for
+                      good. Their check-in history is kept, and only a new registration at the
+                      kiosk brings them back.
+                    </span>
+                  }
+                >
+                  <div className="mt-auto flex w-full flex-col gap-2 lg:w-auto lg:flex-row">
+                    <Button
+                      variant="danger"
+                      className="min-h-12 w-full lg:w-auto"
+                      onClick={onDiscard}
+                      disabled={disabled}
+                    >
+                      Yes, take them off
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="min-h-12 w-full lg:w-auto"
+                      onClick={() => setConfirmingDiscard(false)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </Decision>
+              ) : (
+                <Decision
+                  caption={
+                    row.guardian
+                      ? `Takes ${listNames(held)} off the roster and forgets ${formatPhone(row.guardian.phone)} for good.`
+                      : `Takes ${listNames(held)} off the roster. No number was given, so nothing else is lost.`
+                  }
+                >
+                  <Button
+                    variant="secondary"
+                    className="mt-auto min-h-12 w-full lg:w-auto"
+                    onClick={() => setConfirmingDiscard(true)}
+                    disabled={disabled}
+                  >
+                    Not ours
+                  </Button>
+                </Decision>
+              )}
+            </>
           )}
         </div>
-        {confirmingDiscard ? (
-          <p className="text-xs text-ink-500">
-            Takes {row.children.length === 1 ? 'this child' : 'these children'} off the roster and
-            forgets the phone number. Their check-in history is kept.
-          </p>
+
+        {/*
+          The instrument a half-failed push actually needs.
+
+          Offered only when the *adult* is what the backend refused: that is
+          usually refused for a reason no retry can fix — a number it already
+          holds for somebody outside this household — so a reviewer whose only
+          other moves are "try again for ever" or "discard a family whose
+          children are already upstream" has no way to end the job. A child-side
+          failure is left alone, because retrying that one usually works.
+        */}
+        {row.lastError && row.lastErrorKind !== 'children' && row.guardian ? (
+          <Decision
+            caption={`Adds ${listNames(held)} with no adult attached, and forgets ${formatPhone(row.guardian.phone)}. Somebody has to join them to a household in the church’s database afterwards.`}
+          >
+            <Button
+              variant="secondary"
+              className="min-h-12 w-full lg:w-auto"
+              onClick={() => onApprove(true)}
+              disabled={disabled}
+            >
+              Add the children without {row.guardian.firstName}
+            </Button>
+          </Decision>
         ) : null}
       </div>
     </Card>
@@ -384,24 +627,28 @@ function RegistrationCard({
 /* One child, and who they might already be                                    */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * The roster rows a child might already be, and the choice between them.
+ *
+ * Always open, never behind a link. The control that prevents a permanent
+ * duplicate used to be twelve pixels of amber text with no chrome, sitting a
+ * thumb's width above the button that makes one — and the facts that settle
+ * the question were behind pressing it. They are the comparison; they belong
+ * in front of the person making it.
+ */
 function ChildRow({
   child,
   disabled,
-  onMerge,
+  resolution,
+  onResolve,
 }: {
   child: PendingRegistrationChild;
   disabled: boolean;
-  onMerge: (keeperId: string, foldId: string) => void;
+  /** A candidate id, `'new'`, or nothing decided yet. */
+  resolution: string | 'new' | undefined;
+  onResolve: (choice: string | 'new') => void;
 }) {
-  const [picking, setPicking] = useState(false);
-  // Nothing left to decide once a reviewer has decided: a merged child is the
-  // row it was folded into, and offering the picker again would invite folding
-  // it a second time.
-  const candidates = child.mergedIntoStudentId
-    ? []
-    : child.possibleDuplicates.filter(
-        (candidate) => candidate.status === 'active' && candidate.studentId !== child.studentId,
-      );
+  const candidates = candidatesFor(child);
 
   return (
     <li className="rounded-xl bg-ink-950 px-3 py-2.5 ring-1 ring-ink-800">
@@ -424,67 +671,156 @@ function ChildRow({
           </span>
           <span className="block truncate text-xs text-ink-500">
             {gradeSentence(child) ?? 'No grade given'}
-            {child.allergies ? ` · ${child.allergies}` : ''}
           </span>
+          {/*
+            The allergy on its own line, a rung up the ramp. Joined to the grade
+            by a middle dot it rendered exactly like "4th grade" — a fact of an
+            entirely different kind in the card's quietest voice.
+          */}
+          {child.allergies ? (
+            <span className="mt-0.5 block text-xs text-ink-300">{child.allergies}</span>
+          ) : null}
         </span>
+        {/*
+          A plain label, not a pill: the filled ringed chip belongs to the card
+          header, where it says what the whole family's state is. Two objects of
+          identical form at two scopes made position the only thing carrying the
+          difference.
+        */}
         {child.mergedIntoStudentId ? (
-          <Badge tone="neutral">Merged</Badge>
+          <span className="shrink-0 text-xs text-ink-400">Merged</span>
         ) : child.pendingReview ? null : (
-          <Badge tone="success">Added</Badge>
+          <span className="shrink-0 text-xs text-ink-400">Added</span>
         )}
       </div>
 
-      {/*
-        The suspicion, stated as one. The door recorded that this name already
-        exists and did nothing about it, deliberately — a name is not an
-        identity, and the grade beside it is what tells two Jacob Smiths apart.
-      */}
       {candidates.length > 0 && child.studentId ? (
-        <div className="mt-2 border-t border-ink-800 pt-2">
-          {picking ? (
-            <>
-              <p className="text-xs font-semibold text-ink-200">
-                Which of these is the same child? Their check-ins will be kept together.
-              </p>
-              <ul className="mt-1.5 flex flex-col gap-1">
-                {candidates.map((candidate) => (
-                  <li key={candidate.studentId}>
-                    <button
-                      type="button"
-                      disabled={disabled}
-                      onClick={() => {
-                        setPicking(false);
-                        onMerge(candidate.studentId, child.studentId!);
-                      }}
-                      className="flex min-h-11 w-full items-center rounded-lg bg-ink-900 px-3 py-2 text-left text-sm text-ink-200 ring-1 ring-ink-800 transition-colors active:bg-ink-800 disabled:opacity-60"
-                    >
-                      {summaryLabel(candidate)}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              <button
-                type="button"
-                onClick={() => setPicking(false)}
-                className="mt-1.5 text-xs text-ink-500 hover:text-ink-300"
-              >
-                None of them — {child.firstName} is new
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setPicking(true)}
-              disabled={disabled}
-              className="text-xs text-warn-400 hover:underline disabled:opacity-60"
-            >
-              {candidates.length === 1
-                ? 'Somebody with this name is already on the roster'
-                : `${candidates.length} students with this name are already on the roster`}
-            </button>
-          )}
+        /*
+          `ml-12` is the avatar plus the gap after it — where this child's own
+          name starts. The candidates are being compared *to that name*, so they
+          hang under it rather than 12px to its left.
+        */
+        <div className="mt-3 ml-12 border-t border-ink-800 pt-3">
+          <p className="text-sm font-semibold text-ink-200 lg:text-xs">
+            {candidates.length === 1
+              ? 'One student on the roster shares this name.'
+              : `${candidates.length} students on the roster share this name.`}
+          </p>
+          <p className={cn('mt-0.5', CAPTION)}>
+            Merging can be undone. A duplicate in the church&rsquo;s database cannot.
+          </p>
+
+          <ul
+            className={cn(
+              'mt-2 flex flex-col gap-1.5',
+              candidates.length > 1 && 'lg:grid lg:grid-cols-2 lg:gap-x-6',
+            )}
+          >
+            {candidates.map((candidate) => (
+              <li key={candidate.studentId}>
+                <CandidateButton
+                  candidate={candidate}
+                  child={child}
+                  chosen={resolution === candidate.studentId}
+                  disabled={disabled}
+                  onChoose={() => onResolve(candidate.studentId)}
+                />
+              </li>
+            ))}
+          </ul>
+
+          {/*
+            Outside the list, because it is not a candidate — it was pixel-
+            identical to one, in a set the reader is meant to compare. And it is
+            a real answer now rather than a way to close a panel: saying the
+            child is new is what releases the card's approve button.
+          */}
+          <button
+            type="button"
+            disabled={disabled}
+            aria-pressed={resolution === 'new'}
+            onClick={() => onResolve('new')}
+            className={cn(
+              'mt-1.5 flex min-h-12 w-full items-center rounded-lg px-3 py-2 text-left text-sm ring-1 transition-colors disabled:opacity-60 pointer-fine:min-h-9',
+              resolution === 'new'
+                ? 'bg-brand-500/15 text-brand-300 ring-brand-500/40'
+                : 'text-ink-400 ring-ink-800 active:bg-ink-900',
+            )}
+          >
+            {resolution === 'new' ? '✓ ' : ''}
+            None of them — {child.firstName} is new
+          </button>
         </div>
       ) : null}
     </li>
+  );
+}
+
+/**
+ * One roster row a child might be, with the evidence for and against.
+ *
+ * Two independent discriminators, because a name and a grade often are not
+ * enough: two children can share both, and a grade rolls over between terms.
+ * The digits line is the strongest — if the church already finds that row
+ * under the number this family typed, they are almost certainly one household
+ * — and the weighted grade is the second. Neither sorts, recommends or
+ * pre-selects: the negative is stated as plainly as the positive, so
+ * "different on both" is a visible answer rather than a blank.
+ */
+function CandidateButton({
+  candidate,
+  child,
+  chosen,
+  disabled,
+  onChoose,
+}: {
+  candidate: ReviewStudentSummary;
+  child: PendingRegistrationChild;
+  chosen: boolean;
+  disabled: boolean;
+  onChoose: () => void;
+}) {
+  const sameGrade = candidate.grade !== null && candidate.grade === child.grade;
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      aria-pressed={chosen}
+      onClick={onChoose}
+      className={cn(
+        'flex min-h-12 w-full flex-col justify-center rounded-lg px-3 py-2 text-left ring-1 transition-colors disabled:opacity-60 pointer-fine:min-h-9',
+        chosen
+          ? 'bg-brand-500/15 text-brand-300 ring-brand-500/40'
+          : 'bg-ink-900 text-ink-200 ring-ink-700 active:bg-ink-800',
+      )}
+    >
+      <span className="truncate text-sm">
+        {chosen ? '✓ ' : ''}
+        {candidate.known ? nameOf(candidate) : 'A student on the roster'}
+        {' · '}
+        <span className={sameGrade ? 'font-semibold text-ink-100' : 'text-ink-400'}>
+          {gradeSentence(candidate) ?? 'no grade on file'}
+        </span>
+      </span>
+      <span className={cn('mt-0.5', candidate.sharesFamilyDigits ? 'text-ink-300' : 'text-ink-500', 'text-sm lg:text-xs')}>
+        {candidate.sharesFamilyDigits
+          ? 'Same phone digits on file.'
+          : 'Different phone digits on file.'}
+      </span>
+    </button>
+  );
+}
+
+/**
+ * The rows still worth offering as a duplicate of this child.
+ *
+ * Inactive rows are gone by the time a reviewer looks, a child cannot be a
+ * duplicate of themselves, and a child already merged has nothing left to
+ * decide — offering the picker again would invite folding them a second time.
+ */
+function candidatesFor(child: PendingRegistrationChild): ReviewStudentSummary[] {
+  if (child.mergedIntoStudentId) return [];
+  return child.possibleDuplicates.filter(
+    (candidate) => candidate.status === 'active' && candidate.studentId !== child.studentId,
   );
 }

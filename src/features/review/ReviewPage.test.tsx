@@ -102,8 +102,9 @@ describe('what a reviewer sees', () => {
     mount();
     // The number, not "soon": two days is worth phoning the family before the
     // record goes, two hours is not, and a reviewer can only weigh one of those.
-    expect(await screen.findByText(/Clears in 2 days/i)).toBeInTheDocument();
-    expect(screen.getByText(/takes the phone number with it/i)).toBeInTheDocument();
+    // The badge carries the number; the strip carries what it costs.
+    expect(await screen.findByText(/2 days left/i)).toBeInTheDocument();
+    expect(screen.getByText(/the phone number goes with it/i)).toBeInTheDocument();
   });
 
   it('puts the family closest to being swept first, whatever the server sorted by', async () => {
@@ -177,15 +178,36 @@ describe('a name that already exists', () => {
       ],
     });
 
-  it('offers the grade, which is the only thing telling two of them apart', async () => {
+  it('shows the candidates without being asked, because they are the comparison', async () => {
+    listPendingRegistrations.mockResolvedValue({ data: [withDuplicate()] });
+    mount();
+
+    // The door deliberately did not decide this. A reviewer cannot either,
+    // from a name alone — so the row that would be merged says its grade, and
+    // it says it before anybody presses anything.
+    expect(
+      await screen.findByRole('button', { name: /Robin Fields · 9th grade/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/One student on the roster shares this name/i)).toBeInTheDocument();
+  });
+
+  it('will not approve while the collision is unresolved', async () => {
+    /*
+     * The card names the mistake and explains it; it must not also offer it.
+     * A second Robin Fields in the church's database cannot be removed.
+     */
     listPendingRegistrations.mockResolvedValue({ data: [withDuplicate()] });
     const user = userEvent.setup();
     mount();
 
-    await user.click(await screen.findByText(/already on the roster/i));
-    // The door deliberately did not decide this. A reviewer cannot either,
-    // from a name alone — so the row that would be merged says its grade.
-    expect(screen.getByRole('button', { name: /Robin Fields · 9th grade/ })).toBeInTheDocument();
+    const approve = await screen.findByRole('button', { name: /Approve and add/i });
+    expect(approve).toBeDisabled();
+    expect(screen.getByText(/Waiting on Robin’s row/i)).toBeInTheDocument();
+    // Never held: a reviewer must always be able to say this is not their family.
+    expect(screen.getByRole('button', { name: /Not ours/i })).toBeEnabled();
+
+    await user.click(screen.getByRole('button', { name: /Robin is new/i }));
+    expect(screen.getByRole('button', { name: /Approve and add/i })).toBeEnabled();
   });
 
   it('merges into the row that was already there, not the other way round', async () => {
@@ -193,24 +215,67 @@ describe('a name that already exists', () => {
     const user = userEvent.setup();
     mount();
 
-    await user.click(await screen.findByText(/already on the roster/i));
-    await user.click(screen.getByRole('button', { name: /Robin Fields · 9th grade/ }));
+    await user.click(await screen.findByRole('button', { name: /Robin Fields · 9th grade/ }));
 
     await waitFor(() =>
       expect(mergeStudents).toHaveBeenCalledWith({ keeperId: 'pco_7', foldId: 'held-1' }),
     );
   });
 
-  it('lets a reviewer say they are two different children', async () => {
+  it('lets a reviewer say they are two different children, and sends nothing', async () => {
     listPendingRegistrations.mockResolvedValue({ data: [withDuplicate()] });
     const user = userEvent.setup();
     mount();
 
-    await user.click(await screen.findByText(/already on the roster/i));
-    await user.click(screen.getByRole('button', { name: /Robin is new/i }));
+    await user.click(await screen.findByRole('button', { name: /Robin is new/i }));
 
+    // An assertion by a person, not a fact about the world: it settles the card
+    // and never round-trips.
     expect(mergeStudents).not.toHaveBeenCalled();
-    expect(screen.queryByRole('button', { name: /9th grade/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Robin is new/i })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
+  it('says which candidate the church already finds under these digits', async () => {
+    listPendingRegistrations.mockResolvedValue({
+      data: [
+        registration({
+          children: [
+            {
+              ...withDuplicate().children[0]!,
+              possibleDuplicates: [
+                {
+                  studentId: 'pco_7',
+                  firstName: 'Robin',
+                  lastName: 'Fields',
+                  grade: 9,
+                  known: true,
+                  status: 'active',
+                  sharesFamilyDigits: true,
+                },
+                {
+                  studentId: 'pco_8',
+                  firstName: 'Robin',
+                  lastName: 'Fields',
+                  grade: 4,
+                  known: true,
+                  status: 'active',
+                  sharesFamilyDigits: false,
+                },
+              ],
+            },
+          ],
+        }),
+      ],
+    });
+    mount();
+
+    // Both states render: "different on both" has to be a visible answer
+    // rather than a blank a reader mistakes for missing data.
+    expect(await screen.findByText(/Same phone digits on file/i)).toBeInTheDocument();
+    expect(screen.getByText(/Different phone digits on file/i)).toBeInTheDocument();
   });
 });
 
@@ -248,19 +313,42 @@ describe('once a child has been merged', () => {
     expect(await screen.findByText('Merged')).toBeInTheDocument();
     expect(screen.queryByText('Added')).not.toBeInTheDocument();
     // Offering it again would invite folding the same child a second time.
-    expect(screen.queryByText(/already on the roster/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/shares this name/i)).not.toBeInTheDocument();
   });
 });
 
 describe('the two decisions', () => {
-  it('approves in one press', async () => {
+  it('arms before it approves, and the commit is not where the arm was', async () => {
+    /*
+     * The only irreversible action in the app. A first press arms; the commit
+     * lives in the *other* slot, so a repeat press on an apparently
+     * unresponsive control cancels rather than sends.
+     */
     const user = userEvent.setup();
     mount();
 
     await user.click(await screen.findByRole('button', { name: /Approve and add/i }));
+    expect(approveRegistration).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /^Cancel$/ })).toBeInTheDocument();
+    expect(screen.getByText(/can be deleted or taken back/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /^Yes — add/i }));
     await waitFor(() =>
       expect(approveRegistration).toHaveBeenCalledWith({ registrationId: 'reg-1' }),
     );
+  });
+
+  it('cancels instead of sending when the same spot is pressed twice', async () => {
+    const user = userEvent.setup();
+    mount();
+
+    const approve = await screen.findByRole('button', { name: /Approve and add/i });
+    await user.click(approve);
+    // The rectangle the finger just left now holds Cancel.
+    await user.click(screen.getByRole('button', { name: /^Cancel$/ }));
+
+    expect(approveRegistration).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /Approve and add/i })).toBeInTheDocument();
   });
 
   it('asks before discarding, and says what discarding does', async () => {
@@ -269,7 +357,7 @@ describe('the two decisions', () => {
 
     await user.click(await screen.findByRole('button', { name: /Not ours/i }));
     // Irreversible for the phone number, so the sentence comes before the press.
-    expect(screen.getByText(/forgets the phone number/i)).toBeInTheDocument();
+    expect(screen.getByText(/forgets \(555\) 010-3344 for good/i)).toBeInTheDocument();
     expect(discardRegistration).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole('button', { name: /Yes, take them off/i }));
@@ -294,11 +382,54 @@ describe('the two decisions', () => {
     mount();
 
     await user.click(await screen.findByRole('button', { name: /Approve and add/i }));
+    await user.click(screen.getByRole('button', { name: /^Yes — add/i }));
     await waitFor(() =>
       expect(show).toHaveBeenCalledWith(expect.stringMatching(/Could not reach/i), {
         tone: 'error',
       }),
     );
+  });
+
+  it('offers to finish without the adult when the guardian is what failed', async () => {
+    /*
+     * The dead end: a guardian write refused for a reason no retry can fix.
+     * Retrying reattempts the same refusal, and discarding takes a family off
+     * the roster whose first child may already be upstream, where nothing
+     * deletes anything. This is the third move.
+     */
+    listPendingRegistrations.mockResolvedValue({
+      data: [
+        registration({
+          lastError: 'That number already belongs to somebody else.',
+          lastErrorKind: 'guardian',
+        }),
+      ],
+    });
+    const user = userEvent.setup();
+    mount();
+
+    await user.click(await screen.findByRole('button', { name: /without Dana/i }));
+    await waitFor(() =>
+      expect(approveRegistration).toHaveBeenCalledWith({
+        registrationId: 'reg-1',
+        withoutGuardian: true,
+      }),
+    );
+  });
+
+  it('does not offer it when the children were what failed, because retrying works', async () => {
+    listPendingRegistrations.mockResolvedValue({
+      data: [
+        registration({
+          lastError: '1 of 2 children could not be added.',
+          lastErrorKind: 'children',
+        }),
+      ],
+    });
+    mount();
+
+    expect(await screen.findByRole('button', { name: /Approve and add/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /without Dana/i })).not.toBeInTheDocument();
   });
 });
 
