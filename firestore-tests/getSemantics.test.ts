@@ -48,9 +48,10 @@ const DEFAULT_EMULATOR = '127.0.0.1:8080';
  */
 const PROBE_PROJECT_ID = 'demo-tally-getsemantics';
 
-/** Nothing is ever written here. That is the point. */
-const MISSING = 'acl/missing';
-/** Seeded below with `restricted: true`, members `[uid-member]`. */
+/**
+ * Seeded below with `restricted: true`, members `[uid-member]`. Its sibling
+ * `acl/missing` is named in the ruleset and never written — that is the point.
+ */
 const PRESENT = 'acl/present';
 
 const UID_MEMBER = 'uid-member';
