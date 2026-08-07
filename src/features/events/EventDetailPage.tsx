@@ -25,6 +25,8 @@ import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useEvent } from '@/hooks/useEvent';
 import { LockedGathering } from '@/features/events/LockedGathering';
+import { AccessSheet } from '@/features/events/AccessSheet';
+import { chainKey } from '@/lib/materialize';
 import { useToast } from '@/context/toastContext';
 import { EventDangerZone } from '@/features/events/EventDangerZone';
 import { EventEditorModal } from '@/features/events/EventEditorModal';
@@ -49,7 +51,7 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 
 export function EventDetailPage() {
   const { eventId } = useParams();
-  const { events, series, students, loading, canWork } = useData();
+  const { events, series, students, loading, canWork, access } = useData();
   const { user } = useAuth();
   const { show } = useToast();
   const navigate = useNavigate();
@@ -68,6 +70,7 @@ export function EventDetailPage() {
   );
 
   const [editorOpen, setEditorOpen] = useState(false);
+  const [accessOpen, setAccessOpen] = useState(false);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -111,6 +114,7 @@ export function EventDetailPage() {
     return <LockedGathering event={event} now={now} backTo="/events" backLabel="Events" />;
   }
 
+  const accessList = access.get(chainKey(event));
   const cancelled = event.status === 'cancelled';
   const seriesTitle = series.find((candidate) => candidate.id === event.seriesId)?.title ?? null;
   // Said out loud, because a trip with a predicted roster looks identical to one
@@ -358,6 +362,29 @@ export function EventDetailPage() {
         </div>
       </Card>
 
+      {/*
+        Who's on this gathering.
+        Above the danger zone and below the register, because it is an ordinary
+        setting rather than something destructive — but it is the one setting on
+        this page that changes what other people can see, so it is not buried in
+        the editor modal either.
+      */}
+      <Card>
+        <div className="flex items-center justify-between gap-3 p-4">
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-ink-100">Who's on this gathering</h2>
+            <p className="truncate text-xs text-ink-500">
+              {accessList?.restricted
+                ? `${accessList.members.size} ${accessList.members.size === 1 ? 'person' : 'people'} — everyone else sees it locked`
+                : 'Everyone on the team can take this register'}
+            </p>
+          </div>
+          <Button variant="secondary" onClick={() => setAccessOpen(true)}>
+            {accessList?.restricted ? 'Change' : 'Limit'}
+          </Button>
+        </div>
+      </Card>
+
       {event.mode === 'oneoff' ? <RsvpManager event={event} /> : null}
 
       <EventDangerZone
@@ -370,6 +397,13 @@ export function EventDetailPage() {
         open={editorOpen}
         onClose={() => setEditorOpen(false)}
         event={event}
+      />
+
+      <AccessSheet
+        open={accessOpen}
+        onClose={() => setAccessOpen(false)}
+        event={event}
+        now={now}
       />
     </div>
   );

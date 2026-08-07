@@ -34,6 +34,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { paths } from '@/lib/paths';
+import { fetchAttendance } from '@/services/attendance';
 import { toDateOrNull } from '@/services/converters';
 import type { EventAccess } from '@/types';
 
@@ -75,6 +76,56 @@ export function subscribeEventAccess(
     },
     onError,
   );
+}
+
+/**
+ * Who has actually been taking this gathering's register.
+ *
+ * The safety net under the one mistake this feature makes easiest. Nothing
+ * stops a core member restricting *Friday Fellowship* — the gathering the whole
+ * ministry works — and it is three taps. If the list started empty, or started
+ * with only the person doing it, the default outcome of a mis-tap would be
+ * locking out every counselor until an admin intervened.
+ *
+ * Starting from the people who have taken the register recently makes the
+ * default outcome "no change": the gathering closes to exactly the set already
+ * working it. Somebody restricting deliberately trims from there, which is less
+ * work than building the list from memory anyway.
+ *
+ * Reads a handful of recent nights rather than a year. Three is enough to
+ * distinguish the team from a one-off stand-in, and this runs while somebody
+ * waits for a sheet to open.
+ */
+export async function recentRegisterTakers(
+  events: readonly { id: string }[],
+): Promise<Set<string>> {
+  const takers = new Set<string>();
+
+  const registers = await Promise.all(
+    events.map(async (event) => {
+      try {
+        return await fetchAttendance(event.id);
+      } catch {
+        // One unreadable night should not stop the sheet opening; a shorter
+        // suggestion is better than none, and the person can add anybody.
+        return [];
+      }
+    }),
+  );
+
+  for (const records of registers) {
+    for (const record of records) takers.add(record.checkedInBy);
+  }
+
+  /*
+   * Not every value in here is a person. An import writes
+   * `checkedInBy: 'planning-center'`, and any future route that is not a
+   * counselor's thumb will write something of its own. Rather than guess at the
+   * shape of a uid — Firebase's are opaque, and 'planning-center' would survive
+   * most guesses — the caller intersects this with the team directory, which is
+   * the only thing that actually knows who is a person.
+   */
+  return takers;
 }
 
 /**
