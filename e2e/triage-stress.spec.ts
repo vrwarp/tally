@@ -461,11 +461,19 @@ test.describe('merges that must be refused', () => {
       await gotoReady(page, '/review');
       const card = cardFor(page, `Amara ${surname}`);
       await expect(card).toBeVisible({ timeout: 30_000 });
-      await card.getByRole('button', { name: /already on the roster/i }).click();
-      // A row whose name lives in the backend is named as exactly that rather
-      // than drawn as an empty line nobody can choose between.
-      await expect(card.getByText(/A student on the roster/i)).toBeVisible();
-      await card.getByRole('button', { name: /A student on the roster/i }).first().click();
+      /*
+       * No door to open — the candidates are the comparison, so they are on
+       * the screen already. The backend-linked row is *named* now: the
+       * callable asks each backend for the names it holds rather than leaving
+       * a candidate a reviewer cannot tell from the one above it. "A student
+       * on the roster" survives only as the last resort for a backend that
+       * cannot be reached at all, so the click accepts either.
+       */
+      await expect(card.getByText(/shares this name/i)).toBeVisible();
+      await card
+        .getByRole('button', { name: new RegExp(`Chidera|A student on the roster`, 'i') })
+        .first()
+        .click();
 
       await expect(card.getByText(/Merged into/i)).toBeVisible({ timeout: 30_000 });
       const after = await readCollection('students');
