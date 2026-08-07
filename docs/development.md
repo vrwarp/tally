@@ -15,10 +15,9 @@ npm run dev:emulated        # builds functions, starts the emulators, starts Vit
 ```
 
 That leaves the app on <http://localhost:5173> and the Emulator UI on <http://127.0.0.1:4000>. The
-lobby kiosk is a separate page at `/kiosk.html`, and the registration form a family fills in on their
-own phone is another at `/welcome.html` — both are their own Vite entries, deliberately outside the
-PWA. The welcome page needs a code from a kiosk's QR screen: open `/kiosk.html`, pair it, bind it to
-a gathering, tap **First time here?**, and use the six characters printed under the code.
+lobby kiosk is a separate page at `/kiosk.html` — its own Vite entry, deliberately outside the PWA.
+To try a family registration, pair the kiosk, bind it to a gathering, and tap **First time here?**;
+the wizard opens right there.
 
 **You also need the Planning Center simulator running.** Tally holds no copy of the church's people:
 the roster, every profile, and the answer to "may this person sign in" all come from Planning Center

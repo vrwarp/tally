@@ -380,7 +380,9 @@ gcloud projects add-iam-policy-binding tally-76406 \
 until pairing gives it one — and are covered by the same `allUsers` invoker binding as every other
 callable above. What keeps them harmless is in the handlers: a cap on live pairings, a ten-minute
 expiry, a hashed device secret, and the fact that no token exists until a signed-in staff member
-approves the code.
+approves the code. They are also the **only** intentionally-unauthenticated callables since the
+QR/phone registration was retired: `registerFamily` requires the kiosk's own token outright, so
+nothing app-level accepts an anonymous caller any more.
 
 ### The artifact cleanup policy
 
