@@ -7,12 +7,17 @@
  * nothing on the search screen does — the device's native keyboard is slow to
  * raise and covers half the questions when it does.
  *
- * The wizard is deliberately short. Three questions per child, three about one
- * adult, and a confirm. Allergies, emails and second guardians are not here:
- * this is the same bargain the staff quick-add makes — enough to put somebody
- * on the roster and reach their family, with the incomplete profile as the
- * handoff to whoever follows up. A lobby form that asks for everything is a
- * lobby form nobody finishes.
+ * The wizard is deliberately short. Three questions per child — four where the
+ * church's database can hold an allergy note, and the fourth is one tap for
+ * the families it does not apply to — three about one adult, and a confirm.
+ * Emails and second guardians are still not here: this is the same bargain the
+ * staff quick-add makes — enough to put somebody on the roster and reach their
+ * family, with the incomplete profile as the handoff to whoever follows up. A
+ * lobby form that asks for everything is a lobby form nobody finishes.
+ *
+ * The allergies question exists at all because the phone form that used to
+ * collect it is retired; it is gated on the binding's `allergiesSupported`,
+ * which is the same write-back check that form made before showing its field.
  */
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import { gradeDescription, haptic, NO_GRADE } from '@/lib/utils';
@@ -127,7 +132,14 @@ export function RegistrationFlow({
   const reduce = useMemo(() => makeReducer(tracksCheckOut), [tracksCheckOut]);
   const [state, dispatch] = useReducer(
     reduce,
-    { registrationId, requiresCheckOut: tracksCheckOut, mode },
+    {
+      registrationId,
+      requiresCheckOut: tracksCheckOut,
+      mode,
+      // Absent on a binding written before the flag existed, and absent means
+      // "don't ask" — the question is only safe where the answer can land.
+      allergiesSupported: binding.allergiesSupported ?? false,
+    },
     initialState,
   );
   const anchorIds = useMemo(() => (anchors ?? []).map((sibling) => sibling.id), [anchors]);
@@ -335,8 +347,19 @@ export function RegistrationFlow({
       {isTypingStep(state.step) ? (
         <div className="flex flex-col gap-1.5">
           <div className="px-2">
+            {/*
+              * On the allergies step the same button is the skip: "No
+              * allergies" while the buffer is empty, "Next" the moment it is
+              * not. One tap answers the common case, typing converts the same
+              * control, and nothing moves — a second button would push the
+              * keyboard down on exactly one step of eight.
+              */}
             <Big
-              label="Next"
+              label={
+                state.step === 'child-allergies' && state.buffer.trim() === ''
+                  ? 'No allergies'
+                  : 'Next'
+              }
               tone="brand"
               disabled={!canAdvance(state)}
               onPick={() => dispatch({ type: 'next' })}
@@ -412,16 +435,27 @@ function Header({
   );
 }
 
-/** One child as the wizard has them: the name, and the grade beside it. */
+/** One child as the wizard has them: the name, the grade, and any note. */
 function ChildRow({ child }: { child: DraftChild }) {
   return (
-    <div className="flex h-16 items-center justify-between rounded-xl bg-ink-900 px-5">
-      <span className="truncate text-xl font-semibold text-ink-100">
-        {child.firstName} {child.lastName}
-      </span>
-      <span className="pl-3 text-base whitespace-nowrap text-ink-400">
-        {child.grade === null ? NO_GRADE : gradeDescription(child.grade)}
-      </span>
+    <div className="flex min-h-16 flex-col justify-center rounded-xl bg-ink-900 px-5 py-2.5">
+      <div className="flex items-center justify-between">
+        <span className="truncate text-xl font-semibold text-ink-100">
+          {child.firstName} {child.lastName}
+        </span>
+        <span className="pl-3 text-base whitespace-nowrap text-ink-400">
+          {child.grade === null ? NO_GRADE : gradeDescription(child.grade)}
+        </span>
+      </div>
+      {/*
+        * On the roster rows a warn-tone dot is all the kiosk shows; here the
+        * note itself is printed, because this list is the family checking
+        * their own typing — the one moment the person reading it is the
+        * person who wrote it, before it becomes a record a reviewer acts on.
+        */}
+      {child.allergies !== '' && (
+        <div className="truncate text-base text-warn-400">Allergies: {child.allergies}</div>
+      )}
     </div>
   );
 }
@@ -486,6 +520,7 @@ function titleFor(state: RegistrationState, childNumber: number): string {
     case 'child-first':
     case 'child-last':
     case 'child-grade':
+    case 'child-allergies':
       return state.mode === 'sibling' && childNumber === 1
         ? // Not "their brother or sister". The kiosk infers kinship from four
           // phone digits, and this wizard is reached from the screen that
@@ -522,6 +557,11 @@ function subtitleFor(state: RegistrationState, binding: KioskBinding): string {
       return 'And their last name?';
     case 'child-grade':
       return 'What grade are they in?';
+    case 'child-allergies':
+      // "we should know about" and not "do they have": a parent whose child's
+      // hay fever is nobody's business at a check-in desk is being invited to
+      // skip, not interrogated.
+      return 'Any allergies we should know about?';
     case 'another':
       return 'You can add the whole family in one go.';
     /*
@@ -559,6 +599,8 @@ function placeholderFor(state: RegistrationState): string {
       return "Child's first name";
     case 'child-last':
       return "Child's last name";
+    case 'child-allergies':
+      return 'Allergies';
     case 'guardian-first':
       return 'Your first name';
     case 'guardian-last':

@@ -20,12 +20,16 @@ export const MAX_CHILDREN = 6;
 /** Long enough for any real name; the same ceiling the callable enforces. */
 export const NAME_MAX_LENGTH = 40;
 
+/** Room for a real note; the same ceiling the callable enforces. */
+export const ALLERGIES_MAX_LENGTH = 200;
+
 export const PHONE_LENGTH = 10;
 
 export type StepKind =
   | 'child-first'
   | 'child-last'
   | 'child-grade'
+  | 'child-allergies'
   | 'another'
   | 'guardian-first'
   | 'guardian-last'
@@ -54,11 +58,24 @@ export interface DraftChild {
   firstName: string;
   lastName: string;
   grade: Grade | null;
+  /** The allergy note as typed, or '' for none — which is the common answer. */
+  allergies: string;
 }
 
 export interface RegistrationState {
   mode: RegistrationMode;
   step: StepKind;
+  /**
+   * Whether the allergies question exists in this run at all.
+   *
+   * From the binding, which carried it from the server: true exactly when the
+   * church's people backend can hold the answer. Asking without that would be
+   * collecting a family's medical note into a screen that silently drops it —
+   * the retired phone form made the same check before showing its field. On
+   * the state rather than threaded as a parameter, because `chooseGrade`
+   * advances internally and every caller would have to carry it.
+   */
+  allergiesSupported: boolean;
   /** Minted once per run and re-sent on every retry — see the callable. */
   registrationId: string;
   /** Children whose three questions are answered. */
@@ -99,16 +116,19 @@ export function initialState(args: {
   registrationId: string;
   requiresCheckOut: boolean;
   mode?: RegistrationMode;
+  allergiesSupported?: boolean;
 }): RegistrationState {
   return {
     mode: args.mode ?? 'family',
     step: 'child-first',
     registrationId: args.registrationId,
+    allergiesSupported: args.allergiesSupported === true,
     children: [],
     draft: {
       firstName: '',
       lastName: '',
       grade: defaultGrade(args.requiresCheckOut),
+      allergies: '',
     },
     guardian: { firstName: '', lastName: '', phone: '' },
     buffer: '',
@@ -127,6 +147,7 @@ export function isTypingStep(step: StepKind): boolean {
   return (
     step === 'child-first' ||
     step === 'child-last' ||
+    step === 'child-allergies' ||
     step === 'guardian-first' ||
     step === 'guardian-last' ||
     step === 'guardian-phone'
@@ -134,6 +155,17 @@ export function isTypingStep(step: StepKind): boolean {
 }
 
 const NAME_CHARACTER = /[\p{L}' -]/u;
+
+/**
+ * What an allergy note may contain: everything the glass keyboard can produce.
+ *
+ * Wider than a name on purpose — digits are legitimate medical text ("Type 1
+ * diabetes", "EpiPen 0.3") — and no wider, deliberately: the keyboard has no
+ * comma or period, and growing it two keys would change its geometry on every
+ * screen including search. "Peanuts tree nuts EpiPen in bag" reads fine to the
+ * human this note is for, and the upstream editor refines it after approval.
+ */
+const ALLERGY_CHARACTER = /[\p{L}\p{N}' -]/u;
 
 /**
  * Where a capital belongs in a name, if nobody says otherwise.
@@ -191,6 +223,19 @@ export function applyKey(
     return { ...state, buffer: state.buffer + key.value };
   }
 
+  if (state.step === 'child-allergies') {
+    if (!ALLERGY_CHARACTER.test(key.value)) return state;
+    const next = (
+      state.buffer + (state.buffer === '' ? key.value.trimStart() : key.value)
+    ).replace(/\s{2,}/g, ' ');
+    if (next.length > ALLERGIES_MAX_LENGTH) return state;
+    return {
+      ...state,
+      buffer: next,
+      shift: state.shift === 'lock' ? 'lock' : autoShiftAfter(next),
+    };
+  }
+
   if (!NAME_CHARACTER.test(key.value)) return state;
   // A leading space is the one keystroke that would silently do nothing useful.
   const next = (
@@ -210,6 +255,9 @@ export function applyKey(
 export function canAdvance(state: RegistrationState): boolean {
   if (state.step === 'guardian-phone')
     return state.buffer.length === PHONE_LENGTH;
+  // An empty allergies buffer is not an unanswered question — it is the
+  // answer most families give.
+  if (state.step === 'child-allergies') return true;
   if (isTypingStep(state.step)) return state.buffer.trim().length > 0;
   return true;
 }
@@ -258,7 +306,20 @@ export function advance(state: RegistrationState): RegistrationState {
         shift: 'on',
       };
     case 'child-grade':
-      return { ...state, step: 'another', buffer: '', shift: 'on' };
+      return {
+        ...state,
+        step: state.allergiesSupported ? 'child-allergies' : 'another',
+        buffer: '',
+        shift: 'on',
+      };
+    case 'child-allergies':
+      return {
+        ...state,
+        draft: { ...state.draft, allergies: value },
+        step: 'another',
+        buffer: '',
+        shift: 'on',
+      };
     case 'guardian-first':
       return {
         ...state,
@@ -325,6 +386,7 @@ export function answerAnother(
         firstName: '',
         lastName: '',
         grade: defaultGrade(requiresCheckOut),
+        allergies: '',
       },
       step: 'child-first',
       buffer: '',
@@ -339,6 +401,7 @@ export function answerAnother(
       firstName: '',
       lastName: '',
       grade: defaultGrade(requiresCheckOut),
+      allergies: '',
     },
     // A sibling registration has no adult to ask about: the family is already
     // identified, and the household upstream already holds their parent.
@@ -375,8 +438,19 @@ export function goBack(state: RegistrationState): RegistrationState | null {
         buffer: state.draft.lastName,
         shift: autoShiftAfter(state.draft.lastName),
       };
-    case 'another':
+    case 'child-allergies':
       return { ...state, step: 'child-grade', buffer: '', shift: 'on' };
+    case 'another':
+      return state.allergiesSupported
+        ? {
+            ...state,
+            step: 'child-allergies',
+            // The note as answered, reopened for editing — the same contract
+            // every other reopened question keeps.
+            buffer: state.draft.allergies,
+            shift: autoShiftAfter(state.draft.allergies),
+          }
+        : { ...state, step: 'child-grade', buffer: '', shift: 'on' };
     case 'guardian-first':
       return { ...state, step: 'another', buffer: '', shift: 'on' };
     case 'guardian-last':

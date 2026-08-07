@@ -640,3 +640,114 @@ describe('the clock', () => {
     expect(screen.getByText(/Type a name, or the last 4 digits/)).toBeTruthy();
   });
 });
+
+/**
+ * The allergies question, as a family meets it.
+ *
+ * The step machine's rules are pinned in steps.test.ts; what belongs here is
+ * the rendered contract — the one-tap "No allergies" button that is also the
+ * Next button, the note echoed on the confirm list, and the wire shape: notes
+ * ride beside the children only when the binding said the backend can carry
+ * them, and never at all when nobody typed one.
+ */
+describe('the allergies question, where the backend can carry it', () => {
+  const asking = () => binding({ allergiesSupported: true });
+
+  it('asks after the grade, and one tap answers "none"', async () => {
+    await mount(asking());
+    await tap(/Register your child/);
+    await tap(/Register right here/);
+    await enterChild('Robin', 'Fields', '4');
+
+    expect(screen.getByText(/Any allergies we should know about/i)).toBeTruthy();
+    // The skip and the advance are one control: "No allergies" on an empty
+    // buffer, so the common case costs one tap and nothing on the screen
+    // moves.
+    await tap('No allergies');
+    expect(screen.getByText('Anybody else?')).toBeTruthy();
+  });
+
+  it('never asks where the binding is silent', async () => {
+    await mount(); // no allergiesSupported key — a pre-flag binding
+    await tap(/Register your child/);
+    await tap(/Register right here/);
+    await enterChild('Robin', 'Fields', '4');
+    expect(screen.queryByText(/Any allergies/i)).toBeNull();
+    expect(screen.getByText('Anybody else?')).toBeTruthy();
+  });
+
+  it('relabels to Next the moment a note is typed, and shows it on the confirm', async () => {
+    await mount(asking());
+    await tap(/Register your child/);
+    await tap(/Register right here/);
+    await enterChild('Robin', 'Fields', '4');
+
+    await type('Peanuts');
+    expect(screen.queryByText('No allergies')).toBeNull();
+    await tap('Next');
+    await tap("That's everyone");
+    await type('Dana');
+    await tap('Next');
+    await tap('Clear');
+    await type('Fields');
+    await tap('Next');
+    await type('5550103344');
+    await tap('Next');
+
+    // The family checking their own typing — the one moment the reader is the
+    // writer, before this becomes a record a reviewer acts on.
+    expect(screen.getByText('Allergies: Peanuts')).toBeTruthy();
+  });
+
+  it('sends the notes beside the children, and only when one was typed', async () => {
+    await mount(asking());
+    await tap(/Register your child/);
+    await tap(/Register right here/);
+    await enterChild('Robin', 'Fields', '4');
+    await type('Peanuts');
+    await tap('Next');
+    await tap('Add another child');
+    await enterChild('Sam', 'Fields', '2');
+    await tap('No allergies');
+    await tap("That's everyone");
+    await type('Dana');
+    await tap('Next');
+    await tap('Clear');
+    await type('Fields');
+    await tap('Next');
+    await type('5550103344');
+    await tap('Next');
+    await tap(/Check in everyone/);
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0]!.allergies).toEqual(['Peanuts', null]);
+    // The children themselves stay the three-field shape the callable parses.
+    expect(sent[0]!.children).toEqual([
+      { firstName: 'Robin', lastName: 'Fields', grade: 4 },
+      { firstName: 'Sam', lastName: 'Fields', grade: 2 },
+    ]);
+  });
+
+  it('omits the key entirely when every answer was "none"', async () => {
+    await mount(asking());
+    await tap(/Register your child/);
+    await tap(/Register right here/);
+    await enterChild('Robin', 'Fields', '4');
+    await tap('No allergies');
+    await tap("That's everyone");
+    await type('Dana');
+    await tap('Next');
+    await tap('Clear');
+    await type('Fields');
+    await tap('Next');
+    await type('5550103344');
+    await tap('Next');
+    await tap(/^Check in$/);
+
+    expect(sent).toHaveLength(1);
+    // Not [null] — absent. An all-null array says nothing, and omitting it
+    // keeps every no-notes run working across a functions rollback to a
+    // version that refuses the key.
+    expect(sent[0]!).not.toHaveProperty('allergies');
+  });
+});

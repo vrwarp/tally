@@ -63,6 +63,17 @@ export interface KioskBinding {
    * missing sticker rather than a wrong one.
    */
   labelTemplate?: LabelTemplate | null;
+  /**
+   * Whether the registration wizard asks about allergies.
+   *
+   * Optional for the same reason `requiresCheckOut` is: a binding written
+   * before the flag existed has no such key, and a paired lobby screen must
+   * not be logged out by a deploy. Absent reads as "don't ask", which is the
+   * safe direction twice over — the failure is a question missing for one
+   * evening, not a family's medical note typed into a backend that refuses
+   * it. The next rebind picks up the real answer.
+   */
+  allergiesSupported?: boolean;
   boundAtMs: number;
 }
 

@@ -213,8 +213,8 @@ describe('the loop', () => {
     held = answerAnother(held, false, false);
 
     expect(held.children).toEqual([
-      { firstName: 'Ada', lastName: 'Lovelace', grade: 4 },
-      { firstName: 'Byron', lastName: 'Lovelace', grade: 1 },
+      { firstName: 'Ada', lastName: 'Lovelace', grade: 4, allergies: '' },
+      { firstName: 'Byron', lastName: 'Lovelace', grade: 1, allergies: '' },
     ]);
   });
 });
@@ -280,5 +280,93 @@ describe('adding a sibling', () => {
     held = answerAnother(held, false, false);
 
     expect(goBack(held)!.step).toBe('another');
+  });
+});
+
+/**
+ * The allergies question, which exists exactly where the backend can hold the
+ * answer.
+ *
+ * The gate is the whole design: the retired phone form checked the same
+ * write-back capability before showing its field, because a medical note typed
+ * into a screen that silently drops it is worse than a screen that never
+ * asked. Everything else — one tap for "none", digits allowed, the 200-cap —
+ * follows from what the note is and what the glass keyboard can produce.
+ */
+describe('the allergies question', () => {
+  function startAsking(requiresCheckOut = false): RegistrationState {
+    return initialState({
+      registrationId: 'r-1',
+      requiresCheckOut,
+      allergiesSupported: true,
+    });
+  }
+
+  /** Through the name and grade questions, to wherever the wizard goes next. */
+  function throughGrade(state: RegistrationState): RegistrationState {
+    let held = advance(typeText(state, 'Ada'));
+    held = advance(typeText(applyKey(held, { kind: 'clear' }), 'Lovelace'));
+    return chooseGrade(held, 4 as Grade);
+  }
+
+  it('is only asked when the binding says the answer can land', () => {
+    expect(throughGrade(startAsking()).step).toBe('child-allergies');
+    // The default is silence: a binding written before the flag existed, or a
+    // backend that cannot carry the note, and the wizard is exactly as short
+    // as it was.
+    expect(throughGrade(start()).step).toBe('another');
+  });
+
+  it('records nothing on one tap, which is the common answer', () => {
+    const asked = throughGrade(startAsking());
+    expect(canAdvance(asked)).toBe(true);
+    const answered = advance(asked);
+    expect(answered.step).toBe('another');
+    expect(answered.draft.allergies).toBe('');
+  });
+
+  it('accepts the digits a name refuses', () => {
+    // "Type 1 diabetes" is medical text, not a name. The class is exactly what
+    // the glass keyboard produces — no comma, no period, and that is a
+    // decision: two more keys would change the keyboard's geometry on every
+    // screen, and a space-separated note reads fine to the human it is for.
+    const asked = throughGrade(startAsking());
+    expect(typeText(asked, 'Type 1 diabetes').buffer).toBe('Type 1 diabetes');
+  });
+
+  it('refuses a note longer than the callable would take', () => {
+    const asked = typeText(throughGrade(startAsking()), 'a'.repeat(300));
+    expect(asked.buffer.length).toBe(200);
+  });
+
+  it('keeps the note on the child it was typed for', () => {
+    let held = advance(typeText(throughGrade(startAsking()), 'Peanuts'));
+    held = answerAnother(held, true, false);
+    held = advance(typeText(held, 'Byron'));
+    held = advance(held); // prefilled surname
+    held = chooseGrade(held, 1 as Grade);
+    held = advance(held); // no allergies for Byron
+    held = answerAnother(held, false, false);
+
+    expect(held.children.map((child) => child.allergies)).toEqual(['Peanuts', '']);
+  });
+
+  it('reopens with the note in the buffer, like every other question', () => {
+    const answered = advance(typeText(throughGrade(startAsking()), 'Bee stings'));
+    const reopened = goBack(answered)!;
+    expect(reopened.step).toBe('child-allergies');
+    expect(reopened.buffer).toBe('Bee stings');
+    // And one more step back is the grade, not a skipped-over hole.
+    expect(goBack(reopened)!.step).toBe('child-grade');
+  });
+
+  it('is asked for a sibling too — the gate is the binding, not the mode', () => {
+    const sibling = initialState({
+      registrationId: 'r-2',
+      requiresCheckOut: false,
+      mode: 'sibling',
+      allergiesSupported: true,
+    });
+    expect(throughGrade(sibling).step).toBe('child-allergies');
   });
 });

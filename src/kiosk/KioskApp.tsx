@@ -1223,15 +1223,32 @@ export function KioskApp() {
           registrationId={registering.registrationId}
           mode={registering.anchors.length > 0 ? 'sibling' : 'family'}
           anchors={registering.anchors}
-          submit={({ registrationId, children, guardian, anchorStudentIds }) =>
-            services.registerFamily({
+          submit={({ registrationId, children, guardian, anchorStudentIds }) => {
+            /*
+             * The notes ride beside the children, not inside them: the wire
+             * shape is the index-aligned array the phone form used, and the
+             * key is only sent at all when the binding said the backend can
+             * carry it AND somebody typed one. Omitting an all-null array
+             * costs nothing (the server fills nulls) and keeps every
+             * "No allergies" run working across a functions rollback to a
+             * version that refuses the key.
+             */
+            const notes = children.map((child) => (child.allergies === '' ? null : child.allergies));
+            const carryNotes =
+              (binding.allergiesSupported ?? false) && notes.some((note) => note !== null);
+            return services.registerFamily({
               registrationId,
-              children,
+              children: children.map((child) => ({
+                firstName: child.firstName,
+                lastName: child.lastName,
+                grade: child.grade,
+              })),
               guardian,
               anchorStudentIds,
               eventId: binding.eventId,
-            })
-          }
+              ...(carryNotes ? { allergies: notes } : {}),
+            });
+          }}
           onRegistered={(result) =>
             onRegistered({
               children: result.children.map((child) => ({
@@ -1240,10 +1257,10 @@ export function KioskApp() {
                 lastName: child.lastName,
                 grade: child.grade,
                 searchName: child.searchName,
-                // Nothing is on file for a child registered a second ago; an
-                // allergy note only ever arrives on the phone form, lands
-                // upstream, and reaches this screen through a later read.
-                hasAllergies: false,
+                // The callable's echo — the one place tonight's truth lives;
+                // the roster read answers false for Tally-owned students by
+                // rule until approval pushes the note upstream.
+                hasAllergies: child.hasAllergies === true,
               })),
               last4: result.last4,
               checkedIn: result.checkedIn,

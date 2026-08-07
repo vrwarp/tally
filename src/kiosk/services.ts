@@ -147,6 +147,14 @@ export interface KioskEventEntry {
   location: string | null;
   requiresCheckOut: boolean;
   labelTemplate: LabelTemplate | null;
+  /**
+   * Whether the wizard should ask about allergies. Optional on the wire so a
+   * new bundle against old functions reads `undefined` — and `undefined` must
+   * mean "don't ask": old functions refuse a kiosk allergy note outright, so
+   * asking the question there would fail the whole registration, not merely
+   * drop the answer.
+   */
+  allergiesSupported?: boolean;
 }
 
 const startKioskPairing = httpsCallable<void, { code: string; secret: string; expiresInSeconds: number }>(
@@ -261,6 +269,9 @@ export async function bindEntry(entry: KioskEventEntry): Promise<KioskBinding> {
     // will read back out of localStorage for the rest of the evening, and the
     // renderer should never be handed a shape it has to defend against.
     labelTemplate: sanitizeLabelTemplate(entry.labelTemplate),
+    // Only ever an explicit true: absent, null, or anything else a stale
+    // server sent reads as "don't ask" (see the entry field's comment).
+    allergiesSupported: entry.allergiesSupported === true,
     boundAtMs: Date.now(),
   };
 }
@@ -686,7 +697,14 @@ export async function registerFamily(
  * later can only agree with it.
  */
 export function applyRegistration(result: {
-  children: readonly { studentId: string; firstName: string; lastName: string; grade: number | null; searchName: string }[];
+  children: readonly {
+    studentId: string;
+    firstName: string;
+    lastName: string;
+    grade: number | null;
+    searchName: string;
+    hasAllergies?: boolean;
+  }[];
   last4: string;
 }): KioskStudent[] {
   const students: KioskStudent[] = result.children.map((child) => ({
@@ -695,10 +713,12 @@ export function applyRegistration(result: {
     lastName: child.lastName,
     grade: child.grade as Grade | null,
     searchName: child.searchName,
-    // Nothing is on file for a child registered a second ago. Allergies are
-    // only ever asked for on the phone form, land upstream, and reach this
-    // screen — if at all — through a later roster read.
-    hasAllergies: false,
+    // The callable's echo, because nothing else knows tonight: the roster
+    // read answers false for every Tally-owned student by rule, and the note
+    // itself is on the registration record, not the student. The marker
+    // survives locally until the next roster rebuild — an evening-of
+    // affordance, made permanent when approval pushes the note upstream.
+    hasAllergies: child.hasAllergies === true,
   }));
 
   const cached = readCachedRoster();

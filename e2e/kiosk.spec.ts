@@ -740,6 +740,89 @@ test.describe('registering a family at the kiosk', () => {
     }
   });
 
+  /*
+   * The allergies question exists exactly where the answer can land.
+   *
+   * The wizard asks it only when the binding says the people backend takes
+   * full write-back — the same gate the retired phone form kept — and the
+   * binding learns that at bind time, which is why the config is written
+   * before the kiosk binds. The note travels the whole way: typed on the
+   * glass, echoed on the confirm, held on the review record for the person
+   * who decides the family.
+   *
+   * The suite's own default (PCO_WRITE_BACK=create) is what every other
+   * wizard spec runs under, so "the step never appears" is already pinned by
+   * each of them; this is the one world where it does.
+   */
+  test('asks about allergies only where the church database can hold the answer', async ({
+    browser,
+    page,
+    signedInAs,
+    firestore,
+  }) => {
+    await signedInAs('core');
+    // Before the kiosk binds: the capability rides the event row into the
+    // binding, so a config written after binding would not be seen tonight.
+    await writeDocument('config/planningCenter', { writeBack: 'full' });
+    const { context, page: kiosk } = await openKiosk(browser);
+
+    try {
+      await pairKiosk(kiosk, page);
+      await bindTo(kiosk, /nursery/i);
+
+      await kiosk.getByRole('button', { name: /Register your child/i }).click();
+      // The QR is offered first; the on-kiosk wizard is behind "no phone".
+      await kiosk.getByRole('button', { name: /Register right here/i }).click();
+
+      await enterChild(kiosk, 'Juniper', 'Aldercroft', '4th grade');
+      // The fourth question, which the write-back capability just unlocked.
+      await expect(kiosk.getByText(/Any allergies we should know about/i)).toBeVisible();
+      await typeOnKiosk(kiosk, 'Peanuts and bee stings');
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+
+      await kiosk.getByRole('button', { name: /Add another child/i }).click();
+      await enterChild(kiosk, 'Rowan', 'Aldercroft', '2nd grade');
+      // The common answer is one tap, on the same button Next lives on.
+      await kiosk.getByRole('button', { name: /No allergies/i }).click();
+      await kiosk.getByRole('button', { name: /That's everyone/i }).click();
+
+      await typeOnKiosk(kiosk, 'Dana');
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await kiosk.locator('[data-key="clear"]').click();
+      await typeOnKiosk(kiosk, 'Aldercroft');
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await typeOnKiosk(kiosk, '5550142299');
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+
+      // The family checking their own typing, before it becomes a record.
+      await expect(kiosk.getByText('Allergies: Peanuts and bee stings')).toBeVisible();
+      await kiosk.getByRole('button', { name: /Check in everyone/i }).click();
+      await expect(kiosk.getByText(/are checked in\. Welcome!/i)).toBeVisible({
+        timeout: 20_000,
+      });
+
+      // The note landed on the registration record — for the reviewer, and
+      // nowhere else. Student documents refuse the key by rule.
+      const records = await firestore.until(
+        'kioskRegistrations',
+        (docs) => docs.some((doc) => Array.isArray(doc.data.allergies)),
+        'the registration record carrying the allergy note',
+      );
+      const record = records.find((doc) => Array.isArray(doc.data.allergies))!;
+      expect(record.data.allergies).toEqual(['Peanuts and bee stings', null]);
+
+      // And the reviewer sees it on the card, beside the child it belongs to.
+      await gotoReady(page, '/review');
+      await expect(page.getByText('Peanuts and bee stings')).toBeVisible({ timeout: 30_000 });
+    } finally {
+      // The suite is serial on one emulator: a leaked write-back=full would
+      // flip this question on (and contact-writing behaviour) for every spec
+      // after this one.
+      await deleteDocument('config/planningCenter');
+      await context.close();
+    }
+  });
+
   /**
    * The flagship of the pulse: a family registers on their phone and the kiosk
    * reacts with nobody touching it.

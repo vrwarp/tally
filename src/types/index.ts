@@ -735,6 +735,14 @@ export interface RegisterFamilyRequest {
   anchorStudentIds?: string[];
   /** The gathering to check everybody in against. Kiosk mode only. */
   eventId?: string;
+  /**
+   * One note per child, index-aligned with `children`, null for none.
+   *
+   * Only sent when the binding said the backend can carry the answer — the
+   * key is omitted entirely otherwise, which is what keeps a submission
+   * working across a functions rollback to a version that refuses it.
+   */
+  allergies?: (string | null)[];
 }
 
 export interface RegisteredChild {
@@ -743,6 +751,13 @@ export interface RegisteredChild {
   lastName: string;
   grade: Grade | null;
   searchName: string;
+  /**
+   * Whether an allergy note was recorded with the registration. The boolean,
+   * never the note: the kiosk marks the row; the note stays on the
+   * registration record for the reviewer. Optional because an old functions
+   * deploy does not send it — absent reads false.
+   */
+  hasAllergies?: boolean;
 }
 
 /**
