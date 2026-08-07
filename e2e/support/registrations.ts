@@ -45,6 +45,8 @@ export interface SeededRegistration {
   /** Verified siblings — the "another child for a family we have" shape. */
   anchorStudentIds?: string[];
   lastError?: string | null;
+  /** Which half of a failed approval — the screen picks its instrument off this. */
+  lastErrorKind?: 'children' | 'guardian' | 'both' | null;
 }
 
 function searchNameOf(first: string, last: string): string {
@@ -124,6 +126,7 @@ export async function seedRegistration(row: SeededRegistration): Promise<string[
     ),
     anchorStudentIds: row.anchorStudentIds ?? [],
     lastError: row.lastError ?? null,
+    lastErrorKind: row.lastErrorKind ?? null,
   });
 
   return studentIds;

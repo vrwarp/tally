@@ -52,6 +52,19 @@ async function recordIsGone(registrationId: string): Promise<void> {
     .toBe(false);
 }
 
+/**
+ * Approve, which is two presses now.
+ *
+ * The first arms and sends nothing; the commit lives in the *other* slot, so a
+ * repeat press on the same spot cancels rather than pushes. Every spec that
+ * approves goes through here, so the guard cannot be silently lost by one of
+ * them being written the old way.
+ */
+async function approve(card: ReturnType<typeof cardFor>): Promise<void> {
+  await card.getByRole('button', { name: /Approve and add|Finish adding them/i }).click();
+  await card.getByRole('button', { name: /^Yes — add/i }).click();
+}
+
 /** A roster row the seeded ministry already holds, to point duplicate hints at. */
 async function anExistingStudent(): Promise<{ id: string; firstName: string; lastName: string }> {
   const students = await readCollection('students');
@@ -99,7 +112,12 @@ test.describe('deciding a family', () => {
       // the one screen that shows it before it goes upstream.
       await expect(card.getByText(/Latex/)).toBeVisible();
 
+      // Arms, then commits. The first press must send nothing: this is the
+      // only action in the app with no undo behind it.
       await card.getByRole('button', { name: /Approve and add/i }).click();
+      await expect(card.getByRole('button', { name: /^Cancel$/ })).toBeVisible();
+      await expect(card.getByText(/can be deleted or taken back/i)).toBeVisible();
+      await card.getByRole('button', { name: /^Yes — add/i }).click();
 
       await expect
         .poll(
@@ -147,9 +165,9 @@ test.describe('deciding a family', () => {
       const card = cardFor(page, `Ilse ${existing.lastName || 'Vance'}`);
       await expect(card).toBeVisible({ timeout: 30_000 });
 
-      // The door recorded the suspicion and did nothing about it; the screen
-      // states it and offers the only judgement that can settle it.
-      await card.getByRole('button', { name: /already on the roster/i }).click();
+      // No door to open: the candidates are the comparison, so they are on the
+      // screen before anybody presses anything.
+      await expect(card.getByText(/shares this name/i)).toBeVisible();
       await card.getByRole('button', { name: new RegExp(existing.firstName, 'i') }).first().click();
 
       await expect(card.getByText(/^Merged$/)).toBeVisible({ timeout: 30_000 });
@@ -305,7 +323,7 @@ test.describe('deciding a family', () => {
       // The reason the record survived is on the record, and the button says
       // finishing rather than approving.
       await expect(card.getByText(/Last attempt did not finish/i)).toBeVisible();
-      await card.getByRole('button', { name: /Approve and add|Finish adding them/i }).click();
+      await approve(card);
 
       await expect
         .poll(async () => (await simulatorPeople()).filter((p) => p.last_name === surname).length, {

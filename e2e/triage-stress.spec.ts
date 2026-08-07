@@ -29,6 +29,19 @@ function cardFor(page: Page, title: string) {
   return page.locator('section', { hasText: title }).first();
 }
 
+/**
+ * Approve, which is two presses now.
+ *
+ * The first arms and sends nothing; the commit lives in the *other* slot, so a
+ * repeat press on the same spot cancels rather than pushes. Every spec that
+ * approves goes through here, so the guard cannot be silently lost by one of
+ * them being written the old way.
+ */
+async function approve(card: ReturnType<typeof cardFor>): Promise<void> {
+  await card.getByRole('button', { name: /Approve and add|Finish adding them/i }).click();
+  await card.getByRole('button', { name: /^Yes — add/i }).click();
+}
+
 test.describe('two people, one family', () => {
   test('pressing approve twice in one second pushes each child once', async ({
     page,
@@ -54,12 +67,17 @@ test.describe('two people, one family', () => {
       const card = cardFor(page, `Ingrid ${surname}`);
       await expect(card).toBeVisible({ timeout: 30_000 });
 
-      const approve = card.getByRole('button', { name: /Approve and add|Finish adding them/i });
-      // Twice, as fast as the DOM allows. The screen is expected to refuse the
-      // second press; the assertion is about what reached the church database
-      // either way.
-      await approve.click();
-      await approve.click({ force: true, timeout: 2_000 }).catch(() => {});
+      /*
+       * The arm press first, then the *commit* pressed twice as fast as the DOM
+       * allows. Arming twice is harmless by construction — the second press
+       * lands on Cancel — so the press worth stressing is the one that sends,
+       * and the assertion is about what reached the church's database either
+       * way rather than about what the screen did.
+       */
+      await card.getByRole('button', { name: /Approve and add|Finish adding them/i }).click();
+      const commit = card.getByRole('button', { name: /^Yes — add/i });
+      await commit.click();
+      await commit.click({ force: true, timeout: 2_000 }).catch(() => {});
 
       await expect
         .poll(async () => (await simulatorPeople()).filter((p) => p.last_name === surname).length, {
@@ -101,13 +119,171 @@ test.describe('two people, one family', () => {
       // The other reviewer decides, out from under this tab.
       await deleteDocument(`kioskRegistrations/${registrationId}`);
 
-      await card.getByRole('button', { name: /Approve and add|Finish adding them/i }).click();
+      await approve(card);
       // An answer, not a crash and not a silent no-op.
       await expect(page.getByText(/already been dealt with/i)).toBeVisible({ timeout: 30_000 });
       await expect(card).toBeHidden({ timeout: 30_000 });
 
       // Nobody was pushed by the dead press.
       expect((await simulatorPeople()).some((p) => p.last_name === surname)).toBe(false);
+    } finally {
+      await removeRegistration(registrationId, 1);
+    }
+  });
+});
+
+test.describe('the guards on the irreversible press', () => {
+  test('a repeat press on the same spot cancels instead of sending', async ({
+    page,
+    signedInAs,
+  }) => {
+    /*
+     * The habit that produces an accidental commit is pressing again when a
+     * control seems not to have responded. The commit therefore does not live
+     * where the arm button was: that rectangle holds Cancel, so the reflex is
+     * the safe answer rather than the permanent one.
+     */
+    const surname = `Eskildsen${RUN}`;
+    const registrationId = `stress-rearm-${RUN}`;
+    await signedInAs('core');
+    await seedRegistration({
+      registrationId,
+      guardian: { firstName: 'Mette', lastName: surname, phone: '5550188123' },
+      children: [{ firstName: 'Freja', lastName: surname, grade: 4 }],
+    });
+
+    try {
+      await gotoReady(page, '/review');
+      const card = cardFor(page, `Mette ${surname}`);
+      await expect(card).toBeVisible({ timeout: 30_000 });
+
+      const armBox = await card
+        .getByRole('button', { name: /Approve and add|Finish adding them/i })
+        .boundingBox();
+      await card.getByRole('button', { name: /Approve and add|Finish adding them/i }).click();
+
+      // Whatever now occupies the arm button's own coordinates must not be the
+      // commit — asserted geometrically, because that is the actual claim.
+      const commitBox = await card.getByRole('button', { name: /^Yes — add/i }).boundingBox();
+      const overlaps =
+        armBox !== null &&
+        commitBox !== null &&
+        armBox.x < commitBox.x + commitBox.width &&
+        commitBox.x < armBox.x + armBox.width &&
+        armBox.y < commitBox.y + commitBox.height &&
+        commitBox.y < armBox.y + armBox.height;
+      expect(overlaps, 'the commit does not sit where the arm button was').toBe(false);
+
+      await card.getByRole('button', { name: /^Cancel$/ }).click();
+      await expect(card.getByRole('button', { name: /Approve and add/i })).toBeVisible();
+      // Nothing was sent by arming and then retreating.
+      expect((await simulatorPeople()).some((p) => p.last_name === surname)).toBe(false);
+    } finally {
+      await removeRegistration(registrationId, 1);
+    }
+  });
+
+  test('will not approve a family whose duplicate nobody has settled', async ({
+    page,
+    signedInAs,
+  }) => {
+    /*
+     * The card names the mistake and explains it. It must not also offer it:
+     * a second row for the same child in the church's database cannot be
+     * removed. Saying the child is new settles it, and so does merging.
+     */
+    await signedInAs('core');
+    const students = await readCollection('students');
+    const existing = students.find(
+      (doc) =>
+        doc.data.status === 'active' &&
+        typeof doc.data.firstName === 'string' &&
+        (doc.data.firstName as string).length > 0,
+    )!;
+    const surname = (existing.data.lastName as string) || `Halloran${RUN}`;
+    const registrationId = `stress-held-${RUN}`;
+    await seedRegistration({
+      registrationId,
+      guardian: { firstName: 'Wanda', lastName: surname, phone: '5550199234' },
+      children: [
+        {
+          firstName: existing.data.firstName as string,
+          lastName: surname,
+          grade: 6,
+          possibleDuplicateOf: [existing.id],
+        },
+      ],
+    });
+
+    try {
+      await gotoReady(page, '/review');
+      const card = cardFor(page, `Wanda ${surname}`);
+      await expect(card).toBeVisible({ timeout: 30_000 });
+
+      const approveButton = card.getByRole('button', {
+        name: /Approve and add|Finish adding them/i,
+      });
+      await expect(approveButton).toBeDisabled();
+      await expect(card.getByText(/Waiting on/i)).toBeVisible();
+      // Never held: a reviewer must always be able to say this is not theirs.
+      await expect(card.getByRole('button', { name: /Not ours/i })).toBeEnabled();
+
+      // Saying the child is new is a settling answer, and it sends nothing.
+      await card.getByRole('button', { name: /is new$/i }).click();
+      await expect(approveButton).toBeEnabled();
+      const students2 = await readCollection('students');
+      expect(students2.find((doc) => doc.id === `${registrationId}-child-0`)!.data
+        .mergedIntoStudentId ?? null).toBeNull();
+    } finally {
+      await removeRegistration(registrationId, 1);
+    }
+  });
+
+  test('finishes without the adult when the guardian is what the backend refused', async ({
+    page,
+    signedInAs,
+  }) => {
+    /*
+     * The dead end: a guardian write refused for a reason no retry can fix.
+     * Before this instrument existed the record could only be retried for ever
+     * or discarded — and discarding takes a family off the roster whose
+     * children may already be upstream, where nothing deletes anything.
+     */
+    const surname = `Wickramasinghe${RUN}`;
+    const registrationId = `stress-noguardian-${RUN}`;
+    await signedInAs('core');
+    await seedRegistration({
+      registrationId,
+      guardian: { firstName: 'Dilani', lastName: surname, phone: '5550100987' },
+      lastError: 'That number already belongs to somebody outside this household.',
+      // The kind is what selects the instrument: a guardian refusal offers
+      // finishing without them, a child refusal offers a plain retry.
+      lastErrorKind: 'guardian',
+      children: [{ firstName: 'Ravi', lastName: surname, grade: 8 }],
+    });
+
+    try {
+      await gotoReady(page, '/review');
+      const card = cardFor(page, `Dilani ${surname}`);
+      await expect(card).toBeVisible({ timeout: 30_000 });
+
+      await card.getByRole('button', { name: /without Dilani/i }).click();
+
+      await expect
+        .poll(async () => (await simulatorPeople()).filter((p) => p.last_name === surname).length, {
+          timeout: 30_000,
+          message: 'the child lands even though the adult was waived',
+        })
+        .toBe(1);
+      // The job is over: the record goes, and the number with it, rather than
+      // being held for thirty days to serve a retry that was declined.
+      await expect
+        .poll(
+          async () =>
+            (await readCollection('kioskRegistrations')).some((d) => d.id === registrationId),
+          { timeout: 30_000, message: 'the record is released' },
+        )
+        .toBe(false);
     } finally {
       await removeRegistration(registrationId, 1);
     }
@@ -145,7 +321,7 @@ test.describe('when the backend will not take them', () => {
       await gotoReady(page, '/review');
       const card = cardFor(page, `Paz ${surname}`);
       await expect(card).toBeVisible({ timeout: 30_000 });
-      await card.getByRole('button', { name: /Approve and add|Finish adding them/i }).click();
+      await approve(card);
 
       /*
        * The record survives *because* pressing again can still help, and the
@@ -171,7 +347,7 @@ test.describe('when the backend will not take them', () => {
       await page.reload();
       const again = cardFor(page, `Paz ${surname}`);
       await expect(again).toBeVisible({ timeout: 30_000 });
-      await again.getByRole('button', { name: /Approve and add|Finish adding them/i }).click();
+      await approve(again);
 
       await expect
         .poll(async () => (await simulatorPeople()).filter((p) => p.last_name === surname).length, {
@@ -343,7 +519,7 @@ test.describe('shapes the screen has to survive', () => {
         await expect(card.getByText(`${child.firstName} ${surname}`)).toBeVisible();
       }
       // And the decision is still reachable without leaving the card.
-      await card.getByRole('button', { name: /Approve and add|Finish adding them/i }).click();
+      await approve(card);
       await expect
         .poll(async () => (await simulatorPeople()).filter((p) => p.last_name === surname).length, {
           timeout: 60_000,
@@ -400,7 +576,7 @@ test.describe('shapes the screen has to survive', () => {
       );
       expect(overflow).toBeLessThanOrEqual(1);
 
-      await card.getByRole('button', { name: /Approve and add|Finish adding them/i }).click();
+      await approve(card);
       await expect
         .poll(async () => (await simulatorPeople()).filter((p) => p.last_name === surname).length, {
           timeout: 30_000,
