@@ -142,8 +142,31 @@ function encode(value: unknown): RestValue {
     return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
   }
   if (Array.isArray(value)) return { arrayValue: { values: value.map(encode) } };
+  /*
+   * Maps, because the documents worth arranging by hand are the ones with shape
+   * — a `kioskRegistrations` record holds a guardian object, a list of children
+   * objects and a duplicate-hint map keyed by child index, and a spec that
+   * cannot write those can only arrange the easy half of the triage screen.
+   */
+  if (typeof value === 'object') {
+    return { mapValue: { fields: encodeFields(value as Record<string, unknown>) } };
+  }
   throw new Error(`No encoding for ${typeof value} in a test-written document.`);
 }
+
+function encodeFields(data: Record<string, unknown>): Record<string, RestValue> {
+  return Object.fromEntries(Object.entries(data).map(([key, value]) => [key, encode(value)]));
+}
+
+/** What `writeDocument` will take: JSON, plus the Dates that become timestamps. */
+export type WritableValue =
+  | string
+  | number
+  | boolean
+  | null
+  | Date
+  | readonly WritableValue[]
+  | { readonly [key: string]: WritableValue };
 
 /**
  * Writes one document whole, through the admin channel — for the settings a
@@ -152,9 +175,9 @@ function encode(value: unknown): RestValue {
  */
 export async function writeDocument(
   path: string,
-  data: Record<string, string | number | boolean | null | Date>,
+  data: Record<string, WritableValue>,
 ): Promise<void> {
-  const fields = Object.fromEntries(Object.entries(data).map(([key, value]) => [key, encode(value)]));
+  const fields = encodeFields(data);
   const response = await fetch(`${FIRESTORE_ROOT}/${path}`, {
     method: 'PATCH',
     headers: { ...ADMIN, 'content-type': 'application/json' },

@@ -91,6 +91,24 @@ export default defineConfig({
       stderr: 'pipe',
     },
     {
+      /*
+       * The second backend's simulator, which this config does not otherwise
+       * need and cannot skip: `globalSetup` is shared with the e2e suite and
+       * waits for every simulator the suite can reach, so a capture without
+       * this one dies before it signs in — "Attendees simulator never became
+       * ready", from a config that never meant to start it. Cheaper to run the
+       * process than to fork the setup.
+       */
+      command: 'npm run a32-sim',
+      url: `${E2E.a32SimulatorUrl}/_health`,
+      env: { A32_SIM_PORT: String(E2E.attendees) },
+      cwd: repoRoot,
+      reuseExistingServer: true,
+      timeout: 60_000,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+    {
       command: `npm run functions:build && npx firebase emulators:start --project ${E2E.projectId} --only auth,firestore,functions`,
       url: `http://127.0.0.1:${E2E.firestore}/`,
       env: {

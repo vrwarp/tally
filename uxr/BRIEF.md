@@ -78,6 +78,7 @@ icon library — icons are single characters and emoji, deliberately.
 | `dashboard` | core team | Work out who to phone this week: who drifted, who is new, who nobody can reach. |
 | `events` | core team | See what is on, schedule next Friday, find the gathering from three weeks ago. |
 | `students` | core team | Find one student among forty-five, see who has no parent contact, open a record. |
+| `review` | core team | Decide five families the lobby screen recorded and could not judge — duplicates, a half-failed push, a record about to be swept — knowing approval is irreversible upstream. |
 
 ## How the loop works
 
