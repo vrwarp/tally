@@ -1402,6 +1402,269 @@ describe('skippedNights', () => {
   });
 });
 
+/**
+ * Who may work one gathering.
+ *
+ * This block governs the access list itself, not the gatherings it protects —
+ * the gates on `events`, `attendance` and `rsvps` are tested where they live.
+ * The distinction matters because the interesting failures here are about
+ * *changing the fence*, and a fence somebody outside can move is not a fence.
+ *
+ * `sunday-school` is seeded restricted to `counselor` and `core`. `outsider`
+ * and `outsiderCore` are active members in good standing who are simply not on
+ * it, which is what separates this fence from the app's front door.
+ */
+describe('eventAccess', () => {
+  const chain = ID.restrictedSeries;
+  const openChain = ID.series;
+
+  const acl = (over: Record<string, unknown> = {}) => ({
+    chainKey: chain,
+    restricted: true,
+    members: [UID.counselor, UID.core],
+    updatedAt: serverTimestamp(),
+    updatedBy: UID.core,
+    ...over,
+  });
+
+  describe('reading it', () => {
+    it('is readable by any active member, including one not on the gathering', async () => {
+      // This is what lets the locked screen say "Miriam or Dana can add you"
+      // instead of just refusing. Locked, not hidden.
+      await assertSucceeds(getDoc(doc(asUser(env, UID.outsider), paths.eventAccess(chain))));
+      await assertSucceeds(getDoc(doc(asUser(env, UID.counselor), paths.eventAccess(chain))));
+    });
+
+    it('refuses somebody with no active membership', async () => {
+      await assertFails(getDoc(doc(asUser(env, UID.inactive), paths.eventAccess(chain))));
+      await assertFails(getDoc(doc(asAnonymous(env), paths.eventAccess(chain))));
+    });
+  });
+
+  describe('restricting a gathering that was open', () => {
+    it('lets a core member close one, keeping themselves on it', async () => {
+      const db = asUser(env, UID.core);
+      await assertSucceeds(
+        setDoc(doc(db, paths.eventAccess(openChain)), acl({ chainKey: openChain })),
+      );
+    });
+
+    it('refuses a counselor', async () => {
+      // Adding somebody to a gathering you work hands out access you already
+      // have. Closing one takes access away from everybody else, which is a
+      // decision about the gathering rather than about a person.
+      const db = asUser(env, UID.counselor);
+      await assertFails(
+        setDoc(
+          doc(db, paths.eventAccess(openChain)),
+          acl({ chainKey: openChain, members: [UID.counselor], updatedBy: UID.counselor }),
+        ),
+      );
+    });
+
+    it('refuses closing the door from outside it', async () => {
+      // The lockout this feature makes easiest: restrict Friday Fellowship,
+      // leave yourself off, and nobody below an admin can reopen it — because
+      // reopening requires being on it.
+      const db = asUser(env, UID.core);
+      await assertFails(
+        setDoc(
+          doc(db, paths.eventAccess(openChain)),
+          acl({ chainKey: openChain, members: [UID.counselor] }),
+        ),
+      );
+    });
+
+    it('refuses a document that claims nothing', async () => {
+      // `restricted: false` with no prior document is a no-op that would cost
+      // a billed read on every gated request forever. Absence is how a
+      // gathering says it is open.
+      const db = asUser(env, UID.core);
+      await assertFails(
+        setDoc(
+          doc(db, paths.eventAccess(openChain)),
+          acl({ chainKey: openChain, restricted: false }),
+        ),
+      );
+    });
+
+    it('refuses a document filed under the wrong chain', async () => {
+      const db = asUser(env, UID.core);
+      await assertFails(setDoc(doc(db, paths.eventAccess(openChain)), acl()));
+    });
+
+    it('refuses signing somebody else name to the write', async () => {
+      const db = asUser(env, UID.core);
+      await assertFails(
+        setDoc(
+          doc(db, paths.eventAccess(openChain)),
+          acl({ chainKey: openChain, updatedBy: UID.admin }),
+        ),
+      );
+    });
+
+    it('refuses a malformed list', async () => {
+      const db = asUser(env, UID.core);
+
+      for (const over of [
+        { members: UID.core },
+        { members: Array.from({ length: 201 }, (_, i) => `uid-${i}`).concat(UID.core) },
+        { restricted: 'yes' },
+        { updatedAt: 'now' },
+      ]) {
+        await assertFails(
+          setDoc(doc(db, paths.eventAccess(openChain)), acl({ chainKey: openChain, ...over })),
+        );
+      }
+    });
+  });
+
+  describe('adding somebody', () => {
+    it('lets a counselor already on it add another', async () => {
+      // Priya is on Friday Fellowship, Jo turns up at the door, and Priya adds
+      // her without finding an admin. The permissive half, working as intended.
+      const db = asUser(env, UID.counselor);
+      await assertSucceeds(
+        updateDoc(doc(db, paths.eventAccess(chain)), {
+          members: [UID.counselor, UID.core, UID.outsider],
+          updatedAt: serverTimestamp(),
+          updatedBy: UID.counselor,
+        }),
+      );
+    });
+
+    it('refuses a counselor who is not on it', async () => {
+      // Otherwise the fence is a door with the handle on the outside.
+      const db = asUser(env, UID.outsider);
+      await assertFails(
+        updateDoc(doc(db, paths.eventAccess(chain)), {
+          members: [UID.counselor, UID.core, UID.outsider],
+          updatedAt: serverTimestamp(),
+          updatedBy: UID.outsider,
+        }),
+      );
+    });
+
+    it('refuses a core member who is not on it', async () => {
+      // Rank is not a way in. Core removes and reopens, but only on the
+      // gatherings they work; the break-glass is admin.
+      const db = asUser(env, UID.outsiderCore);
+      await assertFails(
+        updateDoc(doc(db, paths.eventAccess(chain)), {
+          members: [UID.counselor, UID.core, UID.outsiderCore],
+          updatedAt: serverTimestamp(),
+          updatedBy: UID.outsiderCore,
+        }),
+      );
+    });
+  });
+
+  describe('removing somebody', () => {
+    it('lets a core member on it remove a helper', async () => {
+      const db = asUser(env, UID.core);
+      await assertSucceeds(
+        updateDoc(doc(db, paths.eventAccess(chain)), {
+          members: [UID.core],
+          updatedAt: serverTimestamp(),
+          updatedBy: UID.core,
+        }),
+      );
+    });
+
+    it('refuses a counselor, who may only add', async () => {
+      // Not symmetric with adding: a counselor handing out the access they
+      // have is one thing, a counselor evicting the person who set the
+      // gathering up is another.
+      const db = asUser(env, UID.counselor);
+      await assertFails(
+        updateDoc(doc(db, paths.eventAccess(chain)), {
+          members: [UID.counselor],
+          updatedAt: serverTimestamp(),
+          updatedBy: UID.counselor,
+        }),
+      );
+    });
+
+    it('refuses removing yourself, whatever your rank', async () => {
+      // Same lockout as closing the door from outside, arrived at one edit
+      // later.
+      const db = asUser(env, UID.core);
+      await assertFails(
+        updateDoc(doc(db, paths.eventAccess(chain)), {
+          members: [UID.counselor],
+          updatedAt: serverTimestamp(),
+          updatedBy: UID.core,
+        }),
+      );
+    });
+  });
+
+  describe('reopening it', () => {
+    it('lets a core member on it reopen, keeping the list', async () => {
+      // Keeping the list is the point: changing your mind twice should not
+      // mean rebuilding four names from memory.
+      const db = asUser(env, UID.core);
+      await assertSucceeds(
+        updateDoc(doc(db, paths.eventAccess(chain)), {
+          restricted: false,
+          members: [UID.counselor, UID.core],
+          updatedAt: serverTimestamp(),
+          updatedBy: UID.core,
+        }),
+      );
+    });
+
+    it('refuses a counselor, who may not flip the switch', async () => {
+      const db = asUser(env, UID.counselor);
+      await assertFails(
+        updateDoc(doc(db, paths.eventAccess(chain)), {
+          restricted: false,
+          members: [UID.counselor, UID.core],
+          updatedAt: serverTimestamp(),
+          updatedBy: UID.counselor,
+        }),
+      );
+    });
+
+    it('refuses deleting the document, even for an admin', async () => {
+      // Deleting reopens the gathering to everybody — the same outcome as
+      // `restricted: false`, reached by a verb the rules would have handed
+      // over for free had this been written `allow write:`.
+      await assertFails(deleteDoc(doc(asUser(env, UID.admin), paths.eventAccess(chain))));
+      await assertFails(deleteDoc(doc(asUser(env, UID.core), paths.eventAccess(chain))));
+    });
+  });
+
+  describe('the break-glass', () => {
+    it('lets an admin who is not on it fix a lockout', async () => {
+      // The scenario: one core member restricted the gathering the whole
+      // ministry works and left everybody off. Somebody has to be able to undo
+      // that without a database console.
+      const db = asUser(env, UID.admin);
+      await assertSucceeds(
+        updateDoc(doc(db, paths.eventAccess(chain)), {
+          restricted: false,
+          members: [UID.counselor, UID.core],
+          updatedAt: serverTimestamp(),
+          updatedBy: UID.admin,
+        }),
+      );
+    });
+
+    it('lets an admin rewrite the list without joining it', async () => {
+      // An admin tidying somebody else's gathering is not locking themselves
+      // out, because they never needed to be on it.
+      const db = asUser(env, UID.admin);
+      await assertSucceeds(
+        updateDoc(doc(db, paths.eventAccess(chain)), {
+          members: [UID.core],
+          updatedAt: serverTimestamp(),
+          updatedBy: UID.admin,
+        }),
+      );
+    });
+  });
+});
 
 describe('kiosk', () => {
   /*

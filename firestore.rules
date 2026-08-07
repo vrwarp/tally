@@ -624,6 +624,132 @@ service cloud.firestore {
     }
 
     /* ---------------------------------------------------------------- */
+    /* eventAccess                                                       */
+    /* ---------------------------------------------------------------- */
+
+    /**
+     * Who may work one gathering.
+     *
+     * The problem being solved is clutter, not secrecy: the Sunday-morning
+     * nursery team's screen carries Friday's youth night, the retreat and the
+     * Wednesday small group, none of which they will ever stand at. So what
+     * closes is *working* the gathering — check-in, undo, RSVPs, the register,
+     * editing. What stays open is that it exists, what it is called and when it
+     * is on, because a counselor at a door at 6:59pm who sees an empty screen
+     * concludes the app is broken and files check-ins against the wrong thing.
+     *
+     * Chain-keyed, like `skippedNights` above and for the same reason: most
+     * occurrences are projected and have no document to hang an ACL on.
+     *
+     * **An absent document means the gathering is open.** Every rule that reads
+     * this collection has to ask `exists()` before `get()`, because `get()` at
+     * a path with no document raises rather than returning null — see
+     * `firestore-tests/getSemantics.test.ts`. Written the obvious way, every
+     * gathering nobody had restricted would have denied.
+     *
+     * This block governs the ACL itself. The gates that read it live on
+     * `events`, `attendance`, `rsvps` and `skippedNights`.
+     */
+    match /eventAccess/{chainKey} {
+      /**
+       * The permission to change this document is the document.
+       *
+       * `resource`, not a lookup: what is being written *is* the access list,
+       * so the stored version answers "may you touch this" directly. Reading it
+       * through `get()` would be the same document at the cost of a billed
+       * read, and would need the `exists()` dance besides.
+       */
+      function onThisChain() {
+        return isAdmin()
+          || resource.data.get('restricted', false) != true
+          || request.auth.uid in resource.data.get('members', []);
+      }
+
+      /**
+       * `members` is checked for shape and size but not element by element —
+       * rules cannot iterate a list. A non-string in there is inert: it can
+       * never equal `request.auth.uid`, so the worst it does is take up one of
+       * the 200 slots. The cap is what actually matters, because this document
+       * is read on every gated request and an unbounded array would make every
+       * check-in pay for somebody's paste.
+       */
+      function validAccess() {
+        let d = request.resource.data;
+        return d.chainKey == chainKey
+          && d.restricted is bool
+          && d.members is list
+          && d.members.size() <= 200
+          && d.updatedAt is timestamp
+          && d.updatedBy == request.auth.uid;
+      }
+
+      /**
+       * No closing the door from the outside.
+       *
+       * The mistake this feature makes easiest is one core member restricting
+       * *Friday Fellowship* — the gathering the whole ministry works — and
+       * leaving themselves off it. Nobody could then re-open it, because
+       * re-opening requires being on it. So the writer stays on the list.
+       *
+       * Admins are exempt: they pass `onThisChain()` regardless, so they are
+       * never locking themselves out, and they may be tidying somebody else's
+       * list on their behalf.
+       */
+      function writerStays() {
+        return isAdmin() || request.auth.uid in request.resource.data.members;
+      }
+
+      /**
+       * The permissive half, and the reason a counselor can be trusted with
+       * it: Priya is already on Friday Fellowship, Jo turns up at the door, and
+       * Priya adds her without finding an admin. Adding somebody to a gathering
+       * you already work is not an escalation — it hands out exactly the access
+       * you have.
+       *
+       * Removing somebody is not symmetric with adding them, so it is not here.
+       * Nor is flipping `restricted`, which is a decision about the gathering
+       * rather than about one person.
+       */
+      function onlyAdds() {
+        return request.resource.data.members.hasAll(resource.data.get('members', []))
+          && request.resource.data.restricted == resource.data.get('restricted', false);
+      }
+
+      /*
+       * Readable to the whole team, which is what makes the locked screen able
+       * to say "Miriam or Dana can add you" rather than just refusing. The
+       * client pre-filters what it shows; this is not where the gathering is
+       * protected.
+       */
+      allow get, list: if isActive();
+
+      /*
+       * The document only comes into existence by restricting something —
+       * a fresh one saying `restricted: false` would be a no-op that costs a
+       * read on every gated request forever. Re-opening is an update.
+       */
+      allow create: if isCore()
+        && validAccess()
+        && writerStays()
+        && request.resource.data.restricted == true;
+
+      allow update: if validAccess() && writerStays() && (
+           isAdmin()
+        || (isCore() && onThisChain())
+        || (isCounselor() && onThisChain() && onlyAdds())
+      );
+
+      /*
+       * Stated rather than left to the default deny at the bottom of the file,
+       * because the distinction is load-bearing: writing `allow write:` in
+       * place of `create, update:` would have silently handed over deletion,
+       * and deleting this document re-opens the gathering to everybody. The way
+       * to re-open is `restricted: false`, which keeps the list.
+       */
+      allow delete: if false;
+    }
+
+    /* ---------------------------------------------------------------- */
     /* config                                                            */
     /* ---------------------------------------------------------------- */
 
