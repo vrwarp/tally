@@ -66,7 +66,7 @@ jobs:
             echo 'present=true' >> "$GITHUB_OUTPUT"
           else
             echo 'present=false' >> "$GITHUB_OUTPUT"
-            echo '::notice::FIREBASE_SERVICE_ACCOUNT_TALLY_BACKEND or FUNCTIONS_ENV is not set, so the deploy dry run was skipped. See README.md#repository-secrets.'
+            echo '::notice::FIREBASE_SERVICE_ACCOUNT_TALLY_BACKEND or FUNCTIONS_ENV is not set, so the deploy dry run was skipped. See docs/deployment-setup.md#repository-secrets.'
           fi
 
       # The CLI resolves the functions' defineString params from
@@ -141,7 +141,7 @@ jobs:
           FUNCTIONS_ENV: ${{ secrets.FUNCTIONS_ENV }}
         run: |
           if [ -z "$FUNCTIONS_ENV" ]; then
-            echo "::error::FUNCTIONS_ENV is not set. See README.md#repository-secrets."
+            echo "::error::FUNCTIONS_ENV is not set. See docs/deployment-setup.md#repository-secrets."
             exit 1
           fi
           printf '%s\n' "$FUNCTIONS_ENV" > "functions/.env.$FIREBASE_PROJECT"

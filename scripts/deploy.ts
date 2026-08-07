@@ -18,7 +18,7 @@ function fail(message: string): never {
 const firebaserc = JSON.parse(readFileSync(new URL('../.firebaserc', import.meta.url), 'utf8'));
 const projectId: string | undefined = firebaserc.projects?.default;
 if (!projectId) {
-  fail('.firebaserc has no default project configured — see the "Deployment" section in README.md.');
+  fail('.firebaserc has no default project configured — see docs/deployment-setup.md.');
 }
 
 if (!existsSync(new URL('../.env.local', import.meta.url))) {

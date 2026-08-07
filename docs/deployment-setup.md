@@ -5,9 +5,41 @@ only becomes visible when CI is the thing deploying: a human running `npm run de
 account gets APIs enabled and IAM granted silently along the way, whereas a deploy service account
 deliberately cannot do either.
 
-Read [Deployment](../README.md#deployment) first for what the workflows do; this file is the setup
-they assume. The reasoning behind the split — why Hosting is automated more freely than the backend —
-is in [docs/ci.md](ci.md#what-ci-deploys).
+[Deploying](#deploying) below is the command itself; the rest of this file is the setup it assumes.
+What the workflows do, and the reasoning behind the split — why Hosting is automated more freely than
+the backend — is in [docs/ci.md](ci.md#what-ci-deploys).
+
+---
+
+## Deploying
+
+Merging to `main` deploys everything — Hosting, Cloud Functions, Firestore rules and Firestore
+indexes — to the `tally-76406` Firebase project configured in `.firebaserc`. By hand, which is still
+the way to deploy from a branch or when CI is unavailable:
+
+```bash
+npm run deploy
+```
+
+This checks that you're logged in to the Firebase CLI and that `.env.local` exists, then runs
+`npm run build` and `firebase deploy` (hosting, rules, indexes and functions — the functions build
+runs automatically as `firebase.json`'s `predeploy` hook). If either check fails it names the setup
+step below that you skipped, rather than failing deep inside `firebase deploy`. The same thing,
+without the checks: `npm run build && firebase deploy`.
+
+To deploy only one piece — e.g. after a rules-only change — use the Firebase CLI's `--only` flag
+directly: `npx firebase deploy --only firestore:rules`.
+
+Deploying by hand skips one thing CI does: `npm run functions:invokers`, which re-asserts that each
+callable's Cloud Run service still answers unauthenticated requests. A callable that has lost that
+binding fails in the browser as a CORS error and cannot be fixed from this repository — the details,
+and why it does not weaken authentication, are in
+[callable functions must allow unauthenticated invocations](#callable-functions-must-allow-unauthenticated-invocations).
+
+The Firebase **web config in `.env` is not a secret** — `apiKey`, `projectId` and friends are shipped
+to every browser by design, and access control lives in `firestore.rules`, not in those values. The
+Planning Center token **is** one, and lives in Secret Manager; the full set of files and which one
+applies when is [Configuration](configuration.md).
 
 ---
 
@@ -25,7 +57,7 @@ is in [docs/ci.md](ci.md#what-ci-deploys).
    `VITE_FIREBASE_CONFIG`. Paste it in whichever form the console gives you — the
    `const firebaseConfig = { … };` snippet is accepted as-is, and so is JSON. This is what the
    production build embeds, so it has to exist even though
-   [none of it is secret](../README.md#deploying).
+   [none of it is secret](#deploying).
 4. **Set the Planning Center secrets**, once, in Secret Manager:
    ```bash
    npx firebase functions:secrets:set PCO_APP_ID

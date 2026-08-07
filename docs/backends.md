@@ -57,7 +57,7 @@ human to choose from — because creating a second David Kim is a merge somebody
 while attaching a child to the wrong David Kim shows one family another family's contact details.
 
 `createFamily` serves the kiosk's self-registration — not at the door any more, but on the
-[Review screen](../README.md) where somebody approves the family. Three consequences.
+[Review screen](product.md) where somebody approves the family. Three consequences.
 
 It takes **every child at once** and puts them in one household. Calling `addParent` per child would
 mint one household per sibling and leave each of them alone in it, which is also why approval replays

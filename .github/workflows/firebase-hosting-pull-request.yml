@@ -45,7 +45,7 @@ jobs:
             echo 'present=true' >> "$GITHUB_OUTPUT"
           else
             echo 'present=false' >> "$GITHUB_OUTPUT"
-            echo '::notice::FIREBASE_SERVICE_ACCOUNT_TALLY is not set, so no preview channel was deployed. See README.md#repository-secrets.'
+            echo '::notice::FIREBASE_SERVICE_ACCOUNT_TALLY is not set, so no preview channel was deployed. See docs/deployment-setup.md#repository-secrets.'
           fi
 
       - uses: FirebaseExtended/action-hosting-deploy@v0
