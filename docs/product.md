@@ -127,6 +127,19 @@ pushes every child and then builds **one** household for the family. The guardia
 wait on a functions-only document with a thirty-day TTL until then — the one place in Tally a parent's
 number lives, and [documented as the exception it is](data-model.md#kioskregistrationsregistrationid).
 
+That screen is built around one asymmetry: **merging can be undone; a duplicate in the church's
+database cannot.** So every control carries a sentence above it naming the children by name and what
+the press costs, approving arms before it commits — with the commit deliberately *not* where the arm
+button was, so a repeat press on an apparently unresponsive control cancels — and a card whose child
+collides with a roster row cannot be approved at all until somebody settles which they are. The
+candidates are on the screen rather than behind a link, each carrying the two facts that separate two
+children of one name: whether the church already finds that row under this family's own four digits,
+and whether the grade matches. A merge names who the child was folded into and offers the undo
+Tally has always had. And a family whose *parent* the backend refuses — usually for a reason no
+retry can fix — can be finished without them rather than retried for ever or discarded with children
+already upstream. Five rounds of critique are recorded in [`uxr/rounds/`](../uxr/rounds/); the last
+two judged the shipping screen rather than a prototype.
+
 **Journey 2½ — the second child.** A parent whose next child is finally old enough finds their family
 by phone as usual, taps a name, and finds **"Anyone else?"** already asked on the confirm screen —
 the children the kiosk guessed, ending in **"+ Another child"**. Which of them arrive *ticked* is a

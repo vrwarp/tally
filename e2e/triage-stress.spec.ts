@@ -16,6 +16,7 @@
  * asserted, never a mock.
  */
 import type { Page } from '@playwright/test';
+import { parseStudentId } from '../src/lib/backendIds';
 import { gotoReady } from './support/auth';
 import { deleteDocument, readCollection, simulatorPeople, writeDocument } from './support/emulator';
 import { expect, test } from './support/fixtures';
@@ -410,8 +411,10 @@ test.describe('merges that must be refused', () => {
      */
     await signedInAs('core');
     const students = await readCollection('students');
+    // Prefixed ids are `pco_…` / `a32_…`, not colon-separated — the colon
+    // check here never matched, so this case had been skipping every run.
     const upstream = students.find(
-      (doc) => doc.data.status === 'active' && doc.id.includes(':'),
+      (doc) => doc.data.status === 'active' && parseStudentId(doc.id) !== null,
     );
     test.skip(!upstream, 'The seeded roster holds no backend-linked student.');
 

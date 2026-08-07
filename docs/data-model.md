@@ -476,6 +476,16 @@ both families' children appear and a parent picks their own — but an offer can
 the stricter test. What is offered stays as wide as that guess; which of it arrives *ticked* is a
 different question, answered by the document below.
 
+**Its third reader is the review screen**, and for the same reason a parent types digits: to tell
+two children of the same name apart. A merge is the one decision on that screen with a right
+answer, and a name and a grade are often not enough to make it — two children can share both, and a
+grade rolls over between terms, so "Elena Salgado · 8th grade" against an incoming "Elena Salgado ·
+7th grade" is either the same girl a year later or a different girl. `listPendingRegistrations`
+reads this map once per call and marks each duplicate candidate the church already finds under the
+registering family's own four digits (`sharesFamilyDigits`). It is evidence and never a verdict:
+the negative is rendered as plainly as the positive, so "different on both" is a visible answer
+rather than a blank, and the reviewer still chooses.
+
 ### `kioskIndex/participation`
 
 Who belongs to each gathering, and who comes to it regularly. One document, keyed by chain.
@@ -626,6 +636,7 @@ what make every write downstream safe to repeat.
 | `possibleDuplicateOf` | map | Child index → active student ids with the same name. Recorded, never acted on: it is what puts "this might be the Jacob Smith we have" in front of a human. |
 | `anchorStudentIds` | string[] | Verified siblings, when a parent added a second child to a family the church already has. Decides which household is joined at approval. |
 | `lastError` | string \| null | Why the last approval attempt did not finish. |
+| `lastErrorKind` | `'children' \| 'guardian' \| 'both'` \| null | *Which half* did not finish, because the two halves want opposite moves. Children a backend refused are worth retrying — the usual cause is an outage that has passed. An adult it refused usually cannot be retried into working, since the usual cause is a number it already holds for somebody outside this household, and retrying reattempts exactly that refusal. The review screen reads this to decide whether to offer a retry or to offer finishing without the adult (`approveRegistration({ withoutGuardian: true })`, which pushes the children, never attempts the parent, and releases the record — number included — rather than holding it thirty days to serve a retry the reviewer declined). Null on records written before this existed, which the screen reads as "offer the ordinary foot". |
 | `createdAt`, `completedAt` | — | Swept after **30 days**, or deleted the moment a reviewer approves or discards. |
 
 #### The one place Tally holds a parent's phone number
