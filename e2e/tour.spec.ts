@@ -491,7 +491,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
 
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: 'Kindergarten', exact: true }).click();
-      await kiosk.getByRole('button', { name: /No allergies/i }).click();
+      await kiosk.getByRole('checkbox', { name: /No allergies/i }).click();
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: /That's everyone/i }).click();
       await typeOnKiosk(kiosk, 'Ngozi');
@@ -550,7 +550,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       await typeOnKiosk(kiosk, cast.doorLast);
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: '3rd grade', exact: true }).click();
-      await kiosk.getByRole('button', { name: /No allergies/i }).click();
+      await kiosk.getByRole('checkbox', { name: /No allergies/i }).click();
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: /That's everyone/i }).click();
       await typeOnKiosk(kiosk, 'Mira');
@@ -714,7 +714,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       await typeOnKiosk(kiosk, cast.edgeChild.split(' ')[1]!);
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: '2nd grade', exact: true }).click();
-      await kiosk.getByRole('button', { name: /No allergies/i }).click();
+      await kiosk.getByRole('checkbox', { name: /No allergies/i }).click();
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: /That's everyone/i }).click();
       await shoot(kiosk, 'kiosk', {
@@ -751,7 +751,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       await typeOnKiosk(kiosk, cast.surname);
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: '1st grade', exact: true }).click();
-      await kiosk.getByRole('button', { name: /No allergies/i }).click();
+      await kiosk.getByRole('checkbox', { name: /No allergies/i }).click();
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: /That's everyone/i }).click();
       await typeOnKiosk(kiosk, 'Ngozi');

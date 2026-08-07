@@ -201,7 +201,14 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
         caption:
           'The fourth question, and it only exists when the church\'s own database takes full write-back — the same gate the retired phone form kept, because collecting a medical note into a screen that silently drops it is worse than never asking. The common answer is the tick under the box rather than anything typed into it: a medical field with a keyboard under it and no visible way to say "nothing" collects "None" and "N/A" as though they were notes. Ticking empties the box and greys it out. The note goes to the reviewer and then upstream; the kiosk keeps a marker, never the text.',
       });
-      await kiosk.getByRole('button', { name: /No allergies/i }).click();
+      await kiosk.getByRole('checkbox', { name: /No allergies/i }).click();
+      await shoot({
+        flow: 'Right here',
+        state: 'One child',
+        title: 'Ticked, and the box goes quiet',
+        caption:
+          'What the tick does, rather than only that it is there. The box empties and dims and the keyboard goes with it, so the question is visibly answered and there is nothing left to type into — which is the whole point of a control that exists to stop people writing the word "none" into a medical field. Anything already typed is cleared rather than hidden behind the grey: a note that survived out of sight would be a note nobody agreed to send. Unticking reopens an empty box, not the old text.',
+      });
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await shoot({
         flow: 'Right here',
@@ -224,7 +231,7 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
 
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: '2nd grade', exact: true }).click();
-      await kiosk.getByRole('button', { name: /No allergies/i }).click();
+      await kiosk.getByRole('checkbox', { name: /No allergies/i }).click();
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await shoot({
         flow: 'Right here',
@@ -333,7 +340,7 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
       await typeOnKiosk(kiosk, SIB.surname);
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: 'Kindergarten', exact: true }).click();
-      await kiosk.getByRole('button', { name: /No allergies/i }).click();
+      await kiosk.getByRole('checkbox', { name: /No allergies/i }).click();
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: /That's everyone/i }).click();
       await shoot({

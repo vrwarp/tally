@@ -763,7 +763,7 @@ test.describe('registering a family at the kiosk', () => {
       await kiosk.getByRole('button', { name: /Add another child/i }).click();
       await enterChild(kiosk, 'Rowan', 'Aldercroft', '2nd grade');
       // The common answer is the tick under the box, not typed into it.
-      await kiosk.getByRole('button', { name: /No allergies/i }).click();
+      await kiosk.getByRole('checkbox', { name: /No allergies/i }).click();
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: /That's everyone/i }).click();
 
