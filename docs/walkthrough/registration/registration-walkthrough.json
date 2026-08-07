@@ -43,8 +43,16 @@
     "flow": "Right here",
     "state": "One child",
     "title": "Allergies, only where they can land",
-    "caption": "The fourth question, and it only exists when the church's own database takes full write-back — the same gate the retired phone form kept, because collecting a medical note into a screen that silently drops it is worse than never asking. The common answer is the button itself: \"No allergies\" until a letter is typed, Next the moment one is. The note goes to the reviewer and then upstream; the kiosk keeps a marker, never the text.",
+    "caption": "The fourth question, and it only exists when the church's own database takes full write-back — the same gate the retired phone form kept, because collecting a medical note into a screen that silently drops it is worse than never asking. The common answer is the tick under the box rather than anything typed into it: a medical field with a keyboard under it and no visible way to say \"nothing\" collects \"None\" and \"N/A\" as though they were notes. Ticking empties the box and greys it out. The note goes to the reviewer and then upstream; the kiosk keeps a marker, never the text.",
     "file": "landscape-06-allergies-only-where-they-can-land.png",
+    "orientation": "landscape"
+  },
+  {
+    "flow": "Right here",
+    "state": "One child",
+    "title": "Ticked, and the box goes quiet",
+    "caption": "What the tick does, rather than only that it is there. The box empties and dims and the keyboard goes with it, so the question is visibly answered and there is nothing left to type into — which is the whole point of a control that exists to stop people writing the word \"none\" into a medical field. Anything already typed is cleared rather than hidden behind the grey: a note that survived out of sight would be a note nobody agreed to send. Unticking reopens an empty box, not the old text.",
+    "file": "landscape-07-ticked-and-the-box-goes-quiet.png",
     "orientation": "landscape"
   },
   {
@@ -52,7 +60,7 @@
     "state": "One child",
     "title": "Anybody else?",
     "caption": "The fork that makes this worth doing at a kiosk at all: a parent with three children walks the loop three times rather than queueing three times. Who is on the list so far is named above the buttons, because the question cannot be answered against a parent's memory of what they typed forty seconds ago — least of all the parent of four, who is exactly who this loop is for. It is also the last chance to catch a child entered twice, or one whose name went in wrong.",
-    "file": "landscape-07-anybody-else.png",
+    "file": "landscape-08-anybody-else.png",
     "orientation": "landscape"
   },
   {
@@ -60,7 +68,7 @@
     "state": "Two children",
     "title": "The surname, carried",
     "caption": "The second child's last name arrives already typed, and the shift key is down rather than up — the next keystroke belongs mid-word, not at the start of one. This is the whole argument for a wizard over a form: the questions know what the family has already said, and a form cannot.",
-    "file": "landscape-08-the-surname-carried.png",
+    "file": "landscape-09-the-surname-carried.png",
     "orientation": "landscape"
   },
   {
@@ -68,7 +76,7 @@
     "state": "Two children",
     "title": "Both of them, named",
     "caption": "The same fork one child later. Nothing about this screen asks a parent to remember anything.",
-    "file": "landscape-09-both-of-them-named.png",
+    "file": "landscape-10-both-of-them-named.png",
     "orientation": "landscape"
   },
   {
@@ -76,7 +84,7 @@
     "state": "Two children, one adult",
     "title": "A dialer, for the one question that is a number",
     "caption": "The QWERTY row can type digits, but picking ten targets out of forty-three on a tablet while a queue watches is asking for a mistake in the one field where a mistake is expensive: four of these digits become the family's key for every visit after this one. The line above says why it is being asked for while a parent decides whether to give it — and it is the only thing on this screen Tally will not keep. The number lives inside one call, long enough to build the family in the church's own database and to be reduced to four digits for the kiosk index.",
-    "file": "landscape-10-a-dialer-for-the-one-question-that-is-a-number.png",
+    "file": "landscape-11-a-dialer-for-the-one-question-that-is-a-number.png",
     "orientation": "landscape"
   },
   {
@@ -84,7 +92,7 @@
     "state": "Two children, one adult",
     "title": "Ten digits",
     "caption": "Grouped as they are typed. A number nobody could ring is refused here rather than after the round trip, and a repdigit — the thing somebody types to get past a field they do not want to answer — is refused too.",
-    "file": "landscape-11-ten-digits.png",
+    "file": "landscape-12-ten-digits.png",
     "orientation": "landscape"
   },
   {
@@ -92,7 +100,7 @@
     "state": "Ready to check in",
     "title": "Does this look right?",
     "caption": "The whole family on one screen, and one button. Everything before this was reversible with Back; this is the point where two children join the ministry's roster and are marked present, as a single act.",
-    "file": "landscape-12-does-this-look-right.png",
+    "file": "landscape-13-does-this-look-right.png",
     "orientation": "landscape"
   },
   {
@@ -100,7 +108,7 @@
     "state": "On the roster, checked in",
     "title": "Next time, just type those four digits",
     "caption": "Both children exist, both are checked in against tonight's gathering, and a sticker is coming out of the printer for each of them. The sentence under the tick is the part that matters next week: the last four digits of the number they just gave are the search this kiosk already had, and this is where the family learns it. That is the entire handoff — no account, no password, no app.",
-    "file": "landscape-13-next-time-just-type-those-four-digits.png",
+    "file": "landscape-14-next-time-just-type-those-four-digits.png",
     "orientation": "landscape"
   },
   {
@@ -108,7 +116,7 @@
     "state": "Findable",
     "title": "And it works immediately",
     "caption": "Typed on the same screen, seconds later. Nothing was refetched: the answer came back with the registration and went straight into what this kiosk holds. It survives the nightly rebuild too — that job reads the church's backends, which may not know this number for hours or, on a deployment that cannot write households, ever, so a registration keeps its digits in an overlay the rebuild folds in rather than overwrites.",
-    "file": "landscape-14-and-it-works-immediately.png",
+    "file": "landscape-15-and-it-works-immediately.png",
     "orientation": "landscape"
   },
   {
@@ -116,7 +124,7 @@
     "state": "On the confirm screen",
     "title": "The other door, in the same slot",
     "caption": "A parent whose next child is finally old enough starts here, not at the front door: they have already found their family by phone and tapped a name. The offer sits below the main action in the smaller weight, because it is the rarer of the two things somebody came to this screen to do — and it is on this screen at all because this is where the kiosk knows which family is standing in front of it.",
-    "file": "landscape-15-the-other-door-in-the-same-slot.png",
+    "file": "landscape-16-the-other-door-in-the-same-slot.png",
     "orientation": "landscape"
   },
   {
@@ -124,7 +132,7 @@
     "state": "Searching the roster first",
     "title": "The cheaper answer, offered first",
     "caption": "Both readings of that link are real journeys. The common one is a sibling already on the roster whom the phone search did not surface — the church has them, the family folk simply do not line up — and finding them costs nothing and creates nothing. So this screen searches by name, shows the family's own rows greyed and inert so nobody taps a child twice, and keeps \"add a new child\" as a standing offer rather than the destination. A registration is the expensive answer and it is one tap further away.",
-    "file": "landscape-16-the-cheaper-answer-offered-first.png",
+    "file": "landscape-17-the-cheaper-answer-offered-first.png",
     "orientation": "landscape"
   },
   {
@@ -132,7 +140,7 @@
     "state": "Two questions, no adult",
     "title": "Joining the family that exists",
     "caption": "No name, no phone number, no second household invented — the confirm names the siblings this child is being added to and that is the whole of it. The kiosk resolved the family from the four digits it searched with; the server re-verifies every one of those ids before it believes any of them, and at approval the household comes from an existing sibling rather than from the children in the run. That last part is the fix for a real bug: a family gaining a second child used to gain a second household, with the first child left behind in the original and invisible from the new one.",
-    "file": "landscape-17-joining-the-family-that-exists.png",
+    "file": "landscape-18-joining-the-family-that-exists.png",
     "orientation": "landscape"
   },
   {
@@ -140,7 +148,7 @@
     "state": "Checked in, held for review",
     "title": "Recorded, not decided",
     "caption": "Nothing reached Planning Center. Every child a family registers is written held, and the hold is the only thing that gates the push — both backends, both sweeps, the on-create trigger and the re-create repair all consult it. What happens next happens on a weekday, on a core-team screen, with the form as the family typed it beside any roster row that shares a name: approve, merge, or discard. The door records; a person decides.",
-    "file": "landscape-18-recorded-not-decided.png",
+    "file": "landscape-19-recorded-not-decided.png",
     "orientation": "landscape"
   },
   {
@@ -187,8 +195,16 @@
     "flow": "Right here",
     "state": "One child",
     "title": "Allergies, only where they can land",
-    "caption": "The fourth question, and it only exists when the church's own database takes full write-back — the same gate the retired phone form kept, because collecting a medical note into a screen that silently drops it is worse than never asking. The common answer is the button itself: \"No allergies\" until a letter is typed, Next the moment one is. The note goes to the reviewer and then upstream; the kiosk keeps a marker, never the text.",
+    "caption": "The fourth question, and it only exists when the church's own database takes full write-back — the same gate the retired phone form kept, because collecting a medical note into a screen that silently drops it is worse than never asking. The common answer is the tick under the box rather than anything typed into it: a medical field with a keyboard under it and no visible way to say \"nothing\" collects \"None\" and \"N/A\" as though they were notes. Ticking empties the box and greys it out. The note goes to the reviewer and then upstream; the kiosk keeps a marker, never the text.",
     "file": "portrait-06-allergies-only-where-they-can-land.png",
+    "orientation": "portrait"
+  },
+  {
+    "flow": "Right here",
+    "state": "One child",
+    "title": "Ticked, and the box goes quiet",
+    "caption": "What the tick does, rather than only that it is there. The box empties and dims and the keyboard goes with it, so the question is visibly answered and there is nothing left to type into — which is the whole point of a control that exists to stop people writing the word \"none\" into a medical field. Anything already typed is cleared rather than hidden behind the grey: a note that survived out of sight would be a note nobody agreed to send. Unticking reopens an empty box, not the old text.",
+    "file": "portrait-07-ticked-and-the-box-goes-quiet.png",
     "orientation": "portrait"
   },
   {
@@ -196,7 +212,7 @@
     "state": "One child",
     "title": "Anybody else?",
     "caption": "The fork that makes this worth doing at a kiosk at all: a parent with three children walks the loop three times rather than queueing three times. Who is on the list so far is named above the buttons, because the question cannot be answered against a parent's memory of what they typed forty seconds ago — least of all the parent of four, who is exactly who this loop is for. It is also the last chance to catch a child entered twice, or one whose name went in wrong.",
-    "file": "portrait-07-anybody-else.png",
+    "file": "portrait-08-anybody-else.png",
     "orientation": "portrait"
   },
   {
@@ -204,7 +220,7 @@
     "state": "Two children",
     "title": "The surname, carried",
     "caption": "The second child's last name arrives already typed, and the shift key is down rather than up — the next keystroke belongs mid-word, not at the start of one. This is the whole argument for a wizard over a form: the questions know what the family has already said, and a form cannot.",
-    "file": "portrait-08-the-surname-carried.png",
+    "file": "portrait-09-the-surname-carried.png",
     "orientation": "portrait"
   },
   {
@@ -212,7 +228,7 @@
     "state": "Two children",
     "title": "Both of them, named",
     "caption": "The same fork one child later. Nothing about this screen asks a parent to remember anything.",
-    "file": "portrait-09-both-of-them-named.png",
+    "file": "portrait-10-both-of-them-named.png",
     "orientation": "portrait"
   },
   {
@@ -220,7 +236,7 @@
     "state": "Two children, one adult",
     "title": "A dialer, for the one question that is a number",
     "caption": "The QWERTY row can type digits, but picking ten targets out of forty-three on a tablet while a queue watches is asking for a mistake in the one field where a mistake is expensive: four of these digits become the family's key for every visit after this one. The line above says why it is being asked for while a parent decides whether to give it — and it is the only thing on this screen Tally will not keep. The number lives inside one call, long enough to build the family in the church's own database and to be reduced to four digits for the kiosk index.",
-    "file": "portrait-10-a-dialer-for-the-one-question-that-is-a-number.png",
+    "file": "portrait-11-a-dialer-for-the-one-question-that-is-a-number.png",
     "orientation": "portrait"
   },
   {
@@ -228,7 +244,7 @@
     "state": "Two children, one adult",
     "title": "Ten digits",
     "caption": "Grouped as they are typed. A number nobody could ring is refused here rather than after the round trip, and a repdigit — the thing somebody types to get past a field they do not want to answer — is refused too.",
-    "file": "portrait-11-ten-digits.png",
+    "file": "portrait-12-ten-digits.png",
     "orientation": "portrait"
   },
   {
@@ -236,7 +252,7 @@
     "state": "Ready to check in",
     "title": "Does this look right?",
     "caption": "The whole family on one screen, and one button. Everything before this was reversible with Back; this is the point where two children join the ministry's roster and are marked present, as a single act.",
-    "file": "portrait-12-does-this-look-right.png",
+    "file": "portrait-13-does-this-look-right.png",
     "orientation": "portrait"
   },
   {
@@ -244,7 +260,7 @@
     "state": "On the roster, checked in",
     "title": "Next time, just type those four digits",
     "caption": "Both children exist, both are checked in against tonight's gathering, and a sticker is coming out of the printer for each of them. The sentence under the tick is the part that matters next week: the last four digits of the number they just gave are the search this kiosk already had, and this is where the family learns it. That is the entire handoff — no account, no password, no app.",
-    "file": "portrait-13-next-time-just-type-those-four-digits.png",
+    "file": "portrait-14-next-time-just-type-those-four-digits.png",
     "orientation": "portrait"
   },
   {
@@ -252,7 +268,7 @@
     "state": "Findable",
     "title": "And it works immediately",
     "caption": "Typed on the same screen, seconds later. Nothing was refetched: the answer came back with the registration and went straight into what this kiosk holds. It survives the nightly rebuild too — that job reads the church's backends, which may not know this number for hours or, on a deployment that cannot write households, ever, so a registration keeps its digits in an overlay the rebuild folds in rather than overwrites.",
-    "file": "portrait-14-and-it-works-immediately.png",
+    "file": "portrait-15-and-it-works-immediately.png",
     "orientation": "portrait"
   },
   {
@@ -260,7 +276,7 @@
     "state": "On the confirm screen",
     "title": "The other door, in the same slot",
     "caption": "A parent whose next child is finally old enough starts here, not at the front door: they have already found their family by phone and tapped a name. The offer sits below the main action in the smaller weight, because it is the rarer of the two things somebody came to this screen to do — and it is on this screen at all because this is where the kiosk knows which family is standing in front of it.",
-    "file": "portrait-15-the-other-door-in-the-same-slot.png",
+    "file": "portrait-16-the-other-door-in-the-same-slot.png",
     "orientation": "portrait"
   },
   {
@@ -268,7 +284,7 @@
     "state": "Searching the roster first",
     "title": "The cheaper answer, offered first",
     "caption": "Both readings of that link are real journeys. The common one is a sibling already on the roster whom the phone search did not surface — the church has them, the family folk simply do not line up — and finding them costs nothing and creates nothing. So this screen searches by name, shows the family's own rows greyed and inert so nobody taps a child twice, and keeps \"add a new child\" as a standing offer rather than the destination. A registration is the expensive answer and it is one tap further away.",
-    "file": "portrait-16-the-cheaper-answer-offered-first.png",
+    "file": "portrait-17-the-cheaper-answer-offered-first.png",
     "orientation": "portrait"
   },
   {
@@ -276,7 +292,7 @@
     "state": "Two questions, no adult",
     "title": "Joining the family that exists",
     "caption": "No name, no phone number, no second household invented — the confirm names the siblings this child is being added to and that is the whole of it. The kiosk resolved the family from the four digits it searched with; the server re-verifies every one of those ids before it believes any of them, and at approval the household comes from an existing sibling rather than from the children in the run. That last part is the fix for a real bug: a family gaining a second child used to gain a second household, with the first child left behind in the original and invisible from the new one.",
-    "file": "portrait-17-joining-the-family-that-exists.png",
+    "file": "portrait-18-joining-the-family-that-exists.png",
     "orientation": "portrait"
   },
   {
@@ -284,7 +300,7 @@
     "state": "Checked in, held for review",
     "title": "Recorded, not decided",
     "caption": "Nothing reached Planning Center. Every child a family registers is written held, and the hold is the only thing that gates the push — both backends, both sweeps, the on-create trigger and the re-create repair all consult it. What happens next happens on a weekday, on a core-team screen, with the form as the family typed it beside any roster row that shares a name: approve, merge, or discard. The door records; a person decides.",
-    "file": "portrait-18-recorded-not-decided.png",
+    "file": "portrait-19-recorded-not-decided.png",
     "orientation": "portrait"
   }
 ]
