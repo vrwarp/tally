@@ -172,6 +172,60 @@ describe('what a reviewer is shown', () => {
     const [row] = await listPendingRegistrations(db, NOW);
     expect(row!.children[0]!.possibleDuplicates[0]!.known).toBe(false);
   });
+
+  it('asks the backend for the names it holds, so a candidate is never anonymous', async () => {
+    /*
+     * The screen lists candidates side by side and asks which of them is the
+     * same child. An option reading "a student on the roster" cannot be told
+     * from the one above it, and the wrong answer is a duplicate in a database
+     * with no delete — so the names are fetched rather than shrugged at.
+     */
+    const db = dbWithRegistration({ possibleDuplicateOf: { '0': ['pco_9'] } });
+    db.seed('students/pco_9', { status: 'active' });
+    const fetchRoster = vi.fn(async () => ({
+      people: [
+        {
+          id: 'pco_9',
+          pcoPersonId: '9',
+          backendId: 'pco' as const,
+          firstName: 'Ethan',
+          lastName: 'Nguyen',
+          grade: 9,
+          status: 'active' as const,
+          searchName: 'ethan nguyen',
+        },
+      ],
+      unresolved: [],
+    }));
+
+    const [row] = await listPendingRegistrations(db, NOW, {
+      registry: registryOf(backendWith({ fetchRoster } as unknown as Partial<PeopleBackend>)),
+    });
+
+    const candidate = row!.children[0]!.possibleDuplicates[0]!;
+    expect(candidate.known).toBe(true);
+    expect(candidate.firstName).toBe('Ethan');
+    expect(candidate.grade).toBe(9);
+    // One call for the page, not one per candidate: a queue of a dozen
+    // families would otherwise walk the backend's rate limit on page load.
+    expect(fetchRoster).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves the labels alone when the backend cannot be reached', async () => {
+    const db = dbWithRegistration({ possibleDuplicateOf: { '0': ['pco_9'] } });
+    db.seed('students/pco_9', { status: 'active' });
+    const fetchRoster = vi.fn(async () => {
+      throw new Error('Planning Center is unavailable');
+    });
+
+    const [row] = await listPendingRegistrations(db, NOW, {
+      registry: registryOf(backendWith({ fetchRoster } as unknown as Partial<PeopleBackend>)),
+    });
+
+    // Degraded and honest: the same screen this shipped with, never an empty
+    // line and never a thrown page.
+    expect(row!.children[0]!.possibleDuplicates[0]!.known).toBe(false);
+  });
 });
 
 describe('approving', () => {

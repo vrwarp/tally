@@ -37,6 +37,7 @@ import { Timestamp } from 'firebase-admin/firestore';
 import type { BackendRegistry } from '../backends/registry.js';
 import type { CreateFamilyResult } from '../backends/types.js';
 import { PATHS, SILENT_LOGGER, type FirestoreLike, type FunctionLogger } from '../firestore.js';
+import { parseStudentId, type BackendId } from '../generated/backendIds.js';
 import { bumpPulse } from './pulse.js';
 import {
   REGISTRATIONS_COLLECTION,
@@ -94,6 +95,60 @@ export interface PendingRegistration {
   lastError: string | null;
 }
 
+/**
+ * Names the roster rows whose names live in a backend rather than here.
+ *
+ * A student linked to Planning Center or Attendees keeps their name upstream,
+ * so `summarise` below can only answer "a student on the roster" for them. That
+ * was survivable while the duplicate candidates sat behind a click and became a
+ * defect the moment they were listed side by side: a reviewer asked "which of
+ * these is the same child?" cannot answer when one option has no name, and the
+ * wrong answer is a permanent duplicate in a database with no delete.
+ *
+ * One batched read per backend, and every failure is silent — an unreachable
+ * Planning Center leaves the labels exactly as they were, which is the same
+ * degraded-but-honest screen this shipped with.
+ */
+async function namesFromBackends(
+  registry: BackendRegistry | undefined,
+  summaries: ReviewStudentSummary[],
+  logger: FunctionLogger,
+): Promise<void> {
+  if (!registry) return;
+  const wanted = summaries.filter((summary) => !summary.known);
+  if (wanted.length === 0) return;
+
+  const byBackend = new Map<BackendId, Map<string, ReviewStudentSummary[]>>();
+  for (const summary of wanted) {
+    const parsed = parseStudentId(summary.studentId);
+    if (!parsed) continue;
+    const forBackend = byBackend.get(parsed.backendId) ?? new Map();
+    forBackend.set(parsed.personId, [...(forBackend.get(parsed.personId) ?? []), summary]);
+    byBackend.set(parsed.backendId, forBackend);
+  }
+
+  for (const [backendId, wantedFromIt] of byBackend) {
+    const backend = registry.get(backendId);
+    if (!backend) continue;
+    try {
+      const result = await backend.fetchRoster({ personIds: [...wantedFromIt.keys()] });
+      for (const person of result.people) {
+        for (const summary of wantedFromIt.get(person.pcoPersonId) ?? []) {
+          summary.firstName = person.firstName;
+          summary.lastName = person.lastName;
+          summary.grade = person.grade;
+          summary.known = person.firstName.length > 0 || person.lastName.length > 0;
+        }
+      }
+    } catch (error) {
+      logger.warn('Could not name a duplicate candidate from its backend', {
+        backendId,
+        error: String(error),
+      });
+    }
+  }
+}
+
 async function summarise(db: FirestoreLike, studentId: string): Promise<ReviewStudentSummary> {
   const snapshot = await db.doc(`${PATHS.students}/${studentId}`).get();
   const data = snapshot.exists ? (snapshot.data() ?? {}) : {};
@@ -128,7 +183,9 @@ async function summarise(db: FirestoreLike, studentId: string): Promise<ReviewSt
 export async function listPendingRegistrations(
   db: FirestoreLike,
   now: Date = new Date(),
+  options: { registry?: BackendRegistry; logger?: FunctionLogger } = {},
 ): Promise<PendingRegistration[]> {
+  const logger = options.logger ?? SILENT_LOGGER;
   const snapshot = await db.collection(REGISTRATIONS_COLLECTION).get();
   const rows: PendingRegistration[] = [];
 
@@ -179,6 +236,21 @@ export async function listPendingRegistrations(
       lastError: record.lastError,
     });
   }
+
+  /*
+   * One pass over every summary on the page, after they are all built.
+   *
+   * Batched deliberately: a reviewer's queue can hold a dozen families whose
+   * duplicate hints all point at backend-linked rows, and asking the backend
+   * once per candidate would be a page load that walks Planning Center's rate
+   * limit. Mutates the summaries in place because they are this call's own
+   * objects and nothing else has seen them yet.
+   */
+  await namesFromBackends(
+    options.registry,
+    rows.flatMap((row) => [...row.anchors, ...row.children.flatMap((c) => c.possibleDuplicates)]),
+    logger,
+  );
 
   return rows.sort((a, b) => (b.registeredAt ?? 0) - (a.registeredAt ?? 0));
 }

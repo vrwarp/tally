@@ -2376,7 +2376,15 @@ export const listPendingRegistrations = onCall<void, Promise<PendingRegistration
     const database = db();
     const now = new Date();
     await sweepRegistrations(database, now);
-    return listPending(database, now);
+    /*
+     * The registry is here to *name* things, not to write them: a duplicate
+     * candidate whose name lives in a backend is a row the screen would
+     * otherwise render as "a student on the roster", which is unusable in a
+     * list where the reviewer is being asked which of two rows is the same
+     * child. A backend that cannot be reached simply leaves those labels as
+     * they were.
+     */
+    return listPending(database, now, { registry: await createRegistry(database), logger });
   },
 );
 
