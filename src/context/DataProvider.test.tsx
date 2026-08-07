@@ -55,6 +55,25 @@ vi.mock('@/services/events', async () => {
   };
 });
 
+/*
+ * The provider reads the signed-in identity to answer `canWork`. Nothing here
+ * is about access, so this is the smallest stand-in that lets it mount — these
+ * tests render `DataProvider` on its own, where the real `AuthProvider` above
+ * it in the tree is exactly the thing being left out.
+ */
+vi.mock('@/context/authContext', () => ({
+  useAuth: () => ({ profile: { id: 'uid-core', role: 'core' }, can: () => false }),
+}));
+
+vi.mock('@/services/eventAccess', () => ({
+  // No gathering is restricted, which is what every one of these assertions
+  // depends on and what a fresh deployment looks like.
+  subscribeEventAccess: (next: (value: Map<string, unknown>) => void) => {
+    next(new Map());
+    return () => {};
+  },
+}));
+
 /** The instant Planning Center reports, deliberately the same for every read. */
 const FETCHED_AT = '2026-02-13T19:30:00.000Z';
 

@@ -315,11 +315,11 @@ describe('fetchAttendanceByEvent', () => {
     const result = await fetchAttendanceByEvent(ids);
 
     expect(getDocs).toHaveBeenCalledTimes(ids.length);
-    expect(result.size).toBe(ids.length);
+    expect(result.byEvent.size).toBe(ids.length);
     // Not just the right count — the right people against the right night. A
     // pool that raced two workers onto one index would show up here.
     for (const id of ids) {
-      expect(result.get(id)?.present).toEqual(new Set([`student-for-${id}`]));
+      expect(result.byEvent.get(id)?.present).toEqual(new Set([`student-for-${id}`]));
     }
   });
 
@@ -360,7 +360,59 @@ describe('fetchAttendanceByEvent', () => {
   it('asks for nothing when given nothing', async () => {
     const result = await fetchAttendanceByEvent([]);
 
-    expect(result.size).toBe(0);
+    expect(result.byEvent.size).toBe(0);
+    expect(result.denied.size).toBe(0);
     expect(getDocs).not.toHaveBeenCalled();
+  });
+
+  describe('when one of the gatherings is not the caller’s', () => {
+    const denied = (id: string) =>
+      Object.assign(new Error(`Missing or insufficient permissions on ${id}`), {
+        code: 'permission-denied',
+      });
+
+    it('keeps the rest of the batch', async () => {
+      /*
+       * The failure this replaces: one restricted Sunday in a window rejected
+       * the whole read, so a counselor standing at Friday's door got a roster
+       * with nobody on it. The windows callers pass are mixed by construction —
+       * "the dashboard's last six weeks" does not sort by who may read what.
+       */
+      getDocs.mockImplementation(async (ref: { path: string }) => {
+        const id = eventOf(ref.path);
+        if (id === 'sunday') throw denied(id);
+        return { docs: [{ id: `student-for-${id}`, get: () => null }] };
+      });
+
+      const result = await fetchAttendanceByEvent(['friday', 'sunday', 'wednesday']);
+
+      expect([...result.byEvent.keys()].sort()).toEqual(['friday', 'wednesday']);
+      expect(result.denied).toEqual(new Set(['sunday']));
+    });
+
+    it('reports it as refused rather than as an empty register', async () => {
+      // The distinction the whole feature turns on. An entry in `byEvent` with
+      // an empty `present` is a claim that nobody came, and `sessionOutcome`
+      // believes it — a night that reads as cancelled becomes an absence for
+      // every student on the MIA list.
+      getDocs.mockImplementation(async () => {
+        throw denied('sunday');
+      });
+
+      const result = await fetchAttendanceByEvent(['sunday']);
+
+      expect(result.byEvent.has('sunday')).toBe(false);
+      expect(result.denied.has('sunday')).toBe(true);
+    });
+
+    it('still rejects on a failure that is not a refusal', async () => {
+      // A dropped request is worth retrying and worth saying out loud. Only a
+      // refusal is a settled fact, and only a refusal is swallowed.
+      getDocs.mockImplementation(async () => {
+        throw new Error('network request failed');
+      });
+
+      await expect(fetchAttendanceByEvent(['friday'])).rejects.toThrow('network request failed');
+    });
   });
 });

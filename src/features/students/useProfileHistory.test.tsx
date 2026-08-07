@@ -46,7 +46,7 @@ const NOBODY = night('nobody', '2026-01-23');
 
 beforeEach(() => {
   fetchAttendanceByEvent.mockReset();
-  fetchAttendanceByEvent.mockResolvedValue(new Map());
+  fetchAttendanceByEvent.mockResolvedValue({ byEvent: new Map(), denied: new Set() });
   fetchStudentAttendanceSince.mockReset();
   fetchStudentAttendanceSince.mockResolvedValue(new Set(['came']));
   fetchSkippedNights.mockReset();
@@ -125,7 +125,10 @@ describe('useProfileHistory, when the registry has not examined a night', () => 
       ]),
     );
     const december = night('december', '2025-12-12');
-    fetchAttendanceByEvent.mockResolvedValue(new Map([['december', { present: new Set(['bo']), checkedOut: new Set() }]]));
+    fetchAttendanceByEvent.mockResolvedValue({
+      byEvent: new Map([['december', { present: new Set(['bo']), checkedOut: new Set() }]]),
+      denied: new Set(),
+    });
 
     const { result } = renderHook(() =>
       useProfileHistory(STUDENT, [CAME, december], WINDOW_START),
@@ -137,12 +140,13 @@ describe('useProfileHistory, when the registry has not examined a night', () => 
 
   it('writes down what it found so nobody pays for it again', async () => {
     fetchSkippedNights.mockResolvedValue(new Map());
-    fetchAttendanceByEvent.mockResolvedValue(
-      new Map([
+    fetchAttendanceByEvent.mockResolvedValue({
+      byEvent: new Map([
         ['came', { present: new Set(['ada']), checkedOut: new Set() }],
         ['nobody', { present: new Set(), checkedOut: new Set() }],
       ]),
-    );
+      denied: new Set(),
+    });
 
     const { result } = renderHook(() => useProfileHistory(STUDENT, [CAME, NOBODY], WINDOW_START));
 
@@ -159,7 +163,10 @@ describe('useProfileHistory, when the registry has not examined a night', () => 
 
   it('does not let a failed write break a page whose numbers are right', async () => {
     fetchSkippedNights.mockResolvedValue(new Map());
-    fetchAttendanceByEvent.mockResolvedValue(new Map([['came', { present: new Set(['ada']), checkedOut: new Set() }]]));
+    fetchAttendanceByEvent.mockResolvedValue({
+      byEvent: new Map([['came', { present: new Set(['ada']), checkedOut: new Set() }]]),
+      denied: new Set(),
+    });
     recordExamination.mockRejectedValueOnce(new Error('offline'));
 
     const { result } = renderHook(() => useProfileHistory(STUDENT, [CAME], WINDOW_START));
@@ -167,6 +174,65 @@ describe('useProfileHistory, when the registry has not examined a night', () => 
     await waitFor(() => expect(result.current.snapshots).toHaveLength(1));
     expect(result.current.error).toBeNull();
     expect(result.current.snapshots[0].held).toBe(true);
+  });
+});
+
+describe('useProfileHistory, when a gathering is not the reader’s', () => {
+  /** Sunday School, which this reader is not on. Friday is theirs. */
+  const SUNDAY = night('sunday', '2026-01-11', 'sunday-school');
+
+  it('leaves the night out of the history rather than calling it cancelled', async () => {
+    /*
+     * "Not held" is not a neutral absence on this page — it means the gathering
+     * was cancelled, and a cancelled night is nobody's absence. Handing a
+     * refusal through as `held: false` would tell the reader a Sunday School
+     * that ran perfectly well never happened, and would quietly stop counting
+     * it against anybody's attendance.
+     */
+    fetchSkippedNights.mockResolvedValue(new Map());
+    fetchAttendanceByEvent.mockResolvedValue({
+      byEvent: new Map([['came', { present: new Set(['ada']), checkedOut: new Set() }]]),
+      denied: new Set(['sunday']),
+    });
+
+    const { result } = renderHook(() =>
+      useProfileHistory(STUDENT, [CAME, SUNDAY], WINDOW_START),
+    );
+
+    await waitFor(() => expect(result.current.snapshots).toHaveLength(1));
+    expect(result.current.snapshots[0].event.id).toBe('came');
+    expect(result.current.snapshots.map((s) => s.event.id)).not.toContain('sunday');
+    // And says so, so the page can tell the reader something is missing rather
+    // than showing them a shorter history that looks complete.
+    expect(result.current.withheld).toEqual(new Set(['sunday']));
+  });
+
+  it('never writes a watermark over a chain it could not read', async () => {
+    /*
+     * The one that would outlive the session. `recordExamination` writes "every
+     * night of this chain from here on has been looked at, and anything not in
+     * `skipped` was held" — and that claim is *shared*. Written from a reader
+     * who was refused, the next person to open any profile, including somebody
+     * who is on the gathering, would read it, trust it, and be told a term of
+     * Sunday Schools was cancelled.
+     *
+     * One reader's missing permission becomes everybody's wrong history.
+     */
+    fetchSkippedNights.mockResolvedValue(new Map());
+    fetchAttendanceByEvent.mockResolvedValue({
+      byEvent: new Map([['came', { present: new Set(['ada']), checkedOut: new Set() }]]),
+      denied: new Set(['sunday']),
+    });
+
+    renderHook(() => useProfileHistory(STUDENT, [CAME, SUNDAY], WINDOW_START));
+
+    await waitFor(() => expect(recordExamination).toHaveBeenCalled());
+
+    const chains = (recordExamination.mock.calls as unknown as Array<[{ chainKey: string }]>).map(
+      ([args]) => args.chainKey,
+    );
+    expect(chains).toContain('friday');
+    expect(chains).not.toContain('sunday-school');
   });
 });
 
@@ -181,7 +247,10 @@ describe('useProfileHistory, on a one-off', () => {
       seriesId: null,
       startAt: new Date('2026-01-30T19:00:00'),
     });
-    fetchAttendanceByEvent.mockResolvedValue(new Map([['retreat', { present: new Set(['ada']), checkedOut: new Set() }]]));
+    fetchAttendanceByEvent.mockResolvedValue({
+      byEvent: new Map([['retreat', { present: new Set(['ada']), checkedOut: new Set() }]]),
+      denied: new Set(),
+    });
 
     const { result } = renderHook(() => useProfileHistory(STUDENT, [retreat], WINDOW_START));
 

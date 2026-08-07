@@ -29,6 +29,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { COLLECTIONS, paths } from '@/lib/paths';
+import { isPermissionDenied } from '@/lib/permissionDenied';
 import {
   attendancePayload as buildAttendancePayload,
   studentDatePatch as buildStudentDatePatch,
@@ -305,10 +306,32 @@ export interface EventAttendanceIds {
   checkedOut: Set<string>;
 }
 
+/**
+ * What a batch read came back with, and what it was refused.
+ *
+ * The two have to be separate channels, and this is the single most important
+ * shape in the access feature. A register the reader may not see is *not* an
+ * empty register: `sessionOutcome` reads an empty one as `presumed-cancelled`,
+ * which drops the night out of `buildChainHistory`, inflates the dashboard's
+ * skipped count, and counts as an absence for every student in
+ * `computeMiaByGathering` — which is a phone call to a family about a gathering
+ * the reader simply was not allowed to look at.
+ *
+ * So a denied event appears in `denied` and *nowhere* in `byEvent`. A caller
+ * that ignores `denied` gets no snapshot rather than a wrong one, which is the
+ * failure mode worth having.
+ */
+export interface EventAttendanceRead {
+  byEvent: Map<string, EventAttendanceIds>;
+  /** Event ids whose register the caller may not read. */
+  denied: Set<string>;
+}
+
 export async function fetchAttendanceByEvent(
   eventIds: readonly string[],
-): Promise<Map<string, EventAttendanceIds>> {
-  const results = new Map<string, EventAttendanceIds>();
+): Promise<EventAttendanceRead> {
+  const byEvent = new Map<string, EventAttendanceIds>();
+  const denied = new Set<string>();
   let next = 0;
 
   // Each worker takes the next id and reads it, until there are none left. The
@@ -318,13 +341,32 @@ export async function fetchAttendanceByEvent(
     for (let index = next++; index < eventIds.length; index = next++) {
       const eventId = eventIds[index];
       if (eventId === undefined) continue;
-      const snapshot = await getDocs(collection(db, paths.attendanceCollection(eventId)));
-      results.set(eventId, {
-        present: new Set(snapshot.docs.map((d) => d.id)),
-        checkedOut: new Set(
-          snapshot.docs.filter((d) => d.get('checkedOutAt') != null).map((d) => d.id),
-        ),
-      });
+
+      /*
+       * Per event, not per batch.
+       *
+       * Callers hand this a window — one series' recent instances, the
+       * dashboard's last six weeks — and those windows mix gatherings freely.
+       * Rejecting the whole batch on the first refusal meant one restricted
+       * Sunday emptied the roster of every Friday beside it, on a screen
+       * somebody is standing at a door holding.
+       *
+       * Only a refusal is swallowed. A network failure or a malformed document
+       * still rejects, because those are worth retrying and worth saying out
+       * loud.
+       */
+      try {
+        const snapshot = await getDocs(collection(db, paths.attendanceCollection(eventId)));
+        byEvent.set(eventId, {
+          present: new Set(snapshot.docs.map((d) => d.id)),
+          checkedOut: new Set(
+            snapshot.docs.filter((d) => d.get('checkedOutAt') != null).map((d) => d.id),
+          ),
+        });
+      } catch (cause) {
+        if (!isPermissionDenied(cause)) throw cause;
+        denied.add(eventId);
+      }
     }
   };
 
@@ -332,7 +374,7 @@ export async function fetchAttendanceByEvent(
     Array.from({ length: Math.min(ATTENDANCE_READ_CONCURRENCY, eventIds.length) }, worker),
   );
 
-  return results;
+  return { byEvent, denied };
 }
 
 /**

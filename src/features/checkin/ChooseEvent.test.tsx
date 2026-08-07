@@ -104,7 +104,7 @@ function cardLinks() {
 beforeEach(() => {
   invalidateSnapshotCache();
   fetchPastEvents.mockResolvedValue({ events: [], cursor: null, hasMore: false });
-  fetchAttendanceByEvent.mockResolvedValue(new Map());
+  fetchAttendanceByEvent.mockResolvedValue({ byEvent: new Map(), denied: new Set() });
 });
 
 afterEach(() => {
@@ -327,11 +327,12 @@ describe('the catch-up tail', () => {
       cursor: null,
       hasMore: false,
     });
-    fetchAttendanceByEvent.mockResolvedValue(
-      new Map([
+    fetchAttendanceByEvent.mockResolvedValue({
+      byEvent: new Map([
         ['last-friday', { present: new Set(['a', 'b', 'c', 'd']), checkedOut: new Set() }],
       ]),
-    );
+      denied: new Set(),
+    });
 
     show([]);
 

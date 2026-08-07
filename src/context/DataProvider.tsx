@@ -1,15 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { subscribeEventSeries, subscribeEvents, subscribeSettings } from '@/services/events';
+import { subscribeEventAccess } from '@/services/eventAccess';
 import { subscribeStudents } from '@/services/students';
 import { cachedRoster, fetchRoster, mergeRoster, rememberRosterPerson } from '@/services/roster';
 import type { RosterBackendStatus } from '@/services/functions';
 import { fromRosterPerson } from '@/services/converters';
 import { useNow } from '@/hooks/useNow';
 import { calendarSignature, projectEvents } from '@/lib/eventProjection';
+import { canWorkChain } from '@/lib/eventAccess';
+import { chainKey } from '@/lib/materialize';
 import { pcoErrorReport } from '@/lib/pcoErrors';
+import { useAuth } from '@/context/authContext';
 import {
   DEFAULT_SETTINGS,
   type AppSettings,
+  type EventAccess,
   type EventSeries,
   type PcoErrorReport,
   type PcoRosterPerson,
@@ -135,6 +140,7 @@ function backendReportSignature(entries: readonly RosterBackendStatus[]): string
 }
 
 export function DataProvider({ children }: { children: ReactNode }) {
+  const { profile, can } = useAuth();
   const [documents, setDocuments] = useState<Student[]>([]);
   const [storedEvents, setStoredEvents] = useState<TallyEvent[]>([]);
   const [series, setSeries] = useState<EventSeries[]>([]);
@@ -150,11 +156,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [rosterFetchedAt, setRosterFetchedAt] = useState<Date | null>(null);
   const [rosterBackends, setRosterBackends] = useState<RosterBackendStatus[]>([]);
 
+  const [access, setAccess] = useState<Map<string, EventAccess>>(() => new Map());
+
   const [ready, setReady] = useState({
     students: false,
     events: false,
     series: false,
     settings: false,
+    access: false,
   });
   const [error, setError] = useState<string | null>(null);
 
@@ -193,6 +202,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setSettings(next);
         markReady('settings');
       }, fail('settings')),
+
+      subscribeEventAccess((next) => {
+        setAccess(next);
+        markReady('access');
+      }, fail('access')),
     ];
 
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
@@ -361,12 +375,35 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const loading = !Object.values(ready).every(Boolean);
 
+  /**
+   * Whether the signed-in person may work a gathering.
+   *
+   * Keyed on the chain rather than the night, because most nights on the
+   * calendar are projected and have no document of their own — `chainKey` is
+   * already what the app means by "the same gathering" everywhere else.
+   *
+   * **Fails open when the access stream is broken**, and that is a decision
+   * rather than an oversight. If this collection cannot be read, the honest
+   * options are to hide every gathering or to show every gathering; hiding
+   * gives a counselor at a door an empty screen, which is the failure this
+   * whole feature is shaped to avoid, and showing gives them a locked screen at
+   * worst. The rules refuse the reads and writes either way, so nothing is
+   * protected by guessing here — the client is a courtesy, not the fence.
+   */
+  const canWork = useCallback(
+    (event: Pick<TallyEvent, 'id' | 'seriesId' | 'recurrenceRootId'>) =>
+      canWorkChain(access.get(chainKey(event)), profile?.id ?? '', can('admin')),
+    [access, profile?.id, can],
+  );
+
   const value = useMemo<DataContextValue>(
     () => ({
       students,
       events,
       series,
       settings,
+      access,
+      canWork,
       loading,
       error,
       rosterLoading,
@@ -383,6 +420,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       events,
       series,
       settings,
+      access,
+      canWork,
       loading,
       error,
       rosterLoading,

@@ -65,6 +65,9 @@ function harness(overrides: Partial<DataContextValue> = {}) {
     rosterOffline: false,
     rosterFetchedAt: null,
     rosterBackends: [],
+    // Nothing restricted, which is the state every screen has to keep working in.
+    access: new Map(),
+    canWork: () => true,
     refreshRoster,
     applyRosterPerson: () => {},
     ...overrides,

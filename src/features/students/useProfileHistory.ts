@@ -34,6 +34,15 @@ import type { EventAttendanceSnapshot, Student, TallyEvent } from '@/types';
 
 export interface ProfileHistoryResult {
   snapshots: EventAttendanceSnapshot[];
+  /**
+   * Nights left out because the reader may not work their gathering.
+   *
+   * Surfaced rather than swallowed, because a profile that quietly drops a
+   * gathering is a profile that under-reports somebody's attendance to the
+   * person deciding whether to ring their family. There is no snapshot for any
+   * of these — see the note in `resolve`.
+   */
+  withheld: ReadonlySet<string>;
   loading: boolean;
   error: string | null;
 }
@@ -47,11 +56,23 @@ function isChained(event: TallyEvent): boolean {
   return event.mode !== 'oneoff';
 }
 
+/** Shared, so the ordinary case allocates nothing. */
+const EMPTY: ReadonlySet<string> = new Set<string>();
+
 interface Resolved {
   /** Nights the student was checked into. */
   attended: ReadonlySet<string>;
   /** Nights known to have happened, whatever this student did. */
   held: ReadonlySet<string>;
+  /**
+   * Nights this reader was refused.
+   *
+   * A third answer, and it has to be third. "Not held" already means something
+   * specific and load-bearing on this page — the gathering was cancelled, so
+   * the night is nobody's absence — and folding a refusal into it would tell
+   * the reader a Sunday School that ran perfectly well never happened.
+   */
+  withheld: ReadonlySet<string>;
 }
 
 /**
@@ -92,18 +113,37 @@ async function resolve(
     }
   }
 
-  if (unexamined.length === 0) return { attended, held };
+  if (unexamined.length === 0) return { attended, held, withheld: EMPTY };
 
   // The nights nobody has looked at yet. Read as they always were, then written
   // down so this is the last time anybody pays for them.
   const registers = await fetchAttendanceByEvent(unexamined.map((event) => event.id));
-  for (const [eventId, ids] of registers) {
+  for (const [eventId, ids] of registers.byEvent) {
     if (ids.present.size > 0) held.add(eventId);
   }
 
-  await recordExaminations(unexamined, registers, registries, windowStart);
+  /*
+   * A refused night is never examined, and that is the whole reason this
+   * distinction is threaded through.
+   *
+   * `recordExamination` writes a watermark meaning "every night of this chain
+   * from here on has been looked at, and anything not in `skipped` was held".
+   * Handed a chain this reader could not read, it would write that claim about
+   * nights it never saw — and the claim is shared. The next person to open any
+   * profile, including somebody who *is* on the gathering, would read the
+   * watermark, trust it, and be told a term of Sunday Schools was cancelled.
+   *
+   * One reader's missing permission would have become everybody's wrong
+   * history, stored, with nothing left to say it was ever in doubt.
+   */
+  const examined =
+    registers.denied.size === 0
+      ? unexamined
+      : unexamined.filter((event) => !registers.denied.has(event.id));
 
-  return { attended, held };
+  await recordExaminations(examined, registers.byEvent, registries, windowStart);
+
+  return { attended, held, withheld: registers.denied };
 }
 
 /**
@@ -223,15 +263,26 @@ export function useProfileHistory(
   const snapshots = useMemo(() => {
     if (!student || !resolved) return last.current.length === 0 ? last.current : (last.current = []);
 
-    const next = events.map<EventAttendanceSnapshot>((event) => ({
-      event,
-      // At most the subject student. This is a projection, not a register.
-      presentStudentIds: resolved.attended.has(event.id) ? new Set([student.id]) : new Set(),
-      // This projection answers "was this student here" and nothing else; it
-      // never reads the registers, so it has no pickup to report.
-      checkedOutStudentIds: new Set<string>(),
-      held: resolved.held.has(event.id),
-    }));
+    const next = events
+      /*
+       * No snapshot at all for a night the reader was refused.
+       *
+       * Not one with `held: false`, which this page reads as "cancelled", and
+       * not one with an empty `presentStudentIds`, which every derivation
+       * downstream reads as "they were not there". Absent is the only honest
+       * shape: the page can say what it left out, and nothing can accidentally
+       * believe a claim that was never made.
+       */
+      .filter((event) => !resolved.withheld.has(event.id))
+      .map<EventAttendanceSnapshot>((event) => ({
+        event,
+        // At most the subject student. This is a projection, not a register.
+        presentStudentIds: resolved.attended.has(event.id) ? new Set([student.id]) : new Set(),
+        // This projection answers "was this student here" and nothing else; it
+        // never reads the registers, so it has no pickup to report.
+        checkedOutStudentIds: new Set<string>(),
+        held: resolved.held.has(event.id),
+      }));
 
     const unchanged =
       next.length === last.current.length &&
@@ -247,5 +298,5 @@ export function useProfileHistory(
     return last.current;
   }, [events, resolved, student]);
 
-  return { snapshots, loading, error };
+  return { snapshots, withheld: resolved?.withheld ?? EMPTY, loading, error };
 }
