@@ -266,7 +266,6 @@ export function RegistrationFlow({
           )}
           {state.step === 'child-grade' && (
             <div className="mt-auto grid grid-cols-3 gap-2 pt-2">
-              <GradeChip label={NO_GRADE} onPick={() => dispatch({ type: 'grade', grade: null })} />
               {GRADES.map((grade) => (
                 <GradeChip
                   key={grade}
@@ -275,6 +274,11 @@ export function RegistrationFlow({
                   onPick={() => dispatch({ type: 'grade', grade })}
                 />
               ))}
+              {/* Last, because it is the one chip here that is not an answer.
+                  In reading position one, styled like the thirteen real values,
+                  it reads as the default — and what it produces is a
+                  grade-less record for the core team to adjudicate. */}
+              <GradeChip label={NO_GRADE} onPick={() => dispatch({ type: 'grade', grade: null })} />
             </div>
           )}
 
@@ -560,30 +564,49 @@ function Header({
   onClose: () => void;
 }) {
   return (
-    <div className="relative px-6 pt-[max(1rem,var(--spacing-safe-top))] pb-2 text-center">
+    /*
+     * Three slots, not a centred title with two controls floated over it.
+     *
+     * Absolutely positioned, Back and Cancel were outside the title's layout,
+     * so a long title simply painted across them: "Does this look right?" needs
+     * 282px on a 390px phone and the gap between the two controls is 238, which
+     * obliterated the last two letters of **Back** and the first two of
+     * **Cancel**. That is the confirm step — the last screen before a family
+     * record goes upstream and cannot be taken back — and Back is the only
+     * repair a parent who spots a wrong name has. A control that reads as
+     * broken at the moment it is needed is worse than one that is not there.
+     *
+     * The side columns are reserved now and the title wraps inside what is
+     * left, which is what the search header already does with a long gathering
+     * name.
+     */
+    <div className="grid grid-cols-[auto_1fr_auto] items-start gap-1 px-2 pt-[max(0.75rem,var(--spacing-safe-top))] pb-2">
       <button
         type="button"
         tabIndex={-1}
         onPointerDown={onBack}
-        className="absolute top-[max(0.75rem,var(--spacing-safe-top))] left-4 h-12 rounded-lg px-3 text-sm text-ink-400 active:bg-ink-800"
+        className="h-12 rounded-lg px-3 text-sm text-ink-400 active:bg-ink-800"
       >
         ← Back
       </button>
-      {canClose && (
-        <button
-          type="button"
-          tabIndex={-1}
-          onPointerDown={onClose}
-          /* The same ink as Back. They are peers — two ways out of the same
-             flow — and a step apart made Cancel read as the less available of
-             the two, which it is not. */
-          className="absolute top-[max(0.75rem,var(--spacing-safe-top))] right-4 h-12 rounded-lg px-3 text-sm text-ink-400 active:bg-ink-800"
-        >
-          Cancel
-        </button>
-      )}
-      <div className="text-2xl font-semibold text-ink-100 kiosk:text-3xl">{title}</div>
-      <div className="text-base text-ink-500 kiosk:text-lg">{subtitle}</div>
+      <div className="min-w-0 pt-1 text-center">
+        <div className="text-2xl font-semibold text-balance text-ink-100 kiosk:text-3xl">{title}</div>
+        <div className="truncate text-base text-ink-500 kiosk:text-lg">{subtitle}</div>
+      </div>
+      {/* The same ink as Back. They are peers — two ways out of the same flow —
+          and a step apart made Cancel read as the less available of the two,
+          which it is not. The slot stays reserved while the call is in flight
+          so the title does not reflow when the button goes. */}
+      <button
+        type="button"
+        tabIndex={-1}
+        onPointerDown={canClose ? onClose : undefined}
+        className={`h-12 rounded-lg px-3 text-sm text-ink-400 active:bg-ink-800 ${
+          canClose ? '' : 'invisible'
+        }`}
+      >
+        Cancel
+      </button>
     </div>
   );
 }
