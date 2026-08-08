@@ -216,6 +216,39 @@ gathering's own name for the whole repeat, which cannot be typed without naming 
 ministry's gatherings is about to stop existing. The dialog says what it is about to remove, counted
 by the server through the same code that would do the removing.
 
+**Journey 8 — five gatherings a week, and only one of them yours.** A ministry running Friday
+Fellowship, Sunday School, a Wednesday small group and a retreat gives its nursery volunteers a
+chooser carrying four gatherings they will never stand at. So a gathering can be narrowed to the
+people who work it: **Who's on this gathering** → *Only people I add*.
+
+The problem is clutter, not secrecy, and everything follows from taking that seriously. A gathering
+you are not on is **demoted, never hidden** — it drops below a divider into a collapsed *Not yours*
+section, with a lock and the name of somebody who can add you. A volunteer at a door at 6:59pm who
+opens Tally and sees an empty screen does not conclude "I have not been added to this"; they conclude
+the app is broken, and then they find something else to file forty check-ins against. When nothing
+today is theirs the section opens by itself and the heading reads *Nothing you're on today* rather
+than *Nothing on today* — the difference between an app that is empty and one that is refusing.
+
+Adding somebody is open to anybody already on the gathering, which is the case that matters most:
+Priya is on Friday Fellowship, a new volunteer turns up at the door beside her, and she adds them
+from the header chip in three taps without going to find an admin. Handing out access you already
+hold is not an escalation. Removing somebody, and reopening a gathering, are core team.
+
+The mistake this makes easiest is one core member restricting Friday Fellowship — the gathering the
+whole ministry works — and leaving everyone off it. Three things blunt it. Closing a gathering
+pre-fills the list from whoever has recently taken its register, so the default outcome of a mis-tap
+is *no change*. The writer cannot leave themselves off, so there is always somebody who can reopen
+it. And admins pass every gathering regardless, which is the break-glass.
+
+What closes is *working* the gathering: check-in, undo, RSVPs, the register, editing. What stays open
+is that it exists, what it is called and when it is on. Insights is where this stops being cosmetic
+for the core team — its numbers come from registers, so a gathering you are not on cannot appear in
+them, and the screen names what it left out rather than quietly showing a shorter MIA list that reads
+as good news.
+
+Restriction is a scope, not a substitute for membership. Removing somebody from Tally altogether is
+still deactivating them in Settings → Team.
+
 ---
 
 ## Where the people come from

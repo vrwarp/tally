@@ -399,6 +399,60 @@ year cannot undo a correction another device made while it was reading.
 **Who writes:** counselor and up. Readable by anyone active. Deletes are refused — forgetting the
 document silently un-examines a year, and the way to correct one night is to remove one night.
 
+### `eventAccess/{chainKey}`
+
+Who may *work* one gathering. Absent for every gathering nobody has restricted, which is the whole
+migration: deploying this changed nothing, and there was no backfill to get wrong.
+
+Chain-keyed for the same reason `skippedNights` is. Most occurrences on the calendar are projected —
+`eventProjection` expands a recurrence rule into occurrences with derived ids and no document until
+somebody checks in — so an ACL on the event document could not cover next Friday, and nobody is going
+to grant fifty-two Fridays one at a time.
+
+| Field | Meaning |
+| --- | --- |
+| `chainKey` | The chain this governs. Matches the document id, as `skippedNights` does. |
+| `restricted` | False — or no document at all — means every active member. |
+| `members` | Uids. Kept when `restricted` goes false, so re-opening and changing your mind again does not mean rebuilding the list from memory. |
+| `updatedAt` / `updatedBy` | Who last changed it. |
+
+**Locked, not hidden.** A gathering you are not on still appears on the chooser, below a divider,
+with a lock and the name of somebody who can add you. This is a deliberate limit on how much the
+feature protects: a counselor standing at a door at 6:59pm who sees an empty screen concludes the app
+is broken and files forty check-ins against the wrong thing, which is the worst failure this app has.
+So what closes is check-in, undo, RSVPs, the register and editing. What stays open is that the
+gathering exists, what it is called and when it is on.
+
+**Who writes:** creating one — restricting a gathering — is core team and up. Adding somebody is
+open to anybody already on the gathering, because handing out access you already hold is not an
+escalation and it is the whole point of the volunteer-at-the-door case. Removing somebody, and
+flipping `restricted`, are core team. The writer must stay on the list: otherwise one core member can
+close *Friday Fellowship* and leave themselves off, and nobody below an admin could reopen it,
+because reopening requires being on it. Admins pass regardless — that is the break-glass. Deletes are
+refused, because deleting the document reopens the gathering; the way to reopen is `restricted:
+false`, which keeps the list.
+
+**One `get()` note that is not a detail.** Every rule reading this collection asks `exists()` before
+`get()`. A `get()` at a path with no document *raises* rather than returning null, and a raised
+lookup denies — so the natural `a == null || …` form would have denied every gathering nobody had
+restricted, which is all of them on the day it deployed. `firestore-tests/getSemantics.test.ts` pins
+that fact.
+
+### What restriction does not protect
+
+A fence whose gaps are undocumented is worse than none, so:
+
+- **`students.lastAttendedAt` / `firstAttendedAt`.** Every check-in stamps the student document, and
+  `students` is readable to any active member. Diffing those dates across the roster before and after
+  a restricted gathering reconstructs most of its register. There is no fix that keeps the dashboard
+  working, and this is the real boundary of "locked, not hidden": it protects the ledger and the
+  working surface, not the fact that a given student was somewhere on a given evening.
+- **Orphan ACLs.** Deleting a one-off leaves `eventAccess/{eventId}` behind. Left deliberately —
+  "delete and recreate to unlock" would be worse than an orphan, and a recreated event gets a new id.
+- **Not a data-protection boundary.** The problem being solved is clutter on a nursery volunteer's
+  screen, not secrecy. Anything that genuinely must not be seen by part of the team does not belong
+  in Tally.
+
 ### `kioskPairings/{code}`
 
 The self-serve kiosk's pairing handshake — how a browser on a lobby shelf acquires a session
@@ -799,7 +853,17 @@ a retreat is not evidence about who turns up to a retreat — so the chains them
   `checkedInAt desc` — one student's history, one series' history, and first-ever check-ins. The
   first of these is what "Every night they came" on a student's page pages through
   (`fetchStudentHistory`), which is how that list reaches years further back than the calendar the
-  app keeps loaded. A collection-group query is only authorised by a rule at a wildcard path, so
-  `firestore.rules` carries a `match /{path=**}/attendance/{studentId}` granting `list` to any
-  active member — the same people the nested rule already lets read the same documents one event at
-  a time.
+  app keeps loaded.
+
+  These are read by the `getStudentAttendance` callable rather than from a browser, and that is the
+  interesting part. A collection-group query is only authorised by a rule at a wildcard path — and a
+  wildcard path has no single parent event, so no rule there can ask which gathering a record belongs
+  to. With `seriesId` indexed, one line in a console returned an entire restricted gathering's
+  register. Worse, a wildcard path also matches an ordinary subcollection query at
+  `events/{id}/attendance`, and rules are OR'd across matching paths — so the rule that made a
+  profile's history possible was also granting the `list` that the per-gathering gate denies.
+
+  Neither can be fixed by narrowing the rule, because rules cannot tell a collection-group query from
+  a subcollection one. So `match /{path=**}/attendance/{studentId}` is `allow list: if false`, and
+  the query moved to a callable that reads each record's parent event and drops what the caller may
+  not see.
