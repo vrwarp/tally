@@ -24,6 +24,7 @@ result portable back into `src/`.
 | `snapshot.ts` | The freeze: inlines every stylesheet, preserves the runtime custom properties and typed-in values, strips scripts, and appends an empty override block. |
 | `playwright.config.ts` | The end-to-end stack, at phone (390×844) and desktop (1440×900). |
 | `shoot.ts` | Renders prototype HTML to PNG. `-fold` is what fits without scrolling; `-full` is the whole page. |
+| `kiosk-live/` | The kiosk's screens mounted from `src/` and shot straight, state by state. See below. |
 | `measure.ts` | Re-runs the walkthrough's measurements against the frozen scenes: how far each page scrolls, and whether it scrolls sideways. |
 | `baseline/` | The frozen app as it was. Never edited. |
 | `prototype/` | The working copy the ideation agent edits. |
@@ -52,6 +53,30 @@ npm run uxr:shoot -- uxr/prototype --out uxr/renders/r01
 ```
 
 The loop ends when a round produces no finding above `minor`.
+
+## The kiosk is shot live, not frozen
+
+```bash
+npm run uxr:kiosk -- --out uxr/renders/ks-r01     # → one PNG per state per viewport
+```
+
+Freezing exists because the app's scenes sit behind a sign-in, an emulator
+suite and a seeded ministry — reaching one costs more than copying it. The
+kiosk inverts that. `SearchScreen` and `RegistrationFlow` are pure functions of
+their props: a binding, a buffer, a search outcome. No store, no router, no
+network. So `kiosk-live/` mounts the real components in a dev server and drives
+their state from the query string, and a round of frames costs a few seconds.
+
+That matters beyond convenience. `kiosk-confirm.ts` — the generator that served
+the confirm-screen rounds — hand-writes a static copy of the component's markup
+and keeps its measurements in step by discipline, and a critique is only worth
+what the frame is worth. This cannot drift, because it is the app.
+
+It also asserts on the way past what a screenshot cannot show: whether any frame
+scrolls sideways. A fixed-height row whose contents are wider than the glass
+takes the whole grid with it rather than clipping, and the frame looks identical
+either way — it is the viewport in both cases. The shooter exits non-zero
+instead.
 
 ## The before/after page
 
