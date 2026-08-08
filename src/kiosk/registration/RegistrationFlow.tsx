@@ -209,7 +209,7 @@ export function RegistrationFlow({
   const childNumber = state.children.length + 1;
 
   return (
-    <div className="grid h-full grid-rows-[auto_1fr_auto]">
+    <div className="grid h-full grid-rows-[auto_1fr_auto_auto]">
       <Header
         title={titleFor(state, childNumber)}
         subtitle={subtitleFor(state, binding)}
@@ -239,12 +239,33 @@ export function RegistrationFlow({
           */}
         <div
           className={`mx-auto flex w-full max-w-2xl flex-col gap-3 pb-2 ${
-            isTypingStep(state.step) ? 'mt-auto' : ''
+            'min-h-full'
           }`}
         >
+          {/*
+            * The step's question, in the region where its answer gets built.
+            *
+            * It has been in three places across this loop. In the header it was
+            * fourteen pixels of `ink-500` — 4.24:1, under the AA floor — at the
+            * far end of the screen from the hand, and the only thing telling
+            * step two of this wizard from step five. Hard against the readout it
+            * was legible and adjacent but it left this region empty: a third of
+            * the screen with nothing in it, and the first object below the title
+            * a disabled **Next**, which is what made the register step read as a
+            * screen that had not finished loading beside the search screen it
+            * came from.
+            *
+            * Here, and quieter than search's "Type a name", because that one is
+            * the whole screen and this one shares its step with a header that
+            * already says whose turn it is.
+            */}
+          {isTypingStep(state.step) && (
+            <div className="text-center text-xl text-ink-300 kiosk:text-2xl">
+              {placeholderFor(state)}
+            </div>
+          )}
           {state.step === 'child-grade' && (
-            <div className="grid grid-cols-3 gap-2 pt-2">
-              <GradeChip label={NO_GRADE} onPick={() => dispatch({ type: 'grade', grade: null })} />
+            <div className="mt-auto grid grid-cols-3 gap-2 pt-2">
               {GRADES.map((grade) => (
                 <GradeChip
                   key={grade}
@@ -253,6 +274,11 @@ export function RegistrationFlow({
                   onPick={() => dispatch({ type: 'grade', grade })}
                 />
               ))}
+              {/* Last, because it is the one chip here that is not an answer.
+                  In reading position one, styled like the thirteen real values,
+                  it reads as the default — and what it produces is a
+                  grade-less record for the core team to adjudicate. */}
+              <GradeChip label={NO_GRADE} onPick={() => dispatch({ type: 'grade', grade: null })} />
             </div>
           )}
 
@@ -273,7 +299,7 @@ export function RegistrationFlow({
               * parent can see they are in, and a button that had already been
               * pressed would look exactly like one that had not.
               */
-            <div className="pt-2">
+            <div className="mt-auto pt-2">
               <button
                 type="button"
                 tabIndex={-1}
@@ -305,7 +331,7 @@ export function RegistrationFlow({
           )}
 
           {state.step === 'another' && (
-            <div className="flex flex-col gap-3 pt-2">
+            <div className="mt-auto flex flex-col gap-3 pt-2">
               {/*
                 * Who is on the list so far, above the two buttons.
                 *
@@ -336,7 +362,11 @@ export function RegistrationFlow({
           )}
 
           {state.step === 'confirm' && (
-            <div className="flex flex-col gap-2 pt-2">
+            /* Against the commit, not stranded a screen above it. This is the
+               last thing a parent reads before a record goes upstream, and on a
+               portrait tablet the list of their own children sat a thousand
+               pixels from the button that files it. */
+            <div className="mt-auto flex flex-col gap-2 pt-2">
               {state.children.map((child, index) => (
                 <ChildRow key={`${child.firstName}-${child.lastName}-${index}`} child={child} />
               ))}
@@ -395,11 +425,22 @@ export function RegistrationFlow({
         </div>
       </div>
 
+      {/*
+        * The same rule the search screen draws, because it is a property of the
+        * console rather than of that screen. Below it: the action, the readout
+        * and the keys. A parent learns to read that object as the thing they
+        * operate, and one tap later it used to dissolve — the two screens
+        * differ only in their bottom third, so a missing edge was the most
+        * noticeable change between them, and it made the step a parent had just
+        * chosen look less structured than the screen they chose it from.
+        */}
+      <div className="border-t border-ink-800/70" />
+
       {/* The bottom row: the readout and the keyboard where something is being
           typed, the one action that ends the step where it is not. */}
       {isTypingStep(state.step) ? (
         <div className="flex flex-col gap-1.5">
-          <div className="px-2">
+          <div className="px-2 pt-2">
             {/*
               * Always "Next" on the allergies step, now that the tick above
               * the keyboard says "No allergies".
@@ -455,12 +496,15 @@ export function RegistrationFlow({
             }`}
           >
             <div className="mx-auto flex h-16 max-w-2xl items-center justify-center px-4">
-              {state.buffer ? (
-                <span className="truncate text-3xl font-semibold tracking-wide text-ink-50">
+              {/* Letters only, and empty until there are some. The search screen
+                  teaches a parent two taps earlier that the bold word above the
+                  keys is what *they* typed; a placeholder sitting in that slot
+                  read as something a previous family had already entered. What
+                  the box is for is said above it, at size. */}
+              {state.buffer && (
+                <span className="truncate text-3xl font-semibold tracking-wide text-ink-50 kiosk:text-4xl">
                   {state.step === 'guardian-phone' ? formatPhone(state.buffer) : state.buffer}
                 </span>
-              ) : (
-                <span className="text-xl text-ink-500">{placeholderFor(state)}</span>
               )}
             </div>
           </div>
@@ -520,27 +564,49 @@ function Header({
   onClose: () => void;
 }) {
   return (
-    <div className="relative px-6 pt-[max(1rem,var(--spacing-safe-top))] pb-2 text-center">
+    /*
+     * Three slots, not a centred title with two controls floated over it.
+     *
+     * Absolutely positioned, Back and Cancel were outside the title's layout,
+     * so a long title simply painted across them: "Does this look right?" needs
+     * 282px on a 390px phone and the gap between the two controls is 238, which
+     * obliterated the last two letters of **Back** and the first two of
+     * **Cancel**. That is the confirm step — the last screen before a family
+     * record goes upstream and cannot be taken back — and Back is the only
+     * repair a parent who spots a wrong name has. A control that reads as
+     * broken at the moment it is needed is worse than one that is not there.
+     *
+     * The side columns are reserved now and the title wraps inside what is
+     * left, which is what the search header already does with a long gathering
+     * name.
+     */
+    <div className="grid grid-cols-[auto_1fr_auto] items-start gap-1 px-2 pt-[max(0.75rem,var(--spacing-safe-top))] pb-2">
       <button
         type="button"
         tabIndex={-1}
         onPointerDown={onBack}
-        className="absolute top-[max(0.75rem,var(--spacing-safe-top))] left-4 h-12 rounded-lg px-3 text-base text-ink-400 active:bg-ink-800"
+        className="h-12 rounded-lg px-3 text-sm text-ink-400 active:bg-ink-800"
       >
         ← Back
       </button>
-      {canClose && (
-        <button
-          type="button"
-          tabIndex={-1}
-          onPointerDown={onClose}
-          className="absolute top-[max(0.75rem,var(--spacing-safe-top))] right-4 h-12 rounded-lg px-3 text-base text-ink-500 active:bg-ink-800"
-        >
-          Cancel
-        </button>
-      )}
-      <div className="text-lg font-semibold text-ink-200">{title}</div>
-      <div className="text-sm text-ink-500">{subtitle}</div>
+      <div className="min-w-0 pt-1 text-center">
+        <div className="text-2xl font-semibold text-balance text-ink-100 kiosk:text-3xl">{title}</div>
+        <div className="truncate text-base text-ink-500 kiosk:text-lg">{subtitle}</div>
+      </div>
+      {/* The same ink as Back. They are peers — two ways out of the same flow —
+          and a step apart made Cancel read as the less available of the two,
+          which it is not. The slot stays reserved while the call is in flight
+          so the title does not reflow when the button goes. */}
+      <button
+        type="button"
+        tabIndex={-1}
+        onPointerDown={canClose ? onClose : undefined}
+        className={`h-12 rounded-lg px-3 text-sm text-ink-400 active:bg-ink-800 ${
+          canClose ? '' : 'invisible'
+        }`}
+      >
+        Cancel
+      </button>
     </div>
   );
 }
@@ -661,10 +727,15 @@ function titleFor(state: RegistrationState, childNumber: number): string {
 
 function subtitleFor(state: RegistrationState, binding: KioskBinding): string {
   switch (state.step) {
+    /*
+     * The typing steps name the field against the readout now, so this line
+     * goes back to identity: a parent glancing up wants to know they are still
+     * at the right gathering, not to read the same question twice at opposite
+     * ends of the type ramp.
+     */
     case 'child-first':
-      return 'What is their first name?';
     case 'child-last':
-      return 'And their last name?';
+      return binding.title;
     case 'child-grade':
       return 'What grade are they in?';
     case 'child-allergies':
@@ -682,7 +753,7 @@ function subtitleFor(state: RegistrationState, binding: KioskBinding): string {
      */
     case 'guardian-first':
     case 'guardian-last':
-      return 'So we know who brought them.';
+      return binding.title;
     case 'guardian-phone':
       // Said before the number is typed rather than after: a parent wants to
       // know why it is being asked for while they decide whether to give it.

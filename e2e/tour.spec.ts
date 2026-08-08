@@ -111,7 +111,7 @@ async function backToSearch(kiosk: Page): Promise<void> {
   if (await done.isVisible().catch(() => false)) {
     await done.click({ timeout: 2_000 }).catch(() => {});
   }
-  await expect(kiosk.getByText(/type a name, or the last 4 digits/i)).toBeVisible({
+  await expect(kiosk.getByText(/^type a name$/i)).toBeVisible({
     timeout: 30_000,
   });
 }
@@ -989,7 +989,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
 
       const clearKiosk = async () => {
         await kiosk.locator('[data-key="clear"]').click();
-        await expect(kiosk.getByText(/type a name, or the last 4 digits/i)).toBeVisible({
+        await expect(kiosk.getByText(/^type a name$/i)).toBeVisible({
           timeout: 15_000,
         });
       };
@@ -1001,7 +1001,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
        */
       const reloadKiosk = async () => {
         await kiosk.reload();
-        await expect(kiosk.getByText(/type a name, or the last 4 digits/i)).toBeVisible({
+        await expect(kiosk.getByText(/^type a name$/i)).toBeVisible({
           timeout: 60_000,
         });
       };

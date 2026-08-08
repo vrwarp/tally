@@ -153,7 +153,7 @@ test.describe('the kiosk', () => {
 
       await hold(kiosk, nursery);
 
-      await expect(kiosk.getByText(/type a name, or the last 4 digits/i)).toBeVisible({
+      await expect(kiosk.getByText(/^type a name$/i)).toBeVisible({
         timeout: 30_000,
       });
     } finally {
@@ -182,7 +182,7 @@ test.describe('the kiosk', () => {
       await kiosk.getByText(/welcome/i).click();
 
       // The placeholder is the proof: the query the check-in came from is gone.
-      await expect(kiosk.getByText(/type a name, or the last 4 digits/i)).toBeVisible();
+      await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
       await findOnKiosk(kiosk, COLLECTED);
 
       // The row that used to be inert now says what a tap would do.
@@ -560,7 +560,7 @@ test.describe('the kiosk', () => {
       await kiosk.reload();
       // Straight back to the search screen: the binding, the roster and the
       // phone index all come out of localStorage before the SDK loads.
-      await expect(kiosk.getByText(/type a name, or the last 4 digits/i)).toBeVisible({
+      await expect(kiosk.getByText(/^type a name$/i)).toBeVisible({
         timeout: 30_000,
       });
     } finally {
@@ -599,7 +599,7 @@ test.describe('the kiosk', () => {
       // Declining lands back on the search screen, still on the gathering —
       // the queue standing at the kiosk loses the seconds and nothing else.
       await kiosk.getByRole('button', { name: /Keep checking in/i }).click();
-      await expect(kiosk.getByText(/type a name, or the last 4 digits/i)).toBeVisible();
+      await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
 
       await hold(kiosk, '[data-key="clear"]');
       await kiosk.getByRole('button', { name: /^Leave /i }).click();

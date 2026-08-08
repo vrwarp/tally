@@ -1,6 +1,41 @@
 @import 'tailwindcss';
 
 /*
+ * `tall:` — a screen with more height than a hand-held device has.
+ *
+ * Height, not width, because the thing it answers is a height problem. The
+ * lobby kiosk pins a keyboard to the bottom of the glass and a header to the
+ * top, and what is left between them is a track whose content does not grow
+ * with it: on an 800×1280 tablet a five-name list left four hundred pixels of
+ * nothing under it, and the empty part of the screen became the largest object
+ * in the frame. A width breakpoint would have caught that tablet and also
+ * caught a phone turned sideways, which has the opposite problem.
+ *
+ * 1000px is above every phone held upright (844 on the tallest) and below every
+ * tablet stood on end (1024 on the smallest). What it buys is not just a filled
+ * track: a kiosk is read by somebody standing at arm's length rather than held
+ * at reading distance, so the type it steps up wants stepping up anyway.
+ */
+@custom-variant tall (@media (min-height: 1000px));
+
+/*
+ * `kiosk:` — a screen nobody is holding.
+ *
+ * `tall:` above answers a height question: has this track more room than its
+ * content. This one answers a distance question, and they are not the same
+ * screen. A 1280×800 lobby tablet fell through `tall:` entirely and ran the
+ * phone's type and the phone's target sizes on the largest, furthest piece of
+ * glass of the three — sized as if somebody were holding it, when it is on a
+ * shelf at arm's length.
+ *
+ * Either axis is enough to mean "not a phone": a tablet stood on end clears the
+ * height, one laid on its side clears the width, and a phone in either
+ * orientation clears neither. Both entries exist only in the kiosk's own
+ * screens, so a wide desktop window matching it is not a case that arises.
+ */
+@custom-variant kiosk (@media (min-height: 1000px), (min-width: 1024px));
+
+/*
  * Tally design tokens.
  *
  * The app is used one-handed, in dim rooms, by volunteers who are looking at a
@@ -125,6 +160,64 @@
   --color-danger-400: #b91c1c;
   --color-danger-500: #dc2626;
   --color-danger-600: #991b1b;
+}
+
+/*
+ * The fade at the foot of the kiosk's results list.
+ *
+ * It exists so a clipped row is a strip of card with no ink in it: a thumb aims
+ * at letters, and a half-cut name is a target that offers to check in a child
+ * who may not be in the building. A single linear ramp did that on a phone by
+ * luck — where the clip lands inside a row is an accident of how the row height
+ * divides into the track, and on a landscape kiosk it landed just under the
+ * baseline, leaving two whole rows legible at half strength. Half-strength and
+ * legible is what this list already means by *collected*, so the rows that
+ * continue below read as rows already dealt with.
+ *
+ * So the ramp is a row deep rather than a few pixels, and it is most of the way
+ * to nothing by the time a row could still be showing its name. A partial row
+ * is shorter than a whole one by definition, which is what makes "one row deep"
+ * the right measure: whatever is cut is inside the ramp at every shape.
+ *
+ * Written twice because the kiosk runs on whatever tablet the church owns and
+ * WebKit still wants the prefix.
+ */
+.kiosk-list-fade {
+  --kiosk-fade: 4rem;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    #000 calc(100% - var(--kiosk-fade)),
+    rgba(0, 0, 0, 0.1) calc(100% - var(--kiosk-fade) * 0.7),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    #000 calc(100% - var(--kiosk-fade)),
+    rgba(0, 0, 0, 0.1) calc(100% - var(--kiosk-fade) * 0.7),
+    transparent
+  );
+}
+
+/* Rows step up on a screen stood on end, so the ramp does too. */
+@media (min-height: 1000px) {
+  .kiosk-list-fade {
+    --kiosk-fade: 5rem;
+  }
+}
+
+/*
+ * And it runs deeper on the shape with the shortest track.
+ *
+ * A landscape kiosk leaves the region under three hundred pixels, so where the
+ * clip falls inside a row leaves more of that row showing than on a phone: the
+ * last card stayed fully drawn and legible at about a third strength, which
+ * reads as a row that has been dimmed — already handled — rather than as one
+ * continuing below. The cue has to be dissolution, not dimming.
+ */
+@media (min-width: 1024px) {
+  .kiosk-list-fade {
+    --kiosk-fade: 5.5rem;
+  }
 }
 
 @layer base {
