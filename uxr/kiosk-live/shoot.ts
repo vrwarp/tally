@@ -67,6 +67,17 @@ const SCENES: {
    * position nothing was ever shot in.
    */
   scrollToEnd?: boolean;
+  /**
+   * Presses to run before the shot, as `data-key` values or button labels.
+   *
+   * The wizard holds its step in a reducer, so the only way to photograph step
+   * three is to walk to it. Worth the few lines: for nine rounds the register
+   * flow was one frame — phone, first step, nothing typed — and the states that
+   * carry its risk (the grade grid, the greyed keyboard beside the allergies
+   * tick, the phone pad swapped in mid-flow, the list of children read back
+   * before it is committed) had never been photographed at any size.
+   */
+  drive?: readonly string[];
 }[] = [
   { id: 'search-idle', query: '', views: ['phone', 'kiosktall', 'kioskwide'] },
   { id: 'search-idle-pickup', query: 'pickup=1', views: ['phone', 'kiosktall'] },
@@ -105,7 +116,34 @@ const SCENES: {
     scrollToEnd: true,
   },
   { id: 'search-nomatch', query: 'buffer=Zzz&nomatch=1', views: ['phone', 'kiosktall', 'kioskwide'] },
-  { id: 'register-first', query: 'screen=register', views: ['phone'] },
+  { id: 'register-first', query: 'screen=register', views: ['phone', 'kiosktall', 'kioskwide'] },
+  {
+    id: 'register-typing',
+    query: 'screen=register',
+    views: ['phone', 'kiosktall'],
+    drive: ['R', 'O', 'B', 'I', 'N'],
+  },
+  {
+    id: 'register-grade',
+    query: 'screen=register',
+    views: ['phone', 'kiosktall', 'kioskwide'],
+    drive: ['R', 'O', 'Next', 'F', 'O', 'X', 'Next'],
+  },
+  {
+    id: 'register-confirm',
+    query: 'screen=register',
+    views: ['phone', 'kiosktall'],
+    drive: [
+      'R', 'O', 'Next',
+      'F', 'O', 'X', 'Next',
+      '7th grade',
+      'Next',
+      "That's everyone",
+      'A', 'M', 'Next',
+      'F', 'O', 'X', 'Next',
+      '5', '5', '5', '0', '1', '2', '3', '4', '5', '6', 'Next',
+    ],
+  },
 ];
 
 const args = process.argv.slice(2);
@@ -139,6 +177,13 @@ for (const scene of SCENES) {
     const page = await context.newPage();
     await page.goto(`${base}?${scene.query}`, { waitUntil: 'networkidle' });
     await page.waitForTimeout(250);
+
+    for (const press of scene.drive ?? []) {
+      const key = page.locator(`[data-key="${press}"]`).first();
+      const target = (await key.count()) > 0 ? key : page.getByRole('button', { name: press }).first();
+      await target.dispatchEvent('pointerdown');
+      await page.waitForTimeout(60);
+    }
 
     if (scene.scrollToEnd) {
       await page.evaluate(() => {

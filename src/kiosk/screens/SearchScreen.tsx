@@ -845,8 +845,14 @@ export function SearchScreen({
               * On width, never on state: this row's height is fixed and its
               * contents must not reflow because a keystroke found somebody.
               */}
-            <span className={canWiden ? 'hidden sm:inline' : undefined}>{offerPrompt}&nbsp;</span>
-            Register your child
+            {canWiden ? (
+              <>
+                <span className="sm:hidden">Not yours?&nbsp;Register</span>
+                <span className="hidden sm:inline">{offerPrompt}&nbsp;Register your child</span>
+              </>
+            ) : (
+              <>{offerPrompt}&nbsp;Register your child</>
+            )}
           </button>
         )}
       </div>

@@ -239,7 +239,7 @@ export function RegistrationFlow({
           */}
         <div
           className={`mx-auto flex w-full max-w-2xl flex-col gap-3 pb-2 ${
-            isTypingStep(state.step) ? 'min-h-full' : ''
+            'min-h-full'
           }`}
         >
           {/*
@@ -327,7 +327,7 @@ export function RegistrationFlow({
           )}
 
           {state.step === 'another' && (
-            <div className="flex flex-col gap-3 pt-2">
+            <div className="mt-auto flex flex-col gap-3 pt-2">
               {/*
                 * Who is on the list so far, above the two buttons.
                 *
@@ -358,7 +358,11 @@ export function RegistrationFlow({
           )}
 
           {state.step === 'confirm' && (
-            <div className="flex flex-col gap-2 pt-2">
+            /* Against the commit, not stranded a screen above it. This is the
+               last thing a parent reads before a record goes upstream, and on a
+               portrait tablet the list of their own children sat a thousand
+               pixels from the button that files it. */
+            <div className="mt-auto flex flex-col gap-2 pt-2">
               {state.children.map((child, index) => (
                 <ChildRow key={`${child.firstName}-${child.lastName}-${index}`} child={child} />
               ))}
