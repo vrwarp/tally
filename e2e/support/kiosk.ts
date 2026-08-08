@@ -182,7 +182,7 @@ export async function readPairingCode(kiosk: Page): Promise<string> {
 export async function bindTo(kiosk: Page, title: string | RegExp): Promise<void> {
   await kiosk.getByRole('button', { name: title }).first().click();
   await hold(kiosk, 'button:has-text("Hold to set kiosk")');
-  await expect(kiosk.getByText(/type a name, or the last 4 digits/i)).toBeVisible({
+  await expect(kiosk.getByText(/^type a name$/i)).toBeVisible({
     timeout: 30_000,
   });
 }
