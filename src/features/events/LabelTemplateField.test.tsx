@@ -18,6 +18,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { LabelTemplateField } from '@/features/events/LabelTemplateField';
 import {
+  DEFAULT_FIXED_LENGTH_MM,
   DEFAULT_LABEL_TEMPLATE,
   MAX_LABEL_COPIES,
   MAX_LABEL_LINES,
@@ -271,6 +272,140 @@ describe('a line that would print its caption alone', () => {
     expect(add).toBeDisabled();
     await user.click(add);
     expect(stored()?.lines).toHaveLength(MAX_LABEL_LINES);
+  });
+
+  describe('putting the lines in order', () => {
+    const three = {
+      lines: ['One', 'Two', 'Three'].map((text) => ({
+        text,
+        size: 'md' as const,
+        bold: false,
+        align: 'center' as const,
+        requiresValue: false,
+      })),
+      copies: 1,
+    };
+
+    const texts = () => stored()?.lines.map((line) => line.text);
+
+    it('moves a line down, and its neighbour up with it', async () => {
+      const user = userEvent.setup();
+      render(<Harness initial={three} />);
+
+      await user.click(screen.getByRole('button', { name: 'Move line 1 down' }));
+      expect(texts()).toEqual(['Two', 'One', 'Three']);
+    });
+
+    it('moves a line back up again', async () => {
+      const user = userEvent.setup();
+      render(<Harness initial={three} />);
+
+      await user.click(screen.getByRole('button', { name: 'Move line 3 up' }));
+      expect(texts()).toEqual(['One', 'Three', 'Two']);
+    });
+
+    it('carries the whole line, not just its words', async () => {
+      // The size and weight are the reason to reorder at all — a name that ends
+      // up small because only the text moved is worse than no button.
+      const user = userEvent.setup();
+      render(
+        <Harness
+          initial={{
+            lines: [
+              { text: 'Name', size: 'xl', bold: true, align: 'center', requiresValue: false },
+              { text: 'Time', size: 'sm', bold: false, align: 'left', requiresValue: false },
+            ],
+            copies: 1,
+          }}
+        />,
+      );
+
+      await user.click(screen.getByRole('button', { name: 'Move line 2 up' }));
+      expect(stored()?.lines[0]).toMatchObject({ text: 'Time', size: 'sm', align: 'left' });
+      expect(stored()?.lines[1]).toMatchObject({ text: 'Name', size: 'xl', bold: true });
+    });
+
+    it('cannot move the ends off the label', () => {
+      render(<Harness initial={three} />);
+      expect(screen.getByRole('button', { name: 'Move line 1 up' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Move line 3 down' })).toBeDisabled();
+    });
+  });
+
+  describe('how the sticker sits on the roll', () => {
+    it('stores nothing until something is asked for', () => {
+      // Absent is what every gathering set up before this reads as, and it is
+      // what keeps their labels printing exactly as they did.
+      render(<Harness initial={DEFAULT_LABEL_TEMPLATE} />);
+      expect(stored()).not.toHaveProperty('rotated');
+      expect(stored()).not.toHaveProperty('marginTopMm');
+      expect(stored()).not.toHaveProperty('fixedLengthMm');
+    });
+
+    it('turns the label a quarter turn, and back', async () => {
+      const user = userEvent.setup();
+      render(<Harness initial={DEFAULT_LABEL_TEMPLATE} />);
+
+      await user.click(screen.getByLabelText(/Print along the tape/));
+      expect(stored()?.rotated).toBe(true);
+
+      // Off again removes the key rather than storing false, so the template
+      // goes back to being the one it was before anybody ticked anything.
+      await user.click(screen.getByLabelText(/Print along the tape/));
+      expect(stored()).not.toHaveProperty('rotated');
+    });
+
+    it('records the margins in millimetres', async () => {
+      const user = userEvent.setup();
+      render(<Harness initial={DEFAULT_LABEL_TEMPLATE} />);
+
+      await user.type(screen.getByLabelText(/Space above/), '6');
+      expect(stored()?.marginTopMm).toBe(6);
+    });
+
+    it('goes back to the default when a margin is cleared', async () => {
+      const user = userEvent.setup();
+      render(<Harness initial={{ ...DEFAULT_LABEL_TEMPLATE, marginTopMm: 6 }} />);
+
+      await user.clear(screen.getByLabelText(/Space above/));
+      expect(stored()).not.toHaveProperty('marginTopMm');
+    });
+
+    it('offers a length only once a fixed one has been asked for', async () => {
+      const user = userEvent.setup();
+      render(<Harness initial={DEFAULT_LABEL_TEMPLATE} />);
+
+      expect(screen.queryByLabelText(/^Length/)).toBeNull();
+      await user.click(screen.getByLabelText(/Same length every time/));
+
+      expect(stored()?.fixedLengthMm).toBe(DEFAULT_FIXED_LENGTH_MM);
+      expect(screen.getByLabelText(/^Length/)).toBeTruthy();
+    });
+
+    it('says when the previewed roll is going to ignore all this', async () => {
+      // The preview is about to look exactly as though the tick did nothing,
+      // because on die-cut media it did.
+      const user = userEvent.setup();
+      render(<Harness initial={DEFAULT_LABEL_TEMPLATE} />);
+
+      await user.click(screen.getByLabelText(/Print along the tape/));
+      expect(screen.getByText(/die-cut, so the preview ignores these/)).toBeTruthy();
+
+      await user.selectOptions(screen.getByLabelText(/Preview on/), '62');
+      expect(screen.queryByText(/die-cut, so the preview ignores these/)).toBeNull();
+    });
+
+    it('never produces a shape the kiosk would refuse', async () => {
+      const user = userEvent.setup();
+      render(<Harness initial={DEFAULT_LABEL_TEMPLATE} />);
+
+      await user.click(screen.getByLabelText(/Print along the tape/));
+      await user.type(screen.getByLabelText(/Space above/), '6');
+      await user.click(screen.getByLabelText(/Same length every time/));
+
+      const template = stored();
+      expect(sanitizeLabelTemplate(template)).toEqual(template);
+    });
   });
 
   it('offers only copy counts the rules accept', () => {

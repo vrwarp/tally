@@ -27,12 +27,21 @@ export function LabelPreview({
   template,
   values = SAMPLE_VALUES,
   box,
+  rotated = false,
   className,
 }: {
   template: LabelTemplate;
   values?: LabelTokenValues;
   /** The media to preview against, in printer dots. */
   box: LabelBox;
+  /**
+   * Draw the label turned a quarter turn, the way the kiosk would print it.
+   *
+   * Shown the way it comes off the roll rather than the way it was laid out —
+   * a leader ticking "along the tape" wants to see a long thin sticker, not the
+   * same upright one relabelled.
+   */
+  rotated?: boolean;
   className?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -41,12 +50,13 @@ export function LabelPreview({
     scaled: false,
   });
 
-  const scale = PREVIEW_WIDTH_PX / box.width;
-
   // Serialised so the effect re-runs when a line's text changes, not only when
   // the array identity does — the editor rebuilds this object on every keystroke
   // either way, but depending on the identity would hide a mutation.
-  const key = useMemo(() => JSON.stringify([template, values, box]), [template, values, box]);
+  const key = useMemo(
+    () => JSON.stringify([template, values, box, rotated]),
+    [template, values, box, rotated],
+  );
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -60,19 +70,34 @@ export function LabelPreview({
     };
 
     // Measured unscaled, in dots, so the layout sees the same numbers the
-    // printer will. The transform below only changes how it is painted.
+    // printer will. The transforms below only change how it is painted.
     const layout = layoutLabel(template, values, box, measure);
-    const heightDots = layout.height;
+
+    /*
+     * The sticker's two dimensions, swapped when it is turned — the same
+     * arithmetic `drawLabel` does for the raster, for the same reason. `across`
+     * is the roll's width and `along` is how much tape it takes.
+     */
+    const across = rotated ? layout.height : layout.width;
+    const along = rotated ? layout.width : layout.height;
+    // Fitted to the width on screen rather than to the roll's, so a rotated
+    // label — which is wider than it is tall — is not drawn microscopically.
+    const scale = PREVIEW_WIDTH_PX / across;
 
     const ratio = window.devicePixelRatio || 1;
-    canvas.width = Math.round(box.width * scale * ratio);
-    canvas.height = Math.round(heightDots * scale * ratio);
-    canvas.style.width = `${Math.round(box.width * scale)}px`;
-    canvas.style.height = `${Math.round(heightDots * scale)}px`;
+    canvas.width = Math.round(across * scale * ratio);
+    canvas.height = Math.round(along * scale * ratio);
+    canvas.style.width = `${Math.round(across * scale)}px`;
+    canvas.style.height = `${Math.round(along * scale)}px`;
 
     ctx.setTransform(scale * ratio, 0, 0, scale * ratio, 0, 0);
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, box.width, heightDots);
+    ctx.fillRect(0, 0, across, along);
+
+    if (rotated) {
+      ctx.translate(across, 0);
+      ctx.rotate(Math.PI / 2);
+    }
 
     ctx.fillStyle = '#000000';
     ctx.textBaseline = 'alphabetic';
@@ -83,9 +108,9 @@ export function LabelPreview({
     }
 
     setNotes({ dropped: layout.droppedLines, scaled: layout.scaledToFit });
-    // `key` stands in for the three objects it serialises.
+    // `key` stands in for the objects it serialises.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, scale]);
+  }, [key]);
 
   return (
     <div className={className}>

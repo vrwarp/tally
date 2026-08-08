@@ -20,7 +20,7 @@
  */
 import { createJob, expectedImageSize } from '@vrwarp/brother-ql-webusb/convert';
 import { isEndless, resolveLabel } from '@vrwarp/brother-ql-webusb/labels';
-import { DOTS_PER_MM } from '@/lib/labelRender';
+import { labelBoxFor } from '@/lib/labelRender';
 import type { LabelTemplate, LabelTokenValues } from '@/lib/labelTemplate';
 import { drawLabel } from './draw';
 
@@ -29,13 +29,6 @@ export interface RasterRequest {
   id: number;
   model: string;
   label: string;
-  /**
-   * Blank millimetres above and below the text on continuous tape, if this
-   * kiosk has been given a preference. Ignored on die-cut media, whose length
-   * is fixed and whose block is centred. See `PrinterConfig.marginTopMm`.
-   */
-  marginTopMm?: number;
-  marginBottomMm?: number;
   template: LabelTemplate;
   values: LabelTokenValues;
 }
@@ -58,28 +51,24 @@ const ctx = self as unknown as {
   postMessage(message: RasterReply, transfer?: ArrayBuffer[]): void;
 };
 
-/** A margin a person typed, as dots, or undefined to leave the default alone. */
-function marginDots(mm: number | undefined): number | undefined {
-  return mm === undefined ? undefined : Math.round(mm * DOTS_PER_MM);
+/**
+ * The box this template asks for on the roll the kiosk has loaded.
+ *
+ * The geometry lives in `lib/labelRender.ts`, shared with the event editor's
+ * preview so the two cannot disagree. What is local is the lookup: only here is
+ * the label table available to say how wide the roll is and whether it is tape.
+ */
+function boxFor(template: LabelTemplate, label: string) {
+  const [widthDots, lengthDots] = expectedImageSize(label);
+  return labelBoxFor(template, {
+    widthDots,
+    lengthDots: isEndless(resolveLabel(label)) ? null : lengthDots,
+  });
 }
 
 function build(request: RasterRequest): { job: Uint8Array; pageCount: number } {
-  const [width, height] = expectedImageSize(request.label);
-  const endless = isEndless(resolveLabel(request.label));
-
-  const image = drawLabel(request.template, request.values, {
-    width,
-    // Continuous tape has no fixed length, so the content decides it. Die-cut
-    // media does, and `prepareImage` will refuse anything else.
-    height: endless ? null : height,
-    // Only on tape. On die-cut media a margin cannot lengthen the label, so all
-    // it could do is shove the text off-centre on a label somebody chose for its
-    // size — a setting that says "continuous tape" on the screen it is set from
-    // should not quietly do that.
-    ...(endless
-      ? { paddingTop: marginDots(request.marginTopMm), paddingBottom: marginDots(request.marginBottomMm) }
-      : {}),
-  });
+  const { box, rotated } = boxFor(request.template, request.label);
+  const image = drawLabel(request.template, request.values, box, { rotated });
 
   /*
    * Copies are pages: the same image handed over as many times as asked for.

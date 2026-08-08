@@ -35,11 +35,14 @@ export interface RenderedLabel {
 }
 
 /**
- * How tall a continuous-tape label may get before it is a stationery incident.
+ * How much tape one label may take before it is a stationery incident.
  *
  * 62mm tape at 300 dpi is about 12 dots per millimetre, so 1800 dots is 150mm —
  * generous for four lines of text, and short of the length a runaway template
  * could otherwise ask for.
+ *
+ * It is a limit along the roll, so on a rotated label it caps the length a long
+ * name can run to rather than the height of the text.
  *
  * The margins on `box` count towards it, so a template already long enough to
  * be cut short loses its bottom margin first. That is the right order: the cap
@@ -52,12 +55,25 @@ const MAX_ENDLESS_HEIGHT_DOTS = 1800;
  * Draw a label and hand back its pixels.
  *
  * `box.height` null means continuous tape, where the length follows the content;
- * a number means die-cut, where it does not and the layout has to fit.
+ * a number means die-cut, where it does not and the layout has to fit. `box.width`
+ * null is the rotated mirror of that: the roll's width has become the height and
+ * the length is what the content decides.
+ *
+ * `rotated` turns the finished layout a quarter turn on its way to the raster.
+ * The layout itself knows nothing about it — it is handed a box whose height is
+ * the tape's width and whose width is free, lays out in that frame as usual, and
+ * this transposes the result. Which is the whole reason the geometry is a pure
+ * function of a box: the rotated case is a different box, not a different
+ * algorithm.
+ *
+ * The turn puts the start of the first line at the leading edge of the tape, so
+ * the label reads in the order it comes out of the printer.
  */
 export function drawLabel(
   template: LabelTemplate,
   values: LabelTokenValues,
   box: LabelBox,
+  { rotated = false }: { rotated?: boolean } = {},
 ): RenderedLabel {
   // A 1x1 scratch canvas purely to get a context to measure with: text metrics
   // do not depend on the canvas size, and the real one cannot be allocated
@@ -72,14 +88,31 @@ export function drawLabel(
   };
 
   const layout = layoutLabel(template, values, box, measure);
-  const height = Math.min(MAX_ENDLESS_HEIGHT_DOTS, Math.max(1, layout.height));
 
-  const canvas = new OffscreenCanvas(box.width, height);
+  /*
+   * The two dimensions of the raster, which are the layout's two dimensions
+   * swapped when rotated. `width` is always across the head and `height` always
+   * along the roll, so the cap belongs to `height` either way — it is a limit on
+   * how much tape one child may take, not on how tall a line may be.
+   */
+  const across = Math.max(1, rotated ? layout.height : layout.width);
+  const along = Math.min(MAX_ENDLESS_HEIGHT_DOTS, Math.max(1, rotated ? layout.width : layout.height));
+
+  const canvas = new OffscreenCanvas(across, along);
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('No 2d context on an OffscreenCanvas.');
 
   ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, box.width, height);
+  ctx.fillRect(0, 0, across, along);
+
+  if (rotated) {
+    // Logical (x, y) lands at physical (across - y, x): the first line's start
+    // goes to the leading edge of the tape, and the layout's top edge to one
+    // side of it. Set before any text is drawn, and never unset — nothing after
+    // this draws in physical coordinates.
+    ctx.translate(across, 0);
+    ctx.rotate(Math.PI / 2);
+  }
 
   ctx.fillStyle = '#000000';
   ctx.textBaseline = 'alphabetic';
@@ -89,10 +122,10 @@ export function drawLabel(
     ctx.fillText(draw.text, draw.x, draw.y);
   }
 
-  const image = ctx.getImageData(0, 0, box.width, height);
+  const image = ctx.getImageData(0, 0, across, along);
   return {
-    width: box.width,
-    height,
+    width: across,
+    height: along,
     // `ImageData.data` is a Uint8ClampedArray over the same buffer; the library
     // wants a Uint8Array and a view costs nothing.
     data: new Uint8Array(image.data.buffer, image.data.byteOffset, image.data.byteLength),

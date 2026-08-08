@@ -10,6 +10,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DEFAULT_LABEL_TEMPLATE,
+  MAX_LABEL_FIXED_LENGTH_MM,
+  MAX_LABEL_MARGIN_MM,
+  MIN_LABEL_FIXED_LENGTH_MM,
   LABEL_TOKENS,
   MAX_LABEL_COPIES,
   MAX_LABEL_LINES,
@@ -54,6 +57,53 @@ describe('fillLabelTokens', () => {
     expect(fillLabelTokens('  {{firstName}}   {{lastName}}  ', { firstName: 'Ada', lastName: 'L' })).toBe(
       'Ada L',
     );
+  });
+});
+
+describe('an optional [...] group', () => {
+  const full = { lastName: 'Lovelace', grade: '8th grade' };
+  const sparse = { lastName: 'Lovelace' };
+
+  it('keeps the group, punctuation and all, for a child who has the value', () => {
+    expect(fillLabelTokens('{{lastName}}[ ({{grade}})]', full)).toBe('Lovelace (8th grade)');
+  });
+
+  it('drops the whole group for a child who has none', () => {
+    // The point of the feature: without brackets this line prints "Lovelace ()"
+    // for most of a nursery, and collapsing whitespace cannot fix a bracket.
+    expect(fillLabelTokens('{{lastName}}[ ({{grade}})]', sparse)).toBe('Lovelace');
+    expect(fillLabelTokens('{{lastName}} ({{grade}})', sparse)).toBe('Lovelace ()');
+  });
+
+  it('keeps a group where only some of its tokens came to nothing', () => {
+    // Same "any, not all" rule `requiresValue` applies to a line.
+    expect(fillLabelTokens('[{{lastName}} {{grade}}]', sparse)).toBe('Lovelace');
+  });
+
+  it('keeps a group of fixed text, which has nothing to wait on', () => {
+    expect(fillLabelTokens('[Room 3]', sparse)).toBe('Room 3');
+  });
+
+  it('drops a whole line that is nothing but an empty group', () => {
+    // Which is what lets the renderer close the gap: an empty line is dropped.
+    expect(fillLabelTokens('[Allergy: {{allergy}}]', sparse)).toBe('');
+  });
+
+  it('handles more than one group on a line', () => {
+    expect(fillLabelTokens('{{lastName}}[ ({{grade}})][ — {{allergy}}]', full)).toBe(
+      'Lovelace (8th grade)',
+    );
+  });
+
+  it('lets a leader type a real bracket by doubling it', () => {
+    expect(fillLabelTokens('Room [[3]]', sparse)).toBe('Room [3]');
+  });
+
+  it('still reports the tokens inside a group', () => {
+    // The editor's unknown-token check and `requiresValue` both read this, and
+    // a token hidden from them because it sat inside brackets would be a
+    // template that warns about nothing and drops nothing.
+    expect(tokensIn('{{lastName}}[ ({{grade}})]')).toEqual(['lastName', 'grade']);
   });
 });
 
@@ -199,6 +249,63 @@ describe('sanitizeLabelTemplate', () => {
       copies: 1,
     });
     expect(result?.lines[0]?.text.length).toBe(120);
+  });
+});
+
+describe('the shape settings', () => {
+  function shaped(extra: Record<string, unknown>) {
+    return sanitizeLabelTemplate({ ...DEFAULT_LABEL_TEMPLATE, ...extra });
+  }
+
+  it('keeps a margin, a turn and a fixed length that are in range', () => {
+    expect(shaped({ marginTopMm: 6, marginBottomMm: 2, rotated: true, fixedLengthMm: 50 })).toMatchObject(
+      { marginTopMm: 6, marginBottomMm: 2, rotated: true, fixedLengthMm: 50 },
+    );
+  });
+
+  it('leaves them off a template that does not mention them', () => {
+    // Every gathering already set up. Absent has to survive as absent, because
+    // absent is what the renderer reads as "print what you printed yesterday".
+    const template = sanitizeLabelTemplate(DEFAULT_LABEL_TEMPLATE)!;
+    expect('marginTopMm' in template).toBe(false);
+    expect('rotated' in template).toBe(false);
+    expect('fixedLengthMm' in template).toBe(false);
+  });
+
+  it('clamps rather than refusing the template it came in', () => {
+    // A wrong margin is a label that looks odd; a refused template is a
+    // gathering that silently stops printing.
+    expect(shaped({ marginTopMm: 900, marginBottomMm: -5 })).toMatchObject({
+      marginTopMm: MAX_LABEL_MARGIN_MM,
+      marginBottomMm: 0,
+    });
+    expect(shaped({ fixedLengthMm: 4000 })).toMatchObject({
+      fixedLengthMm: MAX_LABEL_FIXED_LENGTH_MM,
+    });
+    expect(shaped({ fixedLengthMm: 1 })).toMatchObject({
+      fixedLengthMm: MIN_LABEL_FIXED_LENGTH_MM,
+    });
+  });
+
+  it('drops a value that is not a number, back to the default', () => {
+    const template = shaped({ marginTopMm: '6mm', fixedLengthMm: Number.NaN })!;
+    expect('marginTopMm' in template).toBe(false);
+    expect('fixedLengthMm' in template).toBe(false);
+  });
+
+  it('reads anything but true as not rotated', () => {
+    expect('rotated' in shaped({ rotated: 'yes' })!).toBe(false);
+    expect('rotated' in shaped({ rotated: false })!).toBe(false);
+  });
+
+  it('tells two templates apart by their shape alone', () => {
+    const plain = sanitizeLabelTemplate(DEFAULT_LABEL_TEMPLATE);
+    expect(sameLabelTemplate(plain, shaped({ marginTopMm: 6 }))).toBe(false);
+    expect(sameLabelTemplate(plain, shaped({ rotated: true }))).toBe(false);
+    expect(sameLabelTemplate(plain, shaped({ fixedLengthMm: 50 }))).toBe(false);
+    // An absent turn and an explicit false are the same label, so a template
+    // read back from Firestore does not look like an unsaved edit.
+    expect(sameLabelTemplate(plain, shaped({ rotated: false }))).toBe(true);
   });
 });
 

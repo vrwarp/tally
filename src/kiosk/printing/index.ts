@@ -53,13 +53,7 @@ import { createLabelQueue, type LabelJob, type RasterResult } from './queue';
 import RasterWorker from './raster.worker?worker';
 import type { RasterReply, RasterRequest } from './raster.worker';
 
-export {
-  DEFAULT_LABEL_MARGIN_MM,
-  DEFAULT_PRINTER_LABEL,
-  DEFAULT_PRINTER_MODEL,
-  MAX_LABEL_MARGIN_MM,
-  readPrinterConfig,
-} from './device';
+export { DEFAULT_PRINTER_LABEL, DEFAULT_PRINTER_MODEL, readPrinterConfig } from './device';
 export type { PrinterConfig } from './device';
 
 /*
@@ -72,17 +66,15 @@ export type { AllergySource } from './allergy';
 /*
  * The model and label tables, re-exported for the setup screen.
  *
- * It needs them as values — a list of models, a list of media, the media the
- * printer says it can see, and whether the chosen roll is continuous, which is
- * what decides whether the margins are a question at all — and it must not
- * import them itself. `PrinterScreen`
+ * It needs them as values — a list of models, a list of media, and the media the
+ * printer says it can see — and it must not import them itself. `PrinterScreen`
  * is referenced statically by `KioskApp`, so a direct import there would put the
  * tables and the transport into the first-paint graph and undo the whole reason
  * this module is loaded dynamically. Reaching them through the handle keeps the
  * boundary in one place, the same way every screen gets Firebase through
  * `services`.
  */
-export { isEndless, labelName, labelsForModel } from '@vrwarp/brother-ql-webusb/labels';
+export { labelName, labelsForModel } from '@vrwarp/brother-ql-webusb/labels';
 export { modelIdentifiers } from '@vrwarp/brother-ql-webusb/models';
 export { suggestLabels } from '@vrwarp/brother-ql-webusb/printer-core';
 export type { Label } from '@vrwarp/brother-ql-webusb/labels';
@@ -216,8 +208,6 @@ function rasterInWorker(config: PrinterConfig, job: LabelJob): Promise<RasterRes
       id,
       model: config.model,
       label: config.label,
-      marginTopMm: config.marginTopMm,
-      marginBottomMm: config.marginBottomMm,
       template: job.template,
       values: job.values,
     };
