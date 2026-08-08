@@ -1,6 +1,24 @@
 @import 'tailwindcss';
 
 /*
+ * `tall:` — a screen with more height than a hand-held device has.
+ *
+ * Height, not width, because the thing it answers is a height problem. The
+ * lobby kiosk pins a keyboard to the bottom of the glass and a header to the
+ * top, and what is left between them is a track whose content does not grow
+ * with it: on an 800×1280 tablet a five-name list left four hundred pixels of
+ * nothing under it, and the empty part of the screen became the largest object
+ * in the frame. A width breakpoint would have caught that tablet and also
+ * caught a phone turned sideways, which has the opposite problem.
+ *
+ * 1000px is above every phone held upright (844 on the tallest) and below every
+ * tablet stood on end (1024 on the smallest). What it buys is not just a filled
+ * track: a kiosk is read by somebody standing at arm's length rather than held
+ * at reading distance, so the type it steps up wants stepping up anyway.
+ */
+@custom-variant tall (@media (min-height: 1000px));
+
+/*
  * Tally design tokens.
  *
  * The app is used one-handed, in dim rooms, by volunteers who are looking at a

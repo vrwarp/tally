@@ -49,8 +49,12 @@ const ROWS: string[][] = [
 ];
 
 const KEY_CLASS =
+  /* `tall:` steps the keys up on a screen stood on end — see the variant's
+     note in index.css. A kiosk is read and reached at arm's length by
+     somebody standing, so a key that is comfortable in a hand is small on
+     a shelf. */
   'flex h-14 min-w-0 flex-1 select-none items-center justify-center rounded-lg ' +
-  'bg-ink-800 text-xl font-semibold text-ink-100 active:bg-ink-600';
+  'bg-ink-800 text-xl font-semibold text-ink-100 active:bg-ink-600 tall:h-16 tall:text-2xl';
 
 export const Keyboard = memo(function Keyboard({
   onKey,
