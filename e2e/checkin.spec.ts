@@ -227,7 +227,17 @@ test.describe('check-in', () => {
     // worst failure and the counselor is no longer being told what was chosen
     // for them.
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-    await expect(page.getByText('Today', { exact: true })).toBeVisible();
+    /*
+     * The date line under the title, not a capsule beside it.
+     *
+     * There used to be a neutral "Today" badge as well, which this asserted
+     * with `exact` — and it was the same word twice on the one row that has no
+     * space to spare. The claim being made here is about the header saying
+     * which night it is filing against, and this line is where it says it; the
+     * capsule survives only in its warn-toned form, where "not today" is a
+     * warning rather than a repetition.
+     */
+    await expect(page.getByText(/^Today · /)).toBeVisible();
     await expect(page.getByRole('link', { name: 'Change' })).toBeVisible();
     await expect(page.getByLabel(/switch event/i)).toBeVisible();
     await expect(page.getByLabel(/search students by name/i)).toBeVisible();
