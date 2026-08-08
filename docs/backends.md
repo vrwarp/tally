@@ -97,12 +97,12 @@ Attendees pushes write only the generics, and absent generics plus a bare `pcoPe
 as Planning Center. That fallback is the whole migration story — **there is none**. Existing
 deployments' documents, field names, config docs and callable names all keep working unchanged.
 
-Two field names deserve their footnote. `pcoPushPending` means "queued for the *default push
+Two field names deserve their footnote. `upstreamPushPending` means "queued for the *default push
 backend*" — which backend that is gets decided server-side at push time from `config/backends`, so
-the client never picks one. `pcoRecordMissing` means "the linked upstream record is gone" for any
-backend, and is what the check-in freeze in `firestore.rules` reads. Both are named for the first
-backend Tally had, because renaming a field the deployed rules and clients already read would buy
-churn and nothing else.
+the client never picks one. `upstreamRecordMissing` means "the linked upstream record is gone" for any
+backend, and is what the attendance freeze in `firestore.rules` reads. Both were once spelled with a
+`pco` prefix, from the years Planning Center was the only backend there was; they say `upstream` now
+because neither has meant one backend for a long time.
 
 ## The registry and per-request wiring
 

@@ -230,7 +230,7 @@ export async function pushStudent(
     await client.patch(API.attendeeById(personId), patch, {
       'X-Target-Attendee-Id': personId,
     });
-    await ref.update({ pcoSyncedAt: nowTs, pcoPushPending: false, updatedAt: nowTs });
+    await ref.update({ pcoSyncedAt: nowTs, upstreamPushPending: false, updatedAt: nowTs });
     return {
       status: 'updated',
       pcoPersonId: personId,
@@ -239,14 +239,14 @@ export async function pushStudent(
   }
 
   /* ---- Not linked yet ---------------------------------------------------- */
-  if (data.pcoPushPending !== true) {
+  if (data.upstreamPushPending !== true) {
     return { status: 'skipped', pcoPersonId: null, message: 'Student is not queued for Attendees.' };
   }
   /*
    * A grade-less student is created, but never matched onto an existing one.
    *
    * The create used to be refused outright, which left a nursery child queued
-   * on `pcoPushPending` for ever — a queue that never drains rather than a
+   * on `upstreamPushPending` for ever — a queue that never drains rather than a
    * visible failure.
    *
    * The duplicate check is skipped rather than widened, and that is the
@@ -264,7 +264,7 @@ export async function pushStudent(
     await ref.update({
       upstreamBackend: 'a32',
       upstreamPersonId: existing.id,
-      pcoPushPending: false,
+      upstreamPushPending: false,
       pcoSyncedAt: nowTs,
       updatedAt: nowTs,
     });
@@ -315,7 +315,7 @@ export async function pushStudent(
   await ref.update({
     upstreamBackend: 'a32',
     upstreamPersonId: createdId,
-    pcoPushPending: false,
+    upstreamPushPending: false,
     pcoSyncedAt: nowTs,
     updatedAt: nowTs,
   });
@@ -1171,7 +1171,7 @@ export async function recreateStudent(
   const check = await checkPerson(client, resolved.personId);
   if (check.outcome === 'exists') {
     // The record is alive after all; the roster read clears the freeze.
-    await db.doc(`${PATHS.students}/${studentId}`).set({ pcoRecordMissing: false }, { merge: true });
+    await db.doc(`${PATHS.students}/${studentId}`).set({ upstreamRecordMissing: false }, { merge: true });
     return {
       status: 'still-there',
       message: 'Attendees still has this person; nothing needed re-creating.',

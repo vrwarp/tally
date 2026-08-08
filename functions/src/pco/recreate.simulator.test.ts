@@ -2,7 +2,7 @@
  * Re-creating a Planning Center person for a student whose record died.
  *
  * The scenarios mirror the freeze this exists to thaw: a student flagged
- * `pcoRecordMissing` is refused check-ins by the rules, and this flow is the
+ * `upstreamRecordMissing` is refused check-ins by the rules, and this flow is the
  * sanctioned way back that does not take them off the roster. The tests lean
  * on what the flow must *refuse* to do — create where the record still
  * exists, create where a merge survivor lives, create a duplicate of somebody
@@ -64,20 +64,20 @@ describe('what it refuses to create', () => {
 
   it('clears the flag when the record is actually still there', async () => {
     const person = h.store.createPerson({ first_name: 'Still', last_name: 'Here', child: true });
-    h.db.seed(`students/pco_${person.id}`, { status: 'active', pcoRecordMissing: true });
+    h.db.seed(`students/pco_${person.id}`, { status: 'active', upstreamRecordMissing: true });
 
     const result = await run(h, `pco_${person.id}`);
 
     expect(result.status).toBe('still-there');
     expect(h.store.people.filter((p) => p.last_name === 'Here')).toHaveLength(1);
     const docData = (await h.db.doc(`students/pco_${person.id}`).get()).data();
-    expect(docData?.pcoRecordMissing).toBe(false);
+    expect(docData?.upstreamRecordMissing).toBe(false);
   });
 
   it('relinks to a merge survivor instead of creating a duplicate', async () => {
     const dup = h.store.createPerson({ first_name: 'Rowan', last_name: 'Vasquez', child: true });
     const kept = h.store.createPerson({ first_name: 'Rowan', last_name: 'Vasquez', child: true });
-    h.db.seed(`students/pco_${dup.id}`, { status: 'active', pcoRecordMissing: true });
+    h.db.seed(`students/pco_${dup.id}`, { status: 'active', upstreamRecordMissing: true });
     h.store.buryPerson(dup.id, kept.id);
 
     const result = await run(h, `pco_${dup.id}`);
@@ -86,7 +86,7 @@ describe('what it refuses to create', () => {
     expect(result.pcoPersonId).toBe(kept.id);
     expect(result.studentId).toBe(`pco_${kept.id}`);
     const keeperDoc = (await h.db.doc(`students/pco_${kept.id}`).get()).data();
-    expect(keeperDoc).toMatchObject({ status: 'active', pcoRecordMissing: false });
+    expect(keeperDoc).toMatchObject({ status: 'active', upstreamRecordMissing: false });
   });
 
   it('does nothing at all while write-back is off', async () => {
@@ -116,8 +116,8 @@ describe('re-creating for a visitor document', () => {
   it('re-creates through the push, which links the document and thaws it', async () => {
     const dead = h.store.createPerson({ first_name: 'Gone', last_name: 'Entirely', child: true });
     h.db.seed('students/tally-v3', {
-      status: 'active', pcoPersonId: dead.id, pcoPushPending: false,
-      pcoRecordMissing: true, firstName: 'Priya', lastName: 'Natarajan', grade: 8,
+      status: 'active', pcoPersonId: dead.id, upstreamPushPending: false,
+      upstreamRecordMissing: true, firstName: 'Priya', lastName: 'Natarajan', grade: 8,
     });
     h.store.buryPerson(dead.id, null);
 
@@ -129,8 +129,8 @@ describe('re-creating for a visitor document', () => {
     const docData = (await h.db.doc('students/tally-v3').get()).data();
     expect(docData).toMatchObject({
       pcoPersonId: created!.id,
-      pcoPushPending: false,
-      pcoRecordMissing: false,
+      upstreamPushPending: false,
+      upstreamRecordMissing: false,
     });
   });
 
@@ -140,7 +140,7 @@ describe('re-creating for a visitor document', () => {
       first_name: 'Priya', last_name: 'Natarajan', child: true, grade: 8,
     });
     h.db.seed('students/tally-v4', {
-      status: 'active', pcoPersonId: dead.id, pcoRecordMissing: true,
+      status: 'active', pcoPersonId: dead.id, upstreamRecordMissing: true,
       firstName: 'Priya', lastName: 'Natarajan', grade: 8,
     });
     h.store.buryPerson(dead.id, null);
@@ -160,7 +160,7 @@ describe('re-creating for a pco_ document, which holds no name', () => {
 
   it('asks for the name it never stored', async () => {
     const dead = h.store.createPerson({ first_name: 'Name', last_name: 'Lost', child: true });
-    h.db.seed(`students/pco_${dead.id}`, { status: 'active', pcoRecordMissing: true });
+    h.db.seed(`students/pco_${dead.id}`, { status: 'active', upstreamRecordMissing: true });
     h.store.buryPerson(dead.id, null);
 
     const result = await run(h, `pco_${dead.id}`);
@@ -172,7 +172,7 @@ describe('re-creating for a pco_ document, which holds no name', () => {
   it('creates from the typed name and migrates the membership', async () => {
     const dead = h.store.createPerson({ first_name: 'Name', last_name: 'Lost', child: true });
     h.db.seed(`students/pco_${dead.id}`, {
-      status: 'active', pcoRecordMissing: true, addedToRosterAt: 'earlier',
+      status: 'active', upstreamRecordMissing: true, addedToRosterAt: 'earlier',
     });
     h.store.buryPerson(dead.id, null);
 
@@ -189,7 +189,7 @@ describe('re-creating for a pco_ document, which holds no name', () => {
     expect(fresh).toMatchObject({
       pcoPersonId: created!.id,
       status: 'active',
-      pcoRecordMissing: false,
+      upstreamRecordMissing: false,
       recreatedFromStudentId: `pco_${dead.id}`,
       addedToRosterAt: 'earlier',
     });

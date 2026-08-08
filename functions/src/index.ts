@@ -541,7 +541,7 @@ export const getRoster = onCall<{ force?: boolean } | undefined, Promise<RosterR
         const studentDoc = studentDocFor(scan, result.backendId, personId);
         if (studentDoc && !scan.recordMissing[studentDoc]) {
           await database.doc(`${PATHS.students}/${studentDoc}`).set(
-            { pcoRecordMissing: true }, { merge: true });
+            { upstreamRecordMissing: true }, { merge: true });
         }
       }
       const resolved = new Set(result.people.map((person) => person.pcoPersonId));
@@ -550,7 +550,7 @@ export const getRoster = onCall<{ force?: boolean } | undefined, Promise<RosterR
         const linkage = linkageOfStudentDoc(scan, studentDoc);
         if (linkage?.backendId === result.backendId && resolved.has(linkage.personId)) {
           await database.doc(`${PATHS.students}/${studentDoc}`).set(
-            { pcoRecordMissing: false }, { merge: true });
+            { upstreamRecordMissing: false }, { merge: true });
         }
       }
     }
@@ -1905,9 +1905,9 @@ export const addParent = onCall<
 /**
  * Puts a person back in Planning Center for a student whose record died there.
  *
- * The other half of the check-in freeze: a student flagged `pcoRecordMissing`
- * cannot accumulate attendance under a dead id, and this is the sanctioned way
- * to thaw them without taking them off the roster. The flow itself lives in
+ * The other half of the attendance freeze: a student flagged
+ * `upstreamRecordMissing` cannot accumulate attendance under a dead id, and
+ * this is the sanctioned way to thaw them without taking them off the roster. The flow itself lives in
  * ./pco/recreate.ts and refuses to create where creating would be wrong — a
  * record that still exists clears the flag, a merge with a living survivor
  * relinks instead.
@@ -2008,7 +2008,7 @@ export const onStudentCreated = onDocumentCreated(
     await bumpPulse(db(), ['roster'], new Date(), { debounceMs: PULSE_DEBOUNCE_MS, logger });
 
     if (
-      data.pcoPushPending !== true ||
+      data.upstreamPushPending !== true ||
       typeof data.pcoPersonId === 'string' ||
       typeof data.upstreamPersonId === 'string'
     ) {

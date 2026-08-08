@@ -72,7 +72,7 @@ export async function seedStudent(
     pcoPersonId: null,
     // A child who has been pushed is no longer queued; one who was merged away
     // is not waiting for anything either.
-    pcoPushPending: !(child.approved || child.mergedInto),
+    upstreamPushPending: !(child.approved || child.mergedInto),
     pendingReview: !(child.approved || child.mergedInto),
     ...(child.mergedInto ? { mergedIntoStudentId: child.mergedInto } : {}),
     createdAt: when,

@@ -244,7 +244,7 @@ describe('quickAddAndCheckIn', () => {
     const [, payload] = set.mock.calls[0]!;
     expect(payload).not.toHaveProperty('grade');
     // Still a real student in every other respect, and still queued for a push.
-    expect(payload).toMatchObject({ firstName: 'Nia', pcoPushPending: true });
+    expect(payload).toMatchObject({ firstName: 'Nia', upstreamPushPending: true });
   });
 });
 

@@ -202,7 +202,7 @@ Only a person with neither is grade-less.
 
 **A grade-less student is still pushed.** Creating one used to be refused — on the reasoning that
 every student queued for a create had a grade typed at quick-add — which left a nursery child sitting
-on `pcoPushPending` for ever, a queue that never drains rather than a visible failure. The create now
+on `upstreamPushPending` for ever, a queue that never drains rather than a visible failure. The create now
 omits the attribute rather than sending a zero, and still sends `child: true`, so they land in the
 church's children's views rather than the adult directory.
 
@@ -226,7 +226,7 @@ later.
 
 | Mode | Will change in Planning Center | Will never change |
 | --- | --- | --- |
-| `off` | Nothing at all. | Everything. Quick-added visitors stay queued (`pcoPushPending: true`) so switching the mode on later picks them up with nobody re-editing anything. |
+| `off` | Nothing at all. | Everything. Quick-added visitors stay queued (`upstreamPushPending: true`) so switching the mode on later picks them up with nobody re-editing anything. |
 | `create` *(default)* | Creates a **Person** for a quick-added visitor — first name, last name, grade, `child: true`, and allergies as `medical_notes` — but only after searching for an exact first + last + grade match and linking to that instead. | Any existing person. No edits, ever. Planning Center still owns every field on everyone it already knows. |
 | `full` | Everything `create` does, plus edits to **linked** people — `first_name`, `nickname`, `last_name`, `grade`, `medical_notes`, `birthdate` — from the student editor (`updateStudentProfile`) and from the reconcile push. Adds a **PhoneNumber** or **Email** to an adult already in a student's household. And, for a student with no adult on file, creates the **parent** — plus a **Household** and **HouseholdMembership** when there is none — through `addParent`, after offering any existing people of that name for a human to choose from. | Notes and anything not in that list. Nothing on file is ever overwritten, no person is created for a name a leader has not confirmed is new, and nothing is ever deleted or deactivated in Planning Center; a student who leaves is deactivated in Tally only. |
 

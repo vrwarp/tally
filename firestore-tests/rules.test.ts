@@ -280,7 +280,7 @@ describe('students', () => {
     await assertSucceeds(
       setDoc(
         doc(db, paths.student('student-new')),
-        studentDoc({ isVisitor: true, pcoPersonId: null, pcoPushPending: true }),
+        studentDoc({ isVisitor: true, pcoPersonId: null, upstreamPushPending: true }),
       ),
     );
   });
@@ -759,13 +759,13 @@ describe('check-out', () => {
   });
 });
 
-describe('the check-in freeze (pcoRecordMissing)', () => {
+describe('the attendance freeze (upstreamRecordMissing)', () => {
   /** Server-writes a student whose Planning Center record is known gone. */
   async function seedFrozenStudent(studentId: string): Promise<void> {
     await env.withSecurityRulesDisabled(async (context) => {
       await setDoc(
         doc(context.firestore(), paths.student(studentId)),
-        studentDoc({ pcoPersonId: '77001', pcoPushPending: false, pcoRecordMissing: true }),
+        studentDoc({ pcoPersonId: '77001', upstreamPushPending: false, upstreamRecordMissing: true }),
       );
     });
   }
@@ -787,6 +787,25 @@ describe('the check-in freeze (pcoRecordMissing)', () => {
     await assertFails(deleteDoc(doc(db, paths.attendance(ID.event, ID.student))));
   });
 
+  /*
+   * The third verb, and the one the old name hid. `attendanceFrozen()` guards
+   * `create`, `update` and `delete` alike — it was called `checkInFrozen()`
+   * while it did all three, which read as though a pickup slipped through.
+   * It does not, and should not: a collection recorded against a student the
+   * system of record no longer holds is exactly as unreconcilable as an
+   * arrival, and the volunteer at the door would never learn it had failed.
+   */
+  it('refuses to collect a frozen student', async () => {
+    await seedFrozenStudent(ID.student);
+    const db = asUser(env, UID.counselor);
+    await assertFails(
+      updateDoc(doc(db, paths.attendance(ID.event, ID.student)), {
+        checkedOutAt: serverTimestamp(),
+        checkedOutBy: UID.counselor,
+      }),
+    );
+  });
+
   it('still lets a student with no document be checked in (quick-add creates it)', async () => {
     const db = asUser(env, UID.counselor);
     await assertSucceeds(
@@ -802,7 +821,7 @@ describe('the check-in freeze (pcoRecordMissing)', () => {
     await assertFails(
       setDoc(
         doc(db, paths.student('forged-frozen')),
-        studentDoc({ pcoRecordMissing: true }),
+        studentDoc({ upstreamRecordMissing: true }),
       ),
     );
   });
@@ -811,14 +830,14 @@ describe('the check-in freeze (pcoRecordMissing)', () => {
     await seedFrozenStudent(ID.otherStudent);
     const db = asUser(env, UID.counselor);
     await assertFails(
-      updateDoc(doc(db, paths.student(ID.otherStudent)), { pcoRecordMissing: false }),
+      updateDoc(doc(db, paths.student(ID.otherStudent)), { upstreamRecordMissing: false }),
     );
   });
 
   it('rejects a client freezing somebody else by update', async () => {
     const db = asUser(env, UID.counselor);
     await assertFails(
-      updateDoc(doc(db, paths.student(ID.student)), { pcoRecordMissing: true }),
+      updateDoc(doc(db, paths.student(ID.student)), { upstreamRecordMissing: true }),
     );
   });
 });
@@ -836,7 +855,7 @@ describe('the review hold (pendingReview)', () => {
     await env.withSecurityRulesDisabled(async (context) => {
       await setDoc(
         doc(context.firestore(), paths.student(studentId)),
-        studentDoc({ pcoPushPending: true, pendingReview: true }),
+        studentDoc({ upstreamPushPending: true, pendingReview: true }),
       );
     });
   }
@@ -1395,7 +1414,7 @@ describe('kiosk', () => {
       await assertFails(setDoc(doc(db, paths.student('lobby-invented')), { ...base, status: 'active' }));
       await assertFails(setDoc(doc(db, paths.student('lobby-invented')), { ...base, isVisitor: true }));
       await assertFails(
-        setDoc(doc(db, paths.student('lobby-invented')), { ...base, pcoPushPending: true }),
+        setDoc(doc(db, paths.student('lobby-invented')), { ...base, upstreamPushPending: true }),
       );
       await assertFails(
         setDoc(doc(db, paths.student('lobby-invented')), { ...base, registrationId: 'reg-1' }),

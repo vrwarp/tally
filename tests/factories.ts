@@ -57,14 +57,14 @@ export function makeStudent(overrides: Partial<Student> = {}): Student {
     ...(overrides.upstreamPersonId === undefined
       ? {}
       : { upstreamPersonId: overrides.upstreamPersonId }),
-    ...(overrides.pcoRecordMissing === undefined
+    ...(overrides.upstreamRecordMissing === undefined
       ? {}
-      : { pcoRecordMissing: overrides.pcoRecordMissing }),
+      : { upstreamRecordMissing: overrides.upstreamRecordMissing }),
     searchName: pick(overrides, 'searchName', buildSearchName(firstName, lastName)),
     firstAttendedAt: pick(overrides, 'firstAttendedAt', null),
     lastAttendedAt: pick(overrides, 'lastAttendedAt', null),
     pcoPersonId: pick(overrides, 'pcoPersonId', null),
-    pcoPushPending: pick(overrides, 'pcoPushPending', false),
+    upstreamPushPending: pick(overrides, 'upstreamPushPending', false),
     createdAt: pick(overrides, 'createdAt', new Date('2025-09-01T12:00:00')),
     updatedAt: pick(overrides, 'updatedAt', new Date('2025-09-01T12:00:00')),
     createdBy: pick(overrides, 'createdBy', 'seed'),

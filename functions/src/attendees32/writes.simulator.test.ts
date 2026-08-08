@@ -62,7 +62,7 @@ describe('pushStudent', () => {
       lastName: 'Māhoe',
       grade: 8,
       status: 'active',
-      pcoPushPending: true,
+      upstreamPushPending: true,
     });
 
     const result = await pushStudent({ db, client, config, cache, studentId: 'visitor-1' });
@@ -80,7 +80,7 @@ describe('pushStudent', () => {
     const doc = db.get('students/visitor-1')!;
     expect(doc.upstreamBackend).toBe('a32');
     expect(doc.upstreamPersonId).toBe(createdId);
-    expect(doc.pcoPushPending).toBe(false);
+    expect(doc.upstreamPushPending).toBe(false);
     // The legacy field means Planning Center and stays untouched.
     expect(doc.pcoPersonId).toBeUndefined();
   });
@@ -89,7 +89,7 @@ describe('pushStudent', () => {
    * A nursery child, who has no grade to type at quick-add.
    *
    * This used to be refused outright, leaving them queued on
-   * `pcoPushPending` for ever — a queue that never drains rather than a
+   * `upstreamPushPending` for ever — a queue that never drains rather than a
    * visible failure.
    */
   it('creates a grade-less child, and does not try to match one', async () => {
@@ -102,7 +102,7 @@ describe('pushStudent', () => {
       firstName: 'Priya',
       lastName: 'Raghunathan',
       status: 'active',
-      pcoPushPending: true,
+      upstreamPushPending: true,
     });
 
     const result = await pushStudent({ db, client, config, cache, studentId: 'nursery-1' });
@@ -114,7 +114,7 @@ describe('pushStudent', () => {
     // Omitted, not zero: a grade nobody supplied is a claim about a real child.
     const created = store.attendees.get(result.pcoPersonId!)!;
     expect((created.infos.fixed as Record<string, unknown>).grade).toBeUndefined();
-    expect(db.get('students/nursery-1')!.pcoPushPending).toBe(false);
+    expect(db.get('students/nursery-1')!.upstreamPushPending).toBe(false);
   });
 
   it('links to the person the office already typed in rather than duplicating them', async () => {
@@ -123,7 +123,7 @@ describe('pushStudent', () => {
       lastName: 'Raghunathan',
       grade: 9,
       status: 'active',
-      pcoPushPending: true,
+      upstreamPushPending: true,
     });
 
     const before = store.attendees.size;
@@ -161,12 +161,12 @@ describe('pushStudent', () => {
       lastName: 'Visitor',
       grade: 7,
       status: 'active',
-      pcoPushPending: true,
+      upstreamPushPending: true,
     });
 
     const result = await pushStudent({ db, client, config, cache, studentId: 'visitor-3' });
     expect(result.status).toBe('skipped');
-    expect(db.get('students/visitor-3')!.pcoPushPending).toBe(true);
+    expect(db.get('students/visitor-3')!.upstreamPushPending).toBe(true);
   });
 });
 
@@ -374,11 +374,11 @@ describe('addParent', () => {
 describe('recreateStudent + checkPerson', () => {
   it('confirms a live person instead of re-creating them', async () => {
     const priya = idOf('Priya');
-    db.seed(`students/a32_${priya}`, { status: 'active', pcoRecordMissing: true });
+    db.seed(`students/a32_${priya}`, { status: 'active', upstreamRecordMissing: true });
 
     const result = await recreateStudent({ db, client, config, cache, studentId: `a32_${priya}` });
     expect(result.status).toBe('still-there');
-    expect(db.get(`students/a32_${priya}`)!.pcoRecordMissing).toBe(false);
+    expect(db.get(`students/a32_${priya}`)!.upstreamRecordMissing).toBe(false);
   });
 
   it('re-creates a gone person and moves the membership to the new document', async () => {
@@ -386,7 +386,7 @@ describe('recreateStudent + checkPerson', () => {
     store.attendees.get(dmitri)!.isRemoved = true;
     db.seed(`students/a32_${dmitri}`, {
       status: 'active',
-      pcoRecordMissing: true,
+      upstreamRecordMissing: true,
       firstName: 'Dmitri',
       lastName: 'Volkov',
       grade: 12,
@@ -412,7 +412,7 @@ describe('recreateStudent + checkPerson', () => {
       upstreamBackend: 'a32',
       upstreamPersonId: newId,
       status: 'active',
-      pcoRecordMissing: false,
+      upstreamRecordMissing: false,
     });
     expect(db.get(`students/a32_${dmitri}`)).toMatchObject({
       status: 'inactive',

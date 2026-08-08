@@ -11,7 +11,7 @@
  * goes inactive with a pointer, keeping every attendance record it anchors
  * resolvable.
  *
- * `pcoRecordMissing: false` rides along on the destination: a migration is
+ * `upstreamRecordMissing: false` rides along on the destination: a migration is
  * exactly how a frozen student thaws, and the flag is what the check-in
  * rules read.
  */
@@ -40,7 +40,7 @@ export async function migrateStudentMemberships(
   const parsed = parseStudentId(fromStudentId);
   if (!parsed) {
     await db.doc(`${PATHS.students}/${fromStudentId}`).set(
-      { ...linkageFields(linkage), pcoRecordMissing: false },
+      { ...linkageFields(linkage), upstreamRecordMissing: false },
       { merge: true },
     );
     return { studentId: fromStudentId };
@@ -58,7 +58,7 @@ export async function migrateStudentMemberships(
     {
       ...linkageFields(linkage),
       status: 'active',
-      pcoRecordMissing: false,
+      upstreamRecordMissing: false,
       mergedFromStudentId: fromStudentId,
       ...(keeperSnapshot.exists
         ? {}

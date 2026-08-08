@@ -124,7 +124,7 @@ export function studentDoc(overrides: Partial<StudentDoc> = {}): StudentDoc {
     status: 'active',
     isVisitor: false,
     pcoPersonId: null,
-    pcoPushPending: true,
+    upstreamPushPending: true,
     searchName: 'jamie rivera',
     firstAttendedAt: null,
     lastAttendedAt: null,

@@ -450,7 +450,7 @@ test.describe('merges that must be refused', () => {
       firstAttendedAt: null,
       lastAttendedAt: null,
       pcoPersonId: null,
-      pcoPushPending: false,
+      upstreamPushPending: false,
       pendingReview: false,
       createdAt: new Date(),
       updatedAt: new Date(),

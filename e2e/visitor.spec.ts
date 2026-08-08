@@ -65,7 +65,7 @@ test.describe('quick-add visitor', () => {
      * the two fields agree with each other is.
      */
     const pushed = (created.data.pcoPersonId ?? null) !== null;
-    expect(created.data.pcoPushPending).toBe(!pushed);
+    expect(created.data.upstreamPushPending).toBe(!pushed);
   });
 
   test('refuses to save a half-typed name', async ({ page, signedInAs }) => {

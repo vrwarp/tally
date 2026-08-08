@@ -58,7 +58,7 @@ describe('a32AliasPairs', () => {
 describe('collapseAliasPair', () => {
   it('keeps the Planning Center side and points the Attendees side at it', async () => {
     const db = new FakeFirestore();
-    db.seed('students/pco_101', { status: 'active', pcoRecordMissing: true, notes: 'keeper' });
+    db.seed('students/pco_101', { status: 'active', upstreamRecordMissing: true, notes: 'keeper' });
     db.seed(`students/a32_${UUID}`, { status: 'active', notes: 'folded' });
     const scan = await scanRoster(db);
     const [pair] = a32AliasPairs(scan, { '101': UUID });
@@ -68,7 +68,7 @@ describe('collapseAliasPair', () => {
     // The keeper stays, thawed — a fold resolves whatever froze it.
     expect(db.get('students/pco_101')).toMatchObject({
       status: 'active',
-      pcoRecordMissing: false,
+      upstreamRecordMissing: false,
       mergedFromStudentId: `a32_${UUID}`,
       notes: 'keeper',
     });

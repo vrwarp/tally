@@ -724,7 +724,7 @@ export async function discardRegistration(options: {
       {
         status: 'inactive',
         pendingReview: false,
-        pcoPushPending: false,
+        upstreamPushPending: false,
         reviewedAt: at,
         reviewedBy: uid,
         updatedAt: at,
