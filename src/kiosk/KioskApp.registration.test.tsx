@@ -305,8 +305,9 @@ describe('getting into the wizard', () => {
     await tap(/Register your child/);
 
     // And it is the same door, opening the same wizard — one tap from the
-    // question to the first question.
-    expect(screen.getByText(/What is their first name\?/)).toBeTruthy();
+    // question to the first question. The wizard names its field against the
+    // readout rather than in the header; that label is what identifies the step.
+    expect(screen.getByText("Child's first name")).toBeTruthy();
   });
 });
 
@@ -397,8 +398,13 @@ describe('the four things a parent touches', () => {
     await tap('4');
     await tap("That's everyone");
     expect(screen.getAllByText('Your first name').length).toBeGreaterThan(0);
-    // And the line above it is context, not the same words again.
-    expect(screen.getByText('So we know who brought them.')).toBeTruthy();
+    /*
+     * And the header is not the same words again. It carries the gathering,
+     * because the field says what it wants against the field: the question used
+     * to be asked twice at opposite ends of the type ramp, once at 4.24:1 in
+     * the smallest text on the screen and once as the loudest object on it.
+     */
+    expect(screen.getAllByText('Friday Fellowship').length).toBeGreaterThan(0);
   });
 
   it('offers a shift key, and types what the key is showing', async () => {

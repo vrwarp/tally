@@ -250,6 +250,8 @@ export function SearchScreen({
    * hundred and eighty pixels of nothing beneath them.
    */
   const rowless = outcome.results.length === 0;
+  /** A finished search that matched nobody — the state with two doors in it. */
+  const nobody = (outcome.mode === 'phone' || outcome.mode === 'name') && rowless;
 
   /*
    * Where a row-less state sits in the track.
@@ -299,7 +301,18 @@ export function SearchScreen({
   const wraps = outcome.results.length >= 4;
 
   const station =
-    outcome.mode === 'idle' ? 'my-auto tall:my-0' : rowless ? 'mt-auto tall:mt-0' : '';
+    outcome.mode === 'idle'
+      ? 'my-auto tall:my-0'
+      : /*
+         * The no-match panel spans the region rather than sitting in it: its
+         * heading is pinned to the top and its doors to the bottom, so the
+         * column has to fill the track for either end to mean anything.
+         */
+        rowless && !nobody
+        ? 'mt-auto tall:mt-0'
+        : rowless
+          ? 'min-h-full'
+          : '';
 
   /*
    * Every keystroke starts the list again from the top. Without this, a parent
@@ -380,12 +393,8 @@ export function SearchScreen({
         */}
       <div
         ref={resultsRef}
-        className="mb-4 flex min-h-0 flex-col overflow-y-auto overscroll-contain scroll-touch px-6"
-        style={{
-          touchAction: 'pan-y',
-          WebkitMaskImage: 'linear-gradient(to bottom, #000 calc(100% - 1.25rem), transparent)',
-          maskImage: 'linear-gradient(to bottom, #000 calc(100% - 1.25rem), transparent)',
-        }}
+        className="kiosk-list-fade mb-4 flex min-h-0 flex-col overflow-y-auto overscroll-contain scroll-touch px-6"
+        style={{ touchAction: 'pan-y' }}
       >
         {/* The bottom padding rides on the column, not the scroller: end
             padding on a scroll container is not reliably scrollable to.
@@ -515,7 +524,20 @@ export function SearchScreen({
                centred missed each other's edges by 11px a side, which nothing
                in the frame explained — because nothing did: it was the length
                of two labels. */
-            <div className="mx-auto flex w-full max-w-xs flex-col items-stretch gap-3 pt-6 text-center tall:max-w-md tall:gap-4 lg:max-w-2xl">
+            /*
+             * The heading sits where the rows were, because that is where a
+             * parent is looking. The doors do not travel with it: they fall to
+             * the foot of the region, a hand's width above the console, which
+             * is where the standing pair lives in every other state.
+             *
+             * Without that split, the keystroke that turns one match into none
+             * teleported "Search everyone" — the commonest correct move when a
+             * scoped search misses a child who is in the directory but not this
+             * gathering's pool — from just under the rule to the top third of
+             * the screen, seven hundred pixels from the keys the parent was
+             * pressing a moment ago.
+             */
+            <div className="mx-auto flex h-full w-full max-w-xs flex-col items-stretch gap-3 pt-6 text-center tall:max-w-md tall:gap-4 lg:max-w-2xl">
               {/* The state's own sentence holds the top of the ramp. Set at the
                   bottom of it, the loudest thing in the frame was the query
                   that did not work, echoed in bold white above the keys, and
@@ -556,7 +578,7 @@ export function SearchScreen({
                 * reading what looked like a broken screen. That shape has
                 * width and no height, so the doors spend the axis it has.
                 */}
-              <div className="flex flex-col items-stretch gap-3 tall:gap-4 lg:flex-row lg:justify-center lg:gap-4">
+              <div className="mt-auto flex flex-col items-stretch gap-3 pt-6 tall:gap-4 lg:flex-row lg:justify-center lg:gap-4">
                 <button
                   type="button"
                   tabIndex={-1}
@@ -586,6 +608,22 @@ export function SearchScreen({
                 * the church may have added them since — is that control.
                 */}
               <div className="text-base text-ink-500 kiosk:text-lg">or see a leader.</div>
+            </div>
+          )}
+          {/*
+            * Rendered after the rows, which is the point of it.
+            *
+            * The count in the readout says eleven names over a list of eight,
+            * and a parent who reads that still has to discover where the list
+            * stops. The bottom of the last row is the one place somebody who
+            * has run out of names is guaranteed to be looking, and it is the
+            * only place a terminal signal can sit without moving anything: it
+            * is inside the scrolling region, so it costs no geometry and the
+            * keyboard cannot feel it.
+            */}
+          {truncated && (
+            <div className="order-last pt-2 pb-4 text-center text-base text-ink-400 kiosk:text-lg">
+              More names than fit — keep typing.
             </div>
           )}
           {outcome.results.slice(0, MAX_RESULTS).map((student) => {
@@ -835,7 +873,7 @@ export function SearchScreen({
                 * registers a child the church already has. Past the cap the
                 * only useful thing to say is the thing that works.
                 */}
-              {truncated ? 'Keep typing' : `${matchCount} ${matchCount === 1 ? 'name' : 'names'}`}
+              {matchCount} {matchCount === 1 ? 'name' : 'names'}
             </span>
           )}
         </div>
