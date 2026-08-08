@@ -203,6 +203,22 @@ export async function importMeetHistory(args: {
   const events: PlannedEvent[] = [];
   const eventDocByGathering = new Map<number, string>();
   const gatheringIdByEventDoc = new Map<string, number>();
+  /*
+   * The calendar days already spoken for, so two gatherings cannot land on one
+   * document.
+   *
+   * `occurrenceId` derives a night's id from its chain and its *day*, because
+   * Tally admits one occurrence of a chain per day on purpose ("two gatherings
+   * of the same series on one day is not a thing that happens"). A meet that
+   * runs a morning and an evening session breaks that assumption, and the two
+   * would otherwise share an id: one document, both registers merged into it,
+   * and everybody at the morning reading as present at the evening.
+   *
+   * Keyed on the day rather than on the eventual document id, because the
+   * root's own id carries no date and would slip past that check. Same rule,
+   * and the same handling, as the Check-Ins import — see `pco/checkins.ts`.
+   */
+  const takenDays = new Set<string>();
   for (const gathering of sortedGatherings) {
     const startAt = new Date(gathering.start);
     if (!Number.isFinite(startAt.getTime())) {
@@ -216,6 +232,21 @@ export async function importMeetHistory(args: {
       skipped.emptyPeriods += 1;
       continue;
     }
+
+    // Checked after the empty test, so a holiday week nobody attended does not
+    // spend the day its real session needed. The list is sorted by start, so
+    // "the first" is the earliest, and the skipped night's attendance goes with
+    // it rather than inflating the survivor's head count — its gathering never
+    // reaches `eventDocByGathering`, which is what the attendance loop reads.
+    const dayKey = occurrenceId(rootEventId, startAt);
+    if (takenDays.has(dayKey)) {
+      warnings.push(
+        `Two Attendees gatherings share ${startAt.toDateString()}; kept the first and skipped the other, along with its ${attended.length} attendance ${attended.length === 1 ? 'row' : 'rows'}.`,
+      );
+      continue;
+    }
+    takenDays.add(dayKey);
+
     const finishAt = new Date(gathering.finish);
     const endAt = Number.isFinite(finishAt.getTime())
       ? finishAt

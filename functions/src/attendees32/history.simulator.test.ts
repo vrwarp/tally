@@ -17,6 +17,7 @@ import {
   SIMULATOR_ORIGIN,
 } from '../../../tools/a32-simulator/src/index.js';
 import type { A32Config } from '../config.js';
+import { occurrenceId } from '../generated/materialize.js';
 import { FakeFirestore } from '../testing/fakeFirestore.js';
 import { a32Config } from '../testing/a32Config.js';
 import { createA32Client, type A32Client } from './client.js';
@@ -224,5 +225,49 @@ describe('importMeetHistory', () => {
       now: NOW,
     });
     expect(summary.gatherings.skippedEmpty).toBeGreaterThan(0);
+  });
+
+  it('keeps the first of two gatherings that share a calendar day', async () => {
+    /*
+     * A meet that runs two sessions in one day would otherwise put both on one
+     * document — Tally derives a night's id from its chain and its *day* — and
+     * the two registers would merge, so everybody at the first session read as
+     * present at the second.
+     */
+    const nights = [...store.gatherings].sort((a, b) => (a.start < b.start ? -1 : 1));
+    // The most recent night, so the collision is between two derived ids
+    // rather than involving the root, whose id carries no date at all.
+    const evening = nights.at(-1)!;
+    const start = new Date(new Date(evening.start).getTime() + 3 * 60 * 60 * 1000);
+    const second = store.seedGathering(
+      start.toISOString(),
+      new Date(start.getTime() + 2 * 60 * 60 * 1000).toISOString(),
+    );
+
+    // Somebody who came to that second session and to nothing else, so any
+    // sighting of them anywhere is the merge this guards against.
+    const otto = store.seedStudent({ firstName: 'Otto', lastName: 'Baumann', grade: 9 });
+    store.seedAttendance(second, otto.id, ATTENDANCE_CATEGORIES.attended);
+
+    const summary = await importMeetHistory({
+      db,
+      client,
+      config,
+      meetSlug: 'simorg_tally_gathering',
+      uid: 'uid-leader',
+      now: NOW,
+    });
+
+    // Never silently: a dropped session is a night of attendance that vanished.
+    expect(summary.warnings.some((warning) => warning.includes('share'))).toBe(true);
+
+    expect(db.get(`students/a32_${otto.id}`)).toBeUndefined();
+    expect(
+      [...db.data.keys()].filter((path) => path.endsWith(`/attendance/a32_${otto.id}`)),
+    ).toEqual([]);
+
+    // The night that was kept is the earlier one, with its own register intact.
+    const keptId = occurrenceId(a32RootEventId('simorg_tally_gathering'), new Date(evening.start));
+    expect(db.get(`events/${keptId}`)).toMatchObject({ a32GatheringId: evening.id });
   });
 });
