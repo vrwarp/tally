@@ -103,7 +103,12 @@ function CatchUp({ before, now }: { before: Date; now: Date }) {
       </p>
       <ul className="flex flex-col gap-2">
         {finished.map((event) => (
-          <PastEventRow key={event.id} event={event} count={counts.get(event.id)} />
+          <PastEventRow
+            key={event.id}
+            event={event}
+            count={counts.get(event.id)}
+            locked={!canWork(event)}
+          />
         ))}
       </ul>
     </section>

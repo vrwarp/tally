@@ -23,7 +23,7 @@
   {
     "journey": "Journey 1 — high-volume check-in",
     "title": "One tap checks a student in",
-    "caption": "Maya Adebayo turned green exactly where they stood, and the header count went up. Nothing moves on a tap: with two counselors working one queue, a list that re-sorts on every write slides the next name out from under a thumb. The row flashed and buzzed before the write left the device — the authoritative state then arrives back through Firestore, so the second phone sees it too.",
+    "caption": "Aisha Rahman turned green exactly where they stood, and the header count went up. Nothing moves on a tap: with two counselors working one queue, a list that re-sorts on every write slides the next name out from under a thumb. The row flashed and buzzed before the write left the device — the authoritative state then arrives back through Firestore, so the second phone sees it too.",
     "file": "desktop-04-one-tap-checks-a-student-in.png",
     "viewport": "desktop"
   },
@@ -151,6 +151,34 @@
     "title": "Scrolling into the ministry’s past",
     "caption": "The pages come straight out of Firestore, a dozen gatherings at a time, cursored rather than counted — the calendar the rest of the app holds in memory is a bounded window, and its far edge is exactly the boundary somebody looking for last March is trying to cross. The head counts come from the same cache the predictive roster fills, so scrolling back over a fortnight the roster already read costs nothing.",
     "file": "desktop-22-scrolling-into-the-ministry-s-past.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "Journey 8 — a gathering that is not everybody’s",
+    "title": "Who’s on this gathering",
+    "caption": "A ministry running Friday Fellowship, Sunday School, a Wednesday group and a retreat gives its nursery volunteers a chooser carrying three gatherings they will never stand at. The problem is clutter, not secrecy. The sheet says what it covers before it does anything — the person is standing on one night’s page and this changes every Sunday School, past and future — and it opens from the night itself rather than from a settings screen, because that is where somebody is when they think of it.",
+    "file": "desktop-23-who-s-on-this-gathering.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "Journey 8 — a gathering that is not everybody’s",
+    "title": "The list starts from whoever already works it",
+    "caption": "Closing a gathering pre-fills from the people who have recently taken its register, which is the safety net under the one mistake this feature makes easiest: nothing stops a core member restricting Friday Fellowship — the gathering the whole ministry works — and it is three taps. Starting from the team already working it makes the default outcome of a mis-tap “no change”. The writer cannot leave themselves off, so somebody can always reopen it, and admins pass every gathering regardless.",
+    "file": "desktop-24-the-list-starts-from-whoever-already-works-it.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "Journey 8 — a gathering that is not everybody’s",
+    "title": "Demoted, never hidden",
+    "caption": "Sam’s chooser now leads with the gatherings he actually works. Sunday School has dropped below a divider into a collapsed “Not yours” section, with a lock and the name of somebody who can add him. Hiding it outright would have been easier and is the wrong answer: a volunteer at a door at 6:59pm who opens Tally and sees an empty screen does not conclude “I have not been added to this” — they conclude the app is broken, and then they find something else to file forty check-ins against. When nothing today is theirs the section opens by itself and the heading reads “Nothing you’re on today”, which is the difference between an app that is empty and one that is refusing.",
+    "file": "desktop-25-demoted-never-hidden.png",
+    "viewport": "desktop"
+  },
+  {
+    "journey": "Journey 8 — a gathering that is not everybody’s",
+    "title": "A lock, and a name to ask",
+    "caption": "One tap opens it. The row is deliberately less appealing than the card above it and is not a link, because there is nowhere useful to go — the gathering’s own page would refuse him too — so it states the situation instead of promising a screen that cannot help. The name matters more than the lock: anybody already on a gathering can add somebody else to it, so the person standing next to Sam at the door is usually the person who can fix it, and neither of them has to find an admin.",
+    "file": "desktop-26-a-lock-and-a-name-to-ask.png",
     "viewport": "desktop"
   }
 ]
