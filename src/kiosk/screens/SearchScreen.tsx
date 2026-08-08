@@ -565,7 +565,7 @@ export function SearchScreen({
              * the screen, seven hundred pixels from the keys the parent was
              * pressing a moment ago.
              */
-            <div className="mx-auto flex h-full w-full max-w-xs flex-col items-stretch gap-3 pt-6 text-center tall:max-w-md tall:gap-4 lg:max-w-2xl">
+            <div className="mx-auto flex h-full w-full max-w-xs flex-col items-stretch gap-3 pt-6 text-center tall:max-w-md tall:justify-end tall:gap-4 lg:max-w-2xl">
               {/* The state's own sentence holds the top of the ramp. Set at the
                   bottom of it, the loudest thing in the frame was the query
                   that did not work, echoed in bold white above the keys, and
@@ -606,7 +606,17 @@ export function SearchScreen({
                 * reading what looked like a broken screen. That shape has
                 * width and no height, so the doors spend the axis it has.
                 */}
-              <div className="mt-auto flex flex-col items-stretch gap-3 pt-6 tall:gap-4 lg:flex-row lg:justify-center lg:gap-4">
+              {/*
+                * The doors hang from the foot of the region — except on a
+                * screen stood on end, where the whole block travels down
+                * together instead. Anchoring the two ends independently put a
+                * third of a portrait tablet between a question and its own two
+                * answers, so they stopped reading as one statement and started
+                * reading as two blocks sharing a screen. The other shapes hold
+                * it together at fifty to ninety pixels; this is the one where
+                * the family broke.
+                */}
+              <div className="mt-auto flex flex-col items-stretch gap-3 pt-6 tall:mt-0 tall:gap-4 lg:flex-row lg:justify-center lg:gap-4">
                 <button
                   type="button"
                   tabIndex={-1}

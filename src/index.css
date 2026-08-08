@@ -205,6 +205,21 @@
   }
 }
 
+/*
+ * And it runs deeper on the shape with the shortest track.
+ *
+ * A landscape kiosk leaves the region under three hundred pixels, so where the
+ * clip falls inside a row leaves more of that row showing than on a phone: the
+ * last card stayed fully drawn and legible at about a third strength, which
+ * reads as a row that has been dimmed — already handled — rather than as one
+ * continuing below. The cue has to be dissolution, not dimming.
+ */
+@media (min-width: 1024px) {
+  .kiosk-list-fade {
+    --kiosk-fade: 5.5rem;
+  }
+}
+
 @layer base {
   html {
     -webkit-tap-highlight-color: transparent;
