@@ -19,7 +19,7 @@
  * page: sharing storage with the staff session would work, and would not be the
  * thing being tested.
  */
-import { expect, type Browser, type BrowserContext, type Page } from '@playwright/test';
+import { expect, type Browser, type BrowserContext, type Locator, type Page } from '@playwright/test';
 
 /**
  * The built entry, not the hosting route.
@@ -64,14 +64,18 @@ export async function openKiosk(
  * escape hatch for the old staff gate, a transparent square in the corner of
  * the header, and the gate that replaced it draws progress like everything
  * else. Every hold a person can find is a hold they can watch.
+ *
+ * Takes a locator as well as a selector because the holds are no longer all
+ * buttons with fixed words on them — an event row on the chooser is reached by
+ * role and name like the row it is.
  */
 export async function hold(
   page: Page,
-  selector: Parameters<Page['locator']>[0],
+  target: string | Locator,
 ): Promise<void> {
-  const target = page.locator(selector);
-  const box = await target.boundingBox();
-  if (!box) throw new Error(`Cannot hold ${String(selector)} — it has no box on screen.`);
+  const locator = typeof target === 'string' ? page.locator(target) : target;
+  const box = await locator.boundingBox();
+  if (!box) throw new Error(`Cannot hold ${String(target)} — it has no box on screen.`);
 
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
@@ -166,7 +170,15 @@ export async function readPairingCode(kiosk: Page): Promise<string> {
   return ((await code.textContent()) ?? '').trim();
 }
 
-/** Binds the kiosk to a gathering by name — the row, then the three-second hold. */
+/**
+ * Binds the kiosk to a gathering by name — the row, then the three-second hold.
+ *
+ * The two-gesture route on purpose, even though holding the row does the whole
+ * thing now: this is the path with the labelled button on it, and it is the one
+ * that would break silently if the button and the rows ever disagreed about
+ * which gathering is picked. The one-gesture route has a test of its own in
+ * `kiosk.spec.ts`.
+ */
 export async function bindTo(kiosk: Page, title: string | RegExp): Promise<void> {
   await kiosk.getByRole('button', { name: title }).first().click();
   await hold(kiosk, 'button:has-text("Hold to set kiosk")');

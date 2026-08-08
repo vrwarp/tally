@@ -11,16 +11,25 @@
  * pointer handlers that arm and cancel it.
  *
  * The bar is a white wash, and has to be something like it. Every caller draws
- * this control on a dark surface — `bg-brand-600` at both call sites —
- * so a fill tinted in the brand ramp composites to within nothing of the button
- * it covers, and the hold becomes three seconds of a button doing visibly
- * nothing. Which is not a subtle bug: nobody keeps their thumb down for three
- * seconds against no feedback, so the control reads as broken rather than as
- * slow. Whatever this fill is, it must contrast with the button under it.
+ * this control on a dark surface — `bg-brand-600` on the two committing buttons,
+ * `bg-ink-900` on the chooser's rows — so a fill tinted in the brand ramp
+ * composites to within nothing of the button it covers, and the hold becomes
+ * three seconds of a button doing visibly nothing. Which is not a subtle bug:
+ * nobody keeps their thumb down for three seconds against no feedback, so the
+ * control reads as broken rather than as slow. Whatever this fill is, it must
+ * contrast with the button under it.
  *
  * Completion buzzes; arming does not. Three seconds is long enough that a thumb
  * wants to be told when it may leave, and a buzz on contact would say the
  * gesture had happened when it had only started.
+ *
+ * `onTap` makes the same control answer a short press too, and passing it says
+ * this one lives inside something that scrolls — the chooser's event list is
+ * the only such caller. Both halves of that follow: the press has to be tracked
+ * so a finger that drags away is neither a hold nor a tap (the reasoning, and
+ * the slop, are `components/tapGuard.ts`'s), and `touchAction` has to leave the
+ * vertical pan to the browser rather than swallowing it, or the list under the
+ * rows stops scrolling wherever a row happens to be.
  *
  * `HOLD_MS` is exported and reused rather than restated. The staff gate no
  * longer draws this control — it is a hold on the keyboard's Clear key, whose
@@ -30,43 +39,77 @@
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { haptic } from '@/lib/utils';
+import { strayed, type Press } from './tapGuard';
 
 export const HOLD_MS = 3000;
 
 export function HoldButton({
   onHeld,
+  onTap,
   className = '',
   children,
   'aria-label': ariaLabel,
 }: {
   onHeld: () => void;
+  /**
+   * What a short press means, for a control that has a second, lighter answer.
+   * Fires on lift, and only if the finger stayed put — see the note above.
+   * Omitted, a press that does not reach three seconds does nothing at all.
+   */
+  onTap?: () => void;
   className?: string;
   children: ReactNode;
   'aria-label'?: string;
 }) {
   const [holding, setHolding] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pressRef = useRef<Press | null>(null);
   const heldRef = useRef(onHeld);
   heldRef.current = onHeld;
+  const tappedRef = useRef(onTap);
+  tappedRef.current = onTap;
 
   const cancel = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = null;
+    pressRef.current = null;
     setHolding(false);
   }, []);
 
-  const start = useCallback(
+  const start = useCallback((event: React.PointerEvent) => {
+    event.preventDefault();
+    pressRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+    setHolding(true);
+    timerRef.current = setTimeout(() => {
+      timerRef.current = null;
+      // The gesture has spent itself: the lift that follows is the end of a
+      // hold that already fired, never a tap on top of it.
+      pressRef.current = null;
+      setHolding(false);
+      haptic();
+      heldRef.current();
+    }, HOLD_MS);
+  }, []);
+
+  const move = useCallback(
     (event: React.PointerEvent) => {
-      event.preventDefault();
-      setHolding(true);
-      timerRef.current = setTimeout(() => {
-        timerRef.current = null;
-        setHolding(false);
-        haptic();
-        heldRef.current();
-      }, HOLD_MS);
+      // Only where a press has a second meaning. A hold that stands alone is
+      // the more forgiving control on purpose: three seconds is a long time to
+      // ask a thumb to hold still, and there is nothing under a committing
+      // button for a drift to have meant instead.
+      if (!tappedRef.current) return;
+      if (pressRef.current && strayed(pressRef.current, event)) cancel();
     },
-    [],
+    [cancel],
+  );
+
+  const end = useCallback(
+    (event: React.PointerEvent) => {
+      const wasTap = !strayed(pressRef.current, event);
+      cancel();
+      if (wasTap) tappedRef.current?.();
+    },
+    [cancel],
   );
 
   useEffect(() => cancel, [cancel]);
@@ -79,11 +122,14 @@ export function HoldButton({
       className={`relative select-none overflow-hidden ${className}`}
       // `WebkitTouchCallout` for the iPads these sit on: a press this long is
       // exactly the gesture that raises the callout, and a kiosk has no use for
-      // one. `touchAction` keeps the same press from being read as a scroll.
-      style={{ touchAction: 'none', WebkitTouchCallout: 'none' }}
+      // one. `touchAction` keeps the same press from being read as a scroll —
+      // except where the control is a row in a list, which has to go on
+      // scrolling under a thumb that came down on it.
+      style={{ touchAction: onTap ? 'pan-y' : 'none', WebkitTouchCallout: 'none' }}
       onContextMenu={(event) => event.preventDefault()}
       onPointerDown={start}
-      onPointerUp={cancel}
+      onPointerMove={move}
+      onPointerUp={end}
       onPointerLeave={cancel}
       onPointerCancel={cancel}
     >
@@ -95,7 +141,7 @@ export function HoldButton({
           transition: holding ? `transform ${HOLD_MS}ms linear` : 'none',
         }}
       />
-      <span className="relative">{children}</span>
+      <span className="relative block">{children}</span>
     </button>
   );
 }

@@ -5,6 +5,14 @@
  * as the main app's chooser. The gathering whose check-in window is open is
  * ringed and sorted first, but somebody still has to pick it, and confirming
  * is a three-second hold so a wandering hand cannot re-point the kiosk.
+ *
+ * The hold is on the rows as well as on the button: holding a gathering sets
+ * the kiosk to it outright, so the usual setup is one gesture rather than a tap
+ * and then a hold somewhere else on the screen. The button stays because it is
+ * what says the word "hold" — the rows carry no such label, and a control whose
+ * only instruction is a subtitle is a control most people tap once and give up
+ * on. Tapping a row still only selects, which is what keeps the button honest
+ * and what keeps a scrolling thumb from re-pointing anything.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { HoldButton } from '../components/HoldButton';
@@ -60,10 +68,18 @@ export function EventChooser({
     };
   }, [services]);
 
-  const bindSelected = async () => {
-    if (selected === null || !entries || binding) return;
-    const entry = entries[selected];
-    if (!entry) return;
+  /**
+   * Sets the kiosk to one row, from either hold.
+   *
+   * `setSelected` even though the screen is about to be replaced: a bind takes
+   * a round trip, and for that second the ringed row has to be the one the
+   * thumb is on — otherwise holding a row while another is selected reads as
+   * setting up the wrong gathering.
+   */
+  const bind = async (index: number) => {
+    const entry = entries?.[index];
+    if (!entry || binding) return;
+    setSelected(index);
     setBinding(true);
     try {
       const bound = await services.bindEntry(entry);
@@ -76,8 +92,12 @@ export function EventChooser({
 
   return (
     <div className="flex h-full flex-col p-6">
-      <div className="pb-4 text-center text-lg font-medium text-ink-400">
-        Which gathering is this kiosk for?
+      <div className="pb-4 text-center">
+        <div className="text-lg font-medium text-ink-400">Which gathering is this kiosk for?</div>
+        {/* The only place the rows' hold is written down. Kept to one line and
+            below the question, because the person reading it is a volunteer
+            setting a tablet up once, not somebody using this screen daily. */}
+        <div className="pt-1 text-sm text-ink-500">Hold one to set the kiosk to it.</div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -96,12 +116,13 @@ export function EventChooser({
             const ended = nowMs > entry.endAt;
             const isSelected = selected === index;
             return (
-              <button
+              <HoldButton
                 key={`${entry.chain}:${entry.startAt}`}
-                type="button"
-                tabIndex={-1}
-                onClick={() => setSelected(index)}
+                onTap={() => setSelected(index)}
+                onHeld={() => void bind(index)}
                 className={`rounded-xl border-2 p-5 text-left transition-colors ${
+                  binding ? 'pointer-events-none ' : ''
+                }${
                   isSelected
                     ? 'border-brand-500 bg-ink-800'
                     : live
@@ -116,7 +137,7 @@ export function EventChooser({
                   {live && <span className="pl-2 font-medium text-present-400">Check-in open</span>}
                   {ended && <span className="pl-2 font-medium text-ink-500">Ended — pickup only</span>}
                 </div>
-              </button>
+              </HoldButton>
             );
           })}
           {entries?.length === 0 && (
@@ -160,7 +181,9 @@ export function EventChooser({
         </button>
 
         <HoldButton
-          onHeld={bindSelected}
+          onHeld={() => {
+            if (selected !== null) void bind(selected);
+          }}
           className={`w-full rounded-xl p-5 text-xl font-semibold ${
             selected !== null && !binding
               ? 'bg-brand-600 text-white'
