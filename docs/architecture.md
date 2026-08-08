@@ -130,6 +130,17 @@ pairing screen itself. `scripts/check-kiosk-budget.mjs` holds the worker to a by
 the build if the manifest, its icons or the registration go missing, because all three are static
 files whose absence produces a page that runs perfectly and can never be installed.
 
+**The screen does not sleep.** The kiosk holds a `navigator.wakeLock` screen lock for as long as its
+page is the visible one, in every phase — pairing included, because the code on that screen is one a
+leader walks away from and comes back to. A dimmed shelf tablet is not a cosmetic problem: waking one
+often means a passcode, and the person standing in front of it is the one person in the building who
+must not have it. A wake lock is a lease rather than a setting, so `src/kiosk/wakeLock.ts` is mostly
+recovery — the browser takes it back on every app switch and the kiosk takes it again on the way back,
+and a refusal (low battery, device policy) is retried every 30 seconds rather than treated as this
+device's final answer. What it cannot do is outrank the OS: a tablet told to lock after five minutes
+still locks. **A shelf device still wants its display timeout set to never and its screen lock turned
+off** — this is the half that holds when somebody forgot.
+
 **A label is rasterised in a worker and sent from the main thread.** Turning a check-in into a
 Brother raster job is one synchronous pass over a few hundred thousand pixels, and the moment it would
 run is the worst one available: the pre-raster fires when the confirm screen opens, which is while a
