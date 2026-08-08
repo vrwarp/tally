@@ -54,7 +54,20 @@ type ViewportName = keyof typeof VIEWPORTS;
  * because both change the header's height, and the header is the one part of
  * this layout that is allowed to.
  */
-const SCENES: { id: string; query: string; views: readonly ViewportName[] }[] = [
+const SCENES: {
+  id: string;
+  query: string;
+  views: readonly ViewportName[];
+  /**
+   * Shoot the results region scrolled to its end rather than at rest.
+   *
+   * Every frame in this loop was at scroll 0 for eight rounds, which is how a
+   * fade tuned on the resting state kept its cost hidden: the last row of an
+   * overflowing list is only ever seen at maximum scroll, and that was the one
+   * position nothing was ever shot in.
+   */
+  scrollToEnd?: boolean;
+}[] = [
   { id: 'search-idle', query: '', views: ['phone', 'kiosktall', 'kioskwide'] },
   { id: 'search-idle-pickup', query: 'pickup=1', views: ['phone', 'kiosktall'] },
   {
@@ -84,6 +97,12 @@ const SCENES: { id: string; query: string; views: readonly ViewportName[] }[] = 
     id: 'search-capped',
     query: 'buffer=Al',
     views: ['phone', 'kiosktall', 'kioskwide'],
+  },
+  {
+    id: 'search-typed-scrolled',
+    query: 'buffer=Alva&present=2',
+    views: ['phone', 'kioskwide'],
+    scrollToEnd: true,
   },
   { id: 'search-nomatch', query: 'buffer=Zzz&nomatch=1', views: ['phone', 'kiosktall', 'kioskwide'] },
   { id: 'register-first', query: 'screen=register', views: ['phone'] },
@@ -120,6 +139,14 @@ for (const scene of SCENES) {
     const page = await context.newPage();
     await page.goto(`${base}?${scene.query}`, { waitUntil: 'networkidle' });
     await page.waitForTimeout(250);
+
+    if (scene.scrollToEnd) {
+      await page.evaluate(() => {
+        const region = document.querySelector('.overflow-y-auto');
+        if (region) region.scrollTop = region.scrollHeight;
+      });
+      await page.waitForTimeout(150);
+    }
 
     const overflows = await page.evaluate(
       () => document.documentElement.scrollWidth > document.documentElement.clientWidth,

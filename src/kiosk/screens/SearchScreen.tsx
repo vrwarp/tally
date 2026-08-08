@@ -314,6 +314,7 @@ export function SearchScreen({
    * share a top edge — is worth keeping.
    */
   const station = nobody ? 'min-h-full' : '';
+  const rows = outcome.results.length > 0;
 
   /*
    * Every keystroke starts the list again from the top. Without this, a parent
@@ -433,7 +434,26 @@ export function SearchScreen({
           */}
         <div
           className={`mx-auto w-full max-w-2xl ${station} ${
-            rowless ? 'pb-6' : 'pb-2'
+            rowless ? 'pb-6' : truncated ? 'pb-2' : ''
+          } ${
+            /*
+             * The ramp's own depth, so the last row clears it at maximum
+             * scroll.
+             *
+             * This clearance used to ride on the truncation sentence, which
+             * only renders when the search matched more than the list can show
+             * — so a list that overflows the region without being capped (five
+             * or six matches on a phone, which is what a common surname
+             * prefix produces) had none of it. A parent did exactly what the
+             * readout asked: the count said five names, they could see four,
+             * they swiped. The list stopped moving and the fifth name was a
+             * ghost, with nowhere further to scroll and no state of the screen
+             * in which it became readable.
+             *
+             * Where the sentence does render it carries its own copy of this,
+             * because it is a sibling below this column rather than inside it.
+             */
+            rows && !truncated ? 'pb-16 tall:pb-20' : ''
           } flex flex-col gap-2 ${
             wraps ? 'lg:block lg:columns-2 lg:gap-x-8 lg:max-w-5xl' : ''
           }`}
