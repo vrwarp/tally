@@ -187,13 +187,13 @@
   -webkit-mask-image: linear-gradient(
     to bottom,
     #000 calc(100% - var(--kiosk-fade)),
-    rgba(0, 0, 0, 0.2) calc(100% - var(--kiosk-fade) * 0.5),
+    rgba(0, 0, 0, 0.1) calc(100% - var(--kiosk-fade) * 0.7),
     transparent
   );
   mask-image: linear-gradient(
     to bottom,
     #000 calc(100% - var(--kiosk-fade)),
-    rgba(0, 0, 0, 0.2) calc(100% - var(--kiosk-fade) * 0.5),
+    rgba(0, 0, 0, 0.1) calc(100% - var(--kiosk-fade) * 0.7),
     transparent
   );
 }

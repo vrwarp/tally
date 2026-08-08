@@ -300,19 +300,20 @@ export function SearchScreen({
    */
   const wraps = outcome.results.length >= 4;
 
-  const station =
-    outcome.mode === 'idle'
-      ? 'my-auto tall:my-0'
-      : /*
-         * The no-match panel spans the region rather than sitting in it: its
-         * heading is pinned to the top and its doors to the bottom, so the
-         * column has to fill the track for either end to mean anything.
-         */
-        rowless && !nobody
-        ? 'mt-auto tall:mt-0'
-        : rowless
-          ? 'min-h-full'
-          : '';
+  /*
+   * The no-match panel spans the region rather than sitting in it: its heading
+   * is pinned to the top and its doors to the bottom, so the column has to fill
+   * the track for either end to mean anything.
+   *
+   * Everything else is top-anchored, at every shape. The idle prompt used to
+   * centre itself on short screens to sit nearer the hand, which made one
+   * component behave as two: on a phone the first keystroke jumped the reading
+   * position a row and a half, because the prompt was not where the rows were
+   * going to be. Nothing in that block is pressable, so the reach it was
+   * buying was worth nothing, and the rule it was breaking — idle and typed
+   * share a top edge — is worth keeping.
+   */
+  const station = nobody ? 'min-h-full' : '';
 
   /*
    * Every keystroke starts the list again from the top. Without this, a parent
@@ -393,7 +394,14 @@ export function SearchScreen({
         */}
       <div
         ref={resultsRef}
-        className="kiosk-list-fade mb-4 flex min-h-0 flex-col overflow-y-auto overscroll-contain scroll-touch px-6"
+        className={`mb-4 flex min-h-0 flex-col overflow-y-auto overscroll-contain scroll-touch px-6 ${
+          /* Only where there is a list to run past. The panel that fills the
+             region on a failed search ends with "or see a leader." — the door
+             that costs the church nothing — and an unconditional ramp dimmed it
+             below legible, so the state read as a block that had been cut off
+             rather than one that finished. */
+          outcome.results.length > 0 ? 'kiosk-list-fade' : ''
+        }`}
         style={{ touchAction: 'pan-y' }}
       >
         {/* The bottom padding rides on the column, not the scroller: end
@@ -610,22 +618,6 @@ export function SearchScreen({
               <div className="text-base text-ink-500 kiosk:text-lg">or see a leader.</div>
             </div>
           )}
-          {/*
-            * Rendered after the rows, which is the point of it.
-            *
-            * The count in the readout says eleven names over a list of eight,
-            * and a parent who reads that still has to discover where the list
-            * stops. The bottom of the last row is the one place somebody who
-            * has run out of names is guaranteed to be looking, and it is the
-            * only place a terminal signal can sit without moving anything: it
-            * is inside the scrolling region, so it costs no geometry and the
-            * keyboard cannot feel it.
-            */}
-          {truncated && (
-            <div className="order-last pt-2 pb-4 text-center text-base text-ink-400 kiosk:text-lg">
-              More names than fit — keep typing.
-            </div>
-          )}
           {outcome.results.slice(0, MAX_RESULTS).map((student) => {
             const present = presentIds.has(student.id);
             /*
@@ -685,6 +677,26 @@ export function SearchScreen({
             );
           })}
         </div>
+
+        {/*
+          * After the rows, and outside the column block.
+          *
+          * The count in the readout says eleven names over a list of eight, and
+          * a parent who reads it still has to find where the list stops; the
+          * bottom of the last row is the one place somebody who has run out of
+          * names is guaranteed to be looking. A sibling of the list rather than
+          * its last child, because the landscape shape lays the rows out in
+          * multi-column flow, where source order is column order and `order`
+          * does nothing — as the list's last child this sentence became the
+          * first thing in the left column, a heading over the names that
+          * matched best, and it pushed that column out of register with the
+          * other one.
+          */}
+        {truncated && (
+          <div className="mx-auto w-full max-w-2xl pt-2 pb-16 text-center text-base text-ink-400 kiosk:text-lg tall:pb-20 lg:max-w-5xl">
+            More names than fit — keep typing.
+          </div>
+        )}
       </div>
 
       {/*

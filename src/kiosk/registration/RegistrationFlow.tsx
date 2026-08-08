@@ -239,11 +239,33 @@ export function RegistrationFlow({
           */}
         <div
           className={`mx-auto flex w-full max-w-2xl flex-col gap-3 pb-2 ${
-            isTypingStep(state.step) ? 'mt-auto' : ''
+            isTypingStep(state.step) ? 'min-h-full' : ''
           }`}
         >
+          {/*
+            * The step's question, in the region where its answer gets built.
+            *
+            * It has been in three places across this loop. In the header it was
+            * fourteen pixels of `ink-500` — 4.24:1, under the AA floor — at the
+            * far end of the screen from the hand, and the only thing telling
+            * step two of this wizard from step five. Hard against the readout it
+            * was legible and adjacent but it left this region empty: a third of
+            * the screen with nothing in it, and the first object below the title
+            * a disabled **Next**, which is what made the register step read as a
+            * screen that had not finished loading beside the search screen it
+            * came from.
+            *
+            * Here, and quieter than search's "Type a name", because that one is
+            * the whole screen and this one shares its step with a header that
+            * already says whose turn it is.
+            */}
+          {isTypingStep(state.step) && (
+            <div className="text-center text-2xl font-semibold text-ink-300 kiosk:text-3xl">
+              {placeholderFor(state)}
+            </div>
+          )}
           {state.step === 'child-grade' && (
-            <div className="grid grid-cols-3 gap-2 pt-2">
+            <div className="mt-auto grid grid-cols-3 gap-2 pt-2">
               <GradeChip label={NO_GRADE} onPick={() => dispatch({ type: 'grade', grade: null })} />
               {GRADES.map((grade) => (
                 <GradeChip
@@ -273,7 +295,7 @@ export function RegistrationFlow({
               * parent can see they are in, and a button that had already been
               * pressed would look exactly like one that had not.
               */
-            <div className="pt-2">
+            <div className="mt-auto pt-2">
               <button
                 type="button"
                 tabIndex={-1}
@@ -465,26 +487,6 @@ export function RegistrationFlow({
               state.noAllergies ? 'opacity-40' : ''
             }`}
           >
-            {/*
-              * The field's name, against the field.
-              *
-              * This question has been in three places across this loop and each
-              * was wrong in its own way. In the header it was fourteen pixels of
-              * `ink-500` — 4.24:1, under the AA floor — at the far end of the
-              * screen from the hand, and it was the only thing telling step two
-              * of this wizard from step five. Moved into the body at size it
-              * became the loudest object on the screen: a placeholder shouting
-              * over the answer, and sitting directly above **Next**, so the eye
-              * paired it with the button rather than with the box.
-              *
-              * Here it is adjacent to the readout, on the same side of the
-              * console rule, quiet enough to be a label and specific enough to
-              * be the step — "So we know who brought them" does not say whose
-              * last name this is, and "Your last name" does.
-              */}
-            <div className="pb-1 text-center text-lg text-ink-400 kiosk:text-xl">
-              {placeholderFor(state)}
-            </div>
             <div className="mx-auto flex h-16 max-w-2xl items-center justify-center px-4">
               {/* Letters only, and empty until there are some. The search screen
                   teaches a parent two taps earlier that the bold word above the
