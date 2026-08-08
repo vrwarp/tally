@@ -260,7 +260,7 @@ export function RegistrationFlow({
             * already says whose turn it is.
             */}
           {isTypingStep(state.step) && (
-            <div className="text-center text-2xl font-semibold text-ink-300 kiosk:text-3xl">
+            <div className="text-center text-xl text-ink-300 kiosk:text-2xl">
               {placeholderFor(state)}
             </div>
           )}

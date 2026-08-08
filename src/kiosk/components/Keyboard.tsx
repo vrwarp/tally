@@ -161,7 +161,7 @@ export const Keyboard = memo(function Keyboard({
          became the largest empty rectangle in the frame. Capped to the measure
          the results and the readout sit on, the keys stay a family across the
          three shapes and the screen has one left edge instead of two. */
-      className="mx-auto flex w-full flex-col gap-1.5 p-2 pb-[max(0.5rem,var(--spacing-safe-bottom))] lg:max-w-5xl"
+      className="mx-auto flex w-full flex-col gap-1.5 p-2 pb-[max(0.5rem,var(--spacing-safe-bottom))] lg:max-w-5xl lg:px-0"
       style={{ touchAction: 'manipulation' }}
       onPointerDown={onPointerDown}
     >

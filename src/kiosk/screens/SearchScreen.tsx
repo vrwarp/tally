@@ -635,7 +635,7 @@ export function SearchScreen({
                 * not mine" is a real state, and the answer to it — look again,
                 * the church may have added them since — is that control.
                 */}
-              <div className="text-base text-ink-500 kiosk:text-lg">or see a leader.</div>
+              <div className="text-base text-ink-400 kiosk:text-lg">or see a leader.</div>
             </div>
           )}
           {outcome.results.slice(0, MAX_RESULTS).map((student) => {
@@ -788,7 +788,7 @@ export function SearchScreen({
               pixel were two apart while every other gap inside the console was
               40 or more, so the edge separated without containing — it read as
               the button's own top border run out to the screen. */}
-      <div className="flex h-14 flex-row-reverse items-center justify-center gap-4 overflow-hidden px-2 pt-2 tall:h-20 tall:gap-6">
+      <div className="mx-auto flex h-14 w-full max-w-2xl flex-row-reverse items-center justify-center gap-4 overflow-hidden px-2 pt-2 tall:h-20 tall:gap-6 lg:max-w-5xl">
         {/*
           * The way out of the scope, standing beside the way out of the search.
           *
