@@ -28,6 +28,7 @@
  * `scripts/sync-functions-shared.mjs`. This file is only the parts that differ
  * on a server: reading the collection, decoding admin `Timestamp`s, and writing.
  */
+import { sanitizeKioskTheme } from './generated/kioskTheme.js';
 import { sanitizeLabelTemplate } from './generated/labelTemplate.js';
 import {
   chainKey,
@@ -146,6 +147,7 @@ export function toSource(id: string, data: Record<string, unknown>): OccurrenceS
     notes: str(data.notes),
     requiresCheckOut: data.requiresCheckOut === true,
     labelTemplate: sanitizeLabelTemplate(data.labelTemplate),
+    kioskTheme: sanitizeKioskTheme(data.kioskTheme),
   };
 }
 
@@ -188,6 +190,9 @@ function payloadFor(
     // Inherited for the same reason: materialising the Sunday a kiosk is being
     // bound to must not be what stops its labels printing.
     labelTemplate: source.labelTemplate,
+    // And the look, so materialising the Sunday a kiosk is being bound to is
+    // not what sends the lobby screen back to navy.
+    kioskTheme: source.kioskTheme,
     status: 'scheduled',
     createdAt: now,
     updatedAt: now,

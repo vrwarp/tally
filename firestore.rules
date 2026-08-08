@@ -442,6 +442,34 @@ service cloud.firestore {
       }
 
       /**
+       * The look a gathering lends a lobby kiosk.
+       *
+       * Same argument as `validLabelTemplate` above, and the same limits. Four
+       * short strings, of which only the ground is a vocabulary small enough to
+       * pin here — the hue wheel lives in `lib/kioskTheme.ts` and pinning a copy
+       * of it in the fence would mean a deploy that adds a colour also needs a
+       * rules deploy, in the wrong order, or nobody can pick it.
+       *
+       * Which is safe, because the reader defends itself: `sanitizeKioskTheme`
+       * reads a hue it does not ship as the default for that slot, and refuses
+       * the amber band for `confirm` outright, so the worst a bad string can do
+       * is be ignored. The bound is what matters here — a hue *name* is a short
+       * token, and a document that arrives carrying a novel in that field is not
+       * one any version of this app wrote.
+       */
+      function validHueName(v) {
+        return v is string && v.size() > 0 && v.size() <= 32;
+      }
+
+      function validKioskTheme(t) {
+        return t is map
+          && t.get('ground', 'dark') in ['dark', 'light']
+          && validHueName(t.get('accent', 'sky'))
+          && validHueName(t.get('confirm', 'forest'))
+          && validHueName(t.get('backdrop', 'indigo'));
+      }
+
+      /**
        * A reference to a chain: `seriesId`, `recurrenceRootId`,
        * `predictFromChain`.
        *
@@ -477,6 +505,7 @@ service cloud.firestore {
         let d = request.resource.data;
         let recurrence = d.get('recurrence', null);
         let labelTemplate = d.get('labelTemplate', null);
+        let kioskTheme = d.get('kioskTheme', null);
         return d.startAt is timestamp
           && d.endAt is timestamp
           && d.checkInOpensAt is timestamp
@@ -484,6 +513,7 @@ service cloud.firestore {
           && d.mode in ['recurring', 'oneoff']
           && (recurrence == null || validRecurrence(recurrence))
           && (labelTemplate == null || validLabelTemplate(labelTemplate))
+          && (kioskTheme == null || validKioskTheme(kioskTheme))
           && validChainRef(d.get('seriesId', null))
           && validChainRef(d.get('recurrenceRootId', null))
           && validChainRef(d.get('predictFromChain', null));

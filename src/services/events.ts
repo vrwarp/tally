@@ -21,6 +21,7 @@ import {
 import { db } from '@/lib/firebase';
 import { paths } from '@/lib/paths';
 import { findEventIcon } from '@/lib/eventIcons';
+import { sanitizeKioskTheme, type KioskTheme } from '@/lib/kioskTheme';
 import { sanitizeLabelTemplate, type LabelTemplate } from '@/lib/labelTemplate';
 import { chainKey } from '@/lib/materialize';
 import { normalizeRecurrence } from '@/lib/recurrence';
@@ -63,6 +64,8 @@ export interface EventDraft {
   requiresRsvp?: boolean;
   requiresCheckOut?: boolean;
   labelTemplate?: LabelTemplate | null;
+  /** Ground and hues for a lobby kiosk bound to this gathering. */
+  kioskTheme?: KioskTheme | null;
   status?: EventStatus;
 }
 
@@ -238,6 +241,11 @@ function buildEventPayload(draft: EventDraft, uid: string, isNew: boolean) {
      * the sanitizer also drops any stray key the editor's form state picked up.
      */
     labelTemplate: draft.labelTemplate ? sanitizeLabelTemplate(draft.labelTemplate) : null,
+    // Sanitised on the way out for the same reason, and with an extra one of
+    // its own: the confirm slot refuses the amber band, and that refusal has to
+    // hold against a stale editor bundle as well as against a hand-written
+    // document.
+    kioskTheme: sanitizeKioskTheme(draft.kioskTheme),
     status: draft.status ?? 'scheduled',
     updatedAt: serverTimestamp(),
   };

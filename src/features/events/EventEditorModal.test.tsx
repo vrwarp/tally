@@ -10,7 +10,7 @@
  * the draft the form builds, which is the only thing the writes see.
  */
 import type { ReactNode } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { AuthContext, type AuthContextValue } from '@/context/authContext';
@@ -186,6 +186,38 @@ describe('EventEditorModal: a one-off borrowing a gathering', () => {
       mode: 'recurring',
       predictFromChain: null,
     });
+  });
+
+  it('saves the colours a leader picked for the lobby screen', async () => {
+    const user = userEvent.setup();
+    show();
+
+    await user.type(screen.getByLabelText(/^Title/), 'Sunday Nursery');
+    await user.click(screen.getByRole('button', { name: /^Kiosk colours/ }));
+    await user.click(
+      within(screen.getByRole('group', { name: 'What you touch' })).getByRole('button', {
+        name: 'Ember',
+      }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Schedule event' }));
+
+    await waitFor(() => expect(createEvent).toHaveBeenCalled());
+    expect(createEvent.mock.calls.at(-1)![0]).toMatchObject({
+      kioskTheme: { ground: 'dark', accent: 'ember', confirm: 'forest', backdrop: 'indigo' },
+    });
+  });
+
+  it('sends null for a gathering nobody themed, rather than a default object', async () => {
+    // Null is what "the kiosk that shipped" is written as, everywhere down the
+    // path — the resolver, the chooser row and the binding all lean on it.
+    const user = userEvent.setup();
+    show();
+
+    await user.type(screen.getByLabelText(/^Title/), 'Friday Fellowship');
+    await user.click(screen.getByRole('button', { name: 'Schedule event' }));
+
+    await waitFor(() => expect(createEvent).toHaveBeenCalled());
+    expect(createEvent.mock.calls.at(-1)![0]).toMatchObject({ kioskTheme: null });
   });
 
   it('keeps a chosen gathering that has scrolled out of the loaded window', () => {

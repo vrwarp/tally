@@ -9,6 +9,7 @@
  */
 import { Timestamp, type DocumentData, type DocumentSnapshot } from 'firebase/firestore';
 import { findEventIcon } from '@/lib/eventIcons';
+import { sanitizeKioskTheme } from '@/lib/kioskTheme';
 import { sanitizeLabelTemplate } from '@/lib/labelTemplate';
 import {
   EVERY_WEEKDAY,
@@ -280,6 +281,7 @@ export function toEvent(snapshot: DocumentSnapshot<DocumentData>): TallyEvent {
     // Null for "prints nothing", which is also what a malformed template reads
     // as — the sanitizer's docblock explains why that is the safe direction.
     labelTemplate: sanitizeLabelTemplate(data.labelTemplate),
+    kioskTheme: sanitizeKioskTheme(data.kioskTheme),
     status: data.status === 'cancelled' ? 'cancelled' : 'scheduled',
     createdAt: toDate(data.createdAt, fallback),
     updatedAt: toDate(data.updatedAt, fallback),

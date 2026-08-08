@@ -66,6 +66,10 @@ function asEvent(
     // not: a Sunday nobody has materialised yet is a Sunday a kiosk can be
     // bound to, and it has to print the labels the chain prints.
     labelTemplate: source.labelTemplate,
+    // And the look, on the same argument: the Sunday nobody has materialised
+    // yet is the Sunday a lobby screen gets bound to, and it should not go back
+    // to navy for the one week ahead of the chain.
+    kioskTheme: source.kioskTheme,
     // A projected gathering is on by definition. Calling one off is an act, and
     // an act materialises it.
     status: 'scheduled',

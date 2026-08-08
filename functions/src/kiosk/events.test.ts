@@ -160,6 +160,69 @@ describe('listKioskEvents', () => {
     expect(entries[0]?.labelTemplate).toEqual(DEFAULT_LABEL_TEMPLATE);
   });
 
+  /*
+   * The row is where the colour maths happens, so it is where it has to be
+   * checked. The kiosk is handed finished hex and does no colour work at all —
+   * see the comment on `KioskEventEntry.palette`.
+   */
+  it('resolves a theme into finished hex on the way out', async () => {
+    const db = new FakeFirestore();
+    seedEvent(
+      db,
+      'nursery',
+      {
+        start: '2026-08-09T10:00:00Z',
+        end: '2026-08-09T12:00:00Z',
+        closes: '2026-08-09T13:00:00Z',
+      },
+      { kioskTheme: { ground: 'light', accent: 'ember', confirm: 'teal', backdrop: 'amber' } },
+    );
+
+    const entry = (await listKioskEvents(db, NOW, logger))[0];
+    expect(entry?.ground).toBe('light');
+    // Names went in; colours come out, and nothing that is not a colour.
+    for (const [key, value] of Object.entries(entry?.palette ?? {})) {
+      expect(key).toMatch(/^--color-(ink|brand|present)-\d+$/);
+      expect(value).toMatch(/^#[0-9a-f]{6}$/);
+    }
+    expect(entry?.palette?.['--color-brand-400']).toBeDefined();
+  });
+
+  it('says nothing at all about a gathering nobody themed', async () => {
+    // Most gatherings, and the chooser can list a month of them: the ordinary
+    // case has to cost this payload nothing.
+    const db = new FakeFirestore();
+    seedEvent(db, 'youth', {
+      start: '2026-08-09T18:00:00Z',
+      end: '2026-08-09T20:00:00Z',
+      closes: '2026-08-09T21:00:00Z',
+    });
+
+    const entry = (await listKioskEvents(db, NOW, logger))[0];
+    expect(entry && 'ground' in entry).toBe(false);
+    expect(entry && 'palette' in entry).toBe(false);
+  });
+
+  it('keeps the ground when a gathering moved only that', async () => {
+    // A light nursery that liked Tally's own colours is themed, not unthemed:
+    // there is no palette to send, and `data-theme` still has to move.
+    const db = new FakeFirestore();
+    seedEvent(
+      db,
+      'nursery',
+      {
+        start: '2026-08-09T10:00:00Z',
+        end: '2026-08-09T12:00:00Z',
+        closes: '2026-08-09T13:00:00Z',
+      },
+      { kioskTheme: { ground: 'light', accent: 'sky', confirm: 'forest', backdrop: 'indigo' } },
+    );
+
+    const entry = (await listKioskEvents(db, NOW, logger))[0];
+    expect(entry?.ground).toBe('light');
+    expect(entry?.palette).toBeUndefined();
+  });
+
   it('carries it onto an occurrence nothing stands for yet', async () => {
     const db = new FakeFirestore();
     // A weekly Sunday whose latest instance is last week: this week's is
@@ -186,6 +249,7 @@ describe('listKioskEvents', () => {
       notes: null,
       requiresCheckOut: true,
       labelTemplate: DEFAULT_LABEL_TEMPLATE,
+      kioskTheme: { ground: 'light', accent: 'ember', confirm: 'teal', backdrop: 'amber' },
     });
 
     const entries = await listKioskEvents(db, NOW, logger);
@@ -195,6 +259,8 @@ describe('listKioskEvents', () => {
     for (const entry of projected) {
       expect(entry.labelTemplate).toEqual(DEFAULT_LABEL_TEMPLATE);
       expect(entry.requiresCheckOut).toBe(true);
+      expect(entry.ground).toBe('light');
+      expect(entry.palette?.['--color-brand-400']).toMatch(/^#[0-9a-f]{6}$/);
     }
   });
 

@@ -542,6 +542,58 @@ describe('events', () => {
     }
   });
 
+  it('accepts a gathering that lends the kiosk no colours', async () => {
+    const db = asUser(env, UID.core);
+    await assertSucceeds(
+      setDoc(doc(db, paths.event('event-unthemed')), { ...eventDoc(), kioskTheme: null }),
+    );
+  });
+
+  it('accepts a well-formed kiosk theme', async () => {
+    const db = asUser(env, UID.core);
+    await assertSucceeds(
+      setDoc(doc(db, paths.event('event-themed')), {
+        ...eventDoc(),
+        kioskTheme: { ground: 'light', accent: 'ember', confirm: 'teal', backdrop: 'amber' },
+      }),
+    );
+  });
+
+  it('rejects a malformed kiosk theme', async () => {
+    /*
+     * Only the ground and the bounds are pinned; the hue wheel is not, because
+     * `sanitizeKioskTheme` already reads a name it does not ship as that slot's
+     * default. So `accent: 'chartreuse'` is *accepted* here on purpose and lands
+     * as sky — what the fence stops is the shape that makes the document
+     * nonsense, and a field big enough to be something other than a name.
+     */
+    const db = asUser(env, UID.core);
+    const good = { ground: 'dark', accent: 'sky', confirm: 'forest', backdrop: 'indigo' };
+
+    for (const kioskTheme of [
+      { ...good, ground: 'sepia' },
+      { ...good, ground: 7 },
+      { ...good, accent: 42 },
+      { ...good, confirm: '' },
+      { ...good, backdrop: 'x'.repeat(33) },
+      'ember',
+    ]) {
+      await assertFails(
+        setDoc(doc(db, paths.event('event-bad-theme')), { ...eventDoc(), kioskTheme }),
+      );
+    }
+  });
+
+  it('lets a hue it has never heard of through, for the reader to fall back on', async () => {
+    const db = asUser(env, UID.core);
+    await assertSucceeds(
+      setDoc(doc(db, paths.event('event-future-hue')), {
+        ...eventDoc(),
+        kioskTheme: { ground: 'dark', accent: 'chartreuse', confirm: 'forest', backdrop: 'indigo' },
+      }),
+    );
+  });
+
   describe('the chain references', () => {
     /*
      * `seriesId`, `recurrenceRootId` and `predictFromChain` are the three

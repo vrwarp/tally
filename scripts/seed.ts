@@ -33,6 +33,7 @@ import {
   writeBatch,
   type Firestore,
 } from 'firebase/firestore';
+import type { KioskTheme } from '../src/lib/kioskTheme';
 import { DEFAULT_LABEL_TEMPLATE, type LabelTemplate } from '../src/lib/labelTemplate';
 import { SERIES_IDS, paths } from '../src/lib/paths';
 import {
@@ -454,6 +455,8 @@ interface BuiltEvent {
   requiresCheckOut: boolean;
   /** What the kiosk prints at check-in, or null for nothing. */
   labelTemplate: LabelTemplate | null;
+  /** What a kiosk bound here looks like, or null for Tally's own colours. */
+  kioskTheme: KioskTheme | null;
   startAt: Date;
   endAt: Date;
   checkInOpensAt: Date;
@@ -669,6 +672,7 @@ function buildEvents(now: Date): BuiltEvent[] {
         requiresRsvp: false,
         requiresCheckOut: false,
         labelTemplate: null,
+    kioskTheme: null,
         startAt,
         endAt,
         checkInOpensAt: addMinutes(startAt, -60),
@@ -693,6 +697,7 @@ function buildEvents(now: Date): BuiltEvent[] {
     requiresRsvp: true,
     requiresCheckOut: false,
     labelTemplate: null,
+    kioskTheme: null,
     startAt: retreatStart,
     endAt: retreatEnd,
     // Boarding, not the whole weekend: the roster is for the bus door.
@@ -719,6 +724,7 @@ function buildEvents(now: Date): BuiltEvent[] {
     requiresRsvp: false,
     requiresCheckOut: false,
     labelTemplate: null,
+    kioskTheme: null,
     startAt: lockInStart,
     endAt: lockInEnd,
     checkInOpensAt: addMinutes(lockInStart, -60),
@@ -749,6 +755,11 @@ function buildEvents(now: Date): BuiltEvent[] {
     // from is what labels are for, and it means `npm run seed` leaves the
     // kiosk's printing path reachable without configuring an event first.
     labelTemplate: DEFAULT_LABEL_TEMPLATE,
+    // The one themed gathering, for the same reason it is the one that prints:
+    // a Sunday morning nursery is a bright room, and it leaves the kiosk's
+    // theming path reachable from `npm run seed` without configuring an event
+    // first. Light ground, warm accent, a page washed the same way.
+    kioskTheme: { ground: 'light', accent: 'ember', confirm: 'forest', backdrop: 'amber' },
     startAt: nurseryStart,
     endAt: addMinutes(nurseryStart, 90),
     checkInOpensAt: addMinutes(nurseryStart, -30),
@@ -797,6 +808,7 @@ function buildEvents(now: Date): BuiltEvent[] {
       requiresRsvp: false,
       requiresCheckOut: false,
       labelTemplate: null,
+    kioskTheme: null,
       startAt,
       endAt,
       checkInOpensAt: addMinutes(startAt, -60),
@@ -1139,6 +1151,7 @@ function collectWrites(now: Date): {
         requiresRsvp: event.requiresRsvp,
         requiresCheckOut: event.requiresCheckOut,
         labelTemplate: event.labelTemplate,
+        kioskTheme: event.kioskTheme,
         status: 'scheduled',
         createdAt: schoolYearStart(now),
         updatedAt: schoolYearStart(now),

@@ -32,6 +32,7 @@ import type { PrinterState } from './printing';
 // families never reach must not sit on the path to the one they all use.
 import type * as RegistrationModule from './registration';
 import { bindingIsLive, clearBinding, readBinding, writeBinding, type KioskBinding } from './binding';
+import { applyKioskTheme } from './theme';
 import type { KioskKey } from './components/Keyboard';
 import { sortByName } from '@/lib/utils';
 import { buildFamilyDigits, familyOf } from './family';
@@ -474,6 +475,28 @@ export function KioskApp() {
    * this app can be in where a lobby screen going dark is what anybody wanted.
    */
   useEffect(() => keepScreenAwake(), []);
+
+  /* ---- The gathering's colours ------------------------------------------ */
+
+  /*
+   * Worn while bound, and taken off the moment the binding goes.
+   *
+   * Keyed on the binding rather than on `phase` on purpose. src/kiosk/main.tsx
+   * has already put a live binding's colours on the document before this
+   * component first rendered — that is what stops a themed kiosk booting navy —
+   * and `phase` spends the first few hundred milliseconds on `booting` while
+   * the Firebase chunk loads. Reacting to the phase would strip the theme for
+   * exactly that window and paint it back, which is the flash the pre-paint
+   * apply exists to avoid.
+   *
+   * The liveness test is the same one main.tsx makes: an expired binding is
+   * still in state until the clock below clears it, and a kiosk on its way to
+   * the chooser is not at any gathering.
+   */
+  useEffect(() => {
+    const wearing = binding && bindingIsLive(binding, Date.now()) ? binding : null;
+    applyKioskTheme(wearing?.kioskGround, wearing?.kioskPalette);
+  }, [binding]);
 
   /* ---- The clock: binding expiry and the nightly reload ------------------ */
 

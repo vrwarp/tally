@@ -39,8 +39,10 @@ import { useToast } from '@/context/toastContext';
 import { CheckInWindowField } from '@/features/events/CheckInWindowField';
 import { IconPickerField } from '@/features/events/IconPickerField';
 import { RecurrenceField } from '@/features/events/RecurrenceField';
+import { KioskThemeField } from '@/features/events/KioskThemeField';
 import { LabelTemplateField } from '@/features/events/LabelTemplateField';
 import { gatheringOptions } from '@/lib/gatherings';
+import type { KioskTheme } from '@/lib/kioskTheme';
 import type { LabelTemplate } from '@/lib/labelTemplate';
 import { defaultRecurrence, retimeRecurrence, validateRecurrence } from '@/lib/recurrence';
 import { cn } from '@/lib/utils';
@@ -83,6 +85,8 @@ interface EditorForm {
   requiresCheckOut: boolean;
   /** What the kiosk prints at check-in, or null for nothing. */
   labelTemplate: LabelTemplate | null;
+  /** What a kiosk bound here looks like, or null for Tally's own colours. */
+  kioskTheme: KioskTheme | null;
   /**
    * A window left at the standard hour follows the event when its times move;
    * one somebody hand-tuned is pinned and never rewritten underneath them.
@@ -153,6 +157,7 @@ function buildForm(
     requiresRsvp: event?.requiresRsvp ?? defaults?.requiresRsvp ?? mode === 'oneoff',
     requiresCheckOut: event?.requiresCheckOut ?? defaults?.requiresCheckOut ?? false,
     labelTemplate: event?.labelTemplate ?? defaults?.labelTemplate ?? null,
+    kioskTheme: event?.kioskTheme ?? defaults?.kioskTheme ?? null,
     opensPinned:
       Math.round((startAt.getTime() - opensAt.getTime()) / 60_000) !== OPENS_BEFORE_MIN,
     closesPinned:
@@ -383,6 +388,10 @@ export function EventEditorModal({
       // and writing a template a kiosk would honour on a trip nobody set up for
       // it is the wrong half to ship first.
       labelTemplate: form.mode === 'recurring' ? form.labelTemplate : null,
+      // Not narrowed to recurring the way labels are: the kiosk's chooser lists
+      // one-offs too, and a week of holiday club is exactly the thing somebody
+      // wants their lobby screen to look like.
+      kioskTheme: form.kioskTheme,
       // `buildEventPayload` writes `status` on every save, so an edit has to
       // carry the current one forward or it would quietly un-cancel the event.
       status: event?.status ?? 'scheduled',
@@ -681,6 +690,14 @@ export function EventEditorModal({
               onChange={(labelTemplate) => patch({ labelTemplate })}
             />
           ) : null}
+
+          {/* Beside the label template because both are about the screen in the
+              lobby rather than about the phone at the door, and unlike the
+              template this one is offered on a one-off too. */}
+          <KioskThemeField
+            value={form.kioskTheme}
+            onChange={(kioskTheme) => patch({ kioskTheme })}
+          />
 
           <TextField
             label="Location"

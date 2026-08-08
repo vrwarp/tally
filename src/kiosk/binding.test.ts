@@ -92,4 +92,13 @@ describe('persistence', () => {
     writeBinding(DOORS_CLOSE_EARLY);
     expect(readBinding()?.requiresCheckOut).toBeUndefined();
   });
+
+  it('reads one written before themes existed, and simply wears none', () => {
+    // Same bargain, one deploy later: a paired kiosk with no colours on its
+    // binding is the kiosk that shipped, not a kiosk that has to pair again.
+    writeBinding(DOORS_CLOSE_EARLY);
+    const stored = readBinding();
+    expect(stored?.kioskGround).toBeUndefined();
+    expect(stored?.kioskPalette).toBeUndefined();
+  });
 });

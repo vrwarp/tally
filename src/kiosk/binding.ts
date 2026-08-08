@@ -17,6 +17,7 @@
  * produce one. Taking the later of the two cannot shorten any binding, which
  * a bare `checkInClosesAt` would.
  */
+import type { KioskGround, KioskPalette } from '@/lib/kioskTheme';
 import type { LabelTemplate } from '@/lib/labelTemplate';
 import { KIOSK_KEYS, readJson, removeKey, writeJson } from './storage';
 
@@ -74,6 +75,27 @@ export interface KioskBinding {
    * it. The next rebind picks up the real answer.
    */
   allergiesSupported?: boolean;
+  /**
+   * The look this gathering lends the screen, already worked out.
+   *
+   * Optional for the same reason `requiresCheckOut` is: a binding written
+   * before themes existed has no such key, and a paired lobby screen must not
+   * be logged out by a deploy. Absent reads as the kiosk that shipped, and the
+   * next rebind picks up whatever the gathering actually says.
+   *
+   * Finished hex rather than the hue names stored on the event, because the
+   * kiosk does no colour work — the server resolved this while building the
+   * chooser row, the way it already resolves which occurrences exist. Both keys
+   * are absent together on a gathering nobody themed, and `kioskPalette` alone
+   * is absent on one that moved its ground and left the hues alone.
+   *
+   * A theme edited mid-evening does not reach a bound kiosk until it rebinds,
+   * which is how every other field here already behaves — and better than a
+   * lobby screen repainting under a family's hands because somebody is editing
+   * an event in another room.
+   */
+  kioskGround?: KioskGround | null;
+  kioskPalette?: KioskPalette | null;
   boundAtMs: number;
 }
 
