@@ -726,17 +726,34 @@ describe('attendance', () => {
    * a collection-group query however permissive it is — so this is the test
    * that the wildcard exists and is scoped to the same people.
    */
-  it('lets an active member read one student\u2019s attendance across every event', async () => {
-    const db = asUser(env, UID.counselor);
-    await assertSucceeds(
-      getDocs(
-        query(
-          collectionGroup(db, COLLECTIONS.attendance),
-          where('studentId', '==', ID.student),
-          orderBy('checkedInAt', 'desc'),
+  it('is now refused to everybody, including the core team', async () => {
+    /*
+     * The wildcard rule this used to assert is gone, and its absence is the
+     * feature rather than a regression.
+     *
+     * `attendance` documents carry `seriesId`, and `firestore.indexes.json`
+     * declares a collection-group index on it — so this exact query, with the
+     * filter changed, returned an entire restricted gathering's register, every
+     * night of it, to anybody with a browser console. A rule at a wildcard path
+     * cannot narrow that: there is no single parent event to ask about, which
+     * is also why it was silently overriding the per-event gate.
+     *
+     * The profile's history now goes through `getStudentAttendance`, which runs
+     * on the Admin SDK, reads each record's parent event and drops what the
+     * caller may not see. The indexes stay declared, because that callable uses
+     * them.
+     */
+    for (const db of [asUser(env, UID.counselor), asUser(env, UID.core), asUser(env, UID.admin)]) {
+      await assertFails(
+        getDocs(
+          query(
+            collectionGroup(db, COLLECTIONS.attendance),
+            where('studentId', '==', ID.student),
+            orderBy('checkedInAt', 'desc'),
+          ),
         ),
-      ),
-    );
+      );
+    }
   });
 
   it('denies that same sweep to everyone else', async () => {
@@ -1734,33 +1751,33 @@ describe('working a restricted gathering', () => {
       );
     });
 
-    it('KNOWN GAP: a list of the register is still let through', async () => {
+    it('refuses a list of the register too, which took denying the wildcard', async () => {
       /*
-       * Not the behaviour anybody wants, and pinned here so it cannot be
-       * mistaken for working.
+       * This was the last hole, and it was not in the nested rule.
        *
-       * `match /{path=**}/attendance/{studentId}` — the rule at the bottom of
-       * the file that exists so a student's profile can run one collection-group
-       * query instead of a read per night — also matches an ordinary
-       * subcollection query at `events/{id}/attendance`. Rules are OR'd across
-       * every matching path, so its `allow list: if isActive()` grants what the
-       * nested rule directly above denies. `get` is refused because the wildcard
-       * rule allows only `list`; that asymmetry is the whole shape of the hole.
+       * `match /{path=**}/attendance/{studentId}` existed so a student's
+       * profile could run one collection-group query instead of a read per
+       * night — but a wildcard path also matches an ordinary subcollection
+       * query at `events/{id}/attendance`, and rules are OR'd across every
+       * matching path. Its `allow list: if isActive()` was granting exactly
+       * what the nested rule denied: `get` on one record was refused and
+       * `list` of the whole register was not.
        *
-       * Rules cannot tell a collection-group query from a subcollection one —
-       * that is exactly why the wildcard rule has to exist — so this cannot be
-       * fixed by narrowing it. The fix is to deny the wildcard outright and
-       * answer the profile's two questions through a callable that filters
-       * server-side, which is the next commit. This assertion flips to
-       * `assertFails` there.
-       *
-       * Until then the honest description of the feature is: a restricted
-       * gathering is closed for *working* — check-in, undo, RSVPs, editing, and
-       * reading any single record — and its register is still enumerable in one
-       * query by anybody on the team.
+       * It could not be narrowed — rules cannot tell a collection-group query
+       * from a subcollection one, which is why the wildcard had to exist — so
+       * it is denied outright and the profile's two questions go through
+       * `getStudentAttendance`, which can read the parent event and filter.
        */
-      await assertSucceeds(
+      await assertFails(
         getDocs(collection(asUser(env, UID.outsider), paths.attendanceCollection(locked))),
+      );
+    });
+
+    it('lets somebody on the gathering list it', async () => {
+      // The other half: denying the wildcard must not cost a member the read
+      // they are entitled to through the nested rule.
+      await assertSucceeds(
+        getDocs(collection(asUser(env, UID.counselor), paths.attendanceCollection(locked))),
       );
     });
   });

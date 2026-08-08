@@ -136,6 +136,36 @@ export const getRoster = httpsCallable<{ force?: boolean } | void, RosterRespons
 );
 
 /**
+ * One student's attendance, filtered server-side by what the caller may see.
+ *
+ * A callable rather than a query, and not for performance. A collection-group
+ * query can only be authorised at a wildcard path, where no rule can ask which
+ * gathering a record belongs to — and the same wildcard also matches an
+ * ordinary subcollection query, so the rule that made the profile's history
+ * possible was granting `list` over every restricted register besides. Both
+ * facts point the same way: deny the wildcard, and ask somewhere that can
+ * filter. See `functions/src/index.ts`.
+ */
+export const getStudentAttendance = httpsCallable<
+  {
+    studentId: string;
+    /** Milliseconds. The cheap form: which nights, since when. */
+    since?: number;
+    /** The paged form. Serialisable, unlike the snapshot cursor it replaces. */
+    cursor?: { checkedInAt: number; path: string } | null;
+    pageSize?: number;
+  },
+  {
+    eventIds?: string[];
+    records?: Array<{ eventId: string; id: string; data: Record<string, unknown> }>;
+    cursor?: { checkedInAt: number; path: string } | null;
+    hasMore?: boolean;
+    /** Chains left out because the caller is not on them. */
+    withheld: string[];
+  }
+>(functions, 'getStudentAttendance');
+
+/**
  * Parent contact and allergies for one student, for a screen that shows them.
  *
  * Split from the roster so a door volunteer's device never receives a minor's

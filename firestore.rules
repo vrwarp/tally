@@ -1048,28 +1048,39 @@ service cloud.firestore {
     /* ---------------------------------------------------------------- */
 
     /**
-     * A collection-group query over `attendance`, which is how a student's
-     * page shows history older than the calendar the app keeps loaded.
+     * Denied, and the deny is the feature.
      *
-     * A collection-group query is only ever authorised by a rule at a wildcard
-     * path — the nested `events/{eventId}/attendance/{studentId}` rule above
-     * cannot grant it, however permissive it is — so this exists to make that
-     * one query shape possible.
+     * A student's profile shows history older than the calendar the app keeps
+     * loaded, and it used to do that with a collection-group query over
+     * `attendance` — one indexed read for any depth of history, instead of a
+     * read per night. A collection-group query is only ever authorised by a
+     * rule at a wildcard path, so this block existed to make that one query
+     * shape possible, and it said `allow list: if isActive()`.
      *
-     * It widens no data. Every document this can reach is already readable to
-     * the same people through the nested rule, one event at a time; an active
-     * member could already enumerate the lot by walking `events`. What changes
-     * is the number of round trips it takes to ask "when did this student come",
-     * which is the difference between a profile that can show two years of
-     * history and one that stops at the loaded window.
+     * Two things were wrong with it once gatherings could be restricted, and
+     * neither can be fixed by narrowing the condition.
      *
-     * `list` only. A single document is fetched through its own path, and
-     * writes stay where they are checked against the event they belong to —
-     * `studentId == the document id`, `checkedInBy == the caller` — none of
-     * which this wildcard could enforce.
+     * A wildcard path has no single parent event. So no rule here can ask which
+     * gathering a record belongs to, let alone whether the caller is on it —
+     * and `attendance` documents carry `seriesId`, with a declared
+     * collection-group index on it, so one line in a browser console returned
+     * an entire restricted chain's register, every night of it. A second
+     * declared index on `isFirstEver` returned every first-timer.
+     *
+     * And a wildcard path matches *more* than the collection group. It also
+     * matches an ordinary subcollection query at `events/{id}/attendance`, and
+     * rules are OR'd across every matching path — so this block was granting
+     * precisely the `list` that the nested rule above now denies. The gate on a
+     * restricted register was not incomplete because of an oversight in the
+     * nested rule; it was being overridden from down here.
+     *
+     * The query therefore moves to `getStudentAttendance`, which runs on the
+     * Admin SDK, reads each record's parent event, and drops what the caller
+     * may not see. The two collection-group indexes stay declared — the
+     * callable uses them.
      */
     match /{path=**}/attendance/{studentId} {
-      allow list: if isActive();
+      allow list: if false;
     }
 
     /* ---------------------------------------------------------------- */

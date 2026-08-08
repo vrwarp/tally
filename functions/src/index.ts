@@ -62,6 +62,7 @@ import {
 } from './backends/types.js';
 import { BACKEND_SECRETS, resolveConfig, type PcoConfig } from './config.js';
 import { asFirestoreLike, PATHS, type FirestoreLike } from './firestore.js';
+import { ChainAccessReader } from './eventAccess.js';
 import {
   deleteEvents as removeEvents,
   type DeletionSummary,
@@ -2108,6 +2109,205 @@ export const materializeOccurrence = onCall<
 
   return result;
 });
+
+/**
+ * One student's attendance, filtered by what the caller may actually see.
+ *
+ * This exists because of a shape in the security rules that cannot be fixed
+ * inside them. A student's profile answers "when did this child come?" with a
+ * collection-group query over `attendance`, which is one indexed read for any
+ * depth of history rather than a read per night. A collection-group query can
+ * only be authorised by a rule at a wildcard path — and a wildcard path has no
+ * single parent event, so no rule there can ask which gathering a record
+ * belongs to, let alone whether the reader is on it.
+ *
+ * Worse, the wildcard also matches an ordinary subcollection query, so the rule
+ * that made the profile possible was quietly granting `list` over every
+ * restricted register too. The two facts together mean the wildcard has to be
+ * denied outright, and the query has to move somewhere that can filter. Here.
+ *
+ * The Admin SDK bypasses rules, so this is the gate for these reads. Nothing
+ * about that is incidental — get the filtering wrong here and there is no
+ * second fence behind it.
+ */
+export const getStudentAttendance = onCall<
+  {
+    studentId?: string;
+    /** Milliseconds. The cheap form: which nights, since when. */
+    since?: number;
+    /** The paged form. Serialisable, unlike the snapshot cursor it replaces. */
+    cursor?: { checkedInAt: number; path: string } | null;
+    pageSize?: number;
+  },
+  Promise<{
+    /** The `since` form: event ids, newest first. Absent on a paged call. */
+    eventIds?: string[];
+    /** The paged form. Absent on a `since` call. */
+    records?: Array<{ eventId: string; id: string; data: Record<string, unknown> }>;
+    cursor?: { checkedInAt: number; path: string } | null;
+    hasMore?: boolean;
+    /** Chains left out because the caller is not on them. */
+    withheld: string[];
+  }>
+>({ timeoutSeconds: 30, memory: '256MiB' }, async (request) => {
+  await requireMember(request.auth?.uid);
+  const uid = request.auth!.uid;
+  const caller = await readCaller(uid);
+
+  const studentId = request.data?.studentId;
+  if (typeof studentId !== 'string' || studentId.trim().length === 0) {
+    throw new HttpsError('invalid-argument', 'studentId is required.');
+  }
+
+  // The raw handle rather than `db()`: this needs `collectionGroup`, which the
+  // narrowed `FirestoreLike` deliberately does not expose.
+  const firestore = getFirestore();
+  const reader = new ChainAccessReader(firestore, uid, caller.role === 'admin');
+
+  /*
+   * The chain a record belongs to, from the event document rather than from the
+   * record's own `seriesId` field.
+   *
+   * The two agree — the rules require it on every write — but the record is
+   * written by the client and the event is the thing the ACL is actually keyed
+   * on. Trusting the record here would let a forged `seriesId` name an open
+   * chain and walk a restricted register out through this callable, which is
+   * the one place with no rules behind it.
+   */
+  const chains = new Map<string, string>();
+  const chainOf = async (eventId: string): Promise<string> => {
+    const held = chains.get(eventId);
+    if (held !== undefined) return held;
+
+    const snapshot = await firestore.doc(`events/${eventId}`).get();
+    const data = snapshot.exists ? (snapshot.data() ?? {}) : {};
+    const chain =
+      typeof data.seriesId === 'string' && data.seriesId.length > 0
+        ? data.seriesId
+        : typeof data.recurrenceRootId === 'string' && data.recurrenceRootId.length > 0
+          ? data.recurrenceRootId
+          : eventId;
+
+    chains.set(eventId, chain);
+    return chain;
+  };
+
+  /** The event id from the document's own path — see `fetchStudentHistory`. */
+  const eventIdOf = (ref: FirebaseFirestore.DocumentReference): string | null =>
+    ref.parent.parent?.id ?? null;
+
+  const withheld = new Set<string>();
+
+  /* ---- The cheap form: which nights, since when ------------------------- */
+
+  if (typeof request.data?.since === 'number') {
+    const snapshot = await firestore
+      .collectionGroup('attendance')
+      .where('studentId', '==', studentId)
+      .where('checkedInAt', '>=', Timestamp.fromMillis(request.data.since))
+      .orderBy('checkedInAt', 'desc')
+      .get();
+
+    const eventIds: string[] = [];
+    for (const document of snapshot.docs) {
+      const eventId = eventIdOf(document.ref);
+      if (!eventId) continue;
+      const chain = await chainOf(eventId);
+      if (await reader.canWork(chain)) eventIds.push(eventId);
+      else withheld.add(chain);
+    }
+
+    return { eventIds: [...new Set(eventIds)], withheld: [...withheld] };
+  }
+
+  /* ---- The paged form --------------------------------------------------- */
+
+  const pageSize = Math.min(Math.max(request.data?.pageSize ?? 20, 1), 100);
+  const cursor = request.data?.cursor ?? null;
+
+  /*
+   * The cursor is `checkedInAt` plus the document path, because the client can
+   * no longer hold a snapshot. `checkedInAt` alone is not unique — an import
+   * can stamp a whole register with one instant — so the path is what stops a
+   * page boundary from dropping or repeating a row. `__name__` is the implicit
+   * tiebreak Firestore already orders by, named here so `startAfter` can take
+   * a value for it.
+   */
+  const base = firestore
+    .collectionGroup('attendance')
+    .where('studentId', '==', studentId)
+    .orderBy('checkedInAt', 'desc')
+    .orderBy('__name__', 'desc');
+
+  /*
+   * Over-read, because a page can filter down.
+   *
+   * Twenty rows in may be six rows out for a student who attends a restricted
+   * gathering, and a client that inferred "no more" from a short page would
+   * stop the profile's infinite scroll at the first such page — silently, on
+   * the screen whose entire job is showing a complete history. So the loop
+   * keeps reading until the page is full or the query is exhausted, and
+   * `hasMore` is stated rather than guessed.
+   */
+  const records: Array<{ eventId: string; id: string; data: Record<string, unknown> }> = [];
+  let last: { checkedInAt: number; path: string } | null = cursor;
+  let exhausted = false;
+
+  while (records.length < pageSize && !exhausted) {
+    const batch = await (last
+      ? base.startAfter(
+          Timestamp.fromMillis(last.checkedInAt),
+          firestore.doc(last.path),
+        )
+      : base
+    )
+      .limit(pageSize)
+      .get();
+
+    if (batch.empty) {
+      exhausted = true;
+      break;
+    }
+    if (batch.docs.length < pageSize) exhausted = true;
+
+    for (const document of batch.docs) {
+      const data = document.data();
+      const checkedInAt = data.checkedInAt as Timestamp | undefined;
+      last = {
+        checkedInAt: checkedInAt?.toMillis() ?? 0,
+        path: document.ref.path,
+      };
+
+      const eventId = eventIdOf(document.ref);
+      if (!eventId) continue;
+
+      const chain = await chainOf(eventId);
+      if (!(await reader.canWork(chain))) {
+        withheld.add(chain);
+        continue;
+      }
+
+      records.push({ eventId, id: document.id, data: serialiseAttendance(data) });
+      if (records.length >= pageSize) break;
+    }
+  }
+
+  return {
+    records,
+    cursor: exhausted && records.length === 0 ? null : last,
+    hasMore: !exhausted,
+    withheld: [...withheld],
+  };
+});
+
+/** Timestamps to millis, so the page survives the wire. */
+function serialiseAttendance(data: FirebaseFirestore.DocumentData): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data)) {
+    out[key] = value instanceof Timestamp ? value.toMillis() : value;
+  }
+  return out;
+}
 
 /**
  * Removes a gathering, or every gathering in one chain of repeats, along with

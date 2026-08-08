@@ -48,7 +48,11 @@ beforeEach(() => {
   fetchAttendanceByEvent.mockReset();
   fetchAttendanceByEvent.mockResolvedValue({ byEvent: new Map(), denied: new Set() });
   fetchStudentAttendanceSince.mockReset();
-  fetchStudentAttendanceSince.mockResolvedValue(new Set(['came']));
+  // The callable's shape: which nights, plus which chains it refused.
+  fetchStudentAttendanceSince.mockResolvedValue({
+    eventIds: new Set(['came']),
+    withheld: new Set<string>(),
+  });
   fetchSkippedNights.mockReset();
   recordExamination.mockClear();
 });

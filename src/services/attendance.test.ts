@@ -37,7 +37,14 @@ const updateDoc = vi.hoisted(() =>
   vi.fn(async (_ref: { path: string }, _payload: Record<string, unknown>) => {}),
 );
 
-vi.mock('@/lib/firebase', () => ({ db: {} }));
+vi.mock('@/lib/firebase', () => ({ db: {}, firebaseApp: {} }));
+
+/*
+ * A student's history is a callable now, not a query — see `fetchStudentHistory`
+ * for why the collection-group rule had to go. Nothing in this file tests that
+ * path, so the binding is stubbed rather than the SDK stood up.
+ */
+vi.mock('@/services/functions', () => ({ getStudentAttendance: vi.fn() }));
 vi.mock('firebase/firestore', () => ({
   doc: (_db: unknown, path: string) => ({ path }),
   serverTimestamp: () => 'server-timestamp',

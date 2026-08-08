@@ -87,10 +87,20 @@ async function resolve(
   const chained = events.filter(isChained);
   const chains = [...new Set(chained.map(chainKey))];
 
-  const [registries, attended] = await Promise.all([
+  const [registries, since] = await Promise.all([
     chains.length > 0 ? fetchSkippedNights(chains) : Promise.resolve(new Map<string, SkippedNights>()),
     fetchStudentAttendanceSince(student.id, windowStart),
   ]);
+
+  const attended = since.eventIds;
+  /*
+   * Chains the server refused, arriving from the cheap half.
+   *
+   * It knows exactly what it withheld — it read the parent events to decide —
+   * which is better than the client reconstructing it from an absence. Nights
+   * of these chains are dropped from the history rather than shown empty.
+   */
+  const refusedChains = since.withheld;
 
   const held = new Set<string>();
   const unexamined: TallyEvent[] = [];
@@ -113,7 +123,13 @@ async function resolve(
     }
   }
 
-  if (unexamined.length === 0) return { attended, held, withheld: EMPTY };
+  const fromChains = new Set(
+    events.filter((event) => refusedChains.has(chainKey(event))).map((event) => event.id),
+  );
+
+  if (unexamined.length === 0) {
+    return { attended, held, withheld: fromChains };
+  }
 
   // The nights nobody has looked at yet. Read as they always were, then written
   // down so this is the last time anybody pays for them.
@@ -143,7 +159,11 @@ async function resolve(
 
   await recordExaminations(examined, registers.byEvent, registries, windowStart);
 
-  return { attended, held, withheld: registers.denied };
+  return {
+    attended,
+    held,
+    withheld: fromChains.size === 0 ? registers.denied : new Set([...fromChains, ...registers.denied]),
+  };
 }
 
 /**
