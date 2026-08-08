@@ -242,29 +242,6 @@ export function RegistrationFlow({
             isTypingStep(state.step) ? 'mt-auto' : ''
           }`}
         >
-          {/*
-            * The question, where the search screen puts "Type a name" and for
-            * the same reasons.
-            *
-            * It lived only in the header: fourteen pixels of `ink-500` — 4.24:1,
-            * under the AA floor — at the opposite end of the screen from the
-            * hand, and it was the single thing distinguishing step two of this
-            * wizard from step five. Six steps run in sequence with the same
-            * frame, the same keyboard and the same empty readout; a parent who
-            * loses the thread in a dim lobby types a guardian's name into a
-            * child's last-name field, and that lands in the review queue for a
-            * leader to judge.
-            *
-            * The field's own name rather than the header's conversational
-            * question, because that is the half that is specific: "So we know
-            * who brought them" does not say whose last name this is, and "Your
-            * last name" does.
-            */}
-          {isTypingStep(state.step) && (
-            <div className="pb-2 text-center text-3xl font-semibold text-ink-100 kiosk:text-4xl">
-              {placeholderFor(state)}
-            </div>
-          )}
           {state.step === 'child-grade' && (
             <div className="grid grid-cols-3 gap-2 pt-2">
               <GradeChip label={NO_GRADE} onPick={() => dispatch({ type: 'grade', grade: null })} />
@@ -433,7 +410,7 @@ export function RegistrationFlow({
           typed, the one action that ends the step where it is not. */}
       {isTypingStep(state.step) ? (
         <div className="flex flex-col gap-1.5">
-          <div className="px-2">
+          <div className="px-2 pt-2">
             {/*
               * Always "Next" on the allergies step, now that the tick above
               * the keyboard says "No allergies".
@@ -488,6 +465,26 @@ export function RegistrationFlow({
               state.noAllergies ? 'opacity-40' : ''
             }`}
           >
+            {/*
+              * The field's name, against the field.
+              *
+              * This question has been in three places across this loop and each
+              * was wrong in its own way. In the header it was fourteen pixels of
+              * `ink-500` — 4.24:1, under the AA floor — at the far end of the
+              * screen from the hand, and it was the only thing telling step two
+              * of this wizard from step five. Moved into the body at size it
+              * became the loudest object on the screen: a placeholder shouting
+              * over the answer, and sitting directly above **Next**, so the eye
+              * paired it with the button rather than with the box.
+              *
+              * Here it is adjacent to the readout, on the same side of the
+              * console rule, quiet enough to be a label and specific enough to
+              * be the step — "So we know who brought them" does not say whose
+              * last name this is, and "Your last name" does.
+              */}
+            <div className="pb-1 text-center text-lg text-ink-400 kiosk:text-xl">
+              {placeholderFor(state)}
+            </div>
             <div className="mx-auto flex h-16 max-w-2xl items-center justify-center px-4">
               {/* Letters only, and empty until there are some. The search screen
                   teaches a parent two taps earlier that the bold word above the
@@ -562,7 +559,7 @@ function Header({
         type="button"
         tabIndex={-1}
         onPointerDown={onBack}
-        className="absolute top-[max(0.75rem,var(--spacing-safe-top))] left-4 h-12 rounded-lg px-3 text-base text-ink-400 active:bg-ink-800"
+        className="absolute top-[max(0.75rem,var(--spacing-safe-top))] left-4 h-12 rounded-lg px-3 text-sm text-ink-400 active:bg-ink-800"
       >
         ← Back
       </button>
@@ -571,13 +568,16 @@ function Header({
           type="button"
           tabIndex={-1}
           onPointerDown={onClose}
-          className="absolute top-[max(0.75rem,var(--spacing-safe-top))] right-4 h-12 rounded-lg px-3 text-base text-ink-500 active:bg-ink-800"
+          /* The same ink as Back. They are peers — two ways out of the same
+             flow — and a step apart made Cancel read as the less available of
+             the two, which it is not. */
+          className="absolute top-[max(0.75rem,var(--spacing-safe-top))] right-4 h-12 rounded-lg px-3 text-sm text-ink-400 active:bg-ink-800"
         >
           Cancel
         </button>
       )}
-      <div className="text-lg font-semibold text-ink-200">{title}</div>
-      <div className="text-sm text-ink-400 kiosk:text-base">{subtitle}</div>
+      <div className="text-2xl font-semibold text-ink-100 kiosk:text-3xl">{title}</div>
+      <div className="text-base text-ink-500 kiosk:text-lg">{subtitle}</div>
     </div>
   );
 }
@@ -698,10 +698,15 @@ function titleFor(state: RegistrationState, childNumber: number): string {
 
 function subtitleFor(state: RegistrationState, binding: KioskBinding): string {
   switch (state.step) {
+    /*
+     * The typing steps name the field against the readout now, so this line
+     * goes back to identity: a parent glancing up wants to know they are still
+     * at the right gathering, not to read the same question twice at opposite
+     * ends of the type ramp.
+     */
     case 'child-first':
-      return 'What is their first name?';
     case 'child-last':
-      return 'And their last name?';
+      return binding.title;
     case 'child-grade':
       return 'What grade are they in?';
     case 'child-allergies':
@@ -719,7 +724,7 @@ function subtitleFor(state: RegistrationState, binding: KioskBinding): string {
      */
     case 'guardian-first':
     case 'guardian-last':
-      return 'So we know who brought them.';
+      return binding.title;
     case 'guardian-phone':
       // Said before the number is typed rather than after: a parent wants to
       // know why it is being asked for while they decide whether to give it.
