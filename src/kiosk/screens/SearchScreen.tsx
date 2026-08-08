@@ -46,6 +46,29 @@ function gradeLabel(grade: number | null): string {
 }
 
 /**
+ * "6:30 – 8:00 PM" — when this gathering runs.
+ *
+ * `Intl` rather than the `date-fns` helper the rest of the app formats times
+ * with, and that is a deliberate cost: `src/lib/time.ts` would pull the whole
+ * library into a bundle with a hard gzipped budget (see
+ * `scripts/check-kiosk-budget.mjs`) for one line of text. The browser already
+ * has this.
+ *
+ * The meridiem is written once when both ends share it, because "6:30 PM –
+ * 8:00 PM" is the same fact said twice and this line sits under a title it
+ * must not compete with.
+ */
+function eventWindow(binding: KioskBinding): string {
+  const clock = (ms: number) =>
+    new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const start = clock(binding.startAtMs);
+  const end = clock(binding.endAtMs);
+  const meridiem = /\s?([AP]M)$/i.exec(start);
+  const shared = meridiem && end.toUpperCase().endsWith(meridiem[1]!.toUpperCase());
+  return `${shared ? start.slice(0, meridiem.index) : start} – ${end}`;
+}
+
+/**
  * **Search everyone**, in the two places it has to be.
  *
  * One component rather than two copies, because the pair must not drift: a
@@ -241,25 +264,95 @@ export function SearchScreen({
             className="absolute top-[max(1rem,var(--spacing-safe-top))] right-4 h-3 w-3 rounded-full bg-warn-500"
           />
         )}
-        <div className="text-lg font-semibold text-ink-200">{binding.title}</div>
-        <div className="text-sm text-ink-500">
-          {tracksCheckOut
-            ? 'Welcome! Check in below, or tap a name to collect.'
-            : closed
-              ? 'Check-in window has closed — you can still check in.'
-              : 'Welcome! Check in below.'}
+        {/*
+          * The header answers *where and when*, and nothing else.
+          *
+          * It used to answer "what do I do" as well — "Welcome! Check in
+          * below." — which put the one instruction a parent needs in the
+          * smallest type on the screen, four hundred pixels above the keys, in
+          * a line they read after the title and forget before the keyboard.
+          * That sentence has moved into the body, where a parent's eye
+          * actually goes and where the results will replace it (see the idle
+          * panel below).
+          *
+          * What is left is identity. A parent walking up wants to know they
+          * are at the right screen for the right evening — a church can run
+          * two gatherings in two rooms on one night — so the title carries
+          * real weight, and the window under it is the fact that settles it.
+          * Not a display size: the loudest thing on this screen has to stay
+          * what the parent is doing, not the label on the room they are
+          * standing in.
+          */}
+        <div className="text-2xl font-semibold text-ink-100">{binding.title}</div>
+        <div className="text-base text-ink-500">
+          {closed
+            ? 'Check-in window has closed — you can still check in.'
+            : tracksCheckOut
+              ? `${eventWindow(binding)} · Check in or collect`
+              : eventWindow(binding)}
         </div>
       </div>
 
-      {/* Results — fixed-height rows in a fixed region that scrolls past them. */}
+      {/* Results — fixed-height rows in a fixed region that scrolls past them.
+          The margin is a dead gutter, not padding: end padding *inside* a
+          scroll container is scrolled through, so at rest the last row was
+          being cut flush against the offer buttons a pixel below it — two
+          adjacent targets, one of which checks a child in, with nothing
+          between them. The margin comes out of the track instead, where
+          nothing can scroll into it. */}
       <div
         ref={resultsRef}
-        className="min-h-0 overflow-y-auto overscroll-contain scroll-touch px-6"
+        className="mb-2 min-h-0 overflow-y-auto overscroll-contain scroll-touch px-6"
         style={{ touchAction: 'pan-y' }}
       >
         {/* The bottom padding rides on the column, not the scroller: end
             padding on a scroll container is not reliably scrollable to. */}
         <div className="mx-auto flex max-w-2xl flex-col gap-2 pb-2">
+          {/*
+            * The screen a parent actually walks up to.
+            *
+            * The instruction lives here — at the top of the region the results
+            * will fill — rather than in the readout above the keys, and both
+            * critics of this screen arrived at that from opposite directions.
+            * A parent reads top-down: they used to cross four hundred pixels
+            * of nothing and meet **Register your child** as the first lit
+            * object on the glass, which is the door for the minority and the
+            * one that makes a duplicate of a child the church already has.
+            * The instruction for everybody else was below it, and dimmer.
+            *
+            * And it gives the empty screen an edge. That gap was not
+            * whitespace, it was whatever the flexible track had left over, so
+            * the idle screen was a title stranded above a cluster sunk to the
+            * bottom with nothing saying the two were one screen. Now idle and
+            * typed share a top edge: what a keystroke does is replace this
+            * with rows, in the place the rows were always going to be.
+            *
+            * Inside the scrolling region on purpose — the one part of this
+            * layout allowed to change with what has been typed. The keyboard
+            * cannot move.
+            */}
+          {outcome.mode === 'idle' && (
+            <div className="flex flex-col items-center gap-2 pt-6 text-center">
+              <div className="text-4xl font-semibold text-ink-100">Type a name</div>
+              <div className="text-lg text-ink-400">or the last 4 digits of your phone</div>
+              {/*
+                * What happens next, said before it has to be guessed.
+                *
+                * A name row is a button and does not look like one — no ring,
+                * no chevron, a card a fraction off the page it sits on — and
+                * the only unmistakably pressable thing on the screen is the
+                * register offer. A parent who finds their child and then hunts
+                * for the button to press is a parent one tap from the wrong
+                * door. This is the sentence that stops that, and it is free
+                * here: the space is empty and the eye is already on it.
+                */}
+              <div className="pt-1 text-base text-ink-500">
+                {tracksCheckOut
+                  ? "Then tap your child's name to check in or collect."
+                  : "Then tap your child's name."}
+              </div>
+            </div>
+          )}
           {outcome.mode === 'phone-partial' && (
             <div className="pt-6 text-center text-lg text-ink-400">
               Enter all 4 digits of a phone number in your family.
@@ -359,13 +452,22 @@ export function SearchScreen({
                 type="button"
                 tabIndex={-1}
                 {...rowTap(student)}
+                /*
+                 * `ink-800`, not `ink-900`: a row is a button and has to look
+                 * like one in a dim lobby. Against `ink-950` a 900 card is
+                 * 1.24:1 — not a shape, just a bright name floating in the
+                 * dark — and the only object on the screen that unmistakably
+                 * read as pressable was the register offer, which is the wrong
+                 * door. It is the same fill the quiet **Search everyone**
+                 * carries, so nothing new enters the palette.
+                 */
                 className={`flex h-16 shrink-0 items-center justify-between rounded-xl px-5 text-left ${
                   collected
-                    ? 'bg-ink-900/60 opacity-60'
+                    ? 'bg-ink-800/50 opacity-60'
                     : present
                       ? 'bg-present-600/20'
-                      : 'bg-ink-900 active:bg-ink-700'
-                } ${inert || collected ? '' : 'active:bg-ink-700'}`}
+                      : 'bg-ink-800 active:bg-ink-600'
+                } ${inert || collected ? '' : 'active:bg-ink-600'}`}
               >
                 <span className="truncate text-xl font-semibold text-ink-100">
                   {student.firstName} {student.lastName}
@@ -479,30 +581,21 @@ export function SearchScreen({
         * letters appear, and nothing on the screen invites a press that has no
         * answer.
         *
-        * With the fill gone the empty state stops being a hollow box and reads
-        * as what it always was — the instruction telling a parent what to do,
-        * and on an untouched screen it is the *only* thing to read. It used to
-        * be one dim grey sentence in the smallest type on the glass, wrapped
-        * over two lines, under a screen of nothing: the one thing a parent
-        * needed was the one thing set like a footnote.
-        *
-        * It is a heading now, and the two halves of it are ranked. **Type a
-        * name** is the instruction and carries the weight; the phone digits
-        * are the shortcut for the family who has been here before and knows
-        * to use them, so they stay a quiet second line rather than an equal
-        * half of a sentence nobody finishes reading. One notch below the
-        * typed text in size and well below it in colour, so a prompt is never
-        * mistaken for something already entered.
+        * Empty on an untouched screen, and that is the point of the row
+        * rather than a gap in it. The instruction used to live here, and it
+        * was the loudest thing on the glass for as long as nobody had typed —
+        * which put the sentence a parent reads *first* at the bottom of the
+        * screen, beneath the register offer, four hundred pixels below where
+        * their eye lands. It is at the top of the results now. This row keeps
+        * its height either way, because a keystroke must not move the
+        * keyboard, and the empty band it leaves is doing a second job: it is
+        * the one place a thumb reaching for the top row of keys could
+        * otherwise commit the register offer by accident.
         */}
       <div className="px-6 pb-1">
         <div className="mx-auto flex h-16 max-w-2xl items-center justify-center px-4 text-center">
-          {buffer ? (
+          {buffer && (
             <span className="truncate text-3xl font-semibold tracking-wide text-ink-50">{buffer}</span>
-          ) : (
-            <span className="flex flex-col leading-tight">
-              <span className="text-2xl font-semibold text-ink-300">Type a name</span>
-              <span className="text-base text-ink-500">or the last 4 digits of your phone</span>
-            </span>
           )}
         </div>
       </div>

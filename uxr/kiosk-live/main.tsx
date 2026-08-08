@@ -72,7 +72,7 @@ const STUDENTS: KioskStudent[] = [
 function outcomeFor(buffer: string, nobody: boolean): KioskSearchOutcome {
   const digits = /^\d+$/.test(buffer);
   const mode = !buffer
-    ? 'empty'
+    ? 'idle'
     : digits
       ? buffer.length === 4
         ? 'phone'
