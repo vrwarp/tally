@@ -26,15 +26,21 @@ import { useCallback, useRef } from 'react';
  */
 export const TAP_SLOP_PX = 12;
 
-/** Where a finger landed on a row, and which finger it was. */
-interface Press {
+/**
+ * Where a finger landed on a row, and which finger it was.
+ *
+ * Exported, with `strayed`, for `components/HoldButton.tsx`: a row that is held
+ * rather than tapped asks the same question of the same gesture, and two
+ * answers to "did this finger stay put" is one more than a kiosk should have.
+ */
+export interface Press {
   pointerId: number;
   x: number;
   y: number;
 }
 
 /** Whether this pointer has moved far enough to have meant a scroll. */
-function strayed(press: Press | null, event: React.PointerEvent): boolean {
+export function strayed(press: Press | null, event: React.PointerEvent): boolean {
   if (!press || press.pointerId !== event.pointerId) return true;
   return (
     Math.abs(event.clientX - press.x) > TAP_SLOP_PX ||

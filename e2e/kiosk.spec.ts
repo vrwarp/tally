@@ -130,6 +130,37 @@ test.describe('the kiosk', () => {
     }
   });
 
+  /**
+   * The setup gesture a volunteer actually makes.
+   *
+   * Binding used to be a tap on a row and then a hold on a button at the other
+   * end of a tablet, which is two gestures and a journey for the one thing this
+   * screen exists to do. Holding the row is the whole of it — and it has to be
+   * a *hold*, because the same rows scroll under the same thumb.
+   */
+  test('binds from a hold on the gathering itself', async ({ browser, page, signedInAs }) => {
+    await signedInAs('core');
+    const { context, page: kiosk } = await openKiosk(browser);
+
+    try {
+      await pairKiosk(kiosk, page);
+
+      const nursery = kiosk.getByRole('button', { name: /nursery/i }).first();
+      await expect(nursery).toBeVisible({ timeout: 30_000 });
+
+      // Nothing has been picked — the labelled button is still asking for one.
+      await expect(kiosk.getByText(/pick a gathering/i)).toBeVisible();
+
+      await hold(kiosk, nursery);
+
+      await expect(kiosk.getByText(/type a name, or the last 4 digits/i)).toBeVisible({
+        timeout: 30_000,
+      });
+    } finally {
+      await context.close();
+    }
+  });
+
   test('renders a present child as collectable, and records the pickup', async ({
     browser,
     page,
