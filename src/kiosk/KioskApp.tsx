@@ -51,6 +51,7 @@ import {
   readJson,
   type CachedPulse,
 } from './storage';
+import { keepScreenAwake } from './wakeLock';
 import { ConfirmScreen } from './screens/ConfirmScreen';
 import { SiblingScreen } from './screens/SiblingScreen';
 import { EventChooser } from './screens/EventChooser';
@@ -462,6 +463,17 @@ export function KioskApp() {
       window.removeEventListener('online', online);
     };
   }, [phase, services, binding, hydrate, onPulse]);
+
+  /* ---- The screen: awake for as long as this page is on it ---------------- */
+
+  /*
+   * Every phase, not just `ready`. A kiosk showing its pairing code is a kiosk
+   * somebody is walking back and forth to a laptop to approve, and a screen that
+   * sleeps between the two trips is the one that loses the code. Unconditional
+   * for the same reason it is unconditional in wakeLock.ts: there is no state
+   * this app can be in where a lobby screen going dark is what anybody wanted.
+   */
+  useEffect(() => keepScreenAwake(), []);
 
   /* ---- The clock: binding expiry and the nightly reload ------------------ */
 
