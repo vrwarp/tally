@@ -46,7 +46,7 @@ describe('searchStudents', () => {
   });
 
   it('answers unknown digits with an empty phone result, not a name search', () => {
-    expect(searchStudents('7777', ROSTER, LAST4)).toEqual({ mode: 'phone', results: [] });
+    expect(searchStudents('7777', ROSTER, LAST4)).toEqual({ mode: 'phone', results: [], total: 0 });
   });
 
   it('searches names for anything with a letter in it', () => {
@@ -71,5 +71,22 @@ describe('searchStudents', () => {
     const many = Array.from({ length: 30 }, (_, i) => student(`s-${i}`, `Aaa${i}`, 'Zed'));
     const outcome = searchStudents('aaa', many, {});
     expect(outcome.results).toHaveLength(MAX_RESULTS);
+  });
+
+  /*
+   * The count the kiosk shows a parent is drawn from `total`, and it has to be
+   * what the search found rather than what survived the cap. Read off the
+   * sliced array, a search matching thirty reported "8 names" — a
+   * complete-looking number for a list that is not complete, which leaves a
+   * parent who has scrolled all eight believing their child is not here.
+   */
+  it('reports what it matched, not what it kept', () => {
+    const many = Array.from({ length: 30 }, (_, i) => student(`s-${i}`, `Aaa${i}`, 'Zed'));
+    expect(searchStudents('aaa', many, {}).total).toBe(30);
+  });
+
+  it('reports a total the list did not have to truncate', () => {
+    const outcome = searchStudents('osei', ROSTER, LAST4);
+    expect(outcome.total).toBe(outcome.results.length);
   });
 });

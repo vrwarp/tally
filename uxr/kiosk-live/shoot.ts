@@ -62,8 +62,19 @@ const SCENES: { id: string; query: string; views: readonly ViewportName[] }[] = 
     query: 'title=Wednesday+Night+Middle+School+Gathering',
     views: ['phone'],
   },
-  { id: 'search-typed', query: 'buffer=Alva&present=2', views: ['phone', 'kiosktall'] },
-  { id: 'search-nomatch', query: 'buffer=Zzz&nomatch=1', views: ['phone', 'kiosktall'] },
+  {
+    id: 'search-typed',
+    query: 'buffer=Alva&present=2',
+    /*
+     * `kioskwide` is here because it was not, and a change to how the list
+     * wraps shipped unlooked-at: the landscape kiosk was only ever shot idle,
+     * so the round that gave it two columns had no frame with rows in it and
+     * both critics had to render one themselves. A state list that omits the
+     * state a change is about is worse than a short one.
+     */
+    views: ['phone', 'kiosktall', 'kioskwide'],
+  },
+  { id: 'search-nomatch', query: 'buffer=Zzz&nomatch=1', views: ['phone', 'kiosktall', 'kioskwide'] },
   { id: 'register-first', query: 'screen=register', views: ['phone'] },
 ];
 

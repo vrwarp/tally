@@ -112,8 +112,8 @@ function WidenButton({
                name would read as a button, and this button carries the same
                fill — so the ring made the *widen* control the strongest edge on
                a screen whose primary targets are the names beside it. */
-            'flex h-11 min-w-0 shrink items-center justify-center truncate rounded-xl bg-ink-800/70 px-3 text-sm font-semibold whitespace-nowrap text-ink-300 active:bg-ink-700'
-          : 'flex h-14 w-full items-center justify-center rounded-xl bg-ink-800 text-lg font-semibold text-ink-100 active:bg-ink-700'
+            'flex h-11 min-w-0 shrink items-center justify-center truncate rounded-xl bg-ink-800/70 px-3 text-sm font-semibold whitespace-nowrap text-ink-300 active:bg-ink-700 tall:h-14 tall:px-5 tall:text-base'
+          : 'flex h-14 w-full items-center justify-center rounded-xl bg-ink-800 px-8 text-lg font-semibold text-ink-100 active:bg-ink-700 tall:h-16 tall:text-xl lg:flex-1'
       }
       style={{ touchAction: 'manipulation' }}
     >
@@ -275,10 +275,18 @@ export function SearchScreen({
    * moved, but everything they were looking at did. Up there the block stays
    * where the rows will be.
    */
-  /* Before the slice: what the search actually found, which is the number a
-     parent needs when the list shows fewer. */
-  const matchCount = outcome.results.length;
-  const rows = matchCount > 0;
+  /*
+   * What the search found, and whether the list is all of it.
+   *
+   * `outcome.total` is the count before `MAX_RESULTS` cut the array — the
+   * screen used to read the sliced length, so a search matching twenty-three
+   * said "8 names", which is a complete-looking number for an incomplete list.
+   * At that point a parent has scrolled everything on offer, found nobody
+   * theirs, and the doors left to them include the one that makes a duplicate.
+   */
+  const matchCount = outcome.total ?? outcome.results.length;
+  const truncated = matchCount > outcome.results.length;
+  const rows = outcome.results.length > 0;
 
   const station =
     outcome.mode === 'idle' ? 'my-auto tall:my-0' : rowless ? 'mt-auto tall:mt-0' : '';
@@ -497,14 +505,18 @@ export function SearchScreen({
                centred missed each other's edges by 11px a side, which nothing
                in the frame explained — because nothing did: it was the length
                of two labels. */
-            <div className="mx-auto flex w-full max-w-xs flex-col items-stretch gap-3 pt-6 text-center">
+            <div className="mx-auto flex w-full max-w-xs flex-col items-stretch gap-3 pt-6 text-center tall:max-w-md tall:gap-4 lg:max-w-2xl">
               {/* The state's own sentence holds the top of the ramp. Set at the
                   bottom of it, the loudest thing in the frame was the query
                   that did not work, echoed in bold white above the keys, and
                   the fact explaining the empty screen read as fine print over
                   two buttons. One thing at the top of a ramp, and here it is
                   the outcome rather than the input. */}
-              <div className="text-3xl font-semibold text-ink-100 tall:text-4xl">
+              {/* Its own measure, wider than the doors under it, and balanced.
+                  Inheriting the button column broke the sentence inside its own
+                  phrase on a phone — "No match — first / time here?" — with the
+                  em dash sitting right there unused. */}
+              <div className="mx-auto max-w-sm text-center text-3xl font-semibold text-balance text-ink-100 tall:max-w-md tall:text-4xl">
                 {refresh === 'done' ? (
                   <>
                     {/*
@@ -523,38 +535,47 @@ export function SearchScreen({
                   'No match — first time here?'
                 )}
               </div>
-              <button
-                type="button"
-                tabIndex={-1}
-                onPointerDown={() => {
-                  haptic();
-                  onRegister();
-                }}
-                className="flex h-14 items-center justify-center rounded-xl bg-brand-600 text-lg font-semibold text-white active:bg-brand-500"
-              >
-                Register your child
-              </button>
+              {/*
+                * Stacked, until the screen is wide and short.
+                *
+                * On a 1280×800 kiosk the fixed chrome leaves this track 259px
+                * and the stack needed about 300, so the closing line — "or see
+                * a leader.", the door that costs the church nothing — was cut
+                * through its x-height and faded out by the region's mask. A
+                * parent deciding whether they have to create a record was
+                * reading what looked like a broken screen. That shape has
+                * width and no height, so the doors spend the axis it has.
+                */}
+              <div className="flex flex-col items-stretch gap-3 tall:gap-4 lg:flex-row lg:justify-center lg:gap-4">
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onPointerDown={() => {
+                    haptic();
+                    onRegister();
+                  }}
+                  className="flex h-14 items-center justify-center rounded-xl bg-brand-600 px-8 text-lg font-semibold text-white active:bg-brand-500 tall:h-16 tall:text-xl lg:flex-1"
+                >
+                  Register your child
+                </button>
+                <WidenButton widening={widening} onWiden={onWiden} />
+              </div>
               {refresh === 'failed' && (
-                <div className="text-base text-ink-500">Couldn&apos;t reach the network just now.</div>
+                <div className="text-base text-ink-500 tall:text-lg">
+                  Couldn&apos;t reach the network just now.
+                </div>
               )}
               {/*
-                * Stays, and reports.
-                *
-                * It used to remove itself the moment it was pressed, which
-                * left a parent looking at the place a button had been with
-                * no more evidence of the press than one word changing in the
-                * line above. And it left the family it had failed with
-                * nothing to press: four digits are a small keyspace and
-                * names collide, so "widened and still not mine" is a real
-                * state, and the answer to it — look again, the church may
-                * have added them since — is this control.
-                *
-                * `aria-label` rather than the label alone, so it keeps its
-                * name while its face is a spinner: the button a parent is
-                * waiting on is still the same button.
+                * "Search everyone" stays, and reports — it used to remove
+                * itself the moment it was pressed, which left a parent looking
+                * at the place a button had been with no more evidence of the
+                * press than one word changing in the line above. And it left
+                * the family it had failed with nothing to press: four digits
+                * are a small keyspace and names collide, so "widened and still
+                * not mine" is a real state, and the answer to it — look again,
+                * the church may have added them since — is that control.
                 */}
-              <WidenButton widening={widening} onWiden={onWiden} />
-              <div className="text-base text-ink-500">or see a leader.</div>
+              <div className="text-base text-ink-500 tall:text-lg">or see a leader.</div>
             </div>
           )}
           {outcome.results.slice(0, MAX_RESULTS).map((student) => {
@@ -584,7 +605,13 @@ export function SearchScreen({
                  * door. It is the same fill the quiet **Search everyone**
                  * carries, so nothing new enters the palette.
                  */
-                className={`flex h-16 shrink-0 items-center justify-between rounded-xl px-5 text-left tall:h-20 lg:break-inside-avoid lg:not-first:mt-2 ${
+                /* `lg:w-full` is not decoration. Multi-column flow drops these out of
+                   the flex column that was stretching them, and a `button` in
+                   normal flow is shrink-to-fit — so every card became as wide as
+                   its own name, the grade stopped being a right-hand column, and
+                   checking a child in *resized their row*, which is the one thing
+                   this list promises never to do. */
+                className={`flex h-16 w-full shrink-0 items-center justify-between rounded-xl px-5 text-left tall:h-20 lg:break-inside-avoid lg:not-first:mt-2 ${
                   collected
                     ? 'bg-ink-800/50 opacity-60'
                     : present
@@ -681,7 +708,7 @@ export function SearchScreen({
               pixel were two apart while every other gap inside the console was
               40 or more, so the edge separated without containing — it read as
               the button's own top border run out to the screen. */}
-      <div className="flex h-14 flex-row-reverse items-center justify-center gap-4 overflow-hidden px-2 pt-2 tall:h-16">
+      <div className="flex h-14 flex-row-reverse items-center justify-center gap-4 overflow-hidden px-2 pt-2 tall:h-20 tall:gap-6">
         {/*
           * The way out of the scope, standing beside the way out of the search.
           *
@@ -705,7 +732,12 @@ export function SearchScreen({
               haptic(8);
               onRegister();
             }}
-            className="flex h-11 min-w-0 shrink items-center justify-center truncate rounded-xl bg-brand-600/15 px-3 text-sm font-semibold whitespace-nowrap text-brand-300 ring-1 ring-brand-500/40 active:bg-brand-600/30"
+            /* The `tall:` step every other control got. Quiet in weight — a
+               tinted chip beside a keyboard — is a different lever from quiet
+               in legibility, and on a portrait tablet this was simultaneously
+               the only accented object on the glass and the smallest type on
+               it, read at arm's length. */
+            className="flex h-11 min-w-0 shrink items-center justify-center truncate rounded-xl bg-brand-600/15 px-3 text-sm font-semibold whitespace-nowrap text-brand-300 ring-1 ring-brand-500/40 active:bg-brand-600/30 tall:h-14 tall:px-5 tall:text-base"
           >
             {/*
               * The question goes first and, on a narrow screen standing beside
@@ -754,7 +786,11 @@ export function SearchScreen({
         * otherwise commit the register offer by accident.
         */}
       <div className="px-6 pb-1">
-        <div className="relative mx-auto flex h-16 max-w-2xl items-center justify-center px-4 text-center tall:h-20">
+        {/* The same measure as the results column, so the count below hangs off
+            the edge the rows are flush to rather than off this band's own
+            padding — it is the list's caption, and it was missing the strongest
+            vertical line in the frame by sixteen pixels. */}
+        <div className="relative mx-auto flex h-16 max-w-2xl items-center justify-center text-center tall:h-20 lg:max-w-5xl">
           {buffer && (
             <span className="truncate text-3xl font-semibold tracking-wide text-ink-50 tall:text-4xl">
               {buffer}
@@ -779,8 +815,17 @@ export function SearchScreen({
             * letters off centre or move a row.
             */}
           {matchCount > 0 && (
-            <span className="absolute right-4 text-sm text-ink-400 tall:text-base">
-              {matchCount} {matchCount === 1 ? 'name' : 'names'}
+            <span className="absolute right-0 text-sm text-ink-400 tall:text-base">
+              {/*
+                * A number while the list is all of it, a sentence when it is
+                * not. `MAX_RESULTS` is eight, and "8 names" over a list that
+                * was cut from twenty-three is a complete-looking answer to an
+                * incomplete search — the parent scrolls all eight, finds
+                * nobody, and the doors left to them include the one that
+                * registers a child the church already has. Past the cap the
+                * only useful thing to say is the thing that works.
+                */}
+              {truncated ? 'Keep typing' : `${matchCount} ${matchCount === 1 ? 'name' : 'names'}`}
             </span>
           )}
         </div>

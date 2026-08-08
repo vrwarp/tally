@@ -49,6 +49,21 @@ export type KioskSearchMode =
 export interface KioskSearchOutcome {
   mode: KioskSearchMode;
   results: KioskStudent[];
+  /**
+   * How many children the search actually matched, before `MAX_RESULTS` cut
+   * the list down.
+   *
+   * The screen counts the names it is showing a parent, and until this existed
+   * it counted them off `results` — which is the sliced array, so a search that
+   * matched twenty-three reported "8 names". A complete-looking number for a
+   * list that is not complete is worse than no number: a parent scrolls all
+   * eight, finds nobody theirs, and the doors left to them include the one that
+   * registers a child the church already has.
+   *
+   * Absent means "the same as `results.length`" — the two states that return no
+   * rows at all have nothing to have truncated.
+   */
+  total?: number;
 }
 
 export function searchStudents(
@@ -66,12 +81,12 @@ export function searchStudents(
     // answering the first four anyway keeps this total rather than throwing.
     const ids = new Set(last4Index[trimmed.slice(0, PHONE_QUERY_LENGTH)] ?? []);
     const results = students.filter((student) => ids.has(student.id)).sort(sortByName);
-    return { mode: 'phone', results: results.slice(0, MAX_RESULTS) };
+    return { mode: 'phone', results: results.slice(0, MAX_RESULTS), total: results.length };
   }
 
   const matcher = createSearchMatcher(trimmed);
   const results = students
     .filter((student) => matcher.matches(student.searchName))
     .sort((a, b) => matcher.rank(a) - matcher.rank(b) || sortByName(a, b));
-  return { mode: 'name', results: results.slice(0, MAX_RESULTS) };
+  return { mode: 'name', results: results.slice(0, MAX_RESULTS), total: results.length };
 }
