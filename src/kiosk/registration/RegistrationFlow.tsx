@@ -460,7 +460,16 @@ export function RegistrationFlow({
                   {state.step === 'guardian-phone' ? formatPhone(state.buffer) : state.buffer}
                 </span>
               ) : (
-                <span className="text-xl text-ink-500">{placeholderFor(state)}</span>
+                /* Set like the search screen's prompt and for the same reason:
+                   on a step nobody has typed into yet this line is the only
+                   thing on the lower half of the glass, and the smallest,
+                   dimmest type on the screen is the wrong place to say what
+                   the box is for. One notch below the typed text in size and
+                   well below it in colour, so it cannot be read as an answer
+                   somebody already gave. */
+                <span className="truncate text-2xl font-semibold text-ink-300">
+                  {placeholderFor(state)}
+                </span>
               )}
             </div>
           </div>

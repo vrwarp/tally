@@ -480,14 +480,29 @@ export function SearchScreen({
         * answer.
         *
         * With the fill gone the empty state stops being a hollow box and reads
-        * as what it always was — the sentence telling a parent what to type.
+        * as what it always was — the instruction telling a parent what to do,
+        * and on an untouched screen it is the *only* thing to read. It used to
+        * be one dim grey sentence in the smallest type on the glass, wrapped
+        * over two lines, under a screen of nothing: the one thing a parent
+        * needed was the one thing set like a footnote.
+        *
+        * It is a heading now, and the two halves of it are ranked. **Type a
+        * name** is the instruction and carries the weight; the phone digits
+        * are the shortcut for the family who has been here before and knows
+        * to use them, so they stay a quiet second line rather than an equal
+        * half of a sentence nobody finishes reading. One notch below the
+        * typed text in size and well below it in colour, so a prompt is never
+        * mistaken for something already entered.
         */}
       <div className="px-6 pb-1">
-        <div className="mx-auto flex h-16 max-w-2xl items-center justify-center px-4">
+        <div className="mx-auto flex h-16 max-w-2xl items-center justify-center px-4 text-center">
           {buffer ? (
             <span className="truncate text-3xl font-semibold tracking-wide text-ink-50">{buffer}</span>
           ) : (
-            <span className="text-xl text-ink-500">Type a name, or the last 4 digits of your phone</span>
+            <span className="flex flex-col leading-tight">
+              <span className="text-2xl font-semibold text-ink-300">Type a name</span>
+              <span className="text-base text-ink-500">or the last 4 digits of your phone</span>
+            </span>
           )}
         </div>
       </div>

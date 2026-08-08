@@ -514,7 +514,7 @@ describe('the clock', () => {
       await vi.advanceTimersByTimeAsync(95_000);
     });
 
-    expect(screen.getByText(/Type a name, or the last 4 digits/)).toBeTruthy();
+    expect(screen.getByText(/^Type a name$/)).toBeTruthy();
   });
 });
 
