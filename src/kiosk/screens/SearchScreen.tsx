@@ -252,6 +252,38 @@ export function SearchScreen({
   const rowless = outcome.results.length === 0;
 
   /*
+   * Where a row-less state sits in the track.
+   *
+   * Sinking all of them put the idle prompt hard against the console on a
+   * portrait tablet with the whole void above it, so the emptiness swapped ends
+   * the instant somebody typed — the geometry did not move, but the composition
+   * did. The idle prompt is text with nothing in it to press, so it takes the
+   * middle and the void splits either side of it.
+   *
+   * The states that ask for a press do not take the middle. No match, and the
+   * four-digit prompt that is one keystroke away from becoming one, hang from
+   * the bottom where the hand is. That is the whole distinction: a decision a
+   * parent has to reach for belongs near the keys; a sentence they only read
+   * does not.
+   *
+   * And all of it is a short-track behaviour, which is what `tall:` undoes.
+   * Moving a block toward the hand is worth a few dozen pixels on a phone,
+   * where the track is about three hundred tall and the whole screen is within
+   * a thumb's sweep. On a tablet stood on end the same rule moves it six
+   * hundred, so a parent reads the instruction at the bottom of the glass,
+   * types two letters, and the answer appears at the top — the geometry never
+   * moved, but everything they were looking at did. Up there the block stays
+   * where the rows will be.
+   */
+  /* Before the slice: what the search actually found, which is the number a
+     parent needs when the list shows fewer. */
+  const matchCount = outcome.results.length;
+  const rows = matchCount > 0;
+
+  const station =
+    outcome.mode === 'idle' ? 'my-auto tall:my-0' : rowless ? 'mt-auto tall:mt-0' : '';
+
+  /*
    * Every keystroke starts the list again from the top. Without this, a parent
    * who scrolled down a broad match and then typed one more letter would be
    * looking at the bottom of a list short enough to have no bottom — an empty
@@ -341,8 +373,35 @@ export function SearchScreen({
             padding on a scroll container is not reliably scrollable to.
             `mt-auto` sinks the row-less states toward the hand and collapses
             to nothing the moment the content is taller than the box. */}
+        {/*
+          * Two columns on a landscape kiosk, one everywhere else.
+          *
+          * A 1280×800 tablet is the worst of the three shapes for the only
+          * thing this screen does. The fixed chrome — header, offer row,
+          * readout, keyboard — leaves the track under three hundred pixels, so
+          * it showed three matches out of a possible eight, against four on a
+          * phone and all eight on the same tablet stood on end. None of that
+          * height is recoverable: the keys and the rows are already at the
+          * sizes a standing adult needs.
+          *
+          * The axis nobody was using is the one that is free. The rows sat in a
+          * capped column with three hundred pixels of dead page on either side.
+          * `columns` rather than a grid because CSS multi-column fills
+          * column-major — down the first, then the second — so an A–Z list
+          * still reads downward, which a two-column grid would have broken by
+          * laying it out in rows.
+          *
+          * Above `lg` only, which the phone never reaches and the portrait
+          * kiosk (800px wide) does not either. Row height, row fill and the
+          * promise that a tap never moves a row are all untouched; only the
+          * wrap changes.
+          */}
         <div
-          className={`mx-auto flex w-full max-w-2xl flex-col gap-2 ${rowless ? 'mt-auto pb-6' : 'pb-2'}`}
+          className={`mx-auto w-full max-w-2xl ${station} ${
+            rowless ? 'pb-6' : 'pb-2'
+          } flex flex-col gap-2 ${
+            rows ? 'lg:block lg:columns-2 lg:gap-x-3 lg:max-w-5xl' : ''
+          }`}
         >
           {/*
             * The screen a parent actually walks up to.
@@ -373,8 +432,8 @@ export function SearchScreen({
                   one unit, set tight; what happens next is separated by air
                   rather than by a third size, which at a 2px step read as one
                   paragraph fading out. */}
-              <div className="text-4xl font-semibold text-ink-100">Type a name</div>
-              <div className="pt-1 text-lg text-ink-400">or the last 4 digits of your phone</div>
+              <div className="text-4xl font-semibold text-ink-100 tall:text-5xl">Type a name</div>
+              <div className="pt-1 text-lg text-ink-400 tall:text-xl">or the last 4 digits of your phone</div>
               {/*
                 * What happens next, said before it has to be guessed.
                 *
@@ -404,7 +463,7 @@ export function SearchScreen({
                 * sends somebody hunting for a button and finding the register
                 * offer.
                 */}
-              <div className="pt-4 text-base text-ink-400">Then tap your child&rsquo;s name.</div>
+              <div className="pt-4 text-lg text-ink-400 tall:text-xl">Then tap your child&rsquo;s name.</div>
             </div>
           )}
           {outcome.mode === 'phone-partial' && (
@@ -439,7 +498,13 @@ export function SearchScreen({
                in the frame explained — because nothing did: it was the length
                of two labels. */
             <div className="mx-auto flex w-full max-w-xs flex-col items-stretch gap-3 pt-6 text-center">
-              <div className="text-lg text-ink-400">
+              {/* The state's own sentence holds the top of the ramp. Set at the
+                  bottom of it, the loudest thing in the frame was the query
+                  that did not work, echoed in bold white above the keys, and
+                  the fact explaining the empty screen read as fine print over
+                  two buttons. One thing at the top of a ramp, and here it is
+                  the outcome rather than the input. */}
+              <div className="text-3xl font-semibold text-ink-100 tall:text-4xl">
                 {refresh === 'done' ? (
                   <>
                     {/*
@@ -519,7 +584,7 @@ export function SearchScreen({
                  * door. It is the same fill the quiet **Search everyone**
                  * carries, so nothing new enters the palette.
                  */
-                className={`flex h-16 shrink-0 items-center justify-between rounded-xl px-5 text-left ${
+                className={`flex h-16 shrink-0 items-center justify-between rounded-xl px-5 text-left tall:h-20 lg:break-inside-avoid lg:not-first:mt-2 ${
                   collected
                     ? 'bg-ink-800/50 opacity-60'
                     : present
@@ -527,10 +592,10 @@ export function SearchScreen({
                       : 'bg-ink-800 active:bg-ink-600'
                 } ${inert || collected ? '' : 'active:bg-ink-600'}`}
               >
-                <span className="truncate text-xl font-semibold text-ink-100">
+                <span className="truncate text-xl font-semibold text-ink-100 tall:text-2xl">
                   {student.firstName} {student.lastName}
                 </span>
-                <span className="pl-3 text-base whitespace-nowrap text-ink-400">
+                <span className="pl-3 text-base whitespace-nowrap text-ink-400 tall:text-lg">
                   {collected ? (
                     <span className="font-semibold text-ink-400">Collected</span>
                   ) : present && tracksCheckOut ? (
@@ -612,7 +677,11 @@ export function SearchScreen({
         * The air comes out of the row's own side margins, which were doing
         * nothing.
         */}
-      <div className="flex h-12 flex-row-reverse items-center justify-center gap-4 overflow-hidden px-2">
+      {/* `pt-2` is the console's interior. The rule and this row's first
+              pixel were two apart while every other gap inside the console was
+              40 or more, so the edge separated without containing — it read as
+              the button's own top border run out to the screen. */}
+      <div className="flex h-14 flex-row-reverse items-center justify-center gap-4 overflow-hidden px-2 pt-2 tall:h-16">
         {/*
           * The way out of the scope, standing beside the way out of the search.
           *
@@ -685,9 +754,34 @@ export function SearchScreen({
         * otherwise commit the register offer by accident.
         */}
       <div className="px-6 pb-1">
-        <div className="mx-auto flex h-16 max-w-2xl items-center justify-center px-4 text-center">
+        <div className="relative mx-auto flex h-16 max-w-2xl items-center justify-center px-4 text-center tall:h-20">
           {buffer && (
-            <span className="truncate text-3xl font-semibold tracking-wide text-ink-50">{buffer}</span>
+            <span className="truncate text-3xl font-semibold tracking-wide text-ink-50 tall:text-4xl">
+              {buffer}
+            </span>
+          )}
+          {/*
+            * How many names the search found, beside the letters that found
+            * them.
+            *
+            * The list clips, and the peek that says so is a strip of card
+            * faded to nothing — `ink-800` on `ink-950` is barely a shape at
+            * full strength, so a few pixels of it ramping to the page is not a
+            * signal anybody catches in a lobby. A phone fits four rows and
+            * MAX_RESULTS is eight, so a family whose name sorts fifth met four
+            * confident wrong rows and nothing at all to say a fifth existed —
+            * and the doors available to them from there include the one that
+            * registers a child the church already has.
+            *
+            * Here rather than on the list because this band is where a parent
+            * is already looking while they type, and because it costs no
+            * geometry: absolutely positioned, so the count cannot push the
+            * letters off centre or move a row.
+            */}
+          {matchCount > 0 && (
+            <span className="absolute right-4 text-sm text-ink-400 tall:text-base">
+              {matchCount} {matchCount === 1 ? 'name' : 'names'}
+            </span>
           )}
         </div>
       </div>
