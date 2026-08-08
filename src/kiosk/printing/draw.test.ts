@@ -129,6 +129,25 @@ describe('drawLabel', () => {
       expect(taller.data.length).toBe(696 * taller.height * 4);
     });
 
+    it('adds the margins asked for to the length', () => {
+      const one: LabelTemplate = {
+        lines: [{ text: '{{firstName}}', size: 'md', bold: false, align: 'center', requiresValue: false }],
+        copies: 1,
+      };
+
+      const plain = drawLabel(one, values, { width: 696, height: null });
+      const spaced = drawLabel(one, values, {
+        width: 696,
+        height: null,
+        paddingTop: 60,
+        paddingBottom: 120,
+      });
+
+      // The tape is cut where the raster stops, so a margin is length.
+      expect(spaced.height).toBe(plain.height + (60 - 8) + (120 - 8));
+      expect(spaced.data.length).toBe(696 * spaced.height * 4);
+    });
+
     it('will not run off the end of the roll', () => {
       // Six lines of xl on continuous tape is a stationery incident waiting to
       // happen; 1800 dots is 150mm at 300 dpi.

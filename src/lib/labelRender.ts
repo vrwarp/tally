@@ -71,7 +71,27 @@ export interface LabelBox {
   height: number | null;
   /** Blank dots kept clear on every edge. */
   padding?: number;
+  /**
+   * Blank dots above the content, in place of `padding` at that edge.
+   *
+   * Its reason for existing is continuous tape, where the length follows the
+   * content and so the space above and below the text is the only thing that
+   * decides where the sticker sits between two cuts. On die-cut media the
+   * height is fixed and the block is centred in what these leave, which is a
+   * way of nudging it up or down rather than of making the label longer.
+   */
+  paddingTop?: number;
+  /** Blank dots below the content, in place of `padding` at that edge. */
+  paddingBottom?: number;
 }
+
+/**
+ * Dots per millimetre at 300 dpi, for callers holding a measurement in mm.
+ *
+ * Everything in this module is dots, because that is what the print head has.
+ * A margin a person typed is millimetres, because that is what a ruler has.
+ */
+export const DOTS_PER_MM = 300 / 25.4;
 
 /**
  * Nominal dot heights per size name.
@@ -214,12 +234,20 @@ export function layoutLabel(
   measure: MeasureText,
 ): LabelLayout {
   const padding = box.padding ?? DEFAULT_PADDING;
+  const paddingTop = box.paddingTop ?? padding;
+  const paddingBottom = box.paddingBottom ?? padding;
   const innerWidth = Math.max(1, box.width - padding * 2);
-  const maxHeight = box.height === null ? null : Math.max(1, box.height - padding * 2);
+  const maxHeight =
+    box.height === null ? null : Math.max(1, box.height - paddingTop - paddingBottom);
 
   const resolved = resolveLines(template, values);
   if (resolved.length === 0) {
-    return { draws: [], height: box.height ?? padding * 2, droppedLines: 0, scaledToFit: false };
+    return {
+      draws: [],
+      height: box.height ?? paddingTop + paddingBottom,
+      droppedLines: 0,
+      scaledToFit: false,
+    };
   }
 
   /** Lay out at a given scale, reporting the height it wanted. */
@@ -264,8 +292,11 @@ export function layoutLabel(
   }
 
   const contentHeight = result.height;
-  const height = box.height ?? Math.ceil(contentHeight + padding * 2);
-  const top = box.height === null ? padding : padding + Math.max(0, ((maxHeight ?? 0) - contentHeight) / 2);
+  const height = box.height ?? Math.ceil(contentHeight + paddingTop + paddingBottom);
+  const top =
+    box.height === null
+      ? paddingTop
+      : paddingTop + Math.max(0, ((maxHeight ?? 0) - contentHeight) / 2);
 
   const draws: LabelDraw[] = [];
   let cursor = top;

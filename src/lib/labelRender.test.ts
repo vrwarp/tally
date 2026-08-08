@@ -204,6 +204,59 @@ describe('layoutLabel', () => {
       const result = layoutLabel(template([line('one', 'sm')]), {}, ENDLESS, measure);
       expect(result.draws[0]!.y).toBeLessThan(50);
     });
+
+    describe('with margins asked for at the ends', () => {
+      const lines = template([line('one', 'sm')]);
+
+      it('pushes the text down by the top margin', () => {
+        const plain = layoutLabel(lines, {}, ENDLESS, measure);
+        const spaced = layoutLabel(lines, {}, { ...ENDLESS, paddingTop: 120 }, measure);
+        expect(spaced.draws[0]!.y - plain.draws[0]!.y).toBe(120 - 8);
+      });
+
+      it('grows the label by both, because the tape is cut where it stops', () => {
+        const plain = layoutLabel(lines, {}, ENDLESS, measure);
+        const spaced = layoutLabel(
+          lines,
+          {},
+          { ...ENDLESS, paddingTop: 120, paddingBottom: 60 },
+          measure,
+        );
+        expect(spaced.height - plain.height).toBe(120 - 8 + (60 - 8));
+      });
+
+      it('leaves the bottom margin alone under the text', () => {
+        // Only the length changes: a margin below cannot move a line that has
+        // already been placed from the top.
+        const plain = layoutLabel(lines, {}, ENDLESS, measure);
+        const spaced = layoutLabel(lines, {}, { ...ENDLESS, paddingBottom: 200 }, measure);
+        expect(spaced.draws[0]!.y).toBe(plain.draws[0]!.y);
+        expect(spaced.height).toBe(plain.height + 200 - 8);
+      });
+
+      it('keeps the side padding out of it', () => {
+        const result = layoutLabel(
+          template([line('a', 'md', false, 'left')]),
+          {},
+          { ...ENDLESS, paddingTop: 100, paddingBottom: 100 },
+          measure,
+        );
+        expect(result.draws[0]!.x).toBe(8);
+      });
+
+      it('spaces an empty label by them too', () => {
+        // Nothing resolved, so there is no content to sit between the two — but
+        // the tape still has to be as long as they say it is.
+        const result = layoutLabel(
+          template([line('{{grade}}')]),
+          {},
+          { ...ENDLESS, paddingTop: 30, paddingBottom: 50 },
+          measure,
+        );
+        expect(result.draws).toEqual([]);
+        expect(result.height).toBe(80);
+      });
+    });
   });
 
   describe('when the content is taller than a die-cut label', () => {
@@ -284,6 +337,20 @@ describe('layoutLabel', () => {
         measure,
       );
       expect(result.draws[0]!.x).toBe(24);
+    });
+
+    it('cannot lengthen a die-cut label by asking for margins', () => {
+      // The height was fixed going in. All the ends can do here is decide how
+      // much room the block is centred in, which is why the kiosk only offers
+      // them for tape.
+      const result = layoutLabel(
+        template([line('Ada', 'sm')]),
+        {},
+        { ...DIE_CUT, paddingTop: 100, paddingBottom: 4 },
+        measure,
+      );
+      expect(result.height).toBe(271);
+      expect(result.draws[0]!.y).toBeGreaterThan(100);
     });
 
     it('stacks lines downwards without overlapping', () => {

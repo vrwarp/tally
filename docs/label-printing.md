@@ -20,7 +20,8 @@ What follows is what that person has to do.
   QL-820NWB are the same print head and the same 400-byte preamble. Nineteen
   models are supported in total — the setup screen lists them.
 - **A roll.** 62 × 29 mm die-cut is the ordinary name badge and the default.
-  62 mm continuous works too, and the label grows to fit the text.
+  62 mm continuous works too, and the label grows to fit the text plus whatever
+  margins you set.
 - **Chrome or Edge**, on macOS, ChromeOS, Android or Linux. Safari and Firefox
   have both declined to implement WebUSB and never will, so a kiosk that prints
   is a Chromium kiosk.
@@ -40,17 +41,46 @@ What follows is what that person has to do.
 5. Pick the **loaded label**. Press **Check the printer** and it will offer what
    the printer senses — though 62 mm tape matches both `62` and `62red` and the
    printer cannot tell them apart, so confirm rather than assume.
-6. Press **Connect a printer** and choose it in the browser's dialog. This is
+6. On a continuous roll only, set the **blank tape around the text** — see
+   [Margins on a continuous roll](#margins-on-a-continuous-roll). Leave it alone
+   and you get what Tally has always printed.
+7. Press **Connect a printer** and choose it in the browser's dialog. This is
    the only step that needs a person: the browser opens its device chooser only
    in response to a real gesture. Everything afterwards — reconnecting at boot,
    printing, reading status — needs none, so the kiosk can run unattended for
    weeks and reopen the printer by itself after the nightly reload.
-7. Press **Print a test label**. It goes through the whole chain — worker,
+8. Press **Print a test label**. It goes through the whole chain — worker,
    rasteriser, transport — so a label coming out means the feature works, not
    just that the device answered.
 
-The model and the roll are stored on **this device**, not on the event. Changing
-rolls is a change here, not an edit to every gathering.
+The model, the roll and its margins are stored on **this device**, not on the
+event. Changing rolls is a change here, not an edit to every gathering.
+
+## Margins on a continuous roll
+
+Die-cut labels are a fixed size and Tally centres the text in them. Continuous
+tape is not: the sticker is as long as the text needs and the printer cuts it
+there, so how much blank tape sits above and below a name is a decision nobody
+has made until somebody makes it.
+
+**Blank tape around the text** on the printer screen makes it — an **Above** and
+a **Below**, stepped in whole millimetres up to 25 mm each, with a rough diagram
+of the shape they produce. It appears only when the loaded label is a continuous
+roll, because on die-cut media there is no length to give and all a margin could
+do is shove the name off the middle of a label somebody chose for its size.
+
+Both are 0.7 mm out of the box, which is exactly what Tally printed before this
+setting existed — a kiosk already in a lobby prints the same label after an
+update as before one.
+
+Every millimetre is tape. Two 10 mm margins is 20 mm of blank roll per child, so
+this is worth spending only where something needs it: a badge holder that hides
+the top of the sticker, a cutter that shaves the last line, a name that wants
+room around it. Press **Print a test label** after changing it — that goes
+through the real path, so what comes out is the label a child will get.
+
+The margins stay put when you change rolls, so swapping to die-cut for an
+afternoon does not cost the tape its setting.
 
 ## Turning it on for a gathering
 
@@ -204,6 +234,12 @@ note cannot be read prints the word `Allergy`, never nothing.
 
 **Cut off at the bottom.** More lines than the label has room for. The editor
 says so when it happens; fewer or smaller lines print larger.
+
+**Too much blank tape, or the text against an edge.** On a continuous roll that
+is the margins, on the printer screen — see
+[Margins on a continuous roll](#margins-on-a-continuous-roll). On die-cut media
+it is not, because the text is centred in a fixed label: what you are seeing
+there is the label's own size.
 
 **Refused with a size error.** The roll in the printer is not the one the kiosk
 is set to. Die-cut media has to match exactly — the rasteriser refuses rather
