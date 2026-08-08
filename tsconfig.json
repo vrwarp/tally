@@ -38,6 +38,13 @@
     "firestore-tests",
     "vite.config.ts",
     "vitest.config.ts",
-    "eslint.config.js"
+    "eslint.config.js",
+    // The kiosk critique harness mounts the real screens, so it is browser
+    // React with the app's aliases — it belongs to this project even though the
+    // shooter that drives it, two files away, is Node and belongs to the e2e
+    // one. It fell between the two: `uxr` is globbed wholesale over there,
+    // where there is no `jsx` and no `@/`, and this project did not name it at
+    // all, so the only environment that saw it was the wrong one.
+    "uxr/kiosk-live/main.tsx"
   ]
 }

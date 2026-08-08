@@ -52,6 +52,7 @@ const binding: KioskBinding = {
   startAtMs: NOW - 22 * 60_000,
   endAtMs: NOW + 68 * 60_000,
   checkInClosesAtMs: NOW + 98 * 60_000,
+  boundAtMs: NOW - 45 * 60_000,
   requiresCheckOut: params.get('pickup') === '1',
   allergiesSupported: true,
 };
