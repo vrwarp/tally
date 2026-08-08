@@ -112,8 +112,8 @@ function WidenButton({
                name would read as a button, and this button carries the same
                fill — so the ring made the *widen* control the strongest edge on
                a screen whose primary targets are the names beside it. */
-            'flex h-11 min-w-0 shrink items-center justify-center truncate rounded-xl bg-ink-800/70 px-3 text-sm font-semibold whitespace-nowrap text-ink-300 active:bg-ink-700 tall:h-14 tall:px-5 tall:text-base'
-          : 'flex h-14 w-full items-center justify-center rounded-xl bg-ink-800 px-8 text-lg font-semibold text-ink-100 active:bg-ink-700 tall:h-16 tall:text-xl lg:flex-1'
+            'flex h-11 min-w-0 shrink items-center justify-center truncate rounded-xl bg-ink-800/70 px-3 text-sm font-semibold whitespace-nowrap text-ink-300 active:bg-ink-700 tall:h-14 tall:px-5 kiosk:text-base'
+          : 'flex h-14 w-full items-center justify-center rounded-xl bg-ink-800 px-8 text-lg font-semibold text-ink-100 active:bg-ink-700 tall:h-16 kiosk:text-xl lg:flex-1'
       }
       style={{ touchAction: 'manipulation' }}
     >
@@ -286,7 +286,17 @@ export function SearchScreen({
    */
   const matchCount = outcome.total ?? outcome.results.length;
   const truncated = matchCount > outcome.results.length;
-  const rows = outcome.results.length > 0;
+  /*
+   * Whether the landscape kiosk splits the list in two.
+   *
+   * Not simply "are there rows". A two-column frame with one name in it puts a
+   * half-width card against the left margin with the whole right half of the
+   * page empty beside it — and strands the count, which hangs off the rows'
+   * right edge and would be pointing at an edge no row is flush to. That is the
+   * state a parent most wants to reach: enough letters typed, one child left.
+   * Four is where both columns have something in them.
+   */
+  const wraps = outcome.results.length >= 4;
 
   const station =
     outcome.mode === 'idle' ? 'my-auto tall:my-0' : rowless ? 'mt-auto tall:mt-0' : '';
@@ -344,8 +354,8 @@ export function SearchScreen({
           * what the parent is doing, not the label on the room they are
           * standing in.
           */}
-        <div className="text-2xl font-semibold text-ink-100">{binding.title}</div>
-        <div className="text-base text-ink-500">
+        <div className="text-2xl font-semibold text-ink-100 kiosk:text-3xl">{binding.title}</div>
+        <div className="text-base text-ink-500 kiosk:text-lg">
           {closed ? 'Check-in window has closed — you can still check in.' : eventWindow(binding)}
         </div>
       </div>
@@ -408,7 +418,7 @@ export function SearchScreen({
           className={`mx-auto w-full max-w-2xl ${station} ${
             rowless ? 'pb-6' : 'pb-2'
           } flex flex-col gap-2 ${
-            rows ? 'lg:block lg:columns-2 lg:gap-x-3 lg:max-w-5xl' : ''
+            wraps ? 'lg:block lg:columns-2 lg:gap-x-8 lg:max-w-5xl' : ''
           }`}
         >
           {/*
@@ -440,8 +450,8 @@ export function SearchScreen({
                   one unit, set tight; what happens next is separated by air
                   rather than by a third size, which at a 2px step read as one
                   paragraph fading out. */}
-              <div className="text-4xl font-semibold text-ink-100 tall:text-5xl">Type a name</div>
-              <div className="pt-1 text-lg text-ink-400 tall:text-xl">or the last 4 digits of your phone</div>
+              <div className="text-4xl font-semibold text-ink-100 kiosk:text-5xl">Type a name</div>
+              <div className="pt-1 text-lg text-ink-400 kiosk:text-xl">or the last 4 digits of your phone</div>
               {/*
                 * What happens next, said before it has to be guessed.
                 *
@@ -471,7 +481,7 @@ export function SearchScreen({
                 * sends somebody hunting for a button and finding the register
                 * offer.
                 */}
-              <div className="pt-4 text-lg text-ink-400 tall:text-xl">Then tap your child&rsquo;s name.</div>
+              <div className="pt-4 text-lg text-ink-400 kiosk:text-xl">Then tap your child&rsquo;s name.</div>
             </div>
           )}
           {outcome.mode === 'phone-partial' && (
@@ -516,7 +526,7 @@ export function SearchScreen({
                   Inheriting the button column broke the sentence inside its own
                   phrase on a phone — "No match — first / time here?" — with the
                   em dash sitting right there unused. */}
-              <div className="mx-auto max-w-sm text-center text-3xl font-semibold text-balance text-ink-100 tall:max-w-md tall:text-4xl">
+              <div className="mx-auto max-w-sm text-center text-3xl font-semibold text-balance text-ink-100 tall:max-w-md kiosk:text-4xl">
                 {refresh === 'done' ? (
                   <>
                     {/*
@@ -554,14 +564,14 @@ export function SearchScreen({
                     haptic();
                     onRegister();
                   }}
-                  className="flex h-14 items-center justify-center rounded-xl bg-brand-600 px-8 text-lg font-semibold text-white active:bg-brand-500 tall:h-16 tall:text-xl lg:flex-1"
+                  className="flex h-14 items-center justify-center rounded-xl bg-brand-600 px-8 text-lg font-semibold text-white active:bg-brand-500 tall:h-16 kiosk:text-xl lg:flex-1"
                 >
                   Register your child
                 </button>
                 <WidenButton widening={widening} onWiden={onWiden} />
               </div>
               {refresh === 'failed' && (
-                <div className="text-base text-ink-500 tall:text-lg">
+                <div className="text-base text-ink-500 kiosk:text-lg">
                   Couldn&apos;t reach the network just now.
                 </div>
               )}
@@ -575,7 +585,7 @@ export function SearchScreen({
                 * not mine" is a real state, and the answer to it — look again,
                 * the church may have added them since — is that control.
                 */}
-              <div className="text-base text-ink-500 tall:text-lg">or see a leader.</div>
+              <div className="text-base text-ink-500 kiosk:text-lg">or see a leader.</div>
             </div>
           )}
           {outcome.results.slice(0, MAX_RESULTS).map((student) => {
@@ -619,10 +629,10 @@ export function SearchScreen({
                       : 'bg-ink-800 active:bg-ink-600'
                 } ${inert || collected ? '' : 'active:bg-ink-600'}`}
               >
-                <span className="truncate text-xl font-semibold text-ink-100 tall:text-2xl">
+                <span className="truncate text-xl font-semibold text-ink-100 kiosk:text-2xl">
                   {student.firstName} {student.lastName}
                 </span>
-                <span className="pl-3 text-base whitespace-nowrap text-ink-400 tall:text-lg">
+                <span className="pl-3 text-base whitespace-nowrap text-ink-400 kiosk:text-lg">
                   {collected ? (
                     <span className="font-semibold text-ink-400">Collected</span>
                   ) : present && tracksCheckOut ? (
@@ -737,7 +747,7 @@ export function SearchScreen({
                in legibility, and on a portrait tablet this was simultaneously
                the only accented object on the glass and the smallest type on
                it, read at arm's length. */
-            className="flex h-11 min-w-0 shrink items-center justify-center truncate rounded-xl bg-brand-600/15 px-3 text-sm font-semibold whitespace-nowrap text-brand-300 ring-1 ring-brand-500/40 active:bg-brand-600/30 tall:h-14 tall:px-5 tall:text-base"
+            className="flex h-11 min-w-0 shrink items-center justify-center truncate rounded-xl bg-brand-600/15 px-3 text-sm font-semibold whitespace-nowrap text-brand-300 ring-1 ring-brand-500/40 active:bg-brand-600/30 tall:h-14 tall:px-5 kiosk:text-base"
           >
             {/*
               * The question goes first and, on a narrow screen standing beside
@@ -792,7 +802,7 @@ export function SearchScreen({
             vertical line in the frame by sixteen pixels. */}
         <div className="relative mx-auto flex h-16 max-w-2xl items-center justify-center text-center tall:h-20 lg:max-w-5xl">
           {buffer && (
-            <span className="truncate text-3xl font-semibold tracking-wide text-ink-50 tall:text-4xl">
+            <span className="truncate text-3xl font-semibold tracking-wide text-ink-50 kiosk:text-4xl">
               {buffer}
             </span>
           )}
@@ -815,7 +825,7 @@ export function SearchScreen({
             * letters off centre or move a row.
             */}
           {matchCount > 0 && (
-            <span className="absolute right-0 text-sm text-ink-400 tall:text-base">
+            <span className="absolute right-0 text-sm text-ink-400 kiosk:text-base">
               {/*
                 * A number while the list is all of it, a sentence when it is
                 * not. `MAX_RESULTS` is eight, and "8 names" over a list that

@@ -74,6 +74,17 @@ const SCENES: { id: string; query: string; views: readonly ViewportName[] }[] = 
      */
     views: ['phone', 'kiosktall', 'kioskwide'],
   },
+  {
+    /*
+     * More matches than the screen can show. The readout answers a capped list
+     * with "Keep typing" rather than a number, and that state went through a
+     * whole round of critique with no frame of it — the fixture held five
+     * children and the cap is eight, so nothing shot could produce it.
+     */
+    id: 'search-capped',
+    query: 'buffer=Al',
+    views: ['phone', 'kiosktall', 'kioskwide'],
+  },
   { id: 'search-nomatch', query: 'buffer=Zzz&nomatch=1', views: ['phone', 'kiosktall', 'kioskwide'] },
   { id: 'register-first', query: 'screen=register', views: ['phone'] },
 ];

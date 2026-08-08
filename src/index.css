@@ -19,6 +19,23 @@
 @custom-variant tall (@media (min-height: 1000px));
 
 /*
+ * `kiosk:` — a screen nobody is holding.
+ *
+ * `tall:` above answers a height question: has this track more room than its
+ * content. This one answers a distance question, and they are not the same
+ * screen. A 1280×800 lobby tablet fell through `tall:` entirely and ran the
+ * phone's type and the phone's target sizes on the largest, furthest piece of
+ * glass of the three — sized as if somebody were holding it, when it is on a
+ * shelf at arm's length.
+ *
+ * Either axis is enough to mean "not a phone": a tablet stood on end clears the
+ * height, one laid on its side clears the width, and a phone in either
+ * orientation clears neither. Both entries exist only in the kiosk's own
+ * screens, so a wide desktop window matching it is not a case that arises.
+ */
+@custom-variant kiosk (@media (min-height: 1000px), (min-width: 1024px));
+
+/*
  * Tally design tokens.
  *
  * The app is used one-handed, in dim rooms, by volunteers who are looking at a

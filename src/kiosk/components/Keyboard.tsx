@@ -54,7 +54,7 @@ const KEY_CLASS =
      somebody standing, so a key that is comfortable in a hand is small on
      a shelf. */
   'flex h-14 min-w-0 flex-1 select-none items-center justify-center rounded-lg ' +
-  'bg-ink-800 text-xl font-semibold text-ink-100 active:bg-ink-600 tall:h-16 tall:text-2xl';
+  'bg-ink-800 text-xl font-semibold text-ink-100 active:bg-ink-600 tall:h-16 kiosk:text-2xl';
 
 export const Keyboard = memo(function Keyboard({
   onKey,
@@ -155,7 +155,13 @@ export const Keyboard = memo(function Keyboard({
 
   return (
     <div
-      className="flex flex-col gap-1.5 p-2 pb-[max(0.5rem,var(--spacing-safe-bottom))]"
+      /* One measure for the screen. Given a landscape kiosk the board used to
+         spend the extra width on the keys rather than on itself: 32px wide on a
+         phone, 121 here, so a key stopped being a key shape and the space bar
+         became the largest empty rectangle in the frame. Capped to the measure
+         the results and the readout sit on, the keys stay a family across the
+         three shapes and the screen has one left edge instead of two. */
+      className="mx-auto flex w-full flex-col gap-1.5 p-2 pb-[max(0.5rem,var(--spacing-safe-bottom))] lg:max-w-5xl"
       style={{ touchAction: 'manipulation' }}
       onPointerDown={onPointerDown}
     >

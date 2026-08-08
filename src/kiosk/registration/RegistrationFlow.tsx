@@ -209,7 +209,7 @@ export function RegistrationFlow({
   const childNumber = state.children.length + 1;
 
   return (
-    <div className="grid h-full grid-rows-[auto_1fr_auto]">
+    <div className="grid h-full grid-rows-[auto_1fr_auto_auto]">
       <Header
         title={titleFor(state, childNumber)}
         subtitle={subtitleFor(state, binding)}
@@ -242,6 +242,29 @@ export function RegistrationFlow({
             isTypingStep(state.step) ? 'mt-auto' : ''
           }`}
         >
+          {/*
+            * The question, where the search screen puts "Type a name" and for
+            * the same reasons.
+            *
+            * It lived only in the header: fourteen pixels of `ink-500` — 4.24:1,
+            * under the AA floor — at the opposite end of the screen from the
+            * hand, and it was the single thing distinguishing step two of this
+            * wizard from step five. Six steps run in sequence with the same
+            * frame, the same keyboard and the same empty readout; a parent who
+            * loses the thread in a dim lobby types a guardian's name into a
+            * child's last-name field, and that lands in the review queue for a
+            * leader to judge.
+            *
+            * The field's own name rather than the header's conversational
+            * question, because that is the half that is specific: "So we know
+            * who brought them" does not say whose last name this is, and "Your
+            * last name" does.
+            */}
+          {isTypingStep(state.step) && (
+            <div className="pb-2 text-center text-3xl font-semibold text-ink-100 kiosk:text-4xl">
+              {placeholderFor(state)}
+            </div>
+          )}
           {state.step === 'child-grade' && (
             <div className="grid grid-cols-3 gap-2 pt-2">
               <GradeChip label={NO_GRADE} onPick={() => dispatch({ type: 'grade', grade: null })} />
@@ -395,6 +418,17 @@ export function RegistrationFlow({
         </div>
       </div>
 
+      {/*
+        * The same rule the search screen draws, because it is a property of the
+        * console rather than of that screen. Below it: the action, the readout
+        * and the keys. A parent learns to read that object as the thing they
+        * operate, and one tap later it used to dissolve — the two screens
+        * differ only in their bottom third, so a missing edge was the most
+        * noticeable change between them, and it made the step a parent had just
+        * chosen look less structured than the screen they chose it from.
+        */}
+      <div className="border-t border-ink-800/70" />
+
       {/* The bottom row: the readout and the keyboard where something is being
           typed, the one action that ends the step where it is not. */}
       {isTypingStep(state.step) ? (
@@ -455,23 +489,15 @@ export function RegistrationFlow({
             }`}
           >
             <div className="mx-auto flex h-16 max-w-2xl items-center justify-center px-4">
-              {state.buffer ? (
-                <span className="truncate text-3xl font-semibold tracking-wide text-ink-50">
+              {/* Letters only, and empty until there are some. The search screen
+                  teaches a parent two taps earlier that the bold word above the
+                  keys is what *they* typed; a placeholder sitting in that slot
+                  read as something a previous family had already entered. What
+                  the box is for is said above it, at size. */}
+              {state.buffer && (
+                <span className="truncate text-3xl font-semibold tracking-wide text-ink-50 kiosk:text-4xl">
                   {state.step === 'guardian-phone' ? formatPhone(state.buffer) : state.buffer}
                 </span>
-              ) : (
-                /*
-                 * A label, and unmistakably not a value.
-                 *
-                 * The search screen leaves this slot empty until a key lands,
-                 * which teaches a parent two taps earlier that the bold word
-                 * above the keys is what *they* typed. Set at one size step and
-                 * one grey below the real thing, this placeholder then read as
-                 * something the previous family had entered — same position,
-                 * same weight, same shape. Two size steps and a weight class
-                 * apart is a different kind of object; dimming alone was not.
-                 */
-                <span className="truncate text-lg text-ink-500">{placeholderFor(state)}</span>
               )}
             </div>
           </div>
@@ -551,7 +577,7 @@ function Header({
         </button>
       )}
       <div className="text-lg font-semibold text-ink-200">{title}</div>
-      <div className="text-sm text-ink-500">{subtitle}</div>
+      <div className="text-sm text-ink-400 kiosk:text-base">{subtitle}</div>
     </div>
   );
 }
