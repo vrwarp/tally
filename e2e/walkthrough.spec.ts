@@ -320,6 +320,94 @@ test('capture the walkthrough', async ({ page, signedInAs }) => {
       'The pages come straight out of Firestore, a dozen gatherings at a time, cursored rather than counted — the calendar the rest of the app holds in memory is a bounded window, and its far edge is exactly the boundary somebody looking for last March is trying to cross. The head counts come from the same cache the predictive roster fills, so scrolling back over a fortnight the roster already read costs nothing.',
   });
 
+  /* ---- Journey 8: a gathering that is not everybody's ------------------ */
+
+  /*
+   * Photographed through the real flow rather than seeded, because the claim
+   * being made is that a core member can do this in three taps from a night's
+   * own page. A seeded ACL would photograph the *result* and prove nothing
+   * about the route.
+   *
+   * Sunday School is the right subject: the seed gives it its own history and
+   * its own regulars, so the locked row a counselor sees is a gathering that
+   * genuinely runs rather than an empty fixture.
+   */
+  await gotoReady(page, '/events');
+  await page.waitForTimeout(800);
+
+  const sundayLink = page.getByRole('link', { name: /sunday school/i }).first();
+  await sundayLink.waitFor({ timeout: 30_000 });
+  await sundayLink.click();
+  await page.waitForTimeout(1200);
+
+  await page
+    .getByRole('button', { name: /^(Limit|Change)$/ })
+    .first()
+    .click();
+  await page.waitForTimeout(600);
+
+  await capture(page, {
+    journey: 'Journey 8 — a gathering that is not everybody’s',
+    title: 'Who’s on this gathering',
+    caption:
+      'A ministry running Friday Fellowship, Sunday School, a Wednesday group and a retreat gives its nursery volunteers a chooser carrying three gatherings they will never stand at. The problem is clutter, not secrecy. The sheet says what it covers before it does anything — the person is standing on one night’s page and this changes every Sunday School, past and future — and it opens from the night itself rather than from a settings screen, because that is where somebody is when they think of it.',
+  });
+
+  await page.getByRole('button', { name: /only people i add/i }).click();
+  await page.waitForTimeout(1800);
+
+  await capture(page, {
+    journey: 'Journey 8 — a gathering that is not everybody’s',
+    title: 'The list starts from whoever already works it',
+    caption:
+      'Closing a gathering pre-fills from the people who have recently taken its register, which is the safety net under the one mistake this feature makes easiest: nothing stops a core member restricting Friday Fellowship — the gathering the whole ministry works — and it is three taps. Starting from the team already working it makes the default outcome of a mis-tap “no change”. The writer cannot leave themselves off, so somebody can always reopen it, and admins pass every gathering regardless.',
+  });
+
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(400);
+
+  await signOut(page);
+  await signedInAs('counselor');
+  await page.waitForTimeout(1500);
+
+  await capture(page, {
+    journey: 'Journey 8 — a gathering that is not everybody’s',
+    title: 'Demoted, never hidden',
+    caption:
+      'Sam’s chooser now leads with the gatherings he actually works. Sunday School has dropped below a divider into a collapsed “Not yours” section, with a lock and the name of somebody who can add him. Hiding it outright would have been easier and is the wrong answer: a volunteer at a door at 6:59pm who opens Tally and sees an empty screen does not conclude “I have not been added to this” — they conclude the app is broken, and then they find something else to file forty check-ins against. When nothing today is theirs the section opens by itself and the heading reads “Nothing you’re on today”, which is the difference between an app that is empty and one that is refusing.',
+  });
+
+  const notYours = page.getByRole('region', { name: /not yours/i });
+  if (await notYours.isVisible().catch(() => false)) {
+    await notYours.getByRole('group').first().click().catch(() => {});
+    await page.waitForTimeout(500);
+    await capture(page, {
+      journey: 'Journey 8 — a gathering that is not everybody’s',
+      title: 'A lock, and a name to ask',
+      caption:
+        'One tap opens it. The row is deliberately less appealing than the card above it and is not a link, because there is nowhere useful to go — the gathering’s own page would refuse him too — so it states the situation instead of promising a screen that cannot help. The name matters more than the lock: anybody already on a gathering can add somebody else to it, so the person standing next to Sam at the door is usually the person who can fix it, and neither of them has to find an admin.',
+    });
+  }
+
+  /*
+   * Put it back. This spec is a documentation build that runs against the same
+   * seeded emulator every other spec uses, and leaving Sunday School closed
+   * would quietly change what those specs are testing.
+   */
+  await signOut(page);
+  await signedInAs('core');
+  await gotoReady(page, '/events');
+  await page.waitForTimeout(800);
+  await page
+    .getByRole('link', { name: /sunday school/i })
+    .first()
+    .click();
+  await page.waitForTimeout(1200);
+  await page.getByRole('button', { name: /^Change$/ }).first().click();
+  await page.waitForTimeout(400);
+  await page.getByRole('button', { name: /everyone on the team/i }).click();
+  await page.waitForTimeout(1200);
+
   await writeFile(
     join(OUT_DIR, `walkthrough-${test.info().project.name}.json`),
     JSON.stringify(shots, null, 2),

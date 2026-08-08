@@ -29,7 +29,7 @@ export interface ThresholdPreviewProps {
 }
 
 export function ThresholdPreview({ draft, saved, valid }: ThresholdPreviewProps) {
-  const { students, events, series, settings } = useData();
+  const { students, events, series, settings, canWork } = useData();
   const now = useNow(60_000);
 
   const history = useMemo(
@@ -46,7 +46,18 @@ export function ThresholdPreview({ draft, saved, valid }: ThresholdPreviewProps)
     [events, now],
   );
 
-  const { snapshots, loading } = useEventSnapshots(history);
+  /*
+   * Narrowed to the gatherings this counselor may actually work, before the
+   * read rather than after.
+   *
+   * Not an optimisation. `fetchAttendanceByEvent` tolerates a refusal per
+   * event, but a refusal is still a round trip and still a console error on a
+   * screen that has nothing to say about it — and asking at all for a register
+   * the reader cannot have is asking a question whose answer would be
+   * misleading if it arrived.
+   */
+  const workable = useMemo(() => history.filter(canWork), [history, canWork]);
+  const { snapshots, loading } = useEventSnapshots(workable);
 
   const withDraft = (overrides: Partial<AppSettings>): AppSettings => ({
     ...settings,

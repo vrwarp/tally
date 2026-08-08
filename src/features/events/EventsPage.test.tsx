@@ -84,6 +84,9 @@ function show(events: readonly TallyEvent[]) {
     rosterOffline: false,
     rosterFetchedAt: null,
     rosterBackends: [],
+    // Nothing restricted, which is the state every screen has to keep working in.
+    access: new Map(),
+    canWork: () => true,
     refreshRoster: async () => {},
     applyRosterPerson: () => {},
   };
@@ -133,7 +136,7 @@ beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.setSystemTime(NOW);
   fetchPastEvents.mockResolvedValue({ events: [], cursor: null, hasMore: false });
-  fetchAttendanceByEvent.mockResolvedValue(new Map());
+  fetchAttendanceByEvent.mockResolvedValue({ byEvent: new Map(), denied: new Set() });
 });
 
 afterEach(() => {
@@ -231,11 +234,12 @@ describe('the history', () => {
       cursor: null,
       hasMore: false,
     });
-    fetchAttendanceByEvent.mockResolvedValue(
-      new Map([
+    fetchAttendanceByEvent.mockResolvedValue({
+      byEvent: new Map([
         ['last-friday', { present: new Set(['a', 'b', 'c', 'd']), checkedOut: new Set() }],
       ]),
-    );
+      denied: new Set(),
+    });
 
     show([]);
 
@@ -252,7 +256,10 @@ describe('the history', () => {
       cursor: null,
       hasMore: false,
     });
-    fetchAttendanceByEvent.mockResolvedValue(new Map([['snowed-off', { present: new Set(), checkedOut: new Set() }]]));
+    fetchAttendanceByEvent.mockResolvedValue({
+      byEvent: new Map([['snowed-off', { present: new Set(), checkedOut: new Set() }]]),
+      denied: new Set(),
+    });
 
     show([]);
 

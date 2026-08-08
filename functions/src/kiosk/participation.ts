@@ -143,11 +143,36 @@ export async function buildParticipationIndex(
 
   const scopes = buildChainScopes(instances, rule, now);
 
+  /*
+   * Restricted gatherings are left out of this document entirely.
+   *
+   * It is precomputed from a year of registers and read by every active member
+   * — and any of them can force it fresh through `refreshKioskParticipation`.
+   * A restricted chain's entry is that gathering's roster and its regulars,
+   * served in one read, which is a longer way of saying the fence would have a
+   * hole in it shaped exactly like the thing the fence is for.
+   *
+   * There is no per-reader filtering available here: one document is written
+   * nightly and everybody gets the same one. So the answer is omission. A
+   * kiosk bound to a restricted gathering therefore falls back to the whole
+   * roster and an unticked sibling list — worse ordering, never a wrong or a
+   * leaked one — and `getKioskEvents` refuses that binding at pairing time
+   * anyway, so in practice nothing reaches this state.
+   */
+  const restricted = await restrictedChains(db, [...scopes.keys()]);
+
   const chains: Record<string, { participated: string[]; recent: string[] }> = {};
   const everybody = new Set<string>();
   for (const [chain, scope] of scopes) {
+    if (restricted.has(chain)) continue;
     chains[chain] = scope;
     for (const studentId of scope.participated) everybody.add(studentId);
+  }
+
+  if (restricted.size > 0) {
+    options.logger?.info('Left restricted gatherings out of the kiosk participation index', {
+      chains: restricted.size,
+    });
   }
 
   const payload = {
@@ -182,4 +207,26 @@ export async function buildParticipationIndex(
     students: everybody.size,
     builtAt: now.toISOString(),
   };
+}
+
+/**
+ * Which of `chains` somebody has closed.
+ *
+ * An absent `eventAccess` document means the gathering is open, which is almost
+ * all of them — so this reads one document per chain and usually finds nothing.
+ */
+async function restrictedChains(
+  db: FirestoreLike,
+  chains: readonly string[],
+): Promise<Set<string>> {
+  const closed = new Set<string>();
+
+  await Promise.all(
+    chains.map(async (chain) => {
+      const snapshot = await db.doc(`eventAccess/${chain}`).get();
+      if (snapshot.exists && snapshot.data()?.restricted === true) closed.add(chain);
+    }),
+  );
+
+  return closed;
 }

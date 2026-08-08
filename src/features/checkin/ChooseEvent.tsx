@@ -24,8 +24,10 @@ import { PageFrame } from '@/components/PageFrame';
 import { EmptyState } from '@/components/ui';
 import { useAuth } from '@/context/authContext';
 import { EventHeroCard } from '@/features/events/EventHeroCard';
+import { LockedGatherings } from '@/features/events/LockedGatherings';
 import { PastEventRow } from '@/features/events/PastGatherings';
 import { useEventSnapshots } from '@/hooks/useEventSnapshots';
+import { useData } from '@/context/dataContext';
 import { usePastEvents } from '@/hooks/usePastEvents';
 import { isCheckInOpen, startOfDay } from '@/lib/time';
 import type { TallyEvent } from '@/types';
@@ -49,6 +51,7 @@ export interface ChooseEventProps {
 
 function CatchUp({ before, now }: { before: Date; now: Date }) {
   const { events, loading } = usePastEvents(before, CATCH_UP);
+  const { canWork } = useData();
 
   /*
    * "Before midnight" and "finished" are not the same thing.
@@ -66,7 +69,18 @@ function CatchUp({ before, now }: { before: Date; now: Date }) {
     [events, now],
   );
 
-  const { snapshots } = useEventSnapshots(finished);
+  /*
+   * Narrowed to the gatherings this counselor may actually work, before the
+   * read rather than after.
+   *
+   * Not an optimisation. `fetchAttendanceByEvent` tolerates a refusal per
+   * event, but a refusal is still a round trip and still a console error on a
+   * screen that has nothing to say about it — and asking at all for a register
+   * the reader cannot have is asking a question whose answer would be
+   * misleading if it arrived.
+   */
+  const workable = useMemo(() => finished.filter(canWork), [finished, canWork]);
+  const { snapshots } = useEventSnapshots(workable);
 
   const counts = useMemo(
     () => new Map(snapshots.map((s) => [s.event.id, s.presentStudentIds.size])),
@@ -89,7 +103,12 @@ function CatchUp({ before, now }: { before: Date; now: Date }) {
       </p>
       <ul className="flex flex-col gap-2">
         {finished.map((event) => (
-          <PastEventRow key={event.id} event={event} count={counts.get(event.id)} />
+          <PastEventRow
+            key={event.id}
+            event={event}
+            count={counts.get(event.id)}
+            locked={!canWork(event)}
+          />
         ))}
       </ul>
     </section>
@@ -100,6 +119,7 @@ function CatchUp({ before, now }: { before: Date; now: Date }) {
 
 export function ChooseEvent({ events, now }: ChooseEventProps) {
   const { can } = useAuth();
+  const { canWork } = useData();
 
   const { dayStart, today } = useMemo(() => {
     /*
@@ -137,24 +157,41 @@ export function ChooseEvent({ events, now }: ChooseEventProps) {
     };
   }, [events, now]);
 
+  /*
+   * Yours, and everybody else's.
+   *
+   * The partition is the whole feature. What was one list of hero cards is now
+   * the counselor's own gatherings — unchanged, still hero cards, still the
+   * answer to the question the screen asks — and, below a divider, the ones
+   * they are not on, demoted rather than hidden. See `LockedGatherings` for why
+   * hiding them would be the worse bug.
+   */
+  const { mine, locked } = useMemo(
+    () => ({
+      mine: today.filter(canWork),
+      locked: today.filter((event) => !canWork(event)),
+    }),
+    [today, canWork],
+  );
+
   return (
     /* Same frame as every other screen, and the same `widen: false` as the
        roster it leads to — these two are one tab and must not move under a
        counselor who taps from one to the other. */
     <PageFrame widen={false} gap="lg" className="pb-8">
-      {today.length > 0 ? (
+      {mine.length > 0 ? (
         <section aria-labelledby="choose-heading">
           <h1 id="choose-heading" className="pb-1 text-xl font-bold text-ink-50">
-            {today.length === 1 ? 'On today' : 'Which gathering?'}
+            {mine.length === 1 ? 'On today' : 'Which gathering?'}
           </h1>
           <p className="pb-3 text-sm text-ink-500">
-            {today.length === 1
+            {mine.length === 1
               ? 'Open it to start checking students in.'
               : 'Pick the one you are standing at — attendance is filed against it.'}
           </p>
 
           <div className="flex flex-col gap-3">
-            {today.map((event) => (
+            {mine.map((event) => (
               <EventHeroCard
                 key={event.id}
                 event={event}
@@ -168,12 +205,20 @@ export function ChooseEvent({ events, now }: ChooseEventProps) {
       ) : (
         <EmptyState
           className="py-8"
-          icon="🗓"
-          title="Nothing on today"
+          icon={locked.length > 0 ? '🔒' : '🗓'}
+          /*
+           * "Nothing you're on" is a different sentence from "nothing on", and
+           * the difference is the difference between an app that is empty and
+           * one that is refusing. A counselor who reads the first goes and asks
+           * somebody; one who reads the second concludes Tally is broken.
+           */
+          title={locked.length > 0 ? "Nothing you're on today" : 'Nothing on today'}
           description={
-            can('core')
-              ? 'Nothing is scheduled for today. The calendar, and everything already held, is on the Events tab.'
-              : 'Nothing is scheduled for today. Ask the core team if a gathering is missing.'
+            locked.length > 0
+              ? `${locked.length === 1 ? 'One gathering is' : `${locked.length} gatherings are`} on today that you have not been added to. They are listed below — ask whoever is named to add you.`
+              : can('core')
+                ? 'Nothing is scheduled for today. The calendar, and everything already held, is on the Events tab.'
+                : 'Nothing is scheduled for today. Ask the core team if a gathering is missing.'
           }
           action={
             can('core') ? (
@@ -187,6 +232,8 @@ export function ChooseEvent({ events, now }: ChooseEventProps) {
           }
         />
       )}
+
+      <LockedGatherings events={locked} hasOwn={mine.length > 0} />
 
       <CatchUp before={dayStart} now={now} />
     </PageFrame>

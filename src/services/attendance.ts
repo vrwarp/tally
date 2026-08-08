@@ -7,28 +7,21 @@
  */
 import {
   collection,
-  collectionGroup,
   deleteDoc,
   deleteField,
   doc,
   getDoc,
   getDocs,
-  limit,
   onSnapshot,
-  orderBy,
-  query,
   serverTimestamp,
   setDoc,
-  startAfter,
   updateDoc,
-  where,
   writeBatch,
-  type DocumentData,
-  type QueryDocumentSnapshot,
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { COLLECTIONS, paths } from '@/lib/paths';
+import { paths } from '@/lib/paths';
+import { isPermissionDenied } from '@/lib/permissionDenied';
 import {
   attendancePayload as buildAttendancePayload,
   studentDatePatch as buildStudentDatePatch,
@@ -37,6 +30,7 @@ import {
   type CheckInStudent,
 } from '@/services/attendancePayloads';
 import { toAttendance, toEvent } from '@/services/converters';
+import { getStudentAttendance } from '@/services/functions';
 import { buildStudentPayload, newStudentRef, type StudentDraft } from '@/services/students';
 import type { AttendanceRecord, CheckInMethod, TallyEvent } from '@/types';
 
@@ -305,10 +299,32 @@ export interface EventAttendanceIds {
   checkedOut: Set<string>;
 }
 
+/**
+ * What a batch read came back with, and what it was refused.
+ *
+ * The two have to be separate channels, and this is the single most important
+ * shape in the access feature. A register the reader may not see is *not* an
+ * empty register: `sessionOutcome` reads an empty one as `presumed-cancelled`,
+ * which drops the night out of `buildChainHistory`, inflates the dashboard's
+ * skipped count, and counts as an absence for every student in
+ * `computeMiaByGathering` — which is a phone call to a family about a gathering
+ * the reader simply was not allowed to look at.
+ *
+ * So a denied event appears in `denied` and *nowhere* in `byEvent`. A caller
+ * that ignores `denied` gets no snapshot rather than a wrong one, which is the
+ * failure mode worth having.
+ */
+export interface EventAttendanceRead {
+  byEvent: Map<string, EventAttendanceIds>;
+  /** Event ids whose register the caller may not read. */
+  denied: Set<string>;
+}
+
 export async function fetchAttendanceByEvent(
   eventIds: readonly string[],
-): Promise<Map<string, EventAttendanceIds>> {
-  const results = new Map<string, EventAttendanceIds>();
+): Promise<EventAttendanceRead> {
+  const byEvent = new Map<string, EventAttendanceIds>();
+  const denied = new Set<string>();
   let next = 0;
 
   // Each worker takes the next id and reads it, until there are none left. The
@@ -318,13 +334,32 @@ export async function fetchAttendanceByEvent(
     for (let index = next++; index < eventIds.length; index = next++) {
       const eventId = eventIds[index];
       if (eventId === undefined) continue;
-      const snapshot = await getDocs(collection(db, paths.attendanceCollection(eventId)));
-      results.set(eventId, {
-        present: new Set(snapshot.docs.map((d) => d.id)),
-        checkedOut: new Set(
-          snapshot.docs.filter((d) => d.get('checkedOutAt') != null).map((d) => d.id),
-        ),
-      });
+
+      /*
+       * Per event, not per batch.
+       *
+       * Callers hand this a window — one series' recent instances, the
+       * dashboard's last six weeks — and those windows mix gatherings freely.
+       * Rejecting the whole batch on the first refusal meant one restricted
+       * Sunday emptied the roster of every Friday beside it, on a screen
+       * somebody is standing at a door holding.
+       *
+       * Only a refusal is swallowed. A network failure or a malformed document
+       * still rejects, because those are worth retrying and worth saying out
+       * loud.
+       */
+      try {
+        const snapshot = await getDocs(collection(db, paths.attendanceCollection(eventId)));
+        byEvent.set(eventId, {
+          present: new Set(snapshot.docs.map((d) => d.id)),
+          checkedOut: new Set(
+            snapshot.docs.filter((d) => d.get('checkedOutAt') != null).map((d) => d.id),
+          ),
+        });
+      } catch (cause) {
+        if (!isPermissionDenied(cause)) throw cause;
+        denied.add(eventId);
+      }
     }
   };
 
@@ -332,7 +367,7 @@ export async function fetchAttendanceByEvent(
     Array.from({ length: Math.min(ATTENDANCE_READ_CONCURRENCY, eventIds.length) }, worker),
   );
 
-  return results;
+  return { byEvent, denied };
 }
 
 /**
@@ -340,37 +375,34 @@ export async function fetchAttendanceByEvent(
  *
  * The cheap half of a profile's history. "Was this student here?" is a fact
  * about the student, and their own attendance documents are where it is written
- * — so a year of it is one indexed query against the collection group rather
- * than a read of every night that happened. The other half, "did the gathering
- * happen at all", is not about them and comes from `skippedNights`.
+ * — so a year of it is one indexed query rather than a read of every night that
+ * happened. The other half, "did the gathering happen at all", is not about
+ * them and comes from `skippedNights`.
  *
- * Ids come from the document path rather than the `eventId` field, for the
- * reason `fetchStudentHistory` gives: the two agree because the rules require
- * it, but the path is the one that cannot have been written wrong, and this is
- * the read that would otherwise attribute a night to the wrong gathering.
+ * Through a callable now rather than a collection-group query from here. The
+ * wildcard rule that authorised the query could not ask which gathering a
+ * record belonged to — no rule at a wildcard path can — and it was granting
+ * `list` over every restricted register into the bargain. The filtering
+ * therefore happens on a server that can see the parent event; see
+ * `getStudentAttendance`.
+ *
+ * `withheld` is the gathering chains the caller was not shown, and it must not
+ * be dropped: a profile that quietly returns a shorter history under-reports
+ * somebody's attendance to the person deciding whether to ring their family.
  *
  * Unpaged deliberately. A year of one student is at most a few hundred small
- * documents, and the profile needs all of them before it can draw anything —
- * paging would be latency spent to arrive at the same place.
+ * documents, and the profile needs all of them before it can draw anything.
  */
 export async function fetchStudentAttendanceSince(
   studentId: string,
   since: Date,
-): Promise<Set<string>> {
-  const snapshot = await getDocs(
-    query(
-      collectionGroup(db, COLLECTIONS.attendance),
-      where('studentId', '==', studentId),
-      where('checkedInAt', '>=', since),
-      orderBy('checkedInAt', 'desc'),
-    ),
-  );
+): Promise<{ eventIds: Set<string>; withheld: Set<string> }> {
+  const result = await getStudentAttendance({ studentId, since: since.getTime() });
 
-  return new Set(
-    snapshot.docs
-      .map((document) => document.ref.parent.parent?.id)
-      .filter((id): id is string => typeof id === 'string' && id.length > 0),
-  );
+  return {
+    eventIds: new Set(result.data.eventIds ?? []),
+    withheld: new Set(result.data.withheld ?? []),
+  };
 }
 
 /** Full attendance records (not just ids) for one event. */
@@ -400,13 +432,26 @@ export interface StudentHistoryEntry {
   event: TallyEvent | null;
 }
 
-/** Opaque cursor for the next page. Nothing outside this module reads it. */
-export type StudentHistoryCursor = QueryDocumentSnapshot<DocumentData>;
+/**
+ * Where the next page starts.
+ *
+ * A plain value rather than the `QueryDocumentSnapshot` this used to be,
+ * because the query now runs on a server and the cursor has to survive the
+ * wire. `checkedInAt` alone would not do: an import can stamp a whole register
+ * with one instant, so the document path is what stops a page boundary from
+ * dropping or repeating a row.
+ */
+export interface StudentHistoryCursor {
+  checkedInAt: number;
+  path: string;
+}
 
 export interface StudentHistoryPage {
   entries: StudentHistoryEntry[];
   cursor: StudentHistoryCursor | null;
   hasMore: boolean;
+  /** Gathering chains left out because the reader is not on them. */
+  withheld: Set<string>;
 }
 
 /**
@@ -414,13 +459,19 @@ export interface StudentHistoryPage {
  * as far back as the ministry has records, not as far back as the calendar the
  * app keeps loaded.
  *
- * A collection-group query rather than a walk over `events`, and that choice is
- * the whole point: the student's own attendance documents *are* the answer, and
- * asking for them directly is one indexed query for any depth of history. The
- * index has been declared for this since before anything used it
- * (`firestore.indexes.json`, `attendance` by `studentId` + `checkedInAt desc`),
- * and `firestore.rules` carries the wildcard `list` a collection-group query
- * needs.
+ * Through `getStudentAttendance` rather than a collection-group query from
+ * here. The reason is not performance: a collection-group query can only be
+ * authorised by a rule at a wildcard path, and a wildcard path has no single
+ * parent event, so no rule there can ask which gathering a record belongs to or
+ * whether the reader is on it. The same wildcard also matched an ordinary
+ * subcollection query, so the rule that made this page possible was granting
+ * `list` over every restricted register besides. Both facts point one way.
+ *
+ * **`hasMore` is the server's answer, not a guess from the page length.** A
+ * page of twenty may come back as six once the reader's own gatherings are
+ * filtered out, and inferring "that was the end" from a short page would stop
+ * the profile's infinite scroll at the first such page — silently, on the
+ * screen whose whole job is a complete history.
  *
  * What it deliberately cannot answer is which nights the student *missed*: an
  * absence is a fact about the gathering's calendar, not about this student, and
@@ -432,44 +483,38 @@ export async function fetchStudentHistory(
   cursor: StudentHistoryCursor | null = null,
   pageSize: number = STUDENT_HISTORY_PAGE_SIZE,
 ): Promise<StudentHistoryPage> {
-  const snapshot = await getDocs(
-    query(
-      collectionGroup(db, COLLECTIONS.attendance),
-      where('studentId', '==', studentId),
-      orderBy('checkedInAt', 'desc'),
-      ...(cursor ? [startAfter(cursor)] : []),
-      limit(pageSize),
-    ),
-  );
+  const result = await getStudentAttendance({ studentId, cursor, pageSize });
+  const records = result.data.records ?? [];
 
   /*
-   * The event id comes from the document's own path rather than from its
-   * `eventId` field. The two agree — the security rules require it on every
-   * write — but the path is the one that cannot have been written wrong, and
-   * this is the read that would silently attribute a night to the wrong
-   * gathering if it were.
+   * The event id came from the document's own path on the server, for the
+   * reason it always did: the record's `eventId` field agrees — the rules
+   * require it on every write — but the path is the one that cannot have been
+   * written wrong, and this is the read that would silently attribute a night
+   * to the wrong gathering if it were.
    */
-  const eventIds = [
-    ...new Set(
-      snapshot.docs
-        .map((document) => document.ref.parent.parent?.id)
-        .filter((id): id is string => typeof id === 'string' && id.length > 0),
-    ),
-  ];
+  const eventIds = [...new Set(records.map((record) => record.eventId))];
 
   const events = new Map<string, TallyEvent>();
   await Promise.all(
     eventIds.map(async (eventId) => {
-      const document = await getDoc(doc(db, paths.event(eventId)));
-      if (document.exists()) events.set(eventId, toEvent(document));
+      try {
+        const document = await getDoc(doc(db, paths.event(eventId)));
+        if (document.exists()) events.set(eventId, toEvent(document));
+      } catch (cause) {
+        // The event read still goes through the rules, and a chain the server
+        // was willing to show should also be readable here — but a race with
+        // somebody restricting it mid-scroll is possible, and a night with no
+        // event still renders as a record. See `StudentHistoryEntry.event`.
+        if (!isPermissionDenied(cause)) throw cause;
+      }
     }),
   );
 
-  const entries = snapshot.docs.flatMap<StudentHistoryEntry>((document) => {
-    const eventId = document.ref.parent.parent?.id;
-    if (!eventId) return [];
-    return [{ record: toAttendance(document, eventId), event: events.get(eventId) ?? null }];
-  });
+  const entries = records.map<StudentHistoryEntry>((record) => ({
+    record: fromCallableAttendance(record.id, record.eventId, record.data),
+    event: events.get(record.eventId) ?? null,
+  }));
 
   /*
    * Ordered by the night, not by when the kiosk recorded it.
@@ -487,12 +532,48 @@ export async function fetchStudentHistory(
       (a.event?.startAt ?? a.record.checkedInAt).getTime(),
   );
 
-  const last = snapshot.docs.at(-1) ?? null;
   return {
     entries,
-    // A short page is the end of the history, and a cursor for it could only
-    // buy a request that comes back empty.
-    cursor: snapshot.docs.length === pageSize ? last : null,
-    hasMore: snapshot.docs.length === pageSize,
+    cursor: result.data.cursor ?? null,
+    hasMore: result.data.hasMore === true,
+    withheld: new Set(result.data.withheld ?? []),
+  };
+}
+
+/**
+ * One attendance record as it comes back over the wire.
+ *
+ * `toAttendance` takes a `DocumentSnapshot`, which a callable result is not.
+ * The fields are the same; the timestamps arrive as milliseconds because JSON
+ * has no other way to carry them.
+ */
+function fromCallableAttendance(
+  id: string,
+  eventId: string,
+  data: Record<string, unknown>,
+): AttendanceRecord {
+  const millis = (value: unknown): Date | null =>
+    typeof value === 'number' ? new Date(value) : null;
+  const str = (value: unknown): string => (typeof value === 'string' ? value : '');
+  const method = data.method;
+
+  return {
+    id,
+    studentId: str(data.studentId) || id,
+    eventId: str(data.eventId) || eventId,
+    seriesId: typeof data.seriesId === 'string' ? data.seriesId : null,
+    checkedInAt: millis(data.checkedInAt) ?? new Date(0),
+    checkedInBy: str(data.checkedInBy),
+    method:
+      method === 'search' ||
+      method === 'quick-add' ||
+      method === 'manual' ||
+      method === 'import' ||
+      method === 'kiosk'
+        ? method
+        : 'tap',
+    isFirstEver: data.isFirstEver === true,
+    checkedOutAt: millis(data.checkedOutAt),
+    checkedOutBy: typeof data.checkedOutBy === 'string' ? data.checkedOutBy : null,
   };
 }

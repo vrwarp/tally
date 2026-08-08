@@ -19,6 +19,7 @@ import { format } from 'date-fns';
 import { Badge, ErrorBanner } from '@/components/ui';
 import { EventIcon } from '@/components/ui/EventIcon';
 import { useEventSnapshots } from '@/hooks/useEventSnapshots';
+import { useData } from '@/context/dataContext';
 import { usePastEvents } from '@/hooks/usePastEvents';
 import { formatEventWindow } from '@/lib/time';
 import type { TallyEvent } from '@/types';
@@ -62,9 +63,34 @@ function groupByMonth(events: readonly TallyEvent[]): MonthGroup[] {
  * `lib/sessionHistory.ts`) — so printing a bold `0` beside it would state a
  * turnout the app does not itself believe.
  */
-function AttendanceStat({ event, count }: { event: TallyEvent; count: number | undefined }) {
+function AttendanceStat({
+  event,
+  count,
+  locked,
+}: {
+  event: TallyEvent;
+  count: number | undefined;
+  locked?: boolean;
+}) {
   if (event.status === 'cancelled') {
     return <Badge tone="danger">Cancelled</Badge>;
+  }
+
+  /*
+   * A lock, not a spinner.
+   *
+   * The count for a gathering this reader is not on is never read — the callers
+   * narrow the window before asking — so the pulsing placeholder below would
+   * pulse forever. It is also the wrong claim twice over: a skeleton says "this
+   * is arriving", and a nought would say "nobody came".
+   */
+  if (locked) {
+    return (
+      <span className="block text-right text-[11px] leading-tight text-ink-500">
+        <span aria-hidden>🔒</span>
+        <span className="block">not yours</span>
+      </span>
+    );
   }
 
   if (count === undefined) {
@@ -118,9 +144,12 @@ function AttendanceStat({ event, count }: { event: TallyEvent; count: number | u
 export function PastEventRow({
   event,
   count,
+  locked,
 }: {
   event: TallyEvent;
   count: number | undefined;
+  /** Not this reader's gathering — the head count was never asked for. */
+  locked?: boolean;
 }) {
   return (
     <li>
@@ -139,7 +168,7 @@ export function PastEventRow({
           </span>
         </span>
 
-        <AttendanceStat event={event} count={count} />
+        <AttendanceStat event={event} count={count} locked={locked} />
       </Link>
     </li>
   );
@@ -157,7 +186,19 @@ export interface PastGatheringsProps {
 
 export function PastGatherings({ before }: PastGatheringsProps) {
   const { events, loading, hasMore, error, loadMore, retry } = usePastEvents(before);
-  const { snapshots } = useEventSnapshots(events);
+  const { canWork } = useData();
+  /*
+   * Narrowed to the gatherings this counselor may actually work, before the
+   * read rather than after.
+   *
+   * Not an optimisation. `fetchAttendanceByEvent` tolerates a refusal per
+   * event, but a refusal is still a round trip and still a console error on a
+   * screen that has nothing to say about it — and asking at all for a register
+   * the reader cannot have is asking a question whose answer would be
+   * misleading if it arrived.
+   */
+  const workable = useMemo(() => events.filter(canWork), [events, canWork]);
+  const { snapshots } = useEventSnapshots(workable);
 
   const counts = useMemo(
     () => new Map(snapshots.map((snapshot) => [snapshot.event.id, snapshot.presentStudentIds.size])),
@@ -211,7 +252,12 @@ export function PastGatherings({ before }: PastGatheringsProps) {
             </h3>
             <ul className="flex flex-col gap-2">
               {group.events.map((event) => (
-                <PastEventRow key={event.id} event={event} count={counts.get(event.id)} />
+                <PastEventRow
+              key={event.id}
+              event={event}
+              count={counts.get(event.id)}
+              locked={!canWork(event)}
+            />
               ))}
             </ul>
           </div>

@@ -38,6 +38,7 @@ export const SHARED_FILES = [
   'materialize.ts',
   'phoneDigits.ts',
   'participation.ts',
+  'eventAccess.ts',
 ];
 
 const BANNER = `/*

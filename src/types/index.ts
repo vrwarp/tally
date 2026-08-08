@@ -642,6 +642,60 @@ export interface Rsvp extends Omit<RsvpDoc, 'updatedAt'> {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Access                                                                      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Who may work one gathering, stored at `eventAccess/{chainKey}`.
+ *
+ * ## Why the chain and not the night
+ *
+ * Most occurrences on the calendar have no document at all — `eventProjection`
+ * expands a recurrence rule into occurrences with derived ids, and one only
+ * becomes real when somebody checks in. An ACL on the event document could not
+ * cover next Friday, and nobody is going to grant fifty-two Fridays one at a
+ * time. The chain is already what the app means by "the same gathering" for
+ * prediction, for history, and for `skippedNights` — which this is shaped after
+ * for exactly that reason.
+ *
+ * ## Why absence means open
+ *
+ * There is no document for a gathering nobody has restricted, and that is the
+ * whole migration: deploying this changes nothing, and there is no backfill to
+ * get wrong. It is also the reason the rules ask `exists()` before `get()` —
+ * see `firestore-tests/getSemantics.test.ts`, which exists because the obvious
+ * alternative would have taken every unrestricted gathering offline.
+ *
+ * ## What it does and does not close
+ *
+ * It closes *working* the gathering: check-in, undo, RSVPs, the register,
+ * editing. It does not hide the gathering — a counselor who is not on it still
+ * sees it, locked, because somebody standing at a door at 6:59pm looking at an
+ * empty screen concludes the app is broken and files check-ins against the
+ * wrong thing. `docs/data-model.md` carries the rest of the ledger.
+ */
+export interface EventAccessDoc {
+  /** Mirrors the document id, as `skippedNights` mirrors its own. */
+  chainKey: string;
+  /** False — or no document at all — means every active member. */
+  restricted: boolean;
+  /**
+   * Uids. Kept when `restricted` goes false, so re-opening a gathering and
+   * changing your mind again does not mean rebuilding the list from memory.
+   */
+  members: string[];
+  updatedAt: Timestamp;
+  updatedBy: string;
+}
+
+export interface EventAccess extends Omit<EventAccessDoc, 'updatedAt' | 'members'> {
+  /** Equal to `chainKey`. */
+  id: string;
+  members: ReadonlySet<string>;
+  updatedAt: Date | null;
+}
+
+/* -------------------------------------------------------------------------- */
 /* Settings                                                                    */
 /* -------------------------------------------------------------------------- */
 

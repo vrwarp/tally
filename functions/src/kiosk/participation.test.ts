@@ -154,6 +154,60 @@ describe('buildParticipationIndex', () => {
     expect(summary.instances).toBe(1);
   });
 
+  describe('a restricted gathering', () => {
+    /*
+     * This document is precomputed nightly, read by every active member, and
+     * refreshable on demand by any of them. A restricted chain's entry would be
+     * that gathering's roster and its regulars served in one read — a hole in
+     * the fence shaped exactly like the thing the fence is for.
+     *
+     * There is no per-reader filtering available: one document, everybody gets
+     * the same one. So the answer is omission.
+     */
+    it('is left out of the shared document entirely', async () => {
+      const db = new FakeFirestore();
+      seedEvent(db, 'f1', { startAt: daysAgo(7), seriesId: 'friday', present: ['ada'] });
+      seedEvent(db, 'f2', { startAt: daysAgo(14), seriesId: 'friday', present: ['ada'] });
+      seedEvent(db, 's1', { startAt: daysAgo(7), seriesId: 'sunday', present: ['bo'] });
+      seedEvent(db, 's2', { startAt: daysAgo(14), seriesId: 'sunday', present: ['bo'] });
+      db.seed('eventAccess/sunday', {
+        chainKey: 'sunday',
+        restricted: true,
+        members: ['uid-miriam'],
+      });
+
+      await buildParticipationIndex(db, { builtBy: 'test', now: NOW });
+
+      const written = db.get(PARTICIPATION_DOC) as {
+        chains: Record<string, { participated: string[] }>;
+      };
+      expect(Object.keys(written.chains)).toEqual(['friday']);
+      // And not by leaving an empty husk behind, which would still say the
+      // gathering exists and that nobody comes to it.
+      expect(written.chains.sunday).toBeUndefined();
+      // Bo appears nowhere: they are only ever seen at the restricted one.
+      expect(written.chains.friday.participated).toEqual(['ada']);
+    });
+
+    it('stays in once it is reopened', async () => {
+      // Reopening writes `restricted: false` rather than deleting, so the
+      // document is still there and must not read as a closed gathering.
+      const db = new FakeFirestore();
+      seedEvent(db, 's1', { startAt: daysAgo(7), seriesId: 'sunday', present: ['bo'] });
+      seedEvent(db, 's2', { startAt: daysAgo(14), seriesId: 'sunday', present: ['bo'] });
+      db.seed('eventAccess/sunday', {
+        chainKey: 'sunday',
+        restricted: false,
+        members: ['uid-miriam'],
+      });
+
+      await buildParticipationIndex(db, { builtBy: 'test', now: NOW });
+
+      const written = db.get(PARTICIPATION_DOC) as { chains: Record<string, unknown> };
+      expect(Object.keys(written.chains)).toEqual(['sunday']);
+    });
+  });
+
   describe('the prediction knobs', () => {
     const fridays = (db: FakeFirestore) => {
       seedEvent(db, 'f1', { startAt: daysAgo(7), seriesId: 'friday', present: ['ada'] });

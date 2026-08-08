@@ -17,6 +17,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { act, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthContext, type AuthContextValue } from '@/context/authContext';
+import { DataContext, type DataContextValue } from '@/context/dataContext';
 import { ChooseEvent } from '@/features/checkin/ChooseEvent';
 import { invalidateSnapshotCache } from '@/hooks/useEventSnapshots';
 import { makeEvent } from '../../../tests/factories';
@@ -32,6 +33,15 @@ vi.mock('@/services/events', () => ({
 
 vi.mock('@/services/attendance', () => ({
   fetchAttendanceByEvent: (...args: unknown[]) => fetchAttendanceByEvent(...args),
+}));
+
+// The locked section names who can let you in, which is the only thing on this
+// screen that needs the team directory. Nobody here has a name to look up.
+vi.mock('@/services/users', () => ({
+  subscribeUsers: (next: (value: never[]) => void) => {
+    next([]);
+    return () => {};
+  },
 }));
 
 /** Wednesday 29 July 2026, quarter past four in the afternoon. */
@@ -65,16 +75,36 @@ function auth(role: 'counselor' | 'core'): AuthContextValue {
   } as AuthContextValue;
 }
 
-function wrap(children: ReactNode, role: 'counselor' | 'core') {
+/**
+ * Which gatherings are this counselor's.
+ *
+ * Everything is, unless a test says otherwise — that is the state Tally ships
+ * in, and the thing most of this file is about.
+ */
+function data(canWork: (event: TallyEvent) => boolean = () => true): DataContextValue {
+  return { access: new Map(), canWork } as unknown as DataContextValue;
+}
+
+function wrap(
+  children: ReactNode,
+  role: 'counselor' | 'core',
+  canWork?: (event: TallyEvent) => boolean,
+) {
   return (
     <AuthContext.Provider value={auth(role)}>
-      <MemoryRouter>{children}</MemoryRouter>
+      <DataContext.Provider value={data(canWork)}>
+        <MemoryRouter>{children}</MemoryRouter>
+      </DataContext.Provider>
     </AuthContext.Provider>
   );
 }
 
-function show(events: readonly TallyEvent[], role: 'counselor' | 'core' = 'core') {
-  return render(wrap(<ChooseEvent events={events} now={NOW} />, role));
+function show(
+  events: readonly TallyEvent[],
+  role: 'counselor' | 'core' = 'core',
+  canWork?: (event: TallyEvent) => boolean,
+) {
+  return render(wrap(<ChooseEvent events={events} now={NOW} />, role, canWork));
 }
 
 /** The same, at an hour of the caller's choosing — for the night that runs late. */
@@ -104,7 +134,7 @@ function cardLinks() {
 beforeEach(() => {
   invalidateSnapshotCache();
   fetchPastEvents.mockResolvedValue({ events: [], cursor: null, hasMore: false });
-  fetchAttendanceByEvent.mockResolvedValue(new Map());
+  fetchAttendanceByEvent.mockResolvedValue({ byEvent: new Map(), denied: new Set() });
 });
 
 afterEach(() => {
@@ -263,6 +293,65 @@ describe('choosing a gathering', () => {
 /* Nothing on                                                                  */
 /* -------------------------------------------------------------------------- */
 
+describe('a gathering the counselor is not on', () => {
+  /*
+   * The whole feature, from the door. `mine` is what they came for; `locked` is
+   * demoted below a divider rather than removed, because a counselor at 6:59pm
+   * looking at an empty screen concludes the app is broken and files forty
+   * check-ins against the wrong thing.
+   */
+  const FRIDAY = event({
+    id: 'friday',
+    title: 'Friday Fellowship',
+    startAt: at(29, 19),
+    endAt: at(29, 21),
+  });
+  const SUNDAY = event({
+    id: 'sunday',
+    title: 'Sunday School',
+    startAt: at(29, 9),
+    endAt: at(29, 10, 30),
+  });
+
+  const mineOnly = (e: TallyEvent) => e.id !== 'sunday';
+
+  it('keeps it on the screen, below the divider, and off the cards', async () => {
+    show([FRIDAY, SUNDAY], 'counselor', mineOnly);
+
+    // Theirs is still a hero card with a route into the register.
+    expect(screen.getByRole('link', { name: /friday fellowship/i })).toBeInTheDocument();
+
+    const notYours = screen.getByRole('region', { name: /not yours/i });
+    expect(within(notYours).getByText('Sunday School')).toBeInTheDocument();
+    // Demoted, not promoted: no route in, because the gathering's own page
+    // would refuse them too.
+    expect(within(notYours).queryByRole('link')).not.toBeInTheDocument();
+
+    await settle();
+  });
+
+  it('says nothing is *yours*, rather than nothing is on', async () => {
+    // The difference between an app that is empty and one that is refusing.
+    // A counselor who reads the first goes and asks somebody.
+    show([SUNDAY], 'counselor', mineOnly);
+
+    expect(screen.getByText(/nothing you’re on today|nothing you're on today/i)).toBeInTheDocument();
+    expect(screen.queryByText(/^nothing on today$/i)).not.toBeInTheDocument();
+
+    await settle();
+  });
+
+  it('leaves it out of the picture entirely when nothing is restricted', async () => {
+    // The state Tally ships in, and the one that must look exactly like before.
+    show([FRIDAY, SUNDAY], 'counselor');
+
+    expect(screen.queryByRole('region', { name: /not yours/i })).not.toBeInTheDocument();
+    expect(cardLinks()).toHaveLength(2);
+
+    await settle();
+  });
+});
+
 describe('when nothing is on', () => {
   it('points the core team at the calendar', async () => {
     show([], 'core');
@@ -327,11 +416,12 @@ describe('the catch-up tail', () => {
       cursor: null,
       hasMore: false,
     });
-    fetchAttendanceByEvent.mockResolvedValue(
-      new Map([
+    fetchAttendanceByEvent.mockResolvedValue({
+      byEvent: new Map([
         ['last-friday', { present: new Set(['a', 'b', 'c', 'd']), checkedOut: new Set() }],
       ]),
-    );
+      denied: new Set(),
+    });
 
     show([]);
 

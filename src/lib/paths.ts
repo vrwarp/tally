@@ -48,6 +48,14 @@ export const COLLECTIONS = {
    * instead of one per night.
    */
   skippedNights: 'skippedNights',
+  /**
+   * One document per repeat chain, recording who may work it.
+   *
+   * Chain-keyed and top-level for the same reason `skippedNights` is: it
+   * answers about a gathering, not about a night, and most nights have no
+   * document to hang it on. An absent document means the gathering is open.
+   */
+  eventAccess: 'eventAccess',
   /** Subcollection names. */
   attendance: 'attendance',
   rsvps: 'rsvps',
@@ -88,6 +96,9 @@ export const paths = {
   event: (eventId: string) => `${COLLECTIONS.events}/${eventId}`,
 
   skippedNights: (chainKey: string) => `${COLLECTIONS.skippedNights}/${chainKey}`,
+
+  eventAccessCollection: () => COLLECTIONS.eventAccess,
+  eventAccess: (chainKey: string) => `${COLLECTIONS.eventAccess}/${chainKey}`,
 
   attendanceCollection: (eventId: string) =>
     `${COLLECTIONS.events}/${eventId}/${COLLECTIONS.attendance}`,

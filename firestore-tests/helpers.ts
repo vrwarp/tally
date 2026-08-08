@@ -25,6 +25,7 @@ import { paths } from '@/lib/paths';
 import type {
   AppSettingsDoc,
   AttendanceRecordDoc,
+  EventAccessDoc,
   InvitationDoc,
   PcoRuntimeConfigDoc,
   RsvpDoc,
@@ -48,6 +49,16 @@ export const UID = {
   admin: 'uid-admin',
   inactive: 'uid-inactive',
   stranger: 'uid-stranger',
+  /**
+   * An active counselor in good standing who is on no restricted gathering.
+   *
+   * Distinct from `stranger`, who has no profile: every "denied" this uid earns
+   * is earned by the access list alone, which is the only way to tell a
+   * gathering's fence apart from the app's front door.
+   */
+  outsider: 'uid-outsider',
+  /** Core, and deliberately not on the restricted chain either. */
+  outsiderCore: 'uid-outsider-core',
 } as const;
 
 export const ID = {
@@ -55,6 +66,13 @@ export const ID = {
   otherStudent: 'student-2',
   event: 'event-1',
   series: 'friday-fellowship',
+  /**
+   * The locked gathering. Restricted to `counselor` and `core`; `outsider`,
+   * `outsiderCore` and every other member are off it, and `admin` passes
+   * regardless.
+   */
+  restrictedSeries: 'sunday-school',
+  restrictedEvent: 'event-sunday-1',
 } as const;
 
 const T0 = Timestamp.fromDate(new Date('2026-02-13T19:00:00Z'));
@@ -266,6 +284,24 @@ export function invitationDoc(overrides: Partial<InvitationDoc> = {}): Invitatio
   };
 }
 
+/**
+ * A gathering's access list.
+ *
+ * Defaults to restricted, because an unrestricted one is a document that should
+ * not exist: absence is how a gathering says it is open, and the rules refuse
+ * to create a document that claims nothing.
+ */
+export function eventAccessDoc(overrides: Partial<EventAccessDoc> = {}): EventAccessDoc {
+  return {
+    chainKey: ID.restrictedSeries,
+    restricted: true,
+    members: [UID.counselor, UID.core],
+    updatedAt: T0,
+    updatedBy: UID.core,
+    ...overrides,
+  };
+}
+
 /* -------------------------------------------------------------------------- */
 /* Seeding                                                                     */
 /* -------------------------------------------------------------------------- */
@@ -287,6 +323,14 @@ export async function seedUsers(env: RulesTestEnvironment): Promise<void> {
       doc(db, paths.user(UID.inactive)),
       userDoc({ email: 'former@example.org', role: 'core', active: false }),
     );
+    await setDoc(
+      doc(db, paths.user(UID.outsider)),
+      userDoc({ email: 'outsider@example.org', role: 'counselor' }),
+    );
+    await setDoc(
+      doc(db, paths.user(UID.outsiderCore)),
+      userDoc({ email: 'outsider-core@example.org', role: 'core' }),
+    );
   });
 }
 
@@ -303,6 +347,25 @@ export async function seedContent(env: RulesTestEnvironment): Promise<void> {
     await setDoc(doc(db, paths.attendance(ID.event, ID.student)), attendanceDoc());
     await setDoc(doc(db, paths.rsvp(ID.event, ID.student)), rsvpDoc());
     await setDoc(doc(db, paths.settings()), settingsDoc());
+
+    /*
+     * A second gathering, locked. `event-1` above stays open — every existing
+     * assertion in the suite runs against it, and the most important thing this
+     * feature can prove is that an unrestricted gathering did not change.
+     */
+    await setDoc(
+      doc(db, paths.event(ID.restrictedEvent)),
+      eventDoc({ title: 'Sunday School', seriesId: ID.restrictedSeries }),
+    );
+    await setDoc(
+      doc(db, paths.attendance(ID.restrictedEvent, ID.student)),
+      attendanceDoc({ eventId: ID.restrictedEvent, seriesId: ID.restrictedSeries }),
+    );
+    await setDoc(
+      doc(db, paths.rsvp(ID.restrictedEvent, ID.student)),
+      rsvpDoc({ eventId: ID.restrictedEvent }),
+    );
+    await setDoc(doc(db, paths.eventAccess(ID.restrictedSeries)), eventAccessDoc());
   });
 }
 

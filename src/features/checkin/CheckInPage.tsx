@@ -36,6 +36,7 @@ import { useToast } from '@/context/toastContext';
 import { EventHeader } from '@/features/checkin/EventHeader';
 import { FilterBar } from '@/features/checkin/FilterBar';
 import { ArchivedNight } from '@/features/checkin/ArchivedNight';
+import { LockedGathering } from '@/features/events/LockedGathering';
 import { ChooseEvent } from '@/features/checkin/ChooseEvent';
 import { QuickAddVisitorModal } from '@/features/checkin/QuickAddVisitorModal';
 import { RosterList } from '@/features/checkin/RosterList';
@@ -114,15 +115,32 @@ export function CheckInPage() {
     eventId ?? null,
   );
 
-  const { students, settings, loading: dataLoading, rosterError } = useData();
+  const { students, settings, loading: dataLoading, rosterError, canWork } = useData();
   const { user, can } = useAuth();
   const { show } = useToast();
 
+  /*
+   * Decided before a single listener is opened, and passed as `null` rather
+   * than branched on below — hooks cannot be skipped, so the only way to not
+   * mount the register is to give it nothing to mount.
+   *
+   * Every piece of this screen would otherwise be refused and keep asking. The
+   * attendance listener retries, `ensureMaterialized` runs on a timer until it
+   * succeeds, the prediction hangs behind a skeleton and then silently drops to
+   * "all", and the optimistic green flash on a tap lands a moment before the
+   * write comes back refused. A person who has simply not been added to a
+   * gathering would watch the app appear to work and then take it back.
+   */
+  const locked = event ? !canWork(event) : false;
+
   const { attendance, error: attendanceError } = useAttendance(
-    event?.id ?? null,
+    locked ? null : (event?.id ?? null),
   );
-  const { rsvps } = useRsvps(event?.id ?? null, event?.requiresRsvp ?? false);
-  const historyEvents = useSeriesHistoryEvents(event);
+  const { rsvps } = useRsvps(
+    locked ? null : (event?.id ?? null),
+    event?.requiresRsvp ?? false,
+  );
+  const historyEvents = useSeriesHistoryEvents(locked ? null : event);
   const { snapshots } = useEventSnapshots(historyEvents);
 
   const [query, setQuery] = useState("");
@@ -194,6 +212,9 @@ export function CheckInPage() {
    */
   const materializing = useRef<string | null>(null);
   useEffect(() => {
+    // `locked` first: this one runs on a timer, so a refused gathering would
+    // retry a write it can never land for as long as the tab is open.
+    if (locked) return;
     if (!event || event.materialized || !isCheckInOpen(event, now)) return;
     if (materializing.current === event.id) return;
 
@@ -201,7 +222,7 @@ export function CheckInPage() {
     void ensureMaterialized(event).catch(() => {
       materializing.current = null;
     });
-  }, [event, now]);
+  }, [event, now, locked]);
 
   // Published for the roster heading below it, which sticks to the underside of
   // the search box rather than to the top of the window.
@@ -664,6 +685,15 @@ export function CheckInPage() {
    */
   if (event && fromArchive) {
     return <ArchivedNight event={event} attendance={attendance} students={students} now={now} />;
+  }
+
+  /*
+   * Checked before the roster branch for the same reason the archive is: there
+   * is no honest roster to draw, and drawing one anyway would offer forty rows
+   * whose every tap is refused.
+   */
+  if (event && locked) {
+    return <LockedGathering event={event} now={now} />;
   }
 
   if (!event || !roster) {

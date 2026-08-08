@@ -2,6 +2,7 @@ import { createContext, useContext } from 'react';
 import type { RosterBackendStatus } from '@/services/functions';
 import type {
   AppSettings,
+  EventAccess,
   EventSeries,
   PcoErrorReport,
   PcoRosterPerson,
@@ -95,6 +96,29 @@ export interface DataContextValue {
    * is nothing here to match it to.
    */
   applyRosterPerson: (person?: PcoRosterPerson | null) => void;
+
+  /* ---- Access ------------------------------------------------------------ */
+  /**
+   * Every restricted gathering's access list, keyed by `chainKey`.
+   *
+   * The whole collection, not just the caller's: a locked gathering still
+   * appears on the chooser, and drawing it needs to know who *can* let somebody
+   * in. Empty in every deployment where nobody has restricted anything, which
+   * is the state this ships in.
+   */
+  access: Map<string, EventAccess>;
+  /**
+   * May the signed-in person work this gathering?
+   *
+   * "Work" is check-in, undo, RSVPs, the register and editing — not seeing that
+   * the gathering exists, which everybody may do. A gathering with no access
+   * document is open, so this is `true` for almost everything almost always.
+   *
+   * A convenience, not a fence. `firestore.rules` refuses the writes and the
+   * reads regardless; what this buys is a screen that says so before somebody
+   * taps, instead of a red toast after.
+   */
+  canWork: (event: Pick<TallyEvent, 'id' | 'seriesId' | 'recurrenceRootId'>) => boolean;
 }
 
 export const DataContext = createContext<DataContextValue | null>(null);

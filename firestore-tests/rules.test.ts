@@ -22,6 +22,7 @@ import {
   query,
   deleteField,
   serverTimestamp,
+  writeBatch,
   setDoc,
   updateDoc,
   where,
@@ -540,6 +541,90 @@ describe('events', () => {
       );
     }
   });
+
+  describe('the chain references', () => {
+    /*
+     * `seriesId`, `recurrenceRootId` and `predictFromChain` are the three
+     * fields `chainKey()` chooses between, and whichever it picks becomes a
+     * document id — `skippedNights/{chainKey}`, `eventAccess/{chainKey}`, and
+     * the path these rules interpolate to find a gathering's access list.
+     *
+     * Nothing here is an escalation: every malformed value fails closed. What
+     * they are is an outage one core member can write from the event editor,
+     * on the one gathering whose ACL then cannot be found.
+     */
+    it('accepts null, which is what most gatherings carry', async () => {
+      const db = asUser(env, UID.core);
+      await assertSucceeds(
+        setDoc(doc(db, paths.event('event-no-chain')), {
+          ...eventDoc(),
+          seriesId: null,
+          recurrenceRootId: null,
+          predictFromChain: null,
+        }),
+      );
+    });
+
+    it('accepts an ordinary chain id', async () => {
+      const db = asUser(env, UID.core);
+      await assertSucceeds(
+        setDoc(doc(db, paths.event('event-chained')), {
+          ...eventDoc(),
+          seriesId: 'sunday-school',
+          recurrenceRootId: 'event-root-1',
+          predictFromChain: 'friday-fellowship',
+        }),
+      );
+    });
+
+    it('rejects a value that would slice into a different path', async () => {
+      const db = asUser(env, UID.core);
+
+      for (const seriesId of [
+        // The one that matters: a slash makes `eventAccess/$(key)` name a
+        // document two levels down that the writer chose.
+        'sunday/school',
+        '../events/event-1',
+        // Relative-path names: legal strings, illegal document ids.
+        '.',
+        '..',
+        // Non-strings do not interpolate at all.
+        42,
+        true,
+        { seriesId: 'sunday-school' },
+        ['sunday-school'],
+        // Empty is not a document id either, and `?? ` would not fall through
+        // it — `chainKey()` uses `??`, so '' wins over the root and the id.
+        '',
+        'x'.repeat(201),
+      ]) {
+        await assertFails(
+          setDoc(doc(db, paths.event('event-bad-chain')), { ...eventDoc(), seriesId }),
+        );
+      }
+    });
+
+    it('rejects it on recurrenceRootId and predictFromChain too', async () => {
+      // Same field, three names. `chainKey()` falls through seriesId to the
+      // root, and the roster reads `predictFromChain` to borrow another
+      // gathering's history — all three end up as ids.
+      const db = asUser(env, UID.core);
+
+      await assertFails(
+        setDoc(doc(db, paths.event('event-bad-root')), {
+          ...eventDoc(),
+          seriesId: null,
+          recurrenceRootId: 'sunday/school',
+        }),
+      );
+      await assertFails(
+        setDoc(doc(db, paths.event('event-bad-predict')), {
+          ...eventDoc(),
+          predictFromChain: 'sunday/school',
+        }),
+      );
+    });
+  });
 });
 
 describe('attendance', () => {
@@ -641,17 +726,34 @@ describe('attendance', () => {
    * a collection-group query however permissive it is — so this is the test
    * that the wildcard exists and is scoped to the same people.
    */
-  it('lets an active member read one student\u2019s attendance across every event', async () => {
-    const db = asUser(env, UID.counselor);
-    await assertSucceeds(
-      getDocs(
-        query(
-          collectionGroup(db, COLLECTIONS.attendance),
-          where('studentId', '==', ID.student),
-          orderBy('checkedInAt', 'desc'),
+  it('is now refused to everybody, including the core team', async () => {
+    /*
+     * The wildcard rule this used to assert is gone, and its absence is the
+     * feature rather than a regression.
+     *
+     * `attendance` documents carry `seriesId`, and `firestore.indexes.json`
+     * declares a collection-group index on it — so this exact query, with the
+     * filter changed, returned an entire restricted gathering's register, every
+     * night of it, to anybody with a browser console. A rule at a wildcard path
+     * cannot narrow that: there is no single parent event to ask about, which
+     * is also why it was silently overriding the per-event gate.
+     *
+     * The profile's history now goes through `getStudentAttendance`, which runs
+     * on the Admin SDK, reads each record's parent event and drops what the
+     * caller may not see. The indexes stay declared, because that callable uses
+     * them.
+     */
+    for (const db of [asUser(env, UID.counselor), asUser(env, UID.core), asUser(env, UID.admin)]) {
+      await assertFails(
+        getDocs(
+          query(
+            collectionGroup(db, COLLECTIONS.attendance),
+            where('studentId', '==', ID.student),
+            orderBy('checkedInAt', 'desc'),
+          ),
         ),
-      ),
-    );
+      );
+    }
   });
 
   it('denies that same sweep to everyone else', async () => {
@@ -1318,6 +1420,495 @@ describe('skippedNights', () => {
   });
 });
 
+/**
+ * Who may work one gathering.
+ *
+ * This block governs the access list itself, not the gatherings it protects —
+ * the gates on `events`, `attendance` and `rsvps` are tested where they live.
+ * The distinction matters because the interesting failures here are about
+ * *changing the fence*, and a fence somebody outside can move is not a fence.
+ *
+ * `sunday-school` is seeded restricted to `counselor` and `core`. `outsider`
+ * and `outsiderCore` are active members in good standing who are simply not on
+ * it, which is what separates this fence from the app's front door.
+ */
+describe('eventAccess', () => {
+  const chain = ID.restrictedSeries;
+  const openChain = ID.series;
+
+  const acl = (over: Record<string, unknown> = {}) => ({
+    chainKey: chain,
+    restricted: true,
+    members: [UID.counselor, UID.core],
+    updatedAt: serverTimestamp(),
+    updatedBy: UID.core,
+    ...over,
+  });
+
+  describe('reading it', () => {
+    it('is readable by any active member, including one not on the gathering', async () => {
+      // This is what lets the locked screen say "Miriam or Dana can add you"
+      // instead of just refusing. Locked, not hidden.
+      await assertSucceeds(getDoc(doc(asUser(env, UID.outsider), paths.eventAccess(chain))));
+      await assertSucceeds(getDoc(doc(asUser(env, UID.counselor), paths.eventAccess(chain))));
+    });
+
+    it('refuses somebody with no active membership', async () => {
+      await assertFails(getDoc(doc(asUser(env, UID.inactive), paths.eventAccess(chain))));
+      await assertFails(getDoc(doc(asAnonymous(env), paths.eventAccess(chain))));
+    });
+  });
+
+  describe('restricting a gathering that was open', () => {
+    it('lets a core member close one, keeping themselves on it', async () => {
+      const db = asUser(env, UID.core);
+      await assertSucceeds(
+        setDoc(doc(db, paths.eventAccess(openChain)), acl({ chainKey: openChain })),
+      );
+    });
+
+    it('refuses a counselor', async () => {
+      // Adding somebody to a gathering you work hands out access you already
+      // have. Closing one takes access away from everybody else, which is a
+      // decision about the gathering rather than about a person.
+      const db = asUser(env, UID.counselor);
+      await assertFails(
+        setDoc(
+          doc(db, paths.eventAccess(openChain)),
+          acl({ chainKey: openChain, members: [UID.counselor], updatedBy: UID.counselor }),
+        ),
+      );
+    });
+
+    it('refuses closing the door from outside it', async () => {
+      // The lockout this feature makes easiest: restrict Friday Fellowship,
+      // leave yourself off, and nobody below an admin can reopen it — because
+      // reopening requires being on it.
+      const db = asUser(env, UID.core);
+      await assertFails(
+        setDoc(
+          doc(db, paths.eventAccess(openChain)),
+          acl({ chainKey: openChain, members: [UID.counselor] }),
+        ),
+      );
+    });
+
+    it('refuses a document that claims nothing', async () => {
+      // `restricted: false` with no prior document is a no-op that would cost
+      // a billed read on every gated request forever. Absence is how a
+      // gathering says it is open.
+      const db = asUser(env, UID.core);
+      await assertFails(
+        setDoc(
+          doc(db, paths.eventAccess(openChain)),
+          acl({ chainKey: openChain, restricted: false }),
+        ),
+      );
+    });
+
+    it('refuses a document filed under the wrong chain', async () => {
+      const db = asUser(env, UID.core);
+      await assertFails(setDoc(doc(db, paths.eventAccess(openChain)), acl()));
+    });
+
+    it('refuses signing somebody else name to the write', async () => {
+      const db = asUser(env, UID.core);
+      await assertFails(
+        setDoc(
+          doc(db, paths.eventAccess(openChain)),
+          acl({ chainKey: openChain, updatedBy: UID.admin }),
+        ),
+      );
+    });
+
+    it('refuses a malformed list', async () => {
+      const db = asUser(env, UID.core);
+
+      for (const over of [
+        { members: UID.core },
+        { members: Array.from({ length: 201 }, (_, i) => `uid-${i}`).concat(UID.core) },
+        { restricted: 'yes' },
+        { updatedAt: 'now' },
+      ]) {
+        await assertFails(
+          setDoc(doc(db, paths.eventAccess(openChain)), acl({ chainKey: openChain, ...over })),
+        );
+      }
+    });
+  });
+
+  describe('adding somebody', () => {
+    it('lets a counselor already on it add another', async () => {
+      // Priya is on Friday Fellowship, Jo turns up at the door, and Priya adds
+      // her without finding an admin. The permissive half, working as intended.
+      const db = asUser(env, UID.counselor);
+      await assertSucceeds(
+        updateDoc(doc(db, paths.eventAccess(chain)), {
+          members: [UID.counselor, UID.core, UID.outsider],
+          updatedAt: serverTimestamp(),
+          updatedBy: UID.counselor,
+        }),
+      );
+    });
+
+    it('refuses a counselor who is not on it', async () => {
+      // Otherwise the fence is a door with the handle on the outside.
+      const db = asUser(env, UID.outsider);
+      await assertFails(
+        updateDoc(doc(db, paths.eventAccess(chain)), {
+          members: [UID.counselor, UID.core, UID.outsider],
+          updatedAt: serverTimestamp(),
+          updatedBy: UID.outsider,
+        }),
+      );
+    });
+
+    it('refuses a core member who is not on it', async () => {
+      // Rank is not a way in. Core removes and reopens, but only on the
+      // gatherings they work; the break-glass is admin.
+      const db = asUser(env, UID.outsiderCore);
+      await assertFails(
+        updateDoc(doc(db, paths.eventAccess(chain)), {
+          members: [UID.counselor, UID.core, UID.outsiderCore],
+          updatedAt: serverTimestamp(),
+          updatedBy: UID.outsiderCore,
+        }),
+      );
+    });
+  });
+
+  describe('removing somebody', () => {
+    it('lets a core member on it remove a helper', async () => {
+      const db = asUser(env, UID.core);
+      await assertSucceeds(
+        updateDoc(doc(db, paths.eventAccess(chain)), {
+          members: [UID.core],
+          updatedAt: serverTimestamp(),
+          updatedBy: UID.core,
+        }),
+      );
+    });
+
+    it('refuses a counselor, who may only add', async () => {
+      // Not symmetric with adding: a counselor handing out the access they
+      // have is one thing, a counselor evicting the person who set the
+      // gathering up is another.
+      const db = asUser(env, UID.counselor);
+      await assertFails(
+        updateDoc(doc(db, paths.eventAccess(chain)), {
+          members: [UID.counselor],
+          updatedAt: serverTimestamp(),
+          updatedBy: UID.counselor,
+        }),
+      );
+    });
+
+    it('refuses removing yourself, whatever your rank', async () => {
+      // Same lockout as closing the door from outside, arrived at one edit
+      // later.
+      const db = asUser(env, UID.core);
+      await assertFails(
+        updateDoc(doc(db, paths.eventAccess(chain)), {
+          members: [UID.counselor],
+          updatedAt: serverTimestamp(),
+          updatedBy: UID.core,
+        }),
+      );
+    });
+  });
+
+  describe('reopening it', () => {
+    it('lets a core member on it reopen, keeping the list', async () => {
+      // Keeping the list is the point: changing your mind twice should not
+      // mean rebuilding four names from memory.
+      const db = asUser(env, UID.core);
+      await assertSucceeds(
+        updateDoc(doc(db, paths.eventAccess(chain)), {
+          restricted: false,
+          members: [UID.counselor, UID.core],
+          updatedAt: serverTimestamp(),
+          updatedBy: UID.core,
+        }),
+      );
+    });
+
+    it('refuses a counselor, who may not flip the switch', async () => {
+      const db = asUser(env, UID.counselor);
+      await assertFails(
+        updateDoc(doc(db, paths.eventAccess(chain)), {
+          restricted: false,
+          members: [UID.counselor, UID.core],
+          updatedAt: serverTimestamp(),
+          updatedBy: UID.counselor,
+        }),
+      );
+    });
+
+    it('refuses deleting the document, even for an admin', async () => {
+      // Deleting reopens the gathering to everybody — the same outcome as
+      // `restricted: false`, reached by a verb the rules would have handed
+      // over for free had this been written `allow write:`.
+      await assertFails(deleteDoc(doc(asUser(env, UID.admin), paths.eventAccess(chain))));
+      await assertFails(deleteDoc(doc(asUser(env, UID.core), paths.eventAccess(chain))));
+    });
+  });
+
+  describe('the break-glass', () => {
+    it('lets an admin who is not on it fix a lockout', async () => {
+      // The scenario: one core member restricted the gathering the whole
+      // ministry works and left everybody off. Somebody has to be able to undo
+      // that without a database console.
+      const db = asUser(env, UID.admin);
+      await assertSucceeds(
+        updateDoc(doc(db, paths.eventAccess(chain)), {
+          restricted: false,
+          members: [UID.counselor, UID.core],
+          updatedAt: serverTimestamp(),
+          updatedBy: UID.admin,
+        }),
+      );
+    });
+
+    it('lets an admin rewrite the list without joining it', async () => {
+      // An admin tidying somebody else's gathering is not locking themselves
+      // out, because they never needed to be on it.
+      const db = asUser(env, UID.admin);
+      await assertSucceeds(
+        updateDoc(doc(db, paths.eventAccess(chain)), {
+          members: [UID.core],
+          updatedAt: serverTimestamp(),
+          updatedBy: UID.admin,
+        }),
+      );
+    });
+  });
+});
+
+/**
+ * The gates themselves — what an access list actually closes.
+ *
+ * Everything above tests the fence; this tests what stands behind it. The
+ * shape of every case is the same pair: `outsider` is refused on
+ * `sunday-school`, and the identical operation on `event-1` — which nobody has
+ * restricted — still succeeds. The second half is the one that matters most. A
+ * feature that protects a restricted gathering by breaking every open one is
+ * not a feature.
+ */
+describe('working a restricted gathering', () => {
+  const locked = ID.restrictedEvent;
+  const open = ID.event;
+
+  describe('the register', () => {
+    it('refuses somebody who is not on the gathering', async () => {
+      const db = asUser(env, UID.outsider);
+
+      await assertFails(getDoc(doc(db, paths.attendance(locked, ID.student))));
+      await assertFails(
+        setDoc(
+          doc(db, paths.attendance(locked, ID.otherStudent)),
+          attendanceDoc({
+            studentId: ID.otherStudent,
+            eventId: locked,
+            checkedInBy: UID.outsider,
+          }),
+        ),
+      );
+      await assertFails(deleteDoc(doc(db, paths.attendance(locked, ID.student))));
+    });
+
+    it('admits somebody who is', async () => {
+      const db = asUser(env, UID.counselor);
+
+      await assertSucceeds(getDocs(collection(db, paths.attendanceCollection(locked))));
+      await assertSucceeds(
+        setDoc(
+          doc(db, paths.attendance(locked, ID.otherStudent)),
+          attendanceDoc({
+            studentId: ID.otherStudent,
+            eventId: locked,
+            checkedInBy: UID.counselor,
+          }),
+        ),
+      );
+    });
+
+    it('leaves an unrestricted gathering exactly as it was', async () => {
+      // The regression that matters most in the whole feature.
+      const db = asUser(env, UID.outsider);
+
+      await assertSucceeds(getDocs(collection(db, paths.attendanceCollection(open))));
+      await assertSucceeds(
+        setDoc(
+          doc(db, paths.attendance(open, ID.otherStudent)),
+          attendanceDoc({ studentId: ID.otherStudent, checkedInBy: UID.outsider }),
+        ),
+      );
+    });
+
+    it('lets an admin through regardless', async () => {
+      await assertSucceeds(
+        getDocs(collection(asUser(env, UID.admin), paths.attendanceCollection(locked))),
+      );
+    });
+
+    it('refuses a list of the register too, which took denying the wildcard', async () => {
+      /*
+       * This was the last hole, and it was not in the nested rule.
+       *
+       * `match /{path=**}/attendance/{studentId}` existed so a student's
+       * profile could run one collection-group query instead of a read per
+       * night — but a wildcard path also matches an ordinary subcollection
+       * query at `events/{id}/attendance`, and rules are OR'd across every
+       * matching path. Its `allow list: if isActive()` was granting exactly
+       * what the nested rule denied: `get` on one record was refused and
+       * `list` of the whole register was not.
+       *
+       * It could not be narrowed — rules cannot tell a collection-group query
+       * from a subcollection one, which is why the wildcard had to exist — so
+       * it is denied outright and the profile's two questions go through
+       * `getStudentAttendance`, which can read the parent event and filter.
+       */
+      await assertFails(
+        getDocs(collection(asUser(env, UID.outsider), paths.attendanceCollection(locked))),
+      );
+    });
+
+    it('lets somebody on the gathering list it', async () => {
+      // The other half: denying the wildcard must not cost a member the read
+      // they are entitled to through the nested rule.
+      await assertSucceeds(
+        getDocs(collection(asUser(env, UID.counselor), paths.attendanceCollection(locked))),
+      );
+    });
+  });
+
+  describe('the RSVP list', () => {
+    it('refuses an outsider and admits a member', async () => {
+      await assertFails(getDoc(doc(asUser(env, UID.outsider), paths.rsvp(locked, ID.student))));
+      await assertSucceeds(getDoc(doc(asUser(env, UID.core), paths.rsvp(locked, ID.student))));
+    });
+
+    it('refuses a core member who is not on it', async () => {
+      // RSVP writes are core-only, so this is the case where rank alone would
+      // have been enough before.
+      await assertFails(
+        setDoc(
+          doc(asUser(env, UID.outsiderCore), paths.rsvp(locked, ID.otherStudent)),
+          rsvpDoc({ studentId: ID.otherStudent, eventId: locked, updatedBy: UID.outsiderCore }),
+        ),
+      );
+    });
+  });
+
+  describe('the skipped-nights registry', () => {
+    it('is gated on the chain, without an event lookup', async () => {
+      // The chain *is* the document id here, which is why this one costs one
+      // billed read rather than two.
+      const registry = {
+        chainKey: ID.restrictedSeries,
+        skipped: [],
+        examinedFrom: Timestamp.fromDate(new Date('2025-08-02T00:00:00Z')),
+        updatedAt: serverTimestamp(),
+      };
+
+      await assertFails(
+        setDoc(doc(asUser(env, UID.outsider), paths.skippedNights(ID.restrictedSeries)), registry),
+      );
+      await assertFails(
+        getDoc(doc(asUser(env, UID.outsider), paths.skippedNights(ID.restrictedSeries))),
+      );
+      await assertSucceeds(
+        setDoc(doc(asUser(env, UID.counselor), paths.skippedNights(ID.restrictedSeries)), registry),
+      );
+    });
+  });
+
+  describe('editing the gathering', () => {
+    it('refuses a core member who is not on it', async () => {
+      await assertFails(
+        setDoc(
+          doc(asUser(env, UID.outsiderCore), paths.event(locked)),
+          eventDoc({ title: 'Renamed', seriesId: ID.restrictedSeries }),
+        ),
+      );
+    });
+
+    it('refuses escaping the ACL by switching the gathering to a one-off', async () => {
+      /*
+       * The front door this closes. `buildEventPayload` nulls `seriesId` and
+       * `recurrenceRootId` when `mode` becomes `'oneoff'` — a supported action
+       * in the event editor. Without checking the *old* chain too, a core
+       * member outside the gathering could collapse its `chainKey` to its own
+       * event id, for which no access document exists, and walk out with the
+       * gathering and its whole register.
+       */
+      await assertFails(
+        setDoc(
+          doc(asUser(env, UID.outsiderCore), paths.event(locked)),
+          eventDoc({
+            title: 'Sunday School',
+            mode: 'oneoff',
+            seriesId: null,
+            recurrenceRootId: null,
+            recurrence: null,
+          }),
+        ),
+      );
+    });
+
+    it('refuses repointing it at a chain the writer can read', async () => {
+      // The same escape by a different verb: keep the event, change which
+      // gathering it claims to belong to.
+      await assertFails(
+        setDoc(
+          doc(asUser(env, UID.outsiderCore), paths.event(locked)),
+          eventDoc({ title: 'Sunday School', seriesId: ID.series }),
+        ),
+      );
+    });
+
+    it('lets somebody on the gathering edit it', async () => {
+      await assertSucceeds(
+        setDoc(
+          doc(asUser(env, UID.core), paths.event(locked)),
+          eventDoc({ title: 'Sunday School, 9am', seriesId: ID.restrictedSeries }),
+        ),
+      );
+    });
+
+    it('still lets a core member create an ordinary gathering', async () => {
+      // `create` has no old chain to leave, and an unrestricted new one waves
+      // straight through — which is every event anybody makes.
+      await assertSucceeds(
+        setDoc(doc(asUser(env, UID.outsiderCore), paths.event('event-new')), eventDoc()),
+      );
+    });
+  });
+
+  describe('the lookup budget', () => {
+    it('still commits a batch the size the RSVP screen writes', async () => {
+      /*
+       * `addRsvps` writes up to 400 documents in one batch, and every one of
+       * them now costs an `eventAccess` lookup on top of the profile and the
+       * event. Rules cache accesses by path within a request, so this should be
+       * three lookups rather than twelve hundred — and if that ever stops being
+       * true, this is the test that says so rather than a leader discovering it
+       * on a retreat sign-up sheet.
+       */
+      const db = asUser(env, UID.core);
+      const batch = writeBatch(db as never);
+
+      for (let index = 0; index < 400; index += 1) {
+        batch.set(
+          doc(db, paths.rsvp(open, `bulk-student-${index}`)),
+          rsvpDoc({ studentId: `bulk-student-${index}` }),
+        );
+      }
+
+      await assertSucceeds(batch.commit());
+    });
+  });
+});
 
 describe('kiosk', () => {
   /*

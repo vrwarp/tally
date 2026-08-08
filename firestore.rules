@@ -55,6 +55,68 @@ service cloud.firestore {
     function isCore() { return hasRole('core'); }
     function isAdmin() { return hasRole('admin'); }
 
+    /* ---------------------------------------------------------------- */
+    /* Per-gathering access                                              */
+    /* ---------------------------------------------------------------- */
+
+    /**
+     * Whether the caller may *work* one gathering.
+     *
+     * See `match /eventAccess/{chainKey}` below for what that means and why it
+     * is keyed on the chain. This is the restatement of `canWorkChain` in
+     * `src/lib/eventAccess.ts` — rules cannot import, so there are two copies,
+     * and these are the ones an attacker cannot skip.
+     *
+     * **`exists()` before `get()`, and the `||` carries the lookup.** A `get()`
+     * at a path with no document raises rather than returning null, and a
+     * raised lookup denies — so the natural `a == null || …` form would have
+     * denied every gathering nobody had restricted, which is all of them on the
+     * day this deploys. `firestore-tests/getSemantics.test.ts` is that fact,
+     * pinned.
+     *
+     * Repeating the lookup rather than binding it to a `let` is deliberate:
+     * `let` would evaluate it before the `exists()` guard could stop it. Rules
+     * cache accesses by path within a request, so the repetition costs nothing
+     * a `let` would have saved.
+     */
+    function accessPath(key) {
+      return /databases/$(database)/documents/eventAccess/$(key);
+    }
+
+    function onChain(key) {
+      return isAdmin()
+        || !exists(accessPath(key))
+        || get(accessPath(key)).data.get('restricted', false) != true
+        || request.auth.uid in get(accessPath(key)).data.get('members', []);
+    }
+
+    /** `chainKey()` from `src/lib/materialize.ts`, over a document's data. */
+    function chainOfData(d, id) {
+      return d.get('seriesId', null) != null
+        ? d.seriesId
+        : (d.get('recurrenceRootId', null) != null ? d.recurrenceRootId : id);
+    }
+
+    /**
+     * Which gathering an event belongs to.
+     *
+     * The fallback when the parent event has no document is its own id, which
+     * is what `chainKey()` would say for a one-off — and it is also a gap worth
+     * naming rather than hiding. A projected occurrence of a restricted chain
+     * has no document until `materializeOccurrence` writes one, and its derived
+     * id (`{chain}-{date}`) has no `eventAccess` document of its own, so an
+     * attendance write aimed at that path before materialisation is not caught
+     * here. What catches it is the callable: `materializeOccurrence` is gated on
+     * the chain, so the occurrence never becomes real for somebody outside it,
+     * and `getKioskEvents` refuses to bind a kiosk to a gathering its approver
+     * cannot work. Rules cannot parse the chain back out of the derived id —
+     * chain keys may themselves contain the separator — so this is the seam.
+     */
+    function eventChain(eventId) {
+      let p = /databases/$(database)/documents/events/$(eventId);
+      return exists(p) ? chainOfData(get(p).data, eventId) : eventId;
+    }
+
     /**
      * A session minted by the kiosk pairing flow: a real staff member's uid,
      * carrying a `kiosk: true` custom claim.
@@ -379,6 +441,38 @@ service cloud.firestore {
           && t.copies <= 3;
       }
 
+      /**
+       * A reference to a chain: `seriesId`, `recurrenceRootId`,
+       * `predictFromChain`.
+       *
+       * These are not ordinary strings. `chainKey()` picks one of them
+       * (`src/lib/materialize.ts`) and the result becomes a *document id* — in
+       * `skippedNights/{chainKey}`, in `eventAccess/{chainKey}`, and inside
+       * these rules, where it is interpolated into a path to find the
+       * gathering's access list. A value carrying a `/` would slice into a
+       * different path than the one it names, and a non-string would not
+       * interpolate at all.
+       *
+       * Both fail closed, so this is not a way in. It is a way to a
+       * *self-inflicted outage*: one core member writing `seriesId: 42` in the
+       * editor takes that gathering — and, once the ACL lookup depends on it,
+       * its whole register — offline until somebody hand-repairs the document
+       * in the console. The four timestamps below have always been validated
+       * for the same reason. These never were.
+       *
+       * Kept to what a Firestore document id can actually be, minus the two
+       * relative-path names, which are legal strings and illegal ids.
+       */
+      function validChainRef(v) {
+        return v == null
+          || (v is string
+              && v.size() > 0
+              && v.size() <= 200
+              && !v.matches('.*/.*')
+              && v != '.'
+              && v != '..');
+      }
+
       function validEvent() {
         let d = request.resource.data;
         let recurrence = d.get('recurrence', null);
@@ -389,14 +483,38 @@ service cloud.firestore {
           && d.checkInClosesAt is timestamp
           && d.mode in ['recurring', 'oneoff']
           && (recurrence == null || validRecurrence(recurrence))
-          && (labelTemplate == null || validLabelTemplate(labelTemplate));
+          && (labelTemplate == null || validLabelTemplate(labelTemplate))
+          && validChainRef(d.get('seriesId', null))
+          && validChainRef(d.get('recurrenceRootId', null))
+          && validChainRef(d.get('predictFromChain', null));
       }
 
       allow get, list: if isActive();
 
       // Core and up only: moving an event's date mid-check-in would swap the
       // active event out from under every counselor's phone at once.
-      allow create, update: if isCore() && validEvent();
+      /**
+       * Both chains, and the second one is not paranoia.
+       *
+       * `buildEventPayload` nulls `seriesId` and `recurrenceRootId` when `mode`
+       * becomes `'oneoff'` — a supported action in the event editor, not an
+       * exotic attack. Without the second check, a core member outside a
+       * restricted gathering could switch one of its instances to a one-off,
+       * collapsing its `chainKey` to its own event id, for which no
+       * `eventAccess` document exists — and the gathering plus its whole
+       * register would be open. Editing `seriesId` to point at an open chain
+       * does the same thing.
+       *
+       * On create, `resource` is null and there is no old chain to leave.
+       */
+      allow create: if isCore()
+        && validEvent()
+        && onChain(chainOfData(request.resource.data, eventId));
+
+      allow update: if isCore()
+        && validEvent()
+        && onChain(chainOfData(resource.data, eventId))
+        && onChain(chainOfData(request.resource.data, eventId));
 
       /**
        * Never from a client, even for the core team who may do everything else
@@ -506,8 +624,16 @@ service cloud.firestore {
             && request.resource.data.get('checkedOutAt', null) != null;
         }
 
-        allow get, list: if isActive();
-        allow create: if isCounselor() && validAttendance() && !attendanceFrozen();
+        /*
+         * `onChain` never mentions `resource`, so it is constant with respect
+         * to the result set and a `list` over this collection stays statically
+         * satisfiable — `eventId` is bound by the query path. That property is
+         * exactly what the collection-group wildcard does not have, which is
+         * why the rule down there had to be denied outright instead.
+         */
+        allow get, list: if isActive() && onChain(eventChain(eventId));
+        allow create: if isCounselor() && validAttendance() && !attendanceFrozen()
+                      && onChain(eventChain(eventId));
         /**
          * A kiosk may add a record, and may record a first pickup. It may not
          * overwrite the moment and method a counselor recorded, and it may not
@@ -516,10 +642,12 @@ service cloud.firestore {
          * re-writing them.
          */
         allow update: if isCounselor() && !attendanceFrozen()
+                      && onChain(eventChain(eventId))
                       && (isKioskSession()
                             ? kioskCheckOutAllowed()
                             : (validAttendance() || validCheckOut()));
-        allow delete: if isCounselor() && !attendanceFrozen() && !isKioskSession();
+        allow delete: if isCounselor() && !attendanceFrozen() && !isKioskSession()
+                      && onChain(eventChain(eventId));
       }
 
       /**
@@ -535,9 +663,9 @@ service cloud.firestore {
           return d.studentId == studentId && d.eventId == eventId;
         }
 
-        allow get, list: if isActive();
-        allow create, update: if isCore() && validRsvp();
-        allow delete: if isCore();
+        allow get, list: if isActive() && onChain(eventChain(eventId));
+        allow create, update: if isCore() && validRsvp() && onChain(eventChain(eventId));
+        allow delete: if isCore() && onChain(eventChain(eventId));
       }
     }
 
@@ -583,8 +711,136 @@ service cloud.firestore {
           && (!('examinedFrom' in d) || d.examinedFrom is timestamp);
       }
 
+      // The chain *is* the document id here, so no event lookup is needed —
+      // one billed read instead of two.
+      allow get, list: if isActive() && onChain(chainKey);
+      allow create, update: if isCounselor() && validSkippedNights() && onChain(chainKey);
+      allow delete: if false;
+    }
+
+    /* ---------------------------------------------------------------- */
+    /* eventAccess                                                       */
+    /* ---------------------------------------------------------------- */
+
+    /**
+     * Who may work one gathering.
+     *
+     * The problem being solved is clutter, not secrecy: the Sunday-morning
+     * nursery team's screen carries Friday's youth night, the retreat and the
+     * Wednesday small group, none of which they will ever stand at. So what
+     * closes is *working* the gathering — check-in, undo, RSVPs, the register,
+     * editing. What stays open is that it exists, what it is called and when it
+     * is on, because a counselor at a door at 6:59pm who sees an empty screen
+     * concludes the app is broken and files check-ins against the wrong thing.
+     *
+     * Chain-keyed, like `skippedNights` above and for the same reason: most
+     * occurrences are projected and have no document to hang an ACL on.
+     *
+     * **An absent document means the gathering is open.** Every rule that reads
+     * this collection has to ask `exists()` before `get()`, because `get()` at
+     * a path with no document raises rather than returning null — see
+     * `firestore-tests/getSemantics.test.ts`. Written the obvious way, every
+     * gathering nobody had restricted would have denied.
+     *
+     * This block governs the ACL itself. The gates that read it live on
+     * `events`, `attendance`, `rsvps` and `skippedNights`.
+     */
+    match /eventAccess/{chainKey} {
+      /**
+       * The permission to change this document is the document.
+       *
+       * `resource`, not a lookup: what is being written *is* the access list,
+       * so the stored version answers "may you touch this" directly. Reading it
+       * through `get()` would be the same document at the cost of a billed
+       * read, and would need the `exists()` dance besides.
+       */
+      function onThisChain() {
+        return isAdmin()
+          || resource.data.get('restricted', false) != true
+          || request.auth.uid in resource.data.get('members', []);
+      }
+
+      /**
+       * `members` is checked for shape and size but not element by element —
+       * rules cannot iterate a list. A non-string in there is inert: it can
+       * never equal `request.auth.uid`, so the worst it does is take up one of
+       * the 200 slots. The cap is what actually matters, because this document
+       * is read on every gated request and an unbounded array would make every
+       * check-in pay for somebody's paste.
+       */
+      function validAccess() {
+        let d = request.resource.data;
+        return d.chainKey == chainKey
+          && d.restricted is bool
+          && d.members is list
+          && d.members.size() <= 200
+          && d.updatedAt is timestamp
+          && d.updatedBy == request.auth.uid;
+      }
+
+      /**
+       * No closing the door from the outside.
+       *
+       * The mistake this feature makes easiest is one core member restricting
+       * *Friday Fellowship* — the gathering the whole ministry works — and
+       * leaving themselves off it. Nobody could then re-open it, because
+       * re-opening requires being on it. So the writer stays on the list.
+       *
+       * Admins are exempt: they pass `onThisChain()` regardless, so they are
+       * never locking themselves out, and they may be tidying somebody else's
+       * list on their behalf.
+       */
+      function writerStays() {
+        return isAdmin() || request.auth.uid in request.resource.data.members;
+      }
+
+      /**
+       * The permissive half, and the reason a counselor can be trusted with
+       * it: Priya is already on Friday Fellowship, Jo turns up at the door, and
+       * Priya adds her without finding an admin. Adding somebody to a gathering
+       * you already work is not an escalation — it hands out exactly the access
+       * you have.
+       *
+       * Removing somebody is not symmetric with adding them, so it is not here.
+       * Nor is flipping `restricted`, which is a decision about the gathering
+       * rather than about one person.
+       */
+      function onlyAdds() {
+        return request.resource.data.members.hasAll(resource.data.get('members', []))
+          && request.resource.data.restricted == resource.data.get('restricted', false);
+      }
+
+      /*
+       * Readable to the whole team, which is what makes the locked screen able
+       * to say "Miriam or Dana can add you" rather than just refusing. The
+       * client pre-filters what it shows; this is not where the gathering is
+       * protected.
+       */
       allow get, list: if isActive();
-      allow create, update: if isCounselor() && validSkippedNights();
+
+      /*
+       * The document only comes into existence by restricting something —
+       * a fresh one saying `restricted: false` would be a no-op that costs a
+       * read on every gated request forever. Re-opening is an update.
+       */
+      allow create: if isCore()
+        && validAccess()
+        && writerStays()
+        && request.resource.data.restricted == true;
+
+      allow update: if validAccess() && writerStays() && (
+           isAdmin()
+        || (isCore() && onThisChain())
+        || (isCounselor() && onThisChain() && onlyAdds())
+      );
+
+      /*
+       * Stated rather than left to the default deny at the bottom of the file,
+       * because the distinction is load-bearing: writing `allow write:` in
+       * place of `create, update:` would have silently handed over deletion,
+       * and deleting this document re-opens the gathering to everybody. The way
+       * to re-open is `restricted: false`, which keeps the list.
+       */
       allow delete: if false;
     }
 
@@ -792,28 +1048,39 @@ service cloud.firestore {
     /* ---------------------------------------------------------------- */
 
     /**
-     * A collection-group query over `attendance`, which is how a student's
-     * page shows history older than the calendar the app keeps loaded.
+     * Denied, and the deny is the feature.
      *
-     * A collection-group query is only ever authorised by a rule at a wildcard
-     * path — the nested `events/{eventId}/attendance/{studentId}` rule above
-     * cannot grant it, however permissive it is — so this exists to make that
-     * one query shape possible.
+     * A student's profile shows history older than the calendar the app keeps
+     * loaded, and it used to do that with a collection-group query over
+     * `attendance` — one indexed read for any depth of history, instead of a
+     * read per night. A collection-group query is only ever authorised by a
+     * rule at a wildcard path, so this block existed to make that one query
+     * shape possible, and it said `allow list: if isActive()`.
      *
-     * It widens no data. Every document this can reach is already readable to
-     * the same people through the nested rule, one event at a time; an active
-     * member could already enumerate the lot by walking `events`. What changes
-     * is the number of round trips it takes to ask "when did this student come",
-     * which is the difference between a profile that can show two years of
-     * history and one that stops at the loaded window.
+     * Two things were wrong with it once gatherings could be restricted, and
+     * neither can be fixed by narrowing the condition.
      *
-     * `list` only. A single document is fetched through its own path, and
-     * writes stay where they are checked against the event they belong to —
-     * `studentId == the document id`, `checkedInBy == the caller` — none of
-     * which this wildcard could enforce.
+     * A wildcard path has no single parent event. So no rule here can ask which
+     * gathering a record belongs to, let alone whether the caller is on it —
+     * and `attendance` documents carry `seriesId`, with a declared
+     * collection-group index on it, so one line in a browser console returned
+     * an entire restricted chain's register, every night of it. A second
+     * declared index on `isFirstEver` returned every first-timer.
+     *
+     * And a wildcard path matches *more* than the collection group. It also
+     * matches an ordinary subcollection query at `events/{id}/attendance`, and
+     * rules are OR'd across every matching path — so this block was granting
+     * precisely the `list` that the nested rule above now denies. The gate on a
+     * restricted register was not incomplete because of an oversight in the
+     * nested rule; it was being overridden from down here.
+     *
+     * The query therefore moves to `getStudentAttendance`, which runs on the
+     * Admin SDK, reads each record's parent event, and drops what the caller
+     * may not see. The two collection-group indexes stay declared — the
+     * callable uses them.
      */
     match /{path=**}/attendance/{studentId} {
-      allow list: if isActive();
+      allow list: if false;
     }
 
     /* ---------------------------------------------------------------- */

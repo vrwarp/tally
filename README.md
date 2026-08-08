@@ -8,6 +8,12 @@ turned up for the first time, and whose profile still has no way to reach a pare
 Two audiences, one app. **Counselors** get exactly one screen — check-in. **Core team and admins**
 also get the dashboard, the roster, event and RSVP management, and settings.
 
+A gathering can also be narrowed to the people who actually work it, which is about clutter rather
+than secrecy: the Sunday-morning nursery team's screen should not carry Friday's youth night, the
+retreat and the Wednesday small group. A gathering you are not on stays visible, below a divider,
+with a lock and the name of somebody who can add you — never invisible, because a volunteer at a
+door who sees an empty screen concludes the app is broken.
+
 ---
 
 ## What it does
@@ -29,6 +35,9 @@ also get the dashboard, the roster, event and RSVP management, and settings.
   week, whose profile has no way to reach a parent, and how the head count is trending.
 - **A calendar** that pages back through every gathering already held, and can cancel a night, delete
   one recorded by mistake, or end a whole recurring gathering.
+- **Per-gathering access**, so a ministry running five things a week gives each team the one screen
+  they need. Anybody already on a gathering can add somebody else to it in three taps — the person at
+  the door with a new volunteer beside them should not have to find an admin.
 
 Tally deliberately stops there. It does not track signed waivers, fees or payments: those are
 someone's clipboard and someone's cash box, and a half-kept copy in an app is worse than none.
