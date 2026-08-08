@@ -501,7 +501,7 @@ describe('the clock', () => {
       await vi.advanceTimersByTimeAsync(70_000);
     });
 
-    expect(screen.getByText(/first name/i)).toBeTruthy();
+    expect(screen.getByText(/^Child's first name$/)).toBeTruthy();
   });
 
   it('puts a half-typed registration away when the family walks off', async () => {

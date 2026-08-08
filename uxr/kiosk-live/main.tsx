@@ -57,9 +57,16 @@ const binding: KioskBinding = {
 };
 
 /*
- * One family and their near-misses. The surnames deliberately collide: four
- * letters of "Alva" reach five children across three households, which is the
- * state the standing "not your family?" door exists for.
+ * One family and their near-misses, and then some.
+ *
+ * The surnames deliberately collide: four letters of "Alva" reach five children
+ * across three households, which is the state the standing "not your family?"
+ * door exists for. The five after them exist so the roster can exceed
+ * `MAX_RESULTS` — a two-letter buffer matches eleven and the screen shows
+ * eight. Without them the fixture could not produce a truncated list at all,
+ * and the readout's "Keep typing" — the whole answer to a search that found
+ * more than it can show — shipped through a round of critique with no frame of
+ * it in the set.
  */
 const STUDENTS: KioskStudent[] = [
   { id: '1', firstName: 'Ramona', lastName: 'Alvarez', grade: 7 },
@@ -67,6 +74,12 @@ const STUDENTS: KioskStudent[] = [
   { id: '3', firstName: 'Priya', lastName: 'Alvarez-Bell', grade: 11 },
   { id: '4', firstName: 'Sam', lastName: 'Alvarado', grade: 6 },
   { id: '5', firstName: 'Jonah', lastName: 'Alvarado', grade: 12 },
+  { id: '6', firstName: 'Alice', lastName: 'Alberts', grade: 6 },
+  { id: '7', firstName: 'Aleksander', lastName: 'Albrecht', grade: 8 },
+  { id: '8', firstName: 'Alma', lastName: 'Alcott', grade: 10 },
+  { id: '9', firstName: 'Alden', lastName: 'Aldridge', grade: 7 },
+  { id: '10', firstName: 'Alethea', lastName: 'Alford', grade: 11 },
+  { id: '11', firstName: 'Alonzo', lastName: 'Allred', grade: 9 },
 ] as KioskStudent[];
 
 function outcomeFor(buffer: string, nobody: boolean): KioskSearchOutcome {
@@ -78,7 +91,23 @@ function outcomeFor(buffer: string, nobody: boolean): KioskSearchOutcome {
         ? 'phone'
         : 'phone-partial'
       : 'name';
-  return { mode, results: buffer && !nobody ? STUDENTS : [] } as KioskSearchOutcome;
+  /* Any word, not the whole name: the app's matcher answers "al" with every
+     Alvarez as well as every Alice, and a fixture that only matched from the
+     first letter of the first name could not produce a list long enough to be
+     truncated. */
+  const needle = buffer.toLowerCase();
+  const matched =
+    buffer && !nobody
+      ? STUDENTS.filter((student) =>
+          `${student.firstName} ${student.lastName}`
+            .toLowerCase()
+            .split(/[\s-]+/)
+            .some((word) => word.startsWith(needle)),
+        )
+      : [];
+  /* Sliced like `searchStudents` slices, and carrying the same pre-slice total,
+     so a capped list renders exactly what the app would render. */
+  return { mode, results: matched.slice(0, 8), total: matched.length } as KioskSearchOutcome;
 }
 
 /* Exported only so this file has an export: the component and the mount live
