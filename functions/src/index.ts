@@ -63,6 +63,7 @@ import {
 import { BACKEND_SECRETS, resolveConfig, type PcoConfig } from './config.js';
 import { asFirestoreLike, PATHS, type FirestoreLike } from './firestore.js';
 import { ChainAccessReader } from './eventAccess.js';
+import { checkInsRootEventId } from './pco/checkins.js';
 import {
   deleteEvents as removeEvents,
   type DeletionSummary,
@@ -311,6 +312,41 @@ async function requireMember(uid: string | undefined): Promise<void> {
   if (!caller.active) {
     throw new HttpsError('permission-denied', 'Your access to Tally is not active.');
   }
+}
+
+/**
+ * The gathering gate, for callables.
+ *
+ * The rules cover what a client writes directly. These cover what it asks a
+ * server to write on its behalf — and the Admin SDK bypasses rules entirely, so
+ * a callable that forgets this is not partially protected, it is unprotected.
+ *
+ * Takes the chain rather than an event id wherever the caller already has one,
+ * because most of these act on a whole chain and looking up an instance to find
+ * the chain it belongs to would be a round trip to learn what was passed in.
+ */
+async function requireOnChain(uid: string, chain: string): Promise<void> {
+  const caller = await readCaller(uid);
+  const reader = new ChainAccessReader(getFirestore(), uid, caller.role === 'admin');
+  if (!(await reader.canWork(chain))) {
+    throw new HttpsError(
+      'permission-denied',
+      'Only people added to that gathering can work it.',
+    );
+  }
+}
+
+/** The same, given an event id — reads the parent to find its chain. */
+async function requireOnEvent(uid: string, eventId: string): Promise<void> {
+  const snapshot = await getFirestore().doc(`events/${eventId}`).get();
+  const data = snapshot.exists ? (snapshot.data() ?? {}) : {};
+  const chain =
+    typeof data.seriesId === 'string' && data.seriesId.length > 0
+      ? data.seriesId
+      : typeof data.recurrenceRootId === 'string' && data.recurrenceRootId.length > 0
+        ? data.recurrenceRootId
+        : eventId;
+  await requireOnChain(uid, chain);
 }
 
 /** Core-team gate. The role is read from Firestore, never from the request. */
@@ -1617,6 +1653,19 @@ export const importCheckInsEvent = onCall<
     throw new HttpsError('failed-precondition', `${backend.displayName} has no history to import.`);
   }
 
+  /*
+   * An import writes events *and* attendance under a chain derived from the
+   * upstream event id — `pco-checkins-{id}`, deterministic, which is what makes
+   * re-importing the same event idempotent and what makes the chain knowable
+   * here without running the import first.
+   *
+   * That determinism is also why this needs a gate: import the same Check-Ins
+   * event twice with a restriction added in between and the second run would
+   * write straight into a gathering the caller is no longer on, through the
+   * Admin SDK, past every rule.
+   */
+  await requireOnChain(request.auth!.uid, checkInsRootEventId(pcoEventId.trim()));
+
   // Occurrence ids embed the ministry-local calendar day, and this container
   // runs in UTC — same reasoning, same fix as `materializeOccurrence`.
   process.env.TZ = MINISTRY_TIME_ZONE;
@@ -2094,6 +2143,18 @@ export const materializeOccurrence = onCall<
     throw new HttpsError('invalid-argument', 'startAt must be a timestamp in milliseconds.');
   }
 
+  /*
+   * The gate that closes the one hole the rules cannot.
+   *
+   * A projected occurrence has no document until this runs, and its derived id
+   * (`{chain}-{date}`) has no `eventAccess` document of its own — so
+   * `eventChain()` in the rules falls back to the id and finds nothing to
+   * refuse. Refusing here is what stops an occurrence of a restricted chain
+   * ever becoming real for somebody outside it, and therefore what stops
+   * attendance being filed under it.
+   */
+  await requireOnChain(request.auth!.uid, chain);
+
   const result = await materializeOne(
     db(),
     { chain, startAt: new Date(startAt), uid: request.auth!.uid },
@@ -2337,15 +2398,24 @@ export const deleteEvents = onCall<
       throw new HttpsError('invalid-argument', 'eventId is required.');
     }
     target = { scope: 'event', eventId };
+    await requireOnEvent(request.auth!.uid, eventId);
   } else if (scope === 'chain') {
     const chain = request.data?.chain;
     if (typeof chain !== 'string' || chain.trim().length === 0) {
       throw new HttpsError('invalid-argument', 'chain is required.');
     }
     target = { scope: 'chain', chain };
+    await requireOnChain(request.auth!.uid, chain);
   } else {
     throw new HttpsError('invalid-argument', "scope must be 'event' or 'chain'.");
   }
+
+  /*
+   * `preview` is gated too, and that is not belt-and-braces. It counts through
+   * exactly the code that would delete — so an ungated preview answers "how
+   * many students have ever been to your restricted gathering" to anybody who
+   * asks, without deleting anything and without leaving a trace.
+   */
 
   const summary = await removeEvents(db(), target, logger, {
     apply: request.data?.preview !== true,
@@ -2466,9 +2536,24 @@ export const getKioskEvents = onCall<
     !('error' in target) && target.backend.capabilities.writeBack === 'full';
 
   const days = typeof request.data?.days === 'number' ? request.data.days : undefined;
-  return {
-    events: await listKioskEvents(database, new Date(), logger, { days, allergiesSupported }),
-  };
+  const events = await listKioskEvents(database, new Date(), logger, { days, allergiesSupported });
+
+  /*
+   * Filtered at bind time, which is the only moment this can be refused kindly.
+   *
+   * A kiosk keeps its binding and nothing else. Bound to a gathering its
+   * approver cannot work, it looks perfectly healthy in the lobby and then
+   * fails on the *first check-in* — in front of a family, with a queue behind
+   * them — and afterwards queues up to fifty more writes that will never land.
+   * The list a kiosk is offered is therefore narrowed to what the person
+   * approving the pairing may actually work.
+   */
+  const uid = request.auth!.uid;
+  const caller = await readCaller(uid);
+  const reader = new ChainAccessReader(getFirestore(), uid, caller.role === 'admin');
+  const { allowed } = await reader.partition(events.map((entry) => entry.chain));
+
+  return { events: events.filter((entry) => allowed.has(entry.chain)) };
 });
 
 /**
