@@ -83,7 +83,7 @@
     "eslint": "^10.8.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
-    "firebase-tools": "^14.6.0",
+    "firebase-tools": "^15.25.1",
     "globals": "^17.8.0",
     "jsdom": "^26.1.0",
     "tailwindcss": "^4.1.10",
