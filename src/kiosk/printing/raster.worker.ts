@@ -20,6 +20,7 @@
  */
 import { createJob, expectedImageSize } from '@vrwarp/brother-ql-webusb/convert';
 import { isEndless, resolveLabel } from '@vrwarp/brother-ql-webusb/labels';
+import { DOTS_PER_MM } from '@/lib/labelRender';
 import type { LabelTemplate, LabelTokenValues } from '@/lib/labelTemplate';
 import { drawLabel } from './draw';
 
@@ -28,6 +29,13 @@ export interface RasterRequest {
   id: number;
   model: string;
   label: string;
+  /**
+   * Blank millimetres above and below the text on continuous tape, if this
+   * kiosk has been given a preference. Ignored on die-cut media, whose length
+   * is fixed and whose block is centred. See `PrinterConfig.marginTopMm`.
+   */
+  marginTopMm?: number;
+  marginBottomMm?: number;
   template: LabelTemplate;
   values: LabelTokenValues;
 }
@@ -50,6 +58,11 @@ const ctx = self as unknown as {
   postMessage(message: RasterReply, transfer?: ArrayBuffer[]): void;
 };
 
+/** A margin a person typed, as dots, or undefined to leave the default alone. */
+function marginDots(mm: number | undefined): number | undefined {
+  return mm === undefined ? undefined : Math.round(mm * DOTS_PER_MM);
+}
+
 function build(request: RasterRequest): { job: Uint8Array; pageCount: number } {
   const [width, height] = expectedImageSize(request.label);
   const endless = isEndless(resolveLabel(request.label));
@@ -59,6 +72,13 @@ function build(request: RasterRequest): { job: Uint8Array; pageCount: number } {
     // Continuous tape has no fixed length, so the content decides it. Die-cut
     // media does, and `prepareImage` will refuse anything else.
     height: endless ? null : height,
+    // Only on tape. On die-cut media a margin cannot lengthen the label, so all
+    // it could do is shove the text off-centre on a label somebody chose for its
+    // size — a setting that says "continuous tape" on the screen it is set from
+    // should not quietly do that.
+    ...(endless
+      ? { paddingTop: marginDots(request.marginTopMm), paddingBottom: marginDots(request.marginBottomMm) }
+      : {}),
   });
 
   /*

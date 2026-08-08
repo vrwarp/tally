@@ -40,6 +40,11 @@ export interface RenderedLabel {
  * 62mm tape at 300 dpi is about 12 dots per millimetre, so 1800 dots is 150mm —
  * generous for four lines of text, and short of the length a runaway template
  * could otherwise ask for.
+ *
+ * The margins on `box` count towards it, so a template already long enough to
+ * be cut short loses its bottom margin first. That is the right order: the cap
+ * is there so that no one child can take 150mm of roll however it was asked
+ * for, and a label at the cap has a bigger problem than its bottom edge.
  */
 const MAX_ENDLESS_HEIGHT_DOTS = 1800;
 
