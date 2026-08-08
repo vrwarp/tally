@@ -460,16 +460,18 @@ export function RegistrationFlow({
                   {state.step === 'guardian-phone' ? formatPhone(state.buffer) : state.buffer}
                 </span>
               ) : (
-                /* Set like the search screen's prompt and for the same reason:
-                   on a step nobody has typed into yet this line is the only
-                   thing on the lower half of the glass, and the smallest,
-                   dimmest type on the screen is the wrong place to say what
-                   the box is for. One notch below the typed text in size and
-                   well below it in colour, so it cannot be read as an answer
-                   somebody already gave. */
-                <span className="truncate text-2xl font-semibold text-ink-300">
-                  {placeholderFor(state)}
-                </span>
+                /*
+                 * A label, and unmistakably not a value.
+                 *
+                 * The search screen leaves this slot empty until a key lands,
+                 * which teaches a parent two taps earlier that the bold word
+                 * above the keys is what *they* typed. Set at one size step and
+                 * one grey below the real thing, this placeholder then read as
+                 * something the previous family had entered — same position,
+                 * same weight, same shape. Two size steps and a weight class
+                 * apart is a different kind of object; dimming alone was not.
+                 */
+                <span className="truncate text-lg text-ink-500">{placeholderFor(state)}</span>
               )}
             </div>
           </div>

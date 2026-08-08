@@ -108,8 +108,12 @@ function WidenButton({
       }}
       className={
         quiet
-          ? 'flex h-11 min-w-0 shrink items-center justify-center truncate rounded-xl bg-ink-800/70 px-3 text-sm font-semibold whitespace-nowrap text-ink-200 ring-1 ring-ink-600/60 active:bg-ink-700'
-          : 'flex h-14 items-center justify-center rounded-xl bg-ink-800 px-8 text-lg font-semibold text-ink-100 active:bg-ink-700'
+          ? /* No ring on the standing one. Rows became `ink-800` so a child's
+               name would read as a button, and this button carries the same
+               fill — so the ring made the *widen* control the strongest edge on
+               a screen whose primary targets are the names beside it. */
+            'flex h-11 min-w-0 shrink items-center justify-center truncate rounded-xl bg-ink-800/70 px-3 text-sm font-semibold whitespace-nowrap text-ink-300 active:bg-ink-700'
+          : 'flex h-14 w-full items-center justify-center rounded-xl bg-ink-800 text-lg font-semibold text-ink-100 active:bg-ink-700'
       }
       style={{ touchAction: 'manipulation' }}
     >
@@ -231,6 +235,23 @@ export function SearchScreen({
   const rowTap = useTapGuard(onPick);
 
   /*
+   * Whether this state has rows in it, which decides where its content sits in
+   * the track.
+   *
+   * A list is top-anchored and has to be: a parent typing one more letter must
+   * not have Ramona Alvarez slide down under the thumb already moving toward
+   * her. The row-less states have no such promise to keep — nothing in an idle
+   * prompt or a no-match panel survives the next keystroke — so they hang from
+   * the bottom of the track instead, near the hand.
+   *
+   * That matters most where it is least obvious. The no-match panel is the one
+   * state on this screen where a parent has to decide and press something, and
+   * top-anchored on a phone its two buttons sat in the upper third with a
+   * hundred and eighty pixels of nothing beneath them.
+   */
+  const rowless = outcome.results.length === 0;
+
+  /*
    * Every keystroke starts the list again from the top. Without this, a parent
    * who scrolled down a broad match and then typed one more letter would be
    * looking at the bottom of a list short enough to have no bottom — an empty
@@ -242,7 +263,7 @@ export function SearchScreen({
   }, [buffer]);
 
   return (
-    <div className="grid h-full grid-rows-[auto_1fr_auto_auto_auto]">
+    <div className="grid h-full grid-rows-[auto_1fr_auto_auto_auto_auto]">
       {/* Header. The staff gate used to be an invisible square over its left
           corner; it is a hold on **Clear** now — see `onStaffGate`. */}
       <div className="relative px-6 pt-[max(1rem,var(--spacing-safe-top))] pb-2 text-center">
@@ -285,29 +306,44 @@ export function SearchScreen({
           */}
         <div className="text-2xl font-semibold text-ink-100">{binding.title}</div>
         <div className="text-base text-ink-500">
-          {closed
-            ? 'Check-in window has closed — you can still check in.'
-            : tracksCheckOut
-              ? `${eventWindow(binding)} · Check in or collect`
-              : eventWindow(binding)}
+          {closed ? 'Check-in window has closed — you can still check in.' : eventWindow(binding)}
         </div>
       </div>
 
-      {/* Results — fixed-height rows in a fixed region that scrolls past them.
-          The margin is a dead gutter, not padding: end padding *inside* a
-          scroll container is scrolled through, so at rest the last row was
-          being cut flush against the offer buttons a pixel below it — two
-          adjacent targets, one of which checks a child in, with nothing
-          between them. The margin comes out of the track instead, where
-          nothing can scroll into it. */}
+      {/*
+        * Results — fixed-height rows in a fixed region that scrolls past them.
+        *
+        * Two things stop a clipped row from bleeding into the console below
+        * it. The margin is a dead gutter rather than padding, because padding
+        * *inside* a scroll container is scrolled through: at rest the last row
+        * was cut flush against buttons nine pixels below it, and nine pixels
+        * is what separates two name rows — so the boundary between "more
+        * names" and "doors out of the search" was signalled by one pixel.
+        *
+        * The mask is the other half, and it is the half that matters. A gutter
+        * separates the *clip line* from the buttons, but a thumb aims at the
+        * letters, and on a clipped row the letters are flush with the clip.
+        * Fading the last few pixels of the region leaves a strip of card with
+        * no ink in it: a peek that says there is more below without offering
+        * anything to press. Written twice because the kiosk runs on whatever
+        * tablet the church owns and WebKit still wants the prefix.
+        */}
       <div
         ref={resultsRef}
-        className="mb-2 min-h-0 overflow-y-auto overscroll-contain scroll-touch px-6"
-        style={{ touchAction: 'pan-y' }}
+        className="mb-4 flex min-h-0 flex-col overflow-y-auto overscroll-contain scroll-touch px-6"
+        style={{
+          touchAction: 'pan-y',
+          WebkitMaskImage: 'linear-gradient(to bottom, #000 calc(100% - 1.25rem), transparent)',
+          maskImage: 'linear-gradient(to bottom, #000 calc(100% - 1.25rem), transparent)',
+        }}
       >
         {/* The bottom padding rides on the column, not the scroller: end
-            padding on a scroll container is not reliably scrollable to. */}
-        <div className="mx-auto flex max-w-2xl flex-col gap-2 pb-2">
+            padding on a scroll container is not reliably scrollable to.
+            `mt-auto` sinks the row-less states toward the hand and collapses
+            to nothing the moment the content is taller than the box. */}
+        <div
+          className={`mx-auto flex w-full max-w-2xl flex-col gap-2 ${rowless ? 'mt-auto pb-6' : 'pb-2'}`}
+        >
           {/*
             * The screen a parent actually walks up to.
             *
@@ -332,9 +368,13 @@ export function SearchScreen({
             * cannot move.
             */}
           {outcome.mode === 'idle' && (
-            <div className="flex flex-col items-center gap-2 pt-6 text-center">
+            <div className="flex flex-col items-center pt-6 text-center">
+              {/* Two voices, not three. The instruction and its alternative are
+                  one unit, set tight; what happens next is separated by air
+                  rather than by a third size, which at a 2px step read as one
+                  paragraph fading out. */}
               <div className="text-4xl font-semibold text-ink-100">Type a name</div>
-              <div className="text-lg text-ink-400">or the last 4 digits of your phone</div>
+              <div className="pt-1 text-lg text-ink-400">or the last 4 digits of your phone</div>
               {/*
                 * What happens next, said before it has to be guessed.
                 *
@@ -346,11 +386,25 @@ export function SearchScreen({
                 * door. This is the sentence that stops that, and it is free
                 * here: the space is empty and the eye is already on it.
                 */}
-              <div className="pt-1 text-base text-ink-500">
-                {tracksCheckOut
-                  ? "Then tap your child's name to check in or collect."
-                  : "Then tap your child's name."}
-              </div>
+              {/*
+                * One sentence, in both modes.
+                *
+                * It carried "…to check in or collect" at a pickup gathering,
+                * which said the mode twice on one screen — the header had it
+                * too — and wrapped this line onto two, ending in a one-word
+                * orphan. Neither copy was where the answer actually is: the
+                * row itself says "Tap to collect", "✓ Checked in" or a dimmed
+                * "Collected", and that is a thing a parent acts on rather than
+                * files.
+                *
+                * `ink-400`, the same step as the line above it. At `ink-500`
+                * the one sentence that tells a parent a name row is pressable
+                * was the dimmest text on the glass — below AA on a
+                * fingerprinted lobby screen — and skipping it is exactly what
+                * sends somebody hunting for a button and finding the register
+                * offer.
+                */}
+              <div className="pt-4 text-base text-ink-400">Then tap your child&rsquo;s name.</div>
             </div>
           )}
           {outcome.mode === 'phone-partial' && (
@@ -380,7 +434,11 @@ export function SearchScreen({
              * appeared the moment a name matched nobody would be the one thing
              * that did.
              */
-            <div className="flex flex-col items-center gap-3 pt-6 text-center">
+            /* One width for the stacked pair. Auto-width buttons stacked and
+               centred missed each other's edges by 11px a side, which nothing
+               in the frame explained — because nothing did: it was the length
+               of two labels. */
+            <div className="mx-auto flex w-full max-w-xs flex-col items-stretch gap-3 pt-6 text-center">
               <div className="text-lg text-ink-400">
                 {refresh === 'done' ? (
                   <>
@@ -407,7 +465,7 @@ export function SearchScreen({
                   haptic();
                   onRegister();
                 }}
-                className="flex h-14 items-center justify-center rounded-xl bg-brand-600 px-8 text-lg font-semibold text-white active:bg-brand-500"
+                className="flex h-14 items-center justify-center rounded-xl bg-brand-600 text-lg font-semibold text-white active:bg-brand-500"
               >
                 Register your child
               </button>
@@ -490,6 +548,26 @@ export function SearchScreen({
       </div>
 
       {/*
+        * The console: the standing offer, the readout and the keys, declared as
+        * one object by the rule along its top.
+        *
+        * They were three things that had ended up adjacent. The offer row
+        * floated in the middle of an idle screen carrying the only accent and
+        * the only ring on the glass, with a two-hundred-pixel void above it and
+        * a seventy-eight-pixel one below — so it belonged to nothing, and the
+        * reserved height under it read as a second hole rather than as the
+        * readout's own space. Below one edge, that band is interior; the dead
+        * gutter above it is a boundary a clipped row cannot bleed across; and
+        * whatever slack the screen has left collects in exactly one field,
+        * above the rule and below the content.
+        *
+        * A hairline rather than a fill. `ink-900` under the page would have
+        * flattened the keys, which are `ink-800` and need the page's distance
+        * to stay shapes in a dim room.
+        */}
+      <div className="border-t border-ink-800/70" />
+
+      {/*
         * The standing offer: the one door off this screen that is never closed.
         *
         * A parent who has been told "just put your name in" types their child's
@@ -520,7 +598,21 @@ export function SearchScreen({
           phone. Hidden overflow lets the track fall back to zero, so a screen
           too narrow for both labels crops them instead of scrolling the whole
           kiosk. */}
-      <div className="flex h-12 items-center justify-center gap-2 overflow-hidden px-2">
+      {/*
+        * The exit sits on the left, and the gap between the two is wider than
+        * the gap between two name rows.
+        *
+        * These are not a matched pair. **Search everyone** is a retry: press it
+        * by accident and the search runs wider, which is a second of waiting.
+        * **Register your child** is an exit, and completed it makes a duplicate
+        * of a child the church already has, for the review queue to judge. They
+        * used to sit six pixels apart — less than the space between two rows on
+        * the same screen — with the exit the wider of the two and on the right,
+        * which on a phone held one-handed is exactly where a thumb travels.
+        * The air comes out of the row's own side margins, which were doing
+        * nothing.
+        */}
+      <div className="flex h-12 flex-row-reverse items-center justify-center gap-4 overflow-hidden px-2">
         {/*
           * The way out of the scope, standing beside the way out of the search.
           *
