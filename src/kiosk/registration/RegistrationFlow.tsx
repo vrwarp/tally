@@ -2,10 +2,10 @@
  * "First time here?" — the other door off the search screen.
  *
  * Everything a family needs to join the roster, asked one question at a time in
- * the frame the search screen already uses: a header, a readout, a body, and
- * the kiosk's own keyboard. Nothing here focuses an input, for the same reason
- * nothing on the search screen does — the device's native keyboard is slow to
- * raise and covers half the questions when it does.
+ * the frame the search screen already uses: a header, a body, then the readout
+ * and the kiosk's own keyboard together at the bottom. Nothing here focuses an
+ * input, for the same reason nothing on the search screen does — the device's
+ * native keyboard is slow to raise and covers half the questions when it does.
  *
  * The wizard is deliberately short. Three questions per child — four where the
  * church's database can hold an allergy note, and the fourth is one tap for
@@ -209,7 +209,7 @@ export function RegistrationFlow({
   const childNumber = state.children.length + 1;
 
   return (
-    <div className="grid h-full grid-rows-[auto_auto_1fr_auto]">
+    <div className="grid h-full grid-rows-[auto_1fr_auto]">
       <Header
         title={titleFor(state, childNumber)}
         subtitle={subtitleFor(state, binding)}
@@ -222,33 +222,26 @@ export function RegistrationFlow({
         onClose={onClose}
       />
 
-      {/* The readout, on the steps that have one. A div, never an input. */}
-      <div className="px-6 pb-2">
-        {isTypingStep(state.step) ? (
-          <div
-            className={`mx-auto flex h-16 max-w-2xl items-center justify-center rounded-xl bg-ink-900 px-4 ${
-              // Ticked "No allergies" empties this box and puts it out of use.
-              // Dimming rather than hiding: the question was asked and answered
-              // in the negative, and a box that vanished would read as a
-              // question that went away.
-              state.noAllergies ? 'opacity-40' : ''
-            }`}
-          >
-            {state.buffer ? (
-              <span className="truncate text-3xl font-semibold tracking-wide text-ink-50">
-                {state.step === 'guardian-phone' ? formatPhone(state.buffer) : state.buffer}
-              </span>
-            ) : (
-              <span className="text-xl text-ink-500">{placeholderFor(state)}</span>
-            )}
-          </div>
-        ) : (
-          <div className="h-16" />
-        )}
-      </div>
-
-      <div className="min-h-0 overflow-y-auto overscroll-contain scroll-touch px-6">
-        <div className="mx-auto flex max-w-2xl flex-col gap-3 pb-2">
+      <div className="flex min-h-0 flex-col overflow-y-auto overscroll-contain scroll-touch px-6">
+        {/*
+          * On a typing step the body hangs from the bottom of its region
+          * rather than the top, so that what a step puts here — today, the
+          * "No allergies" tick — stays against the readout it belongs to.
+          * The readout moved down to the keyboard (see below) and this is the
+          * half of that move that keeps the step whole: a question, its answer
+          * and the keys in one block under the hand, instead of one control
+          * marooned under the header.
+          *
+          * `mt-auto` rather than `justify-end`, because this region scrolls:
+          * an auto margin collapses to nothing once the content is taller than
+          * the box, where end-justified content would push its own top out of
+          * reach.
+          */}
+        <div
+          className={`mx-auto flex w-full max-w-2xl flex-col gap-3 pb-2 ${
+            isTypingStep(state.step) ? 'mt-auto' : ''
+          }`}
+        >
           {state.step === 'child-grade' && (
             <div className="grid grid-cols-3 gap-2 pt-2">
               <GradeChip label={NO_GRADE} onPick={() => dispatch({ type: 'grade', grade: null })} />
@@ -267,12 +260,14 @@ export function RegistrationFlow({
             /*
               * The way to say "nothing", where the typing would have started.
               *
-              * Directly under the box on purpose. The bottom button already
-              * offers the same answer, but it sits below forty keys, and a
-              * parent reading "any allergies we should know about?" is looking
-              * at the box — which is why the field was collecting "None",
-              * "N/A" and "no allergies" as though they were medical notes.
-              * Three spellings of a blank, bound for the church's database.
+              * Directly above the readout on purpose — the body hangs from the
+              * bottom on typing steps so that it lands there. **Next** already
+              * offers the same answer, but a parent reading "any allergies we
+              * should know about?" is looking at the readout and the keys, not
+              * at a button above them — which is why the field was collecting
+              * "None", "N/A" and "no allergies" as though they were medical
+              * notes. Three spellings of a blank, bound for the church's
+              * database.
               *
               * A checkbox rather than a third button: it reports a state the
               * parent can see they are in, and a button that had already been
@@ -400,8 +395,8 @@ export function RegistrationFlow({
         </div>
       </div>
 
-      {/* The bottom row: the keyboard where something is being typed, the one
-          action that ends the step where it is not. */}
+      {/* The bottom row: the readout and the keyboard where something is being
+          typed, the one action that ends the step where it is not. */}
       {isTypingStep(state.step) ? (
         <div className="flex flex-col gap-1.5">
           <div className="px-2">
@@ -426,6 +421,48 @@ export function RegistrationFlow({
               disabled={!canAdvance(state)}
               onPick={() => dispatch({ type: 'next' })}
             />
+          </div>
+          {/*
+            * The readout, between the button that ends the step and the keys
+            * that fill it. A div, never an input.
+            *
+            * It sat under the header until now, which put a parent's eyes and
+            * a parent's hands at opposite ends of an upright screen: they type
+            * a child's name at the bottom edge and it appears four hundred
+            * pixels away, so the letters they are checking cannot be seen
+            * without looking up off the keys. Here it is where every phone
+            * puts it — on top of the keyboard, in the same glance as the
+            * thumb.
+            *
+            * No fill, no border, no rounded corners, for the same reason the
+            * search screen's has none: a box on a touchscreen is a text field,
+            * and a parent taps a text field before typing into it. There is
+            * nothing here to focus and nothing would happen. Bare text says
+            * "this is where the letters land" without promising a press.
+            *
+            * It also lands between the big brand-coloured **Next** and the top
+            * row of keys, which is the one place on this screen a thumb
+            * reaching for '1' could commit the step by accident. An inert band
+            * is a good thing to have there.
+            */}
+          <div
+            className={`px-6 pb-1 ${
+              // Ticked "No allergies" empties the readout and puts it out of
+              // use. Dimming rather than hiding: the question was asked and
+              // answered in the negative, and a readout that vanished would
+              // read as a question that went away.
+              state.noAllergies ? 'opacity-40' : ''
+            }`}
+          >
+            <div className="mx-auto flex h-16 max-w-2xl items-center justify-center px-4">
+              {state.buffer ? (
+                <span className="truncate text-3xl font-semibold tracking-wide text-ink-50">
+                  {state.step === 'guardian-phone' ? formatPhone(state.buffer) : state.buffer}
+                </span>
+              ) : (
+                <span className="text-xl text-ink-500">{placeholderFor(state)}</span>
+              )}
+            </div>
           </div>
           {/* The one question on this screen that is a number gets the shape
               everybody already knows for one. See PhonePad. */}

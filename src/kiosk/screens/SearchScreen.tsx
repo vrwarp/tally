@@ -1,10 +1,19 @@
 /**
  * The screen a parent actually uses.
  *
- * Fixed geometry, top to bottom: event header, the typed buffer, a
- * fixed-height results area, the keyboard. A keystroke changes text and row
- * contents and never the geometry of the frame — nothing reflows, and the
- * keyboard subtree never re-renders (see components/Keyboard.tsx).
+ * Fixed geometry, top to bottom: event header, a fixed-height results area,
+ * the standing offer, the typed buffer, the keyboard. A keystroke changes text
+ * and row contents and never the geometry of the frame — nothing reflows, and
+ * the keyboard subtree never re-renders (see components/Keyboard.tsx).
+ *
+ * The buffer sits *at the bottom*, against the keyboard, rather than up under
+ * the header where it started. Held upright — which is how a phone and most of
+ * these tablets are held — the two halves of one act were a screen apart: the
+ * hand was at the bottom edge and what the hand was producing was four hundred
+ * pixels away, so a parent typing their name could not see the letters land
+ * without leaving the keys. Every phone on earth puts the field on top of the
+ * keyboard for that reason, and this screen is a phone as far as the hand
+ * holding it is concerned.
  *
  * The results area is the one part that scrolls. A search can return up to
  * MAX_RESULTS rows and a phone in a lobby has room for about four of them, so
@@ -76,7 +85,7 @@ function WidenButton({
       }}
       className={
         quiet
-          ? 'flex h-11 items-center justify-center rounded-xl bg-ink-800/70 px-5 text-base font-semibold text-ink-200 ring-1 ring-ink-600/60 active:bg-ink-700'
+          ? 'flex h-11 min-w-0 shrink items-center justify-center truncate rounded-xl bg-ink-800/70 px-3 text-sm font-semibold whitespace-nowrap text-ink-200 ring-1 ring-ink-600/60 active:bg-ink-700'
           : 'flex h-14 items-center justify-center rounded-xl bg-ink-800 px-8 text-lg font-semibold text-ink-100 active:bg-ink-700'
       }
       style={{ touchAction: 'manipulation' }}
@@ -210,7 +219,7 @@ export function SearchScreen({
   }, [buffer]);
 
   return (
-    <div className="grid h-full grid-rows-[auto_auto_1fr_auto_auto]">
+    <div className="grid h-full grid-rows-[auto_1fr_auto_auto_auto]">
       {/* Header. The staff gate used to be an invisible square over its left
           corner; it is a hold on **Clear** now — see `onStaffGate`. */}
       <div className="relative px-6 pt-[max(1rem,var(--spacing-safe-top))] pb-2 text-center">
@@ -239,17 +248,6 @@ export function SearchScreen({
             : closed
               ? 'Check-in window has closed — you can still check in.'
               : 'Welcome! Check in below.'}
-        </div>
-      </div>
-
-      {/* The buffer. A div, never an input — the native keyboard must not rise. */}
-      <div className="px-6 pb-2">
-        <div className="mx-auto flex h-16 max-w-2xl items-center justify-center rounded-xl bg-ink-900 px-4">
-          {buffer ? (
-            <span className="truncate text-3xl font-semibold tracking-wide text-ink-50">{buffer}</span>
-          ) : (
-            <span className="text-xl text-ink-500">Type a name, or the last 4 digits of your phone</span>
-          )}
         </div>
       </div>
 
@@ -413,7 +411,14 @@ export function SearchScreen({
         * promise this file makes about geometry: present from the first paint,
         * so it cannot be the thing that moves when a keystroke lands.
         */}
-      <div className="flex h-12 items-center justify-center gap-2 px-6">
+      {/* `overflow-hidden` is load-bearing, not tidiness: two nowrap labels
+          side by side have a min-content width, and a grid track will widen
+          past the screen to honour it rather than let them shrink — which took
+          the header, the results and the keyboard sideways with it on a narrow
+          phone. Hidden overflow lets the track fall back to zero, so a screen
+          too narrow for both labels crops them instead of scrolling the whole
+          kiosk. */}
+      <div className="flex h-12 items-center justify-center gap-2 overflow-hidden px-2">
         {/*
           * The way out of the scope, standing beside the way out of the search.
           *
@@ -437,11 +442,54 @@ export function SearchScreen({
               haptic(8);
               onRegister();
             }}
-            className="flex h-11 items-center justify-center rounded-xl bg-brand-600/15 px-6 text-base font-semibold text-brand-300 ring-1 ring-brand-500/40 active:bg-brand-600/30"
+            className="flex h-11 min-w-0 shrink items-center justify-center truncate rounded-xl bg-brand-600/15 px-3 text-sm font-semibold whitespace-nowrap text-brand-300 ring-1 ring-brand-500/40 active:bg-brand-600/30"
           >
-            {offerPrompt} Register your child
+            {/*
+              * The question goes first and, on a narrow screen standing beside
+              * **Search everyone**, goes away.
+              *
+              * Both controls and the question do not fit across a phone held
+              * upright: what they did instead was wrap the button onto three
+              * lines, which overran this row's fixed height and painted over
+              * the last row of the results. Dropping the question there rather
+              * than truncating the label keeps the half that says what the
+              * button does — and it is only ever dropped where the other
+              * button is crowding it, so the wider screens, where the pair fits
+              * with room to spare, still get the sentence.
+              *
+              * On width, never on state: this row's height is fixed and its
+              * contents must not reflow because a keystroke found somebody.
+              */}
+            <span className={canWiden ? 'hidden sm:inline' : undefined}>{offerPrompt}&nbsp;</span>
+            Register your child
           </button>
         )}
+      </div>
+
+      {/*
+        * The buffer. A div, never an input — the native keyboard must not rise.
+        *
+        * And, deliberately, not a box either: no fill, no border, no rounded
+        * corners. Everything that looks like a text field on a touchscreen is
+        * a text field, and a parent meeting one taps it before typing —
+        * waiting for a caret and a keyboard that are already there. The tap
+        * does nothing, because there is nothing here to focus, and the second
+        * of confusion it buys is spent at the front of a queue. Bare text on
+        * the background instead: the keys are lit, the readout is where the
+        * letters appear, and nothing on the screen invites a press that has no
+        * answer.
+        *
+        * With the fill gone the empty state stops being a hollow box and reads
+        * as what it always was — the sentence telling a parent what to type.
+        */}
+      <div className="px-6 pb-1">
+        <div className="mx-auto flex h-16 max-w-2xl items-center justify-center px-4">
+          {buffer ? (
+            <span className="truncate text-3xl font-semibold tracking-wide text-ink-50">{buffer}</span>
+          ) : (
+            <span className="text-xl text-ink-500">Type a name, or the last 4 digits of your phone</span>
+          )}
+        </div>
       </div>
 
       <Keyboard onKey={onKey} onClearHeld={onStaffGate} />
