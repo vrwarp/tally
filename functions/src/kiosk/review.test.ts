@@ -581,3 +581,251 @@ describe('discarding', () => {
     expect(db.get('students/held-2')!.status).toBe('inactive');
   });
 });
+
+/* -------------------------------------------------------------------------- */
+/* One family, two cards                                                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The case a real Planning Center showed: one household registering twice on
+ * one night, same number, one child each time.
+ *
+ * Approved a card at a time, the parent was correctly deduplicated and a second
+ * household was built around them anyway — one adult heading two families, in a
+ * database with no merge for households. The backends now survive that press
+ * on their own; this is the other half, where the reviewer can see the two
+ * cards are one family and say so before anything is written.
+ */
+describe('two registrations, one household', () => {
+  const OTHER = 'ffffffff-1111-2222-3333-444444444444';
+
+  /** A second card for the same family: same digits, a different child. */
+  function withSecondRegistration(db: FakeFirestore): FakeFirestore {
+    db.seed('students/held-3', {
+      firstName: 'Ada',
+      lastName: 'Fields',
+      status: 'active',
+      isVisitor: true,
+      upstreamPushPending: true,
+      pendingReview: true,
+      registrationId: OTHER,
+    });
+    db.seed(`${REGISTRATIONS_COLLECTION}/${OTHER}`, {
+      status: 'complete',
+      source: 'kiosk',
+      eventId: 'friday-today',
+      studentIds: ['held-3'],
+      childCount: 1,
+      last4: '3344',
+      checkedIn: true,
+      createdAt: REGISTERED_AT,
+      // Written differently on purpose — the same ten digits is the test.
+      guardian: { firstName: 'Dana', lastName: 'Fields', phone: '(555) 010-3344' },
+      children: [{ firstName: 'Ada', lastName: 'Fields', grade: 6 }],
+      allergies: [],
+      possibleDuplicateOf: {},
+      anchorStudentIds: [],
+      lastError: null,
+    });
+    return db;
+  }
+
+  it('tells a reviewer that another card typed the same number', async () => {
+    const db = withSecondRegistration(dbWithRegistration());
+    const rows = await listPendingRegistrations(db, NOW, { registry: registryOf(backendWith()) });
+
+    // Symmetric: a reviewer works down the queue and has to see it from
+    // whichever card they reach first.
+    const first = rows.find((row) => row.registrationId === ID)!;
+    const second = rows.find((row) => row.registrationId === OTHER)!;
+    expect(first.sameFamily.map((hint) => hint.registrationId)).toEqual([OTHER]);
+    expect(second.sameFamily.map((hint) => hint.registrationId)).toEqual([ID]);
+    // Named, not counted — three cards on screen and the reviewer has to know
+    // which one it means.
+    expect(first.sameFamily[0]!.guardianName).toBe('Dana Fields');
+    expect(first.sameFamily[0]!.childNames).toEqual(['Ada Fields']);
+  });
+
+  it('reports the other card’s unsettled children, so grouping cannot reach around them', async () => {
+    const db = withSecondRegistration(dbWithRegistration());
+    // A roster row Ada collides with — the other card's approve button is held
+    // on it, and a press on this card would otherwise push her regardless.
+    db.seed('students/roster-ada', { firstName: 'Ada', lastName: 'Fields', status: 'active' });
+    db.seed(`${REGISTRATIONS_COLLECTION}/${OTHER}`, {
+      ...db.get(`${REGISTRATIONS_COLLECTION}/${OTHER}`)!,
+      possibleDuplicateOf: { '0': ['roster-ada'] },
+    });
+
+    const rows = await listPendingRegistrations(db, NOW, { registry: registryOf(backendWith()) });
+    const first = rows.find((row) => row.registrationId === ID)!;
+    expect(first.sameFamily[0]!.unsettledChildren).toBe(1);
+    // And the other way round, where there is nothing to settle.
+    const second = rows.find((row) => row.registrationId === OTHER)!;
+    expect(second.sameFamily[0]!.unsettledChildren).toBe(0);
+  });
+
+  it('does not tie together families who merely share four digits', async () => {
+    const db = withSecondRegistration(dbWithRegistration());
+    db.seed(`${REGISTRATIONS_COLLECTION}/${OTHER}`, {
+      ...db.get(`${REGISTRATIONS_COLLECTION}/${OTHER}`)!,
+      guardian: { firstName: 'Rosa', lastName: 'Salgado', phone: '5559993344' },
+    });
+
+    const rows = await listPendingRegistrations(db, NOW, { registry: registryOf(backendWith()) });
+    expect(rows.every((row) => row.sameFamily.length === 0)).toBe(true);
+  });
+
+  it('approves both cards as one family, with one call for the household', async () => {
+    const db = withSecondRegistration(dbWithRegistration());
+    const backend = backendWith();
+
+    const result = await approveRegistration({
+      db,
+      registry: registryOf(backend),
+      registrationId: ID,
+      withRegistrationIds: [OTHER],
+      uid: 'core-uid',
+      now: NOW,
+    });
+
+    expect(result.status).toBe('approved');
+    // Every child of both cards, and exactly one household for the lot — the
+    // failure `createFamily` exists to avoid, now reachable from two records.
+    expect(backend.pushStudent).toHaveBeenCalledTimes(3);
+    expect(backend.createFamily).toHaveBeenCalledTimes(1);
+    expect(backend.createFamily).toHaveBeenCalledWith(
+      expect.objectContaining({ studentIds: ['held-1', 'held-2', 'held-3'] }),
+    );
+    // Both records go: neither can help any more, and each holds a number.
+    expect(db.get(`${REGISTRATIONS_COLLECTION}/${ID}`)).toBeUndefined();
+    expect(db.get(`${REGISTRATIONS_COLLECTION}/${OTHER}`)).toBeUndefined();
+    expect(db.get('students/held-3')!.pendingReview).toBe(false);
+  });
+
+  it('keeps every card in the group when the family write fails', async () => {
+    const db = withSecondRegistration(dbWithRegistration());
+    const backend = backendWith({
+      createFamily: vi.fn(async () => familyResult('no-linked-children', 'Nothing to build.')),
+    });
+
+    const result = await approveRegistration({
+      db,
+      registry: registryOf(backend),
+      registrationId: ID,
+      withRegistrationIds: [OTHER],
+      uid: 'core-uid',
+      now: NOW,
+    });
+
+    // All or none. A half-kept group offers a retry carrying some of the
+    // children and silently dropping the rest, and a household built from
+    // what is left is the second family this whole change exists to stop.
+    expect(result.status).toBe('partial');
+    expect(db.get(`${REGISTRATIONS_COLLECTION}/${ID}`)!.lastErrorKind).toBe('guardian');
+    expect(db.get(`${REGISTRATIONS_COLLECTION}/${OTHER}`)!.lastErrorKind).toBe('guardian');
+  });
+
+  it('carries on when a card in the group was already dealt with', async () => {
+    const db = dbWithRegistration();
+    const backend = backendWith();
+
+    const result = await approveRegistration({
+      db,
+      registry: registryOf(backend),
+      registrationId: ID,
+      withRegistrationIds: [OTHER],
+      uid: 'core-uid',
+      now: NOW,
+    });
+
+    // Somebody's other tab got there first, which is not a reason to strand
+    // the family in front of this reviewer.
+    expect(result.status).toBe('approved');
+    expect(backend.createFamily).toHaveBeenCalledTimes(1);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* The adult, decided by a person rather than by a phone number                */
+/* -------------------------------------------------------------------------- */
+
+describe('who the guardian already is', () => {
+  it('offers the adults the backend already has, with the phone evidence', async () => {
+    const backend = backendWith({
+      findAdultCandidates: vi.fn(async () => [
+        { personId: '900', name: 'Dana Fields', reachable: true, corroborated: true },
+        { personId: '901', name: 'Dana Fields', reachable: false, corroborated: false },
+      ]),
+    });
+
+    const [row] = await listPendingRegistrations(dbWithRegistration(), NOW, {
+      registry: registryOf(backend),
+    });
+
+    expect(row!.guardianCandidates).toHaveLength(2);
+    expect(backend.findAdultCandidates).toHaveBeenCalledWith(
+      expect.objectContaining({ firstName: 'Dana', lastName: 'Fields', phone: '5550103344' }),
+    );
+  });
+
+  it('asks nobody when the deployment could not build a family anyway', async () => {
+    const backend = backendWith({ writeBack: 'create', findAdultCandidates: vi.fn(async () => []) });
+    const [row] = await listPendingRegistrations(dbWithRegistration(), NOW, {
+      registry: registryOf(backend),
+    });
+
+    expect(backend.findAdultCandidates).not.toHaveBeenCalled();
+    expect(row!.guardianCandidates).toEqual([]);
+  });
+
+  it('leaves the queue standing when the backend cannot answer', async () => {
+    const backend = backendWith({
+      findAdultCandidates: vi.fn(async () => {
+        throw new Error('Planning Center is down.');
+      }),
+    });
+
+    const [row] = await listPendingRegistrations(dbWithRegistration(), NOW, {
+      registry: registryOf(backend),
+    });
+
+    // Empty is "we did not find out", and the screen must not read it as
+    // evidence that the guardian is new — but the card still works.
+    expect(row!.guardianCandidates).toEqual([]);
+    expect(row!.children).toHaveLength(2);
+  });
+
+  it("passes a reviewer's choice through instead of letting the backend guess", async () => {
+    const backend = backendWith();
+    await approveRegistration({
+      db: dbWithRegistration(),
+      registry: registryOf(backend),
+      registrationId: ID,
+      guardianPersonId: '900',
+      uid: 'core-uid',
+      now: NOW,
+    });
+
+    expect(backend.createFamily).toHaveBeenCalledWith(
+      expect.objectContaining({ parentPersonId: '900', createNewParent: false }),
+    );
+  });
+
+  it('passes "none of these" through as its own decision', async () => {
+    const backend = backendWith();
+    await approveRegistration({
+      db: dbWithRegistration(),
+      registry: registryOf(backend),
+      registrationId: ID,
+      createNewGuardian: true,
+      uid: 'core-uid',
+      now: NOW,
+    });
+
+    // Distinct from sending nothing, which means nobody was asked: this
+    // suppresses the corroboration guess.
+    expect(backend.createFamily).toHaveBeenCalledWith(
+      expect.objectContaining({ parentPersonId: null, createNewParent: true }),
+    );
+  });
+});

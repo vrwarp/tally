@@ -197,11 +197,24 @@ export function ReviewPage() {
                 gatheringTitle={titleOf(row.eventId)}
                 busy={busy === row.registrationId}
                 disabled={busy !== null}
-                onApprove={(withoutGuardian) =>
+                onApprove={(decision) =>
                   void act(row.registrationId, async () => {
                     const { data } = await approveRegistration({
                       registrationId: row.registrationId,
-                      ...(withoutGuardian ? { withoutGuardian: true } : {}),
+                      /*
+                        Each of these is sent only when a person said it. An
+                        absent field means "nobody was asked", which the backend
+                        answers with its own careful guess — so an omission can
+                        never read as a decision nobody made.
+                      */
+                      ...(decision?.withoutGuardian ? { withoutGuardian: true } : {}),
+                      ...(decision?.withRegistrationIds?.length
+                        ? { withRegistrationIds: decision.withRegistrationIds }
+                        : {}),
+                      ...(decision?.guardianPersonId
+                        ? { guardianPersonId: decision.guardianPersonId }
+                        : {}),
+                      ...(decision?.createNewGuardian ? { createNewGuardian: true } : {}),
                     });
                     return data.message;
                   })
@@ -243,12 +256,24 @@ export function ReviewPage() {
 /* One family                                                                  */
 /* -------------------------------------------------------------------------- */
 
+/** What a reviewer settled on this card before pressing the button. */
+export interface ApproveDecision {
+  /** Finish without the adult — the escape hatch for a refusal no retry fixes. */
+  withoutGuardian?: boolean;
+  /** Other cards that are the same family, approved with this one. */
+  withRegistrationIds?: string[];
+  /** The adult they picked out of the candidates. */
+  guardianPersonId?: string;
+  /** They saw the candidates and said none of them is the parent. */
+  createNewGuardian?: boolean;
+}
+
 interface RegistrationCardProps {
   row: PendingRegistration;
   gatheringTitle: string | null;
   busy: boolean;
   disabled: boolean;
-  onApprove: (withoutGuardian?: boolean) => void;
+  onApprove: (decision?: ApproveDecision) => void;
   onDiscard: () => void;
   onMerge: (keeperId: string, foldId: string) => void;
   onUnmerge: (foldId: string) => void;
@@ -327,6 +352,23 @@ function RegistrationCard({
    * until they approve, and never round-trips to the server.
    */
   const [resolution, setResolution] = useState<Record<string, string | 'new'>>({});
+  /**
+   * The other cards this reviewer has said are the same household.
+   *
+   * Local and unsent until they approve, like every other judgement here: it is
+   * an assertion about two families, and the press that acts on it is the one
+   * that cannot be taken back.
+   */
+  const [sameFamily, setSameFamily] = useState<string[]>([]);
+  /**
+   * Which adult the reviewer says the guardian already is.
+   *
+   * `null` is the meaningful default — nobody has been asked, so the backend
+   * makes its own careful guess, exactly as it did before this control existed.
+   * A person id and the literal `'new'` are both decisions, and the caption
+   * under the approve button says which one is about to be acted on.
+   */
+  const [guardianChoice, setGuardianChoice] = useState<string | 'new' | null>(null);
   const when = row.registeredAt === null ? null : new Date(row.registeredAt);
   const expiringSoon = row.expiresInMs !== null && row.expiresInMs < EXPIRING_SOON_MS;
   // Rounded up, and floored at one: a record with six hours left has "1 day",
@@ -361,6 +403,48 @@ function RegistrationCard({
   const unsettled = held.filter(
     (child) => child.studentId && candidatesFor(child).length > 0 && !resolution[child.studentId],
   );
+
+  const kin = row.sameFamily ?? [];
+  const adults = row.guardianCandidates ?? [];
+  /*
+   * The adult the backend would settle on if nobody said anything — the one
+   * whose number matches, and only when they are the only one. It is the same
+   * rule `createFamily` applies, restated here so the caption under the button
+   * can say what is about to happen instead of leaving a reviewer to find out
+   * from the church's database afterwards.
+   */
+  const corroborated = adults.filter((adult) => adult.corroborated);
+  const wouldJoin = corroborated.length === 1 ? corroborated[0]! : null;
+  const chosenAdult = adults.find((adult) => adult.personId === guardianChoice) ?? null;
+
+  /**
+   * What the approve press will actually do about the adult, in one clause.
+   *
+   * Null where the card cannot honestly say. An empty candidate list is not
+   * "the church has nobody" — it is equally "write-back is not full" and "the
+   * backend did not answer" — so promising a new person on the strength of it
+   * would put an assertion in the one sentence a reviewer reads before an
+   * irreversible press, and let the backend contradict it a second later by
+   * joining a corroborated adult. Said only when somebody chose, or when
+   * candidates came back and the guess can be read off them.
+   */
+  const guardianClause = !row.guardian
+    ? null
+    : chosenAdult
+      ? `joins ${chosenAdult.name}, who the church already has`
+      : guardianChoice === 'new'
+        ? 'is added as a new person'
+        : adults.length === 0
+          ? null
+          : wouldJoin
+            ? `joins ${wouldJoin.name}, whose number matches`
+            : 'is added as a new person';
+
+  const approveDecision = (): ApproveDecision => ({
+    ...(sameFamily.length > 0 ? { withRegistrationIds: sameFamily } : {}),
+    ...(guardianChoice && guardianChoice !== 'new' ? { guardianPersonId: guardianChoice } : {}),
+    ...(guardianChoice === 'new' ? { createNewGuardian: true } : {}),
+  });
 
   return (
     <Card className={cn('mb-4 lg:mb-8 lg:break-inside-avoid', confirmingApprove && 'ring-warn-500/50')}>
@@ -398,6 +482,12 @@ function RegistrationCard({
             </Badge>
           ) : unsettled.length > 0 ? (
             <Badge tone="warn">Possible duplicate</Badge>
+          ) : /* Above "joins a family on file" and below a child collision: a
+                second card of the same household is a fact about which cards a
+                reviewer should read together, and it is worth less than a name
+                clash that could put a second child in for ever. */
+          kin.length > 0 ? (
+            <Badge tone="warn">Also registered separately</Badge>
           ) : row.anchors.length > 0 ? (
             <Badge tone="neutral">Joins a family on file</Badge>
           ) : undefined
@@ -486,6 +576,144 @@ function RegistrationCard({
           </p>
         )}
 
+        {/*
+          The other card that typed this number.
+
+          Above the children, because it changes what the card *is* rather than
+          what one row of it means: a reviewer who has not seen this reads two
+          families and approves twice, which is how one parent ended up heading
+          two households in a database that cannot merge them. The backends now
+          survive that press either way — the second approval finds the parent's
+          own household instead of founding a second — but survived is not the
+          same as understood, and a reviewer deciding about the Nguyens should
+          be told there are two cards of them.
+        */}
+        {kin.length > 0 ? (
+          <div className={STRIP}>
+            <p>
+              {kin.length === 1 ? 'Another registration' : `${kin.length} other registrations`} in
+              this queue typed {row.guardian ? formatPhone(row.guardian.phone) : 'this number'}.
+              Approving together adds every child to one family and asks the church&rsquo;s database
+              for one adult.
+            </p>
+            <ul className="mt-2 flex flex-col gap-2">
+              {kin.map((other) => {
+                const together = sameFamily.includes(other.registrationId);
+                /*
+                 * Held for the same reason this card's own approve button is
+                 * held. Approving as a group pushes the other card's children
+                 * too, which would reach straight around the gate on *their*
+                 * card — a child greyed out there, made permanent by a press
+                 * here, which is the exact duplicate that gate exists to stop.
+                 */
+                const waiting = (other.unsettledChildren ?? 0) > 0;
+                return (
+                  <li
+                    key={other.registrationId}
+                    className="flex flex-wrap items-center justify-between gap-2"
+                  >
+                    <span className="min-w-0 text-ink-200">
+                      {other.guardianName || 'A family'}
+                      {other.childNames.length > 0 ? (
+                        <span className="text-ink-400"> — {other.childNames.join(', ')}</span>
+                      ) : null}
+                      {waiting ? (
+                        <span className="block text-ink-400">
+                          Settle their own card first — {other.unsettledChildren}{' '}
+                          {other.unsettledChildren === 1 ? 'child' : 'children'} there already share
+                          a name with somebody on the roster.
+                        </span>
+                      ) : null}
+                    </span>
+                    <Button
+                      variant={together ? 'primary' : 'secondary'}
+                      className="min-h-9 px-3 text-sm"
+                      disabled={disabled || waiting}
+                      aria-pressed={together}
+                      onClick={() =>
+                        setSameFamily((chosen) =>
+                          together
+                            ? chosen.filter((id) => id !== other.registrationId)
+                            : [...chosen, other.registrationId],
+                        )
+                      }
+                    >
+                      {together ? 'Approving together' : 'Same family'}
+                    </Button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ) : null}
+
+        {/*
+          Who the guardian already is, if the church has them.
+
+          This decision was always being made — `createFamily` matches a name
+          against a phone number and creates a fresh adult for anything less —
+          but it was being made in a Cloud Function with nobody to ask. Here
+          there is somebody, and they can answer the case no matching ever
+          reaches: the mother who is on file under the number she had last year.
+
+          Nothing is held on it. Not answering leaves the same guess that has
+          always run, and the caption under the approve button says which way it
+          will fall — a reviewer should not have to press a button to find out
+          whether the church is about to get a second Rosa Salgado.
+        */}
+        {row.guardian && adults.length > 0 && !row.settled ? (
+          <div className={STRIP}>
+            <p>
+              The church already has {adults.length === 1 ? 'somebody' : `${adults.length} people`}{' '}
+              called {nameOf(row.guardian)}.
+            </p>
+            <ul className="mt-2 flex flex-col gap-2">
+              {adults.map((adult) => {
+                const picked = guardianChoice === adult.personId;
+                return (
+                  <li
+                    key={adult.personId}
+                    className="flex flex-wrap items-center justify-between gap-2"
+                  >
+                    <span className="min-w-0 text-ink-200">
+                      {adult.name}
+                      <span className="text-ink-400">
+                        {' — '}
+                        {adult.corroborated
+                          ? 'their number matches'
+                          : adult.reachable
+                            ? 'a different number on file'
+                            : 'no number on file'}
+                      </span>
+                    </span>
+                    <Button
+                      variant={picked ? 'primary' : 'secondary'}
+                      className="min-h-9 px-3 text-sm"
+                      disabled={disabled}
+                      aria-pressed={picked}
+                      onClick={() => setGuardianChoice(picked ? null : adult.personId)}
+                    >
+                      {picked ? 'This is them' : 'Same person'}
+                    </Button>
+                  </li>
+                );
+              })}
+              <li className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-ink-400">None of them is this parent.</span>
+                <Button
+                  variant={guardianChoice === 'new' ? 'primary' : 'secondary'}
+                  className="min-h-9 px-3 text-sm"
+                  disabled={disabled}
+                  aria-pressed={guardianChoice === 'new'}
+                  onClick={() => setGuardianChoice(guardianChoice === 'new' ? null : 'new')}
+                >
+                  {guardianChoice === 'new' ? 'Adding as new' : 'Add as new'}
+                </Button>
+              </li>
+            </ul>
+          </div>
+        ) : null}
+
         <ul className="flex flex-col gap-2">
           {row.children.map((child, index) => (
             <ChildRow
@@ -532,7 +760,15 @@ function RegistrationCard({
                 caption={
                   <span className="text-warn-400">
                     {listNames(held)} {held.length === 1 ? 'goes' : 'go'} into the church&rsquo;s
-                    database now. Nothing added there can be deleted or taken back.
+                    database now
+                    {sameFamily.length > 0
+                      ? `, with the ${sameFamily.length === 1 ? 'other registration' : `${sameFamily.length} other registrations`} as one family`
+                      : ''}
+                    {/* The adult, named, in the sentence they are agreeing to —
+                        it is the half of this press with no undo and the half
+                        the card was silent about. */}
+                    {guardianClause ? `, and ${row.guardian!.firstName} ${guardianClause}` : ''}.
+                    Nothing added there can be deleted or taken back.
                   </span>
                 }
               >
@@ -540,7 +776,7 @@ function RegistrationCard({
                   className="mt-auto min-h-12 w-full lg:w-auto"
                   onClick={() => {
                     setConfirmingApprove(false);
-                    onApprove();
+                    onApprove(approveDecision());
                   }}
                   disabled={disabled}
                   aria-busy={busy || undefined}
@@ -565,7 +801,7 @@ function RegistrationCard({
                           instrument that ends the job is below it.
                         */
                         `Tries ${row.guardian?.firstName ?? 'the parent'} again. The last attempt was refused, and nothing about the refusal has changed on its own.`
-                      : `Adds ${listNames(held)} to the church’s database. Nothing added there can be taken back.`
+                      : `Adds ${listNames(held)}${sameFamily.length > 0 ? ' and the family they were registered with' : ''} to the church’s database${guardianClause ? `, and ${row.guardian!.firstName} ${guardianClause}` : ''}. Nothing added there can be taken back.`
                 }
               >
                 <Button
@@ -659,7 +895,19 @@ function RegistrationCard({
             >
               <Button
                 className="min-h-12 w-full lg:w-auto"
-                onClick={() => onApprove(true)}
+                /*
+                  The grouping is carried; the adult is not. Which children go
+                  is still this reviewer's answer, and dropping it here would
+                  leave the other card's children behind while its button still
+                  read "Approving together". Who the adult is has no meaning on
+                  a press whose whole content is "no adult".
+                */
+                onClick={() =>
+                  onApprove({
+                    withoutGuardian: true,
+                    ...(sameFamily.length > 0 ? { withRegistrationIds: sameFamily } : {}),
+                  })
+                }
                 disabled={disabled}
               >
                 Add the children without {row.guardian.firstName}

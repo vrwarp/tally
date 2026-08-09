@@ -23,7 +23,7 @@ the registry, with methods that mirror the flows the callables need —
 - reads: `fetchRoster`, `searchPeople`, `fetchPersonDetails`, `fetchAllergyNotes`,
   `fetchParentContactStatus`, `checkPerson`
 - writes: `pushStudent`, `pushPendingStudents`, `updateStudentProfile`, `setParentContact`,
-  `addParent`, `createFamily`, `recreateStudent`
+  `addParent`, `createFamily`, `findAdultCandidates`, `recreateStudent`
 - history: `listImportableEvents`, `importHistory` (optional — capability-gated)
 - lists: `fetchLists`, `fetchListMemberIds` (optional, Planning Center only)
 - cache hygiene: `invalidatePersonDetails`, `invalidateReachability`, `resetCache`
@@ -75,6 +75,23 @@ only when their phone number matches the one the parent typed, and any other out
 name match with a different number, several matches at once — creates a fresh person. A duplicate
 adult is next month's merge; a wrong join has no undo. Absent an anchor, it refuses outright when a
 child's household already has an adult, rather than adding a second one from a lobby form.
+
+That guess is the fallback, not the only path. `parentPersonId` and `createNewParent` carry a
+reviewer's answer straight through — no search runs, and "yes, that is her, she has changed her
+number" becomes reachable, which no amount of matching ever was. The guess is what happens when
+nobody was asked: a pending sweep, a retry, a family who registered again a month later. See
+[the Review screen](product.md) for the other half, and `findAdultCandidates` — the same search,
+answering with `corroborated` per candidate instead of acting on it — for what the screen shows.
+
+**Which household the family joins** is decided by precedence rather than by whichever id sorts
+first: an anchor sibling's, then the resolved parent's own, then the children of this run. The
+middle entry was missing, and its absence is the one bug in this area that reached a real church
+database. A household registering twice resolved to the same adult the second time — corroboration
+working exactly as designed — and then built a household around children created seconds earlier,
+because only *their* households were consulted and they had none. Planning Center ended up holding
+one person as `primary_contact` of two households of the same name, one sibling in each, and it has
+no merge for households. Both adapters now consult the parent, and skip re-posting a membership for
+a household they are already in.
 
 ### The push gate
 

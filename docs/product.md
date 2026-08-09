@@ -141,7 +141,18 @@ children of one name: whether the church already finds that row under this famil
 and whether the grade matches. A merge names who the child was folded into and offers the undo
 Tally has always had. And a family whose *parent* the backend refuses — usually for a reason no
 retry can fix — can be finished without them rather than retried for ever or discarded with children
-already upstream. Five rounds of critique are recorded in [`uxr/rounds/`](../uxr/rounds/); the last
+already upstream.
+
+The same screen now settles the two questions about the *family* that the backend was answering on
+its own in a Cloud Function. **Two cards that typed the same number** — a household who registered
+twice, which is the ordinary shape of a second child or a second visit — say so on both cards and
+can be approved together: every child in one push, one household, one adult. And **who the guardian
+already is** is offered as a list of the adults the church has under that name, marking the one
+whose number matches. Neither holds the button, and not answering leaves exactly the guess that has
+always run — but the sentence above the button says which way it will fall, because a reviewer
+should not have to press it to find out whether the church is about to get a second Rosa Salgado.
+The one answer this reaches that no matching ever could is the mother who is on file under the
+number she had last year. Five rounds of critique are recorded in [`uxr/rounds/`](../uxr/rounds/); the last
 two judged the shipping screen rather than a prototype.
 
 **Journey 2½ — the second child.** A parent whose next child is finally old enough finds their family

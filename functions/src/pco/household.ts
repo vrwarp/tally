@@ -85,6 +85,23 @@ export interface ExistingPerson {
   reachable: boolean;
 }
 
+/**
+ * The same offer, made to a reviewer holding a phone number.
+ *
+ * Backend-independent — Attendees answers with these too — so the id field is
+ * named for what it is rather than for Planning Center. `corroborated` is the
+ * one addition, and it is a fact about the record, not a recommendation: this
+ * person holds the number the family typed.
+ */
+export interface AdultCandidate {
+  personId: string;
+  name: string;
+  /** Whether the backend already has a way to reach them. */
+  reachable: boolean;
+  /** Whether one of their numbers is the one the family typed at the kiosk. */
+  corroborated: boolean;
+}
+
 export interface AddParentResult {
   status: AddParentStatus;
   parentName: string | null;
@@ -175,7 +192,16 @@ async function searchAdultsNamed(
 ): Promise<{ people: PcoPerson[]; index: ReturnType<typeof buildIncludedIndex> }> {
   const body = await client.get<PcoPerson[]>('/people', {
     where: { search_name: `${firstName} ${lastName}`, child: false },
-    include: ['emails', 'phone_numbers'],
+    /*
+     * `households` is here for `createFamily`, which joins the household a
+     * corroborated parent already heads rather than founding a second one. A
+     * relationship that was not asked for is not linkage anybody may read: drop
+     * it and `householdIdsOf` answers "none" for every adult this search
+     * returns, which is exactly the reading that built two households around
+     * one person. The simulator emits the relationship unconditionally, so this
+     * omission does not show in a test — hence the note.
+     */
+    include: ['emails', 'phone_numbers', 'households'],
     per_page: SEARCH_PAGE_SIZE,
   });
 
@@ -211,6 +237,45 @@ async function findAdultsNamed(
       reachable: onFile.phone || onFile.email,
     };
   });
+}
+
+/**
+ * The adults of a name, with the phone evidence attached rather than acted on.
+ *
+ * `findAdultsNamed` above answers the same question for `addParent`, where the
+ * caller is a leader at a desk and a number nobody typed has nothing to say.
+ * This one is for a reviewer holding the number a family typed at the kiosk, so
+ * it carries `corroborated` — which is exactly the fact `createFamily` decides
+ * on when nobody is there to ask, offered here as evidence for somebody who is.
+ */
+export async function findAdultCandidates(options: {
+  client: PcoClient;
+  firstName: string;
+  lastName: string;
+  phone?: string | null;
+  excludePersonIds?: readonly string[];
+}): Promise<AdultCandidate[]> {
+  const firstName = trimmed(options.firstName);
+  const lastName = trimmed(options.lastName) ?? '';
+  if (!firstName) return [];
+
+  const phone = normalizePhone(options.phone);
+  const excluded = new Set(options.excludePersonIds ?? []);
+  const { people, index } = await searchAdultsNamed(options.client, firstName, lastName);
+
+  return people
+    .filter((person) => !excluded.has(person.id))
+    .map((person) => {
+      const onFile = contactFieldsOnFile(person, index);
+      return {
+        personId: person.id,
+        name: personName(person) ?? `${firstName} ${lastName}`.trim(),
+        reachable: onFile.phone || onFile.email,
+        corroborated: phone
+          ? phoneNumbersOf(person, index).some((held) => sameNumber(held, phone))
+          : false,
+      };
+    });
 }
 
 /** The households the student is already in, oldest id first for determinism. */
@@ -471,8 +536,10 @@ export async function addParent(options: AddParentOptions): Promise<AddParentRes
 export type CreateFamilyStatus =
   /** A new adult, in a household with every child Planning Center knows. */
   | 'created'
-  /** An adult the church already had, corroborated by their phone number. */
+  /** An adult the church already had — corroborated, or named by a reviewer. */
   | 'joined'
+  /** A reviewer named an adult the backend no longer has, or who is a child. */
+  | 'parent-not-found'
   /** Somebody is already the adult in this family; nothing was written. */
   | 'already-has-family'
   /** `PCO_WRITE_BACK` is not `full`. */
@@ -506,6 +573,10 @@ export interface CreateFamilyOptions {
   anchorStudentIds?: readonly string[];
   firstName: string;
   lastName: string;
+  /** The adult a reviewer chose. Set, it is the answer and no search runs. */
+  parentPersonId?: string | null;
+  /** A reviewer who saw the candidates and said none of them is the parent. */
+  createNewParent?: boolean;
   phone?: string | null;
   email?: string | null;
   logger?: FunctionLogger;
@@ -533,6 +604,26 @@ function familyResult(
 /** Just the digits, for deciding whether two records name the same human. */
 function digitsOf(value: string): string {
   return value.replace(/\D/g, '');
+}
+
+/**
+ * The adult a reviewer named, or null if Planning Center no longer has them.
+ *
+ * A person deleted or merged upstream since the screen was drawn comes back as
+ * a `410`/`404` from the read, which is a fact about the choice rather than a
+ * transport failure — so it is turned into "not there" for the caller to report
+ * and every other error is left to propagate as itself.
+ */
+async function loadChosenParent(
+  client: PcoClient,
+  personId: string,
+): Promise<Awaited<ReturnType<typeof loadPersonWithHousehold>>> {
+  try {
+    return await loadPersonWithHousehold(client, personId);
+  } catch (error) {
+    if (isPersonGoneError(error)) return null;
+    throw error;
+  }
 }
 
 /**
@@ -732,14 +823,40 @@ export async function createFamily(options: CreateFamilyOptions): Promise<Create
   let createdPerson = false;
   let parentContacts = buildIncludedIndex([]);
 
-  const { people: named, index: namedIndex } = await searchAdultsNamed(client, firstName, lastName);
+  /*
+   * A reviewer's answer, where there is one.
+   *
+   * Read back live rather than trusted: the id came off a screen that may have
+   * been open while somebody merged or deleted that person upstream, and the
+   * cost of being wrong here is a child in a stranger's household. A person who
+   * has since become unreadable is reported rather than quietly replaced with a
+   * new adult of the same name — the reviewer said *that* person, and inventing
+   * a different one is not a smaller version of doing what they asked.
+   */
+  const chosenId = trimmed(options.parentPersonId ?? null);
+  const chosen = chosenId ? await loadChosenParent(client, chosenId) : null;
+  if (chosenId && (!chosen || chosen.person.attributes?.child === true)) {
+    return familyResult(
+      'parent-not-found',
+      'Planning Center no longer has the adult that was chosen for this family — they may have been merged or deleted. Review the family again.',
+    );
+  }
+
+  const { people: named, index: namedIndex } =
+    chosen === null && options.createNewParent !== true
+      ? await searchAdultsNamed(client, firstName, lastName)
+      : { people: [] as PcoPerson[], index: buildIncludedIndex([]) };
   const corroborated = phone
     ? named.filter((person) =>
         phoneNumbersOf(person, namedIndex).some((held) => sameNumber(held, phone)),
       )
     : [];
 
-  if (corroborated.length === 1) {
+  if (chosen) {
+    parentPerson = chosen.person;
+    parentId = chosen.person.id;
+    parentContacts = chosen.index;
+  } else if (corroborated.length === 1) {
     parentPerson = corroborated[0]!;
     parentId = parentPerson.id;
     parentContacts = namedIndex;
@@ -783,27 +900,51 @@ export async function createFamily(options: CreateFamilyOptions): Promise<Create
    * An anchor is a sibling who was already here, so their household is the
    * family's real one. Falling back to the run's own children keeps the
    * first-time case working exactly as before.
+   *
+   * **The parent's own household sits between them**, and its absence is what
+   * put two households on one adult. A family who registers twice — two visits,
+   * two kiosk sessions, the same phone number — resolves to the same parent the
+   * second time, by corroboration or because a reviewer said so. That parent
+   * already has the household the first approval built. Looking only at the
+   * children meant looking only at people created seconds earlier, so the
+   * answer was "no household" and the answer to that was "build one", and the
+   * church database ended up with `Person Household` twice over the same adult,
+   * a sibling stranded in each. Neither is wrong enough to notice from Tally,
+   * and Planning Center has no merge for households.
+   *
+   * Precedence, not a global lowest-id sort. The three groups say different
+   * things — the family named a sibling, we resolved the adult, these children
+   * happen to be somewhere — and sorting them together let the id of a child's
+   * household outrank an anchor the family had just told us about.
    */
-  const householdCandidates = [...anchors, ...linked];
-  const [householdId] = householdCandidates
-    .flatMap((child) => householdIdsOf(child.loaded.person))
-    .sort(compareIds);
+  const parentHouseholds = parentPerson ? householdIdsOf(parentPerson) : [];
+  const [householdId] = [
+    anchors.flatMap((child) => householdIdsOf(child.loaded.person)),
+    parentHouseholds,
+    linked.flatMap((child) => householdIdsOf(child.loaded.person)),
+  ]
+    .map((group) => [...group].sort(compareIds))
+    .find((group) => group.length > 0) ?? [];
   let createdHousehold = false;
 
   if (householdId) {
     /*
-     * The parent is never already in it. Every child's household was checked
-     * for an adult above and the whole call returned if one was there, so this
-     * household has none — and a corroborated adult who has a household of
-     * their own is not in *this* one.
+     * Unless this is the household they are already the parent of — the case
+     * the precedence above exists to reach. Every *child's* household was
+     * checked for an adult and the call returned if one was there, so a
+     * household reached through a child still has none; one reached through the
+     * parent has exactly them, and posting the membership again is how a
+     * duplicate arrives on a record that has no undo.
      */
-    await client.post(`/households/${encodeURIComponent(householdId)}/household_memberships`, {
-      data: {
-        type: PCO_TYPES.householdMembership,
-        attributes: { person_id: parentId, pending: false, household_role: 'parent_guardian' },
-        relationships: { person: { data: { type: PCO_TYPES.person, id: parentId } } },
-      },
-    });
+    if (!parentHouseholds.includes(householdId)) {
+      await client.post(`/households/${encodeURIComponent(householdId)}/household_memberships`, {
+        data: {
+          type: PCO_TYPES.householdMembership,
+          attributes: { person_id: parentId, pending: false, household_role: 'parent_guardian' },
+          relationships: { person: { data: { type: PCO_TYPES.person, id: parentId } } },
+        },
+      });
+    }
     // Siblings who arrived with their own household — or none — join the one
     // the family is being built around. A child already in it is skipped
     // rather than added twice.

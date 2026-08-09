@@ -35,7 +35,7 @@
  */
 import { Timestamp } from 'firebase-admin/firestore';
 import type { BackendRegistry } from '../backends/registry.js';
-import type { CreateFamilyResult } from '../backends/types.js';
+import type { AdultCandidate, CreateFamilyResult } from '../backends/types.js';
 import { PATHS, SILENT_LOGGER, type FirestoreLike, type FunctionLogger } from '../firestore.js';
 import { parseStudentId, type BackendId } from '../generated/backendIds.js';
 import { PHONE_INDEX_DOC } from './phoneIndex.js';
@@ -104,6 +104,39 @@ export interface PendingRegistrationChild extends RegistrationChild {
   possibleDuplicates: ReviewStudentSummary[];
 }
 
+/**
+ * Another family on this same screen who typed the same phone number.
+ *
+ * The evidence for "these two cards are one household", offered rather than
+ * acted on. Two registrations in one queue sharing a number is nearly always a
+ * family who came back — a second child, a second visit, a form filled in twice
+ * — and until now nothing on this screen said so: a reviewer approved them one
+ * at a time, and the backend, which by then could only see one adult with a
+ * matching number, deduplicated the *parent* and built a second household
+ * around them. One adult, two families, in a database with no merge for
+ * households.
+ *
+ * Named rather than counted, because the reviewer has to be able to tell which
+ * card it means when three are on screen.
+ */
+export interface SameFamilyHint {
+  registrationId: string;
+  guardianName: string;
+  /** Their children, so a reviewer can see it is a sibling and not a repeat. */
+  childNames: string[];
+  registeredAt: number | null;
+  /**
+   * How many of their children are still waiting on a name collision.
+   *
+   * The approve button on a card is held until every child of *that* card is
+   * settled, and approving as a group would otherwise reach around it: a child
+   * whose own card is greyed out gets pushed for ever by a press on their
+   * sibling's. Carried per hint so the group control can be held for the same
+   * reason the button is, and say whose row is holding it.
+   */
+  unsettledChildren: number;
+}
+
 export interface PendingRegistration {
   registrationId: string;
   source: 'kiosk' | 'qr';
@@ -118,6 +151,22 @@ export interface PendingRegistration {
   children: PendingRegistrationChild[];
   /** Siblings the family named, already verified as real active students. */
   anchors: ReviewStudentSummary[];
+  /**
+   * Adults the backend already has under the guardian's name.
+   *
+   * The decision `createFamily` otherwise makes alone, brought forward to the
+   * person who can actually make it. A candidate whose `corroborated` is true
+   * is the one the backend would have picked by itself; the rest are the ones
+   * it would have walked past, and a reviewer looking at a name, a phone number
+   * and a list of that adult's own children can answer for them.
+   *
+   * Empty is not "there is nobody" — it is also "the backend takes no writes",
+   * "this deployment cannot build families", and "Planning Center did not
+   * answer". A screen must not read it as evidence that the guardian is new.
+   */
+  guardianCandidates: AdultCandidate[];
+  /** Other pending registrations that typed this family's phone number. */
+  sameFamily: SameFamilyHint[];
   /** Whether every child has already been approved and pushed. */
   settled: boolean;
   /** Why the last approval did not finish, if one did not. */
@@ -262,6 +311,8 @@ export async function listPendingRegistrations(
   const underDigits = await rowsUnderDigits(db, logger);
   const snapshot = await db.collection(REGISTRATIONS_COLLECTION).get();
   const rows: PendingRegistration[] = [];
+  /** Children who already reached the backend, so nobody is offered as their own parent. */
+  const upstreamByRegistration = new Map<string, string[]>();
 
   for (const doc of snapshot.docs) {
     const record = readRegistration(doc.data() ?? {});
@@ -271,6 +322,12 @@ export async function listPendingRegistrations(
         const held = await db.doc(`${PATHS.students}/${studentId}`).get();
         return { studentId, exists: held.exists, data: held.data() ?? {} };
       }),
+    );
+    upstreamByRegistration.set(
+      doc.id,
+      students
+        .map((student) => student.data.upstreamPersonId)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0),
     );
 
     const children: PendingRegistrationChild[] = await Promise.all(
@@ -310,6 +367,8 @@ export async function listPendingRegistrations(
       last4: record.last4,
       children,
       anchors: await Promise.all(record.anchorStudentIds.map((id) => summarise(db, id))),
+      guardianCandidates: [],
+      sameFamily: [],
       settled: children.length > 0 && children.every((child) => !child.pendingReview),
       lastError: record.lastError,
       lastErrorKind: record.lastErrorKind,
@@ -355,7 +414,134 @@ export async function listPendingRegistrations(
     }
   }
 
+  linkSameFamily(rows);
+  await namesFromUpstream(options.registry, rows, upstreamByRegistration, logger);
+
   return rows.sort((a, b) => (b.registeredAt ?? 0) - (a.registeredAt ?? 0));
+}
+
+/**
+ * Ties together the registrations that typed the same number.
+ *
+ * Whole digits rather than the four the kiosk indexes on: `last4` is a bucket
+ * a hundred families share in a large church, and a hint that says "this may be
+ * the same household as the Nguyens" had better not be founded on a one-in-ten-
+ * thousand coincidence. The last ten, so `+1 (555) 010-3344` and `5550103344`
+ * are one number — the same rule the backends compare on.
+ *
+ * Symmetric, so both cards carry it: a reviewer works down the queue from the
+ * top and the pair has to be visible from whichever they reach first.
+ */
+function linkSameFamily(rows: PendingRegistration[]): void {
+  const digitsOf = (phone: string): string => {
+    const digits = phone.replace(/\D/g, '');
+    return digits.length > 10 ? digits.slice(-10) : digits;
+  };
+
+  const byDigits = new Map<string, PendingRegistration[]>();
+  for (const row of rows) {
+    if (row.guardian === null || row.settled) continue;
+    const digits = digitsOf(row.guardian.phone);
+    if (digits.length === 0) continue;
+    byDigits.set(digits, [...(byDigits.get(digits) ?? []), row]);
+  }
+
+  for (const group of byDigits.values()) {
+    if (group.length < 2) continue;
+    for (const row of group) {
+      row.sameFamily = group
+        .filter((other) => other.registrationId !== row.registrationId)
+        .map((other) => ({
+          registrationId: other.registrationId,
+          guardianName: `${other.guardian?.firstName ?? ''} ${other.guardian?.lastName ?? ''}`.trim(),
+          childNames: other.children.map((child) => `${child.firstName} ${child.lastName}`.trim()),
+          registeredAt: other.registeredAt,
+          unsettledChildren: other.children.filter(
+            (child) =>
+              child.pendingReview &&
+              child.mergedIntoStudentId === null &&
+              child.possibleDuplicates.length > 0,
+          ).length,
+        }));
+    }
+  }
+}
+
+/**
+ * Who the backend already has under each guardian's name.
+ *
+ * One search per unreviewed family with a guardian, and deliberately not
+ * cached: this is read at the moment somebody is about to write to the church's
+ * database, and a stale answer here is the wrong household. Families sharing a
+ * name and number are searched once and given the same answer, which is the
+ * ordinary case on a screen holding a repeat registration.
+ *
+ * Every failure is silent and answers with nothing. A reviewer who cannot see
+ * the candidates gets the screen exactly as it was before they existed — the
+ * approve button still works, and the backend still makes its own careful guess
+ * — where a thrown error would take the whole queue down over a read nobody
+ * asked for.
+ */
+async function namesFromUpstream(
+  registry: BackendRegistry | undefined,
+  rows: PendingRegistration[],
+  /** Registration id -> the backend ids its children already have, if any. */
+  upstreamByRegistration: ReadonlyMap<string, string[]>,
+  logger: FunctionLogger,
+): Promise<void> {
+  if (!registry) return;
+  const target = registry.defaultPush();
+  if ('error' in target) return;
+  const backend = target.backend;
+  if (backend.capabilities.writeBack !== 'full') return;
+  const search = backend.findAdultCandidates;
+  if (search === undefined) return;
+
+  const asked = new Map<string, PendingRegistration[]>();
+  for (const row of rows) {
+    if (row.guardian === null || row.settled) continue;
+    // Stringified rather than concatenated: "Ann Marie"/"Lee" and "Ann"/
+    // "MarieLee" are two families, and joining them on nothing makes them one —
+    // which would show the second card the first one's candidate list.
+    const key = JSON.stringify([
+      row.guardian.firstName,
+      row.guardian.lastName,
+      row.guardian.phone,
+    ]);
+    asked.set(key, [...(asked.get(key) ?? []), row]);
+  }
+
+  for (const group of asked.values()) {
+    const guardian = group[0]!.guardian!;
+    /*
+     * The exclusions are pooled across the group rather than taken per card.
+     *
+     * Two registrations under one name and number are one family, so a child
+     * who reached the backend on the first card's half-finished approval must
+     * not be offered as the parent on the second — and they would be, if the
+     * one answer this group shares were computed from one card's children.
+     */
+    const excludePersonIds = group.flatMap(
+      (row) => upstreamByRegistration.get(row.registrationId) ?? [],
+    );
+
+    let candidates: AdultCandidate[] = [];
+    try {
+      candidates = await search.call(backend, {
+        firstName: guardian.firstName,
+        lastName: guardian.lastName,
+        phone: guardian.phone,
+        excludePersonIds,
+        logger,
+      });
+    } catch (error) {
+      logger.warn('Could not read adult candidates for a registration', {
+        registrationId: group[0]!.registrationId,
+        error: String(error),
+      });
+    }
+    for (const row of group) row.guardianCandidates = candidates;
+  }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -416,6 +602,26 @@ export interface ApproveRegistrationResult {
  * adult, and let the record go. It is a decision rather than a retry — the
  * parent's name and number are lost with the record, which is the whole point
  * of taking it, so the caller is expected to have said so on screen first.
+ *
+ * ## What a reviewer may settle that the backend would otherwise guess
+ *
+ * Two decisions, both optional, both the same shape: the caller passes what a
+ * person decided, and passing nothing leaves the backend exactly as careful as
+ * it was.
+ *
+ * - `withRegistrationIds` approves several registrations as **one family** —
+ *   every child in one push, one `createFamily`, one household. Two cards
+ *   sharing a phone number are a family who came back, and approving them one
+ *   at a time is what put one adult at the head of two households: the second
+ *   approval resolved to the same parent and then built a household around
+ *   children who had none, because the parent's own was never consulted. Both
+ *   halves are now fixed — this one so the reviewer can say it, and the
+ *   backends so the sweep gets it right when nobody does.
+ * - `guardianPersonId` / `createNewGuardian` name the adult. The lobby has
+ *   nobody to ask, so `createFamily` corroborates a name with a phone number
+ *   and creates a fresh person for anything less; a reviewer on a Tuesday can
+ *   see the candidates and answer properly — including "yes, that is her, she
+ *   has changed her number", which no amount of matching will ever reach.
  */
 export async function approveRegistration(options: {
   db: FirestoreLike;
@@ -424,6 +630,19 @@ export async function approveRegistration(options: {
   uid: string;
   /** Finish without the adult, for a household the backend will not build. */
   withoutGuardian?: boolean;
+  /**
+   * Other registrations that are the same family, approved along with this one.
+   *
+   * The guardian on *this* record is the one written; the others contribute
+   * their children and their anchors. Ids the collection no longer holds are
+   * skipped rather than refused — a reviewer's other tab may have dealt with
+   * one already, and that is not a reason to strand this family.
+   */
+  withRegistrationIds?: readonly string[];
+  /** The adult the reviewer picked from `guardianCandidates`. */
+  guardianPersonId?: string | null;
+  /** The reviewer saw the candidates and said none of them is the parent. */
+  createNewGuardian?: boolean;
   now?: Date;
   logger?: FunctionLogger;
 }): Promise<ApproveRegistrationResult> {
@@ -445,38 +664,64 @@ export async function approveRegistration(options: {
   }
   const record = readRegistration(snapshot.data() ?? {});
 
+  /* ---- Everything being approved together --------------------------------- */
+
+  /*
+   * The primary first, and the guardian only ever comes from it. The others
+   * are here for their children and their anchors: a family is one adult with
+   * one number, and picking which card's spelling of the name to write is not
+   * a decision to make by iteration order.
+   */
+  const group = [{ id: registrationId, ref, record }];
+  for (const otherId of options.withRegistrationIds ?? []) {
+    if (otherId === registrationId || group.some((entry) => entry.id === otherId)) continue;
+    const otherRef = db.doc(`${REGISTRATIONS_COLLECTION}/${otherId}`);
+    const otherSnapshot = await otherRef.get();
+    // Gone means somebody already dealt with it, which is not a reason to
+    // strand the family in front of us.
+    if (!otherSnapshot.exists) continue;
+    group.push({
+      id: otherId,
+      ref: otherRef,
+      record: readRegistration(otherSnapshot.data() ?? {}),
+    });
+  }
+
   /* ---- The hold comes off first ------------------------------------------- */
 
   const at = Timestamp.fromDate(now);
   const live: string[] = [];
-  for (const studentId of record.studentIds) {
-    const student = await db.doc(`${PATHS.students}/${studentId}`).get();
-    if (!student.exists) continue;
+  for (const entry of group) {
+    for (const studentId of entry.record.studentIds) {
+      const student = await db.doc(`${PATHS.students}/${studentId}`).get();
+      if (!student.exists) continue;
 
-    await db.doc(`${PATHS.students}/${studentId}`).set(
-      {
-        pendingReview: false,
-        reviewedAt: at,
-        reviewedBy: uid,
-        updatedAt: at,
-        updatedBy: uid,
-      },
-      { merge: true },
-    );
+      await db.doc(`${PATHS.students}/${studentId}`).set(
+        {
+          pendingReview: false,
+          reviewedAt: at,
+          reviewedBy: uid,
+          updatedAt: at,
+          updatedBy: uid,
+        },
+        { merge: true },
+      );
 
-    /*
-     * A child a reviewer already merged is pushed as the row that survived, not
-     * as the row that lost.
-     *
-     * Getting this wrong is invisible and expensive: the fold document is still
-     * named on this registration, and pushing it would create upstream exactly
-     * the duplicate the merge was performed to avoid — permanently, since there
-     * is no delete. Following the pointer instead also does something useful,
-     * because the guardian's household is built around whoever comes back from
-     * here: the adult ends up attached to the family that was already on file.
-     */
-    const survivor = await followMerges(db, studentId);
-    if (survivor !== null && !live.includes(survivor)) live.push(survivor);
+      /*
+       * A child a reviewer already merged is pushed as the row that survived,
+       * not as the row that lost.
+       *
+       * Getting this wrong is invisible and expensive: the fold document is
+       * still named on this registration, and pushing it would create upstream
+       * exactly the duplicate the merge was performed to avoid — permanently,
+       * since there is no delete. Following the pointer instead also does
+       * something useful, because the guardian's household is built around
+       * whoever comes back from here: the adult ends up attached to the family
+       * that was already on file.
+       */
+      const survivor = await followMerges(db, studentId);
+      if (survivor !== null && !live.includes(survivor)) live.push(survivor);
+    }
   }
 
   /* ---- Where they are going ----------------------------------------------- */
@@ -490,9 +735,10 @@ export async function approveRegistration(options: {
      * no upstream adult for the guardian's number to land on, and holding a
      * phone number against a maybe is exactly what the TTL exists to stop.
      */
-    await ref.delete();
+    for (const entry of group) await entry.ref.delete();
     logger.info('Approved a registration with nowhere to push it', {
       registrationId,
+      registrations: group.length,
       children: live.length,
     });
     return {
@@ -529,17 +775,19 @@ export async function approveRegistration(options: {
   /* ---- Allergies, where they belong --------------------------------------- */
 
   if (backend.capabilities.writeBack === 'full') {
-    for (const [index, allergies] of record.allergies.entries()) {
-      const named = record.studentIds[index];
-      if (!allergies || !named) continue;
-      // Onto the row that survived a merge, for the same reason the push goes
-      // there: a peanut allergy on a document nobody reads is not recorded.
-      const studentId = await followMerges(db, named);
-      if (studentId === null || !live.includes(studentId)) continue;
-      try {
-        await backend.updateStudentProfile({ studentId, allergies, logger });
-      } catch (error) {
-        logger.warn('Could not record allergies upstream', { studentId, error: String(error) });
+    for (const entry of group) {
+      for (const [index, allergies] of entry.record.allergies.entries()) {
+        const named = entry.record.studentIds[index];
+        if (!allergies || !named) continue;
+        // Onto the row that survived a merge, for the same reason the push goes
+        // there: a peanut allergy on a document nobody reads is not recorded.
+        const studentId = await followMerges(db, named);
+        if (studentId === null || !live.includes(studentId)) continue;
+        try {
+          await backend.updateStudentProfile({ studentId, allergies, logger });
+        } catch (error) {
+          logger.warn('Could not record allergies upstream', { studentId, error: String(error) });
+        }
       }
     }
   }
@@ -579,9 +827,15 @@ export async function approveRegistration(options: {
     try {
       const family = await buildFamily.call(backend, {
         studentIds: live,
-        anchorStudentIds: record.anchorStudentIds,
+        // Every card's siblings, deduplicated: the whole point of approving
+        // together is that one household holds the lot.
+        anchorStudentIds: [
+          ...new Set(group.flatMap((entry) => entry.record.anchorStudentIds)),
+        ],
         firstName: record.guardian.firstName,
         lastName: record.guardian.lastName,
+        parentPersonId: options.guardianPersonId ?? null,
+        createNewParent: options.createNewGuardian === true,
         phone: record.guardian.phone,
         logger,
       });
@@ -627,27 +881,33 @@ export async function approveRegistration(options: {
     withoutGuardian;
   const unfinished = failed > 0 || (record.guardian !== null && !guardianSettled);
 
+  /*
+   * All or none of the group, and that is deliberate on both sides.
+   *
+   * They were approved as one family, so they succeed or fail as one: a
+   * half-kept group would offer a retry that carries some of the children and
+   * silently drops the rest, and a household built from what is left is exactly
+   * the second family this whole change exists to stop. Keeping every record on
+   * a failure costs a reviewer one more press — they say "same family" again —
+   * and it is the press that keeps the retry honest.
+   */
   if (unfinished) {
     const guardianFailed = record.guardian !== null && !guardianSettled;
-    await ref.set(
-      {
-        lastError:
-          guardianMessage ||
-          `${failed} of ${live.length} children could not be added to ${backend.displayName}.`,
-        // Which half, so the screen can offer the move that fits rather than a
-        // retry for a refusal no retry can change. See `lastErrorKind`.
-        lastErrorKind:
-          failed > 0 && guardianFailed ? 'both' : guardianFailed ? 'guardian' : 'children',
-        lastAttemptAt: at,
-      },
-      { merge: true },
-    );
+    const lastError =
+      guardianMessage ||
+      `${failed} of ${live.length} children could not be added to ${backend.displayName}.`;
+    const lastErrorKind =
+      failed > 0 && guardianFailed ? 'both' : guardianFailed ? 'guardian' : 'children';
+    for (const entry of group) {
+      await entry.ref.set({ lastError, lastErrorKind, lastAttemptAt: at }, { merge: true });
+    }
   } else {
-    await ref.delete();
+    for (const entry of group) await entry.ref.delete();
   }
 
   logger.info('Reviewed a self-registration', {
     registrationId,
+    registrations: group.length,
     children: live.length,
     pushed,
     failed,

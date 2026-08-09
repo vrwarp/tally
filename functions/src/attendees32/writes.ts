@@ -11,6 +11,7 @@
 import { Timestamp } from 'firebase-admin/firestore';
 import {
   buildSearchName,
+  compareIds,
   nameGradeKey,
   splitFirstName,
   trimmed,
@@ -21,7 +22,12 @@ import { parseStudentId } from '../generated/backendIds.js';
 import type { TtlCache } from '../pco/cache.js';
 import { normalizeEmail, normalizePhone, type SetParentContactResult } from '../pco/parentContact.js';
 import type { StudentProfilePatch, UpdateStudentProfileResult } from '../pco/profile.js';
-import type { AddParentResult, CreateFamilyResult, ExistingPerson } from '../pco/household.js';
+import type {
+  AddParentResult,
+  AdultCandidate,
+  CreateFamilyResult,
+  ExistingPerson,
+} from '../pco/household.js';
 import type { PushStudentResult } from '../pco/pushStudents.js';
 import type { RecreateStudentResult } from '../pco/recreate.js';
 import { migrateStudentMemberships } from '../backends/studentMigration.js';
@@ -30,8 +36,10 @@ import type { PersonCheck } from '../backends/types.js';
 import { isA32GoneError, type A32Client } from './client.js';
 import {
   a32Grade,
+  allPhonesOf,
   allergiesOf,
   birthdayPatch,
+  contactsOf,
   displayFirstNameOf,
   findParentCandidates,
   mapAttendeeToRosterPerson,
@@ -243,23 +251,29 @@ export async function pushStudent(
     return { status: 'skipped', pcoPersonId: null, message: 'Student is not queued for Attendees.' };
   }
   /*
-   * A grade-less student is created, but never matched onto an existing one.
+   * A grade-less student is matched on name, against children only.
    *
-   * The create used to be refused outright, which left a nursery child queued
-   * on `upstreamPushPending` for ever — a queue that never drains rather than a
-   * visible failure.
+   * This used to skip the check entirely, on the reasoning that Planning Center
+   * has a `child` flag to tell a nursery child from an equally grade-less adult
+   * volunteer and Attendees has nothing of the kind — so matching on name alone
+   * would file a three-year-old as the volunteer who shares their name, in a
+   * database with no merge to undo it with.
    *
-   * The duplicate check is skipped rather than widened, and that is the
-   * difference from Planning Center. There, `child` distinguishes a child too
-   * young for a grade from an adult volunteer, who is equally grade-less;
-   * Attendees has no such flag — *holding a grade at all* is the closest fact
-   * it keeps, which is exactly the fact missing here. Matching on name alone
-   * would file a three-year-old as the volunteer who shares their name, in the
-   * church's permanent database, silently. A duplicate somebody can merge is
-   * the better failure.
+   * The premise was wrong rather than the caution. Attendees does hold the
+   * fact, as a *relation* rather than a field: somebody who is `child` in a
+   * family folk is a child, and the edges ride on every row the search already
+   * returns. So the guard is the same one Planning Center applies — a candidate
+   * must be a child *and* hold no grade — and a grade-less visitor arriving for
+   * the second time now lands on the record the first visit made instead of
+   * beside it.
    */
-  const existing =
-    grade === null ? null : await findExistingAttendee(client, firstName, lastName, grade);
+  const existing = await findExistingAttendee(
+    client,
+    firstName,
+    lastName,
+    grade,
+    grade === null ? await allRelations(options) : new Map(),
+  );
   if (existing) {
     await ref.update({
       upstreamBackend: 'a32',
@@ -331,7 +345,9 @@ async function findExistingAttendee(
   client: A32Client,
   firstName: string,
   lastName: string,
-  grade: number,
+  grade: number | null,
+  /** Only consulted for a grade-less student, to tell a child from an adult. */
+  relations: ReadonlyMap<number, A32Relation>,
 ): Promise<A32Attendee | null> {
   const plainFirstName = splitFirstName(firstName).firstName;
   const wanted = nameGradeKey(firstName, lastName, grade);
@@ -343,9 +359,17 @@ async function findExistingAttendee(
     { pageSize: 25, maxPages: 1 },
   )) {
     for (const attendee of page.data) {
-      // The raw grade, not the clamped one — a blank grade must not be
-      // normalised into the band and match by accident.
-      if (a32Grade(attendee) !== grade) continue;
+      if (grade === null) {
+        // Name is all there is, so being a child has to carry the rest of the
+        // weight — and holding no grade has to as well, because an attendee
+        // with one is not this student whatever their name says.
+        if (a32Grade(attendee) !== null) continue;
+        if (!isChildAttendee(attendee, relations)) continue;
+      } else if (a32Grade(attendee) !== grade) {
+        // The raw grade, not the clamped one — a blank grade must not be
+        // normalised into the band and match by accident.
+        continue;
+      }
       const candidates = new Set([
         nameGradeKey(displayFirstNameOf(attendee), attendee.last_name ?? '', grade),
         nameGradeKey(attendee.first_name ?? '', attendee.last_name ?? '', grade),
@@ -836,6 +860,113 @@ function phoneDigits(value: string | null | undefined): string {
   return digits.length > 10 ? digits.slice(-10) : digits;
 }
 
+/** The family folks somebody is in, lowest id first so repeats agree. */
+function familyFolkIdsOf(personId: string, edges: readonly A32FolkAttendee[]): string[] {
+  return edges
+    .filter(
+      (edge) =>
+        edge.attendee === personId &&
+        edge.folk.category === A32_FAMILY_CATEGORY &&
+        edge.is_removed !== true,
+    )
+    .map((edge) => edge.folk.id)
+    .sort(compareIds);
+}
+
+/**
+ * Whether this attendee is somebody's child.
+ *
+ * Planning Center answers this with a flag on the person; Attendees has no such
+ * field, so the nearest true thing is the relation they hold in their family —
+ * `child` in a family folk. The edges ride on every datagrid row, so this costs
+ * nothing beyond the search that already happened.
+ *
+ * It exists to keep a *parent* search off children, which is the guard the
+ * Planning Center path gets from `where[child]=false`. Without it the only
+ * exclusion is the children of the registration being approved, and a family
+ * whose father and son share a name — the ordinary case for a junior — could
+ * see the son corroborated as the father the moment his own mobile is on file.
+ *
+ * Unknown answers false: an attendee in no family is not a child, they are
+ * somebody nobody has filed yet, and refusing to let them be a parent would
+ * make the common first-visit case unreachable.
+ */
+function isChildAttendee(
+  attendee: A32Attendee,
+  relations: ReadonlyMap<number, A32Relation>,
+): boolean {
+  for (const edge of attendee.folkattendee_set ?? []) {
+    if (edge.is_removed === true) continue;
+    if (edge.folk.category !== A32_FAMILY_CATEGORY) continue;
+    if (relations.get(edge.role)?.title === A32_RELATION_TITLES.child) return true;
+  }
+  return false;
+}
+
+/** The attendee a reviewer named, or null once Attendees no longer has them. */
+async function loadChosenParent(
+  client: A32Client,
+  personId: string,
+): Promise<A32Attendee | null> {
+  try {
+    return await client.get<A32Attendee>(API.attendeeById(personId));
+  } catch (error) {
+    if (isA32GoneError(error)) return null;
+    throw error;
+  }
+}
+
+/**
+ * Adults Attendees already has under a name, with the phone evidence attached.
+ *
+ * The Attendees half of `findAdultCandidates` — same contract as
+ * ../pco/household.ts, same normalisation, and the same refusal to act on what
+ * it finds. See that one for why `corroborated` is carried rather than applied.
+ */
+export async function findAdultCandidates(
+  options: A32WriteOptions & {
+    firstName: string;
+    lastName: string;
+    phone?: string | null;
+    excludePersonIds?: readonly string[];
+  },
+): Promise<AdultCandidate[]> {
+  const { client } = options;
+  const firstName = trimmed(options.firstName);
+  const lastName = trimmed(options.lastName) ?? '';
+  if (!firstName) return [];
+
+  const phone = normalizePhone(options.phone);
+  const excluded = new Set(options.excludePersonIds ?? []);
+  const relations = await allRelations(options);
+  const wantedName = buildSearchName(firstName, lastName);
+
+  const candidates: AdultCandidate[] = [];
+  for await (const page of client.paginate<A32Attendee>(
+    API.attendee,
+    { searchValue: `${firstName} ${lastName}` },
+    { pageSize: 25, maxPages: 1 },
+  )) {
+    for (const attendee of page.data) {
+      if (excluded.has(attendee.id)) continue;
+      if (isChildAttendee(attendee, relations)) continue;
+      if (buildSearchName(displayFirstNameOf(attendee), attendee.last_name ?? '') !== wantedName) {
+        continue;
+      }
+      const { phone: onFile, email } = contactsOf(attendee);
+      candidates.push({
+        personId: attendee.id,
+        name: parentContactOf(attendee).parentName ?? `${firstName} ${lastName}`.trim(),
+        reachable: onFile !== null || email !== null,
+        corroborated: phone
+          ? allPhonesOf(attendee).some((held) => phoneDigits(held) === phoneDigits(phone))
+          : false,
+      });
+    }
+  }
+  return candidates.sort((a, b) => compareIds(a.personId, b.personId));
+}
+
 /**
  * The Attendees half of the self-registration family write. Same contract and
  * the same judgement as the Planning Center one in ../pco/household.ts — one
@@ -850,6 +981,10 @@ export async function createFamily(
     anchorStudentIds?: readonly string[];
     firstName: string;
     lastName: string;
+    /** The adult a reviewer chose. Set, it is the answer and no search runs. */
+    parentPersonId?: string | null;
+    /** A reviewer who saw the candidates and said none of them is the parent. */
+    createNewParent?: boolean;
     phone?: string | null;
     email?: string | null;
   },
@@ -937,18 +1072,8 @@ export async function createFamily(
 
   /* ---- A family that already exists, gaining a child ---------------------- */
 
-  const anchorFolkId = anchors
-    .flatMap((child) =>
-      child.edges
-        .filter(
-          (edge) =>
-            edge.attendee === child.personId &&
-            edge.folk.category === A32_FAMILY_CATEGORY &&
-            edge.is_removed !== true,
-        )
-        .map((edge) => edge.folk.id),
-    )
-    .find((id) => id !== undefined);
+  const anchorFolkIds = anchors.flatMap((child) => familyFolkIdsOf(child.personId, child.edges));
+  const anchorFolkId = anchorFolkIds[0];
   const anchorHasAdult = anchors.some(
     (child) => findParentCandidates(child.personId, child.edges, relations).length > 0,
   );
@@ -1007,7 +1132,24 @@ export async function createFamily(
   const wantedName = buildSearchName(firstName, lastName);
   const childIds = new Set(linked.map((entry) => entry.personId));
 
-  if (phone) {
+  /*
+   * A reviewer's answer, where there is one — read back live, because the id
+   * came off a screen and the cost of it being stale is a child filed into a
+   * stranger's family. See the same block in ../pco/household.ts.
+   */
+  const chosenId = trimmed(options.parentPersonId ?? null);
+  if (chosenId) {
+    const chosen = await loadChosenParent(client, chosenId);
+    if (!chosen || isChildAttendee(chosen, relations)) {
+      return refuse(
+        'parent-not-found',
+        'Attendees no longer has the adult that was chosen for this family. Review the family again.',
+      );
+    }
+    parentId = chosen.id;
+  }
+
+  if (parentId === null && phone && options.createNewParent !== true) {
     const corroborated: string[] = [];
     for await (const page of client.paginate<A32Attendee>(
       API.attendee,
@@ -1016,10 +1158,18 @@ export async function createFamily(
     )) {
       for (const attendee of page.data) {
         if (childIds.has(attendee.id)) continue;
+        // Every child, not just this run's. Attendees has no `child` flag to
+        // filter the search by, so the guard Planning Center gets from
+        // `where[child]=false` is applied here instead — see `isChildAttendee`.
+        if (isChildAttendee(attendee, relations)) continue;
         const theirs = buildSearchName(displayFirstNameOf(attendee), attendee.last_name ?? '');
         if (theirs !== wantedName) continue;
-        const contact = parentContactOf(attendee);
-        if (phoneDigits(contact.parentPhone) === phoneDigits(phone)) corroborated.push(attendee.id);
+        // Every number on file, not the first slot alone: a parent whose work
+        // number happens to sort first is the same parent, and reading past
+        // them creates the duplicate this check exists to prevent.
+        if (allPhonesOf(attendee).some((held) => phoneDigits(held) === phoneDigits(phone))) {
+          corroborated.push(attendee.id);
+        }
       }
     }
     // One corroborated match is the same person. Several is ambiguity, and
@@ -1043,20 +1193,26 @@ export async function createFamily(
   /* ---- One folk for the family -------------------------------------------- */
 
   const anchor = linked[0]!;
-  // Anchors first: a sibling's folk is the family's real one, and a child of
-  // this run has at best the folk `pushStudent` minted for them a moment ago.
-  const existingFolk = [...anchors, ...linked]
-    .flatMap((child) =>
-      child.edges.filter(
-        (edge) =>
-          edge.attendee === child.personId &&
-          edge.folk.category === A32_FAMILY_CATEGORY &&
-          edge.is_removed !== true,
-      ),
-    )
-    .map((edge) => edge.folk.id);
+  /*
+   * Precedence, in the order the three groups actually mean something: a
+   * sibling the family named, then the adult we resolved, then the children of
+   * this run — who have at best the folk `pushStudent` minted for them a moment
+   * ago.
+   *
+   * The parent's own folk is the entry that was missing, and its absence is
+   * what let one adult end up heading two families: a household that registers
+   * twice resolves to the same parent the second time, and looking only at the
+   * children meant looking only at people created seconds earlier. See the same
+   * block in ../pco/household.ts, where the same gap put `Person Household` on
+   * one person twice.
+   */
+  const parentFolkIds = createdPerson
+    ? []
+    : familyFolkIdsOf(parentId, await loadFamilyEdges(client, parentId));
+  const linkedFolkIds = linked.flatMap((child) => familyFolkIdsOf(child.personId, child.edges));
 
-  let folkId = existingFolk[0] ?? null;
+  let folkId =
+    [anchorFolkIds, parentFolkIds, linkedFolkIds].find((group) => group.length > 0)?.[0] ?? null;
   let createdHousehold = false;
   if (!folkId) {
     const folk = await client.post<A32Folk>(
@@ -1086,11 +1242,16 @@ export async function createFamily(
     );
   }
 
-  await client.post<A32FolkAttendee>(
-    API.folkAttendees,
-    { folk: folkId, attendee: parentId, role: relationIds.parent },
-    { 'X-Target-Attendee-Id': anchor.personId },
-  );
+  // Unless this is the folk they already head — the case the precedence above
+  // exists to reach. Posting the membership again is a duplicate edge on a
+  // backend with no merges to undo it with.
+  if (!parentFolkIds.includes(folkId)) {
+    await client.post<A32FolkAttendee>(
+      API.folkAttendees,
+      { folk: folkId, attendee: parentId, role: relationIds.parent },
+      { 'X-Target-Attendee-Id': anchor.personId },
+    );
+  }
 
   /* ---- Contacts onto the parent, fill-only-when-empty --------------------- */
 

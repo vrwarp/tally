@@ -29,6 +29,7 @@ import {
   addParent,
   checkPerson,
   createFamily,
+  findAdultCandidates,
   pushStudent,
   recreateStudent,
   setParentContact,
@@ -128,7 +129,17 @@ export function createA32Backend(args: BackendContext & { config: A32Config }): 
         createNew,
         logger,
       }),
-    createFamily: ({ studentIds, anchorStudentIds, firstName, lastName, phone, email, logger }) =>
+    createFamily: ({
+      studentIds,
+      anchorStudentIds,
+      firstName,
+      lastName,
+      parentPersonId,
+      createNewParent,
+      phone,
+      email,
+      logger,
+    }) =>
       createFamily({
         db,
         client,
@@ -138,8 +149,22 @@ export function createA32Backend(args: BackendContext & { config: A32Config }): 
         anchorStudentIds,
         firstName,
         lastName,
+        parentPersonId,
+        createNewParent,
         phone,
         email,
+        logger,
+      }),
+    findAdultCandidates: ({ firstName, lastName, phone, excludePersonIds, logger }) =>
+      findAdultCandidates({
+        db,
+        client,
+        config,
+        cache,
+        firstName,
+        lastName,
+        phone,
+        excludePersonIds,
         logger,
       }),
     recreateStudent: ({ studentId, firstName, lastName, grade, logger }) =>
