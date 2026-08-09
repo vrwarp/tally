@@ -1,0 +1,1158 @@
+<!doctype html>
+<html lang="en" class="h-full" data-theme="dark" style="--app-header-h: 49px;"><head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Tally">
+    <link rel="apple-touch-icon" href="/icons/icon-192.png">
+    <title>Tally</title>
+    <!--
+      Theme before first paint.
+
+      React cannot do this: by the time the bundle has parsed the browser has
+      already painted the default theme, and a light-theme user gets a black
+      flash on every cold start. So the smallest possible copy of the resolver
+      runs here, synchronously, ahead of everything.
+
+      Deliberately dumb and dependency-free — it must never be the reason a page
+      fails to load, hence the try/catch around storage, which Safari throws on
+      in private mode. src/lib/theme.ts is the real implementation and reaches
+      the same answer a moment later.
+    -->
+    
+    
+    <link rel="modulepreload" crossorigin="" href="/assets/rolldown-runtime-hePW80VL.js">
+    <link rel="modulepreload" crossorigin="" href="/assets/src-BIREgMbv.js">
+    <link rel="modulepreload" crossorigin="" href="/assets/react-DU2DmeOl.js">
+    <link rel="modulepreload" crossorigin="" href="/assets/firebase-core-Bj3lFnyu.js">
+    <link rel="modulepreload" crossorigin="" href="/assets/firebase-pBJTTKps.js">
+    <link rel="modulepreload" crossorigin="" href="/assets/firestore-lite-Bav7Q_hj.js">
+    <link rel="modulepreload" crossorigin="" href="/assets/firestore-Dm_wSPqq.js">
+    <link rel="modulepreload" crossorigin="" href="/assets/firebaseConfig-BxaO2ce3.js">
+    <link rel="modulepreload" crossorigin="" href="/assets/functions-DXxjekDy.js">
+    <link rel="modulepreload" crossorigin="" href="/assets/paths-H3XGn7U5.js">
+    <link rel="modulepreload" crossorigin="" href="/assets/utils-Cbd5vwsO.js">
+    <link rel="modulepreload" crossorigin="" href="/assets/ui-DAL8vpOl.js">
+    <link rel="modulepreload" crossorigin="" href="/assets/time-Bm9IL-lB.js">
+    <link rel="modulepreload" crossorigin="" href="/assets/backendIds-BGFyk5z1.js">
+    <link rel="modulepreload" crossorigin="" href="/assets/types-CeZ8E-b_.js">
+    <link rel="modulepreload" crossorigin="" href="/assets/labelTemplate-C1YYJeUA.js">
+    <link rel="modulepreload" crossorigin="" href="/assets/gatherings-BBZtAtbN.js">
+    <link rel="modulepreload" crossorigin="" href="/assets/authContext-BIDiGPXy.js">
+    <link rel="modulepreload" crossorigin="" href="/assets/events-DbmpBgnW.js">
+    <link rel="modulepreload" crossorigin="" href="/assets/attendancePayloads-BPDMVxfz.js">
+    <link rel="modulepreload" crossorigin="" href="/assets/attendance-D1nXka4_.js">
+    <link rel="modulepreload" crossorigin="" href="/assets/PlanningCenterErrorDetails-DGDV-OHo.js">
+    <link rel="modulepreload" crossorigin="" href="/assets/useParentContact-KsIBszLQ.js">
+    <link rel="modulepreload" crossorigin="" href="/assets/usePersonDetails-D-6p0fq3.js">
+    <link rel="modulepreload" crossorigin="" href="/assets/useAllergyNotes-DvyTvX24.js">
+    
+  <link rel="manifest" href="/manifest.webmanifest"><link rel="modulepreload" as="script" crossorigin="" href="http://127.0.0.1:4173/assets/EventsPage-hIDqQ-qn.js"><link rel="modulepreload" as="script" crossorigin="" href="http://127.0.0.1:4173/assets/EventEditorModal-BJ5EXm-z.js"><style data-uxr="frozen">@layer properties {
+  @supports (((-webkit-hyphens:none)) and (not (margin-trim:inline))) or ((-moz-orient:inline) and (not (color:rgb(from red r g b)))) {
+  *, ::before, ::after, ::backdrop { --tw-translate-x: 0; --tw-translate-y: 0; --tw-translate-z: 0; --tw-rotate-x: initial; --tw-rotate-y: initial; --tw-rotate-z: initial; --tw-skew-x: initial; --tw-skew-y: initial; --tw-divide-y-reverse: 0; --tw-border-style: solid; --tw-leading: initial; --tw-font-weight: initial; --tw-tracking: initial; --tw-ordinal: initial; --tw-slashed-zero: initial; --tw-numeric-figure: initial; --tw-numeric-spacing: initial; --tw-numeric-fraction: initial; --tw-shadow: 0 0 #0000; --tw-shadow-color: initial; --tw-shadow-alpha: 100%; --tw-inset-shadow: 0 0 #0000; --tw-inset-shadow-color: initial; --tw-inset-shadow-alpha: 100%; --tw-ring-color: initial; --tw-ring-shadow: 0 0 #0000; --tw-inset-ring-color: initial; --tw-inset-ring-shadow: 0 0 #0000; --tw-ring-inset: initial; --tw-ring-offset-width: 0px; --tw-ring-offset-color: #fff; --tw-ring-offset-shadow: 0 0 #0000; --tw-outline-style: solid; --tw-blur: initial; --tw-brightness: initial; --tw-contrast: initial; --tw-grayscale: initial; --tw-hue-rotate: initial; --tw-invert: initial; --tw-opacity: initial; --tw-saturate: initial; --tw-sepia: initial; --tw-drop-shadow: initial; --tw-drop-shadow-color: initial; --tw-drop-shadow-alpha: 100%; --tw-drop-shadow-size: initial; --tw-backdrop-blur: initial; --tw-backdrop-brightness: initial; --tw-backdrop-contrast: initial; --tw-backdrop-grayscale: initial; --tw-backdrop-hue-rotate: initial; --tw-backdrop-invert: initial; --tw-backdrop-opacity: initial; --tw-backdrop-saturate: initial; --tw-backdrop-sepia: initial; --tw-ease: initial; }
+}
+}
+@layer theme {
+  :root, :host { --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"; --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; --color-black: #000; --color-white: #fff; --spacing: .25rem; --container-sm: 24rem; --container-md: 28rem; --container-lg: 32rem; --container-2xl: 42rem; --container-3xl: 48rem; --container-7xl: 80rem; --text-xs: .75rem; --text-xs--line-height: calc(1 / .75); --text-sm: .875rem; --text-sm--line-height: calc(1.25 / .875); --text-base: 1rem; --text-base--line-height: calc(1.5 / 1); --text-lg: 1.125rem; --text-lg--line-height: calc(1.75 / 1.125); --text-xl: 1.25rem; --text-xl--line-height: calc(1.75 / 1.25); --text-2xl: 1.5rem; --text-2xl--line-height: calc(2 / 1.5); --text-3xl: 1.875rem; --text-3xl--line-height: calc(2.25 / 1.875); --text-4xl: 2.25rem; --text-4xl--line-height: calc(2.5 / 2.25); --text-5xl: 3rem; --text-5xl--line-height: 1; --text-8xl: 6rem; --text-8xl--line-height: 1; --font-weight-normal: 400; --font-weight-medium: 500; --font-weight-semibold: 600; --font-weight-bold: 700; --tracking-tight: -.025em; --tracking-normal: 0em; --tracking-wide: .025em; --tracking-wider: .05em; --tracking-widest: .1em; --leading-tight: 1.25; --leading-snug: 1.375; --leading-relaxed: 1.625; --radius-sm: .25rem; --radius-md: .375rem; --radius-lg: .5rem; --radius-xl: .75rem; --radius-2xl: 1rem; --ease-out: cubic-bezier(0, 0, .2, 1); --animate-spin: spin 1s linear infinite; --animate-pulse: pulse 2s cubic-bezier(.4, 0, .6, 1) infinite; --default-transition-duration: .15s; --default-transition-timing-function: cubic-bezier(.4, 0, .2, 1); --default-font-family: var(--font-sans); --default-mono-font-family: var(--font-mono); --color-ink-50: #f8fafc; --color-ink-100: #f1f5f9; --color-ink-200: #e2e8f0; --color-ink-300: #cbd5e1; --color-ink-400: #94a3b8; --color-ink-500: #64748b; --color-ink-600: #475569; --color-ink-700: #334155; --color-ink-800: #1e293b; --color-ink-900: #0f172a; --color-ink-950: #020617; --color-brand-200: #bae6fd; --color-brand-300: #7dd3fc; --color-brand-400: #38bdf8; --color-brand-500: #0ea5e9; --color-brand-600: #0284c7; --color-brand-700: #0369a1; --color-present-400: #4ade80; --color-present-500: #22c55e; --color-present-600: #16a34a; --color-warn-400: #facc15; --color-warn-500: #eab308; --color-warn-600: #ca8a04; --color-danger-400: #f87171; --color-danger-500: #ef4444; --color-danger-600: #dc2626; --spacing-safe-bottom: env(safe-area-inset-bottom,0px); --spacing-safe-top: env(safe-area-inset-top,0px); --animate-sheet-in: tally-sheet-in .18s ease-out; --animate-dialog-in: tally-dialog-in .12s ease-out; }
+}
+@layer base {
+  *, ::after, ::before, ::backdrop { box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; }
+  ::file-selector-button { box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; }
+  html, :host { text-size-adjust: 100%; tab-size: 4; line-height: 1.5; font-family: var(--default-font-family,-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"); font-feature-settings: var(--default-font-feature-settings,normal); font-variation-settings: var(--default-font-variation-settings,normal); -webkit-tap-highlight-color: transparent; }
+  hr { height: 0px; color: inherit; border-top-width: 1px; }
+  abbr:where([title]) { text-decoration: underline dotted; }
+  h1, h2, h3, h4, h5, h6 { font-size: inherit; font-weight: inherit; }
+  a { color: inherit; text-decoration: inherit; }
+  b, strong { font-weight: bolder; }
+  code, kbd, samp, pre { font-family: var(--default-mono-font-family,ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace); font-feature-settings: var(--default-mono-font-feature-settings,normal); font-variation-settings: var(--default-mono-font-variation-settings,normal); font-size: 1em; }
+  small { font-size: 80%; }
+  sub, sup { vertical-align: baseline; font-size: 75%; line-height: 0; position: relative; }
+  sub { bottom: -0.25em; }
+  sup { top: -0.5em; }
+  table { text-indent: 0px; border-color: inherit; border-collapse: collapse; }
+  progress { vertical-align: baseline; }
+  summary { display: list-item; }
+  ol, ul, menu { list-style: none; }
+  img, svg, video, canvas, audio, iframe, embed, object { vertical-align: middle; display: block; }
+  img, video { max-width: 100%; height: auto; }
+  button, input, select, optgroup, textarea { font: inherit; letter-spacing: inherit; color: inherit; opacity: 1; background-color: rgba(0, 0, 0, 0); border-radius: 0px; }
+  ::file-selector-button { font: inherit; letter-spacing: inherit; color: inherit; opacity: 1; background-color: rgba(0, 0, 0, 0); border-radius: 0px; }
+  :where(select:is([multiple], [size])) optgroup { font-weight: bolder; }
+  :where(select:is([multiple], [size])) optgroup option { padding-inline-start: 20px; }
+  ::file-selector-button { margin-inline-end: 4px; }
+  ::placeholder { opacity: 1; }
+  @supports (not ((-webkit-appearance:-apple-pay-button))) or (contain-intrinsic-size:1px) {
+  ::placeholder { color: currentcolor; }
+  @supports (color:color-mix(in lab, red, red)) {
+  ::placeholder { color: color-mix(in oklab, currentcolor, transparent); }
+}
+}
+  textarea { resize: vertical; }
+  ::-webkit-search-decoration { appearance: none; }
+  ::-webkit-date-and-time-value { min-height: 1lh; text-align: inherit; }
+  ::-webkit-datetime-edit { display: inline-flex; }
+  ::-webkit-datetime-edit-fields-wrapper { padding: 0px; }
+  ::-webkit-datetime-edit { padding-block: 0px; }
+  ::-webkit-datetime-edit-year-field { padding-block: 0px; }
+  ::-webkit-datetime-edit-month-field { padding-block: 0px; }
+  ::-webkit-datetime-edit-day-field { padding-block: 0px; }
+  ::-webkit-datetime-edit-hour-field { padding-block: 0px; }
+  ::-webkit-datetime-edit-minute-field { padding-block: 0px; }
+  ::-webkit-datetime-edit-second-field { padding-block: 0px; }
+  ::-webkit-datetime-edit-millisecond-field { padding-block: 0px; }
+  ::-webkit-datetime-edit-meridiem-field { padding-block: 0px; }
+  ::-webkit-calendar-picker-indicator { line-height: 1; }
+  button, input:where([type="button"], [type="reset"], [type="submit"]) { appearance: button; }
+  ::file-selector-button { appearance: button; }
+  ::-webkit-inner-spin-button { height: auto; }
+  ::-webkit-outer-spin-button { height: auto; }
+  [hidden]:where(:not([hidden="until-found"])) { display: none !important; }
+  html { -webkit-tap-highlight-color: transparent; text-size-adjust: 100%; }
+  body { user-select: none; }
+  input, textarea, select, [contenteditable]:not([contenteditable="false"]), .select-text { user-select: text; }
+  body { background-color: var(--color-ink-950); color: var(--color-ink-100); -webkit-font-smoothing: antialiased; --lightningcss-light: ; --lightningcss-dark: initial; color-scheme: dark; overscroll-behavior-y: none; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+  :root[data-theme="light"] body { --lightningcss-light: initial; --lightningcss-dark: ; color-scheme: light; }
+  input, select, textarea { font-size: 16px; }
+  @media (pointer: fine) {
+  input, select, textarea { font-size: 14px; }
+}
+  :focus-visible { outline-style: var(--tw-outline-style); outline-offset: calc(-2px); outline-width: 2px; outline-color: var(--color-brand-400); }
+}
+@layer components;
+@layer utilities {
+  .\@container { container-type: inline-size; }
+  .pointer-events-auto { pointer-events: auto; }
+  .pointer-events-none { pointer-events: none; }
+  .collapse { visibility: collapse; }
+  .invisible { visibility: hidden; }
+  .visible { visibility: visible; }
+  .sr-only { clip-path: inset(50%); white-space: nowrap; border-width: 0px; width: 1px; height: 1px; margin: -1px; padding: 0px; position: absolute; overflow: hidden; }
+  .absolute { position: absolute; }
+  .fixed { position: fixed; }
+  .relative { position: relative; }
+  .static { position: static; }
+  .sticky { position: sticky; }
+  .inset-0 { inset: 0px; }
+  .inset-x-0 { inset-inline: 0px; }
+  .inset-y-0 { inset-block: 0px; }
+  .top-0 { top: 0px; }
+  .top-1 { top: var(--spacing); }
+  .top-1\/2 { top: 50%; }
+  .top-12 { top: calc(var(--spacing) * 12); }
+  .top-\[max\(0\.75rem\,var\(--spacing-safe-top\)\)\] { top: max(.75rem, var(--spacing-safe-top)); }
+  .top-\[max\(1rem\,var\(--spacing-safe-top\)\)\] { top: max(1rem, var(--spacing-safe-top)); }
+  .top-full { top: 100%; }
+  .right-0 { right: 0px; }
+  .right-0\.5 { right: calc(var(--spacing) * .5); }
+  .right-3 { right: calc(var(--spacing) * 3); }
+  .right-4 { right: calc(var(--spacing) * 4); }
+  .bottom-0 { bottom: 0px; }
+  .bottom-safe-bottom { bottom: var(--spacing-safe-bottom); }
+  .left-0 { left: 0px; }
+  .left-3 { left: calc(var(--spacing) * 3); }
+  .left-4 { left: calc(var(--spacing) * 4); }
+  .z-10 { z-index: 10; }
+  .z-20 { z-index: 20; }
+  .z-30 { z-index: 30; }
+  .z-40 { z-index: 40; }
+  .z-50 { z-index: 50; }
+  .order-4 { order: 4; }
+  .order-5 { order: 5; }
+  .order-6 { order: 6; }
+  .container { width: 100%; }
+  @media (width >= 40rem) {
+  .container { max-width: 40rem; }
+}
+  @media (width >= 48rem) {
+  .container { max-width: 48rem; }
+}
+  @media (width >= 64rem) {
+  .container { max-width: 64rem; }
+}
+  @media (width >= 80rem) {
+  .container { max-width: 80rem; }
+}
+  @media (width >= 96rem) {
+  .container { max-width: 96rem; }
+}
+  .m-0 { margin: 0px; }
+  .-mx-3 { margin-inline: calc(var(--spacing) * -3); }
+  .mx-3 { margin-inline: calc(var(--spacing) * 3); }
+  .mx-auto { margin-inline: auto; }
+  .my-1 { margin-block: var(--spacing); }
+  .-mt-1 { margin-top: calc(var(--spacing) * -1); }
+  .mt-0 { margin-top: 0px; }
+  .mt-0\.5 { margin-top: calc(var(--spacing) * .5); }
+  .mt-1 { margin-top: var(--spacing); }
+  .mt-1\.5 { margin-top: calc(var(--spacing) * 1.5); }
+  .mt-2 { margin-top: calc(var(--spacing) * 2); }
+  .mt-3 { margin-top: calc(var(--spacing) * 3); }
+  .mt-4 { margin-top: calc(var(--spacing) * 4); }
+  .mt-5 { margin-top: calc(var(--spacing) * 5); }
+  .mt-7 { margin-top: calc(var(--spacing) * 7); }
+  .mt-8 { margin-top: calc(var(--spacing) * 8); }
+  .mt-auto { margin-top: auto; }
+  .-mr-1 { margin-right: calc(var(--spacing) * -1); }
+  .-mr-2 { margin-right: calc(var(--spacing) * -2); }
+  .-mb-5 { margin-bottom: calc(var(--spacing) * -5); }
+  .mb-1 { margin-bottom: var(--spacing); }
+  .mb-2 { margin-bottom: calc(var(--spacing) * 2); }
+  .mb-3 { margin-bottom: calc(var(--spacing) * 3); }
+  .mb-4 { margin-bottom: calc(var(--spacing) * 4); }
+  .mb-20 { margin-bottom: calc(var(--spacing) * 20); }
+  .-ml-3 { margin-left: calc(var(--spacing) * -3); }
+  .-ml-7 { margin-left: calc(var(--spacing) * -7); }
+  .ml-1 { margin-left: var(--spacing); }
+  .ml-2 { margin-left: calc(var(--spacing) * 2); }
+  .ml-3 { margin-left: calc(var(--spacing) * 3); }
+  .ml-9 { margin-left: calc(var(--spacing) * 9); }
+  .ml-12 { margin-left: calc(var(--spacing) * 12); }
+  .ml-14 { margin-left: calc(var(--spacing) * 14); }
+  .ml-auto { margin-left: auto; }
+  .block { display: block; }
+  .contents { display: contents; }
+  .flex { display: flex; }
+  .grid { display: grid; }
+  .hidden { display: none; }
+  .inline { display: inline; }
+  .inline-block { display: inline-block; }
+  .inline-flex { display: inline-flex; }
+  .table { display: table; }
+  .aspect-square { aspect-ratio: 1 / 1; }
+  .size-3 { width: calc(var(--spacing) * 3); height: calc(var(--spacing) * 3); }
+  .size-3\.5 { width: calc(var(--spacing) * 3.5); height: calc(var(--spacing) * 3.5); }
+  .size-4 { width: calc(var(--spacing) * 4); height: calc(var(--spacing) * 4); }
+  .size-5 { width: calc(var(--spacing) * 5); height: calc(var(--spacing) * 5); }
+  .size-6 { width: calc(var(--spacing) * 6); height: calc(var(--spacing) * 6); }
+  .size-8 { width: calc(var(--spacing) * 8); height: calc(var(--spacing) * 8); }
+  .size-9 { width: calc(var(--spacing) * 9); height: calc(var(--spacing) * 9); }
+  .size-10 { width: calc(var(--spacing) * 10); height: calc(var(--spacing) * 10); }
+  .size-11 { width: calc(var(--spacing) * 11); height: calc(var(--spacing) * 11); }
+  .size-12 { width: calc(var(--spacing) * 12); height: calc(var(--spacing) * 12); }
+  .size-14 { width: calc(var(--spacing) * 14); height: calc(var(--spacing) * 14); }
+  .h-3 { height: calc(var(--spacing) * 3); }
+  .h-4 { height: calc(var(--spacing) * 4); }
+  .h-8 { height: calc(var(--spacing) * 8); }
+  .h-9 { height: calc(var(--spacing) * 9); }
+  .h-11 { height: calc(var(--spacing) * 11); }
+  .h-12 { height: calc(var(--spacing) * 12); }
+  .h-14 { height: calc(var(--spacing) * 14); }
+  .h-16 { height: calc(var(--spacing) * 16); }
+  .h-24 { height: calc(var(--spacing) * 24); }
+  .h-36 { height: calc(var(--spacing) * 36); }
+  .h-dvh { height: 100dvh; }
+  .h-full { height: 100%; }
+  .h-px { height: 1px; }
+  .max-h-40 { max-height: calc(var(--spacing) * 40); }
+  .max-h-48 { max-height: calc(var(--spacing) * 48); }
+  .max-h-56 { max-height: calc(var(--spacing) * 56); }
+  .max-h-\[46vh\] { max-height: 46vh; }
+  .max-h-\[92dvh\] { max-height: 92dvh; }
+  .max-h-full { max-height: 100%; }
+  .min-h-0 { min-height: 0px; }
+  .min-h-9 { min-height: calc(var(--spacing) * 9); }
+  .min-h-11 { min-height: calc(var(--spacing) * 11); }
+  .min-h-12 { min-height: calc(var(--spacing) * 12); }
+  .min-h-14 { min-height: calc(var(--spacing) * 14); }
+  .min-h-16 { min-height: calc(var(--spacing) * 16); }
+  .min-h-20 { min-height: calc(var(--spacing) * 20); }
+  .min-h-dvh { min-height: 100dvh; }
+  .min-h-full { min-height: 100%; }
+  .w-3 { width: calc(var(--spacing) * 3); }
+  .w-7 { width: calc(var(--spacing) * 7); }
+  .w-9 { width: calc(var(--spacing) * 9); }
+  .w-10 { width: calc(var(--spacing) * 10); }
+  .w-12 { width: calc(var(--spacing) * 12); }
+  .w-16 { width: calc(var(--spacing) * 16); }
+  .w-24 { width: calc(var(--spacing) * 24); }
+  .w-36 { width: calc(var(--spacing) * 36); }
+  .w-44 { width: calc(var(--spacing) * 44); }
+  .w-52 { width: calc(var(--spacing) * 52); }
+  .w-fit { width: fit-content; }
+  .w-full { width: 100%; }
+  .max-w-2xl { max-width: var(--container-2xl); }
+  .max-w-3xl { max-width: var(--container-3xl); }
+  .max-w-7xl { max-width: var(--container-7xl); }
+  .max-w-32 { max-width: calc(var(--spacing) * 32); }
+  .max-w-\[55\%\] { max-width: 55%; }
+  .max-w-full { max-width: 100%; }
+  .max-w-lg { max-width: var(--container-lg); }
+  .max-w-md { max-width: var(--container-md); }
+  .max-w-sm { max-width: var(--container-sm); }
+  .min-w-0 { min-width: 0px; }
+  .min-w-24 { min-width: calc(var(--spacing) * 24); }
+  .min-w-28 { min-width: calc(var(--spacing) * 28); }
+  .min-w-80 { min-width: calc(var(--spacing) * 80); }
+  .flex-1 { flex: 1 1 0%; }
+  .flex-\[0\.5\] { flex: 0.5 1 0%; }
+  .flex-\[1\.5\] { flex: 1.5 1 0%; }
+  .flex-\[3\.5\] { flex: 3.5 1 0%; }
+  .flex-shrink, .shrink { flex-shrink: 1; }
+  .shrink-0 { flex-shrink: 0; }
+  .flex-grow, .grow { flex-grow: 1; }
+  .basis-0 { flex-basis: 0px; }
+  .border-collapse { border-collapse: collapse; }
+  .origin-left { transform-origin: 0px center; }
+  .-translate-y-1 { --tw-translate-y: calc(var(--spacing) * -1); translate: var(--tw-translate-x) var(--tw-translate-y); }
+  .-translate-y-1\/2 { --tw-translate-y: calc(calc(1 / 2 * 100%) * -1); translate: var(--tw-translate-x) var(--tw-translate-y); }
+  .transform { transform: var(--tw-rotate-x,) var(--tw-rotate-y,) var(--tw-rotate-z,) var(--tw-skew-x,) var(--tw-skew-y,); }
+  .animate-pulse { animation: var(--animate-pulse); }
+  .animate-sheet-in { animation: var(--animate-sheet-in); }
+  .animate-spin { animation: var(--animate-spin); }
+  .cursor-pointer { cursor: pointer; }
+  .resize { resize: both; }
+  .list-disc { list-style-type: disc; }
+  .list-none { list-style-type: none; }
+  .\[appearance\:textfield\] { appearance: textfield; }
+  .appearance-none { appearance: none; }
+  .grid-cols-1 { grid-template-columns: repeat(1, minmax(0px, 1fr)); }
+  .grid-cols-2 { grid-template-columns: repeat(2, minmax(0px, 1fr)); }
+  .grid-cols-3 { grid-template-columns: repeat(3, minmax(0px, 1fr)); }
+  .grid-cols-\[auto_1fr\] { grid-template-columns: auto 1fr; }
+  .grid-cols-\[repeat\(auto-fill\,minmax\(3rem\,1fr\)\)\] { grid-template-columns: repeat(auto-fill, minmax(3rem, 1fr)); }
+  .grid-rows-\[auto_1fr_auto\] { grid-template-rows: auto 1fr auto; }
+  .grid-rows-\[auto_auto_1fr_auto\] { grid-template-rows: auto auto 1fr auto; }
+  .grid-rows-\[auto_auto_1fr_auto_auto\] { grid-template-rows: auto auto 1fr auto auto; }
+  .grid-rows-\[minmax\(0\,1fr\)_auto_auto\] { grid-template-rows: minmax(0px, 1fr) auto auto; }
+  .flex-col { flex-direction: column; }
+  .flex-wrap { flex-wrap: wrap; }
+  .items-baseline { align-items: baseline; }
+  .items-center { align-items: center; }
+  .items-end { align-items: flex-end; }
+  .items-start { align-items: flex-start; }
+  .items-stretch { align-items: stretch; }
+  .justify-between { justify-content: space-between; }
+  .justify-center { justify-content: center; }
+  .justify-end { justify-content: flex-end; }
+  .justify-items-center { justify-items: center; }
+  .gap-0 { gap: 0px; }
+  .gap-0\.5 { gap: calc(var(--spacing) * .5); }
+  .gap-1 { gap: var(--spacing); }
+  .gap-1\.5 { gap: calc(var(--spacing) * 1.5); }
+  .gap-2 { gap: calc(var(--spacing) * 2); }
+  .gap-2\.5 { gap: calc(var(--spacing) * 2.5); }
+  .gap-3 { gap: calc(var(--spacing) * 3); }
+  .gap-4 { gap: calc(var(--spacing) * 4); }
+  .gap-5 { gap: calc(var(--spacing) * 5); }
+  .gap-6 { gap: calc(var(--spacing) * 6); }
+  .gap-8 { gap: calc(var(--spacing) * 8); }
+  .gap-10 { gap: calc(var(--spacing) * 10); }
+  .gap-x-2 { column-gap: calc(var(--spacing) * 2); }
+  .gap-x-3 { column-gap: calc(var(--spacing) * 3); }
+  .gap-y-1 { row-gap: var(--spacing); }
+  :where(.divide-y > :not(:last-child)) { --tw-divide-y-reverse: 0; border-bottom-style: var(--tw-border-style); border-top-style: var(--tw-border-style); border-top-width: calc(1px * var(--tw-divide-y-reverse)); border-bottom-width: calc(1px * calc(1 - var(--tw-divide-y-reverse))); }
+  :where(.divide-ink-800 > :not(:last-child)) { border-color: var(--color-ink-800); }
+  .truncate { text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
+  .overflow-auto { overflow: auto; }
+  .overflow-hidden { overflow: hidden; }
+  .overflow-x-auto { overflow-x: auto; }
+  .overflow-y-auto { overflow-y: auto; }
+  .overscroll-contain { overscroll-behavior: contain; }
+  .rounded { border-radius: 0.25rem; }
+  .rounded-2xl { border-radius: var(--radius-2xl); }
+  .rounded-full { border-radius: 2.14748e+09px; }
+  .rounded-lg { border-radius: var(--radius-lg); }
+  .rounded-md { border-radius: var(--radius-md); }
+  .rounded-sm { border-radius: var(--radius-sm); }
+  .rounded-xl { border-radius: var(--radius-xl); }
+  .rounded-t-2xl { border-top-left-radius: var(--radius-2xl); border-top-right-radius: var(--radius-2xl); }
+  .rounded-t-md { border-top-left-radius: var(--radius-md); border-top-right-radius: var(--radius-md); }
+  .rounded-l-xl { border-top-left-radius: var(--radius-xl); border-bottom-left-radius: var(--radius-xl); }
+  .rounded-tl-xl { border-top-left-radius: var(--radius-xl); }
+  .rounded-r-xl { border-top-right-radius: var(--radius-xl); border-bottom-right-radius: var(--radius-xl); }
+  .rounded-tr-xl { border-top-right-radius: var(--radius-xl); }
+  .rounded-b-lg { border-bottom-right-radius: var(--radius-lg); border-bottom-left-radius: var(--radius-lg); }
+  .rounded-br-xl { border-bottom-right-radius: var(--radius-xl); }
+  .rounded-bl-xl { border-bottom-left-radius: var(--radius-xl); }
+  .border { border-style: var(--tw-border-style); border-width: 1px; }
+  .border-2 { border-style: var(--tw-border-style); border-width: 2px; }
+  .border-x { border-inline-style: var(--tw-border-style); border-inline-width: 1px; }
+  .border-t { border-top-style: var(--tw-border-style); border-top-width: 1px; }
+  .border-b { border-bottom-style: var(--tw-border-style); border-bottom-width: 1px; }
+  .border-l { border-left-style: var(--tw-border-style); border-left-width: 1px; }
+  .border-dashed { --tw-border-style: dashed; border-style: dashed; }
+  .border-brand-500 { border-color: var(--color-brand-500); }
+  .border-current { border-color: currentcolor; }
+  .border-danger-500 { border-color: var(--color-danger-500); }
+  .border-danger-500\/20 { border-color: rgba(239, 68, 68, 0.2); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .border-danger-500\/20 { border-color: color-mix(in oklab, var(--color-danger-500) 20%, transparent); }
+}
+  .border-ink-500 { border-color: var(--color-ink-500); }
+  .border-ink-600 { border-color: var(--color-ink-600); }
+  .border-ink-700 { border-color: var(--color-ink-700); }
+  .border-ink-800 { border-color: var(--color-ink-800); }
+  .border-present-500 { border-color: var(--color-present-500); }
+  .border-present-500\/20 { border-color: rgba(34, 197, 94, 0.2); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .border-present-500\/20 { border-color: color-mix(in oklab, var(--color-present-500) 20%, transparent); }
+}
+  .border-present-500\/60 { border-color: rgba(34, 197, 94, 0.6); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .border-present-500\/60 { border-color: color-mix(in oklab, var(--color-present-500) 60%, transparent); }
+}
+  .border-t-brand-400 { border-top-color: var(--color-brand-400); }
+  .border-t-transparent { border-top-color: rgba(0, 0, 0, 0); }
+  .bg-black { background-color: var(--color-black); }
+  .bg-black\/25 { background-color: rgba(0, 0, 0, 0.25); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .bg-black\/25 { background-color: color-mix(in oklab, var(--color-black) 25%, transparent); }
+}
+  .bg-brand-400 { background-color: var(--color-brand-400); }
+  .bg-brand-500 { background-color: var(--color-brand-500); }
+  .bg-brand-500\/10 { background-color: rgba(14, 165, 233, 0.1); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .bg-brand-500\/10 { background-color: color-mix(in oklab, var(--color-brand-500) 10%, transparent); }
+}
+  .bg-brand-500\/15 { background-color: rgba(14, 165, 233, 0.15); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .bg-brand-500\/15 { background-color: color-mix(in oklab, var(--color-brand-500) 15%, transparent); }
+}
+  .bg-brand-500\/20 { background-color: rgba(14, 165, 233, 0.2); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .bg-brand-500\/20 { background-color: color-mix(in oklab, var(--color-brand-500) 20%, transparent); }
+}
+  .bg-brand-500\/25 { background-color: rgba(14, 165, 233, 0.25); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .bg-brand-500\/25 { background-color: color-mix(in oklab, var(--color-brand-500) 25%, transparent); }
+}
+  .bg-brand-500\/35 { background-color: rgba(14, 165, 233, 0.35); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .bg-brand-500\/35 { background-color: color-mix(in oklab, var(--color-brand-500) 35%, transparent); }
+}
+  .bg-brand-600 { background-color: var(--color-brand-600); }
+  .bg-brand-600\/15 { background-color: rgba(2, 132, 199, 0.15); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .bg-brand-600\/15 { background-color: color-mix(in oklab, var(--color-brand-600) 15%, transparent); }
+}
+  .bg-brand-600\/30 { background-color: rgba(2, 132, 199, 0.3); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .bg-brand-600\/30 { background-color: color-mix(in oklab, var(--color-brand-600) 30%, transparent); }
+}
+  .bg-brand-600\/40 { background-color: rgba(2, 132, 199, 0.4); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .bg-brand-600\/40 { background-color: color-mix(in oklab, var(--color-brand-600) 40%, transparent); }
+}
+  .bg-brand-600\/55 { background-color: rgba(2, 132, 199, 0.55); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .bg-brand-600\/55 { background-color: color-mix(in oklab, var(--color-brand-600) 55%, transparent); }
+}
+  .bg-danger-500 { background-color: var(--color-danger-500); }
+  .bg-danger-500\/10 { background-color: rgba(239, 68, 68, 0.1); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .bg-danger-500\/10 { background-color: color-mix(in oklab, var(--color-danger-500) 10%, transparent); }
+}
+  .bg-danger-500\/15 { background-color: rgba(239, 68, 68, 0.15); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .bg-danger-500\/15 { background-color: color-mix(in oklab, var(--color-danger-500) 15%, transparent); }
+}
+  .bg-danger-600 { background-color: var(--color-danger-600); }
+  .bg-ink-600 { background-color: var(--color-ink-600); }
+  .bg-ink-700 { background-color: var(--color-ink-700); }
+  .bg-ink-800 { background-color: var(--color-ink-800); }
+  .bg-ink-800\/50 { background-color: rgba(30, 41, 59, 0.5); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .bg-ink-800\/50 { background-color: color-mix(in oklab, var(--color-ink-800) 50%, transparent); }
+}
+  .bg-ink-800\/60 { background-color: rgba(30, 41, 59, 0.6); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .bg-ink-800\/60 { background-color: color-mix(in oklab, var(--color-ink-800) 60%, transparent); }
+}
+  .bg-ink-800\/70 { background-color: rgba(30, 41, 59, 0.7); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .bg-ink-800\/70 { background-color: color-mix(in oklab, var(--color-ink-800) 70%, transparent); }
+}
+  .bg-ink-900 { background-color: var(--color-ink-900); }
+  .bg-ink-900\/40 { background-color: rgba(15, 23, 42, 0.4); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .bg-ink-900\/40 { background-color: color-mix(in oklab, var(--color-ink-900) 40%, transparent); }
+}
+  .bg-ink-900\/60 { background-color: rgba(15, 23, 42, 0.6); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .bg-ink-900\/60 { background-color: color-mix(in oklab, var(--color-ink-900) 60%, transparent); }
+}
+  .bg-ink-950 { background-color: var(--color-ink-950); }
+  .bg-ink-950\/40 { background-color: rgba(2, 6, 23, 0.4); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .bg-ink-950\/40 { background-color: color-mix(in oklab, var(--color-ink-950) 40%, transparent); }
+}
+  .bg-ink-950\/70 { background-color: rgba(2, 6, 23, 0.7); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .bg-ink-950\/70 { background-color: color-mix(in oklab, var(--color-ink-950) 70%, transparent); }
+}
+  .bg-ink-950\/95 { background-color: rgba(2, 6, 23, 0.95); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .bg-ink-950\/95 { background-color: color-mix(in oklab, var(--color-ink-950) 95%, transparent); }
+}
+  .bg-present-500 { background-color: var(--color-present-500); }
+  .bg-present-500\/10 { background-color: rgba(34, 197, 94, 0.1); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .bg-present-500\/10 { background-color: color-mix(in oklab, var(--color-present-500) 10%, transparent); }
+}
+  .bg-present-500\/15 { background-color: rgba(34, 197, 94, 0.15); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .bg-present-500\/15 { background-color: color-mix(in oklab, var(--color-present-500) 15%, transparent); }
+}
+  .bg-present-500\/20 { background-color: rgba(34, 197, 94, 0.2); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .bg-present-500\/20 { background-color: color-mix(in oklab, var(--color-present-500) 20%, transparent); }
+}
+  .bg-present-600 { background-color: var(--color-present-600); }
+  .bg-present-600\/20 { background-color: rgba(22, 163, 74, 0.2); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .bg-present-600\/20 { background-color: color-mix(in oklab, var(--color-present-600) 20%, transparent); }
+}
+  .bg-present-600\/55 { background-color: rgba(22, 163, 74, 0.55); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .bg-present-600\/55 { background-color: color-mix(in oklab, var(--color-present-600) 55%, transparent); }
+}
+  .bg-transparent { background-color: rgba(0, 0, 0, 0); }
+  .bg-warn-500 { background-color: var(--color-warn-500); }
+  .bg-warn-500\/10 { background-color: rgba(234, 179, 8, 0.1); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .bg-warn-500\/10 { background-color: color-mix(in oklab, var(--color-warn-500) 10%, transparent); }
+}
+  .bg-warn-500\/15 { background-color: rgba(234, 179, 8, 0.15); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .bg-warn-500\/15 { background-color: color-mix(in oklab, var(--color-warn-500) 15%, transparent); }
+}
+  .bg-warn-500\/20 { background-color: rgba(234, 179, 8, 0.2); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .bg-warn-500\/20 { background-color: color-mix(in oklab, var(--color-warn-500) 20%, transparent); }
+}
+  .bg-white { background-color: var(--color-white); }
+  .bg-white\/35 { background-color: rgba(255, 255, 255, 0.35); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .bg-white\/35 { background-color: color-mix(in oklab, var(--color-white) 35%, transparent); }
+}
+  .p-0 { padding: 0px; }
+  .p-0\.5 { padding: calc(var(--spacing) * .5); }
+  .p-2 { padding: calc(var(--spacing) * 2); }
+  .p-3 { padding: calc(var(--spacing) * 3); }
+  .p-4 { padding: calc(var(--spacing) * 4); }
+  .p-5 { padding: calc(var(--spacing) * 5); }
+  .p-6 { padding: calc(var(--spacing) * 6); }
+  .p-7 { padding: calc(var(--spacing) * 7); }
+  .p-8 { padding: calc(var(--spacing) * 8); }
+  .p-77 { padding: calc(var(--spacing) * 77); }
+  .px-1 { padding-inline: var(--spacing); }
+  .px-1\.5 { padding-inline: calc(var(--spacing) * 1.5); }
+  .px-2 { padding-inline: calc(var(--spacing) * 2); }
+  .px-2\.5 { padding-inline: calc(var(--spacing) * 2.5); }
+  .px-3 { padding-inline: calc(var(--spacing) * 3); }
+  .px-3\.5 { padding-inline: calc(var(--spacing) * 3.5); }
+  .px-4 { padding-inline: calc(var(--spacing) * 4); }
+  .px-5 { padding-inline: calc(var(--spacing) * 5); }
+  .px-6 { padding-inline: calc(var(--spacing) * 6); }
+  .px-8 { padding-inline: calc(var(--spacing) * 8); }
+  .py-0 { padding-block: 0px; }
+  .py-0\.5 { padding-block: calc(var(--spacing) * .5); }
+  .py-1 { padding-block: var(--spacing); }
+  .py-1\.5 { padding-block: calc(var(--spacing) * 1.5); }
+  .py-2 { padding-block: calc(var(--spacing) * 2); }
+  .py-2\.5 { padding-block: calc(var(--spacing) * 2.5); }
+  .py-3 { padding-block: calc(var(--spacing) * 3); }
+  .py-4 { padding-block: calc(var(--spacing) * 4); }
+  .py-6 { padding-block: calc(var(--spacing) * 6); }
+  .py-8 { padding-block: calc(var(--spacing) * 8); }
+  .py-10 { padding-block: calc(var(--spacing) * 10); }
+  .py-12 { padding-block: calc(var(--spacing) * 12); }
+  .py-14 { padding-block: calc(var(--spacing) * 14); }
+  .pt-1 { padding-top: var(--spacing); }
+  .pt-2 { padding-top: calc(var(--spacing) * 2); }
+  .pt-3 { padding-top: calc(var(--spacing) * 3); }
+  .pt-4 { padding-top: calc(var(--spacing) * 4); }
+  .pt-6 { padding-top: calc(var(--spacing) * 6); }
+  .pt-10 { padding-top: calc(var(--spacing) * 10); }
+  .pt-12 { padding-top: calc(var(--spacing) * 12); }
+  .pt-\[max\(1rem\,var\(--spacing-safe-top\)\)\] { padding-top: max(1rem, var(--spacing-safe-top)); }
+  .pr-1 { padding-right: var(--spacing); }
+  .pr-5 { padding-right: calc(var(--spacing) * 5); }
+  .pr-9 { padding-right: calc(var(--spacing) * 9); }
+  .pr-12 { padding-right: calc(var(--spacing) * 12); }
+  .pb-1 { padding-bottom: var(--spacing); }
+  .pb-1\.5 { padding-bottom: calc(var(--spacing) * 1.5); }
+  .pb-2 { padding-bottom: calc(var(--spacing) * 2); }
+  .pb-3 { padding-bottom: calc(var(--spacing) * 3); }
+  .pb-4 { padding-bottom: calc(var(--spacing) * 4); }
+  .pb-8 { padding-bottom: calc(var(--spacing) * 8); }
+  .pb-12 { padding-bottom: calc(var(--spacing) * 12); }
+  .pb-24 { padding-bottom: calc(var(--spacing) * 24); }
+  .pb-\[max\(0\.5rem\,var\(--spacing-safe-bottom\)\)\] { padding-bottom: max(.5rem, var(--spacing-safe-bottom)); }
+  .pb-\[max\(1rem\,var\(--spacing-safe-bottom\)\)\] { padding-bottom: max(1rem, var(--spacing-safe-bottom)); }
+  .pb-\[max\(2rem\,18vh\)\] { padding-bottom: max(2rem, 18vh); }
+  .pl-2 { padding-left: calc(var(--spacing) * 2); }
+  .pl-3 { padding-left: calc(var(--spacing) * 3); }
+  .pl-5 { padding-left: calc(var(--spacing) * 5); }
+  .pl-9 { padding-left: calc(var(--spacing) * 9); }
+  .pl-12 { padding-left: calc(var(--spacing) * 12); }
+  .pl-14 { padding-left: calc(var(--spacing) * 14); }
+  .text-center { text-align: center; }
+  .text-left { text-align: left; }
+  .text-right { text-align: right; }
+  .font-mono { font-family: var(--font-mono); }
+  .text-2xl { font-size: var(--text-2xl); line-height: var(--tw-leading,var(--text-2xl--line-height)); }
+  .text-3xl { font-size: var(--text-3xl); line-height: var(--tw-leading,var(--text-3xl--line-height)); }
+  .text-4xl { font-size: var(--text-4xl); line-height: var(--tw-leading,var(--text-4xl--line-height)); }
+  .text-5xl { font-size: var(--text-5xl); line-height: var(--tw-leading,var(--text-5xl--line-height)); }
+  .text-5xl\/\[1\.15\] { font-size: var(--text-5xl); line-height: 1.15; }
+  .text-8xl { font-size: var(--text-8xl); line-height: var(--tw-leading,var(--text-8xl--line-height)); }
+  .text-base { font-size: var(--text-base); line-height: var(--tw-leading,var(--text-base--line-height)); }
+  .text-lg { font-size: var(--text-lg); line-height: var(--tw-leading,var(--text-lg--line-height)); }
+  .text-sm { font-size: var(--text-sm); line-height: var(--tw-leading,var(--text-sm--line-height)); }
+  .text-xl { font-size: var(--text-xl); line-height: var(--tw-leading,var(--text-xl--line-height)); }
+  .text-xs { font-size: var(--text-xs); line-height: var(--tw-leading,var(--text-xs--line-height)); }
+  .text-\[0\.6rem\] { font-size: 0.6rem; }
+  .text-\[10px\] { font-size: 10px; }
+  .text-\[11px\] { font-size: 11px; }
+  .text-\[13px\] { font-size: 13px; }
+  .text-\[16px\] { font-size: 16px; }
+  .leading-\[2\.75rem\] { --tw-leading: 2.75rem; line-height: 2.75rem; }
+  .leading-none { --tw-leading: 1; line-height: 1; }
+  .leading-relaxed { --tw-leading: var(--leading-relaxed); line-height: var(--leading-relaxed); }
+  .leading-snug { --tw-leading: var(--leading-snug); line-height: var(--leading-snug); }
+  .leading-tight { --tw-leading: var(--leading-tight); line-height: var(--leading-tight); }
+  .font-bold { --tw-font-weight: var(--font-weight-bold); font-weight: var(--font-weight-bold); }
+  .font-medium { --tw-font-weight: var(--font-weight-medium); font-weight: var(--font-weight-medium); }
+  .font-normal { --tw-font-weight: var(--font-weight-normal); font-weight: var(--font-weight-normal); }
+  .font-semibold { --tw-font-weight: var(--font-weight-semibold); font-weight: var(--font-weight-semibold); }
+  .tracking-\[0\.2em\] { --tw-tracking: .2em; letter-spacing: 0.2em; }
+  .tracking-\[0\.3em\] { --tw-tracking: .3em; letter-spacing: 0.3em; }
+  .tracking-\[0\.18em\] { --tw-tracking: .18em; letter-spacing: 0.18em; }
+  .tracking-normal { --tw-tracking: var(--tracking-normal); letter-spacing: var(--tracking-normal); }
+  .tracking-tight { --tw-tracking: var(--tracking-tight); letter-spacing: var(--tracking-tight); }
+  .tracking-wide { --tw-tracking: var(--tracking-wide); letter-spacing: var(--tracking-wide); }
+  .tracking-wider { --tw-tracking: var(--tracking-wider); letter-spacing: var(--tracking-wider); }
+  .tracking-widest { --tw-tracking: var(--tracking-widest); letter-spacing: var(--tracking-widest); }
+  .text-wrap { text-wrap: wrap; }
+  .break-words { overflow-wrap: break-word; }
+  .break-all { word-break: break-all; }
+  .whitespace-normal { white-space: normal; }
+  .whitespace-nowrap { white-space: nowrap; }
+  .whitespace-pre { white-space: pre; }
+  .whitespace-pre-line { white-space: pre-line; }
+  .text-brand-200 { color: var(--color-brand-200); }
+  .text-brand-200\/70 { color: rgba(186, 230, 253, 0.7); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .text-brand-200\/70 { color: color-mix(in oklab, var(--color-brand-200) 70%, transparent); }
+}
+  .text-brand-300 { color: var(--color-brand-300); }
+  .text-brand-400 { color: var(--color-brand-400); }
+  .text-danger-400 { color: var(--color-danger-400); }
+  .text-ink-50 { color: var(--color-ink-50); }
+  .text-ink-100 { color: var(--color-ink-100); }
+  .text-ink-200 { color: var(--color-ink-200); }
+  .text-ink-300 { color: var(--color-ink-300); }
+  .text-ink-400 { color: var(--color-ink-400); }
+  .text-ink-500 { color: var(--color-ink-500); }
+  .text-ink-600 { color: var(--color-ink-600); }
+  .text-ink-900 { color: var(--color-ink-900); }
+  .text-present-400 { color: var(--color-present-400); }
+  .text-present-400\/90 { color: rgba(74, 222, 128, 0.9); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .text-present-400\/90 { color: color-mix(in oklab, var(--color-present-400) 90%, transparent); }
+}
+  .text-present-600 { color: var(--color-present-600); }
+  .text-transparent { color: rgba(0, 0, 0, 0); }
+  .text-warn-400 { color: var(--color-warn-400); }
+  .text-warn-400\/80 { color: rgba(250, 204, 21, 0.8); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .text-warn-400\/80 { color: color-mix(in oklab, var(--color-warn-400) 80%, transparent); }
+}
+  .text-white { color: var(--color-white); }
+  .lowercase { text-transform: lowercase; }
+  .normal-case { text-transform: none; }
+  .uppercase { text-transform: uppercase; }
+  .ordinal { --tw-ordinal: ordinal; font-variant-numeric: var(--tw-ordinal,) var(--tw-slashed-zero,) var(--tw-numeric-figure,) var(--tw-numeric-spacing,) var(--tw-numeric-fraction,); }
+  .tabular-nums { --tw-numeric-spacing: tabular-nums; font-variant-numeric: var(--tw-ordinal,) var(--tw-slashed-zero,) var(--tw-numeric-figure,) var(--tw-numeric-spacing,) var(--tw-numeric-fraction,); }
+  .line-through { text-decoration-line: line-through; }
+  .underline { text-decoration-line: underline; }
+  .underline-offset-2 { text-underline-offset: 2px; }
+  .underline-offset-4 { text-underline-offset: 4px; }
+  .accent-brand-500 { accent-color: var(--color-brand-500); }
+  .opacity-0 { opacity: 0; }
+  .opacity-50 { opacity: 0.5; }
+  .opacity-60 { opacity: 0.6; }
+  .opacity-70 { opacity: 0.7; }
+  .shadow { --tw-shadow: 0 1px 3px 0 var(--tw-shadow-color,#0000001a), 0 1px 2px -1px var(--tw-shadow-color,#0000001a); box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow); }
+  .shadow-lg { --tw-shadow: 0 10px 15px -3px var(--tw-shadow-color,#0000001a), 0 4px 6px -4px var(--tw-shadow-color,#0000001a); box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow); }
+  .shadow-md { --tw-shadow: 0 4px 6px -1px var(--tw-shadow-color,#0000001a), 0 2px 4px -2px var(--tw-shadow-color,#0000001a); box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow); }
+  .shadow-xl { --tw-shadow: 0 20px 25px -5px var(--tw-shadow-color,#0000001a), 0 8px 10px -6px var(--tw-shadow-color,#0000001a); box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow); }
+  .ring, .ring-1 { --tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(1px + var(--tw-ring-offset-width)) var(--tw-ring-color,currentcolor); box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow); }
+  .ring-2 { --tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color,currentcolor); box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow); }
+  .shadow-black { --tw-shadow-color: #000; }
+  @supports (color:color-mix(in lab, red, red)) {
+  .shadow-black { --tw-shadow-color: color-mix(in oklab, var(--color-black) var(--tw-shadow-alpha), transparent); }
+}
+  .shadow-black\/50 { --tw-shadow-color: #00000080; }
+  @supports (color:color-mix(in lab, red, red)) {
+  .shadow-black\/50 { --tw-shadow-color: color-mix(in oklab, color-mix(in oklab, var(--color-black) 50%, transparent) var(--tw-shadow-alpha), transparent); }
+}
+  .ring-brand-400 { --tw-ring-color: var(--color-brand-400); }
+  .ring-brand-500 { --tw-ring-color: var(--color-brand-500); }
+  .ring-brand-500\/25 { --tw-ring-color: #0ea5e940; }
+  @supports (color:color-mix(in lab, red, red)) {
+  .ring-brand-500\/25 { --tw-ring-color: color-mix(in oklab, var(--color-brand-500) 25%, transparent); }
+}
+  .ring-brand-500\/30 { --tw-ring-color: #0ea5e94d; }
+  @supports (color:color-mix(in lab, red, red)) {
+  .ring-brand-500\/30 { --tw-ring-color: color-mix(in oklab, var(--color-brand-500) 30%, transparent); }
+}
+  .ring-brand-500\/40 { --tw-ring-color: #0ea5e966; }
+  @supports (color:color-mix(in lab, red, red)) {
+  .ring-brand-500\/40 { --tw-ring-color: color-mix(in oklab, var(--color-brand-500) 40%, transparent); }
+}
+  .ring-danger-400 { --tw-ring-color: var(--color-danger-400); }
+  .ring-danger-400\/40 { --tw-ring-color: #f8717166; }
+  @supports (color:color-mix(in lab, red, red)) {
+  .ring-danger-400\/40 { --tw-ring-color: color-mix(in oklab, var(--color-danger-400) 40%, transparent); }
+}
+  .ring-danger-500 { --tw-ring-color: var(--color-danger-500); }
+  .ring-danger-500\/25 { --tw-ring-color: #ef444440; }
+  @supports (color:color-mix(in lab, red, red)) {
+  .ring-danger-500\/25 { --tw-ring-color: color-mix(in oklab, var(--color-danger-500) 25%, transparent); }
+}
+  .ring-danger-500\/30 { --tw-ring-color: #ef44444d; }
+  @supports (color:color-mix(in lab, red, red)) {
+  .ring-danger-500\/30 { --tw-ring-color: color-mix(in oklab, var(--color-danger-500) 30%, transparent); }
+}
+  .ring-ink-600 { --tw-ring-color: var(--color-ink-600); }
+  .ring-ink-700 { --tw-ring-color: var(--color-ink-700); }
+  .ring-ink-800 { --tw-ring-color: var(--color-ink-800); }
+  .ring-present-400 { --tw-ring-color: var(--color-present-400); }
+  .ring-present-400\/40 { --tw-ring-color: #4ade8066; }
+  @supports (color:color-mix(in lab, red, red)) {
+  .ring-present-400\/40 { --tw-ring-color: color-mix(in oklab, var(--color-present-400) 40%, transparent); }
+}
+  .ring-present-500 { --tw-ring-color: var(--color-present-500); }
+  .ring-present-500\/25 { --tw-ring-color: #22c55e40; }
+  @supports (color:color-mix(in lab, red, red)) {
+  .ring-present-500\/25 { --tw-ring-color: color-mix(in oklab, var(--color-present-500) 25%, transparent); }
+}
+  .ring-present-500\/30 { --tw-ring-color: #22c55e4d; }
+  @supports (color:color-mix(in lab, red, red)) {
+  .ring-present-500\/30 { --tw-ring-color: color-mix(in oklab, var(--color-present-500) 30%, transparent); }
+}
+  .ring-transparent { --tw-ring-color: transparent; }
+  .ring-warn-500 { --tw-ring-color: var(--color-warn-500); }
+  .ring-warn-500\/25 { --tw-ring-color: #eab30840; }
+  @supports (color:color-mix(in lab, red, red)) {
+  .ring-warn-500\/25 { --tw-ring-color: color-mix(in oklab, var(--color-warn-500) 25%, transparent); }
+}
+  .ring-warn-500\/30 { --tw-ring-color: #eab3084d; }
+  @supports (color:color-mix(in lab, red, red)) {
+  .ring-warn-500\/30 { --tw-ring-color: color-mix(in oklab, var(--color-warn-500) 30%, transparent); }
+}
+  .ring-warn-500\/50 { --tw-ring-color: #eab30880; }
+  @supports (color:color-mix(in lab, red, red)) {
+  .ring-warn-500\/50 { --tw-ring-color: color-mix(in oklab, var(--color-warn-500) 50%, transparent); }
+}
+  .outline { outline-style: var(--tw-outline-style); outline-width: 1px; }
+  .blur { --tw-blur: blur(8px); filter: var(--tw-blur,) var(--tw-brightness,) var(--tw-contrast,) var(--tw-grayscale,) var(--tw-hue-rotate,) var(--tw-invert,) var(--tw-saturate,) var(--tw-sepia,) var(--tw-drop-shadow,); }
+  .saturate-50 { --tw-saturate: saturate(50%); filter: var(--tw-blur,) var(--tw-brightness,) var(--tw-contrast,) var(--tw-grayscale,) var(--tw-hue-rotate,) var(--tw-invert,) var(--tw-saturate,) var(--tw-sepia,) var(--tw-drop-shadow,); }
+  .filter { filter: var(--tw-blur,) var(--tw-brightness,) var(--tw-contrast,) var(--tw-grayscale,) var(--tw-hue-rotate,) var(--tw-invert,) var(--tw-saturate,) var(--tw-sepia,) var(--tw-drop-shadow,); }
+  .backdrop-blur { --tw-backdrop-blur: blur(8px); backdrop-filter: var(--tw-backdrop-blur,) var(--tw-backdrop-brightness,) var(--tw-backdrop-contrast,) var(--tw-backdrop-grayscale,) var(--tw-backdrop-hue-rotate,) var(--tw-backdrop-invert,) var(--tw-backdrop-opacity,) var(--tw-backdrop-saturate,) var(--tw-backdrop-sepia,); }
+  .backdrop-filter { backdrop-filter: var(--tw-backdrop-blur,) var(--tw-backdrop-brightness,) var(--tw-backdrop-contrast,) var(--tw-backdrop-grayscale,) var(--tw-backdrop-hue-rotate,) var(--tw-backdrop-invert,) var(--tw-backdrop-opacity,) var(--tw-backdrop-saturate,) var(--tw-backdrop-sepia,); }
+  .transition { transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to, opacity, box-shadow, transform, translate, scale, rotate, filter, -webkit-backdrop-filter, backdrop-filter, display, content-visibility, overlay, pointer-events; transition-timing-function: var(--tw-ease,var(--default-transition-timing-function)); transition-duration: var(--tw-duration,var(--default-transition-duration)); }
+  .transition-\[filter\,box-shadow\] { transition-property: filter, box-shadow; transition-timing-function: var(--tw-ease,var(--default-transition-timing-function)); transition-duration: var(--tw-duration,var(--default-transition-duration)); }
+  .transition-colors { transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to; transition-timing-function: var(--tw-ease,var(--default-transition-timing-function)); transition-duration: var(--tw-duration,var(--default-transition-duration)); }
+  .ease-out { --tw-ease: var(--ease-out); transition-timing-function: var(--ease-out); }
+  .select-none { user-select: none; }
+  .select-text { user-select: text; }
+  .\[flow\:error\] { }
+  .\[flow\:warn\] { }
+  .group-open\:hidden:is(:where(.group):is([open], :popover-open, :open) *) { display: none; }
+  .group-open\:inline:is(:where(.group):is([open], :popover-open, :open) *) { display: inline; }
+  .placeholder\:text-ink-500::placeholder { color: var(--color-ink-500); }
+  .backdrop\:bg-black\/70::backdrop { background-color: rgba(0, 0, 0, 0.7); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .backdrop\:bg-black\/70::backdrop { background-color: color-mix(in oklab, var(--color-black) 70%, transparent); }
+}
+  .open\:flex:is([open], :popover-open, :open) { display: flex; }
+  .focus-within\:ring-2:focus-within { --tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color,currentcolor); box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow); }
+  .focus-within\:ring-brand-400:focus-within { --tw-ring-color: var(--color-brand-400); }
+  @media (hover: hover) {
+  .hover\:bg-brand-400:hover { background-color: var(--color-brand-400); }
+  .hover\:bg-brand-500\/20:hover { background-color: rgba(14, 165, 233, 0.2); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .hover\:bg-brand-500\/20:hover { background-color: color-mix(in oklab, var(--color-brand-500) 20%, transparent); }
+}
+  .hover\:bg-danger-500:hover { background-color: var(--color-danger-500); }
+  .hover\:bg-ink-700:hover { background-color: var(--color-ink-700); }
+  .hover\:bg-ink-800:hover { background-color: var(--color-ink-800); }
+  .hover\:bg-ink-800\/40:hover { background-color: rgba(30, 41, 59, 0.4); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .hover\:bg-ink-800\/40:hover { background-color: color-mix(in oklab, var(--color-ink-800) 40%, transparent); }
+}
+  .hover\:bg-ink-800\/60:hover { background-color: rgba(30, 41, 59, 0.6); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .hover\:bg-ink-800\/60:hover { background-color: color-mix(in oklab, var(--color-ink-800) 60%, transparent); }
+}
+  .hover\:bg-ink-900:hover { background-color: var(--color-ink-900); }
+  .hover\:bg-ink-900\/40:hover { background-color: rgba(15, 23, 42, 0.4); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .hover\:bg-ink-900\/40:hover { background-color: color-mix(in oklab, var(--color-ink-900) 40%, transparent); }
+}
+  .hover\:bg-present-500:hover { background-color: var(--color-present-500); }
+  .hover\:bg-present-500\/10:hover { background-color: rgba(34, 197, 94, 0.1); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .hover\:bg-present-500\/10:hover { background-color: color-mix(in oklab, var(--color-present-500) 10%, transparent); }
+}
+  .hover\:bg-present-500\/15:hover { background-color: rgba(34, 197, 94, 0.15); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .hover\:bg-present-500\/15:hover { background-color: color-mix(in oklab, var(--color-present-500) 15%, transparent); }
+}
+  .hover\:bg-warn-500\/15:hover { background-color: rgba(234, 179, 8, 0.15); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .hover\:bg-warn-500\/15:hover { background-color: color-mix(in oklab, var(--color-warn-500) 15%, transparent); }
+}
+  .hover\:text-brand-300:hover { color: var(--color-brand-300); }
+  .hover\:text-ink-100:hover { color: var(--color-ink-100); }
+  .hover\:text-ink-200:hover { color: var(--color-ink-200); }
+  .hover\:underline:hover { text-decoration-line: underline; }
+  .hover\:brightness-125:hover { --tw-brightness: brightness(125%); filter: var(--tw-blur,) var(--tw-brightness,) var(--tw-contrast,) var(--tw-grayscale,) var(--tw-hue-rotate,) var(--tw-invert,) var(--tw-saturate,) var(--tw-sepia,) var(--tw-drop-shadow,); }
+}
+  .focus\:ring-2:focus { --tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color,currentcolor); box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow); }
+  .focus\:ring-brand-400:focus { --tw-ring-color: var(--color-brand-400); }
+  .focus\:outline-none:focus { --tw-outline-style: none; outline-style: none; }
+  .focus-visible\:ring-2:focus-visible { --tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color,currentcolor); box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow); }
+  .focus-visible\:ring-brand-400:focus-visible { --tw-ring-color: var(--color-brand-400); }
+  .active\:bg-brand-500:active { background-color: var(--color-brand-500); }
+  .active\:bg-brand-500\/20:active { background-color: rgba(14, 165, 233, 0.2); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .active\:bg-brand-500\/20:active { background-color: color-mix(in oklab, var(--color-brand-500) 20%, transparent); }
+}
+  .active\:bg-brand-600:active { background-color: var(--color-brand-600); }
+  .active\:bg-brand-600\/30:active { background-color: rgba(2, 132, 199, 0.3); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .active\:bg-brand-600\/30:active { background-color: color-mix(in oklab, var(--color-brand-600) 30%, transparent); }
+}
+  .active\:bg-brand-600\/45:active { background-color: rgba(2, 132, 199, 0.45); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .active\:bg-brand-600\/45:active { background-color: color-mix(in oklab, var(--color-brand-600) 45%, transparent); }
+}
+  .active\:bg-ink-600:active { background-color: var(--color-ink-600); }
+  .active\:bg-ink-700:active { background-color: var(--color-ink-700); }
+  .active\:bg-ink-800:active { background-color: var(--color-ink-800); }
+  .active\:bg-ink-800\/60:active { background-color: rgba(30, 41, 59, 0.6); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .active\:bg-ink-800\/60:active { background-color: color-mix(in oklab, var(--color-ink-800) 60%, transparent); }
+}
+  .active\:bg-ink-900:active { background-color: var(--color-ink-900); }
+  .active\:bg-present-500:active { background-color: var(--color-present-500); }
+  .active\:bg-present-500\/10:active { background-color: rgba(34, 197, 94, 0.1); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .active\:bg-present-500\/10:active { background-color: color-mix(in oklab, var(--color-present-500) 10%, transparent); }
+}
+  .active\:bg-present-500\/15:active { background-color: rgba(34, 197, 94, 0.15); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .active\:bg-present-500\/15:active { background-color: color-mix(in oklab, var(--color-present-500) 15%, transparent); }
+}
+  .active\:bg-present-500\/20:active { background-color: rgba(34, 197, 94, 0.2); }
+  @supports (color:color-mix(in lab, red, red)) {
+  .active\:bg-present-500\/20:active { background-color: color-mix(in oklab, var(--color-present-500) 20%, transparent); }
+}
+  .disabled\:pointer-events-none:disabled { pointer-events: none; }
+  .disabled\:cursor-default:disabled { cursor: default; }
+  .disabled\:cursor-not-allowed:disabled { cursor: not-allowed; }
+  .disabled\:bg-ink-800:disabled { background-color: var(--color-ink-800); }
+  .disabled\:text-ink-500:disabled { color: var(--color-ink-500); }
+  .disabled\:text-ink-600:disabled { color: var(--color-ink-600); }
+  .disabled\:opacity-50:disabled { opacity: 0.5; }
+  .disabled\:opacity-60:disabled { opacity: 0.6; }
+  @media (width >= 40rem) {
+  .sm\:max-h-full { max-height: 100%; }
+  .sm\:max-w-\[26rem\] { max-width: 26rem; }
+  .sm\:max-w-\[34rem\] { max-width: 34rem; }
+  .sm\:max-w-\[62rem\] { max-width: 62rem; }
+  .sm\:animate-dialog-in { animation: var(--animate-dialog-in); }
+  .sm\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0px, 1fr)); }
+  .sm\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0px, 1fr)); }
+  .sm\:items-center { align-items: center; }
+  .sm\:justify-end { justify-content: flex-end; }
+  .sm\:rounded-2xl { border-radius: var(--radius-2xl); }
+  .sm\:p-6 { padding: calc(var(--spacing) * 6); }
+  .sm\:py-3 { padding-block: calc(var(--spacing) * 3); }
+  .sm\:shadow-2xl { --tw-shadow: 0 25px 50px -12px var(--tw-shadow-color,#00000040); box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow); }
+  .sm\:shadow-black\/50 { --tw-shadow-color: #00000080; }
+  @supports (color:color-mix(in lab, red, red)) {
+  .sm\:shadow-black\/50 { --tw-shadow-color: color-mix(in oklab, color-mix(in oklab, var(--color-black) 50%, transparent) var(--tw-shadow-alpha), transparent); }
+}
+}
+  @media (width >= 64rem) {
+  .lg\:sticky { position: sticky; }
+  .lg\:top-4 { top: calc(var(--spacing) * 4); }
+  .lg\:right-auto { right: auto; }
+  .lg\:bottom-full { bottom: 100%; }
+  .lg\:left-0 { left: 0px; }
+  .lg\:order-1 { order: 1; }
+  .lg\:order-2 { order: 2; }
+  .lg\:order-none { order: 0; }
+  .lg\:mx-0 { margin-inline: 0px; }
+  .lg\:mt-0 { margin-top: 0px; }
+  .lg\:mb-2 { margin-bottom: calc(var(--spacing) * 2); }
+  .lg\:mb-6 { margin-bottom: calc(var(--spacing) * 6); }
+  .lg\:mb-8 { margin-bottom: calc(var(--spacing) * 8); }
+  .lg\:block { display: block; }
+  .lg\:flex { display: flex; }
+  .lg\:grid { display: grid; }
+  .lg\:hidden { display: none; }
+  .lg\:inline { display: inline; }
+  .lg\:inline-flex { display: inline-flex; }
+  .lg\:size-8 { width: calc(var(--spacing) * 8); height: calc(var(--spacing) * 8); }
+  .lg\:min-h-11 { min-height: calc(var(--spacing) * 11); }
+  .lg\:w-20 { width: calc(var(--spacing) * 20); }
+  .lg\:w-28 { width: calc(var(--spacing) * 28); }
+  .lg\:w-48 { width: calc(var(--spacing) * 48); }
+  .lg\:w-56 { width: calc(var(--spacing) * 56); }
+  .lg\:w-64 { width: calc(var(--spacing) * 64); }
+  .lg\:w-\[28rem\] { width: 28rem; }
+  .lg\:w-auto { width: auto; }
+  .lg\:w-full { width: 100%; }
+  .lg\:max-w-7xl { max-width: var(--container-7xl); }
+  .lg\:max-w-none { max-width: none; }
+  .lg\:min-w-0 { min-width: 0px; }
+  .lg\:min-w-80 { min-width: calc(var(--spacing) * 80); }
+  .lg\:flex-1 { flex: 1 1 0%; }
+  .lg\:shrink-0 { flex-shrink: 0; }
+  .lg\:columns-2 { columns: 2; }
+  .lg\:break-inside-avoid { break-inside: avoid; }
+  .lg\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0px, 1fr)); }
+  .lg\:grid-cols-\[minmax\(0\,1fr\)_17rem\] { grid-template-columns: minmax(0px, 1fr) 17rem; }
+  .lg\:grid-cols-\[minmax\(0\,1fr\)_28rem\] { grid-template-columns: minmax(0px, 1fr) 28rem; }
+  .lg\:grid-cols-\[repeat\(3\,minmax\(0\,1fr\)\)_28rem\] { grid-template-columns: repeat(3, minmax(0px, 1fr)) 28rem; }
+  .lg\:flex-col { flex-direction: column; }
+  .lg\:flex-row { flex-direction: row; }
+  .lg\:flex-nowrap { flex-wrap: nowrap; }
+  .lg\:items-center { align-items: center; }
+  .lg\:items-end { align-items: flex-end; }
+  .lg\:items-start { align-items: flex-start; }
+  .lg\:justify-start { justify-content: flex-start; }
+  .lg\:gap-1 { gap: var(--spacing); }
+  .lg\:gap-4 { gap: calc(var(--spacing) * 4); }
+  .lg\:gap-6 { gap: calc(var(--spacing) * 6); }
+  .lg\:gap-8 { gap: calc(var(--spacing) * 8); }
+  .lg\:gap-x-0 { column-gap: 0px; }
+  .lg\:gap-x-6 { column-gap: calc(var(--spacing) * 6); }
+  .lg\:rounded-xl { border-radius: var(--radius-xl); }
+  .lg\:border-r { border-right-style: var(--tw-border-style); border-right-width: 1px; }
+  .lg\:border-l { border-left-style: var(--tw-border-style); border-left-width: 1px; }
+  .lg\:border-ink-800 { border-color: var(--color-ink-800); }
+  .lg\:px-3 { padding-inline: calc(var(--spacing) * 3); }
+  .lg\:px-8 { padding-inline: calc(var(--spacing) * 8); }
+  .lg\:py-1 { padding-block: var(--spacing); }
+  .lg\:py-2 { padding-block: calc(var(--spacing) * 2); }
+  .lg\:py-4 { padding-block: calc(var(--spacing) * 4); }
+  .lg\:py-6 { padding-block: calc(var(--spacing) * 6); }
+  .lg\:pt-6 { padding-top: calc(var(--spacing) * 6); }
+  .lg\:pr-7 { padding-right: calc(var(--spacing) * 7); }
+  .lg\:pb-0 { padding-bottom: 0px; }
+  .lg\:pb-6 { padding-bottom: calc(var(--spacing) * 6); }
+  .lg\:pb-8 { padding-bottom: calc(var(--spacing) * 8); }
+  .lg\:pl-0 { padding-left: 0px; }
+  .lg\:pl-7 { padding-left: calc(var(--spacing) * 7); }
+  .lg\:text-left { text-align: left; }
+  .lg\:text-right { text-align: right; }
+  .lg\:text-xs { font-size: var(--text-xs); line-height: var(--tw-leading,var(--text-xs--line-height)); }
+  .lg\:group-data-\[rail\]\/shell\:mx-0:is(:where(.group\/shell)[data-rail] *) { margin-inline: 0px; }
+}
+  @media (width >= 96rem) {
+  .\32 xl\:mt-0 { margin-top: 0px; }
+  .\32 xl\:flex { display: flex; }
+  .\32 xl\:shrink-0 { flex-shrink: 0; }
+  .\32 xl\:items-center { align-items: center; }
+  .\32 xl\:gap-4 { gap: calc(var(--spacing) * 4); }
+  .\32 xl\:pb-0 { padding-bottom: 0px; }
+  .\32 xl\:pl-0 { padding-left: 0px; }
+}
+  @container (width >= 26rem) {
+  .\@min-\[26rem\]\:col-span-2 { grid-column: span 2 / span 2; }
+  .\@min-\[26rem\]\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0px, 1fr)); }
+}
+  @container (width >= 30rem) {
+  .\@min-\[30rem\]\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0px, 1fr)); }
+}
+  @container (width >= 34rem) {
+  .\@min-\[34rem\]\:grid-cols-\[1fr_auto\] { grid-template-columns: 1fr auto; }
+}
+  @media (pointer: fine) {
+  .pointer-fine\:right-2\.5 { right: calc(var(--spacing) * 2.5); }
+  .pointer-fine\:left-2\.5 { left: calc(var(--spacing) * 2.5); }
+  .pointer-fine\:size-8 { width: calc(var(--spacing) * 8); height: calc(var(--spacing) * 8); }
+  .pointer-fine\:size-9 { width: calc(var(--spacing) * 9); height: calc(var(--spacing) * 9); }
+  .pointer-fine\:min-h-8 { min-height: calc(var(--spacing) * 8); }
+  .pointer-fine\:min-h-9 { min-height: calc(var(--spacing) * 9); }
+  .pointer-fine\:min-h-10 { min-height: calc(var(--spacing) * 10); }
+  .pointer-fine\:min-h-11 { min-height: calc(var(--spacing) * 11); }
+  .pointer-fine\:w-9 { width: calc(var(--spacing) * 9); }
+  .pointer-fine\:gap-1 { gap: var(--spacing); }
+  .pointer-fine\:gap-2 { gap: calc(var(--spacing) * 2); }
+  .pointer-fine\:gap-3 { gap: calc(var(--spacing) * 3); }
+  .pointer-fine\:rounded-lg { border-radius: var(--radius-lg); }
+  .pointer-fine\:px-2\.5 { padding-inline: calc(var(--spacing) * 2.5); }
+  .pointer-fine\:px-4 { padding-inline: calc(var(--spacing) * 4); }
+  .pointer-fine\:py-1\.5 { padding-block: calc(var(--spacing) * 1.5); }
+  .pointer-fine\:py-2 { padding-block: calc(var(--spacing) * 2); }
+  .pointer-fine\:py-3 { padding-block: calc(var(--spacing) * 3); }
+  .pointer-fine\:pr-8 { padding-right: calc(var(--spacing) * 8); }
+  .pointer-fine\:pr-10 { padding-right: calc(var(--spacing) * 10); }
+  .pointer-fine\:pl-8 { padding-left: calc(var(--spacing) * 8); }
+  .pointer-fine\:text-base { font-size: var(--text-base); line-height: var(--tw-leading,var(--text-base--line-height)); }
+  .pointer-fine\:text-sm { font-size: var(--text-sm); line-height: var(--tw-leading,var(--text-sm--line-height)); }
+  .pointer-fine\:text-xl { font-size: var(--text-xl); line-height: var(--tw-leading,var(--text-xl--line-height)); }
+  .pointer-fine\:text-xs { font-size: var(--text-xs); line-height: var(--tw-leading,var(--text-xs--line-height)); }
+  .pointer-fine\:text-\[14px\] { font-size: 14px; }
+  @media (hover: hover) {
+  .pointer-fine\:hover\:bg-ink-800:hover { background-color: var(--color-ink-800); }
+  .pointer-fine\:hover\:bg-ink-900:hover { background-color: var(--color-ink-900); }
+}
+}
+  .\[\&\:\:-webkit-details-marker\]\:hidden::-webkit-details-marker { display: none; }
+  .\[\&\:\:-webkit-inner-spin-button\]\:appearance-none::-webkit-inner-spin-button { appearance: none; }
+  .\[\&\:\:-webkit-outer-spin-button\]\:appearance-none::-webkit-outer-spin-button { appearance: none; }
+  .\[\&\:\:-webkit-search-cancel-button\]\:appearance-none::-webkit-search-cancel-button { appearance: none; }
+  .\[\&\>\*\]\:flex-1 > * { flex: 1 1 0%; }
+  @media (width >= 40rem) {
+  .sm\:\[\&\>\*\]\:min-w-28 > * { min-width: calc(var(--spacing) * 28); }
+  .sm\:\[\&\>\*\]\:flex-none > * { flex: 0 0 auto; }
+}
+  .\[\&\>\*\:last-child\]\:flex-\[2\] > :last-child { flex: 2 1 0%; }
+  @media (width >= 40rem) {
+  .sm\:\[\&\>\*\:last-child\]\:flex-none > :last-child { flex: 0 0 auto; }
+}
+  .pb-safe { padding-bottom: calc(.75rem + env(safe-area-inset-bottom,0px)); }
+  .pt-safe { padding-top: calc(.5rem + env(safe-area-inset-top,0px)); }
+  .scroll-touch { }
+  .scroll-shadow { background-color: var(--color-ink-900); background-image: linear-gradient(var(--color-ink-900) 30%, transparent), linear-gradient(transparent, var(--color-ink-900) 70%), radial-gradient(farthest-side at 50% 0, #00000073, transparent), radial-gradient(farthest-side at 50% 100%, #00000073, transparent); background-position: 0px 0px, 0px 100%, 0px 0px, 0px 100%; background-repeat: no-repeat; background-size: 100% 1.5rem, 100% 1.5rem, 100% 0.5rem, 100% 0.5rem; background-attachment: local, local, scroll, scroll; }
+}
+:root[data-theme="light"] { --color-ink-50: #0f172a; --color-ink-100: #1e293b; --color-ink-200: #334155; --color-ink-300: #475569; --color-ink-400: #576375; --color-ink-500: #64748b; --color-ink-600: #8b97a8; --color-ink-700: #cbd5e1; --color-ink-800: #e2e8f0; --color-ink-900: #fff; --color-ink-950: #f1f5f9; --color-brand-200: #075985; --color-brand-300: #0369a1; --color-brand-400: #0284c7; --color-brand-500: #0284c7; --color-brand-600: #0369a1; --color-brand-700: #075985; --color-present-400: #15803d; --color-present-500: #16a34a; --color-present-600: #15803d; --color-warn-400: #a16207; --color-warn-500: #ca8a04; --color-warn-600: #854d0e; --color-danger-400: #b91c1c; --color-danger-500: #dc2626; --color-danger-600: #991b1b; }
+@keyframes tally-flash { 
+  0% { background-color: color-mix(in oklab, var(--color-present-500) 55%, transparent); }
+  35% { background-color: color-mix(in oklab, var(--color-present-500) 40%, transparent); }
+  100% { background-color: rgba(0, 0, 0, 0); }
+}
+.animate-flash { animation: 0.6s ease-out 0s 1 normal none running tally-flash; }
+@keyframes tally-sheet-in { 
+  0% { opacity: 0; transform: translateY(1.5rem); }
+}
+@keyframes tally-dialog-in { 
+  0% { opacity: 0; transform: scale(0.98); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-flash { animation-duration: 1ms; }
+  *, ::before, ::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+}
+@property --tw-translate-x { syntax: "*"; inherits: false; initial-value: 0; }
+@property --tw-translate-y { syntax: "*"; inherits: false; initial-value: 0; }
+@property --tw-translate-z { syntax: "*"; inherits: false; initial-value: 0; }
+@property --tw-rotate-x { syntax: "*"; inherits: false; }
+@property --tw-rotate-y { syntax: "*"; inherits: false; }
+@property --tw-rotate-z { syntax: "*"; inherits: false; }
+@property --tw-skew-x { syntax: "*"; inherits: false; }
+@property --tw-skew-y { syntax: "*"; inherits: false; }
+@property --tw-divide-y-reverse { syntax: "*"; inherits: false; initial-value: 0; }
+@property --tw-border-style { syntax: "*"; inherits: false; initial-value: solid; }
+@property --tw-leading { syntax: "*"; inherits: false; }
+@property --tw-font-weight { syntax: "*"; inherits: false; }
+@property --tw-tracking { syntax: "*"; inherits: false; }
+@property --tw-ordinal { syntax: "*"; inherits: false; }
+@property --tw-slashed-zero { syntax: "*"; inherits: false; }
+@property --tw-numeric-figure { syntax: "*"; inherits: false; }
+@property --tw-numeric-spacing { syntax: "*"; inherits: false; }
+@property --tw-numeric-fraction { syntax: "*"; inherits: false; }
+@property --tw-shadow { syntax: "*"; inherits: false; initial-value: 0 0 #0000; }
+@property --tw-shadow-color { syntax: "*"; inherits: false; }
+@property --tw-shadow-alpha { syntax: "<percentage>"; inherits: false; initial-value: 100%; }
+@property --tw-inset-shadow { syntax: "*"; inherits: false; initial-value: 0 0 #0000; }
+@property --tw-inset-shadow-color { syntax: "*"; inherits: false; }
+@property --tw-inset-shadow-alpha { syntax: "<percentage>"; inherits: false; initial-value: 100%; }
+@property --tw-ring-color { syntax: "*"; inherits: false; }
+@property --tw-ring-shadow { syntax: "*"; inherits: false; initial-value: 0 0 #0000; }
+@property --tw-inset-ring-color { syntax: "*"; inherits: false; }
+@property --tw-inset-ring-shadow { syntax: "*"; inherits: false; initial-value: 0 0 #0000; }
+@property --tw-ring-inset { syntax: "*"; inherits: false; }
+@property --tw-ring-offset-width { syntax: "<length>"; inherits: false; initial-value: 0; }
+@property --tw-ring-offset-color { syntax: "*"; inherits: false; initial-value: #fff; }
+@property --tw-ring-offset-shadow { syntax: "*"; inherits: false; initial-value: 0 0 #0000; }
+@property --tw-outline-style { syntax: "*"; inherits: false; initial-value: solid; }
+@property --tw-blur { syntax: "*"; inherits: false; }
+@property --tw-brightness { syntax: "*"; inherits: false; }
+@property --tw-contrast { syntax: "*"; inherits: false; }
+@property --tw-grayscale { syntax: "*"; inherits: false; }
+@property --tw-hue-rotate { syntax: "*"; inherits: false; }
+@property --tw-invert { syntax: "*"; inherits: false; }
+@property --tw-opacity { syntax: "*"; inherits: false; }
+@property --tw-saturate { syntax: "*"; inherits: false; }
+@property --tw-sepia { syntax: "*"; inherits: false; }
+@property --tw-drop-shadow { syntax: "*"; inherits: false; }
+@property --tw-drop-shadow-color { syntax: "*"; inherits: false; }
+@property --tw-drop-shadow-alpha { syntax: "<percentage>"; inherits: false; initial-value: 100%; }
+@property --tw-drop-shadow-size { syntax: "*"; inherits: false; }
+@property --tw-backdrop-blur { syntax: "*"; inherits: false; }
+@property --tw-backdrop-brightness { syntax: "*"; inherits: false; }
+@property --tw-backdrop-contrast { syntax: "*"; inherits: false; }
+@property --tw-backdrop-grayscale { syntax: "*"; inherits: false; }
+@property --tw-backdrop-hue-rotate { syntax: "*"; inherits: false; }
+@property --tw-backdrop-invert { syntax: "*"; inherits: false; }
+@property --tw-backdrop-opacity { syntax: "*"; inherits: false; }
+@property --tw-backdrop-saturate { syntax: "*"; inherits: false; }
+@property --tw-backdrop-sepia { syntax: "*"; inherits: false; }
+@property --tw-ease { syntax: "*"; inherits: false; }
+@keyframes spin { 
+  100% { transform: rotate(360deg); }
+}
+@keyframes pulse { 
+  50% { opacity: 0.5; }
+}</style><style data-uxr="overrides">
+/* Two Tailwind utilities the frozen stylesheet was built without, because the
+   app does not use them yet. Both are stock v4 utilities and will be emitted
+   by the real build the moment the classes appear in a component. */
+.grayscale { filter: grayscale(100%); }
+.transition-transform { transition-property: transform, translate, scale, rotate; transition-timing-function: var(--tw-ease,var(--default-transition-timing-function)); transition-duration: var(--tw-duration,var(--default-transition-duration)); }
+.group-open\:rotate-180:is(:where(.group):is([open], :popover-open, :open) *) { rotate: 180deg; }
+@media (min-width: 64rem) { .lg\:pl-8 { padding-left: 2rem; } }
+
+/* Stock v4 utilities the frozen build had no call for yet. */
+.pr-3 { padding-right: .75rem; }
+.opacity-80 { opacity: .8; }
+.pl-17 { padding-left: calc(var(--spacing) * 17); }
+.before\:absolute::before { content: var(--tw-content, ""); position: absolute; }
+.before\:inset-y-0::before { content: var(--tw-content, ""); inset-block: 0; }
+.before\:left-8::before { content: var(--tw-content, ""); left: calc(var(--spacing) * 8); }
+.before\:w-px::before { content: var(--tw-content, ""); width: 1px; }
+.before\:bg-ink-800::before { content: var(--tw-content, ""); background-color: var(--color-ink-800); }
+@media (min-width: 64rem) {
+  .lg\:border-t-0 { border-top-width: 0px; }
+  .lg\:pt-0 { padding-top: 0px; }
+}
+
+/* ---- round 4 ---- */
+/* Stock v4 utilities the frozen build had no call for yet. */
+.pl-7 { padding-left: calc(var(--spacing) * 7); }
+.gap-1\.5 { gap: calc(var(--spacing) * 1.5); }
+@media (min-width: 64rem) {
+  .lg\:flex-wrap { flex-wrap: wrap; }
+  .lg\:flex-none { flex: none; }
+  .lg\:min-h-8 { min-height: calc(var(--spacing) * 8); }
+  .lg\:pl-2\.5 { padding-left: calc(var(--spacing) * 2.5); }
+  .lg\:pr-2\.5 { padding-right: calc(var(--spacing) * 2.5); }
+  /* re-stated after .pl-7 so the lg value still wins on the notice list */
+  .lg\:pl-8 { padding-left: 2rem; }
+}
+
+/* ---- round 6 (final polish) ---- */
+.origin-\[50\%_69\%\] { transform-origin: 50% 69%; }
+@media (min-width: 64rem) {
+  .lg\:pl-14\.5 { padding-left: calc(var(--spacing) * 14.5); }
+  .lg\:min-w-32 { min-width: calc(var(--spacing) * 32); }
+  .lg\:before\:hidden::before { content: var(--tw-content, ""); display: none; }
+}
+</style></head>
+  <body class="h-full">
+    <div id="root" class="h-full"><div data-rail="" class="group/shell flex min-h-dvh flex-col bg-ink-950 lg:flex-row"><aside class="hidden lg:flex lg:w-56 lg:shrink-0 lg:flex-col lg:gap-1 lg:border-r lg:border-ink-800 lg:px-3 lg:py-4"><span class="px-2 pb-4 text-sm font-bold uppercase tracking-widest text-brand-400">Tally</span><nav class="flex flex-col gap-1"><a class="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium text-ink-400 hover:bg-ink-900 hover:text-ink-200" href="/" data-discover="true"><span aria-hidden="true" class="text-base leading-none">✓</span>Check in</a><a class="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium text-ink-400 hover:bg-ink-900 hover:text-ink-200" href="/dashboard" data-discover="true"><span aria-hidden="true" class="text-base leading-none">◎</span>Insights</a><a aria-current="page" class="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium bg-brand-500/15 text-brand-300" href="/events" data-discover="true"><span aria-hidden="true" class="text-base leading-none">▤</span>Events</a><a class="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium text-ink-400 hover:bg-ink-900 hover:text-ink-200" href="/students" data-discover="true"><span aria-hidden="true" class="text-base leading-none">☰</span>Students</a><a class="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium text-ink-400 hover:bg-ink-900 hover:text-ink-200" href="/review" data-discover="true"><span aria-hidden="true" class="text-base leading-none">▣</span>Review</a></nav><div class="mt-auto pt-4"><div class="relative"><button type="button" aria-expanded="false" aria-haspopup="menu" class="flex items-center gap-2 rounded-full bg-ink-900 py-1 pl-3 pr-1 text-xs text-ink-300 ring-1 ring-ink-800 lg:w-full lg:justify-start lg:rounded-xl lg:py-2"><span class="max-w-32 truncate lg:order-2 lg:max-w-none lg:flex-1 lg:text-left">Ben Tsai</span><span class="flex size-6 items-center justify-center rounded-full bg-brand-500/20 text-brand-300 lg:order-1">B</span></button></div></div></aside><div class="flex min-w-0 flex-1 flex-col"><header class="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-ink-800 bg-ink-950/95 px-4 py-2 pt-safe backdrop-blur lg:hidden"><span class="text-sm font-bold uppercase tracking-widest text-brand-400">Tally</span><div class="relative"><button type="button" aria-expanded="false" aria-haspopup="menu" class="flex items-center gap-2 rounded-full bg-ink-900 py-1 pl-3 pr-1 text-xs text-ink-300 ring-1 ring-ink-800 lg:w-full lg:justify-start lg:rounded-xl lg:py-2"><span class="max-w-32 truncate lg:order-2 lg:max-w-none lg:flex-1 lg:text-left">Ben Tsai</span><span class="flex size-6 items-center justify-center rounded-full bg-brand-500/20 text-brand-300 lg:order-1">B</span></button></div></header><main class="flex-1 pb-24 lg:pb-8"><div class="flex flex-col py-4 lg:py-6 mx-auto w-full px-4 max-w-3xl lg:group-data-[rail]/shell:mx-0 lg:px-8 lg:max-w-7xl gap-8 pb-8"><header class="flex items-center justify-between gap-3"><h1 class="text-xl font-bold text-ink-50">Events</h1><div class="flex items-center gap-2"><button type="button" class="inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-ink-800 text-ink-100 ring-1 ring-ink-700 hover:bg-ink-700 min-h-11 px-4 text-sm pointer-fine:min-h-9">Import</button><button type="button" class="inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-brand-500 text-white hover:bg-brand-400 active:bg-brand-600 min-h-11 px-4 text-sm pointer-fine:min-h-9">New event</button></div></header><section aria-labelledby="not-yours" class="flex flex-col gap-2 rounded-xl bg-ink-900 px-4 py-3 ring-1 ring-ink-800 lg:flex-row lg:items-center lg:gap-8"><span class="flex min-w-0 items-start gap-3 lg:flex-1"><span aria-hidden="true" class="shrink-0 text-sm grayscale opacity-70">🔒</span><span class="min-w-0 flex-1"><span id="not-yours" class="block text-sm font-semibold text-ink-100">You are not on Friday Fellowship or Sunday School</span><span class="mt-0.5 hidden text-xs leading-relaxed text-ink-400 lg:block">Their dates are below; their head counts are not, and nothing in them is yours to open or edit.</span></span></span><ul class="flex shrink-0 flex-col gap-1 pl-7 pt-2 text-xs lg:pl-8 lg:pt-0"><li class="flex min-w-0 items-baseline gap-2"><span class="shrink-0 font-semibold text-ink-400 lg:min-w-32">Friday Fellowship</span><span class="min-w-0 truncate text-ink-200">Miriam or Dana can add you</span></li><li class="flex min-w-0 items-baseline gap-2"><span class="shrink-0 font-semibold text-ink-400 lg:min-w-32">Sunday School</span><span class="min-w-0 truncate text-ink-200">Dana or Sam can add you</span></li></ul></section><div class="flex flex-col gap-8 lg:grid lg:grid-cols-2 lg:gap-8"><section aria-labelledby="events-upcoming" class="flex min-w-0 flex-col"><h2 id="events-upcoming" class="pb-3 text-lg font-bold text-ink-50">Upcoming</h2><div class="flex min-w-0 flex-col gap-8"><section aria-labelledby="events-today"><h2 id="events-today" class="pb-2 text-xs font-bold uppercase tracking-wider text-ink-400">Today</h2><div class="flex flex-col gap-3"><a class="flex flex-col gap-3 rounded-xl bg-ink-900 p-3 ring-1 hover:bg-ink-800/40 active:bg-ink-800 ring-ink-800" href="/events/nursery-2026-08-07" data-discover="true"><div class="flex min-w-0 items-start gap-3"><span aria-hidden="true" class="inline-flex shrink-0 items-center justify-center ring-1 size-11 rounded-xl bg-ink-800 text-ink-200 ring-ink-700"><svg viewBox="0 -960 960 960" fill="currentColor" class="size-6"><path d="M524-40q-84 0-157.5-32t-128-86.5Q184-213 152-286.5T120-444q0-146 93-257.5T450-840q-18 99 11 193.5T561-481q71 71 165.5 100T920-370q-26 144-138 237T524-40Zm0-80q88 0 163-44t118-121q-86-8-163-43.5T504-425q-61-61-97-138t-43-163q-77 43-120.5 118.5T200-444q0 135 94.5 229.5T524-120Zm-20-305Z"></path></svg></span><div class="min-w-0 flex-1"><h3 class="text-base font-semibold leading-tight text-ink-50">Nursery</h3><p class="mt-0.5 text-sm text-ink-400">5:57 AM – 7:27 AM · Fellowship Hall</p></div></div><p class="text-sm leading-relaxed text-ink-300">Games, films and far too little sleep, from Friday night to Saturday breakfast.</p><div class="flex flex-wrap items-center gap-2"><span class="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px] font-semibold ring-1 bg-ink-800 text-ink-300 ring-ink-700">Check-out</span><span class="text-xs text-ink-500">Check-in opens at 5:27 AM</span></div><span class="flex min-h-14 w-full items-center justify-center rounded-xl px-5 text-base font-semibold pointer-fine:min-h-10 pointer-fine:text-sm bg-ink-800 text-ink-100 ring-1 ring-ink-700">Open this gathering</span></a><div class="mt-2 flex flex-col gap-2 border-t border-ink-800 pt-2"><details class="group"><summary class="cursor-pointer list-none flex min-h-14 min-w-0 items-center gap-3 rounded-xl px-3 py-1.5 hover:bg-ink-800/40 pointer-fine:min-h-11"><span aria-hidden="true" class="inline-flex size-11 shrink-0 items-center justify-center text-xl grayscale opacity-80">🔒</span><span class="min-w-0 flex-1"><span class="flex min-w-0 items-center gap-1.5 text-sm font-bold text-ink-200"><span class="min-w-0 truncate"><span class="sr-only">Not yours · 2 gatherings · </span>Friday Fellowship<span class="font-normal text-ink-400"> · next</span> 7:00 PM</span><span aria-hidden="true" class="shrink-0 origin-[50%_69%] text-base leading-none text-ink-500 transition-transform group-open:rotate-180">⌄</span></span><span class="mt-0.5 block text-xs leading-snug text-ink-400">Fellowship Hall</span></span><span aria-hidden="true" class="hidden shrink-0 text-xs tabular-nums text-ink-400 lg:block">2 gatherings</span></summary><ul class="relative mt-1 mb-1 flex flex-col gap-0.5 before:absolute before:inset-y-0 before:left-8 before:w-px before:bg-ink-800 lg:flex-row lg:flex-wrap lg:gap-1 lg:pl-14.5 lg:before:hidden"><li><a class="flex min-h-11 min-w-0 items-center gap-3 rounded-lg py-1.5 pl-17 pr-3 hover:bg-ink-800/40 active:bg-ink-800 pointer-fine:min-h-9 lg:min-h-8 lg:py-1 lg:pl-2.5 lg:pr-2.5" href="/events/friday-fellowship-2026-08-07" data-discover="true"><span class="min-w-0 flex-1 truncate text-sm font-medium text-ink-300 lg:flex-none">2:27 AM – 4:27 AM</span><span aria-hidden="true" class="shrink-0 text-lg text-ink-400 lg:hidden">›</span></a></li><li><a class="flex min-h-11 min-w-0 items-center gap-3 rounded-lg py-1.5 pl-17 pr-3 hover:bg-ink-800/40 active:bg-ink-800 pointer-fine:min-h-9 lg:min-h-8 lg:py-1 lg:pl-2.5 lg:pr-2.5" href="/events/friday-fellowship-2026-08-07-pm" data-discover="true"><span class="min-w-0 flex-1 truncate text-sm font-medium text-ink-300 lg:flex-none">7:00 PM – 9:00 PM</span><span aria-hidden="true" class="shrink-0 text-lg text-ink-400 lg:hidden">›</span></a></li></ul></details></div></div></section><section aria-labelledby="events-next-seven-days"><h2 id="events-next-seven-days" class="pb-2 text-xs font-bold uppercase tracking-wider text-ink-400">Next seven days</h2><div class="flex flex-col gap-2"><a class="flex min-h-14 min-w-0 items-center gap-3 rounded-xl px-3 py-1.5 hover:bg-ink-800/40 pointer-fine:min-h-11 active:bg-ink-800" href="/events/sunday-school-2026-08-09" data-discover="true"><span aria-hidden="true" class="inline-flex size-11 shrink-0 items-center justify-center text-xl grayscale opacity-80">🔒</span><span class="min-w-0 flex-1"><span class="block truncate text-sm font-bold text-ink-200"><span class="sr-only">Not yours · </span>Sunday School<span class="font-normal text-ink-400"> ·</span> Sun, Aug 9</span><span class="mt-0.5 block text-xs leading-snug text-ink-400">9:30 AM – 10:45 AM · Education wing, rooms 201–206</span></span><span aria-hidden="true" class="shrink-0 text-lg text-ink-400">›</span></a><a class="flex min-h-14 min-w-0 items-center gap-3 rounded-xl px-3 py-1.5 hover:bg-ink-800/40 pointer-fine:min-h-11 active:bg-ink-800" href="/events/friday-fellowship-2026-08-14" data-discover="true"><span aria-hidden="true" class="inline-flex size-11 shrink-0 items-center justify-center text-xl grayscale opacity-80">🔒</span><span class="min-w-0 flex-1"><span class="block truncate text-sm font-bold text-ink-200"><span class="sr-only">Not yours · </span>Friday Fellowship<span class="font-normal text-ink-400"> ·</span> Fri, Aug 14</span><span class="mt-0.5 block text-xs leading-snug text-ink-400">7:00 PM – 9:00 PM · Fellowship Hall</span></span><span aria-hidden="true" class="shrink-0 text-lg text-ink-400">›</span></a></div></section><section aria-labelledby="events-later"><h2 id="events-later" class="pb-2 text-xs font-bold uppercase tracking-wider text-ink-400">Later</h2><ul class="flex flex-col gap-2"><li class="flex min-w-0 items-stretch gap-2"><a class="flex min-h-16 min-w-0 flex-1 items-center gap-3 rounded-xl bg-ink-900 px-3 py-3 ring-1 ring-ink-800 hover:bg-ink-800/40 active:bg-ink-800" href="/events/winter-retreat-2026-09-04" data-discover="true"><span aria-hidden="true" class="inline-flex shrink-0 items-center justify-center ring-1 size-11 rounded-xl bg-ink-800 text-ink-200 ring-ink-700"><svg viewBox="0 -960 960 960" fill="currentColor" class="size-6"><path d="M240-200h480v-80H240v80Zm0-160h480v-80H240v80Zm0-160h480v-36l-58-44H298l-58 44v36Zm162-160h156l-78-59-78 59ZM160-120v-375l-72 55-48-64 120-92v-124h80v63l240-183 440 336-48 63-72-54v375H160Zm0-640q0-50 35-85t85-35q17 0 28.5-11.5T320-920h80q0 50-35 85t-85 35q-17 0-28.5 11.5T240-760h-80Z"></path></svg></span><span class="min-w-0 flex-1"><span class="block truncate font-semibold text-ink-100">Winter Retreat</span><span class="mt-0.5 block text-xs leading-snug text-ink-400">Fri, Sep 4 · 5:00 PM – 3:00 PM · Camp Silverpine, Blue Ridge</span><span class="mt-1.5 flex flex-wrap items-center gap-1"><span class="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px] font-semibold ring-1 bg-brand-500/15 text-brand-300 ring-brand-500/30">One-off</span><span class="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px] font-semibold ring-1 bg-ink-800 text-ink-300 ring-ink-700">RSVP only</span></span></span><span aria-hidden="true" class="shrink-0 text-lg text-ink-400">›</span></a></li></ul><div class="mt-2 flex flex-col gap-2 border-t border-ink-800 pt-2"><details class="group"><summary class="cursor-pointer list-none flex min-h-14 min-w-0 items-center gap-3 rounded-xl px-3 py-1.5 hover:bg-ink-800/40 pointer-fine:min-h-11"><span aria-hidden="true" class="inline-flex size-11 shrink-0 items-center justify-center text-xl grayscale opacity-80">🔒</span><span class="min-w-0 flex-1"><span class="flex min-w-0 items-center gap-1.5 text-sm font-bold text-ink-200"><span class="min-w-0 truncate"><span class="sr-only">Not yours · 7 gatherings · </span>Sunday School<span class="font-normal text-ink-400"> · next</span> Aug 16</span><span aria-hidden="true" class="shrink-0 origin-[50%_69%] text-base leading-none text-ink-500 transition-transform group-open:rotate-180">⌄</span></span><span class="mt-0.5 block text-xs leading-snug text-ink-400">9:30 AM – 10:45 AM · Education wing, rooms 201–206</span></span><span aria-hidden="true" class="hidden shrink-0 text-xs tabular-nums text-ink-400 lg:block">7 gatherings</span></summary><ul class="relative mt-1 mb-1 flex flex-col gap-0.5 before:absolute before:inset-y-0 before:left-8 before:w-px before:bg-ink-800 lg:flex-row lg:flex-wrap lg:gap-1 lg:pl-14.5 lg:before:hidden"><li><a class="flex min-h-11 min-w-0 items-center gap-3 rounded-lg py-1.5 pl-17 pr-3 hover:bg-ink-800/40 active:bg-ink-800 pointer-fine:min-h-9 lg:min-h-8 lg:py-1 lg:pl-2.5 lg:pr-2.5" href="/events/sunday-school-2026-08-16" data-discover="true"><span class="min-w-0 flex-1 truncate text-sm font-medium text-ink-300 lg:flex-none">Aug 16</span><span aria-hidden="true" class="shrink-0 text-lg text-ink-400 lg:hidden">›</span></a></li><li><a class="flex min-h-11 min-w-0 items-center gap-3 rounded-lg py-1.5 pl-17 pr-3 hover:bg-ink-800/40 active:bg-ink-800 pointer-fine:min-h-9 lg:min-h-8 lg:py-1 lg:pl-2.5 lg:pr-2.5" href="/events/sunday-school-2026-08-23" data-discover="true"><span class="min-w-0 flex-1 truncate text-sm font-medium text-ink-300 lg:flex-none">Aug 23</span><span aria-hidden="true" class="shrink-0 text-lg text-ink-400 lg:hidden">›</span></a></li><li><a class="flex min-h-11 min-w-0 items-center gap-3 rounded-lg py-1.5 pl-17 pr-3 hover:bg-ink-800/40 active:bg-ink-800 pointer-fine:min-h-9 lg:min-h-8 lg:py-1 lg:pl-2.5 lg:pr-2.5" href="/events/sunday-school-2026-08-30" data-discover="true"><span class="min-w-0 flex-1 truncate text-sm font-medium text-ink-300 lg:flex-none">Aug 30</span><span aria-hidden="true" class="shrink-0 text-lg text-ink-400 lg:hidden">›</span></a></li><li><a class="flex min-h-11 min-w-0 items-center gap-3 rounded-lg py-1.5 pl-17 pr-3 hover:bg-ink-800/40 active:bg-ink-800 pointer-fine:min-h-9 lg:min-h-8 lg:py-1 lg:pl-2.5 lg:pr-2.5" href="/events/sunday-school-2026-09-06" data-discover="true"><span class="min-w-0 flex-1 truncate text-sm font-medium text-ink-300 lg:flex-none">Sep 6</span><span aria-hidden="true" class="shrink-0 text-lg text-ink-400 lg:hidden">›</span></a></li><li><a class="flex min-h-11 min-w-0 items-center gap-3 rounded-lg py-1.5 pl-17 pr-3 hover:bg-ink-800/40 active:bg-ink-800 pointer-fine:min-h-9 lg:min-h-8 lg:py-1 lg:pl-2.5 lg:pr-2.5" href="/events/sunday-school-2026-09-13" data-discover="true"><span class="min-w-0 flex-1 truncate text-sm font-medium text-ink-300 lg:flex-none">Sep 13</span><span aria-hidden="true" class="shrink-0 text-lg text-ink-400 lg:hidden">›</span></a></li><li><a class="flex min-h-11 min-w-0 items-center gap-3 rounded-lg py-1.5 pl-17 pr-3 hover:bg-ink-800/40 active:bg-ink-800 pointer-fine:min-h-9 lg:min-h-8 lg:py-1 lg:pl-2.5 lg:pr-2.5" href="/events/sunday-school-2026-09-20" data-discover="true"><span class="min-w-0 flex-1 truncate text-sm font-medium text-ink-300 lg:flex-none">Sep 20</span><span aria-hidden="true" class="shrink-0 text-lg text-ink-400 lg:hidden">›</span></a></li><li><a class="flex min-h-11 min-w-0 items-center gap-3 rounded-lg py-1.5 pl-17 pr-3 hover:bg-ink-800/40 active:bg-ink-800 pointer-fine:min-h-9 lg:min-h-8 lg:py-1 lg:pl-2.5 lg:pr-2.5" href="/events/sunday-school-2026-09-27" data-discover="true"><span class="min-w-0 flex-1 truncate text-sm font-medium text-ink-300 lg:flex-none">Sep 27</span><span aria-hidden="true" class="shrink-0 text-lg text-ink-400 lg:hidden">›</span></a></li></ul></details><details class="group"><summary class="cursor-pointer list-none flex min-h-14 min-w-0 items-center gap-3 rounded-xl px-3 py-1.5 hover:bg-ink-800/40 pointer-fine:min-h-11"><span aria-hidden="true" class="inline-flex size-11 shrink-0 items-center justify-center text-xl grayscale opacity-80">🔒</span><span class="min-w-0 flex-1"><span class="flex min-w-0 items-center gap-1.5 text-sm font-bold text-ink-200"><span class="min-w-0 truncate"><span class="sr-only">Not yours · 6 gatherings · </span>Friday Fellowship<span class="font-normal text-ink-400"> · next</span> Aug 21</span><span aria-hidden="true" class="shrink-0 origin-[50%_69%] text-base leading-none text-ink-500 transition-transform group-open:rotate-180">⌄</span></span><span class="mt-0.5 block text-xs leading-snug text-ink-400">7:00 PM – 9:00 PM · Fellowship Hall</span></span><span aria-hidden="true" class="hidden shrink-0 text-xs tabular-nums text-ink-400 lg:block">6 gatherings</span></summary><ul class="relative mt-1 mb-1 flex flex-col gap-0.5 before:absolute before:inset-y-0 before:left-8 before:w-px before:bg-ink-800 lg:flex-row lg:flex-wrap lg:gap-1 lg:pl-14.5 lg:before:hidden"><li><a class="flex min-h-11 min-w-0 items-center gap-3 rounded-lg py-1.5 pl-17 pr-3 hover:bg-ink-800/40 active:bg-ink-800 pointer-fine:min-h-9 lg:min-h-8 lg:py-1 lg:pl-2.5 lg:pr-2.5" href="/events/friday-fellowship-2026-08-21" data-discover="true"><span class="min-w-0 flex-1 truncate text-sm font-medium text-ink-300 lg:flex-none">Aug 21</span><span aria-hidden="true" class="shrink-0 text-lg text-ink-400 lg:hidden">›</span></a></li><li><a class="flex min-h-11 min-w-0 items-center gap-3 rounded-lg py-1.5 pl-17 pr-3 hover:bg-ink-800/40 active:bg-ink-800 pointer-fine:min-h-9 lg:min-h-8 lg:py-1 lg:pl-2.5 lg:pr-2.5" href="/events/friday-fellowship-2026-08-28" data-discover="true"><span class="min-w-0 flex-1 truncate text-sm font-medium text-ink-300 lg:flex-none">Aug 28</span><span aria-hidden="true" class="shrink-0 text-lg text-ink-400 lg:hidden">›</span></a></li><li><a class="flex min-h-11 min-w-0 items-center gap-3 rounded-lg py-1.5 pl-17 pr-3 hover:bg-ink-800/40 active:bg-ink-800 pointer-fine:min-h-9 lg:min-h-8 lg:py-1 lg:pl-2.5 lg:pr-2.5" href="/events/friday-fellowship-2026-09-04" data-discover="true"><span class="min-w-0 flex-1 truncate text-sm font-medium text-ink-300 lg:flex-none">Sep 4</span><span aria-hidden="true" class="shrink-0 text-lg text-ink-400 lg:hidden">›</span></a></li><li><a class="flex min-h-11 min-w-0 items-center gap-3 rounded-lg py-1.5 pl-17 pr-3 hover:bg-ink-800/40 active:bg-ink-800 pointer-fine:min-h-9 lg:min-h-8 lg:py-1 lg:pl-2.5 lg:pr-2.5" href="/events/friday-fellowship-2026-09-11" data-discover="true"><span class="min-w-0 flex-1 truncate text-sm font-medium text-ink-300 lg:flex-none">Sep 11</span><span aria-hidden="true" class="shrink-0 text-lg text-ink-400 lg:hidden">›</span></a></li><li><a class="flex min-h-11 min-w-0 items-center gap-3 rounded-lg py-1.5 pl-17 pr-3 hover:bg-ink-800/40 active:bg-ink-800 pointer-fine:min-h-9 lg:min-h-8 lg:py-1 lg:pl-2.5 lg:pr-2.5" href="/events/friday-fellowship-2026-09-18" data-discover="true"><span class="min-w-0 flex-1 truncate text-sm font-medium text-ink-300 lg:flex-none">Sep 18</span><span aria-hidden="true" class="shrink-0 text-lg text-ink-400 lg:hidden">›</span></a></li><li><a class="flex min-h-11 min-w-0 items-center gap-3 rounded-lg py-1.5 pl-17 pr-3 hover:bg-ink-800/40 active:bg-ink-800 pointer-fine:min-h-9 lg:min-h-8 lg:py-1 lg:pl-2.5 lg:pr-2.5" href="/events/friday-fellowship-2026-09-25" data-discover="true"><span class="min-w-0 flex-1 truncate text-sm font-medium text-ink-300 lg:flex-none">Sep 25</span><span aria-hidden="true" class="shrink-0 text-lg text-ink-400 lg:hidden">›</span></a></li></ul></details></div></section><button type="button" class="min-h-12 w-full rounded-xl bg-ink-900 text-sm font-semibold text-ink-300 ring-1 ring-ink-800 hover:bg-ink-800/40 active:bg-ink-800 pointer-fine:min-h-9">Show 2 later gatherings</button></div></section><div class="flex min-w-0 flex-col lg:border-l lg:border-ink-800 lg:pl-8"><section aria-labelledby="past-gatherings"><h2 id="past-gatherings" class="pb-3 text-lg font-bold text-ink-50">Past gatherings</h2><div class="flex flex-col gap-5"><div><h3 class="pb-2 text-xs font-bold uppercase tracking-wider text-ink-400">August 2026</h3><div class="flex flex-col gap-2"><a class="flex min-h-14 min-w-0 items-center gap-3 rounded-xl px-3 py-1.5 hover:bg-ink-800/40 pointer-fine:min-h-11 active:bg-ink-800" href="/event/sunday-school-2026-08-02" data-discover="true"><span aria-hidden="true" class="inline-flex size-11 shrink-0 items-center justify-center text-xl grayscale opacity-80">🔒</span><span class="min-w-0 flex-1"><span class="block truncate text-sm font-bold text-ink-200"><span class="sr-only">Not yours · </span>Sunday School<span class="font-normal text-ink-400"> ·</span> Sun 2</span><span class="mt-0.5 block text-xs leading-snug text-ink-400">9:30 AM – 10:45 AM</span></span><span aria-hidden="true" class="shrink-0 text-lg text-ink-400">›</span></a></div></div><div><h3 class="pb-2 text-xs font-bold uppercase tracking-wider text-ink-400">July 2026</h3><ul class="flex flex-col gap-2"><li><a class="flex min-h-16 min-w-0 items-center gap-3 rounded-xl bg-ink-900 px-3 py-2.5 ring-1 ring-ink-800 hover:bg-ink-800/40 active:bg-ink-800" href="/event/fall-lock-in-2026-07-17" data-discover="true"><span aria-hidden="true" class="inline-flex shrink-0 items-center justify-center ring-1 size-11 rounded-xl bg-ink-800 text-ink-200 ring-ink-700"><svg viewBox="0 -960 960 960" fill="currentColor" class="size-6"><path d="M524-40q-84 0-157.5-32t-128-86.5Q184-213 152-286.5T120-444q0-146 93-257.5T450-840q-18 99 11 193.5T561-481q71 71 165.5 100T920-370q-26 144-138 237T524-40Zm0-80q88 0 163-44t118-121q-86-8-163-43.5T504-425q-61-61-97-138t-43-163q-77 43-120.5 118.5T200-444q0 135 94.5 229.5T524-120Zm-20-305Z"></path></svg></span><span class="min-w-0 flex-1"><span class="block truncate font-semibold text-ink-100">Fall Lock-In</span><span class="mt-0.5 block text-xs leading-snug text-ink-400">Fri 17 · 7:00 PM – 8:00 AM</span></span><span class="block text-right leading-tight"><span aria-hidden="true" class="text-base font-bold tabular-nums text-ink-100">32</span><span class="sr-only">32 students checked in</span><span aria-hidden="true" class="block text-[11px] leading-none text-ink-400">checked in</span></span></a></li></ul><div class="mt-2 flex flex-col gap-2 border-t border-ink-800 pt-2"><details open="" class="group"><summary class="cursor-pointer list-none flex min-h-14 min-w-0 items-center gap-3 rounded-xl px-3 py-1.5 hover:bg-ink-800/40 pointer-fine:min-h-11"><span aria-hidden="true" class="inline-flex size-11 shrink-0 items-center justify-center text-xl grayscale opacity-80">🔒</span><span class="min-w-0 flex-1"><span class="flex min-w-0 items-center gap-1.5 text-sm font-bold text-ink-200"><span class="min-w-0 truncate"><span class="sr-only">Not yours · 5 gatherings · </span>Friday Fellowship<span class="font-normal text-ink-400"> · latest</span> Fri 31</span><span aria-hidden="true" class="shrink-0 origin-[50%_69%] text-base leading-none text-ink-500 transition-transform group-open:rotate-180">⌄</span></span><span class="mt-0.5 block text-xs leading-snug text-ink-400">7:00 PM – 9:00 PM</span></span><span aria-hidden="true" class="hidden shrink-0 text-xs tabular-nums text-ink-400 lg:block">5 gatherings</span></summary><ul class="relative mt-1 mb-1 flex flex-col gap-0.5 before:absolute before:inset-y-0 before:left-8 before:w-px before:bg-ink-800 lg:flex-row lg:flex-wrap lg:gap-1 lg:pl-14.5 lg:before:hidden"><li><a class="flex min-h-11 min-w-0 items-center gap-3 rounded-lg py-1.5 pl-17 pr-3 hover:bg-ink-800/40 active:bg-ink-800 pointer-fine:min-h-9 lg:min-h-8 lg:py-1 lg:pl-2.5 lg:pr-2.5" href="/event/friday-fellowship-2026-07-31" data-discover="true"><span class="min-w-0 flex-1 truncate text-sm font-medium text-ink-300 lg:flex-none">Fri 31</span><span aria-hidden="true" class="shrink-0 text-lg text-ink-400 lg:hidden">›</span></a></li><li><a class="flex min-h-11 min-w-0 items-center gap-3 rounded-lg py-1.5 pl-17 pr-3 hover:bg-ink-800/40 active:bg-ink-800 pointer-fine:min-h-9 lg:min-h-8 lg:py-1 lg:pl-2.5 lg:pr-2.5" href="/event/friday-fellowship-2026-07-24" data-discover="true"><span class="min-w-0 flex-1 truncate text-sm font-medium text-ink-300 lg:flex-none">Fri 24</span><span aria-hidden="true" class="shrink-0 text-lg text-ink-400 lg:hidden">›</span></a></li><li><a class="flex min-h-11 min-w-0 items-center gap-3 rounded-lg py-1.5 pl-17 pr-3 hover:bg-ink-800/40 active:bg-ink-800 pointer-fine:min-h-9 lg:min-h-8 lg:py-1 lg:pl-2.5 lg:pr-2.5" href="/event/friday-fellowship-2026-07-17" data-discover="true"><span class="min-w-0 flex-1 truncate text-sm font-medium text-ink-300 lg:flex-none">Fri 17</span><span aria-hidden="true" class="shrink-0 text-lg text-ink-400 lg:hidden">›</span></a></li><li><a class="flex min-h-11 min-w-0 items-center gap-3 rounded-lg py-1.5 pl-17 pr-3 hover:bg-ink-800/40 active:bg-ink-800 pointer-fine:min-h-9 lg:min-h-8 lg:py-1 lg:pl-2.5 lg:pr-2.5" href="/event/friday-fellowship-2026-07-10" data-discover="true"><span class="min-w-0 flex-1 truncate text-sm font-medium text-ink-300 lg:flex-none">Fri 10</span><span aria-hidden="true" class="shrink-0 text-lg text-ink-400 lg:hidden">›</span></a></li><li><a class="flex min-h-11 min-w-0 items-center gap-3 rounded-lg py-1.5 pl-17 pr-3 hover:bg-ink-800/40 active:bg-ink-800 pointer-fine:min-h-9 lg:min-h-8 lg:py-1 lg:pl-2.5 lg:pr-2.5" href="/event/friday-fellowship-2026-07-03" data-discover="true"><span class="min-w-0 flex-1 truncate text-sm font-medium text-ink-300 lg:flex-none">Fri 3</span><span aria-hidden="true" class="shrink-0 text-lg text-ink-400 lg:hidden">›</span></a></li></ul></details><details class="group"><summary class="cursor-pointer list-none flex min-h-14 min-w-0 items-center gap-3 rounded-xl px-3 py-1.5 hover:bg-ink-800/40 pointer-fine:min-h-11"><span aria-hidden="true" class="inline-flex size-11 shrink-0 items-center justify-center text-xl grayscale opacity-80">🔒</span><span class="min-w-0 flex-1"><span class="flex min-w-0 items-center gap-1.5 text-sm font-bold text-ink-200"><span class="min-w-0 truncate"><span class="sr-only">Not yours · 4 gatherings · </span>Sunday School<span class="font-normal text-ink-400"> · latest</span> Sun 26</span><span aria-hidden="true" class="shrink-0 origin-[50%_69%] text-base leading-none text-ink-500 transition-transform group-open:rotate-180">⌄</span></span><span class="mt-0.5 block text-xs leading-snug text-ink-400">9:30 AM – 10:45 AM</span></span><span aria-hidden="true" class="hidden shrink-0 text-xs tabular-nums text-ink-400 lg:block">4 gatherings</span></summary><ul class="relative mt-1 mb-1 flex flex-col gap-0.5 before:absolute before:inset-y-0 before:left-8 before:w-px before:bg-ink-800 lg:flex-row lg:flex-wrap lg:gap-1 lg:pl-14.5 lg:before:hidden"><li><a class="flex min-h-11 min-w-0 items-center gap-3 rounded-lg py-1.5 pl-17 pr-3 hover:bg-ink-800/40 active:bg-ink-800 pointer-fine:min-h-9 lg:min-h-8 lg:py-1 lg:pl-2.5 lg:pr-2.5" href="/event/sunday-school-2026-07-26" data-discover="true"><span class="min-w-0 flex-1 truncate text-sm font-medium text-ink-300 lg:flex-none">Sun 26</span><span aria-hidden="true" class="shrink-0 text-lg text-ink-400 lg:hidden">›</span></a></li><li><a class="flex min-h-11 min-w-0 items-center gap-3 rounded-lg py-1.5 pl-17 pr-3 hover:bg-ink-800/40 active:bg-ink-800 pointer-fine:min-h-9 lg:min-h-8 lg:py-1 lg:pl-2.5 lg:pr-2.5" href="/event/sunday-school-2026-07-19" data-discover="true"><span class="min-w-0 flex-1 truncate text-sm font-medium text-ink-300 lg:flex-none">Sun 19</span><span aria-hidden="true" class="shrink-0 text-lg text-ink-400 lg:hidden">›</span></a></li><li><a class="flex min-h-11 min-w-0 items-center gap-3 rounded-lg py-1.5 pl-17 pr-3 hover:bg-ink-800/40 active:bg-ink-800 pointer-fine:min-h-9 lg:min-h-8 lg:py-1 lg:pl-2.5 lg:pr-2.5" href="/event/sunday-school-2026-07-12" data-discover="true"><span class="min-w-0 flex-1 truncate text-sm font-medium text-ink-300 lg:flex-none">Sun 12</span><span aria-hidden="true" class="shrink-0 text-lg text-ink-400 lg:hidden">›</span></a></li><li><a class="flex min-h-11 min-w-0 items-center gap-3 rounded-lg py-1.5 pl-17 pr-3 hover:bg-ink-800/40 active:bg-ink-800 pointer-fine:min-h-9 lg:min-h-8 lg:py-1 lg:pl-2.5 lg:pr-2.5" href="/event/sunday-school-2026-07-05" data-discover="true"><span class="min-w-0 flex-1 truncate text-sm font-medium text-ink-300 lg:flex-none">Sun 5</span><span aria-hidden="true" class="shrink-0 text-lg text-ink-400 lg:hidden">›</span></a></li></ul></details></div></div><div><h3 class="pb-2 text-xs font-bold uppercase tracking-wider text-ink-400">June 2026</h3><div class="flex flex-col gap-2"><a class="flex min-h-14 min-w-0 items-center gap-3 rounded-xl px-3 py-1.5 hover:bg-ink-800/40 pointer-fine:min-h-11 active:bg-ink-800" href="/event/sunday-school-2026-06-28" data-discover="true"><span aria-hidden="true" class="inline-flex size-11 shrink-0 items-center justify-center text-xl grayscale opacity-80">🔒</span><span class="min-w-0 flex-1"><span class="block truncate text-sm font-bold text-ink-200"><span class="sr-only">Not yours · </span>Sunday School<span class="font-normal text-ink-400"> ·</span> Sun 28</span><span class="mt-0.5 block text-xs leading-snug text-ink-400">9:30 AM – 10:45 AM</span></span><span aria-hidden="true" class="shrink-0 text-lg text-ink-400">›</span></a></div></div></div><button type="button" class="mt-2 min-h-12 w-full rounded-xl bg-ink-900 text-sm font-semibold text-ink-300 ring-1 ring-ink-800 hover:bg-ink-800/40 active:bg-ink-800 pointer-fine:min-h-9">Load older gatherings</button></section></div></div><dialog aria-labelledby="_r_0_" aria-describedby="_r_0_-description" class="m-0 h-full max-h-full w-full max-w-full bg-transparent p-0 text-ink-100 backdrop:bg-black/70 open:flex items-end justify-center sm:items-center sm:p-6"><div class="flex max-h-[92dvh] w-full flex-col overflow-hidden bg-ink-900 ring-1 ring-ink-700 rounded-t-2xl animate-sheet-in sm:max-h-full sm:rounded-2xl sm:shadow-2xl sm:shadow-black/50 sm:animate-dialog-in sm:max-w-[62rem]"><header class="flex items-start justify-between gap-4 border-b border-ink-800 px-5 py-4 pointer-fine:py-3"><div><h2 id="_r_0_" class="text-lg font-semibold text-ink-50 pointer-fine:text-base">New event</h2><p id="_r_0_-description" class="mt-0.5 text-sm leading-snug text-ink-400">Recurring gatherings predict their roster from their own past nights.</p></div><button type="button" aria-label="Close" class="-mr-2 -mt-1 flex size-11 shrink-0 items-center justify-center rounded-lg text-2xl leading-none text-ink-400 hover:bg-ink-800 hover:text-ink-100 pointer-fine:size-8 pointer-fine:text-xl"><span aria-hidden="true">×</span></button></header><div class="scroll-touch scroll-shadow flex-1 overflow-y-auto px-5 py-4"><form id="event-editor-new" class="grid gap-6 lg:grid-cols-2 lg:gap-x-0" novalidate=""><section class="@container flex min-w-0 flex-col gap-4 pointer-fine:gap-3 lg:pr-7"><h3 class="text-xs font-bold uppercase tracking-wider text-ink-500">The gathering</h3><div class="flex min-w-0 flex-col gap-1.5 pointer-fine:gap-1"><label for="_r_1_" class="text-sm font-medium text-ink-300 pointer-fine:text-xs">Title<span class="ml-1 text-danger-400">*</span></label><span class="relative block"><input id="_r_1_" required="" class="w-full rounded-xl bg-ink-900 px-3 py-3 text-ink-100 ring-1 ring-ink-700 placeholder:text-ink-500 focus:ring-2 focus:ring-brand-400 focus:outline-none disabled:opacity-50 pointer-fine:rounded-lg pointer-fine:px-2.5 pointer-fine:py-2" autocapitalize="words" autocomplete="off" value=""></span></div><div class="flex min-w-0 flex-col gap-1.5 pointer-fine:gap-1"><span id="_r_2_" class="text-sm font-medium text-ink-300 pointer-fine:text-xs">Icon</span><button type="button" aria-expanded="false" aria-labelledby="_r_2_ _r_3_" class="flex min-h-14 items-center gap-3 rounded-xl bg-ink-900 px-3 text-left ring-1 pointer-fine:min-h-11 pointer-fine:rounded-lg ring-ink-700 active:bg-ink-800"><span aria-hidden="true" class="inline-flex shrink-0 items-center justify-center ring-1 size-11 rounded-xl bg-ink-800/60 text-ink-500 ring-ink-800"><svg viewBox="0 -960 960 960" fill="currentColor" class="size-6"><path d="M580-240q-42 0-71-29t-29-71q0-42 29-71t71-29q42 0 71 29t29 71q0 42-29 71t-71 29ZM200-80q-33 0-56.5-23.5T120-160v-560q0-33 23.5-56.5T200-800h40v-80h80v80h320v-80h80v80h40q33 0 56.5 23.5T840-720v560q0 33-23.5 56.5T760-80H200Zm0-80h560v-400H200v400Zm0-480h560v-80H200v80Zm0 0v-80 80Z"></path></svg></span><span id="_r_3_" class="min-w-0 flex-1 truncate text-sm text-ink-200">No icon</span><span aria-hidden="true" class="shrink-0 text-xs font-semibold text-brand-300">Change</span></button><p class="text-xs leading-snug text-ink-500">Shown wherever this gathering is listed.</p></div><div class="flex min-w-0 flex-col gap-1.5 pointer-fine:gap-1"><label for="_r_4_" class="text-sm font-medium text-ink-300 pointer-fine:text-xs">Description</label><textarea id="_r_4_" aria-describedby="_r_4_-hint" rows="2" class="w-full rounded-xl bg-ink-900 px-3 py-3 text-ink-100 ring-1 ring-ink-700 placeholder:text-ink-500 focus:ring-2 focus:ring-brand-400 focus:outline-none disabled:opacity-50 pointer-fine:rounded-lg pointer-fine:px-2.5 pointer-fine:py-2" placeholder="Games, a talk and pizza. Bring a friend."></textarea><p id="_r_4_-hint" class="text-xs leading-snug text-ink-500">A sentence for the people turning up. Shown on the check-in screen when this is today’s gathering.</p></div><div class="flex min-w-0 flex-col gap-1.5 pointer-fine:gap-1"><label for="_r_5_" class="text-sm font-medium text-ink-300 pointer-fine:text-xs">Type</label><span class="relative block"><select id="_r_5_" aria-describedby="_r_5_-hint" class="w-full rounded-xl bg-ink-900 px-3 py-3 text-ink-100 ring-1 ring-ink-700 placeholder:text-ink-500 focus:ring-2 focus:ring-brand-400 focus:outline-none disabled:opacity-50 pointer-fine:rounded-lg pointer-fine:px-2.5 pointer-fine:py-2 appearance-none pr-9 pointer-fine:pr-8"><option value="recurring" selected="">Recurring</option><option value="oneoff">One-off — retreat, outing</option></select><span aria-hidden="true" class="pointer-events-none absolute inset-y-0 flex items-center text-ink-400 right-3 pointer-fine:right-2.5"><svg viewBox="0 0 20 20" fill="none" class="size-4"><path d="m5 8 5 5 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></span></span><p id="_r_5_-hint" class="text-xs leading-snug text-ink-500">Everyone active is on the roster, and its own past nights mark the regulars “Recent”.</p></div><div class="flex min-w-0 flex-col gap-1.5 pointer-fine:gap-1"><label for="_r_6_" class="text-sm font-medium text-ink-300 pointer-fine:text-xs">Series</label><span class="relative block"><select id="_r_6_" aria-describedby="_r_6_-hint" class="w-full rounded-xl bg-ink-900 px-3 py-3 text-ink-100 ring-1 ring-ink-700 placeholder:text-ink-500 focus:ring-2 focus:ring-brand-400 focus:outline-none disabled:opacity-50 pointer-fine:rounded-lg pointer-fine:px-2.5 pointer-fine:py-2 appearance-none pr-9 pointer-fine:pr-8"><option value="" selected="">Not part of one</option><option value="friday-fellowship" disabled="">Friday Fellowship — not yours</option><option value="sunday-school" disabled="">Sunday School — not yours</option></select><span aria-hidden="true" class="pointer-events-none absolute inset-y-0 flex items-center text-ink-400 right-3 pointer-fine:right-2.5"><svg viewBox="0 0 20 20" fill="none" class="size-4"><path d="m5 8 5 5 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></span></span><p id="_r_6_-hint" class="text-xs leading-snug text-ink-500">Optional. Either way this predicts from its own past gatherings — pick one to share an existing gathering’s history.</p></div><div class="grid grid-cols-1 gap-4 @min-[26rem]:grid-cols-2 pointer-fine:gap-3"><div class="flex min-w-0 flex-col gap-1.5 pointer-fine:gap-1"><label for="_r_7_" class="text-sm font-medium text-ink-300 pointer-fine:text-xs">Next start<span class="ml-1 text-danger-400">*</span></label><span class="relative block"><input id="_r_7_" required="" class="w-full rounded-xl bg-ink-900 px-3 py-3 text-ink-100 ring-1 ring-ink-700 placeholder:text-ink-500 focus:ring-2 focus:ring-brand-400 focus:outline-none disabled:opacity-50 pointer-fine:rounded-lg pointer-fine:px-2.5 pointer-fine:py-2" type="datetime-local" value="2026-08-07T03:00"></span></div><div class="flex min-w-0 flex-col gap-1.5 pointer-fine:gap-1"><label for="_r_8_" class="text-sm font-medium text-ink-300 pointer-fine:text-xs">Next end<span class="ml-1 text-danger-400">*</span></label><span class="relative block"><input id="_r_8_" required="" class="w-full rounded-xl bg-ink-900 px-3 py-3 text-ink-100 ring-1 ring-ink-700 placeholder:text-ink-500 focus:ring-2 focus:ring-brand-400 focus:outline-none disabled:opacity-50 pointer-fine:rounded-lg pointer-fine:px-2.5 pointer-fine:py-2" type="datetime-local" value="2026-08-07T05:00"></span></div><p class="text-xs leading-snug text-ink-500 @min-[26rem]:col-span-2">The upcoming gathering. Instances already held keep the times they ran at.</p></div><div class="flex flex-col gap-3"><div class="flex min-w-0 flex-col gap-1.5 pointer-fine:gap-1"><label for="_r_9_" class="text-sm font-medium text-ink-300 pointer-fine:text-xs">Repeats</label><span class="relative block"><select id="_r_9_" class="w-full rounded-xl bg-ink-900 px-3 py-3 text-ink-100 ring-1 ring-ink-700 placeholder:text-ink-500 focus:ring-2 focus:ring-brand-400 focus:outline-none disabled:opacity-50 pointer-fine:rounded-lg pointer-fine:px-2.5 pointer-fine:py-2 appearance-none pr-9 pointer-fine:pr-8"><option value="daily">Daily</option><option value="weekly" selected="">Weekly on Friday</option><option value="monthlyDay">Monthly on day 7</option><option value="monthlyWeekday">Monthly on the first Friday</option><option value="yearly">Annually on August 7</option><option value="custom">Custom…</option></select><span aria-hidden="true" class="pointer-events-none absolute inset-y-0 flex items-center text-ink-400 right-3 pointer-fine:right-2.5"><svg viewBox="0 0 20 20" fill="none" class="size-4"><path d="m5 8 5 5 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></span></span></div><p class="text-xs text-ink-500">Then Aug 14, Aug 21, Aug 28…</p></div></section><section class="@container flex min-w-0 flex-col gap-4 pointer-fine:gap-3 lg:border-l lg:border-ink-800 lg:pl-7"><h3 class="text-xs font-bold uppercase tracking-wider text-ink-500">Roster &amp; details</h3><div class="overflow-hidden rounded-xl bg-ink-950/40 ring-1 ring-ink-800"><button type="button" aria-expanded="false" aria-controls="_r_a_" class="flex w-full items-center gap-3 px-3 py-3 text-left hover:bg-ink-900/40 pointer-fine:py-2"><span class="min-w-0 flex-1"><span class="block text-xs font-bold uppercase tracking-wider text-ink-400">Check-in window</span><span class="mt-0.5 block truncate text-sm text-ink-200">Opens 2:00 AM, closes 6:00 AM</span></span><span aria-hidden="true" class="shrink-0 text-xs font-semibold text-brand-300">Adjust</span></button></div><div class="flex items-start gap-3"><input id="_r_b_" class="mt-0.5 size-5 shrink-0 rounded border-ink-600 bg-ink-900 accent-brand-500" type="checkbox"><label for="_r_b_" class="text-sm text-ink-200">Track check-out<span class="block text-xs text-ink-500">Volunteers record when each child is collected, and the roster shows a live room count.</span></label></div><div class="flex flex-col gap-3"><div class="flex items-start gap-3"><input id="_r_c_" class="mt-0.5 size-5 shrink-0 rounded border-ink-600 bg-ink-900 accent-brand-500" type="checkbox"><label for="_r_c_" class="text-sm text-ink-200">Print a label at check-in<span class="block text-xs text-ink-500">For a room children are collected from. Needs a Brother QL plugged into the kiosk.</span></label></div></div><div class="flex min-w-0 flex-col gap-1.5 pointer-fine:gap-1"><label for="_r_d_" class="text-sm font-medium text-ink-300 pointer-fine:text-xs">Location</label><span class="relative block"><input id="_r_d_" class="w-full rounded-xl bg-ink-900 px-3 py-3 text-ink-100 ring-1 ring-ink-700 placeholder:text-ink-500 focus:ring-2 focus:ring-brand-400 focus:outline-none disabled:opacity-50 pointer-fine:rounded-lg pointer-fine:px-2.5 pointer-fine:py-2" placeholder="Youth room" autocomplete="off" value=""></span></div><div class="flex min-w-0 flex-col gap-1.5 pointer-fine:gap-1"><label for="_r_e_" class="text-sm font-medium text-ink-300 pointer-fine:text-xs">Notes</label><textarea id="_r_e_" aria-describedby="_r_e_-hint" rows="3" class="w-full rounded-xl bg-ink-900 px-3 py-3 text-ink-100 ring-1 ring-ink-700 placeholder:text-ink-500 focus:ring-2 focus:ring-brand-400 focus:outline-none disabled:opacity-50 pointer-fine:rounded-lg pointer-fine:px-2.5 pointer-fine:py-2" placeholder="Meet at the church car park at 5:45…"></textarea><p id="_r_e_-hint" class="text-xs leading-snug text-ink-500">For the core team. Only shown on the event page.</p></div></section></form></div><footer class="border-t border-ink-800 px-5 py-4 pb-safe sm:py-3 flex items-center gap-2 [&amp;&gt;*]:flex-1 [&amp;&gt;*:last-child]:flex-[2] sm:justify-end sm:[&amp;&gt;*]:flex-none sm:[&amp;&gt;*:last-child]:flex-none sm:[&amp;&gt;*]:min-w-28"><button type="button" class="inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-ink-800 text-ink-100 ring-1 ring-ink-700 hover:bg-ink-700 min-h-14 px-5 text-base pointer-fine:min-h-10 pointer-fine:px-4 pointer-fine:text-sm">Cancel</button><button type="submit" class="inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-brand-500 text-white hover:bg-brand-400 active:bg-brand-600 min-h-14 px-5 text-base pointer-fine:min-h-10 pointer-fine:px-4 pointer-fine:text-sm" form="event-editor-new">Schedule event</button></footer></div></dialog><dialog aria-labelledby="_r_f_" aria-describedby="_r_f_-description" class="m-0 h-full max-h-full w-full max-w-full bg-transparent p-0 text-ink-100 backdrop:bg-black/70 open:flex items-end justify-center sm:items-center sm:p-6"><div class="flex max-h-[92dvh] w-full flex-col overflow-hidden bg-ink-900 ring-1 ring-ink-700 rounded-t-2xl animate-sheet-in sm:max-h-full sm:rounded-2xl sm:shadow-2xl sm:shadow-black/50 sm:animate-dialog-in sm:max-w-[34rem]"><header class="flex items-start justify-between gap-4 border-b border-ink-800 px-5 py-4 pointer-fine:py-3"><div><h2 id="_r_f_" class="text-lg font-semibold text-ink-50 pointer-fine:text-base">Import from Planning Center</h2><p id="_r_f_-description" class="mt-0.5 text-sm leading-snug text-ink-400">Bring a Check-Ins event's whole history into Tally: every night it met, everyone who attended, and every check-in. Planning Center is only read — nothing there changes.</p></div><button type="button" aria-label="Close" class="-mr-2 -mt-1 flex size-11 shrink-0 items-center justify-center rounded-lg text-2xl leading-none text-ink-400 hover:bg-ink-800 hover:text-ink-100 pointer-fine:size-8 pointer-fine:text-xl"><span aria-hidden="true">×</span></button></header><div class="scroll-touch scroll-shadow flex-1 overflow-y-auto px-5 py-4"><div class="flex flex-col gap-4"><div class="flex flex-col gap-2 px-3 py-2" aria-hidden="true"><div class="h-16 animate-pulse rounded-xl bg-ink-800/60"></div><div class="h-16 animate-pulse rounded-xl bg-ink-800/60"></div><div class="h-16 animate-pulse rounded-xl bg-ink-800/60"></div></div><p class="px-1 text-xs text-ink-500">Importing is safe to repeat: a re-import picks up nights since the last one and never overwrites anything edited in Tally. Volunteers are not imported — Tally's attendance is a record of students.</p></div></div><footer class="border-t border-ink-800 px-5 py-4 pb-safe sm:py-3 flex items-center gap-2 [&amp;&gt;*]:flex-1 [&amp;&gt;*:last-child]:flex-[2] sm:justify-end sm:[&amp;&gt;*]:flex-none sm:[&amp;&gt;*:last-child]:flex-none sm:[&amp;&gt;*]:min-w-28"><button type="button" class="inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-ink-800 text-ink-100 ring-1 ring-ink-700 hover:bg-ink-700 min-h-11 px-4 text-sm pointer-fine:min-h-9">Done</button></footer></div></dialog></div></main><nav class="sticky bottom-0 z-30 border-t border-ink-800 bg-ink-950/95 pb-safe backdrop-blur lg:hidden"><ul class="mx-auto flex max-w-lg"><li class="flex-1"><a class="flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-ink-500" href="/" data-discover="true"><span aria-hidden="true" class="text-base leading-none">✓</span>Check in</a></li><li class="flex-1"><a class="flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-ink-500" href="/dashboard" data-discover="true"><span aria-hidden="true" class="text-base leading-none">◎</span>Insights</a></li><li class="flex-1"><a aria-current="page" class="flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-brand-400" href="/events" data-discover="true"><span aria-hidden="true" class="text-base leading-none">▤</span>Events</a></li><li class="flex-1"><a class="flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-ink-500" href="/students" data-discover="true"><span aria-hidden="true" class="text-base leading-none">☰</span>Students</a></li><li class="flex-1"><a class="flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-ink-500" href="/review" data-discover="true"><span aria-hidden="true" class="text-base leading-none">▣</span>Review</a></li></ul></nav></div></div><div class="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex flex-col items-center gap-2 px-3 pb-safe" role="status" aria-live="polite"></div></div>
+  
+
+</body></html>

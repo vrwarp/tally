@@ -25,7 +25,7 @@
  * this screen does not subscribe to, and a plausible-looking wrong number is
  * worse than no number when it is what a leader is chasing.
  */
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Badge, Button, EmptyState, EventIcon, SkeletonRows } from '@/components/ui';
 import { PageFrame } from '@/components/PageFrame';
@@ -36,6 +36,9 @@ import { EventEditorModal } from '@/features/events/EventEditorModal';
 import { EventHeroCard } from '@/features/events/EventHeroCard';
 import { AttendanceGridModal } from '@/features/events/AttendanceGridModal';
 import { ImportCheckInsModal } from '@/features/events/ImportCheckInsModal';
+import { LockedChainGroup } from '@/features/events/LockedChainGroup';
+import { partitionBand, type LockedChain } from '@/features/events/lockedChains';
+import { NotYoursNotice } from '@/features/events/NotYoursNotice';
 import { PastGatherings } from '@/features/events/PastGatherings';
 import { useEventSnapshots } from '@/hooks/useEventSnapshots';
 import { useNow } from '@/hooks/useNow';
@@ -76,7 +79,12 @@ function EventRow({
   const badges = [
     event.mode === 'oneoff' ? <Badge key="oneoff" tone="brand">One-off</Badge> : null,
     cancelled ? <Badge key="cancelled" tone="danger">Cancelled</Badge> : null,
-    event.requiresRsvp ? <Badge key="rsvp" tone="warn">RSVP only</Badge> : null,
+    // Neutral, not `warn`. Amber is the token for something the reader has to
+    // act on, and on a page whose subject is which gatherings are blocked it was
+    // the only warm mark on the screen — out-shouting the title of the one row
+    // that is not blocked. `Check-out` beside it already sets the precedent: a
+    // mode a gathering runs in is not a caution.
+    event.requiresRsvp ? <Badge key="rsvp" tone="neutral">RSVP only</Badge> : null,
     event.requiresCheckOut ? (
       <Badge key="checkout" tone="neutral">Check-out</Badge>
     ) : null,
@@ -89,7 +97,7 @@ function EventRow({
     <li className="flex min-w-0 items-stretch gap-2">
       <Link
         to={`/events/${event.id}`}
-        className="flex min-h-16 min-w-0 flex-1 items-center gap-3 rounded-xl bg-ink-900 px-3 py-3 ring-1 ring-ink-800 active:bg-ink-800"
+        className="flex min-h-16 min-w-0 flex-1 items-center gap-3 rounded-xl bg-ink-900 px-3 py-3 ring-1 ring-ink-800 hover:bg-ink-800/40 active:bg-ink-800"
       >
         <EventIcon name={event.icon} size="md" />
 
@@ -103,11 +111,17 @@ function EventRow({
             {event.title}
           </span>
 
-          {/* One step closer than it was. Five of these rows say "Friday
-              Fellowship" and five say "Sunday School", so the date is the only
-              thing that tells them apart — and it was the quietest mark in the
-              row, a step further back than the same line in the past list. */}
-          <span className="mt-0.5 block truncate text-xs text-ink-400">
+          {/* Five of these rows say "Friday Fellowship" and five say "Sunday
+              School", so the date is the only thing that tells them apart — and
+              it used to be the quietest mark in the row.
+
+              Allowed to wrap, too. Truncating this line dropped the room off
+              every row, at a different point on each one because the dates are
+              different widths: a ragged column of ellipses promising a location
+              twenty times and delivering it never. The locked heads below wrap
+              for the same reason, and there was no reason the rows the reader
+              can actually open should keep the recipe rejected next door. */}
+          <span className="mt-0.5 block text-xs leading-snug text-ink-400">
             {formatEventDay(event.startAt, now)} · {formatEventWindow(event)}
             {event.location ? ` · ${event.location}` : ''}
           </span>
@@ -126,7 +140,10 @@ function EventRow({
           ) : null}
         </span>
 
-        <span aria-hidden="true" className="shrink-0 text-lg text-ink-600">
+        {/* `ink-400`, not `ink-600`. At 2.67:1 against the page this was below
+            the floor for a non-text indicator, on the mark that distinguishes a
+            row which navigates from a group head which expands in place. */}
+        <span aria-hidden="true" className="shrink-0 text-lg text-ink-400">
           ›
         </span>
       </Link>
@@ -154,13 +171,19 @@ function RowSection({
   now,
   onUncancel,
   uncancelling,
+  children,
 }: {
   title: string;
   events: readonly TallyEvent[];
   now: Date;
   onUncancel: (event: TallyEvent) => void;
   uncancelling: string | null;
+  /** Rendered after the rows, inside the band — the *show more* control. */
+  children?: ReactNode;
 }) {
+  const { canWork } = useData();
+  const { own, locked } = partitionBand(events, canWork, 'asc');
+
   if (events.length === 0) return null;
 
   return (
@@ -172,7 +195,7 @@ function RowSection({
         {title}
       </h2>
       <ul className="flex flex-col gap-2">
-        {events.map((event) => (
+        {own.map((event) => (
           <EventRow
             key={event.id}
             event={event}
@@ -182,7 +205,38 @@ function RowSection({
           />
         ))}
       </ul>
+
+      <LockedBlock chains={locked} dividing={own.length > 0} />
+
+      {children}
     </section>
+  );
+}
+
+/**
+ * The demoted half of a band: everybody else's gatherings, one group per chain.
+ *
+ * The rule above it is the demotion boundary and only draws when there is
+ * something to demote it *from* — a hairline under nothing is a hairline about
+ * nothing, and this page allows the mark exactly one meaning.
+ */
+function LockedBlock({ chains, dividing }: { chains: readonly LockedChain[]; dividing: boolean }) {
+  if (chains.length === 0) return null;
+
+  return (
+    <ul className={cn('flex flex-col gap-2', dividing && 'mt-2 border-t border-ink-800 pt-2')}>
+      {chains.map((chain) => (
+        <LockedChainGroup
+          key={chain.key}
+          chain={chain}
+          lead="next"
+          // When a band is entirely somebody else's, the group *is* the band, and
+          // a reader looking at an apparently empty week needs to see what is
+          // actually on it. `LockedGatherings` makes the same call.
+          defaultOpen={!dividing && chains.length === 1}
+        />
+      ))}
+    </ul>
   );
 }
 
@@ -192,6 +246,10 @@ function RowSection({
 
 function Today({ events, now }: { events: readonly TallyEvent[]; now: Date }) {
   const { canWork } = useData();
+  const { own, locked } = useMemo(
+    () => partitionBand(events, canWork, 'asc'),
+    [events, canWork],
+  );
   // Head counts, but only for the gatherings that have finished. See the note
   // on `present` in `EventHeroCard`.
   const finished = useMemo(
@@ -225,8 +283,23 @@ function Today({ events, now }: { events: readonly TallyEvent[]; now: Date }) {
       >
         Today
       </h2>
+      {/*
+        A card is the size of a decision, and there is no decision behind a wall.
+
+        A gathering the reader is not on used to render here as a full hero card
+        — icon, description, and a full-width brand-blue "Open this gathering"
+        that led to a page refusing them. It was the loudest object on the screen
+        promising the one thing the screen could not do. `ChooseEvent` already
+        makes this partition on the counselor's side; this is the same call on
+        the other screen that renders these cards.
+
+        The order is untouched. Round 1 of the refinement asked whether Today
+        should re-sort by ownership and the answer was no: what is *visible* in a
+        band stays in date order, and the demoted block is a separate container
+        below a rule.
+      */}
       <div className="flex flex-col gap-3">
-        {events.map((event) => (
+        {own.map((event) => (
           <EventHeroCard
             key={event.id}
             event={event}
@@ -234,9 +307,12 @@ function Today({ events, now }: { events: readonly TallyEvent[]; now: Date }) {
             present={present.get(event.id)}
             to={`/events/${event.id}`}
             cta="Open this gathering"
+            density="compact"
           />
         ))}
       </div>
+
+      <LockedBlock chains={locked} dividing={own.length > 0} />
     </section>
   );
 }
@@ -304,7 +380,7 @@ function QuickAction({
 /* -------------------------------------------------------------------------- */
 
 export function EventsPage() {
-  const { events, series, loading } = useData();
+  const { events, series, loading, canWork } = useData();
   const { user } = useAuth();
   const { show } = useToast();
   const now = useNow(60_000);
@@ -338,7 +414,15 @@ export function EventsPage() {
      */
     const dayStart = startOfDay(now);
     const dayEnd = new Date(dayStart.getTime() + 86_400_000);
-    const weekEnd = new Date(dayStart.getTime() + WEEK_DAYS * 86_400_000);
+    /*
+     * Inclusive of day seven, and that off-by-one was worth a finding of its own.
+     *
+     * The band is called "next seven days" and it excluded the seventh, so on a
+     * Friday the following Friday fell into "Later". A leader whose weekly
+     * question is *is next Friday on the calendar* read a band that named their
+     * gathering's own weekday, did not contain it, and looked complete.
+     */
+    const weekEnd = new Date(dayStart.getTime() + (WEEK_DAYS + 1) * 86_400_000);
 
     const byStart = (a: TallyEvent, b: TallyEvent) => a.startAt.getTime() - b.startAt.getTime();
     const between = (from: Date, to: Date | null) =>
@@ -363,10 +447,23 @@ export function EventsPage() {
     };
   }, [events, now, allLater]);
 
+  /*
+   * Only the series this reader may actually write to.
+   *
+   * `events: create` is gated on `onChain`, so "Schedule next Friday Fellowship"
+   * on a chain somebody is not on opens a pre-filled editor, takes a title, a
+   * room, two dates and a recurrence rule, and is refused at save. It is the
+   * most-repeated act on this page and it was a trap — the shortcut goes where
+   * the write can go. Nothing disappears from the calendar by this: every Friday
+   * is still listed below. It is the affordance that narrows, not the record.
+   */
   const quickActions = useMemo(
     () =>
       series
         .filter((candidate) => candidate.active)
+        .filter((candidate) =>
+          canWork({ id: candidate.id, seriesId: candidate.id, recurrenceRootId: null }),
+        )
         .map((candidate) => {
           const occurrence = nextSeriesOccurrence(candidate, now);
           const existing =
@@ -378,7 +475,7 @@ export function EventsPage() {
             ) ?? null;
           return { series: candidate, existing };
         }),
-    [series, events, now],
+    [series, events, now, canWork],
   );
 
   const handleSchedule = (candidate: EventSeries) => {
@@ -434,19 +531,26 @@ export function EventsPage() {
       <header className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-bold text-ink-50">Events</h1>
         <div className="flex items-center gap-2">
-          {/* Quieter than "New event" on purpose: importing history happens a
-              handful of times in an install's life, scheduling happens weekly. */}
           {/* Same weight as Import, and for the same reason: a grid is
               something a leader builds at the end of a term, not weekly. */}
           <Button variant="secondary" onClick={() => setGridOpen(true)}>
             Export
           </Button>
+          {/* Quieter than "New event" on purpose: importing history happens a
+              handful of times in an install's life, scheduling happens weekly. */}
           <Button variant="secondary" onClick={() => setImporting(true)}>
             Import
           </Button>
           <Button onClick={() => setEditor({ event: null })}>New event</Button>
         </div>
       </header>
+
+      {/*
+        Said once, above both columns, instead of on every row that is not
+        theirs. See `NotYoursNotice` — it renders nothing at all in the ordinary
+        case, which is a ministry that has never restricted anything.
+      */}
+      <NotYoursNotice events={events} />
 
       {/*
         Ahead on the left, behind on the right — side by side where there is a
@@ -460,16 +564,23 @@ export function EventsPage() {
         coming. The phone keeps the original order, because there is only one
         column there and the calendar reads forwards.
       */}
-      <div className="flex flex-col gap-8 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8">
-        <section aria-labelledby="events-upcoming" className="flex min-w-0 flex-col gap-8">
+      <div className="flex flex-col gap-8 lg:grid lg:grid-cols-2 lg:gap-8">
+        <section aria-labelledby="events-upcoming" className="flex min-w-0 flex-col">
           {/* Three ranks, three treatments. The two halves of the calendar are
               the loudest, the groups inside them a step down, the month
               captions inside those a step down again. "Past gatherings" owned
-              half the page and was set like a group inside the other half. */}
-          <h2 id="events-upcoming" className="-mb-5 text-base font-semibold text-ink-100">
+              half the page and was set like a group inside the other half.
+
+              The heading is the section's first child with its own padding,
+              rather than a negative margin cancelling the parent's gap — the
+              shape `PastGatherings` already had, so both halves of the page are
+              built the same way and the next person to add a band does not have
+              to know about a hack. */}
+          <h2 id="events-upcoming" className="pb-3 text-lg font-bold text-ink-50">
             Upcoming
           </h2>
 
+          <div className="flex flex-col gap-8">
           <Today events={today} now={now} />
 
           {/*
@@ -525,22 +636,36 @@ export function EventsPage() {
             now={now}
             onUncancel={onUncancel}
             uncancelling={uncancelling}
-          />
-
-          {/* The same idiom `PastGatherings` uses at the other end of the
-              calendar, so both ends of the page ask the same way. */}
-          {laterHidden > 0 ? (
-            <button
-              type="button"
-              onClick={() => setAllLater(true)}
-              className="min-h-12 w-full rounded-xl bg-ink-900 text-sm font-semibold text-ink-300 ring-1 ring-ink-800 active:bg-ink-800"
-            >
-              Show {laterHidden} later {laterHidden === 1 ? 'gathering' : 'gatherings'}
-            </button>
-          ) : null}
+          >
+            {/* Inside the band it extends, at row distance from it — the same
+                idiom `PastGatherings` uses at the other end of the calendar, so
+                both ends of the page ask the same way. As a sibling of the bands
+                it inherited their 32px separation and read as a fourth,
+                unlabelled band rather than as the foot of this one. */}
+            {laterHidden > 0 ? (
+              <button
+                type="button"
+                onClick={() => setAllLater(true)}
+                className="mt-2 min-h-12 w-full rounded-xl bg-ink-900 text-sm font-semibold text-ink-300 ring-1 ring-ink-800 hover:bg-ink-800/40 active:bg-ink-800 pointer-fine:min-h-9"
+              >
+                Show {laterHidden} later {laterHidden === 1 ? 'gathering' : 'gatherings'}
+              </button>
+            ) : null}
+          </RowSection>
+          </div>
         </section>
 
-        <PastGatherings before={dayStart} />
+        {/*
+          The gutter, stated.
+
+          The two columns are a forward projection and a paged history and will
+          never be the same length, so the answer was not to equalise them but to
+          draw the boundary that was missing. `lg:items-start` is gone from the
+          grid so the rule runs the height of the taller column.
+        */}
+        <div className="flex min-w-0 flex-col lg:border-l lg:border-ink-800 lg:pl-8">
+          <PastGatherings before={dayStart} />
+        </div>
       </div>
 
       <EventEditorModal
