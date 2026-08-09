@@ -2649,7 +2649,13 @@ export const listPendingRegistrations = onCall<void, Promise<PendingRegistration
  * rather than something that happened while they were serving coffee.
  */
 export const approveRegistration = onCall<
-  { registrationId: string; withoutGuardian?: boolean },
+  {
+    registrationId: string;
+    withoutGuardian?: boolean;
+    withRegistrationIds?: string[];
+    guardianPersonId?: string | null;
+    createNewGuardian?: boolean;
+  },
   Promise<ApproveRegistrationResult>
 >({ secrets: BACKEND_SECRETS, timeoutSeconds: 300, memory: '256MiB' }, async (request) => {
   await requireCoreTeam(request.auth?.uid);
@@ -2658,14 +2664,34 @@ export const approveRegistration = onCall<
     throw new HttpsError('invalid-argument', 'registrationId is required.');
   }
 
+  const withRegistrationIds = request.data?.withRegistrationIds;
+  if (withRegistrationIds !== undefined && !Array.isArray(withRegistrationIds)) {
+    throw new HttpsError('invalid-argument', 'withRegistrationIds must be a list.');
+  }
+  const guardianPersonId = request.data?.guardianPersonId;
+  if (
+    guardianPersonId !== undefined &&
+    guardianPersonId !== null &&
+    typeof guardianPersonId !== 'string'
+  ) {
+    throw new HttpsError('invalid-argument', 'guardianPersonId must be a person id.');
+  }
+
   const database = db();
   return runApproveRegistration({
     db: database,
     registry: await createRegistry(database),
     registrationId: registrationId.trim(),
-    // Optional on the wire, and absent means the ordinary approval — an old
-    // bundle cannot accidentally discard a guardian by omission.
+    // Every one of these is optional on the wire, and absent means the ordinary
+    // approval — an old bundle cannot discard a guardian, regroup a family or
+    // name a parent by omission.
     withoutGuardian: request.data?.withoutGuardian === true,
+    withRegistrationIds: (withRegistrationIds ?? [])
+      .filter((id): id is string => typeof id === 'string')
+      .map((id) => id.trim())
+      .filter((id) => id.length > 0),
+    guardianPersonId: typeof guardianPersonId === 'string' ? guardianPersonId.trim() : null,
+    createNewGuardian: request.data?.createNewGuardian === true,
     uid: request.auth!.uid,
     logger,
   });

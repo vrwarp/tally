@@ -767,6 +767,31 @@ export interface PendingRegistrationChild {
   possibleDuplicates: ReviewStudentSummary[];
 }
 
+/** Mirrors `AdultCandidate` in functions/src/pco/household.ts. */
+export interface AdultCandidate {
+  personId: string;
+  name: string;
+  /** Whether the backend already has a way to reach them. */
+  reachable: boolean;
+  /** Whether one of their numbers is the one the family typed at the kiosk. */
+  corroborated: boolean;
+}
+
+/** Mirrors `SameFamilyHint` in functions/src/kiosk/review.ts. */
+export interface SameFamilyHint {
+  registrationId: string;
+  guardianName: string;
+  childNames: string[];
+  registeredAt: number | null;
+  /**
+   * How many of their children still share a name with a roster row nobody has
+   * decided about. Grouping is held while this is above zero, for the same
+   * reason their own card's approve button is: a press here would push them.
+   * Optional so an older callable's answer still typechecks.
+   */
+  unsettledChildren?: number;
+}
+
 /** Mirrors `PendingRegistration` in functions/src/kiosk/review.ts. */
 export interface PendingRegistration {
   registrationId: string;
@@ -780,6 +805,20 @@ export interface PendingRegistration {
   last4: string;
   children: PendingRegistrationChild[];
   anchors: ReviewStudentSummary[];
+  /**
+   * Adults the backend already has under the guardian's name.
+   *
+   * The decision the backend would otherwise make alone, brought forward to
+   * somebody who can make it properly. `corroborated` marks the one it would
+   * have chosen by itself — their number matches what the family typed.
+   *
+   * Optional so an older callable's answer still typechecks, and empty is never
+   * evidence that the guardian is new: it is equally "write-back is not full"
+   * and "the backend did not answer".
+   */
+  guardianCandidates?: AdultCandidate[];
+  /** Other pending registrations that typed this family's phone number. */
+  sameFamily?: SameFamilyHint[];
   settled: boolean;
   lastError: string | null;
   /**
@@ -835,6 +874,30 @@ export const approveRegistration = httpsCallable<
      * parent's details are lost with the record.
      */
     withoutGuardian?: boolean;
+    /**
+     * Other registrations that are the same family, approved with this one.
+     *
+     * One push, one household, one adult. Two cards sharing a phone number are
+     * a family who came back, and approving them one at a time is what left one
+     * parent at the head of two households upstream.
+     */
+    withRegistrationIds?: string[];
+    /**
+     * The adult the reviewer picked out of `guardianCandidates`.
+     *
+     * Sent, it *is* the answer — the backend does no matching of its own. This
+     * is how a reviewer says "yes, that is her, she has changed her number",
+     * which no amount of phone corroboration will ever reach.
+     */
+    guardianPersonId?: string | null;
+    /**
+     * The reviewer saw the candidates and said none of them is the parent.
+     *
+     * Different from sending nothing, which means nobody was asked: this
+     * suppresses the backend's own guess, so a deliberate new person is created
+     * even where a name and a number would have matched.
+     */
+    createNewGuardian?: boolean;
   },
   ApproveRegistrationResult
 >(functions, 'approveRegistration');

@@ -550,3 +550,218 @@ describe('a sibling registration', () => {
     expect(screen.getByText(/rather than making a second one/i)).toBeInTheDocument();
   });
 });
+
+/* -------------------------------------------------------------------------- */
+/* One family, two cards                                                       */
+/* -------------------------------------------------------------------------- */
+
+describe('a family who registered twice', () => {
+  const kin = {
+    registrationId: 'reg-2',
+    guardianName: 'Dana Fields',
+    childNames: ['Ada Fields'],
+    registeredAt: Date.parse('2026-08-09T19:11:00Z'),
+  };
+
+  it('says another card typed the same number, and names it', async () => {
+    listPendingRegistrations.mockResolvedValue({
+      data: [registration({ sameFamily: [kin] })],
+    });
+    mount();
+
+    // Named rather than counted: three cards on screen and the reviewer has to
+    // know which one it means.
+    expect(await screen.findByText(/Another registration/)).toBeInTheDocument();
+    expect(screen.getByText(/Ada Fields/)).toBeInTheDocument();
+    expect(screen.getByText('Also registered separately')).toBeInTheDocument();
+  });
+
+  it('approves the two cards as one family only when the reviewer says so', async () => {
+    const user = userEvent.setup();
+    listPendingRegistrations.mockResolvedValue({
+      data: [registration({ sameFamily: [kin] })],
+    });
+    mount();
+
+    await user.click(await screen.findByRole('button', { name: /^Same family$/i }));
+    await user.click(screen.getByRole('button', { name: /Approve and add/i }));
+    // The sentence they are agreeing to says the grouping out loud.
+    expect(screen.getByText(/as one family/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^Yes — add/i }));
+
+    await waitFor(() =>
+      expect(approveRegistration).toHaveBeenCalledWith({
+        registrationId: 'reg-1',
+        withRegistrationIds: ['reg-2'],
+      }),
+    );
+  });
+
+  it('sends nothing about the other card until it is chosen', async () => {
+    const user = userEvent.setup();
+    listPendingRegistrations.mockResolvedValue({
+      data: [registration({ sameFamily: [kin] })],
+    });
+    mount();
+
+    await user.click(await screen.findByRole('button', { name: /Approve and add/i }));
+    await user.click(screen.getByRole('button', { name: /^Yes — add/i }));
+
+    // An omission must never read as a decision nobody made.
+    await waitFor(() =>
+      expect(approveRegistration).toHaveBeenCalledWith({ registrationId: 'reg-1' }),
+    );
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Who the guardian already is                                                 */
+/* -------------------------------------------------------------------------- */
+
+describe('choosing the adult', () => {
+  const candidates = [
+    { personId: '900', name: 'Dana Fields', reachable: true, corroborated: true },
+    { personId: '901', name: 'Dana Fields', reachable: false, corroborated: false },
+  ];
+
+  it('says which way the decision will fall before anybody presses anything', async () => {
+    listPendingRegistrations.mockResolvedValue({
+      data: [registration({ guardianCandidates: candidates })],
+    });
+    mount();
+
+    expect(await screen.findByText(/already has 2 people called Dana Fields/)).toBeInTheDocument();
+    expect(screen.getByText(/their number matches/)).toBeInTheDocument();
+    // The default, stated: a reviewer should not have to press a button to
+    // find out whether the church is about to get a second Dana Fields.
+    expect(screen.getByText(/joins Dana Fields, whose number matches/)).toBeInTheDocument();
+  });
+
+  it('sends the adult a reviewer picked', async () => {
+    const user = userEvent.setup();
+    listPendingRegistrations.mockResolvedValue({
+      data: [registration({ guardianCandidates: candidates })],
+    });
+    mount();
+
+    const [, second] = await screen.findAllByRole('button', { name: /^Same person$/i });
+    await user.click(second!);
+    await user.click(screen.getByRole('button', { name: /Approve and add/i }));
+    await user.click(screen.getByRole('button', { name: /^Yes — add/i }));
+
+    await waitFor(() =>
+      expect(approveRegistration).toHaveBeenCalledWith({
+        registrationId: 'reg-1',
+        guardianPersonId: '901',
+      }),
+    );
+  });
+
+  it('sends "none of these" as its own decision', async () => {
+    const user = userEvent.setup();
+    listPendingRegistrations.mockResolvedValue({
+      data: [registration({ guardianCandidates: candidates })],
+    });
+    mount();
+
+    await user.click(await screen.findByRole('button', { name: /^Add as new$/i }));
+    expect(screen.getByText(/is added as a new person/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Approve and add/i }));
+    await user.click(screen.getByRole('button', { name: /^Yes — add/i }));
+
+    await waitFor(() =>
+      expect(approveRegistration).toHaveBeenCalledWith({
+        registrationId: 'reg-1',
+        createNewGuardian: true,
+      }),
+    );
+  });
+
+  it('shows no chooser when the backend named nobody', async () => {
+    listPendingRegistrations.mockResolvedValue({ data: [registration()] });
+    mount();
+
+    await screen.findByRole('heading', { name: /Dana Fields/ });
+    // Empty is "we did not find out", not "the guardian is new" — so the card
+    // says nothing about it either way.
+    expect(screen.queryByText(/The church already has/)).not.toBeInTheDocument();
+  });
+});
+
+describe('what the card refuses to claim', () => {
+  it('says nothing about the adult when the backend named nobody', async () => {
+    const user = userEvent.setup();
+    listPendingRegistrations.mockResolvedValue({ data: [registration()] });
+    mount();
+
+    await user.click(await screen.findByRole('button', { name: /Approve and add/i }));
+
+    /*
+     * An empty candidate list is "we did not find out" — write-back may not be
+     * full, the backend may have been down — so the sentence above the one
+     * irreversible press must not promise a new person the backend is about to
+     * contradict by joining a corroborated adult.
+     */
+    expect(screen.queryByText(/added as a new person/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Nothing added there can be deleted/)).toBeInTheDocument();
+  });
+
+  it('holds grouping while the other card has a name collision of its own', async () => {
+    listPendingRegistrations.mockResolvedValue({
+      data: [
+        registration({
+          sameFamily: [
+            {
+              registrationId: 'reg-2',
+              guardianName: 'Dana Fields',
+              childNames: ['Ada Fields'],
+              registeredAt: Date.parse('2026-08-09T19:11:00Z'),
+              unsettledChildren: 1,
+            },
+          ],
+        }),
+      ],
+    });
+    mount();
+
+    // Approving together pushes their children too, which would reach around
+    // the gate on their own card.
+    expect(await screen.findByRole('button', { name: /^Same family$/i })).toBeDisabled();
+    expect(screen.getByText(/Settle their own card first/)).toBeInTheDocument();
+  });
+
+  it('carries the grouping into "add the children without the parent"', async () => {
+    const user = userEvent.setup();
+    listPendingRegistrations.mockResolvedValue({
+      data: [
+        registration({
+          lastError: 'That number belongs to somebody else.',
+          lastErrorKind: 'guardian',
+          sameFamily: [
+            {
+              registrationId: 'reg-2',
+              guardianName: 'Dana Fields',
+              childNames: ['Ada Fields'],
+              registeredAt: null,
+              unsettledChildren: 0,
+            },
+          ],
+        }),
+      ],
+    });
+    mount();
+
+    await user.click(await screen.findByRole('button', { name: /^Same family$/i }));
+    await user.click(screen.getByRole('button', { name: /Add the children without Dana/i }));
+
+    // Dropping it would leave the other card's children behind while its own
+    // button still read "Approving together".
+    await waitFor(() =>
+      expect(approveRegistration).toHaveBeenCalledWith({
+        registrationId: 'reg-1',
+        withoutGuardian: true,
+        withRegistrationIds: ['reg-2'],
+      }),
+    );
+  });
+});

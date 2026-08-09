@@ -22,7 +22,7 @@ import type { PcoWriteBackMode } from '../config.js';
 import type { FirestoreLike, FunctionLogger } from '../firestore.js';
 import type { BackendId } from '../generated/backendIds.js';
 import type { CheckInsEventSummary, CheckInsImportSummary } from '../pco/checkins.js';
-import type { AddParentResult, CreateFamilyResult } from '../pco/household.js';
+import type { AdultCandidate, AddParentResult, CreateFamilyResult } from '../pco/household.js';
 import type { PcoListSummary } from '../pco/lists.js';
 import type { SetParentContactResult } from '../pco/parentContact.js';
 import type { StudentProfilePatch, UpdateStudentProfileResult } from '../pco/profile.js';
@@ -39,6 +39,7 @@ import type { RecreateStudentResult } from '../pco/recreate.js';
 export type { BackendId } from '../generated/backendIds.js';
 export type {
   AddParentResult,
+  AdultCandidate,
   CheckInsEventSummary,
   CheckInsImportSummary,
   CreateFamilyResult,
@@ -198,11 +199,34 @@ export interface PeopleBackend {
    * adult is a merge somebody does later; the wrong join shows one family
    * another family's contact details.
    *
+   * A reviewer who *is* looking at the family can settle it instead, through
+   * `parentPersonId` / `createNewParent` below. The guess is what happens when
+   * nobody was asked — a sweep, a retry, a family who registered again a month
+   * later — not the only way this decision is ever made.
+   *
    * Present iff `capabilities.parentCreatable`.
    */
   createFamily?(args: {
     /** Every child of this family, as Tally student ids. */
     studentIds: readonly string[];
+    /**
+     * The adult a reviewer picked out of `findAdultCandidates`, if they did.
+     *
+     * Set, it *is* the answer: no search runs, and the name and phone below are
+     * only used for what gets written onto them. This is the whole difference
+     * between a lobby guess and a decision — somebody looked at the candidates
+     * and said which one, so nothing here has to infer it from a phone number.
+     */
+    parentPersonId?: string | null;
+    /**
+     * A reviewer who saw the candidates and said none of them is the parent.
+     *
+     * Distinct from passing nothing, which means "nobody was asked": this
+     * suppresses the corroboration guess so a deliberate new person is created
+     * even when a name and a number would have matched. Ignored when
+     * `parentPersonId` is set.
+     */
+    createNewParent?: boolean;
     /**
      * Siblings the backend already holds. Their household is the family's real
      * one, so it is joined rather than a second one invented — the difference
@@ -217,6 +241,32 @@ export interface PeopleBackend {
     email?: string | null;
     logger?: FunctionLogger;
   }): Promise<CreateFamilyResult>;
+
+  /**
+   * Adults the backend already holds under a name, for a reviewer to choose
+   * between before anything is written.
+   *
+   * The read half of `createFamily`'s decision, split out so a screen can show
+   * it. Same search and same normalisation as the guess that runs without one,
+   * with `corroborated` carrying the evidence rather than acting on it — which
+   * is the point: at a kiosk there is nobody to ask and a phone number has to
+   * stand in for a person, but on a Tuesday there is a reviewer, and a name
+   * with no matching number is a question they can answer and this cannot.
+   *
+   * Never writes. A backend that cannot be reached is no candidates, which
+   * leaves the screen offering exactly the decision it offered before.
+   *
+   * Present iff `capabilities.parentCreatable`.
+   */
+  findAdultCandidates?(args: {
+    firstName: string;
+    lastName: string;
+    /** Digits the family typed, for `corroborated`. Never written from here. */
+    phone?: string | null;
+    /** People to leave out — the children of the registration being reviewed. */
+    excludePersonIds?: readonly string[];
+    logger?: FunctionLogger;
+  }): Promise<AdultCandidate[]>;
 
   /** Planning Center Lists. Present iff `capabilities.listsSupported`. */
   fetchLists?(args: { search?: string; limit?: number }): Promise<PcoListSummary[]>;

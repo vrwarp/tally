@@ -247,6 +247,16 @@ the results again locally through the same accent- and punctuation-insensitive n
 collapse duplicate visitors. If several people match exactly, the church database already has
 duplicates and Tally links to the lowest id rather than adding a third.
 
+The **household** a self-registered family lands in is chosen by precedence: a sibling the family
+named, then the adult Tally resolved, then the children of this push. The middle one is a fix rather
+than a refinement. A family who registers twice — two visits, two kiosk sessions, one number —
+resolves to the same parent the second time, and the household lookup used to consult only the
+children, every one of whom had been created seconds earlier and had none. So it built a second one.
+What Planning Center held afterwards was a single person as `primary_contact` of two identically
+named households, one child in each, and **there is no merge for households**: they have to be
+emptied and deleted by hand. Tally now joins the household the parent already heads, and does not
+re-post a membership for one they are already in.
+
 A name Tally holds as `Benson “蔡秉洲”` is split back into `first_name` and `nickname` before any of
 this, because Planning Center stores those as two fields and its fuzzy search indexes them
 separately. Writing the composite into `first_name` would leave Planning Center holding

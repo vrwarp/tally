@@ -22,7 +22,7 @@ import { BACKEND_PREFIXES } from '../generated/backendIds.js';
 import { checkInsBaseUrl, importCheckInsEvent, listCheckInsEvents } from './checkins.js';
 import { createPcoClient, type PcoClient } from './client.js';
 import { a32AliasesFromIncluded, resolveA32UuidFieldId } from './fieldData.js';
-import { addParent, createFamily } from './household.js';
+import { addParent, createFamily, findAdultCandidates } from './household.js';
 import { fetchListMemberIds, fetchLists } from './lists.js';
 import { setParentContact } from './parentContact.js';
 import { collectPhoneLast4 } from './phoneIndex.js';
@@ -163,7 +163,17 @@ export function createPcoBackend(args: BackendContext & { config: PcoConfig }): 
       }),
     recreateStudent: ({ studentId, firstName, lastName, grade, logger }) =>
       recreateStudent({ db, client, config, studentId, firstName, lastName, grade, logger }),
-    createFamily: ({ studentIds, anchorStudentIds, firstName, lastName, phone, email, logger }) =>
+    createFamily: ({
+      studentIds,
+      anchorStudentIds,
+      firstName,
+      lastName,
+      parentPersonId,
+      createNewParent,
+      phone,
+      email,
+      logger,
+    }) =>
       createFamily({
         db,
         client,
@@ -172,10 +182,14 @@ export function createPcoBackend(args: BackendContext & { config: PcoConfig }): 
         anchorStudentIds,
         firstName,
         lastName,
+        parentPersonId,
+        createNewParent,
         phone,
         email,
         logger,
       }),
+    findAdultCandidates: ({ firstName, lastName, phone, excludePersonIds }) =>
+      findAdultCandidates({ client, firstName, lastName, phone, excludePersonIds }),
 
     fetchLists: ({ search, limit }) => fetchLists({ client, search, limit }),
     fetchListMemberIds: (listId) => fetchListMemberIds(client, listId),
