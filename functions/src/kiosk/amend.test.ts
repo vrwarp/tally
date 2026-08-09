@@ -441,8 +441,16 @@ describe('correcting the adult', () => {
     expect(result.message).toContain('no adult on it');
   });
 
-  it('refuses once every child is upstream', async () => {
-    const db = dbWithRegistration();
+  it('still corrects the adult on a card whose children are not held', async () => {
+    /*
+     * Two real cards look like this and both want the correction. A counselor's
+     * parent contact is a record whose child was never held — quick-added at a
+     * door and queued in the ordinary way — and whose adult is the entire point
+     * of it. A kiosk family whose children landed but whose guardian was
+     * refused is kept precisely so somebody can try the adult again, and a
+     * mistyped number is the likeliest reason that refusal happened.
+     */
+    const db = dbWithRegistration({ source: 'counselor' });
     for (const id of ['held-1', 'held-2']) {
       db.seed(`students/${id}`, { ...db.get(`students/${id}`)!, pendingReview: false });
     }
@@ -455,8 +463,33 @@ describe('correcting the adult', () => {
       guardian: { firstName: 'Chidi', lastName: 'Okonkwo', phone: '5550103355' },
     });
 
+    expect(result.status).toBe('amended');
+    expect((record(db).guardian as { phone: string }).phone).toBe('5550103355');
+  });
+
+  it('refuses once the adult itself has landed upstream', async () => {
+    /*
+     * The one state where this record outlives its own adult: approval wrote
+     * the guardian and then failed on a child, so what is being kept is a retry
+     * for the children. Correcting the name here would change a copy that is
+     * about to be deleted and nothing the church can see.
+     */
+    const db = dbWithRegistration({
+      lastError: 'Planning Center is unavailable.',
+      lastErrorKind: 'children',
+    });
+
+    const result = await amendRegistration({
+      db,
+      registrationId: ID,
+      uid: UID,
+      now: NOW,
+      guardian: { firstName: 'Chidinma', lastName: 'Okonkwo', phone: '5550103344' },
+    });
+
     expect(result.status).toBe('refused');
-    expect(result.message).toContain('church’s database');
+    expect(result.message).toContain('already been added to the church’s database');
+    expect((record(db).guardian as { firstName: string }).firstName).toBe('Chidi');
   });
 });
 

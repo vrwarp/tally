@@ -932,6 +932,53 @@ describe('correcting what the family typed', () => {
     expect(screen.getByText(/The number was corrected here/)).toBeInTheDocument();
   });
 
+  it('still offers the adult on a parent contact a counselor took at a door', async () => {
+    // Settled from the moment it is created — the child was quick-added at a
+    // door and never held — and the adult is the entire point of the record.
+    listPendingRegistrations.mockResolvedValue({
+      data: [
+        registration({
+          source: 'counselor',
+          settled: true,
+          children: [
+            {
+              firstName: 'Robin',
+              lastName: 'Fields',
+              grade: 4,
+              studentId: 'held-1',
+              pendingReview: false,
+              mergedIntoStudentId: null,
+              allergies: null,
+              possibleDuplicates: [],
+            },
+          ],
+        }),
+      ],
+    });
+    mount();
+
+    expect(
+      await screen.findByRole('button', { name: /Correct Dana Fields/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('withdraws the adult once the adult itself has landed upstream', async () => {
+    // The mirror image: the guardian went upstream and a child did not, so this
+    // record now outlives its own adult and is only being kept to retry them.
+    listPendingRegistrations.mockResolvedValue({
+      data: [
+        registration({
+          lastError: 'Planning Center is unavailable.',
+          lastErrorKind: 'children',
+        }),
+      ],
+    });
+    mount();
+
+    expect(await screen.findByText('(555) 010-3344')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Correct Dana Fields/i })).toBeNull();
+  });
+
   it('offers no correction on a child who is already upstream', async () => {
     listPendingRegistrations.mockResolvedValue({
       data: [
@@ -957,6 +1004,157 @@ describe('correcting what the family typed', () => {
     // Tally could rename its own copy; the church's database would keep the old
     // spelling, and a button whose only outcome is a refusal is worse than none.
     expect(await screen.findByText('Robin Fields')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Correct/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Correct Robin Fields/i })).toBeNull();
+    // The adult is a different question and is deliberately still offered: this
+    // record is kept precisely so somebody can try the guardian again.
+    expect(screen.getByRole('button', { name: /Correct Dana Fields/i })).toBeInTheDocument();
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A parent contact a counselor took at a door.
+ *
+ * The narrower card, and the one whose every sentence had to be rewritten: its
+ * child is not held, so the foot's stock phrasing — "adds Robin", "takes Robin
+ * off the roster" — would promise things this press cannot do. The claims below
+ * are that a reviewer is told what the two buttons actually touch.
+ */
+function counselorRow(): PendingRegistration {
+  return registration({
+    registrationId: 'reg-door',
+    source: 'counselor',
+    guardian: { firstName: 'Rosa', lastName: 'Delgado', phone: '5550134422' },
+    last4: '4422',
+    children: [
+      {
+        firstName: 'Maya',
+        lastName: 'Chen',
+        grade: 9,
+        studentId: 'live-1',
+        // Never held: the counselor's own device wrote them, and the ordinary
+        // trigger pushed them minutes later.
+        pendingReview: false,
+        mergedIntoStudentId: null,
+        allergies: null,
+        possibleDuplicates: [],
+      },
+    ],
+    settled: true,
+  });
+}
+
+describe('a parent taken at a door', () => {
+  beforeEach(() => {
+    listPendingRegistrations.mockResolvedValue({ data: [counselorRow()] });
+  });
+
+  it('says where the child already is, so nobody reads the card as being about them', async () => {
+    mount();
+    expect(await screen.findByText(/Taken at the door/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/already on the roster and already queued for the church/i),
+    ).toBeInTheDocument();
+  });
+
+  it('offers to add the adult, not the child', async () => {
+    mount();
+    // "Approve and add" would be a promise about children who need nothing.
+    expect(await screen.findByRole('button', { name: /^Add Rosa$/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Approve and add/i })).not.toBeInTheDocument();
+  });
+
+  it('names the roster row the parent is about to be attached to', async () => {
+    const user = userEvent.setup();
+    mount();
+    await user.click(await screen.findByRole('button', { name: /^Add Rosa$/ }));
+
+    expect(screen.getByText(/attached to Maya/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^Yes — add Rosa$/ }));
+    await waitFor(() => expect(approveRegistration).toHaveBeenCalledWith({ registrationId: 'reg-door' }));
+  });
+
+  it('discards a number rather than a child', async () => {
+    const user = userEvent.setup();
+    mount();
+
+    // "Not ours" over a card showing a child's name reads as "remove this
+    // child" — and the callable deliberately leaves an unheld student alone.
+    expect(screen.queryByRole('button', { name: /Not ours/i })).not.toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: /^Forget the number$/ }));
+    expect(screen.getByText(/Maya stays on the roster/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /^Yes, forget the number$/ }));
+    await waitFor(() =>
+      expect(discardRegistration).toHaveBeenCalledWith({ registrationId: 'reg-door' }),
+    );
+  });
+});
+
+/**
+ * The two cards that have nobody held and are still not about the adult.
+ *
+ * Both were caught by `triage-stress.spec.ts` rather than by anything here,
+ * which is the wrong way round for a distinction the whole foot reads off.
+ */
+describe('what is not a parent-only card', () => {
+  it('keeps talking about the children when a push failed and the hold came off', async () => {
+    // Approving clears the hold before it pushes, so a family whose backend was
+    // down is left unheld with their children still absent upstream. The retry
+    // is about the children, and the button has to keep saying so.
+    listPendingRegistrations.mockResolvedValue({
+      data: [
+        registration({
+          settled: true,
+          lastError: 'Planning Center is unavailable.',
+          lastErrorKind: 'children',
+          children: [
+            {
+              firstName: 'Robin',
+              lastName: 'Fields',
+              grade: 4,
+              studentId: 'held-1',
+              pendingReview: false,
+              mergedIntoStudentId: null,
+              allergies: null,
+              possibleDuplicates: [],
+            },
+          ],
+        }),
+      ],
+    });
+    mount();
+
+    expect(await screen.findByRole('button', { name: /Finish adding them/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Add Dana$/ })).not.toBeInTheDocument();
+  });
+
+  it('does not promise a roster row to a registration whose children were never written', async () => {
+    // A registration that died between claiming its id and committing its
+    // batch. "Robin stays on the roster" would be a sentence about a child who
+    // is not on it.
+    listPendingRegistrations.mockResolvedValue({
+      data: [
+        registration({
+          children: [
+            {
+              firstName: 'Robin',
+              lastName: 'Fields',
+              grade: 4,
+              studentId: null,
+              pendingReview: false,
+              mergedIntoStudentId: null,
+              allergies: null,
+              possibleDuplicates: [],
+            },
+          ],
+        }),
+      ],
+    });
+    mount();
+
+    expect(await screen.findByRole('button', { name: /Not ours/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Forget the number/i })).not.toBeInTheDocument();
   });
 });

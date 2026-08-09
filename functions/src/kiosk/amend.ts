@@ -38,11 +38,21 @@
  *
  * ## What may be corrected, and when
  *
- * Only what is still held. A child already pushed upstream, or already folded
- * into another roster row, is not editable here: renaming the first would
- * change Tally's copy and not the church's, and renaming the second edits a
- * document that is not the one approval will push. Both cases are refused with
- * the reason, rather than accepted and quietly ignored.
+ * **A child**, only while still held. One already pushed upstream, or already
+ * folded into another roster row, is not editable here: renaming the first
+ * would change Tally's copy and not the church's, and renaming the second
+ * edits a document that is not the one approval will push.
+ *
+ * **The adult**, for as long as the adult has not been written — and the
+ * record's own survival is the evidence for that, since it is deleted the
+ * moment the guardian lands. Deliberately not keyed on whether the children
+ * are held, which two real cards make wrong: a counselor's parent contact is a
+ * record whose child was never held and whose adult is the whole point, and a
+ * kiosk family whose guardian was refused is kept precisely so somebody can
+ * try the adult again.
+ *
+ * Every refusal carries its reason rather than being accepted and quietly
+ * ignored.
  *
  * ## What the record keeps
  *
@@ -252,7 +262,7 @@ async function amendChild(context: {
      * carry it upstream.
      */
     return refused(
-      'This child has already been added to the church’s database. Correct them on their student page, so the change carries upstream.',
+      'This child is not waiting on this review — they are already on their way to the church’s database. Correct them on their student page, so the change carries upstream.',
     );
   }
 
@@ -425,20 +435,31 @@ async function amendGuardian(context: {
       'This registration has no adult on it — the children were added alongside a family the church already has. There is nothing to correct.',
     );
   }
-  if (record.studentIds.length > 0) {
-    const states = await Promise.all(
-      record.studentIds.map(async (id) => (await db.doc(`${PATHS.students}/${id}`).get()).data()),
+  /*
+   * The adult may be corrected for exactly as long as the adult has not been
+   * written, and the record itself is the evidence: it is deleted the moment
+   * the guardian lands upstream, or is deliberately skipped, or the family is
+   * discarded. So its survival *is* the licence — with one exception.
+   *
+   * `lastErrorKind: 'children'` is that exception, and it is the only state
+   * where this record outlives its own adult: approval wrote the guardian
+   * successfully and then failed on a child, so the record is being kept to
+   * retry the children. Correcting the name or number here would change a copy
+   * that is about to be deleted and nothing the church can see.
+   *
+   * This deliberately does *not* key on whether the children are held, which is
+   * what it used to do and what two real cards make wrong. A counselor's parent
+   * contact (`source: 'counselor'`) is a record whose child was never held —
+   * they were quick-added at a door and queued in the ordinary way — and whose
+   * adult is the entire point of it. And a kiosk family whose children landed
+   * but whose guardian was refused is kept precisely so somebody can try the
+   * adult again; a mistyped number is the likeliest reason that refusal
+   * happened, and fixing it is the move that ends the job.
+   */
+  if (record.lastErrorKind === 'children') {
+    return refused(
+      'The parent on this registration has already been added to the church’s database — what is left to retry is the children. Correct their details there.',
     );
-    if (states.every((data) => data === undefined || data.pendingReview !== true)) {
-      /*
-       * Every child is already upstream, so the household has been built or
-       * refused around the number as it stood. Correcting it here would change
-       * only Tally's soon-to-be-deleted copy.
-       */
-      return refused(
-        'These children have already been added to the church’s database. The parent’s details belong there now.',
-      );
-    }
   }
 
   const corrected = {

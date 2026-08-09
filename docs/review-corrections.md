@@ -241,14 +241,32 @@ exists to prevent (see [data-model.md](data-model.md#the-one-place-tally-holds-a
 That one *was* corrected is recorded instead, which is all a second reviewer
 needs.
 
-### 10. Only offer it where it can still matter.
+### 10. Only offer it where it can still matter — and that is a different question for each half.
 
-No **Correct** button appears on a child who has been pushed, a child who has
-been folded into another roster row, or an adult on a settled card. Each would
-either lie about what it can change or edit a document nobody will read. A
-button whose only possible outcome is a refusal is worse than no button — and
-the server refuses all three anyway, because the screen is not the only thing
-that can call it.
+No **Correct** button appears on a child who has been pushed or folded into
+another roster row. Each would either lie about what it can change or edit a
+document nobody will read.
+
+The adult is *not* the same test, and the obvious version of it is wrong. "Are
+the children still held?" gets two real cards backwards:
+
+- a **counselor's parent contact** — a leader quick-added a visitor at a door
+  and took a number down afterwards — is settled from the moment it is created,
+  because that child was never held. The adult is the entire point of it.
+- a **kiosk family whose guardian was refused** is settled too, and is kept
+  precisely so somebody can try the adult again. A mistyped number is the
+  likeliest reason for that refusal, so correcting it is the move that ends the
+  job.
+
+The adult is editable for as long as the adult has not been written, and the
+record's own survival is the evidence — it is deleted the moment the guardian
+lands. The one genuinely-too-late card is the mirror image: `lastErrorKind:
+'children'` means the guardian went upstream and a child did not, so the record
+now outlives its own adult.
+
+A button whose only possible outcome is a refusal is worse than no button — and
+the server refuses each of these anyway, because the screen is not the only
+thing that can call it.
 
 ---
 

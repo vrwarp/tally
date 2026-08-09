@@ -803,8 +803,14 @@ export interface SameFamilyHint {
 /** Mirrors `PendingRegistration` in functions/src/kiosk/review.ts. */
 export interface PendingRegistration {
   registrationId: string;
-  /** 'qr' is legacy — the retired phone form's records, draining on the 30-day TTL. */
-  source: 'kiosk' | 'qr';
+  /**
+   * Where the card came from. `'counselor'` is a parent contact taken at a door
+   * beside a quick-added visitor — that child is already on the roster and
+   * already queued upstream, so the adult is the only thing waiting.
+   *
+   * `'qr'` is legacy: the retired phone form's records, draining on the 30-day TTL.
+   */
+  source: 'kiosk' | 'qr' | 'counselor';
   eventId: string | null;
   registeredAt: number | null;
   /** Milliseconds until the record is swept. Negative means overdue. */
@@ -860,6 +866,40 @@ export const listPendingRegistrations = httpsCallable<void, PendingRegistration[
   functions,
   'listPendingRegistrations',
 );
+
+/** Mirrors `RecordVisitorParentResult` in functions/src/kiosk/visitorParent.ts. */
+export interface RecordVisitorParentResult {
+  status: 'recorded' | 'already-recorded';
+  /** The digits the family can type at the lobby kiosk from now on. */
+  last4: string;
+  message: string;
+}
+
+/**
+ * The optional second half of a quick-add: a parent's name and number, taken at
+ * the door and held for the Review screen.
+ *
+ * Never on the critical path. The student and their check-in are already
+ * written by the time this is called, so a failure here costs the number and
+ * nothing else — which is why the modal reports it as its own sentence rather
+ * than as a failed check-in.
+ *
+ * A callable rather than a write because there is no document in Tally a client
+ * may put a parent's details on, deliberately: `noMirroredPersonalData` in
+ * `firestore.rules` refuses them on a student, and the registration collection
+ * a member of the team may read is nothing at all.
+ */
+export const recordVisitorParent = httpsCallable<
+  {
+    studentId: string;
+    /** Minted per press of Save; re-sent on a retry so a lost answer cannot double it. */
+    registrationId: string;
+    guardian: { firstName: string; lastName: string; phone: string };
+    /** The gathering they were just checked into, for the reviewer's context. */
+    eventId?: string | null;
+  },
+  RecordVisitorParentResult
+>(functions, 'recordVisitorParent');
 
 /** Mirrors `ApproveRegistrationResult` in functions/src/kiosk/review.ts. */
 export interface ApproveRegistrationResult {

@@ -150,7 +150,13 @@ export interface SameFamilyHint {
 
 export interface PendingRegistration {
   registrationId: string;
-  source: 'kiosk' | 'qr';
+  /**
+   * How this card got here. `'counselor'` is the one whose children are not
+   * held: a leader quick-added the visitor at a door and took a parent's
+   * details down afterwards, so the child is already on the roster and already
+   * queued upstream, and the adult is the only thing waiting on the decision.
+   */
+  source: 'kiosk' | 'qr' | 'counselor';
   /** The gathering they were checked into, when there was one. */
   eventId: string | null;
   registeredAt: number | null;
@@ -485,7 +491,17 @@ function linkSameFamily(rows: PendingRegistration[]): void {
 
   const byDigits = new Map<string, PendingRegistration[]>();
   for (const row of rows) {
-    if (row.guardian === null || row.settled) continue;
+    /*
+     * Every card that still has an adult to place, settled children or not.
+     *
+     * `settled` used to stand in for "nothing left to do here", which was true
+     * while every record on this screen was a kiosk family whose children were
+     * the held half. It is false for a parent a counselor took down at a door —
+     * that child was never held — and false for a kiosk family whose children
+     * landed and whose guardian did not, which is precisely the card that most
+     * needs to know another one shares its number.
+     */
+    if (row.guardian === null) continue;
     const digits = digitsOf(row.guardian.phone);
     if (digits.length === 0) continue;
     byDigits.set(digits, [...(byDigits.get(digits) ?? []), row]);
@@ -544,7 +560,10 @@ async function namesFromUpstream(
 
   const asked = new Map<string, PendingRegistration[]>();
   for (const row of rows) {
-    if (row.guardian === null || row.settled) continue;
+    // An outstanding adult, whatever the children are doing — see the same
+    // change in `linkSameFamily`. The candidates are the whole content of a
+    // counselor's card, whose child was never held in the first place.
+    if (row.guardian === null) continue;
     // Stringified rather than concatenated: "Ann Marie"/"Lee" and "Ann"/
     // "MarieLee" are two families, and joining them on nothing makes them one —
     // which would show the second card the first one's candidate list.
@@ -801,11 +820,30 @@ export async function approveRegistration(options: {
 
   let pushed = 0;
   let failed = 0;
+  let changed = false;
   for (const studentId of live) {
     try {
       const result = await backend.pushStudent({ studentId, logger });
-      if (result.status === 'skipped') failed += 1;
-      else pushed += 1;
+      /*
+       * A child the backend already holds is not a refusal.
+       *
+       * `pushStudent` answers `skipped` for two unrelated things: "I could not"
+       * and "there is nothing to do, they are already linked" — the second of
+       * which comes back carrying the very person id that proves it. Counting
+       * it as a failure kept a record open for ever offering a retry of a job
+       * that was done, which is the state a counselor's card would arrive in on
+       * every deployment short of full write-back: that child was pushed by the
+       * ordinary trigger minutes after they were added. `pushed` already means
+       * "reached the backend on this attempt or an earlier one".
+       */
+      if (result.status === 'skipped') {
+        if (result.pcoPersonId) pushed += 1;
+        else failed += 1;
+      } else {
+        pushed += 1;
+        // Only a write invalidates what a read of the backend would answer.
+        changed = true;
+      }
     } catch (error) {
       failed += 1;
       logger.warn('Could not push an approved child upstream; it stays queued', {
@@ -815,7 +853,7 @@ export async function approveRegistration(options: {
       });
     }
   }
-  if (pushed > 0) backend.resetCache();
+  if (changed) backend.resetCache();
 
   /* ---- Allergies, where they belong --------------------------------------- */
 
@@ -1051,8 +1089,13 @@ export async function discardRegistration(options: {
     status: 'discarded',
     deactivated,
     message:
-      deactivated === 1
-        ? 'Taken off the roster. Their check-in history is kept.'
-        : `${deactivated} students taken off the roster. Their check-in history is kept.`,
+      deactivated === 0
+        ? // Nobody was held, so nobody comes off — the record was carrying an
+          // adult and nothing else, which is what a counselor's is, and what a
+          // kiosk family's becomes once their children have been approved.
+          'The parent’s details are gone. Nothing changed on the roster.'
+        : deactivated === 1
+          ? 'Taken off the roster. Their check-in history is kept.'
+          : `${deactivated} students taken off the roster. Their check-in history is kept.`,
   };
 }

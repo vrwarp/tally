@@ -672,9 +672,19 @@ test pins it.
 
 ### `kioskRegistrations/{registrationId}`
 
-One document per run of the kiosk's "first time here" wizard. It does two jobs: it is the claim that
-makes a retried registration answer instead of creating a second family, and it is the **review
-record** a core-team member acts on afterwards.
+One document per run of the kiosk's "first time here" wizard — and, since Aug 2026, one per parent
+contact a counselor was handed at a door beside a quick-added visitor. It does two jobs: it is the
+claim that makes a retried submission answer instead of creating a second family, and it is the
+**review record** a core-team member acts on afterwards.
+
+The two kinds differ in exactly one way, and `source` is how a reader tells them apart. A `kiosk`
+record's children are **held** (`pendingReview: true`) — a stranger typed them on a public screen, so
+nothing about them reaches the church's database until somebody looks. A `counselor` record's child
+is not: they were quick-added by a member of the team standing next to them, they are on the roster
+and queued upstream in the ordinary way before this document exists, and the only thing waiting on
+the reviewer is the adult. Approving one is therefore a `createFamily` and nothing else; discarding
+one forgets a phone number and leaves the roster alone (`discardRegistration` deactivates held
+students only, which was already true and is now load-bearing).
 
 A parent taps once. A wifi blip means the call runs twice, and the kiosk's retry queue is no help —
 it replays direct Firestore writes, and a callable is not one. So the client mints a
@@ -687,10 +697,10 @@ what make every write downstream safe to repeat.
 | --- | --- | --- |
 | `status` | `'pending' \| 'complete'` | A `pending` document is resumed rather than restarted: every write downstream is keyed by the ids below, so replaying is repeating, not duplicating. |
 | `studentIds` | string[] | Pre-allocated before the batch, which is the whole mechanism. |
-| `source` | `'kiosk' \| 'qr'` | `'qr'` is legacy — the retired phone form wrote it until Aug 2026; such records drain on the 30-day sweep. The read side (this table's parsers, the review card's "from their own phone" subtitle) stays tolerant until they are gone. |
+| `source` | `'kiosk' \| 'counselor' \| 'qr'` | `'counselor'` is a parent contact taken at a door beside a quick-added visitor — the child is already live, and the card is about the adult alone. `'qr'` is legacy — the retired phone form wrote it until Aug 2026; such records drain on the 30-day sweep. The read side (this table's parsers, the review card's "from their own phone" subtitle) stays tolerant until they are gone. |
 | `eventId`, `checkedIn`, `childCount`, `last4` | — | Enough to answer a completed call again. |
-| `guardian` | `{ firstName, lastName, phone }` \| null | **The exception below.** Null only on a sibling registration, where the family is already identified. |
-| `children` | `{ firstName, lastName, grade }[]` | The form as typed, so a reviewer sees what the family wrote and not only what the roster now says. |
+| `guardian` | `{ firstName, lastName, phone }` \| null | **The exception below.** Null only on a sibling registration, where the family is already identified. On a `counselor` record it is the whole point of the document. |
+| `children` | `{ firstName, lastName, grade }[]` | The form as typed, so a reviewer sees what the family wrote and not only what the roster now says. On a `counselor` record it is read back off the student document instead — there is no second typing to preserve, and the name a reviewer decides a household by should be the name on the roster. |
 | `allergies` | `(string \| null)[]` | Index-aligned with `children`, from the wizard's allergies question — asked only where the backend takes full write-back, exactly the gate the retired phone form kept. Sent upstream on approval and held nowhere else. |
 | `possibleDuplicateOf` | map | Child index → active student ids with the same name. Recorded, never acted on: it is what puts "this might be the Jacob Smith we have" in front of a human. Recomputed for every child whenever a reviewer corrects one — the entry is the answer to a question asked about the name *as typed*, and fixing a misspelling is what most often reveals the collision the door missed. Written densely, with an explicit `[]` for a child the rescan cleared, because a merged write cannot remove a key. |
 | `anchorStudentIds` | string[] | Verified siblings, when a parent added a second child to a family the church already has. Decides which household is joined at approval. |
@@ -712,12 +722,20 @@ a lobby screen cannot decide identity) would otherwise mean *losing* the guardia
 `noMirroredPersonalData` in `firestore.rules` forbids a parent's name or number on a student document
 and there is nowhere else for it to go.
 
+A counselor's parent contact lands here for exactly the same reason, and the reasoning transfers
+without weakening. The rule it runs into is the same rule — a student document may not carry a
+parent — and the decision it defers is the same decision: `addParent`, the core team's own path,
+exists because "is this the David Kim the church already has?" is a question a person answers with
+the directory in front of them. A door with a queue behind it is the worst place in the building to
+ask it. So the counselor records and the Review screen decides, and the number lives under the same
+three guarantees below in the meantime.
+
 So it waits here, and "waits" is enforced rather than asserted:
 
 - **No client can read it.** The collection is deny-all in both directions. The only way to see it is
   the `listPendingRegistrations` callable, which is core team only — the same role that may already
   push a student into the church's database.
-- **It may be corrected, never widened.** `amendRegistration` (core team, `functions/src/kiosk/amend.ts`) rewrites one child or the adult on a registration that is still held — the third answer between approving a misspelling into a database with no delete and discarding a real family. It corrects fields that are already here; it cannot add a person, and it refuses a child who has already been pushed or merged. A corrected number moves the family between buckets in [`kioskIndex/phones`](#kioskindexphones) in both directions, so the digits they mistyped stop finding their children.
+- **It may be corrected, never widened.** `amendRegistration` (core team, `functions/src/kiosk/amend.ts`) rewrites one child or the adult on a registration that is still held — the third answer between approving a misspelling into a database with no delete and discarding a real family. It corrects fields that are already here; it cannot add a person, and it refuses a child who has already been pushed or merged. The adult is editable for as long as the adult has not been written — this record's survival is the evidence, since it is deleted the moment the guardian lands — so a counselor's parent contact and a kiosk family whose guardian was refused are both still correctable, and only `lastErrorKind: 'children'` (guardian written, children still to retry) is refused. A corrected number moves the family between buckets in [`kioskIndex/phones`](#kioskindexphones) in both directions, so the digits they mistyped stop finding their children.
 - **It is deleted on decision.** Approve or discard, the document goes. An approval whose family
   write *failed* keeps it, with the reason, so pressing the button again can still finish the job —
   that is the only case where it survives a review.
@@ -811,7 +829,8 @@ family numbers, mapped to student ids, and nothing more. Never a full number, ne
 to a number, and always rebuildable — deleting the document costs one rebuild, not any data.
 
 [`kioskRegistrations`](#kioskregistrationsregistrationid) is the newer one and the wider one: a
-guardian's name and full phone number, waiting for somebody to review the family who typed them. It
+guardian's name and full phone number, waiting for somebody to review the family who typed them — or
+the family a counselor was told about at a door. It
 is a **staging buffer, not a mirror**, and the difference is enforced — no client read path at all,
 a core-team callable to see it, deletion the moment a reviewer decides, and a thirty-day sweep if
 nobody does. It exists because holding a family out of the church's database until a person has
