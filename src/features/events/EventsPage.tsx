@@ -111,16 +111,16 @@ function EventRow({
             {event.title}
           </span>
 
-          {/* One step closer than it was. Five of these rows say "Friday
-              Fellowship" and five say "Sunday School", so the date is the only
-              thing that tells them apart — and it was the quietest mark in the
-              row, a step further back than the same line in the past list. */}
-          {/* Allowed to wrap. Truncating this line dropped the room off every
-              row, at a different point on each one because the dates are
-              different widths — a ragged column of ellipses promising a location
+          {/* Five of these rows say "Friday Fellowship" and five say "Sunday
+              School", so the date is the only thing that tells them apart — and
+              it used to be the quietest mark in the row.
+
+              Allowed to wrap, too. Truncating this line dropped the room off
+              every row, at a different point on each one because the dates are
+              different widths: a ragged column of ellipses promising a location
               twenty times and delivering it never. The locked heads below wrap
-              for the same reason; there was no reason the rows the reader can
-              actually open should keep the recipe rejected next door. */}
+              for the same reason, and there was no reason the rows the reader
+              can actually open should keep the recipe rejected next door. */}
           <span className="mt-0.5 block text-xs leading-snug text-ink-400">
             {formatEventDay(event.startAt, now)} · {formatEventWindow(event)}
             {event.location ? ` · ${event.location}` : ''}
@@ -531,13 +531,13 @@ export function EventsPage() {
       <header className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-bold text-ink-50">Events</h1>
         <div className="flex items-center gap-2">
-          {/* Quieter than "New event" on purpose: importing history happens a
-              handful of times in an install's life, scheduling happens weekly. */}
           {/* Same weight as Import, and for the same reason: a grid is
               something a leader builds at the end of a term, not weekly. */}
           <Button variant="secondary" onClick={() => setGridOpen(true)}>
             Export
           </Button>
+          {/* Quieter than "New event" on purpose: importing history happens a
+              handful of times in an install's life, scheduling happens weekly. */}
           <Button variant="secondary" onClick={() => setImporting(true)}>
             Import
           </Button>
