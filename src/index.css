@@ -33,7 +33,31 @@
  * orientation clears neither. Both entries exist only in the kiosk's own
  * screens, so a wide desktop window matching it is not a case that arises.
  */
-@custom-variant kiosk (@media (min-height: 1000px), (min-width: 1024px));
+/*
+ * Written as two blocks rather than as one comma-separated query, because the
+ * comma-separated form does not survive compilation. Tailwind takes the
+ * shorthand `@custom-variant name (@media A, B)` apart on the comma and keeps
+ * only the first condition, so
+ *
+ *     @custom-variant kiosk (@media (min-height: 1000px), (min-width: 1024px));
+ *
+ * compiled to `@media (height>=1000px)` and nothing else — `kiosk:` was
+ * byte-for-byte `tall:`, and the landscape tablet this variant exists for fell
+ * through it exactly the way it falls through `tall:`. Every `kiosk:` utility
+ * under `src/kiosk/` was inert on a 1280×800 kiosk, silently, because a variant
+ * that matches nothing looks the same as a screen nobody stepped up.
+ *
+ * The block form emits one rule per `@slot`, which is what an "either of these"
+ * variant has to be.
+ */
+@custom-variant kiosk {
+  @media (min-height: 1000px) {
+    @slot;
+  }
+  @media (min-width: 1024px) {
+    @slot;
+  }
+}
 
 /*
  * Tally design tokens.
