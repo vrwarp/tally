@@ -28,6 +28,8 @@ interface DrawnText {
 
 let drawn: DrawnText[] = [];
 let filledRects: number[][] = [];
+/** Every transform the renderer applied, in order — the quarter turn shows up here. */
+let transforms: string[] = [];
 
 class StubContext {
   font = '';
@@ -42,6 +44,20 @@ class StubContext {
 
   fillRect(x: number, y: number, w: number, h: number): void {
     filledRects.push([x, y, w, h]);
+  }
+
+  /*
+   * The stub does not apply these, it records them. What the rotated case has to
+   * get right is the *box*, and the drawing coordinates stay in the layout's own
+   * frame either way — so a stub that faithfully rotated points would be
+   * asserting the browser's matrix maths rather than this file's arithmetic.
+   */
+  translate(x: number, y: number): void {
+    transforms.push(`translate(${x},${y})`);
+  }
+
+  rotate(angle: number): void {
+    transforms.push(`rotate(${angle.toFixed(4)})`);
   }
 
   /** Half the font size per character: monotonic in both variables, like a font. */
@@ -74,6 +90,7 @@ const original = (globalThis as { OffscreenCanvas?: unknown }).OffscreenCanvas;
 beforeEach(() => {
   drawn = [];
   filledRects = [];
+  transforms = [];
   (globalThis as { OffscreenCanvas?: unknown }).OffscreenCanvas = StubOffscreenCanvas;
 });
 
@@ -162,6 +179,61 @@ describe('drawLabel', () => {
         copies: 1,
       };
       expect(drawLabel(runaway, values, { width: 696, height: null }).height).toBeLessThanOrEqual(1800);
+    });
+  });
+
+  describe('turned a quarter turn', () => {
+    const one: LabelTemplate = {
+      lines: [{ text: '{{firstName}}', size: 'xl', bold: true, align: 'center', requiresValue: false }],
+      copies: 1,
+    };
+
+    it('turns the canvas rather than the layout', () => {
+      drawLabel(one, values, { width: null, height: 696 }, { rotated: true });
+      // A quarter turn about the top-right corner, so the first line's start
+      // lands at the leading edge of the tape.
+      expect(transforms).toEqual(['translate(696,0)', `rotate(${(Math.PI / 2).toFixed(4)})`]);
+    });
+
+    it('leaves an upright label untransformed', () => {
+      drawLabel(one, values, { width: 696, height: null });
+      expect(transforms).toEqual([]);
+    });
+
+    it('swaps the raster\'s two dimensions', () => {
+      // Laid out in a box whose height is the tape's width and whose length is
+      // free; rasterised the other way round, because the head is 696 dots wide
+      // however the text is arranged on it.
+      const image = drawLabel(one, values, { width: null, height: 696 }, { rotated: true });
+
+      expect(image.width).toBe(696);
+      expect(image.height).toBeGreaterThan(1);
+      expect(image.data.length).toBe(696 * image.height * 4);
+    });
+
+    it('gets longer as the name gets longer, instead of smaller', () => {
+      const short = drawLabel(one, { firstName: 'Ada' }, { width: null, height: 696 }, { rotated: true });
+      const long = drawLabel(
+        one,
+        { firstName: 'Bartholomew Fitzwilliam' },
+        { width: null, height: 696 },
+        { rotated: true },
+      );
+
+      expect(long.height).toBeGreaterThan(short.height);
+      expect(long.width).toBe(696);
+    });
+
+    it('still refuses to run off the end of the roll', () => {
+      // The cap is a limit along the roll, so turning the label does not escape
+      // it — it is now the name's length that could run away.
+      const image = drawLabel(
+        one,
+        { firstName: 'W'.repeat(400) },
+        { width: null, height: 696 },
+        { rotated: true },
+      );
+      expect(image.height).toBeLessThanOrEqual(1800);
     });
   });
 

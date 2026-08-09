@@ -20,13 +20,18 @@
 import { useState } from 'react';
 import { CheckboxField, SelectField, TextField } from '@/components/ui';
 import {
+  DEFAULT_FIXED_LENGTH_MM,
+  DEFAULT_LABEL_MARGIN_MM,
   DEFAULT_LABEL_TEMPLATE,
   LABEL_LINE_ALIGNS,
   LABEL_LINE_SIZES,
   LABEL_TOKENS,
   MAX_LABEL_COPIES,
+  MAX_LABEL_FIXED_LENGTH_MM,
   MAX_LABEL_LINES,
   MAX_LABEL_LINE_LENGTH,
+  MAX_LABEL_MARGIN_MM,
+  MIN_LABEL_FIXED_LENGTH_MM,
   fillLabelTokens,
   tokensIn,
   unknownTokensIn,
@@ -34,6 +39,7 @@ import {
   type LabelTemplate,
 } from '@/lib/labelTemplate';
 import { cn } from '@/lib/utils';
+import { labelBoxFor } from '@/lib/labelRender';
 import { LabelPreview } from '@/features/events/LabelPreview';
 import { SAMPLE_VALUES, SPARSE_SAMPLE_VALUES } from '@/features/events/labelSamples';
 
@@ -96,6 +102,15 @@ export function LabelTemplateField({
 }) {
   const [media, setMedia] = useState<string>(PREVIEW_MEDIA[0].id);
   const chosen = PREVIEW_MEDIA.find((entry) => entry.id === media) ?? PREVIEW_MEDIA[0];
+  /*
+   * The same mapping the kiosk's rasteriser makes, from the same function — so
+   * a rotated label previews as the long thin sticker it will actually be, and
+   * a fixed length shows up as one.
+   */
+  const preview = labelBoxFor(value ?? DEFAULT_LABEL_TEMPLATE, {
+    widthDots: chosen.width,
+    lengthDots: chosen.height,
+  });
 
   /**
    * Which of the two sample children the preview is drawn for.
@@ -139,6 +154,47 @@ export function LabelTemplateField({
   const addLine = () => {
     if (!value || value.lines.length >= MAX_LABEL_LINES) return;
     onChange({ ...value, lines: [...value.lines, blankLine()] });
+  };
+
+  /**
+   * Swap a line with its neighbour.
+   *
+   * Two buttons rather than a drag: the order matters most on a phone, where a
+   * leader is editing between services, and a drag handle inside a scrolling
+   * form is the one gesture guaranteed to fight the scroll.
+   */
+  const moveLine = (index: number, delta: number) => {
+    if (!value) return;
+    const to = index + delta;
+    if (to < 0 || to >= value.lines.length) return;
+    const lines = [...value.lines];
+    const moving = lines[index]!;
+    lines[index] = lines[to]!;
+    lines[to] = moving;
+    onChange({ ...value, lines });
+  };
+
+  /**
+   * A shape setting, or its absence.
+   *
+   * Absent is a real answer here and not a missing one — it means "whatever the
+   * renderer does by default" — so an emptied box stores nothing rather than a
+   * zero, and the label goes back to printing what it printed before anybody
+   * touched this.
+   */
+  const patchShape = (patch: Partial<LabelTemplate>) => {
+    if (!value) return;
+    const next = { ...value, ...patch };
+    for (const [key, entry] of Object.entries(patch)) {
+      if (entry === undefined) delete next[key as keyof LabelTemplate];
+    }
+    onChange(next);
+  };
+
+  const numberOrUndefined = (raw: string): number | undefined => {
+    if (raw.trim() === '') return undefined;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : undefined;
   };
 
   const insertToken = (index: number, token: string) => {
@@ -225,6 +281,19 @@ export function LabelTemplateField({
                           </button>
                         ))}
                       </div>
+                      {/*
+                        * Shown on the line that has tokens in it, where the
+                        * problem it solves is about to appear. A leader who has
+                        * only ever typed one token per line never needs it, and
+                        * never sees it.
+                        */}
+                      {hasTokens ? (
+                        <p className="text-xs leading-snug text-ink-500">
+                          Put square brackets round a part that should disappear on its own:{' '}
+                          <code className="text-ink-400">{'{{lastName}}[ ({{grade}})]'}</code> prints
+                          the brackets only for a child who has a grade.
+                        </p>
+                      ) : null}
 
                       <div className="flex flex-wrap items-end gap-2">
                         <SelectField
@@ -279,13 +348,48 @@ export function LabelTemplateField({
                             />
                           </div>
                         ) : null}
-                        <button
-                          type="button"
-                          onClick={() => removeLine(index)}
-                          className="ml-auto rounded-md px-2 py-1 text-xs font-semibold text-danger-400 hover:bg-ink-800"
-                        >
-                          Remove
-                        </button>
+                        {/*
+                          * The order is the label: the name goes at the top and
+                          * the time at the bottom, and getting that wrong is the
+                          * commonest thing to want to undo after typing four
+                          * lines. Disabled at the ends rather than hidden, so
+                          * the pair does not jump about as lines move.
+                          */}
+                        <div className="ml-auto flex items-center gap-1">
+                          <button
+                            type="button"
+                            aria-label={`Move line ${index + 1} up`}
+                            disabled={index === 0}
+                            onClick={() => moveLine(index, -1)}
+                            className={cn(
+                              'rounded-md px-2 py-1 text-sm',
+                              index === 0 ? 'text-ink-600' : 'text-ink-300 hover:bg-ink-800',
+                            )}
+                          >
+                            ↑
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={`Move line ${index + 1} down`}
+                            disabled={index === value.lines.length - 1}
+                            onClick={() => moveLine(index, 1)}
+                            className={cn(
+                              'rounded-md px-2 py-1 text-sm',
+                              index === value.lines.length - 1
+                                ? 'text-ink-600'
+                                : 'text-ink-300 hover:bg-ink-800',
+                            )}
+                          >
+                            ↓
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeLine(index)}
+                            className="rounded-md px-2 py-1 text-xs font-semibold text-danger-400 hover:bg-ink-800"
+                          >
+                            Remove
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -323,6 +427,111 @@ export function LabelTemplateField({
                     )}
                   </SelectField>
                 </div>
+
+                {/*
+                  * How the sticker sits on the roll, as opposed to what it says.
+                  *
+                  * Here rather than on the kiosk because this is where somebody
+                  * can see the result: the preview beside it is drawn by the
+                  * same code that will print it, and nobody standing at the
+                  * printer setup screen is looking at labels. The three that
+                  * only continuous tape can honour say so once, at the bottom,
+                  * rather than each repeating it.
+                  */}
+                <fieldset className="flex flex-col gap-3 rounded-lg bg-ink-900/60 p-3">
+                  <legend className="px-1 text-xs font-semibold tracking-wide text-ink-400 uppercase">
+                    On the roll
+                  </legend>
+
+                  <CheckboxField
+                    label="Print along the tape"
+                    hint="Turns the label a quarter turn, so a long name runs down the roll instead of being shrunk to fit across it."
+                    checked={value.rotated === true}
+                    onChange={(changed) =>
+                      patchShape({ rotated: changed.target.checked ? true : undefined })
+                    }
+                  />
+
+                  <div className="flex flex-wrap items-start gap-3">
+                    <TextField
+                      label="Space above (mm)"
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      max={MAX_LABEL_MARGIN_MM}
+                      step={0.1}
+                      className="w-36"
+                      value={value.marginTopMm ?? ''}
+                      placeholder={String(DEFAULT_LABEL_MARGIN_MM)}
+                      onChange={(changed) =>
+                        patchShape({ marginTopMm: numberOrUndefined(changed.target.value) })
+                      }
+                    />
+                    <TextField
+                      label="Space below (mm)"
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      max={MAX_LABEL_MARGIN_MM}
+                      step={0.1}
+                      className="w-36"
+                      value={value.marginBottomMm ?? ''}
+                      placeholder={String(DEFAULT_LABEL_MARGIN_MM)}
+                      onChange={(changed) =>
+                        patchShape({ marginBottomMm: numberOrUndefined(changed.target.value) })
+                      }
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap items-start gap-3">
+                    <CheckboxField
+                      label="Same length every time"
+                      hint="Otherwise the label is as long as the text needs, so a short name makes a short sticker."
+                      checked={value.fixedLengthMm !== undefined}
+                      onChange={(changed) =>
+                        patchShape({
+                          fixedLengthMm: changed.target.checked ? DEFAULT_FIXED_LENGTH_MM : undefined,
+                        })
+                      }
+                    />
+                    {value.fixedLengthMm === undefined ? null : (
+                      <TextField
+                        label="Length (mm)"
+                        type="number"
+                        inputMode="decimal"
+                        min={MIN_LABEL_FIXED_LENGTH_MM}
+                        max={MAX_LABEL_FIXED_LENGTH_MM}
+                        step={1}
+                        className="w-36"
+                        value={value.fixedLengthMm}
+                        onChange={(changed) =>
+                          patchShape({
+                            fixedLengthMm:
+                              numberOrUndefined(changed.target.value) ?? DEFAULT_FIXED_LENGTH_MM,
+                          })
+                        }
+                      />
+                    )}
+                  </div>
+
+                  {/*
+                    * Said when it is being ignored rather than always, because
+                    * "the preview is not showing what you just ticked" is the
+                    * only moment this matters — and the preview beside it is
+                    * about to look exactly as though the tick did nothing.
+                    */}
+                  {chosen.height !== null && (value.rotated === true || value.fixedLengthMm !== undefined) ? (
+                    <p className="text-xs leading-snug text-warn-400">
+                      {chosen.name} is die-cut, so the preview ignores these — its size is already
+                      decided. A kiosk with a continuous roll loaded will use them.
+                    </p>
+                  ) : (
+                    <p className="text-xs leading-snug text-ink-500">
+                      The turn and the fixed length need a continuous roll. A die-cut label is already
+                      a fixed size, and a kiosk with one loaded ignores them.
+                    </p>
+                  )}
+                </fieldset>
               </div>
 
               <div className="flex flex-col gap-2">
@@ -341,7 +550,8 @@ export function LabelTemplateField({
                 <LabelPreview
                   template={value}
                   values={previewSparse ? SPARSE_SAMPLE_VALUES : SAMPLE_VALUES}
-                  box={{ width: chosen.width, height: chosen.height }}
+                  box={preview.box}
+                  rotated={preview.rotated}
                 />
                 <CheckboxField
                   label="A child with nothing on file"

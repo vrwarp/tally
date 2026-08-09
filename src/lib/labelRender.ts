@@ -40,6 +40,14 @@ export interface LabelDraw {
 export interface LabelLayout {
   draws: LabelDraw[];
   /**
+   * The width the content needs, in dots.
+   *
+   * The mirror of `height`: on a rotated label this is the free dimension and
+   * the caller cuts the tape where it says, and everywhere else the width was
+   * fixed going in and this reports it back unchanged.
+   */
+  width: number;
+  /**
    * The height the content needs, in dots.
    *
    * On continuous tape the caller uses this as the label's length. On die-cut
@@ -60,8 +68,16 @@ export interface LabelLayout {
 export type MeasureText = (text: string, fontPx: number, bold: boolean) => number;
 
 export interface LabelBox {
-  /** Printable width in dots. Fixed by the media. */
-  width: number;
+  /**
+   * Printable width in dots, or null when the width is the free dimension.
+   *
+   * Null is the rotated case, and only that: the text runs along the tape, so
+   * the roll's width has become the height and it is the *length* that the
+   * content decides. Every line is then as long as it wants to be — there is
+   * nothing to shrink to and nothing to wrap at — and the layout reports the
+   * width it used.
+   */
+  width: number | null;
   /**
    * Printable height in dots, or null for continuous tape where length is free.
    *
@@ -92,6 +108,71 @@ export interface LabelBox {
  * A margin a person typed is millimetres, because that is what a ruler has.
  */
 export const DOTS_PER_MM = 300 / 25.4;
+
+/**
+ * The media a label is being drawn on, in dots.
+ *
+ * Just the two numbers the geometry needs. The kiosk gets them from the label
+ * table; the event editor, which must not carry that table, gets them from the
+ * short list beside its preview.
+ */
+export interface LabelMedia {
+  /** Printable width across the print head. */
+  widthDots: number;
+  /** Printable length, or null for continuous tape. */
+  lengthDots: number | null;
+}
+
+/**
+ * What the template asks for, on the media that is loaded.
+ *
+ * The one place the two meet, and shared by both drawers on purpose: the kiosk
+ * rasterises through `drawLabel` and the editor paints a preview, and a label
+ * that previews one way and prints another is worse than no preview at all.
+ * Three decisions come out of it.
+ *
+ * **Which dimension is free.** Continuous tape has one, and the quarter turn
+ * decides which: upright, the roll's width is the line length and the label
+ * grows downwards as lines are added; rotated, the roll's width is the height
+ * the lines share and the label grows *longer* as a name gets longer.
+ *
+ * **Whether the turn happens at all.** Only on tape. Both of a die-cut label's
+ * dimensions are fixed, so turning the text would print it off the sides of a
+ * label somebody chose for its size.
+ *
+ * **What a fixed length means.** The free dimension, pinned — which makes tape
+ * behave exactly like die-cut media of that length, block centred and all.
+ */
+export function labelBoxFor(
+  template: LabelTemplate,
+  media: LabelMedia,
+): { box: LabelBox; rotated: boolean } {
+  const endless = media.lengthDots === null;
+  const rotated = endless && template.rotated === true;
+
+  const margins = {
+    paddingTop: marginDots(template.marginTopMm),
+    paddingBottom: marginDots(template.marginBottomMm),
+  };
+  // Only tape has a length to pin. Null leaves the free dimension free.
+  const fixed =
+    endless && template.fixedLengthMm !== undefined
+      ? Math.round(template.fixedLengthMm * DOTS_PER_MM)
+      : null;
+
+  if (rotated) {
+    return { box: { width: fixed, height: media.widthDots, ...margins }, rotated };
+  }
+  return {
+    box: { width: media.widthDots, height: endless ? fixed : media.lengthDots, ...margins },
+    rotated,
+  };
+}
+
+/** A margin a leader typed, as dots, or undefined to leave the default alone. */
+function marginDots(mm: number | undefined): number | undefined {
+  return mm === undefined ? undefined : Math.round(mm * DOTS_PER_MM);
+}
 
 /**
  * Nominal dot heights per size name.
@@ -236,7 +317,14 @@ export function layoutLabel(
   const padding = box.padding ?? DEFAULT_PADDING;
   const paddingTop = box.paddingTop ?? padding;
   const paddingBottom = box.paddingBottom ?? padding;
-  const innerWidth = Math.max(1, box.width - padding * 2);
+  /*
+   * A free width has nothing to shrink to. Infinity is not a fudge here, it is
+   * the honest statement of the rotated case: every line is as long as it wants
+   * to be, so `fitLine` never enters its shrink loop and `wrap` never gets a
+   * chance to break a name that has a whole roll to run along.
+   */
+  const innerWidth =
+    box.width === null ? Number.POSITIVE_INFINITY : Math.max(1, box.width - padding * 2);
   const maxHeight =
     box.height === null ? null : Math.max(1, box.height - paddingTop - paddingBottom);
 
@@ -244,6 +332,7 @@ export function layoutLabel(
   if (resolved.length === 0) {
     return {
       draws: [],
+      width: box.width ?? padding * 2,
       height: box.height ?? paddingTop + paddingBottom,
       droppedLines: 0,
       scaledToFit: false,
@@ -252,7 +341,14 @@ export function layoutLabel(
 
   /** Lay out at a given scale, reporting the height it wanted. */
   const attempt = (scale: number, lines: ResolvedLine[]) => {
-    const rows: { text: string; fontPx: number; bold: boolean; align: LabelLineAlign }[] = [];
+    const rows: {
+      text: string;
+      fontPx: number;
+      bold: boolean;
+      align: LabelLineAlign;
+      /** Measured, because a free width is the widest of these. */
+      width: number;
+    }[] = [];
     let height = 0;
 
     lines.forEach((line, index) => {
@@ -263,7 +359,13 @@ export function layoutLabel(
       const { fontPx, texts } = fitLine(scaled, innerWidth, measure);
       if (index > 0) height += fontPx * LINE_GAP;
       for (const text of texts) {
-        rows.push({ text, fontPx, bold: line.bold, align: line.align });
+        rows.push({
+          text,
+          fontPx,
+          bold: line.bold,
+          align: line.align,
+          width: measure(text, fontPx, line.bold),
+        });
         height += fontPx * LINE_HEIGHT;
       }
     });
@@ -292,6 +394,17 @@ export function layoutLabel(
   }
 
   const contentHeight = result.height;
+  /*
+   * How wide the block came out. On a fixed width this is at most the box, and
+   * usually less — every line was shrunk to fit it. On a free one it is the
+   * label: the widest line decides where the tape gets cut.
+   */
+  const contentWidth = result.rows.reduce((widest, row) => Math.max(widest, row.width), 0);
+  const width = box.width ?? Math.ceil(contentWidth + padding * 2);
+  // Alignment is relative to whatever the label turned out to be, so `right` on
+  // a free width means the end of the longest line rather than a box edge that
+  // does not exist.
+  const alignWidth = box.width === null ? contentWidth : innerWidth;
   const height = box.height ?? Math.ceil(contentHeight + paddingTop + paddingBottom);
   const top =
     box.height === null
@@ -308,7 +421,7 @@ export function layoutLabel(
     const baseline = cursor + row.fontPx;
     draws.push({
       text: row.text,
-      x: xFor(row.align, padding, innerWidth),
+      x: xFor(row.align, padding, alignWidth),
       y: Math.round(baseline),
       fontPx: row.fontPx,
       bold: row.bold,
@@ -319,6 +432,7 @@ export function layoutLabel(
 
   return {
     draws,
+    width,
     height,
     droppedLines: resolved.length - lines.length,
     scaledToFit,

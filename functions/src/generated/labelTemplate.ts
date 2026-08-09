@@ -30,6 +30,17 @@
  * on one kiosk rather than an edit to every event. Sizes here are relative and
  * the renderer fits them to whatever it is given.
  *
+ * What *is* here, and was not at first, is the shape of the sticker on
+ * whatever roll that turns out to be: the margins, the quarter turn and a fixed
+ * length. Those looked like media at first glance and are not. A badge holder
+ * that hides the top of a label, a name that reads better along the tape, a
+ * room that wants every sticker the same length — each is a decision about this
+ * gathering's label, made by the person designing it, and each is invisible on
+ * the kiosk screen where nobody is looking at the labels. They name no roll and
+ * no model: they say how the text should sit on whatever is loaded, in
+ * millimetres the renderer converts, and a die-cut roll ignores the ones it has
+ * no room for.
+ *
  * **The values.** `fillLabelTokens` takes strings that somebody else resolved.
  * A grade reads as "8th grade" through `gradeDescription` in `lib/utils.ts`, and
  * a time through the locale — neither of which this module may import. Handing
@@ -64,6 +75,9 @@ export interface LabelLine {
    *
    * A line with no tokens at all is unaffected — there is nothing for it to
    * wait on, and a leader who typed a fixed caption meant it.
+   *
+   * For part of a line rather than all of it, bracket it: `[...]` is the same
+   * question asked of a group, and the two compose. See `fillLabelTokens`.
    */
   requiresValue: boolean;
 }
@@ -72,6 +86,52 @@ export interface LabelTemplate {
   lines: LabelLine[];
   /** How many stickers one check-in produces. */
   copies: number;
+  /**
+   * Blank millimetres above the first line, as the sticker is read.
+   *
+   * Only continuous tape can honour it, because only continuous tape has a
+   * length to give: a die-cut label is as long as it is, and there these decide
+   * what the block is centred in rather than how much paper is used. Absent
+   * means {@link DEFAULT_LABEL_MARGIN_MM}, which is what every template written
+   * before these existed prints.
+   *
+   * "Above" is in reading order, not in the direction the roll feeds. On a
+   * rotated label that is across the tape rather than along it — the same edge
+   * of the same sticker either way, which is the point: a leader arranging a
+   * label should not have to think about which way the paper came out.
+   */
+  marginTopMm?: number;
+  /** Blank millimetres below the last line, as the sticker is read. */
+  marginBottomMm?: number;
+  /**
+   * Print the text along the tape rather than across it.
+   *
+   * A quarter turn swaps which dimension is free. Upright, the roll's width is
+   * the line length and the label grows downwards as lines are added; rotated,
+   * the roll's width is the height the lines have to share and the label grows
+   * *longer* as a name gets longer. That is the whole reason to want it: a long
+   * name on 29mm tape has almost no width to work with upright and as much as it
+   * likes on its side.
+   *
+   * Ignored on die-cut media, whose two dimensions are both fixed — turning the
+   * text on a 62×29mm label would print it off the sides.
+   */
+  rotated?: boolean;
+  /**
+   * Pin the free dimension to this many millimetres, instead of following the
+   * text.
+   *
+   * Continuous tape decides where to cut from the content, so two children with
+   * different length names get different length stickers. Somewhere that puts
+   * them in a holder, or lines them up on a board, wants them all the same
+   * instead — so this fixes the length and the text is centred in it, exactly
+   * the way a die-cut label behaves.
+   *
+   * Absent means the length follows the text, which is the default and the one
+   * that spends the least tape. Ignored on die-cut media, which has a length
+   * already.
+   */
+  fixedLengthMm?: number;
 }
 
 export const LABEL_LINE_SIZES: readonly LabelLineSize[] = ['sm', 'md', 'lg', 'xl'];
@@ -88,6 +148,43 @@ export const LABEL_LINE_ALIGNS: readonly LabelLineAlign[] = ['left', 'center', '
 export const MAX_LABEL_LINES = 6;
 export const MAX_LABEL_COPIES = 3;
 export const MAX_LABEL_LINE_LENGTH = 120;
+
+/**
+ * The margin a label has had since before it could be asked for.
+ *
+ * 0.7mm — the renderer's own 8-dot padding at 300 dpi, in the units the editor
+ * asks for. Naming it means "leave it alone" and "set it to what it always was"
+ * are the same template rather than two that print differently.
+ */
+export const DEFAULT_LABEL_MARGIN_MM = 0.7;
+
+/**
+ * As much blank tape as either end may be given.
+ *
+ * 25mm is an inch of nothing, past any sensible badge holder and well short of
+ * what a mistyped number could otherwise spend on a roll.
+ */
+export const MAX_LABEL_MARGIN_MM = 25;
+
+/**
+ * The range a fixed length may be set to.
+ *
+ * The floor is roughly the shortest a QL will cut without the label being more
+ * cutter than sticker; the ceiling matches the renderer's own limit on how much
+ * tape one child may take, so a fixed length cannot ask for a label the
+ * rasteriser would then cut short.
+ */
+export const MIN_LABEL_FIXED_LENGTH_MM = 10;
+export const MAX_LABEL_FIXED_LENGTH_MM = 150;
+
+/**
+ * The length offered first when somebody asks for a fixed one.
+ *
+ * 50mm is a little longer than the 29mm die-cut name badge most of these rooms
+ * already use, which makes it a length somebody can picture — and it is a
+ * starting point to be typed over, not a recommendation.
+ */
+export const DEFAULT_FIXED_LENGTH_MM = 50;
 
 /**
  * Every token a label may use.
@@ -158,6 +255,45 @@ export const DEFAULT_LABEL_TEMPLATE: LabelTemplate = {
 const TOKEN_PATTERN = /\{\{\s*([a-zA-Z]+)\s*\}\}/g;
 
 /**
+ * A bracketed group, and the escape that lets a leader type a real bracket.
+ *
+ * `[[` and `]]` stand for a literal `[` and `]`. Doubling is the escape because
+ * it needs no backslash — a backslash on a phone keyboard is two taps into a
+ * symbol page, and a leader typing `Room [[3]]` is rare enough that it should be
+ * possible rather than convenient.
+ *
+ * The group pattern skips doubled brackets on both sides, so `[[` inside a
+ * group does not close it.
+ */
+const OPTIONAL_GROUP_PATTERN = /\[((?:[^[\]]|\[\[|\]\])*)\]/g;
+const ESCAPED_BRACKET_PATTERN = /\[\[|\]\]/g;
+
+/** `[[` and `]]` read back as the brackets they stand for. */
+function unescapeBrackets(text: string): string {
+  return text.replace(ESCAPED_BRACKET_PATTERN, (match) => match[0]!);
+}
+
+/**
+ * Replace every `[...]` group with its contents, or with nothing.
+ *
+ * The rule is the one `requiresValue` already applies to a whole line, scoped
+ * down to a piece of one: a group survives when at least one token inside it got
+ * a value, and disappears whole — punctuation, spaces and all — when none did.
+ * That is what makes `{{lastName}}[ ({{grade}})]` print "Lovelace (8th grade)"
+ * for a child with a grade and "Lovelace" for one without, instead of the
+ * "Lovelace ()" that the same line without brackets would leave behind.
+ *
+ * A group with no tokens in it is kept. There is nothing for it to wait on, and
+ * a leader who bracketed fixed text meant to see it — the same answer
+ * `anyTokenFilled` gives for a line of fixed text.
+ */
+function resolveOptionalGroups(text: string, values: LabelTokenValues): string {
+  return text.replace(OPTIONAL_GROUP_PATTERN, (_match, inner: string) =>
+    anyTokenFilled(inner, values) ? inner : '',
+  );
+}
+
+/**
  * One line's text with its tokens replaced.
  *
  * An unknown token, or a known one with nothing behind it, becomes empty rather
@@ -166,9 +302,16 @@ const TOKEN_PATTERN = /\{\{\s*([a-zA-Z]+)\s*\}\}/g;
  * the first name instead of a name with a trailing gap — and what lets the
  * renderer drop a line that came to nothing at all, so a child with no grade
  * gets a tidy three-line label rather than one with a hole in it.
+ *
+ * Collapsing whitespace is not enough for punctuation, though, which is what
+ * `[...]` is for: `{{lastName}} ({{grade}})` leaves an empty pair of brackets on
+ * every child without a grade, and no amount of tidying spaces fixes that.
+ * See `resolveOptionalGroups`.
  */
 export function fillLabelTokens(text: string, values: LabelTokenValues): string {
-  return text
+  // Groups first, so a group that is going to disappear takes its punctuation
+  // with it rather than leaving the collapse below to tidy up after it.
+  return unescapeBrackets(resolveOptionalGroups(text, values))
     .replace(TOKEN_PATTERN, (_match, name: string) => {
       const value = values[name as LabelToken];
       return typeof value === 'string' ? value : '';
@@ -222,6 +365,31 @@ function isAlign(value: unknown): value is LabelLineAlign {
   return LABEL_LINE_ALIGNS.includes(value as LabelLineAlign);
 }
 
+/** A number in range, or undefined for "this template does not say". */
+function clampNumber(value: unknown, low: number, high: number): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
+  return Math.min(high, Math.max(low, value));
+}
+
+function clampMargin(value: unknown): number | undefined {
+  return clampNumber(value, 0, MAX_LABEL_MARGIN_MM);
+}
+
+function clampFixedLength(value: unknown): number | undefined {
+  return clampNumber(value, MIN_LABEL_FIXED_LENGTH_MM, MAX_LABEL_FIXED_LENGTH_MM);
+}
+
+/**
+ * `{ key: value }`, or nothing at all when the value is undefined.
+ *
+ * Spread into the result so an absent setting is an absent *key*. Firestore
+ * stores `undefined` badly and reads it back worse, and "the key is not there"
+ * is exactly what a template written before these settings existed looks like.
+ */
+function optional<K extends string, V>(key: K, value: V | undefined): Partial<Record<K, V>> {
+  return value === undefined ? {} : ({ [key]: value } as Record<K, V>);
+}
+
 /**
  * A stored value read back as a template, or null for "this gathering prints
  * nothing".
@@ -239,7 +407,14 @@ function isAlign(value: unknown): value is LabelLineAlign {
  */
 export function sanitizeLabelTemplate(value: unknown): LabelTemplate | null {
   if (!value || typeof value !== 'object') return null;
-  const raw = value as { lines?: unknown; copies?: unknown };
+  const raw = value as {
+    lines?: unknown;
+    copies?: unknown;
+    marginTopMm?: unknown;
+    marginBottomMm?: unknown;
+    rotated?: unknown;
+    fixedLengthMm?: unknown;
+  };
   if (!Array.isArray(raw.lines)) return null;
 
   const lines: LabelLine[] = [];
@@ -268,7 +443,23 @@ export function sanitizeLabelTemplate(value: unknown): LabelTemplate | null {
       ? Math.max(1, Math.min(MAX_LABEL_COPIES, Math.floor(raw.copies)))
       : 1;
 
-  return { lines, copies };
+  return {
+    lines,
+    copies,
+    /*
+     * The shape settings are all optional, and absent is load-bearing rather
+     * than lazy: it means "whatever the renderer did before this template could
+     * say", so every gathering set up before they existed keeps printing the
+     * label it printed. Out-of-range numbers are clamped rather than rejected —
+     * a silly margin should cost a sticker, not take a gathering's printing
+     * away — and anything that is not a number at all is dropped back to that
+     * same absent default.
+     */
+    ...optional('marginTopMm', clampMargin(raw.marginTopMm)),
+    ...optional('marginBottomMm', clampMargin(raw.marginBottomMm)),
+    ...optional('rotated', raw.rotated === true ? true : undefined),
+    ...optional('fixedLengthMm', clampFixedLength(raw.fixedLengthMm)),
+  };
 }
 
 /** Whether two templates would print the same sticker. */
@@ -278,6 +469,16 @@ export function sameLabelTemplate(
 ): boolean {
   if (a === null || b === null) return a === b;
   if (a.copies !== b.copies || a.lines.length !== b.lines.length) return false;
+  if (
+    a.marginTopMm !== b.marginTopMm ||
+    a.marginBottomMm !== b.marginBottomMm ||
+    // `!== true` on both sides, so an absent flag and an explicit false are the
+    // same template rather than an edit somebody has to save.
+    (a.rotated === true) !== (b.rotated === true) ||
+    a.fixedLengthMm !== b.fixedLengthMm
+  ) {
+    return false;
+  }
   return a.lines.every((line, index) => {
     const other = b.lines[index];
     return (

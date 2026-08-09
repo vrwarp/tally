@@ -10,7 +10,14 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { layoutLabel, resolveLines, type LabelBox, type MeasureText } from '@/lib/labelRender';
+import {
+  DOTS_PER_MM,
+  labelBoxFor,
+  layoutLabel,
+  resolveLines,
+  type LabelBox,
+  type MeasureText,
+} from '@/lib/labelRender';
 import type { LabelTemplate } from '@/lib/labelTemplate';
 
 /** Half the font size per character, 10% more when bold. */
@@ -259,6 +266,84 @@ describe('layoutLabel', () => {
     });
   });
 
+  describe('on a rotated label, where the width is what is free', () => {
+    /** The tape's width has become the height; the length is the free one. */
+    const SIDEWAYS = { width: null, height: 271 };
+
+    it('reports the width the longest line needed', () => {
+      const short = layoutLabel(template([line('Ada', 'xl')]), {}, SIDEWAYS, measure);
+      const long = layoutLabel(template([line('Bartholomew', 'xl')]), {}, SIDEWAYS, measure);
+
+      expect(long.width).toBeGreaterThan(short.width);
+      // The tape's width does not move: that is the fixed one now.
+      expect(long.height).toBe(271);
+    });
+
+    it('never shrinks a name that has a whole roll to run along', () => {
+      // The entire point of turning the label. Upright this name does not fit
+      // 696 dots across and is shrunk; on its side it stays at the size the
+      // leader chose and the label gets longer instead.
+      const name = template([line('Bartholomew Fitzwilliam', 'xl')]);
+      const upright = layoutLabel(name, {}, { width: 696, height: null }, measure);
+      const sideways = layoutLabel(name, {}, SIDEWAYS, measure);
+
+      expect(sideways.draws[0]!.fontPx).toBe(96);
+      expect(upright.draws[0]!.fontPx).toBeLessThan(96);
+    });
+
+    it('never wraps one either', () => {
+      const result = layoutLabel(
+        template([line('a name with several words in it', 'xl')]),
+        {},
+        SIDEWAYS,
+        measure,
+      );
+      expect(result.draws).toHaveLength(1);
+    });
+
+    it('still shares the fixed height between its lines', () => {
+      // Four xl lines do not fit across 271 dots, so the same squeeze that
+      // applies to a die-cut label applies here — only the other way up.
+      const result = layoutLabel(
+        template([line('one', 'xl'), line('two', 'xl'), line('three', 'xl'), line('four', 'xl')]),
+        {},
+        SIDEWAYS,
+        measure,
+      );
+      expect(result.scaledToFit || result.droppedLines > 0).toBe(true);
+      expect(result.height).toBe(271);
+    });
+
+    it('aligns against the label it produced, not a box edge that does not exist', () => {
+      const result = layoutLabel(
+        template([line('a long line here', 'md', false, 'left'), line('b', 'md', false, 'right')]),
+        {},
+        SIDEWAYS,
+        measure,
+      );
+      const [left, right] = result.draws;
+      expect(left!.x).toBe(8);
+      // The right edge is the widest line's, which is what the label was cut to.
+      expect(right!.x).toBe(result.width - 8);
+    });
+
+    it('spends the margins across the tape rather than on length', () => {
+      /*
+       * "Above" is in reading order either way, and turned that is across the
+       * roll — which is the fixed dimension, so a bigger margin moves the text
+       * within the tape instead of buying more of it. It moves by half what was
+       * added, because the block is still centred in what the margins leave, the
+       * same way it is on a die-cut label.
+       */
+      const one = template([line('Ada', 'sm')]);
+      const plain = layoutLabel(one, {}, SIDEWAYS, measure);
+      const spaced = layoutLabel(one, {}, { ...SIDEWAYS, paddingTop: 60 }, measure);
+
+      expect(spaced.width).toBe(plain.width);
+      expect(spaced.draws[0]!.y - plain.draws[0]!.y).toBe((60 - 8) / 2);
+    });
+  });
+
   describe('when the content is taller than a die-cut label', () => {
     const overfull = template([
       line('Bartholomew', 'xl', true),
@@ -388,5 +473,63 @@ describe('layoutLabel', () => {
     );
     expect(result.draws).toEqual([]);
     expect(result.height).toBe(271);
+  });
+});
+
+/**
+ * Where the template's wishes meet the roll that is loaded.
+ *
+ * Shared by the kiosk's rasteriser and the editor's preview, so these cases are
+ * the contract between what a leader is shown and what comes out of the printer.
+ */
+describe('labelBoxFor', () => {
+  const TAPE = { widthDots: 696, lengthDots: null };
+  const DIE = { widthDots: 696, lengthDots: 271 };
+  const plain = template([line('Ada')]);
+
+  const withShape = (shape: Partial<LabelTemplate>): LabelTemplate => ({ ...plain, ...shape });
+
+  it('leaves the length free on tape, and fixes both on die-cut', () => {
+    expect(labelBoxFor(plain, TAPE).box).toMatchObject({ width: 696, height: null });
+    expect(labelBoxFor(plain, DIE).box).toMatchObject({ width: 696, height: 271 });
+  });
+
+  it('swaps which dimension is free when the label is turned', () => {
+    const { box, rotated } = labelBoxFor(withShape({ rotated: true }), TAPE);
+    expect(rotated).toBe(true);
+    // The roll's width is now the height the lines share.
+    expect(box).toMatchObject({ width: null, height: 696 });
+  });
+
+  it('refuses to turn a die-cut label, whose size somebody chose', () => {
+    const { box, rotated } = labelBoxFor(withShape({ rotated: true }), DIE);
+    expect(rotated).toBe(false);
+    expect(box).toMatchObject({ width: 696, height: 271 });
+  });
+
+  it('pins the free dimension to a fixed length, whichever one it is', () => {
+    const dots = Math.round(50 * DOTS_PER_MM);
+    expect(labelBoxFor(withShape({ fixedLengthMm: 50 }), TAPE).box).toMatchObject({
+      width: 696,
+      height: dots,
+    });
+    expect(labelBoxFor(withShape({ fixedLengthMm: 50, rotated: true }), TAPE).box).toMatchObject({
+      width: dots,
+      height: 696,
+    });
+  });
+
+  it('ignores a fixed length on media that already has one', () => {
+    expect(labelBoxFor(withShape({ fixedLengthMm: 50 }), DIE).box).toMatchObject({
+      width: 696,
+      height: 271,
+    });
+  });
+
+  it('converts the margins to dots, and leaves them alone when unset', () => {
+    expect(labelBoxFor(withShape({ marginTopMm: 10 }), TAPE).box).toMatchObject({
+      paddingTop: Math.round(10 * DOTS_PER_MM),
+      paddingBottom: undefined,
+    });
   });
 });
