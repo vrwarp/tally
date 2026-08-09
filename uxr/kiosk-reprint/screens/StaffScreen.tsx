@@ -1,0 +1,115 @@
+/**
+ * What the staff gate opens onto — the proposal, not the app.
+ *
+ * Today the two-second hold on **Clear** opens `ChangeEventScreen` directly, so
+ * the only door behind the gate is the one that shuts the kiosk. Everything
+ * else a volunteer might want is *through* that door: leave the gathering,
+ * meet the chooser, open the printer, come back, hold a row to re-point the
+ * kiosk at the event it was already on. A reprint costs the queue at the door.
+ *
+ * So the gate opens onto the doors instead, and leaving the gathering becomes
+ * one of them rather than all of them. The warning that used to be on this
+ * screen goes with it: it belongs to that choice, not to the act of looking.
+ *
+ * Shaped after `ChangeEventScreen` deliberately — centred column, one loud way
+ * back, the quiet things stacked above it — because a volunteer who has met one
+ * of these screens has met both.
+ */
+import { haptic } from '@/lib/utils';
+
+export function StaffScreen({
+  title,
+  window: eventWindow,
+  printer,
+  onReprint,
+  onPrinter,
+  onChangeEvent,
+  onStay,
+}: {
+  title: string;
+  window: string;
+  /** What the printer is doing, in the words the chooser already uses. */
+  printer: 'ready' | 'trouble' | 'none';
+  onReprint: () => void;
+  onPrinter: () => void;
+  onChangeEvent: () => void;
+  onStay: () => void;
+}) {
+  const printerLine =
+    printer === 'ready'
+      ? { text: 'Connected and ready', tone: 'text-present-400' }
+      : printer === 'trouble'
+        ? { text: 'Needs attention', tone: 'text-warn-400' }
+        : { text: 'Not set up', tone: 'text-ink-500' };
+
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-8 p-8 text-center">
+      <div className="flex flex-col gap-2">
+        <div className="text-4xl font-semibold text-ink-100">Staff</div>
+        <p className="mx-auto max-w-xl text-xl text-ink-400">
+          <span className="text-ink-200">{title}</span> · {eventWindow}
+        </p>
+      </div>
+
+      <div className="flex w-full max-w-md flex-col gap-3">
+        {/* The reprint is first because it is the one thing on this screen a
+            volunteer does mid-evening; the other two are setup. */}
+        <button
+          type="button"
+          tabIndex={-1}
+          onPointerDown={() => {
+            haptic();
+            onReprint();
+          }}
+          disabled={printer === 'none'}
+          className="flex h-16 w-full items-center justify-center rounded-xl bg-ink-800 text-xl font-semibold text-ink-100 active:bg-ink-700 disabled:opacity-40"
+        >
+          Reprint a name tag
+        </button>
+
+        <button
+          type="button"
+          tabIndex={-1}
+          onPointerDown={() => {
+            haptic();
+            onPrinter();
+          }}
+          className="flex h-16 w-full items-center justify-between rounded-xl bg-ink-800 px-5 text-left text-xl font-semibold text-ink-100 active:bg-ink-700"
+        >
+          <span>Label printer</span>
+          <span className={`pl-3 text-base font-normal ${printerLine.tone}`}>
+            {printerLine.text}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          tabIndex={-1}
+          onPointerDown={() => {
+            haptic();
+            onChangeEvent();
+          }}
+          className="flex h-14 w-full items-center justify-center rounded-xl bg-ink-800 text-lg font-semibold text-ink-200 active:bg-ink-700"
+        >
+          Change event
+        </button>
+      </div>
+
+      {/* The loud one is the way back to the door, as it is on the screen this
+          replaces: everything else here costs somebody standing at the kiosk. */}
+      <div className="w-full max-w-md">
+        <button
+          type="button"
+          tabIndex={-1}
+          onPointerDown={() => {
+            haptic();
+            onStay();
+          }}
+          className="flex h-16 w-full items-center justify-center rounded-xl bg-brand-600 text-xl font-semibold text-white active:bg-brand-500"
+        >
+          Keep checking in
+        </button>
+      </div>
+    </div>
+  );
+}
