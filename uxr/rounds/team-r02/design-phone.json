@@ -1,0 +1,47 @@
+[
+  {
+    "scene": "team, team-core",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the \"How Tally decides who may sign in\" disclosure summary under the page deck",
+    "finding": "The only interactive element in the header is set in exactly the same size and exactly the same ink as the static prose immediately above it, so it reads as a fourth sentence of the deck that happens to be missing its full stop rather than as something that opens. The one cue that it is a control — the ▸ — is set a step smaller and at the same value as the text, which is the least conspicuous thing in the block. The cost is that the recovery sentence about pinned admins, which round 1 deliberately kept for being the only place in the product that says it, is now behind an affordance nobody will read as an affordance.",
+    "evidence": "Deck (\"Who may sign in to Tally…\") and summary are both text-sm at ink-500; the marker glyph is text-xs ink-500. In the phone fold the four grey lines form one uninterrupted paragraph mass, and the summary line is the shortest of them, which reads as a ragged last line, not as a heading.",
+    "direction": "Let the summary separate itself from the prose it is not: a step of value or weight above the deck, or a marker with enough presence to be read as a control, so the header reads as \"one sentence of orientation, then a thing you can open\" rather than as four grey lines. It should not need a box to do it — the box is what round 1 correctly removed."
+  },
+  {
+    "scene": "team",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the disabled \"Invite\" submit at the foot of the invite form, in the first viewport",
+    "finding": "The largest and most saturated mass in the whole frame is a full-bleed brand-filled bar whose label is almost unreadable. The disabled treatment fades fill and label by the same amount, so the button surrenders its legibility while keeping all of its size and colour weight — the opposite of what a resting, not-yet-usable control should do. It arrives before any person's name, and what it says when it arrives is illegible.",
+    "evidence": "The bar is 326×44 of brand-500 at half strength (14,94,138) with the label at (135,139,149) — roughly 2:1 against its own fill, the lowest-contrast text on the page, on the single biggest colour field. By comparison the row checkboxes carry full-strength brand at a twentieth of the area.",
+    "direction": "The resting, empty-form state should shed presence rather than legibility: a quiet ground with a label you can actually read, with the solid brand mass appearing when the address is valid and the button is worth looking at. Failing that, the submit does not need the card's full width above the fold — a shrink-to-content submit at the end of the form would stop it out-shouting the four invitations it sits above."
+  },
+  {
+    "scene": "team",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the control strips in the invitation rows and in the signed-in-team rows",
+    "finding": "Neither strip shares an edge with the text above it, and the two lists disagree with each other about where the same control lives. In the invitation rows the checkbox hangs 8px inside the address's left edge and \"Withdraw\" stops 16px inside the card's right edge — both insets are the buttons' own padding leaking out as layout, so a row that looks justified to the card is actually aligned to nothing. In the roster rows the identical \"Active\" pill sits mid-row instead, with ~140px of unused width to its right. Scrolling from one card into the other, the toggle jumps lanes, and the reader loses the single vertical edge that would let them check eleven states with one downward glance.",
+    "evidence": "Measured on the frame: address text left edge 32px, checkbox left edge 40px, card content edge 358px, \"Withdraw\" label ending at 341px; in the roster rows the same pill starts at 166px and the strip ends at 219px inside a 358px content width.",
+    "direction": "Give both lists one lane scheme and let the padded controls' optical edges land on the row's text edges rather than inside them — pull the leading label out by its own padding, and settle the state toggle into the same column in both cards (the roster's dead right edge is the obvious place, which also widens the gap between the role select and the toggle that round 1 was trying to protect)."
+  },
+  {
+    "scene": "team-core",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the role badge in every signed-in-team row",
+    "finding": "The read-only row is a four-item left-aligned stack in which the fourth item is a filled shape, separated from the three text lines by a gap — so the least interesting fact in the row (everyone has a role; nine of eleven are the same one) is given its own block and the only pill-shaped emphasis on the row. The row has no second lane at all, so eleven people read as eleven small paragraphs rather than as a list with columns, and the recency line — the fact this screen exists to surface — leaves more than half the card's width empty right next to it.",
+    "evidence": "Internal rhythm per row is 0 / 0 / 8 / 12: name, email and recency are set as adjacent lines, then an 8px gap before the badge, then 12px to the divider. \"Last seen 5 days ago\" ends at 159px in a 358px content width; the \"Counselor\" pill is 74px wide, so it fits beside it with room to spare.",
+    "direction": "Move the role token out of the identity's lane and onto the recency line's free right edge, so the row becomes three lines with two columns and the list acquires a right-hand rail of roles the eye can scan. That is the same reading the container-query grid already gives it at width, and it stops the badge announcing itself louder than the person."
+  },
+  {
+    "scene": "team, team-core",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the \"Suspended\" and \"Never signed in\" badges across the two lists",
+    "finding": "The two exception badges — the only two things on this screen that ask the reader to do something — occupy three different positions. \"Suspended\" rides the name line for Marcus Webb, but trails the end of a dim meta sentence for wednesday.volunteer, and \"Never signed in\" sits two lines lower again, in Hannah Boateng's recency slot where it stacks directly above her neutral role pill at the same left edge and the pair reads as one badge cluster. A reader scanning eleven profiles and four invitations for exceptions has to check three vertical positions per row, which is exactly the work the badges were introduced to remove.",
+    "evidence": "Marcus Webb: name line. wednesday.volunteer: after \"Counselor · invited 24 days ago\", the last thing read in the row. Hannah Boateng: line three, 8px above the \"Counselor\" pill, both pills starting at the same 32px left edge.",
+    "direction": "Pick one lane for exception state and hold it in both lists and both permission levels — as near the name as the width allows, which for the invitation row means leading its meta line rather than trailing it, since a 31-character address leaves no room on the name line. The role token should not be able to sit in that lane, or the state stops being the exception."
+  }
+]
