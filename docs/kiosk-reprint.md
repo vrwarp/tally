@@ -212,6 +212,25 @@ reaches the printing module on a kiosk that has no printer.
 
 ---
 
+## Known minors at convergence
+
+Round 4 produced no finding above `minor`, which is where the loop stops. Five
+of the nine are cheap and belong in the implementation rather than in another
+round — they are listed in full in
+[`uxr/rounds/reprint-r04/critique.md`](../uxr/rounds/reprint-r04/critique.md):
+
+- the offer pill narrows by 43px when the hint replaces its label, so the target
+  moves at the moment a parent is told to press it again;
+- nothing restores the offer's own words — a parent who drifts and walks away
+  leaves the kiosk showing *Lift, then hold again* to nobody;
+- the clear band above the commit is measured against this branch's ✓ rather
+  than against the 60px-taller `Check in` on the sibling state, so it is 4px
+  rather than the 48px the file calls an invariant;
+- two multi-line strings orphan their last word, where `done-none`'s line was
+  balanced;
+- on the phone the confirm's caution breaks with the em dash opening the second
+  line.
+
 ## What was thrown out
 
 - **A parent-facing reprint with a per-child cap.** Blocked twice, on the ground
