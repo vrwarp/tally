@@ -11,7 +11,9 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_LABEL_TEMPLATE,
   MAX_LABEL_FIXED_LENGTH_MM,
+  MAX_LABEL_FONT_SCALE,
   MAX_LABEL_MARGIN_MM,
+  MIN_LABEL_FONT_SCALE,
   MIN_LABEL_FIXED_LENGTH_MM,
   LABEL_TOKENS,
   MAX_LABEL_COPIES,
@@ -307,6 +309,18 @@ describe('the shape settings', () => {
     const template = shaped({ marginTopMm: '6mm', fixedLengthMm: Number.NaN })!;
     expect('marginTopMm' in template).toBe(false);
     expect('fixedLengthMm' in template).toBe(false);
+  });
+
+  it('clamps the text size factor, and drops one that is not a number', () => {
+    expect(shaped({ fontScale: 9 })).toMatchObject({ fontScale: MAX_LABEL_FONT_SCALE });
+    expect(shaped({ fontScale: 0.1 })).toMatchObject({ fontScale: MIN_LABEL_FONT_SCALE });
+    expect('fontScale' in shaped({ fontScale: 'big' })!).toBe(false);
+  });
+
+  it('tells two templates apart by their text size', () => {
+    expect(sameLabelTemplate(sanitizeLabelTemplate(DEFAULT_LABEL_TEMPLATE), shaped({ fontScale: 2 }))).toBe(
+      false,
+    );
   });
 
   it('reads anything but true as not rotated', () => {

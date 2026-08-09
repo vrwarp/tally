@@ -21,6 +21,7 @@ import { useState } from 'react';
 import { CheckboxField, SelectField, TextField } from '@/components/ui';
 import {
   DEFAULT_FIXED_LENGTH_MM,
+  DEFAULT_LABEL_FONT_SCALE,
   DEFAULT_LABEL_MARGIN_MM,
   DEFAULT_LABEL_TEMPLATE,
   LABEL_LINE_ALIGNS,
@@ -28,10 +29,12 @@ import {
   LABEL_TOKENS,
   MAX_LABEL_COPIES,
   MAX_LABEL_FIXED_LENGTH_MM,
+  MAX_LABEL_FONT_SCALE,
   MAX_LABEL_LINES,
   MAX_LABEL_LINE_LENGTH,
   MAX_LABEL_MARGIN_MM,
   MIN_LABEL_FIXED_LENGTH_MM,
+  MIN_LABEL_FONT_SCALE,
   fillLabelTokens,
   tokensIn,
   unknownTokensIn,
@@ -452,6 +455,28 @@ export function LabelTemplateField({
                     }
                   />
 
+                  <TextField
+                    label="Text size (×)"
+                    hint="Scales every line together, so the sizes you chose keep their proportions. Worth turning up when the label has room to spare."
+                    type="number"
+                    inputMode="decimal"
+                    min={MIN_LABEL_FONT_SCALE}
+                    max={MAX_LABEL_FONT_SCALE}
+                    step={0.1}
+                    className="w-36"
+                    value={value.fontScale ?? ''}
+                    placeholder={String(DEFAULT_LABEL_FONT_SCALE)}
+                    onChange={(changed) =>
+                      patchShape({ fontScale: numberOrUndefined(changed.target.value) })
+                    }
+                  />
+
+                  {/*
+                    * Above and below the sticker as it comes off the roll, which
+                    * is what the preview shows — and stays that end when the
+                    * label is turned, because a margin is blank tape and the
+                    * roll's width is not this template's to spend.
+                    */}
                   <div className="flex flex-wrap items-start gap-3">
                     <TextField
                       label="Space above (mm)"
@@ -482,6 +507,10 @@ export function LabelTemplateField({
                       }
                     />
                   </div>
+                  <p className="-mt-1 text-xs leading-snug text-ink-500">
+                    Blank tape at each end of the sticker — the two ends the cutter makes, whichever
+                    way the text runs.
+                  </p>
 
                   <div className="flex flex-wrap items-start gap-3">
                     <CheckboxField
