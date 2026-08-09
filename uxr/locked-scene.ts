@@ -34,6 +34,18 @@ const here = dirname(fileURLToPath(import.meta.url));
  */
 const MINE = [/^fall-lock-in-/];
 
+/**
+ * Who is holding the phone.
+ *
+ * The freeze is signed in as Miriam Achebe, and Miriam is an admin — the one
+ * person on the team for whom `canWorkChain` returns true unconditionally. She
+ * is also the name `LockedGatherings` prints as the way *in*. Leaving her in the
+ * account chip would put "Miriam or Dana can add you" on a screen belonging to
+ * Miriam, and any critique of that sentence would be a critique of a scene that
+ * cannot exist.
+ */
+const READER = { from: 'Miriam Achebe', to: 'Ben Tsai', initial: 'B' };
+
 /** `AttendanceStat`'s locked branch, verbatim. */
 const LOCKED_STAT =
   '<span class="block text-right text-[11px] leading-tight text-ink-500">' +
@@ -66,6 +78,21 @@ function lockPast(html: string): { html: string; locked: number; total: number }
   return { html: head + tail, locked, total };
 }
 
+/**
+ * The account chip, in both the rail and the mobile header.
+ *
+ * The initial is its own replacement rather than derived, because the chip
+ * renders it in a separate span and the letter is the only text in it — a blind
+ * substitution of "M" would hit the middle of every other word on the page.
+ */
+function reseat(html: string): string {
+  return html
+    .split(`>${READER.from}</span>`)
+    .join(`>${READER.to}</span>`)
+    .split('lg:order-1">M</span>')
+    .join(`lg:order-1">${READER.initial}</span>`);
+}
+
 const out = (() => {
   const flag = process.argv.indexOf('--out');
   return flag === -1 ? join(here, 'baseline') : process.argv[flag + 1]!;
@@ -73,7 +100,7 @@ const out = (() => {
 
 for (const viewport of ['phone', 'desktop']) {
   const source = join(here, 'baseline', `events--${viewport}.html`);
-  const { html, locked, total } = lockPast(await readFile(source, 'utf8'));
+  const { html, locked, total } = lockPast(reseat(await readFile(source, 'utf8')));
   const target = join(out, `events-locked--${viewport}.html`);
   await writeFile(target, html, 'utf8');
   console.log(`${target} — ${locked} of ${total} past rows locked`);
