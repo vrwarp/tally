@@ -62,7 +62,14 @@ export function AlreadyCheckedInScreen({
       className="grid h-full w-full grid-rows-[minmax(0,1fr)_auto_auto] justify-center justify-items-center p-8 pb-[max(2rem,18vh)] text-center"
       style={{ gridTemplateColumns: 'minmax(0, var(--confirm-measure, 28rem))' }}
     >
-      <div className="flex min-h-0 w-full flex-col items-center justify-end pb-12">
+      {/* The clearance is measured against the tallest thing that ever occupies
+          the row below it, which is `ConfirmScreen`'s green `Check in` — not
+          against this branch's own ✓, which is sixty pixels shorter. At `pb-12`
+          the offer pill spent the bottom of a band no scene may spend: a parent
+          who taps a child because they think they still need to check in
+          travels to where the button always is. The flexible track has the
+          slack for `pb-16` at every shape. */}
+      <div className="flex min-h-0 w-full flex-col items-center justify-end pb-16">
         <div className="w-full shrink-0">
           <div className="text-5xl/[1.15] font-bold text-ink-50">
             {student.firstName} {student.lastName}
@@ -84,6 +91,22 @@ export function AlreadyCheckedInScreen({
             <HoldButton
               onHeld={onReprint}
               cancelOnStray
+              /*
+               * The drift check without this was a dead end. `cancel()` can
+               * only be undone by a fresh `pointerdown`, so a parent whose
+               * thumb wandered twelve pixels — on a pill they have never seen
+               * before, over two seconds — was pressing a button that had
+               * stopped counting, with an empty bar and no buzz, for as long as
+               * they cared to keep pressing. That is the ten-minute window
+               * spending itself on a walk to find a volunteer, which is the one
+               * outcome it exists to prevent.
+               *
+               * The hint is the way back, and it is deliberately not a wider
+               * slop: the check is the whole of what makes this control safe on
+               * glass people lean on, and `tapGuard.ts` answers "did this finger
+               * stay put" once for the whole kiosk.
+               */
+              strayHint="Lift, then hold again"
               className="rounded-xl bg-ink-800 px-6 py-4 text-lg font-semibold text-ink-200 active:bg-ink-700 kiosk:px-8 kiosk:py-5 kiosk:text-xl"
             >
               Hold to print a name tag
@@ -124,7 +147,11 @@ export function AlreadyCheckedInScreen({
           {offer === 'none' && (
             /* The common case, and the only thing added to it: where a name tag
                comes from, for the parent holding a child with no sticker on. */
-            <div className="w-full text-lg text-ink-400 kiosk:text-xl">
+            /* `text-balance` because the one line this screen is allowed to add
+               was the only multi-line element on a screen built entirely of
+               single lines — "desk." alone on a second line at 326px, on the
+               state that has to be indistinguishable from what ships. */
+            <div className="w-full text-lg text-balance text-ink-400 kiosk:text-xl">
               Name tags come from the check-in desk.
             </div>
           )}

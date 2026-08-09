@@ -203,11 +203,21 @@
  * is shorter than a whole one by definition, which is what makes "one row deep"
  * the right measure: whatever is cut is inside the ramp at every shape.
  *
+ * A row deep is the *maximum*, not the depth. Where a caller can say how much is
+ * actually below the fold it sets `--kiosk-hidden`, and the ramp is the smaller
+ * of the two — because "whatever is cut is inside the ramp" reads the other way
+ * round as well: nothing that is *not* cut may be inside it. A region overrun by
+ * nine pixels answering with an eighty-eight pixel dissolve puts a row that is
+ * entirely present, entirely tappable and entirely above the region's own bottom
+ * edge at a fifth of its ink, with bare page showing underneath it. Callers that
+ * say nothing keep the row-deep ramp they have always had.
+ *
  * Written twice because the kiosk runs on whatever tablet the church owns and
  * WebKit still wants the prefix.
  */
 .kiosk-list-fade {
-  --kiosk-fade: 4rem;
+  --kiosk-fade-max: 4rem;
+  --kiosk-fade: min(var(--kiosk-hidden, 100vh), var(--kiosk-fade-max));
   -webkit-mask-image: linear-gradient(
     to bottom,
     #000 calc(100% - var(--kiosk-fade)),
@@ -225,7 +235,7 @@
 /* Rows step up on a screen stood on end, so the ramp does too. */
 @media (min-height: 1000px) {
   .kiosk-list-fade {
-    --kiosk-fade: 5rem;
+    --kiosk-fade-max: 5rem;
   }
 }
 
@@ -240,7 +250,7 @@
  */
 @media (min-width: 1024px) {
   .kiosk-list-fade {
-    --kiosk-fade: 5.5rem;
+    --kiosk-fade-max: 5.5rem;
   }
 }
 

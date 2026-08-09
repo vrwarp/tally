@@ -55,7 +55,7 @@ export function PrinterScreenProto({
   onDone: () => void;
 }) {
   const rowTap = useTapGuard(onPick);
-  const { regionRef, contentRef, overflowing } = useOverflowFade();
+  const { regionRef, contentRef, overflowing, fadeVars } = useOverflowFade();
 
   return (
     <div className="flex h-full flex-col p-6">
@@ -83,8 +83,13 @@ export function PrinterScreenProto({
           {/* Shares the rows' text edge rather than the card's: the heading is
               inset by the card's padding, the names by the card's *and* their
               own. */}
+          {/* Named for what the group holds rather than for how the rows in it
+              ended: under "Printed tonight" the amber row reading *Did not
+              print* is an exception to its own heading, and that row is the one
+              a volunteer is here for. "Name tags tonight" makes it an instance
+              of the section — tonight's jobs, and what became of each. */}
           <div className="shrink-0 px-4 pb-3 text-sm text-ink-400 kiosk:text-base">
-            Printed tonight
+            Name tags tonight
           </div>
           {recent.length === 0 ? (
             <div className="px-4 text-sm text-ink-500 kiosk:text-base">
@@ -100,7 +105,7 @@ export function PrinterScreenProto({
               className={`flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain scroll-touch ${
                 overflowing ? 'kiosk-list-fade' : ''
               }`}
-              style={{ touchAction: 'pan-y' }}
+              style={{ touchAction: 'pan-y', ...fadeVars }}
             >
               <div ref={contentRef} className="flex shrink-0 flex-col gap-2">
                 {recent.map((label) => (
@@ -130,7 +135,9 @@ export function PrinterScreenProto({
                   </button>
                 ))}
               </div>
-              {overflowing && <div aria-hidden className="h-16 shrink-0" />}
+              {overflowing && (
+                <div aria-hidden className="shrink-0" style={{ height: 'var(--kiosk-fade)' }} />
+              )}
             </div>
           )}
         </div>
@@ -192,6 +199,12 @@ export function PrinterScreenProto({
             Reprint a name tag
           </button>
 
+          {/* One size across the three secondary doors, and let colour do the
+              ranking on its own. `text-base text-ink-300` on the unbind against
+              `text-sm text-ink-100` on its two siblings made the largest of the
+              three also the dimmest — size saying *more important*, colour
+              saying *less available*, on the one control here that takes the
+              printer away from the kiosk. */}
           <div className="grid shrink-0 grid-cols-2 gap-3">
             <button
               type="button"
@@ -212,7 +225,7 @@ export function PrinterScreenProto({
           <button
             type="button"
             tabIndex={-1}
-            className="shrink-0 rounded-xl bg-ink-800 p-4 text-base text-ink-300 kiosk:text-lg"
+            className="shrink-0 rounded-xl bg-ink-800 p-4 text-sm text-ink-300 kiosk:text-lg"
           >
             Choose a different printer
           </button>
@@ -223,8 +236,13 @@ export function PrinterScreenProto({
           largest type on the screen made the terminal exit outweigh the blue
           door this screen was reorganised to expose — and it is the same
           control the reprint screen already draws as a pill in its console row,
-          so it is drawn the same way here. */}
-      <div className="mx-auto flex w-full max-w-2xl justify-center pt-4 pb-[max(1rem,var(--spacing-safe-bottom))] lg:max-w-5xl">
+          so it is drawn the same way here.
+
+          Sixteen pixels above a stack whose own rhythm is twelve is not a
+          category break, it is a fifth item in a list of four — and on a phone
+          that stack is directly above it. Both kiosk shapes get the break from
+          the column boundary; the phone has to get it from the gap. */}
+      <div className="mx-auto flex w-full max-w-2xl justify-center pt-7 pb-[max(1rem,var(--spacing-safe-bottom))] lg:max-w-5xl lg:pt-4">
         <button
           type="button"
           tabIndex={-1}

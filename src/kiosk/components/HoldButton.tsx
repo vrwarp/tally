@@ -23,6 +23,13 @@
  * wants to be told when it may leave, and a buzz on contact would say the
  * gesture had happened when it had only started.
  *
+ * Every other end to the gesture is silent, and on these tablets the buzz is
+ * silent too — so anything that stops the count has to be visible or it is
+ * indistinguishable from a button that does nothing. Lifting is its own answer:
+ * the finger is off, and the emptied bar agrees with the hand. Drifting is not,
+ * because the finger is still down; `strayHint` is what the control says
+ * instead.
+ *
  * `onTap` makes the same control answer a short press too, and passing it says
  * this one lives inside something that scrolls — the chooser's event list is
  * the only such caller. Both halves of that follow: the press has to be tracked
@@ -57,6 +64,7 @@ export function HoldButton({
   onHeld,
   onTap,
   cancelOnStray = false,
+  strayHint,
   className = '',
   children,
   'aria-label': ariaLabel,
@@ -83,13 +91,34 @@ export function HoldButton({
    * Passing this asks the same question of the gesture that a row in a list
    * asks (`tapGuard.ts`'s slop, not a second answer), without giving a short
    * press a meaning it does not have.
+   *
+   * Pair it with `strayHint`. On its own the check is a dead end: `cancel()`
+   * clears the timer and only `onPointerDown` can arm it again, so a thumb that
+   * drifts twelve pixels and then keeps pressing is holding a button that has
+   * stopped counting and cannot start.
    */
   cancelOnStray?: boolean;
+  /**
+   * What the control says once a drift has cancelled the count.
+   *
+   * `haptic()` is `navigator.vibrate` and these are iPads, so nothing happens
+   * in the hand: without this, a cancelled hold and a broken button are the
+   * same event — an emptied bar under a thumb that is still down. The hint
+   * replaces the label until the next press arms a new one, which is the only
+   * channel this device has for saying *that did not count, and here is the way
+   * back*. It is a label swap rather than a new colour or a new mark, because
+   * the kiosk's palette is a distance from the reader and a cancelled gesture
+   * is not an error.
+   */
+  strayHint?: ReactNode;
   className?: string;
   children: ReactNode;
   'aria-label'?: string;
 }) {
   const [holding, setHolding] = useState(false);
+  /* Set by a drift, cleared by the next press — never by the lift, so the
+     sentence is still there when the thumb comes off to read it. */
+  const [slipped, setSlipped] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pressRef = useRef<Press | null>(null);
   const heldRef = useRef(onHeld);
@@ -107,6 +136,7 @@ export function HoldButton({
   const start = useCallback((event: React.PointerEvent) => {
     event.preventDefault();
     pressRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+    setSlipped(false);
     setHolding(true);
     timerRef.current = setTimeout(() => {
       timerRef.current = null;
@@ -127,7 +157,12 @@ export function HoldButton({
       // to hold still, and on a screen whose whole point is this button there
       // is nothing under it for a drift to have meant instead.
       if (!tappedRef.current && !cancelOnStray) return;
-      if (pressRef.current && strayed(pressRef.current, event)) cancel();
+      if (!pressRef.current || !strayed(pressRef.current, event)) return;
+      cancel();
+      // Where a drift is the *only* meaning a stray press can have, the caller
+      // gets to say so on the face of the button. Where the drift was a scroll
+      // (`onTap`), the list moving under the thumb has already said it.
+      if (cancelOnStray && !tappedRef.current) setSlipped(true);
     },
     [cancel, cancelOnStray],
   );
@@ -170,7 +205,7 @@ export function HoldButton({
           transition: holding ? `transform ${HOLD_MS}ms linear` : 'none',
         }}
       />
-      <span className="relative block">{children}</span>
+      <span className="relative block">{slipped && strayHint ? strayHint : children}</span>
     </button>
   );
 }
