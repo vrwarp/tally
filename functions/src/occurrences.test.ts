@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 import {
   materializeOccurrence,
   pruneMaterializedOccurrences,
+  repairDetachedOccurrences,
   EVENTS,
   MINISTRY_TIME_ZONE,
 } from './occurrences.js';
@@ -417,5 +418,132 @@ describe('pruneMaterializedOccurrences', () => {
 
     expect(eventIds(db)).toContain('retreat');
     expect(eventIds(db)).toContain('friday-fellowship-2026-07-10');
+  });
+});
+
+/*
+ * The documents an edit detached before the editor stopped detaching them.
+ *
+ * `chainKey` reads `seriesId ?? recurrenceRootId ?? id`, so an instance that
+ * lost both references became a chain of one carrying the same weekly rule —
+ * projected alongside the chain it came from, invisible to that chain's
+ * history, and outside its access list. Nothing on a screen can put it back:
+ * the editor has no field for a recurrence root, and it would be the wrong
+ * place for one.
+ */
+describe('repairDetachedOccurrences', () => {
+  /** A root and three of its Fridays, the middle one detached by an edit. */
+  function detached(): FakeFirestore {
+    const db = new FakeFirestore();
+    db.seed(`${EVENTS}/saturday-root`, eventDoc({ seriesId: null, recurrenceRootId: null }));
+    for (const day of [10, 17, 24]) {
+      db.seed(
+        `${EVENTS}/saturday-root-2026-07-${day}`,
+        eventDoc({
+          seriesId: null,
+          // 17 July is the one somebody edited.
+          recurrenceRootId: day === 17 ? null : 'saturday-root',
+          startAt: new Date(2026, 6, day, 19, 0),
+        }),
+      );
+    }
+    return db;
+  }
+
+  it('reports without writing unless told to apply', async () => {
+    const db = detached();
+    const result = await repairDetachedOccurrences(db, SILENT_LOGGER);
+
+    expect(result.repaired).toEqual([
+      { id: 'saturday-root-2026-07-17', chain: 'saturday-root' },
+    ]);
+    expect(db.writes).toHaveLength(0);
+  });
+
+  it('puts the instance back into the chain its id names', async () => {
+    const db = detached();
+    await repairDetachedOccurrences(db, SILENT_LOGGER, { apply: true });
+
+    expect(db.data.get(`${EVENTS}/saturday-root-2026-07-17`)?.recurrenceRootId).toBe(
+      'saturday-root',
+    );
+  });
+
+  it('leaves alone everything that still has a chain of its own', async () => {
+    const db = detached();
+    // An instance keyed on its series, which is what most of the calendar is.
+    db.seed(`${EVENTS}/friday-fellowship-2026-07-24`, eventDoc({ recurrenceRootId: null }));
+
+    const result = await repairDetachedOccurrences(db, SILENT_LOGGER, { apply: true });
+
+    expect(result.repaired.map((entry) => entry.id)).toEqual(['saturday-root-2026-07-17']);
+    // The root is a root: null is what it should say.
+    expect(db.data.get(`${EVENTS}/saturday-root`)?.recurrenceRootId).toBeNull();
+    // And a series-keyed instance is not missing a root, it does not need one.
+    expect(db.data.get(`${EVENTS}/friday-fellowship-2026-07-24`)?.recurrenceRootId).toBeNull();
+  });
+
+  it('does not touch a one-off, which is keyed on itself by design', async () => {
+    const db = new FakeFirestore();
+    db.seed(`${EVENTS}/saturday-root`, eventDoc({ seriesId: null, recurrenceRootId: null }));
+    db.seed(
+      `${EVENTS}/saturday-root-2026-07-17`,
+      eventDoc({ mode: 'oneoff', seriesId: null, recurrenceRootId: null, recurrence: null }),
+    );
+
+    const result = await repairDetachedOccurrences(db, SILENT_LOGGER, { apply: true });
+
+    expect(result.repaired).toEqual([]);
+    expect(db.writes).toHaveLength(0);
+  });
+
+  /*
+   * A title ending in a date is a real thing a leader types — "Summer Camp
+   * 2026-07-17" — and it is not a detached occurrence. Guessing wrong here
+   * would file a standalone gathering under a chain that has nothing to do
+   * with it, so an unrecognised prefix is reported instead.
+   */
+  it('refuses to guess when the id names a chain nothing else knows about', async () => {
+    const db = new FakeFirestore();
+    db.seed(
+      `${EVENTS}/summer-camp-2026-07-17`,
+      eventDoc({ seriesId: null, recurrenceRootId: null }),
+    );
+
+    const result = await repairDetachedOccurrences(db, SILENT_LOGGER, { apply: true });
+
+    expect(result.repaired).toEqual([]);
+    expect(result.unknown).toEqual(['summer-camp-2026-07-17']);
+    expect(db.writes).toHaveLength(0);
+  });
+
+  it('is safe to run twice', async () => {
+    const db = detached();
+    await repairDetachedOccurrences(db, SILENT_LOGGER, { apply: true });
+    const second = await repairDetachedOccurrences(db, SILENT_LOGGER, { apply: true });
+
+    expect(second.repaired).toEqual([]);
+  });
+
+  /*
+   * A chain whose root was deleted still has instances that were never
+   * detached, and their `recurrenceRootId` is enough to recognise the name.
+   */
+  it('recognises a chain that only its surviving instances still name', async () => {
+    const db = new FakeFirestore();
+    db.seed(
+      `${EVENTS}/saturday-root-2026-07-10`,
+      eventDoc({ seriesId: null, recurrenceRootId: 'saturday-root' }),
+    );
+    db.seed(
+      `${EVENTS}/saturday-root-2026-07-17`,
+      eventDoc({ seriesId: null, recurrenceRootId: null }),
+    );
+
+    const result = await repairDetachedOccurrences(db, SILENT_LOGGER, { apply: true });
+
+    expect(result.repaired).toEqual([
+      { id: 'saturday-root-2026-07-17', chain: 'saturday-root' },
+    ]);
   });
 });

@@ -65,6 +65,44 @@ describe('calendar arithmetic', () => {
     expect(monthlyWeekdayPosition(new Date(2026, 6, 31))).toBe(-1);
   });
 
+  /*
+   * "Last" has to mean the same thing in a month with four of them as in one
+   * with five, because the projection re-derives it from whichever instance it
+   * is expanding from. Asked as "is it the fifth", a last-Friday gathering
+   * became a fourth-Friday one the first time it met in a four-Friday month —
+   * and stayed that way, because every night after it was then the fourth.
+   */
+  it('phrases the last weekday of a month as "last" even when it is the fourth', () => {
+    // Fridays in August 2026: 7, 14, 21, 28. The 28th is the fourth and the last.
+    expect(weekdayOrdinalInMonth(new Date(2026, 7, 28))).toBe(4);
+    expect(monthlyWeekdayPosition(new Date(2026, 7, 28))).toBe(-1);
+    // The one before it is still the third, and nothing about it is "last".
+    expect(monthlyWeekdayPosition(new Date(2026, 7, 21))).toBe(3);
+  });
+
+  it('keeps "the last Friday" on the last Friday for a whole year', () => {
+    const lastFridayOfJuly = new Date(2026, 6, 31, 19, 0);
+    const monthly = rule({ frequency: 'monthly', monthlyMode: 'dayOfWeek' });
+
+    // Each occurrence in turn is used as the anchor for the next, the way the
+    // projection re-anchors on whichever instance was written down last.
+    let anchor = lastFridayOfJuly;
+    const walked: Date[] = [];
+    for (let month = 0; month < 6; month += 1) {
+      anchor = nextRecurrenceOccurrence(monthly, anchor, anchor)!;
+      walked.push(anchor);
+    }
+
+    expect(days(walked)).toEqual([
+      '2026-8-28',
+      '2026-9-25',
+      '2026-10-30',
+      '2026-11-27',
+      '2026-12-25',
+      '2027-1-29',
+    ]);
+  });
+
   it('finds the nth weekday of a month', () => {
     // July 2026 starts on a Wednesday.
     expect(nthWeekdayOfMonth(2026, 6, 3, 1)).toBe(1); // first Wednesday
@@ -301,6 +339,81 @@ describe('recurrenceOccurrences', () => {
       from: new Date(2026, 6, 31),
     });
     expect(days(found)).toEqual(['2026-7-31', '2026-8-7']);
+  });
+
+  /*
+   * A `from` earlier than the anchor is a real question, not a no-op.
+   *
+   * It is what the projection asks of a chain whose newest instance is still
+   * ahead of today — see `projectOccurrences`. The walk used to start at the
+   * anchor whatever it was told, so the answer was silently empty of everything
+   * between the two.
+   */
+  it('reaches back when asked for a window that starts before the anchor', () => {
+    const found = recurrenceOccurrences(rule(), FRIDAY, {
+      limit: 4,
+      from: new Date(2026, 6, 6),
+    });
+    expect(days(found)).toEqual(['2026-7-10', '2026-7-17', '2026-7-24', '2026-7-31']);
+  });
+
+  it('keeps the phase of an interval when it reaches back', () => {
+    const found = recurrenceOccurrences(rule({ interval: 2 }), FRIDAY, {
+      limit: 4,
+      from: new Date(2026, 5, 1),
+    });
+    // Every other Friday, counted off the anchor rather than off the month.
+    expect(days(found)).toEqual(['2026-6-12', '2026-6-26', '2026-7-10', '2026-7-24']);
+  });
+
+  it('reaches back through months and years too', () => {
+    expect(
+      days(
+        recurrenceOccurrences(rule({ frequency: 'monthly' }), FRIDAY, {
+          limit: 3,
+          from: new Date(2026, 3, 1),
+        }),
+      ),
+    ).toEqual(['2026-4-24', '2026-5-24', '2026-6-24']);
+
+    expect(
+      days(
+        recurrenceOccurrences(rule({ frequency: 'yearly' }), FRIDAY, {
+          limit: 2,
+          from: new Date(2024, 0, 1),
+        }),
+      ),
+    ).toEqual(['2024-7-24', '2025-7-24']);
+  });
+
+  /*
+   * The reach-back is measured in whole weeks between two instants, and a week
+   * either side of a clock change is 167 or 169 hours. Dividing those and
+   * flooring lands a week early or late, which moves every date it produces
+   * onto the wrong day. Written to hold in any timezone, like the rest of this
+   * suite: in a zone with no clock change there is nothing to absorb and the
+   * assertions are simply still true.
+   */
+  it('lands on the right weekday all the way back through a year of clock changes', () => {
+    const found = recurrenceOccurrences(rule(), FRIDAY, {
+      // A year of Fridays exactly: 25 Jul 2025 back-filled up to the anchor.
+      limit: 53,
+      from: new Date(2025, 6, 24),
+    });
+
+    expect(found).toHaveLength(53);
+    expect(found.every((date) => date.getDay() === 5)).toBe(true);
+    expect(found.every((date) => date.getHours() === 19 && date.getMinutes() === 0)).toBe(true);
+    expect(days([found[0]!, found.at(-1)!])).toEqual(['2025-7-25', '2026-7-24']);
+  });
+
+  it('leaves a tally alone when it reaches back, since it counts from the anchor', () => {
+    const found = recurrenceOccurrences(rule({ count: 2 }), FRIDAY, {
+      limit: 10,
+      from: new Date(2026, 6, 10),
+    });
+    // Two from the anchor forward; what came before it was never among them.
+    expect(days(found)).toEqual(['2026-7-10', '2026-7-17', '2026-7-24', '2026-7-31']);
   });
 
   it('terminates on a rule that never lands again', () => {
