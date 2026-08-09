@@ -18,7 +18,14 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:url';
 import { chromium } from '@playwright/test';
 
-const PAGE = 'docs/uxr/walkthrough.html';
+/*
+ * Which page to drag. Defaults to the first refinement's, so `npm run
+ * uxr:walkthrough` is unchanged; the Team refinement's page is a second
+ * argument away.
+ *
+ *   npx tsx scripts/check-uxr-walkthrough.ts [docs/uxr/team-walkthrough.html]
+ */
+const PAGE = process.argv[2] ?? 'docs/uxr/walkthrough.html';
 const EXECUTABLE =
   process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ??
   (existsSync('/opt/pw-browsers/chromium-1194/chrome-linux/chrome')

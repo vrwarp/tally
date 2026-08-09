@@ -114,6 +114,24 @@ npm run uxr:shots                    # → docs/uxr/{before,after}/*.jpg
 npm run uxr:walkthrough              # build, then drag every slider to prove it moves
 ```
 
+A screen that is mounted rather than walked to skips the worktree: freeze it
+before the work and again after, from the same `team-live/` mount.
+
+```bash
+npm run uxr:team -- --out uxr/before-team          # at the commit before the work
+npm run uxr:team -- --out uxr/after-team           # once it has shipped
+npx tsx uxr/measure.ts uxr/before-team uxr/after-team
+npm run uxr:shoot -- uxr/before-team --out uxr/renders/before
+npm run uxr:shoot -- uxr/after-team  --out uxr/renders/after
+npm run uxr:shots                                  # → docs/uxr/{before,after}/*.jpg
+npm run uxr:team-walkthrough                       # → docs/uxr/team-walkthrough.html
+```
+
+`scripts/build-uxr-walkthrough.ts` takes the changes file and the output name as
+arguments, both defaulting to the first refinement's, so each refinement gets
+its own page rather than a shared one whose title and round counts are true of
+neither. `docs/uxr/team-changes.json` is the Team screen's.
+
 Both sides have to be captured by the same harness. The first before/after pair
 was not: the before frames came from an earlier revision of `capture.spec.ts`
 that froze Insights while the parent-contact lookup was still in flight, so half
