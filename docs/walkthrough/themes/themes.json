@@ -1,0 +1,165 @@
+[
+  {
+    "title": "Every gathering starts with Tally’s own colours",
+    "act": "Choosing",
+    "state": "Untouched",
+    "caption": "The field sits with the label template, because both are about the screen in the lobby rather than the phone at the door. Shut, it states the current answer — and the ordinary answer is that there is no answer: an unthemed gathering is the kiosk that shipped, stored as null and costing nothing anywhere down the path.",
+    "file": "01-every-gathering-starts-with-tally-s-own-colours.png"
+  },
+  {
+    "title": "Three slots, named for the job rather than the rank",
+    "act": "Choosing",
+    "state": "Open",
+    "caption": "Not primary, secondary and tertiary. Those are a ranking, and the kiosk has nothing to rank — there is no secondary button and no tertiary chip, so two of the three would need screen furniture invented to justify them. Its palette is already semantic, so the slots follow it: what you touch, what just happened, and the room.",
+    "file": "02-three-slots-named-for-the-job-rather-than-the-rank.png"
+  },
+  {
+    "title": "The preview is the point",
+    "act": "Choosing",
+    "state": "Dark · violet",
+    "caption": "The screen being themed is on a shelf in another room, and a row of swatches does not tell anybody what a teal tick on a violet page will look like. So the preview paints one — from the same resolver the kiosk is sent, which is what stops the two disagreeing.",
+    "file": "03-the-preview-is-the-point.png"
+  },
+  {
+    "title": "The same four choices on a light ground",
+    "act": "Choosing",
+    "state": "Light · forest",
+    "caption": "Ground is a separate axis from hue, and it reuses the light theme the app already had — the whole ink ramp flipped and the accents re-picked rather than lightened. A hue means the same thing on either ground because every ramp holds its lightness and turns only its hue. Two things are also missing from this picker, on purpose: the amber band is absent from “what just happened”, and warning amber is absent from every row. That is what an allergy line is painted in, on the screen and on the printed label, and a gathering that softened it to match its theme would be recolouring the one thing whose whole job is to stop a child being handed the wrong food. It stays amber in the preview above whatever else moves — visible here rather than discovered in a lobby.",
+    "file": "04-the-same-four-choices-on-a-light-ground.png"
+  },
+  {
+    "title": "The kiosk that shipped",
+    "act": "Wearing",
+    "state": "Unthemed",
+    "caption": "Sky blue keys on near-black, which is what every kiosk looked like before this and what every unthemed gathering still looks like. Worth holding in mind for the eight frames below: none of them is a redesign, they are this screen with three hues turned.",
+    "file": "05-the-kiosk-that-shipped.png"
+  },
+  {
+    "title": "Friday Fellowship — searching",
+    "act": "Wearing",
+    "state": "Dark · violet",
+    "theme": {
+      "title": "Friday Fellowship",
+      "ground": "dark",
+      "accent": "violet",
+      "confirm": "teal",
+      "backdrop": "violet",
+      "why": "A youth night in a dim hall. The dark ground is the one the kiosk has always had; what changes is that the keys and the page now belong to this evening rather than to the app."
+    },
+    "slot": "room",
+    "caption": "A youth night in a dim hall. The dark ground is the one the kiosk has always had; what changes is that the keys and the page now belong to this evening rather than to the app.",
+    "file": "06-friday-fellowship-searching.png"
+  },
+  {
+    "title": "Friday Fellowship — checked in",
+    "act": "Wearing",
+    "state": "Confirm · teal",
+    "theme": {
+      "title": "Friday Fellowship",
+      "ground": "dark",
+      "accent": "violet",
+      "confirm": "teal",
+      "backdrop": "violet",
+      "why": "A youth night in a dim hall. The dark ground is the one the kiosk has always had; what changes is that the keys and the page now belong to this evening rather than to the app."
+    },
+    "slot": "confirm",
+    "caption": "Friday Fellowship sets its confirmation to teal.",
+    "file": "07-friday-fellowship-checked-in.png"
+  },
+  {
+    "title": "Fall Lock-In — searching",
+    "act": "Wearing",
+    "state": "Dark · ember",
+    "theme": {
+      "title": "Fall Lock-In",
+      "ground": "dark",
+      "accent": "ember",
+      "confirm": "forest",
+      "backdrop": "ember",
+      "why": "The same dark ground, and unmistakably not the same night. This is the comparison that matters: a ground is not a theme, and two gatherings sharing one still have to read as two rooms."
+    },
+    "slot": "room",
+    "caption": "The same dark ground, and unmistakably not the same night. This is the comparison that matters: a ground is not a theme, and two gatherings sharing one still have to read as two rooms.",
+    "file": "08-fall-lock-in-searching.png"
+  },
+  {
+    "title": "Fall Lock-In — checked in",
+    "act": "Wearing",
+    "state": "Confirm · forest",
+    "theme": {
+      "title": "Fall Lock-In",
+      "ground": "dark",
+      "accent": "ember",
+      "confirm": "forest",
+      "backdrop": "ember",
+      "why": "The same dark ground, and unmistakably not the same night. This is the comparison that matters: a ground is not a theme, and two gatherings sharing one still have to read as two rooms."
+    },
+    "slot": "confirm",
+    "caption": "Fall Lock-In sets its confirmation to forest.",
+    "file": "09-fall-lock-in-checked-in.png"
+  },
+  {
+    "title": "Nursery — searching",
+    "act": "Wearing",
+    "state": "Light · forest",
+    "theme": {
+      "title": "Nursery",
+      "ground": "light",
+      "accent": "forest",
+      "confirm": "forest",
+      "backdrop": "forest",
+      "why": "A bright Sunday morning lobby, where a dark screen is the thing that looks broken. Note the cards stay white — pure white has no hue to turn, and a tinted card on paper reads as a stain."
+    },
+    "slot": "room",
+    "caption": "A bright Sunday morning lobby, where a dark screen is the thing that looks broken. Note the cards stay white — pure white has no hue to turn, and a tinted card on paper reads as a stain.",
+    "file": "10-nursery-searching.png"
+  },
+  {
+    "title": "Nursery — checked in",
+    "act": "Wearing",
+    "state": "Confirm · forest",
+    "theme": {
+      "title": "Nursery",
+      "ground": "light",
+      "accent": "forest",
+      "confirm": "forest",
+      "backdrop": "forest",
+      "why": "A bright Sunday morning lobby, where a dark screen is the thing that looks broken. Note the cards stay white — pure white has no hue to turn, and a tinted card on paper reads as a stain."
+    },
+    "slot": "confirm",
+    "caption": "Nursery sets its confirmation to forest.",
+    "file": "11-nursery-checked-in.png"
+  },
+  {
+    "title": "Sunday School — searching",
+    "act": "Wearing",
+    "state": "Light · teal",
+    "theme": {
+      "title": "Sunday School",
+      "ground": "light",
+      "accent": "teal",
+      "confirm": "sky",
+      "backdrop": "teal",
+      "why": "Light again, an hour after the nursery, in the same building. Two light rooms that a parent can still tell apart at a glance is the same test the two dark ones just passed."
+    },
+    "slot": "room",
+    "caption": "Light again, an hour after the nursery, in the same building. Two light rooms that a parent can still tell apart at a glance is the same test the two dark ones just passed.",
+    "file": "12-sunday-school-searching.png"
+  },
+  {
+    "title": "Sunday School — checked in",
+    "act": "Wearing",
+    "state": "Confirm · sky",
+    "theme": {
+      "title": "Sunday School",
+      "ground": "light",
+      "accent": "teal",
+      "confirm": "sky",
+      "backdrop": "teal",
+      "why": "Light again, an hour after the nursery, in the same building. Two light rooms that a parent can still tell apart at a glance is the same test the two dark ones just passed."
+    },
+    "slot": "confirm",
+    "caption": "Sunday School sets its confirmation to sky.",
+    "file": "13-sunday-school-checked-in.png"
+  }
+]
