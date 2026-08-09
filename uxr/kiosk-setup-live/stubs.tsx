@@ -68,10 +68,16 @@ export function useToast() {
  * command — and it is the state most likely to be designed past, because it is
  * absent from the frame everybody looks at.
  */
+const WHERE = {
+  project: 'tally-76406',
+  serviceAccount: 'tally-76406@appspot.gserviceaccount.com',
+};
+
 const STATUSES: Record<KioskStatus['state'], KioskStatus> = {
-  ok: { state: 'ok', problem: null, remedy: null, command: null },
+  ok: { state: 'ok', ...WHERE, problem: null, remedy: null, command: null },
   denied: {
     state: 'denied',
+    ...WHERE,
     problem:
       'This deployment cannot sign kiosk tokens: the functions service account is missing the Service Account Token Creator role.',
     remedy:
@@ -81,6 +87,7 @@ const STATUSES: Record<KioskStatus['state'], KioskStatus> = {
   },
   unknown: {
     state: 'unknown',
+    ...WHERE,
     problem: 'Tally could not verify that it can sign kiosk tokens.',
     remedy: 'Pairing may still work. Try it, and come back here if the kiosk does not sign itself in.',
     command: null,

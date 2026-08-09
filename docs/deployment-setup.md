@@ -345,10 +345,12 @@ It is also shown as "Service account" on the function's Details tab in the Cloud
 project that has never changed it, it is `<project-number>-compute@developer.gserviceaccount.com`.
 
 Without the grant, pairing fails at the very last step with a signing error in the function's logs,
-while everything works flawlessly against the Auth emulator (which mints unsigned tokens). Settings
-→ Check-in kiosk says so directly — it signs a throwaway token on open, and when that is refused it
-prints this same command with the account and project already filled in, read from the deployment
-itself.
+while everything works flawlessly against the Auth emulator (which mints unsigned tokens). The
+**Kiosk** screen — in Tally, under your own name in the account menu — says so directly: it signs a
+throwaway token on open, and when that is refused it prints this same command with the account and
+project already filled in, read from the deployment itself. It names the project and the service
+account when signing *works*, too, so a green answer can be told apart from a green answer about
+staging.
 
 **Cloud Scheduler.** `rebuildKioskPhoneIndex` is the project's first scheduled function; the first
 deploy that includes it may prompt to enable the Cloud Scheduler API (and creates an App Engine

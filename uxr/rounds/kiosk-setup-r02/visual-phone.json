@@ -1,0 +1,38 @@
+[
+  {
+    "scene": "kiosk-menu",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "the bottom sheet's item list — 'Sign out' as the last row, and what that list contains for a counselor",
+    "finding": "The sheet fix landed for the admin and inverted for the counselor, who is the person this journey is about. The reach change moved the whole item list into the thumb zone, and 'Sign out' — the one irreversible thing in it — is now the lowest, largest-reach row on the screen, at the very edge a thumb rests on and where a dismiss-the-sheet tap lands. On the admin build that is cushioned by three destinations above it. On a counselor's build there are no destinations above it: the list is 'Kiosk' and 'Sign out', one wanted row sitting directly on top of one that ends her evening, 9px apart, with the destructive one nearer the thumb. At 6:40pm that mis-tap costs an email-link sign-in while the iPad's code expires in ten minutes, and the iPad is in her other hand.",
+    "evidence": "Measured in the round-2 prototype at 390x844 with touch: rows are 48px (Kiosk y=623, Team 671, Settings 719, Sign out 776-824). Separation between Settings' hit box (ends 767) and Sign out's (starts 776) is 9px plus a 1px rule — better than round 1's zero, but Sign out now occupies the bottom-most 48px of an 844px screen. The counselor's version is in no frame in either round; src/components/AppShell.tsx gates Team and Settings behind `can('core')` and leaves '/pair-kiosk' ungated, so a counselor's sheet is identity block, Kiosk, Sign out — two interactive rows, and by the sheet's own layout Kiosk lands around y=731-779 with Sign out at 788-836.",
+    "direction": "Reach and consequence should point opposite ways in a bottom sheet: frequent and safe low, rare and destructive high. Sign out belongs attached to the identity block at the top of the sheet — it is the same subject as 'Signed in as dana.ruiz@example.org' — leaving the destinations alone in the reachable band. Whatever is chosen, render the counselor's open sheet as a frame; it is the surface the whole 'whoever you are' half of this journey now rests on, and two rounds have judged it only by subtraction from the admin build."
+  },
+  {
+    "scene": "kiosk-menu / kiosk-setup / kiosk-setup-counselor / kiosk-setup-denied",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the account chip in the phone header, top-right, y=8-40",
+    "finding": "The sheet behind it is now a 48px-row surface in the thumb zone, but the door to it was left at 32px in the corner the brief names as unreachable. It is still the first of the two taps on the only route to this screen, and the one that requires the grip shift with an iPad in the other hand. A miss costs a retry rather than the job — there is nothing destructive adjacent, and the wordmark link is 214px away at the far left — which is why this is friction and not failure.",
+    "evidence": "Chip button measures x=266-374, y=8-40: 108x32 CSS px, against the brief's 44 floor and 48 comfort target. Its inner avatar is size-6 (24px) with py-1, so the whole growth needed is 8px of vertical padding on touch. At lg the same element is a full-width rail row, so a touch-only bump costs the pointer build nothing.",
+    "direction": "Give the chip the same `pointer-fine:` split the sheet rows already use — 44-48px on touch, current size on a pointer. My round-1 note that the chip 'can stay where it is' was about position, not about size."
+  },
+  {
+    "scene": "kiosk-setup / kiosk-setup-counselor / kiosk-setup-denied",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the aria-live verdict paragraph directly under 'Approve this kiosk', y=340-360 (y=448-468 on denied)",
+    "finding": "The slot is real, fixed in place and above the keyboard line — that part is answered. But it reserves one line for a message the ideation itself specifies at two, so the ten-minute hint under it still jumps when the verdict arrives, and the verdict is set at exactly the same 14px as that hint. The person who taps Approve, looks up at the iPad across the room and looks back gets one new line of white text among two other 14px paragraphs of grey; the change is legible if you are reading, less so if you are glancing.",
+    "evidence": "The paragraph is `min-h-5 text-sm font-medium text-ink-100` — 20px reserved, 14px type, in a 358px column. The success copy the ideation names ('Code ABC123 approved — the kiosk signs itself in on its next poll', 65 characters) sets to two lines at that size and measure, so ~20px of the arrival is still a push. The hint immediately below is also `text-sm`, differing only in weight and one step of grey.",
+    "direction": "Reserve the height the sentence actually takes, and let the verdict be a size step above the standing hint rather than a weight step — it is the one thing on this page that is news."
+  },
+  {
+    "scene": "kiosk-setup-denied",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the gcloud block and the 'Copy command' / 'Check again' pair, below the deployment facts",
+    "finding": "The diagnosis moved above the fold — that is the round-1 fix and it worked — but the remedy did not move at all. The core-team member who came here to get the fix reads 'Grant it, then check again' at the bottom of what the screen shows them, and the command block begins exactly where the sticky tab bar starts, so at rest it is entirely behind opaque chrome with no cue that anything follows. One flick recovers it, which is why this is minor rather than more.",
+    "evidence": "At 390x844: the explanation ends y=692 and the project facts end y=772, both visible. The `pre` runs y=780-874 and the tab bar occupies y=776-832 at `bg-ink-950/95`; 'Copy command' (y=882, 152x44) and 'Check again' (y=882, 128x44) sit 106px below the fold. Round 1 measured Copy command at ~886 — position is unchanged; only its height (now 44) and the command's wrapping improved.",
+    "direction": "Either lift the command and its two buttons above the deployment's project/service-account facts — the facts are confirmation, the command is the errand — or let the explanation's last clause carry the affordance, so the remedy is one tap from where the reader's eye already stopped."
+  }
+]

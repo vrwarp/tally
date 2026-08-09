@@ -48,6 +48,13 @@ const VIEWPORTS = {
  */
 const SCENES: readonly { id: string; query: string; open?: (page: Page) => Promise<void> }[] = [
   { id: 'kiosk-menu', query: '', open: openAccountMenu },
+  /*
+   * The counselor's menu, which is not the admin's menu with two rows deleted.
+   * It holds one destination and one irreversible act, and a round judging it
+   * by subtraction from the admin frame missed that the two end up adjacent —
+   * with the irreversible one nearer the thumb.
+   */
+  { id: 'kiosk-menu-counselor', query: 'role=counselor', open: openAccountMenu },
   { id: 'kiosk-setup', query: '' },
   { id: 'kiosk-setup-counselor', query: 'role=counselor' },
   { id: 'kiosk-setup-denied', query: 'state=denied' },

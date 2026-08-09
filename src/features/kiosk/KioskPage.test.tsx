@@ -57,10 +57,17 @@ function renderAs(who: Role, status: KioskStatus | Error) {
   );
 }
 
-const OK: KioskStatus = { state: 'ok', problem: null, remedy: null, command: null };
+/** Which deployment answered, as a real one reports it. */
+const WHERE = {
+  project: 'tally-76406',
+  serviceAccount: '481516234-compute@developer.gserviceaccount.com',
+};
+
+const OK: KioskStatus = { state: 'ok', ...WHERE, problem: null, remedy: null, command: null };
 
 const DENIED: KioskStatus = {
   state: 'denied',
+  ...WHERE,
   problem:
     'This project cannot sign kiosk tokens, so pairing a kiosk will hang at the last ' +
     'step — the code stays on screen after it is approved.',
@@ -191,6 +198,7 @@ describe('the signing status', () => {
   it('does not claim a fault it could not confirm', async () => {
     renderAs('admin', {
       state: 'unknown',
+      ...WHERE,
       problem: 'Tally could not tell whether kiosk tokens can be signed: ECONNRESET',
       remedy: null,
       command: null,

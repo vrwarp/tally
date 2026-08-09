@@ -63,7 +63,9 @@
     "uxr:measure": "tsx uxr/measure.ts uxr/before uxr/after",
     "uxr:shots": "tsx scripts/optimize-uxr-shots.ts",
     "uxr:walkthrough": "tsx scripts/build-uxr-walkthrough.ts && tsx scripts/check-uxr-walkthrough.ts",
-    "uxr:team-walkthrough": "tsx scripts/build-uxr-walkthrough.ts team-changes.json team-walkthrough.html && tsx scripts/check-uxr-walkthrough.ts docs/uxr/team-walkthrough.html"
+    "uxr:team-walkthrough": "tsx scripts/build-uxr-walkthrough.ts team-changes.json team-walkthrough.html && tsx scripts/check-uxr-walkthrough.ts docs/uxr/team-walkthrough.html",
+    "uxr:kiosk-setup": "tsx uxr/kiosk-setup-live/freeze.ts",
+    "uxr:kiosk-walkthrough": "tsx scripts/build-uxr-walkthrough.ts kiosk-changes.json kiosk-walkthrough.html && tsx scripts/check-uxr-walkthrough.ts docs/uxr/kiosk-walkthrough.html"
   },
   "dependencies": {
     "@vrwarp/brother-ql-webusb": "^0.1.0",
