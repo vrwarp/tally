@@ -7,7 +7,8 @@ printer.
 Confirmed working on a QL-810W on 2026-08-02. That matters because it is the one
 claim no test here can make: the layout arithmetic is covered in
 `src/lib/labelRender.test.ts`, the queue's ordering and staleness in
-`src/kiosk/printing/queue.test.ts`, which taps print in
+`src/kiosk/printing/queue.test.ts`, what a child's tokens come to in
+`src/kiosk/printing/tokens.test.ts`, which taps print in
 `src/kiosk/KioskApp.printing.test.tsx`, and a real worker producing a real raster
 job in `e2e/kiosk.spec.ts` — but nothing in CI has a printer, so a label actually
 coming out of one is something a person has to go and see.
@@ -71,14 +72,30 @@ One-off events cannot print yet.
 
 ### What a label can say
 
-`{{firstName}}`, `{{lastName}}`, `{{lastInitial}}`, `{{grade}}`, `{{allergy}}`,
-`{{eventTitle}}`, `{{date}}`, `{{time}}`.
+`{{firstName}}`, `{{nickname}}`, `{{lastName}}`, `{{lastInitial}}`, `{{grade}}`,
+`{{allergy}}`, `{{eventTitle}}`, `{{date}}`, `{{time}}`.
 
 That is the whole list, and it is bounded by what the kiosk holds. Parent
 contacts and photographs do not reach a lobby screen — see
 [Handling minors' data](minors-data.md) — so putting either of
 them on a label is a change to what a screen in a public room is allowed to
 display, not a new token.
+
+### Names with two halves
+
+A child linked to Planning Center may have a nickname as well as a first name —
+often a name in another script. Tally stores the two together, so the roster row
+for Benson Tsai reads `Benson “蔡秉洲”` and either spelling finds him in a search.
+
+A label does not get that composite. `{{firstName}}` prints `Benson`, and
+`{{nickname}}` prints `蔡秉洲` if you ask for it. The name line on a sticker is
+there to be read across a room, and quotes with a second script inside them make
+it long enough that Tally starts shrinking the type — often the whole label, not
+just that line. A gathering that wants both names is better served putting them
+on two lines at two sizes, which the editor lets you do.
+
+`{{nickname}}` is empty for most children, so give its line **Only if filled in**
+— see below — if you type anything around it.
 
 ### Lines that come to nothing
 

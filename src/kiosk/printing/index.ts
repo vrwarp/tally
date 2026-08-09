@@ -39,11 +39,11 @@ import {
   watchConnectionEvents,
   type PrinterStatus,
 } from '@vrwarp/brother-ql-webusb/printer-core';
-import { gradeDescription } from '@/lib/utils';
-import type { LabelTemplate, LabelTokenValues } from '@/lib/labelTemplate';
+import type { LabelTemplate } from '@/lib/labelTemplate';
 import type { KioskBinding } from '../binding';
 import type { KioskStudent } from '../search';
 import { allergyFor, forgetAllergy, startAllergyLookup } from './allergy';
+import { tokenValuesFor } from './tokens';
 import {
   readPrinterConfig,
   writePrinterConfig,
@@ -55,6 +55,9 @@ import type { RasterReply, RasterRequest } from './raster.worker';
 
 export { DEFAULT_PRINTER_LABEL, DEFAULT_PRINTER_MODEL, readPrinterConfig } from './device';
 export type { PrinterConfig } from './device';
+
+/* What a child's tokens come to, kept reachable through the one handle. */
+export { tokenValuesFor } from './tokens';
 
 /*
  * The allergy lookup's own surface, re-exported so `KioskApp` reaches it the way
@@ -422,38 +425,6 @@ const queue = createLabelQueue({
     }
   },
 });
-
-/**
- * The values a template's tokens resolve to for this child at this gathering.
- *
- * Resolved here rather than in `labelTemplate.ts` because a grade reads as "8th
- * grade" through `gradeDescription` and a time through the locale, neither of
- * which a module shared with the Cloud Functions may import. Everything comes
- * from the roster row and the binding — which is all the kiosk has, and all it
- * is meant to have.
- *
- * All but one. `allergy` is deliberately absent: it is the only value the roster
- * row does not answer, and it arrives from a callable rather than from a field.
- * `allergyFor` folds it in at rasterise time, which is where waiting is allowed.
- * A missing token reads as empty anyway, so a template using `{{allergy}}` on a
- * kiosk that never looked prints the same tidy label as one for a child with
- * nothing on file.
- */
-export function tokenValuesFor(student: KioskStudent, binding: KioskBinding): LabelTokenValues {
-  const now = new Date();
-  return {
-    firstName: student.firstName,
-    lastName: student.lastName,
-    // No full stop: a template that wants one can say `{{lastInitial}}.`, and a
-    // child with no surname on the roster then gets nothing rather than a stray
-    // dot. See `fillLabelTokens`.
-    lastInitial: student.lastName ? student.lastName.slice(0, 1).toUpperCase() : '',
-    grade: student.grade === null ? '' : gradeDescription(student.grade),
-    eventTitle: binding.title,
-    date: now.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
-    time: now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }),
-  };
-}
 
 function jobFor(
   student: KioskStudent,

@@ -22,6 +22,12 @@ import type { LabelTokenValues } from '@/lib/labelTemplate';
  */
 export const SAMPLE_VALUES: LabelTokenValues = {
   firstName: 'Bartholomew',
+  // A second name in another script, because that is the child this sample used
+  // to hide: the roster row holds `Bartholomew “蔡秉洲”` as one field, and until
+  // the kiosk split the halves apart it printed the composite on the name line.
+  // A leader who puts `{{nickname}}` on a template should see what it costs in
+  // width here rather than on the first family it happens to.
+  nickname: '蔡秉洲',
   lastName: 'Fitzwilliam',
   lastInitial: 'F',
   grade: '8th grade',
@@ -50,6 +56,7 @@ export const SAMPLE_VALUES: LabelTokenValues = {
  */
 export const SPARSE_SAMPLE_VALUES: LabelTokenValues = {
   firstName: 'Ada',
+  nickname: '',
   lastName: '',
   lastInitial: '',
   grade: '',

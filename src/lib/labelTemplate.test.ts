@@ -139,6 +139,22 @@ describe('the default template', () => {
     expect(LABEL_TOKENS).not.toContain('notes');
   });
 
+  it('offers the two halves of a name separately', () => {
+    // One field on the roster row, two tokens here, so the composite Tally
+    // stores for search — `Benson “蔡秉洲”` — never has to go onto the name line
+    // whole. The kiosk splits it; see `kiosk/printing/tokens.ts`.
+    expect(LABEL_TOKENS).toContain('firstName');
+    expect(LABEL_TOKENS).toContain('nickname');
+  });
+
+  it('does not put a second name on a label nobody asked for it on', () => {
+    // The default is the name line at `xl`. A nickname belongs on a line of its
+    // own at a size a leader chose, not inside that one.
+    for (const line of DEFAULT_LABEL_TEMPLATE.lines) {
+      expect(tokensIn(line.text)).not.toContain('nickname');
+    }
+  });
+
   /*
    * The allergy token is the one exception to the paragraph above, and the pair
    * of claims below is what makes it one rather than a hole. It has to exist —
