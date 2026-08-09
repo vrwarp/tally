@@ -252,7 +252,7 @@ export function EventEditorModal({
   defaults,
   onSaved,
 }: EventEditorModalProps) {
-  const { events, series } = useData();
+  const { events, series, canWork } = useData();
   const { user } = useAuth();
   const { show } = useToast();
 
@@ -577,11 +577,29 @@ export function EventEditorModal({
               }
             >
               <option value="">Not part of one</option>
-              {seriesOptions.map((candidate) => (
-                <option key={candidate.id} value={candidate.id}>
-                  {candidate.title}
-                </option>
-              ))}
+              {/*
+                Marked where the choice is made, not after the form.
+
+                `events: create` and `events: update` are both gated on the
+                chain, so picking a series the writer is not on means filling in
+                a title, a room, two dates and a recurrence rule and then being
+                refused at save. Disabled rather than hidden: the series exists,
+                it is on the calendar two inches away, and a gathering that
+                silently vanishes from a picker is the bug this app's whole
+                access design argues against.
+              */}
+              {seriesOptions.map((candidate) => {
+                const mine = canWork({
+                  id: candidate.id,
+                  seriesId: candidate.id,
+                  recurrenceRootId: null,
+                });
+                return (
+                  <option key={candidate.id} value={candidate.id} disabled={!mine}>
+                    {mine ? candidate.title : `${candidate.title} — not yours`}
+                  </option>
+                );
+              })}
             </SelectField>
           ) : null}
 

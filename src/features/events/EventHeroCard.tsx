@@ -33,6 +33,20 @@ export interface EventHeroCardProps {
    * is today, on wherever the card could be any day.
    */
   showDay?: boolean;
+  /**
+   * How much room the card takes.
+   *
+   * `full` is the counselor's chooser, where the card is the whole screen's
+   * decision and the only thing on it. `compact` is the Events tab, where it
+   * sits in a list of rows: same surface, same ring, same description, same
+   * call to action — one rank quieter in type, and on the same 68px text axis
+   * as everything around it.
+   *
+   * It is a prop rather than a breakpoint because the difference is about what
+   * the card is *next to*, and that is not something a width can tell you: the
+   * chooser at 1440px still wants the loud card.
+   */
+  density?: 'full' | 'compact';
   className?: string;
 }
 
@@ -43,16 +57,19 @@ export function EventHeroCard({
   to,
   cta,
   showDay = false,
+  density = 'full',
   className,
 }: EventHeroCardProps) {
   const cancelled = event.status === 'cancelled';
   const open = isCheckInOpen(event, now) && !cancelled;
+  const compact = density === 'compact';
 
   return (
     <Link
       to={to}
       className={cn(
-        'flex flex-col gap-3 rounded-2xl bg-ink-900 p-4 ring-1 active:bg-ink-800',
+        'flex flex-col gap-3 bg-ink-900 ring-1 hover:bg-ink-800/40 active:bg-ink-800',
+        compact ? 'rounded-xl p-3' : 'rounded-2xl p-4',
         // The gathering that is actually happening gets the brand ring, so a
         // counselor walking in can find it without reading anything.
         open ? 'ring-brand-500/40' : 'ring-ink-800',
@@ -60,12 +77,22 @@ export function EventHeroCard({
       )}
     >
       <div className="flex min-w-0 items-start gap-3">
-        <EventIcon name={event.icon} size="lg" tone={open ? 'brand' : 'neutral'} />
+        <EventIcon
+          name={event.icon}
+          size={compact ? 'md' : 'lg'}
+          tone={open ? 'brand' : 'neutral'}
+        />
 
         <div className="min-w-0 flex-1">
+          {/* Compact steps down a rank because on the Events tab this title was
+              byte-identical to the `h2` governing the column it sits in, and a
+              card title outranking its own section heading is a hierarchy with
+              nothing at the top. What makes the card loud there is the surface,
+              the description and the call to action — none of which move. */}
           <h3
             className={cn(
-              'text-lg font-bold leading-tight',
+              'font-bold leading-tight',
+              compact ? 'text-base font-semibold' : 'text-lg',
               cancelled ? 'text-ink-400 line-through' : 'text-ink-50',
             )}
           >
@@ -110,7 +137,10 @@ export function EventHeroCard({
       {/* Not a button. See the note at the top of this file. */}
       <span
         className={cn(
-          'flex min-h-14 w-full items-center justify-center rounded-xl px-5 text-base font-semibold',
+          // Shorter where there is a pointer, like every other control on the
+          // page: 56px is a thumb's target, and the header's own buttons already
+          // drop to 36px.
+          'flex min-h-14 w-full items-center justify-center rounded-xl px-5 text-base font-semibold pointer-fine:min-h-10 pointer-fine:text-sm',
           open
             ? 'bg-brand-500 text-white'
             : 'bg-ink-800 text-ink-100 ring-1 ring-ink-700',

@@ -119,3 +119,9 @@ docs/uxr/team-walkthrough.html
 # tracked; the frames they were made from are not.
 /uxr/rounds/**/*.png
 /uxr/renders/
+
+# One-off measuring scripts the critique agents write beside the prototypes to
+# read a rendered frame's geometry. They are a step in an argument, not a tool —
+# the numbers they produced are quoted in the round's critique, which is tracked.
+/uxr/_*
+/uxr/.measure-*
