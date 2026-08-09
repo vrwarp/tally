@@ -13,8 +13,15 @@
  * family the wrong phone call.
  */
 import { Link } from 'react-router-dom';
+import { ExportCsvButton } from '@/components/ExportCsvButton';
 import { Card, CardHeader, EmptyState } from '@/components/ui';
 import { CopyContactsButton, FollowUpActions } from '@/features/dashboard/FollowUpActions';
+import {
+  buildMiaCsv,
+  NO_EXPORT_CONTEXT,
+  type FollowUpCsvContext,
+} from '@/features/dashboard/followUpCsv';
+import { exportFilename } from '@/lib/csv';
 import { formatRelative, formatShortDate } from '@/lib/time';
 import { gradeLabel, initials } from '@/lib/utils';
 import { studentFullName, type MiaStudent } from '@/types';
@@ -31,9 +38,17 @@ export interface MiaListProps {
    * has just changed it.
    */
   onContactAdded?: () => void;
+  /** What the CSV needs that the rows do not carry. See `followUpCsv.ts`. */
+  exportContext?: FollowUpCsvContext;
 }
 
-export function MiaList({ items, threshold, gatheringTitle = null, onContactAdded }: MiaListProps) {
+export function MiaList({
+  items,
+  threshold,
+  gatheringTitle = null,
+  onContactAdded,
+  exportContext = NO_EXPORT_CONTEXT,
+}: MiaListProps) {
   const students = items.map((item) => item.student);
 
   return (
@@ -48,10 +63,28 @@ export function MiaList({ items, threshold, gatheringTitle = null, onContactAdde
         }
         action={
           items.length > 0 ? (
-            <CopyContactsButton
-              students={students}
-              title={`Follow-up — ${items.length} students we have not seen:`}
-            />
+            // Two, and deliberately not a menu: the clipboard copy goes to the
+            // group chat, the file goes to whoever is tracking who called whom.
+            // Different destinations, both one press away.
+            <div className="flex shrink-0 items-center gap-2">
+              <CopyContactsButton
+                students={students}
+                title={`Follow-up — ${items.length} students we have not seen:`}
+              />
+              <ExportCsvButton
+                build={() => ({
+                  filename: exportFilename({
+                    kind: 'follow-up',
+                    scope: gatheringTitle ? `${gatheringTitle} mia` : 'mia',
+                    at: new Date(),
+                  }),
+                  contents: buildMiaCsv(items, exportContext),
+                })}
+                count={items.length}
+                noun="students"
+                label="Export"
+              />
+            </div>
           ) : undefined
         }
       />

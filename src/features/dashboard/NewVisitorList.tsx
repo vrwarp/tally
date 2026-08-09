@@ -18,10 +18,17 @@
  * go.
  */
 import { Link } from 'react-router-dom';
+import { ExportCsvButton } from '@/components/ExportCsvButton';
 import { Badge, Card, CardHeader, EmptyState } from '@/components/ui';
 import { AddParentContactButton } from '@/features/dashboard/AddParentContactButton';
 import { FollowUpActions } from '@/features/dashboard/FollowUpActions';
+import {
+  buildNewVisitorCsv,
+  NO_EXPORT_CONTEXT,
+  type FollowUpCsvContext,
+} from '@/features/dashboard/followUpCsv';
 import { hasNoParentContact, reachableFor } from '@/features/dashboard/insights';
+import { exportFilename } from '@/lib/csv';
 import { formatRelative, formatShortDate } from '@/lib/time';
 import { gradeLabel, initials, NO_GRADE } from '@/lib/utils';
 import { studentFullName, type NewVisitor } from '@/types';
@@ -53,6 +60,8 @@ export interface NewVisitorListProps {
    * the map above — which said the opposite a second ago — is asked again.
    */
   onContactAdded?: () => void;
+  /** What the CSV needs that the rows do not carry. See `followUpCsv.ts`. */
+  exportContext?: FollowUpCsvContext;
 }
 
 export function NewVisitorList({
@@ -61,6 +70,7 @@ export function NewVisitorList({
   gatheringTitle = null,
   reachable,
   onContactAdded,
+  exportContext = NO_EXPORT_CONTEXT,
 }: NewVisitorListProps) {
   return (
     <Card>
@@ -71,6 +81,23 @@ export function NewVisitorList({
           gatheringTitle
             ? `First seen at ${gatheringTitle} in the last ${windowDays} days.`
             : `First time in the last ${windowDays} days.`
+        }
+        action={
+          items.length > 0 ? (
+            <ExportCsvButton
+              build={() => ({
+                filename: exportFilename({
+                  kind: 'follow-up',
+                  scope: gatheringTitle ? `${gatheringTitle} new` : 'new-faces',
+                  at: new Date(),
+                }),
+                contents: buildNewVisitorCsv(items, exportContext),
+              })}
+              count={items.length}
+              noun="students"
+              label="Export"
+            />
+          ) : undefined
         }
       />
 

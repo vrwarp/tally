@@ -17,6 +17,13 @@
 import { Link } from 'react-router-dom';
 import { Badge, Card, CardHeader, EmptyState, Spinner } from '@/components/ui';
 import { AddParentContactButton } from '@/features/dashboard/AddParentContactButton';
+import { ExportCsvButton } from '@/components/ExportCsvButton';
+import {
+  buildIncompleteProfileCsv,
+  NO_EXPORT_CONTEXT,
+  type FollowUpCsvContext,
+} from '@/features/dashboard/followUpCsv';
+import { exportFilename } from '@/lib/csv';
 import { formatShortDate } from '@/lib/time';
 import { gradeLabel, initials } from '@/lib/utils';
 import { studentFullName, type Student } from '@/types';
@@ -44,6 +51,8 @@ export interface IncompleteProfileListProps {
    * answer this whole list is built from, and the row has just changed it.
    */
   onContactAdded?: () => void;
+  /** What the CSV needs that the rows do not carry. See `followUpCsv.ts`. */
+  exportContext?: FollowUpCsvContext;
 }
 
 export function IncompleteProfileList({
@@ -53,6 +62,7 @@ export function IncompleteProfileList({
   error = null,
   gatheringTitle = null,
   onContactAdded,
+  exportContext = NO_EXPORT_CONTEXT,
 }: IncompleteProfileListProps) {
   return (
     <Card>
@@ -63,6 +73,23 @@ export function IncompleteProfileList({
           gatheringTitle
             ? `Seen at ${gatheringTitle}, with no parent phone or email on file.`
             : 'Active students with no parent phone or email on file.'
+        }
+        action={
+          students.length > 0 ? (
+            <ExportCsvButton
+              build={() => ({
+                filename: exportFilename({
+                  kind: 'follow-up',
+                  scope: gatheringTitle ? `${gatheringTitle} incomplete` : 'incomplete',
+                  at: now,
+                }),
+                contents: buildIncompleteProfileCsv(students, exportContext, now),
+              })}
+              count={students.length}
+              noun="students"
+              label="Export"
+            />
+          ) : undefined
         }
       />
 

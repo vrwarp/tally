@@ -29,6 +29,7 @@ import {
   TextField,
   WarningBadge,
 } from '@/components/ui';
+import { ExportCsvButton } from '@/components/ExportCsvButton';
 import { PageFrame } from '@/components/PageFrame';
 import { RosterErrorBanner } from '@/components/RosterErrorBanner';
 import { useAuth } from '@/context/authContext';
@@ -36,6 +37,8 @@ import { useData } from '@/context/dataContext';
 import { useParentContact } from '@/hooks/useParentContact';
 import { isUnreachable } from '@/features/dashboard/insights';
 import { AddFromPlanningCenterModal } from '@/features/students/AddFromPlanningCenterModal';
+import { PartialRosterDialog } from '@/features/students/PartialRosterDialog';
+import { buildRosterCsv } from '@/features/students/rosterCsv';
 import { RowBadgeModal, type RowBadgeAction } from '@/features/students/RowBadgeModal';
 import { StudentEditorModal } from '@/features/students/StudentEditorModal';
 import {
@@ -44,6 +47,7 @@ import {
   formatBirthdayShort,
   type BirthdayState,
 } from '@/lib/birthday';
+import { exportFilename } from '@/lib/csv';
 import { formatSeenShort } from '@/lib/time';
 import {
   cn,
@@ -59,7 +63,15 @@ type StatusFilter = 'active' | 'inactive' | 'all';
 type QuickFilter = 'none' | 'incomplete' | 'visitors';
 
 export function StudentsPage() {
-  const { students, loading, rosterError, refreshRoster, rosterBackends } = useData();
+  const {
+    students,
+    loading,
+    rosterError,
+    refreshRoster,
+    rosterBackends,
+    rosterLoading,
+    rosterSettled,
+  } = useData();
   // With a second backend connected, "Planning Center" stops being the name
   // for where students come from — the buttons say the neutral thing instead.
   const multiBackend = rosterBackends.length >= 2;
@@ -140,6 +152,66 @@ export function StudentsPage() {
     setQuick('none');
   };
 
+  /*
+   * Whether this roster is fit to leave the app, in three tiers.
+   *
+   * A screen can be honest about a stale roster with a banner beside it; a file
+   * cannot, because it gets forwarded. So the first read in flight disables the
+   * control (nothing trustworthy to export yet), a failed read refuses outright
+   * (`students` is a local copy of unknown age), and a single backend being down
+   * is confirmed and then annotated — see `PartialRosterDialog`.
+   */
+  const backendsDown = useMemo(
+    () => rosterBackends.filter((backend) => !backend.ok),
+    [rosterBackends],
+  );
+  const unresolved = useMemo(
+    () => rosterBackends.reduce((total, backend) => total + (backend.unresolved ?? 0), 0),
+    [rosterBackends],
+  );
+
+  const exportBlockedReason = !rosterSettled
+    ? 'Still reading the roster — nothing to export yet.'
+    : rosterError
+      ? 'The roster could not be read, so an export would not be a true list.'
+      : null;
+
+  const [confirmingPartial, setConfirmingPartial] = useState<{
+    resolve: (proceed: boolean) => void;
+  } | null>(null);
+
+  const confirmExport = useCallback(async () => {
+    if (backendsDown.length === 0 && unresolved === 0) return true;
+    return new Promise<boolean>((resolve) => {
+      setConfirmingPartial({ resolve });
+    });
+  }, [backendsDown.length, unresolved]);
+
+  const settlePartial = useCallback((proceed: boolean) => {
+    setConfirmingPartial((pending) => {
+      pending?.resolve(proceed);
+      return null;
+    });
+  }, []);
+
+  const buildExport = useCallback(
+    () => ({
+      filename: exportFilename({
+        kind: 'roster',
+        at: new Date(),
+        flags: [
+          // Both facts a reader needs before they trust the row count, in the
+          // one label the file keeps once the screen is gone.
+          ...(isFiltered ? ['filtered'] : []),
+          ...(backendsDown.length > 0 ? ['partial'] : []),
+        ],
+      }),
+      // `visible`, never `students`: the file is the rows on screen.
+      contents: buildRosterCsv(visible, { reachable, backends: rosterBackends }),
+    }),
+    [visible, reachable, rosterBackends, isFiltered, backendsDown.length],
+  );
+
   return (
     <PageFrame width="2xl">
       <header className="flex items-start justify-between gap-3">
@@ -167,10 +239,38 @@ export function StudentsPage() {
           <Button variant="secondary" onClick={() => setAddFromPcoOpen(true)}>
             {multiBackend ? 'Add from directory' : 'Add from Planning Center'}
           </Button>
+          {/*
+            The third control, and the only one on this page whose output leaves
+            the app. It exports what is on screen under the filters applied —
+            which is why it reads `visible` and why the count is on its label.
+          */}
+          <ExportCsvButton
+            build={buildExport}
+            count={visible.length}
+            noun="students"
+            blockedReason={exportBlockedReason}
+            confirm={confirmExport}
+          />
         </div>
       </header>
 
       <RosterErrorBanner />
+
+      <PartialRosterDialog
+        open={confirmingPartial !== null}
+        down={backendsDown}
+        unresolved={unresolved}
+        retrying={rosterLoading}
+        onConfirm={() => settlePartial(true)}
+        onCancel={() => settlePartial(false)}
+        onRetry={() => {
+          // Stands the export down rather than holding the dialog open over a
+          // read in flight: if the retry lands, the warning banner clears and
+          // the button is one press away, now describing a whole roster.
+          void refreshRoster(true);
+          settlePartial(false);
+        }}
+      />
 
       {/* One toolbar row where there is a pointer. Stacked, the search field,
           the two selects and the two chips terminated at three different right
