@@ -136,21 +136,37 @@ big bold time behind.
 
 ## Shaping the sticker
 
-Under **On the roll** in the same editor, three settings about how the label sits
-on whatever the kiosk has loaded. All three are per gathering, because the person
+Under **On the roll** in the same editor, four settings about how the label sits
+on whatever the kiosk has loaded. All four are per gathering, because the person
 who can see whether a label looks right is the one designing it — and none of
 them names a roll, so a kiosk can be given a different one without an edit here.
 
-**Space above / space below.** Blank millimetres at the top and bottom of the
-text, up to 25 mm each. On continuous tape this is length: the tape is cut where
-the sticker ends, so two 10 mm margins is 20 mm of blank roll per child. Worth
-spending where a badge holder hides the top of a label, or a cutter shaves the
-last line, and worth leaving alone otherwise. Both default to 0.7 mm, which is
-what Tally printed before this setting existed.
+**Space above / space below.** Blank millimetres at the two ends of the sticker
+— the ends the cutter makes — up to 25 mm each. On continuous tape this is
+length: the tape is cut where the sticker ends, so two 10 mm margins is 20 mm of
+blank roll per child. Worth spending where a badge holder hides the top of a
+label, or a cutter shaves the last line, and worth leaving alone otherwise. Both
+default to 0.7 mm, which is what Tally printed before this setting existed.
+
+They stay at those ends when the label is turned. A margin is blank *tape*, and
+the roll's width is not a template's to spend — 62 mm tape is 62 mm wide whatever
+the text does — so on a turned label the margins are the sides of the text and
+still the ends of the sticker.
 
 On a die-cut label there is no length to give, so these only decide what the
 block is centred in — a way of nudging the text up or down, not of making the
 label bigger.
+
+**Text size.** A multiplier on every line at once, from 0.5× to 4×, keeping the
+sizes you chose in proportion to each other. **Biggest** is 8 mm of cap height,
+picked to fill a 62 × 29 mm badge — so on a wider roll, or on a label given a
+fixed length longer than its text needs, it is not big and there was nothing to
+say so with. Turn this up and the whole label grows into the space.
+
+It cannot overflow: everything that already fits text to a label — shrinking,
+wrapping, scaling the block, dropping trailing lines — still happens afterwards,
+so asking for 4× on a label with no room gives you a full label rather than a
+ruined one. On a roll with a free dimension it buys a longer sticker instead.
 
 **Print along the tape.** Turns the label a quarter turn. Upright, the roll's
 width is how long a line can be, and a long name is shrunk to fit; turned, the
@@ -279,6 +295,10 @@ cannot change the label's size, only where the text sits in it.
 
 **A name shrunk almost to nothing.** It is longer than the roll is wide. Tick
 **Print along the tape** and it runs down the roll at full size instead.
+
+**Half the sticker empty.** The sizes are relative to a 62 × 29 mm badge, so a
+bigger roll leaves room over. Turn **Text size** up — see
+[Shaping the sticker](#shaping-the-sticker).
 
 **Refused with a size error.** The roll in the printer is not the one the kiosk
 is set to. Die-cut media has to match exactly — the rasteriser refuses rather

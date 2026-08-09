@@ -91,14 +91,23 @@ export interface LabelBox {
    * Blank dots above the content, in place of `padding` at that edge.
    *
    * Its reason for existing is continuous tape, where the length follows the
-   * content and so the space above and below the text is the only thing that
+   * content and so the space before and after the text is the only thing that
    * decides where the sticker sits between two cuts. On die-cut media the
    * height is fixed and the block is centred in what these leave, which is a
    * way of nudging it up or down rather than of making the label longer.
+   *
+   * All four exist because a label can be turned. The margins belong to the
+   * *tape* — they are the blank strip at each end of the sticker — so on a
+   * rotated label they are the layout's left and right rather than its top and
+   * bottom. `labelBoxFor` is what decides which pair to fill in.
    */
   paddingTop?: number;
   /** Blank dots below the content, in place of `padding` at that edge. */
   paddingBottom?: number;
+  /** Blank dots left of the content, in place of `padding` at that edge. */
+  paddingLeft?: number;
+  /** Blank dots right of the content, in place of `padding` at that edge. */
+  paddingRight?: number;
 }
 
 /**
@@ -142,6 +151,14 @@ export interface LabelMedia {
  *
  * **What a fixed length means.** The free dimension, pinned — which makes tape
  * behave exactly like die-cut media of that length, block centred and all.
+ *
+ * **Which edges the margins land on.** They belong to the tape, not to the
+ * text: a margin is the blank strip at each end of the sticker, so it is always
+ * spent on length and never on the roll's width. On a turned label the layout's
+ * top and bottom are the roll's two *sides*, which are the one pair of edges a
+ * margin must not touch — the roll is as wide as it is — so the margins go on
+ * the layout's left and right instead. `drawLabel` then turns the whole thing
+ * and they come out where they were asked for, at the ends of the sticker.
  */
 export function labelBoxFor(
   template: LabelTemplate,
@@ -150,10 +167,8 @@ export function labelBoxFor(
   const endless = media.lengthDots === null;
   const rotated = endless && template.rotated === true;
 
-  const margins = {
-    paddingTop: marginDots(template.marginTopMm),
-    paddingBottom: marginDots(template.marginBottomMm),
-  };
+  const before = marginDots(template.marginTopMm);
+  const after = marginDots(template.marginBottomMm);
   // Only tape has a length to pin. Null leaves the free dimension free.
   const fixed =
     endless && template.fixedLengthMm !== undefined
@@ -161,10 +176,25 @@ export function labelBoxFor(
       : null;
 
   if (rotated) {
-    return { box: { width: fixed, height: media.widthDots, ...margins }, rotated };
+    // The turn sends the layout's left edge to the leading end of the tape, so
+    // "above" is the left here — the same end of the same sticker.
+    return {
+      box: {
+        width: fixed,
+        height: media.widthDots,
+        paddingLeft: before,
+        paddingRight: after,
+      },
+      rotated,
+    };
   }
   return {
-    box: { width: media.widthDots, height: endless ? fixed : media.lengthDots, ...margins },
+    box: {
+      width: media.widthDots,
+      height: endless ? fixed : media.lengthDots,
+      paddingTop: before,
+      paddingBottom: after,
+    },
     rotated,
   };
 }
@@ -222,6 +252,15 @@ export function resolveLines(
   template: LabelTemplate,
   values: LabelTokenValues,
 ): ResolvedLine[] {
+  /*
+   * What the template's relative sizes are relative *to*.
+   *
+   * Applied here, once, so everything downstream — shrinking, wrapping, the
+   * block scale, the drop — sees ordinary font sizes and needs to know nothing
+   * about it. See `LabelTemplate.fontScale`.
+   */
+  const zoom = template.fontScale ?? 1;
+
   const resolved: ResolvedLine[] = [];
   for (const line of template.lines) {
     const text = fillLabelTokens(line.text, values);
@@ -229,7 +268,7 @@ export function resolveLines(
     if (line.requiresValue && !anyTokenFilled(line.text, values)) continue;
     resolved.push({
       text,
-      fontPx: NOMINAL_FONT_PX[line.size],
+      fontPx: Math.round(NOMINAL_FONT_PX[line.size] * zoom),
       bold: line.bold,
       align: line.align,
     });
@@ -317,6 +356,8 @@ export function layoutLabel(
   const padding = box.padding ?? DEFAULT_PADDING;
   const paddingTop = box.paddingTop ?? padding;
   const paddingBottom = box.paddingBottom ?? padding;
+  const paddingLeft = box.paddingLeft ?? padding;
+  const paddingRight = box.paddingRight ?? padding;
   /*
    * A free width has nothing to shrink to. Infinity is not a fudge here, it is
    * the honest statement of the rotated case: every line is as long as it wants
@@ -324,7 +365,9 @@ export function layoutLabel(
    * chance to break a name that has a whole roll to run along.
    */
   const innerWidth =
-    box.width === null ? Number.POSITIVE_INFINITY : Math.max(1, box.width - padding * 2);
+    box.width === null
+      ? Number.POSITIVE_INFINITY
+      : Math.max(1, box.width - paddingLeft - paddingRight);
   const maxHeight =
     box.height === null ? null : Math.max(1, box.height - paddingTop - paddingBottom);
 
@@ -332,7 +375,7 @@ export function layoutLabel(
   if (resolved.length === 0) {
     return {
       draws: [],
-      width: box.width ?? padding * 2,
+      width: box.width ?? paddingLeft + paddingRight,
       height: box.height ?? paddingTop + paddingBottom,
       droppedLines: 0,
       scaledToFit: false,
@@ -400,7 +443,7 @@ export function layoutLabel(
    * label: the widest line decides where the tape gets cut.
    */
   const contentWidth = result.rows.reduce((widest, row) => Math.max(widest, row.width), 0);
-  const width = box.width ?? Math.ceil(contentWidth + padding * 2);
+  const width = box.width ?? Math.ceil(contentWidth + paddingLeft + paddingRight);
   // Alignment is relative to whatever the label turned out to be, so `right` on
   // a free width means the end of the longest line rather than a box edge that
   // does not exist.
@@ -421,7 +464,7 @@ export function layoutLabel(
     const baseline = cursor + row.fontPx;
     draws.push({
       text: row.text,
-      x: xFor(row.align, padding, alignWidth),
+      x: xFor(row.align, paddingLeft, alignWidth),
       y: Math.round(baseline),
       fontPx: row.fontPx,
       bold: row.bold,

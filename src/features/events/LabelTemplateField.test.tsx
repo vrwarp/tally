@@ -395,12 +395,24 @@ describe('a line that would print its caption alone', () => {
       expect(screen.queryByText(/die-cut, so the preview ignores these/)).toBeNull();
     });
 
+    it('scales the text, and forgets the factor when it is cleared', async () => {
+      const user = userEvent.setup();
+      render(<Harness initial={DEFAULT_LABEL_TEMPLATE} />);
+
+      await user.type(screen.getByLabelText(/Text size/), '2');
+      expect(stored()?.fontScale).toBe(2);
+
+      await user.clear(screen.getByLabelText(/Text size/));
+      expect(stored()).not.toHaveProperty('fontScale');
+    });
+
     it('never produces a shape the kiosk would refuse', async () => {
       const user = userEvent.setup();
       render(<Harness initial={DEFAULT_LABEL_TEMPLATE} />);
 
       await user.click(screen.getByLabelText(/Print along the tape/));
       await user.type(screen.getByLabelText(/Space above/), '6');
+      await user.type(screen.getByLabelText(/Text size/), '2');
       await user.click(screen.getByLabelText(/Same length every time/));
 
       const template = stored();

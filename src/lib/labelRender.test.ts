@@ -118,6 +118,54 @@ describe('resolveLines', () => {
   });
 });
 
+describe('the text size factor', () => {
+  it('scales every size by it, keeping them in proportion', () => {
+    const lines = template([line('a', 'sm'), line('a', 'xl')]);
+    const [small, large] = resolveLines({ ...lines, fontScale: 2 }, {});
+
+    expect(small!.fontPx).toBe(34 * 2);
+    expect(large!.fontPx).toBe(96 * 2);
+  });
+
+  it('reads an absent factor as leaving everything alone', () => {
+    const lines = template([line('a', 'xl')]);
+    expect(resolveLines(lines, {})[0]!.fontPx).toBe(96);
+    expect(resolveLines({ ...lines, fontScale: 1 }, {})[0]!.fontPx).toBe(96);
+  });
+
+  it('fills more of a label that had room to spare', () => {
+    // The case it exists for: a fixed length longer than the text needs, where
+    // "Biggest" was not big and nothing could say so.
+    const long = { width: 696, height: 1181 };
+    const one = template([line('Ada', 'xl', true)]);
+
+    const plain = layoutLabel(one, {}, long, measure);
+    const zoomed = layoutLabel({ ...one, fontScale: 2 }, {}, long, measure);
+
+    expect(zoomed.draws[0]!.fontPx).toBeGreaterThan(plain.draws[0]!.fontPx);
+  });
+
+  it('grows a free dimension instead of overflowing it', () => {
+    const one = template([line('Ada', 'xl', true)]);
+    const plain = layoutLabel(one, {}, ENDLESS, measure);
+    const zoomed = layoutLabel({ ...one, fontScale: 2 }, {}, ENDLESS, measure);
+
+    expect(zoomed.height).toBeGreaterThan(plain.height);
+  });
+
+  it('still loses to the label when it asks for more than fits', () => {
+    // The fitting that follows has the last word, so a wild factor produces a
+    // full label rather than one printed off the edges.
+    const one = template([line('Bartholomew', 'xl', true)]);
+    const zoomed = layoutLabel({ ...one, fontScale: 4 }, {}, DIE_CUT, measure);
+
+    expect(zoomed.height).toBe(271);
+    for (const draw of zoomed.draws) {
+      expect(measure(draw.text, draw.fontPx, draw.bold)).toBeLessThanOrEqual(696 - 16);
+    }
+  });
+});
+
 describe('layoutLabel', () => {
   it('places a short label without shrinking or dropping anything', () => {
     const result = layoutLabel(
@@ -327,14 +375,28 @@ describe('layoutLabel', () => {
       expect(right!.x).toBe(result.width - 8);
     });
 
-    it('spends the margins across the tape rather than on length', () => {
-      /*
-       * "Above" is in reading order either way, and turned that is across the
-       * roll — which is the fixed dimension, so a bigger margin moves the text
-       * within the tape instead of buying more of it. It moves by half what was
-       * added, because the block is still centred in what the margins leave, the
-       * same way it is on a die-cut label.
-       */
+    it('buys length with the paddings on the free axis', () => {
+      // Which is where `labelBoxFor` puts the margins on a turned label, because
+      // a margin is blank tape and the roll's width is not the template's to
+      // spend. See its own tests below.
+      // Left-aligned, so the leading padding is the x it starts at rather than
+      // something a centre offset has already absorbed.
+      const one = template([line('Ada', 'sm', false, 'left')]);
+      const plain = layoutLabel(one, {}, SIDEWAYS, measure);
+      const spaced = layoutLabel(
+        one,
+        {},
+        { ...SIDEWAYS, paddingLeft: 60, paddingRight: 100 },
+        measure,
+      );
+
+      expect(spaced.width).toBe(plain.width + (60 - 8) + (100 - 8));
+      expect(spaced.draws[0]!.x).toBe(60);
+    });
+
+    it('moves the block within the fixed axis without lengthening anything', () => {
+      // A padding on the axis that cannot grow can only shift what is centred in
+      // it — by half what was added, the same as a die-cut label.
       const one = template([line('Ada', 'sm')]);
       const plain = layoutLabel(one, {}, SIDEWAYS, measure);
       const spaced = layoutLabel(one, {}, { ...SIDEWAYS, paddingTop: 60 }, measure);
@@ -530,6 +592,42 @@ describe('labelBoxFor', () => {
     expect(labelBoxFor(withShape({ marginTopMm: 10 }), TAPE).box).toMatchObject({
       paddingTop: Math.round(10 * DOTS_PER_MM),
       paddingBottom: undefined,
+    });
+  });
+
+  describe('where the margins land', () => {
+    /*
+     * They belong to the tape, not to the text. A margin is the blank strip at
+     * each end of the sticker — the two ends the cutter makes — so it is always
+     * spent on length and never on the roll's width, which is not the
+     * template's to spend in the first place.
+     */
+    const top = Math.round(10 * DOTS_PER_MM);
+    const bottom = Math.round(4 * DOTS_PER_MM);
+    const shape = { marginTopMm: 10, marginBottomMm: 4 };
+
+    it('puts them above and below an upright label', () => {
+      expect(labelBoxFor(withShape(shape), TAPE).box).toMatchObject({
+        paddingTop: top,
+        paddingBottom: bottom,
+      });
+    });
+
+    it('puts them left and right of a turned one, which is the same two ends', () => {
+      // The turn sends the layout's left edge to the leading end of the tape,
+      // so "above" stays the end of the sticker that comes out first.
+      expect(labelBoxFor(withShape({ ...shape, rotated: true }), TAPE).box).toMatchObject({
+        paddingLeft: top,
+        paddingRight: bottom,
+      });
+    });
+
+    it('never spends them on the roll\'s width', () => {
+      const { box } = labelBoxFor(withShape({ ...shape, rotated: true }), TAPE);
+      // The fixed axis is the roll's width, and nothing here may touch it.
+      expect(box.paddingTop).toBeUndefined();
+      expect(box.paddingBottom).toBeUndefined();
+      expect(box.height).toBe(696);
     });
   });
 });

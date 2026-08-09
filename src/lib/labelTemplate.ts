@@ -123,6 +123,26 @@ export interface LabelTemplate {
    * already.
    */
   fixedLengthMm?: number;
+  /**
+   * Scale every line's size by this, keeping their proportions.
+   *
+   * The sizes on a line are relative — `sm` through `xl` — and what they are
+   * relative *to* was a fixed guess: an `xl` is 96 dots, chosen so a first name
+   * fills a 62×29mm badge. On a roll with more room than that, or a label given
+   * a fixed length longer than its text needs, "Biggest" is not big and there is
+   * nothing to say so with. A label that leaves half the sticker empty is not a
+   * layout the renderer can fix on its own either, because filling the space
+   * automatically would silently resize every label already in use.
+   *
+   * So this scales the anchor rather than the sizes. The relationship a leader
+   * chose between their lines survives it, and the fitting that comes afterwards
+   * — shrink, wrap, scale the block, drop trailing lines — still has the last
+   * word: asking for text three times too big gets a full label, not one that
+   * overflows.
+   *
+   * Absent means 1, which is what every template written before this prints.
+   */
+  fontScale?: number;
 }
 
 export const LABEL_LINE_SIZES: readonly LabelLineSize[] = ['sm', 'md', 'lg', 'xl'];
@@ -176,6 +196,18 @@ export const MAX_LABEL_FIXED_LENGTH_MM = 150;
  * starting point to be typed over, not a recommendation.
  */
 export const DEFAULT_FIXED_LENGTH_MM = 50;
+
+/**
+ * How far the text may be scaled, either way.
+ *
+ * Down to a half because below that the renderer's own legibility floor takes
+ * over anyway; up to four because four times an `xl` is about 32mm of cap
+ * height, which is taller than the widest roll a QL takes and so past the point
+ * where more would do anything but overflow.
+ */
+export const MIN_LABEL_FONT_SCALE = 0.5;
+export const MAX_LABEL_FONT_SCALE = 4;
+export const DEFAULT_LABEL_FONT_SCALE = 1;
 
 /**
  * Every token a label may use.
@@ -370,6 +402,10 @@ function clampFixedLength(value: unknown): number | undefined {
   return clampNumber(value, MIN_LABEL_FIXED_LENGTH_MM, MAX_LABEL_FIXED_LENGTH_MM);
 }
 
+function clampFontScale(value: unknown): number | undefined {
+  return clampNumber(value, MIN_LABEL_FONT_SCALE, MAX_LABEL_FONT_SCALE);
+}
+
 /**
  * `{ key: value }`, or nothing at all when the value is undefined.
  *
@@ -405,6 +441,7 @@ export function sanitizeLabelTemplate(value: unknown): LabelTemplate | null {
     marginBottomMm?: unknown;
     rotated?: unknown;
     fixedLengthMm?: unknown;
+    fontScale?: unknown;
   };
   if (!Array.isArray(raw.lines)) return null;
 
@@ -450,6 +487,7 @@ export function sanitizeLabelTemplate(value: unknown): LabelTemplate | null {
     ...optional('marginBottomMm', clampMargin(raw.marginBottomMm)),
     ...optional('rotated', raw.rotated === true ? true : undefined),
     ...optional('fixedLengthMm', clampFixedLength(raw.fixedLengthMm)),
+    ...optional('fontScale', clampFontScale(raw.fontScale)),
   };
 }
 
@@ -466,7 +504,8 @@ export function sameLabelTemplate(
     // `!== true` on both sides, so an absent flag and an explicit false are the
     // same template rather than an edit somebody has to save.
     (a.rotated === true) !== (b.rotated === true) ||
-    a.fixedLengthMm !== b.fixedLengthMm
+    a.fixedLengthMm !== b.fixedLengthMm ||
+    a.fontScale !== b.fontScale
   ) {
     return false;
   }
