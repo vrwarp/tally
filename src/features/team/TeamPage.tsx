@@ -14,6 +14,14 @@
  * inventing a custom field on every person in the church. It was also the wrong
  * place for the decision — the people who edit Planning Center are not
  * necessarily the people who should be granting access to this.
+ *
+ * It is its own screen rather than the last card on Settings, which is where it
+ * used to live. Granting and revoking access to a roster of minors is the most
+ * consequential thing an admin does in Tally and the thing they come back to
+ * every season; the thresholds above it are set once a year. Below the fold of a
+ * page whose other cards are appearance and API connections is the wrong place
+ * to keep it — a leader looking for "who can see this" should not have to scroll
+ * past a colour picker to find out.
  */
 import { useEffect, useState, type FormEvent } from 'react';
 import {
@@ -28,9 +36,11 @@ import {
   SkeletonRows,
   TextField,
 } from '@/components/ui';
+import { PageFrame } from '@/components/PageFrame';
 import { useAuth } from '@/context/authContext';
 import { useToast } from '@/context/toastContext';
 import { formatRelative } from '@/lib/time';
+import { cn } from '@/lib/utils';
 import {
   inviteToTally,
   setInvitationActive,
@@ -48,7 +58,7 @@ const ROLE_LABEL: Record<Role, string> = {
 
 const ROLE_OPTIONS: readonly Role[] = ['counselor', 'core', 'admin'];
 
-export function TeamList() {
+export function TeamPage() {
   const { profile, can } = useAuth();
   const { show } = useToast();
 
@@ -132,15 +142,37 @@ export function TeamList() {
   };
 
   return (
-    <div className="flex flex-col gap-3">
-      <p className="rounded-xl bg-ink-900 px-4 py-3 text-sm text-ink-400 ring-1 ring-ink-800">
+    <PageFrame>
+      <header>
+        <h1 className="text-xl font-bold text-ink-50">Team</h1>
+        <p className="mt-0.5 text-sm text-ink-500">
+          Who may sign in to Tally, and what they may do once they have. Changes apply to every
+          phone immediately.
+        </p>
+      </header>
+
+      <p className="rounded-xl bg-ink-900 px-4 py-3 text-sm text-ink-400 ring-1 ring-ink-800 lg:max-w-4xl">
         Tally decides access by Google address. An admin invites somebody here, they sign in with
-        that Google account, and their profile appears below — from then on the profile decides what
-        they may do. Some admins are pinned by the deployment itself and cannot be changed here;
-        that is the way back in if access is ever lost.
+        that Google account, and their profile appears beside this — from then on the profile
+        decides what they may do. Some admins are pinned by the deployment itself and cannot be
+        changed here; that is the way back in if access is ever lost.
       </p>
 
-      <div className="grid gap-3">
+      {/*
+       * Two columns for an admin above `lg`, one for everybody else.
+       *
+       * The invite form is three short controls, and a screen-wide email box
+       * with a screen-wide button under it is what a full-width column does to
+       * it — the field looks like it wants a paragraph. Beside the roster it is
+       * also where it belongs: inviting somebody and seeing who is already here
+       * is one thought, and on a monitor it should be one glance.
+       *
+       * A core member sees no invite column at all, so the grid would only park
+       * the roster in a 60% gutter. They get the single column they had.
+       */}
+      <div
+        className={cn('grid gap-3', isAdmin && 'lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start')}
+      >
         <Card>
           <CardHeader
             title="Signed-in team"
@@ -163,9 +195,21 @@ export function TeamList() {
             <ul className="divide-y divide-ink-800">
               {users.map((member) => {
                 const isSelf = member.id === profile?.id;
+                const editable = isAdmin && !isSelf;
 
                 return (
-                  <li key={member.id} className="flex flex-col gap-2 px-4 py-3">
+                  // Identity left, the controls that act on it right — a phone
+                  // stack until there is width for both. Only for a row that
+                  // has controls: the read-only rows end in a sentence, and a
+                  // sentence flung to the far edge of a monitor reads as a
+                  // caption for the whitespace next to it.
+                  <li
+                    key={member.id}
+                    className={cn(
+                      'flex flex-col gap-2 px-4 py-3',
+                      editable && 'sm:flex-row sm:items-center sm:justify-between sm:gap-4',
+                    )}
+                  >
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-ink-50">
                         {member.displayName || member.email}
@@ -179,8 +223,8 @@ export function TeamList() {
                       </p>
                     </div>
 
-                    {isAdmin && !isSelf ? (
-                      <div className="flex flex-wrap items-center gap-3">
+                    {editable ? (
+                      <div className="flex shrink-0 flex-wrap items-center gap-3">
                         <select
                           aria-label={`Role for ${member.displayName || member.email}`}
                           value={member.role}
@@ -275,7 +319,10 @@ export function TeamList() {
             ) : (
               <ul className="divide-y divide-ink-800">
                 {invitations.map((invitation) => (
-                  <li key={invitation.id} className="flex flex-col gap-2 px-4 py-3">
+                  <li
+                    key={invitation.id}
+                    className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 lg:flex-col lg:items-stretch lg:gap-2"
+                  >
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-ink-50">
                         {invitation.email}
@@ -285,7 +332,7 @@ export function TeamList() {
                         {invitation.invitedAt ? ` · invited ${formatRelative(invitation.invitedAt)}` : ''}
                       </p>
                     </div>
-                    <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex shrink-0 flex-wrap items-center gap-3">
                       <CheckboxField
                         label="Active"
                         checked={invitation.active}
@@ -310,6 +357,6 @@ export function TeamList() {
           </Card>
         ) : null}
       </div>
-    </div>
+    </PageFrame>
   );
 }

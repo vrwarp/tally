@@ -258,7 +258,7 @@ them, and the screen names what it left out rather than quietly showing a shorte
 as good news.
 
 Restriction is a scope, not a substitute for membership. Removing somebody from Tally altogether is
-still deactivating them in Settings → Team.
+still deactivating them on the Team screen.
 
 ---
 
@@ -269,7 +269,7 @@ medical notes originate there, are read on demand, and are stored nowhere in Tal
 
 *Membership* is Tally's own — both of them. Who is a student is a document in `students/`,
 put there from **Students → Add from Planning Center**; who may sign in is an invitation an admin
-writes in **Settings → Team**, plus the addresses in `TALLY_ADMIN_EMAILS`. Both used to be Planning
+writes on the **Team** screen, plus the addresses in `TALLY_ADMIN_EMAILS`. Both used to be Planning
 Center Lists, which cannot express either: a List is generated from filter rules, so "these
 forty-three teenagers" is only sayable by inventing a custom field on every person in the church.
 
