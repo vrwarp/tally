@@ -51,7 +51,7 @@ const SCENES: {
   { id: 'reprint-capped', query: 'buffer=Al&present=2', views: ['phone', 'kioskwide'] },
   {
     id: 'reprint-sent',
-    query: 'buffer=Alva&present=1,2&sent=Ramona+Alvarez',
+    query: 'buffer=Alva&present=1,2&sentId=1',
     views: ['phone', 'kiosktall'],
   },
   /*
@@ -70,14 +70,29 @@ const SCENES: {
   { id: 'reprint-confirm-trouble', query: 'screen=confirm&printer=trouble', views: ['phone'] },
   /*
    * The parent-facing offer, which is the half of this proposal with a rule
-   * already written against it. Both states are shot at every shape: the
-   * question is not whether the control fits but whether a parent meeting it
-   * reads a statement with something quiet under it or a second button to
-   * press, and that is a composition question at every size.
+   * already written against it. The states are addressed by the facts that
+   * produce them rather than by name — minutes since this kiosk checked the
+   * child in, and whether a label has gone again for them — so that what the
+   * frames show is the rule holding rather than a claim that it does.
+   *
+   * Shot at every shape, because the question is not whether the control fits
+   * but whether a parent meeting it reads a statement with something quiet
+   * beside it or a second button to press, and that is a composition question
+   * at every size.
    */
-  { id: 'done-offer', query: 'screen=done&offer=offer', views: ['phone', 'kiosktall', 'kioskwide'] },
-  { id: 'done-spent', query: 'screen=done&offer=spent', views: ['phone', 'kiosktall'] },
-  { id: 'done-none', query: 'screen=done&offer=none', views: ['phone'] },
+  {
+    id: 'done-offer',
+    query: 'screen=done&checkedInAgo=3',
+    views: ['phone', 'kiosktall', 'kioskwide'],
+  },
+  {
+    id: 'done-spent',
+    query: 'screen=done&checkedInAgo=3&reprinted=1',
+    views: ['phone', 'kiosktall'],
+  },
+  /* Eleven minutes later: the common case, and the one that has to be today's
+     screen and one line. */
+  { id: 'done-none', query: 'screen=done&checkedInAgo=25', views: ['phone', 'kiosktall'] },
   { id: 'printer-recent', query: 'screen=printer', views: ['phone', 'kiosktall', 'kioskwide'] },
 ];
 

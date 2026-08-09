@@ -70,11 +70,24 @@ export function PrinterScreenProto({
         * flexible track at every shape and scrolls inside its own card; the
         * doors are `auto` and cannot be pushed off the bottom by it.
         */}
-      <div className="mx-auto grid min-h-0 w-full max-w-2xl flex-1 grid-rows-[minmax(0,1fr)_auto] gap-4 lg:max-w-5xl lg:grid-cols-2 lg:grid-rows-1 lg:gap-6">
-        <div className="flex min-h-0 flex-col rounded-xl bg-ink-900 p-4">
-          <div className="shrink-0 pb-3 text-sm text-ink-400 kiosk:text-base">Printed tonight</div>
+      {/* Stacked at narrow rather than gridded, so the slack of a quiet evening
+          falls *below* both blocks instead of between them: a 1fr row for the
+          list put five names in a 750px card and left a matching hole under the
+          doors, which is how the largest object on the portrait kiosk came to be
+          an empty container. Two columns where there is width for them. */}
+      <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col gap-4 lg:grid lg:max-w-5xl lg:grid-cols-2 lg:grid-rows-1 lg:gap-6">
+        {/* The card is the height of the evening, not the height of the track:
+            it hugs the names and gives the overflow back to its own scroller
+            the moment the list is longer than the room. */}
+        <div className="flex max-h-full min-h-0 flex-col rounded-xl bg-ink-900 p-4 lg:self-start">
+          {/* Shares the rows' text edge rather than the card's: the heading is
+              inset by the card's padding, the names by the card's *and* their
+              own. */}
+          <div className="shrink-0 px-4 pb-3 text-sm text-ink-400 kiosk:text-base">
+            Printed tonight
+          </div>
           {recent.length === 0 ? (
-            <div className="text-sm text-ink-500 kiosk:text-base">
+            <div className="px-4 text-sm text-ink-500 kiosk:text-base">
               Nothing has printed on this kiosk tonight.
             </div>
           ) : (
@@ -131,31 +144,34 @@ export function PrinterScreenProto({
           <details className="shrink-0 rounded-xl bg-ink-900">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl p-4 text-base text-ink-200 kiosk:text-lg [&::-webkit-details-marker]:hidden">
               <span className="min-w-0 truncate">QL-810W · 62mm continuous</span>
-              <span className="shrink-0 text-sm text-ink-400 kiosk:text-base">Change</span>
+              {/* Stepped with the rest of the kiosk set: this is the affordance
+                  that opens the row, read at arm's length off a wall tablet.
+                  Quieter than the summary in colour, not in size. */}
+              <span className="shrink-0 text-sm text-ink-400 kiosk:text-lg">Change</span>
             </summary>
             <div className="flex flex-col gap-4 px-4 pb-4">
               <label className="flex flex-col gap-1">
-                <span className="text-sm text-ink-400">Printer model</span>
+                <span className="text-sm text-ink-400 kiosk:text-base">Printer model</span>
                 <select
                   defaultValue="QL-810W"
                   className="rounded-xl border-2 border-ink-800 bg-ink-900 p-4 text-lg text-ink-100"
                 >
                   <option>QL-810W</option>
                 </select>
-                <span className="text-xs text-ink-500">
+                <span className="text-xs text-ink-500 kiosk:text-sm">
                   There is no way to detect this — it has to match the printer on the shelf.
                 </span>
               </label>
 
               <label className="flex flex-col gap-1">
-                <span className="text-sm text-ink-400">Loaded label</span>
+                <span className="text-sm text-ink-400 kiosk:text-base">Loaded label</span>
                 <select
                   defaultValue="62mm continuous"
                   className="rounded-xl border-2 border-ink-800 bg-ink-900 p-4 text-lg text-ink-100"
                 >
                   <option>62mm continuous</option>
                 </select>
-                <span className="text-xs text-ink-500">
+                <span className="text-xs text-ink-500 kiosk:text-sm">
                   What is in the printer now. Events describe what the label says, never its size.
                 </span>
               </label>
@@ -203,12 +219,17 @@ export function PrinterScreenProto({
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-2xl pt-4 pb-[max(1rem,var(--spacing-safe-bottom))] lg:max-w-5xl">
+      {/* The way out, at the weight of a way out. A full-width slab carrying the
+          largest type on the screen made the terminal exit outweigh the blue
+          door this screen was reorganised to expose — and it is the same
+          control the reprint screen already draws as a pill in its console row,
+          so it is drawn the same way here. */}
+      <div className="mx-auto flex w-full max-w-2xl justify-center pt-4 pb-[max(1rem,var(--spacing-safe-bottom))] lg:max-w-5xl">
         <button
           type="button"
           tabIndex={-1}
           onPointerDown={onDone}
-          className="w-full rounded-xl bg-ink-800 p-5 text-xl font-semibold text-ink-100"
+          className="flex h-14 items-center justify-center rounded-xl bg-ink-800 px-10 text-base font-semibold whitespace-nowrap text-ink-100 active:bg-ink-700 tall:h-16 kiosk:text-lg"
         >
           Done
         </button>

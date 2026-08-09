@@ -1,5 +1,5 @@
 /**
- * The dead end, given one thing to press.
+ * The dead end, given one thing to press — inside one narrow window.
  *
  * `ConfirmScreen`'s `done` branch is a statement — "✓ Already checked in" — and
  * nothing else: a parent who taps a child the register already holds is
@@ -10,38 +10,41 @@
  *
  * The rule this has to keep is written in `printing/index.ts` and in
  * `KioskApp.onConfirm`: a parent-facing reprint button is a roll of labels on
- * the floor, and a re-tapped row that prints is a runaway loop. Three things
- * hold it:
+ * the floor, and a re-tapped row that prints is a runaway loop. Who the control
+ * appears *for* is `reprintOffer.ts`'s question and the whole of the answer to
+ * that rule — a ten-minute window on this kiosk's own arrivals, once per child,
+ * spent by any label including a staff one. This file is only what the three
+ * answers look like, and there are three things it has to get right:
  *
- * **It is a hold, not a tap.** The gesture the kiosk already teaches, and the
- * one a wandering hand, a coat sleeve and a four-year-old all lose.
+ * **The tick does not move.** It is the answer the parent came for, and it sits
+ * at `ConfirmScreen`'s own height in all three states — which means anything
+ * this screen adds rides the flexible track *above* it, with the identity, and
+ * collapses to nothing when there is no offer. In `none` the frame is today's
+ * screen and one line.
  *
- * **It is once per child, per evening.** After that the control is a statement
- * again and points at the people who can print another. The worst case is one
- * label per child on the register — the same number check-in already printed —
- * rather than one per tap.
+ * **Nothing lives in the band above the commit.** That band is 48px of clear
+ * page on every version of this screen and no scene may spend it: a parent who
+ * taps a child *because they think they still need to check in* travels to
+ * where the green button always is, and what they must not find there is a
+ * control that spends a label. The offer sits where `ConfirmScreen` puts
+ * "Anyone else?" — attached to the child's name, above the clearance.
  *
- * **It is quiet.** The statement stays the answer to the question the parent
- * came with; this sits under it in the page's own greys. Nothing green, nothing
- * that competes with the tick they are looking for.
+ * **It stays a step under the statement.** Not a filled slab at the full
+ * measure carrying the same 24px semibold as the tick: squinted, that reads
+ * name → slab → green line, which is the wrong order for a screen whose job is
+ * to answer a question. It is a pill sized to its own words, one type step
+ * below the statement at *every* size.
  *
- * It renders at all only where a label would actually come out: a gathering
- * with a template, a printer configured and not in trouble. A parent holding a
- * button for two seconds against a printer with its cover open would be told
- * nothing, because a parent is never told about a printer — so the control is
- * absent instead of disappointing.
+ * The gesture is a hold, and it cancels on drift (`cancelOnStray`) — the slab
+ * is 448px wide on a lobby tablet that people lean on, and without the check
+ * any contact persisting two seconds anywhere inside it prints.
  */
 import { gradeDescription } from '@/lib/utils';
 import { HoldButton } from '@/kiosk/components/HoldButton';
 import type { KioskStudent } from '@/kiosk/search';
+import type { ReprintOffer } from './reprintOffer';
 
-export type ReprintOffer =
-  /** A label would come out, and this child has not had a second one tonight. */
-  | 'offer'
-  /** They have. The way to another is a person, not this button. */
-  | 'spent'
-  /** No template, no printer, or a printer in trouble: say nothing at all. */
-  | 'none';
+export type { ReprintOffer };
 
 export function AlreadyCheckedInScreen({
   student,
@@ -68,46 +71,82 @@ export function AlreadyCheckedInScreen({
             <div className="pt-3 text-2xl text-ink-400">{gradeDescription(student.grade)}</div>
           )}
         </div>
+
+        {/* One slot, three answers, and no slot at all is not one of them: the
+            `mt-8` belongs to the block rather than to an empty wrapper, so the
+            common case is `ConfirmScreen` to the pixel plus its one line. */}
+        <div className="mt-8 w-full shrink-0">
+          {offer === 'offer' && (
+            /* `text-lg` on a phone because at `text-xl` the label wrapped onto
+               two lines inside its own button. The `kiosk:` step stops at
+               `text-xl`: the statement below is `text-2xl` at every size, and
+               the control has to stay under it at every size too. */
+            <HoldButton
+              onHeld={onReprint}
+              cancelOnStray
+              className="rounded-xl bg-ink-800 px-6 py-4 text-lg font-semibold text-ink-200 active:bg-ink-700 kiosk:px-8 kiosk:py-5 kiosk:text-xl"
+            >
+              Hold to print a name tag
+            </HoldButton>
+          )}
+
+          {offer === 'spent' && (
+            /*
+             * Two arrivals, two tenses.
+             *
+             * One parent has just held the button for two seconds — and this is
+             * the only signal they get, because `haptic()` is
+             * `navigator.vibrate` and these are iPads, so nothing happens in
+             * the hand. The slab under their thumb is replaced *in place* by
+             * the brightest line in the frame; a receipt that arrived as the
+             * dimmest one is how a parent concludes nothing happened and goes
+             * to fetch a leader, which is how one held button becomes two
+             * labels.
+             *
+             * The other pressed nothing: their child's label was reprinted at
+             * the desk ten minutes ago and the counter is shared. For them the
+             * first line is news and the second is the way on — a place to walk
+             * to rather than a role to go and find.
+             *
+             * "sent", not "printed", because the kiosk only knows it queued the
+             * job, and every staff surface in this flow says so.
+             */
+            <div className="w-full">
+              <div className="text-lg font-semibold text-brand-300 kiosk:text-xl">
+                Name tag sent for {student.firstName}.
+              </div>
+              <div className="pt-2 text-base text-ink-400 kiosk:text-lg">
+                For another, ask at the check-in desk.
+              </div>
+            </div>
+          )}
+
+          {offer === 'none' && (
+            /* The common case, and the only thing added to it: where a name tag
+               comes from, for the parent holding a child with no sticker on. */
+            <div className="w-full text-lg text-ink-400 kiosk:text-xl">
+              Name tags come from the check-in desk.
+            </div>
+          )}
+        </div>
       </div>
 
       {/* The answer to the question they came with, unchanged and still in the
           slot the commit occupies on every other version of this screen. */}
       <div className="shrink-0 text-2xl font-semibold text-present-400">✓ Already checked in</div>
 
-      <div className="mt-8 flex w-full shrink-0 flex-col items-center">
-        {/* `text-lg` on a phone because at `text-xl` the label wrapped onto two
-            lines inside its own button — the one control on this screen a
-            parent has to read as a single instruction. The `kiosk:` step is the
-            one the rest of this flow takes; the name and the tick above are
-            deliberately still `ConfirmScreen`'s, because this screen is that
-            screen with one thing added. */}
-        {offer === 'offer' && (
-          <HoldButton
-            onHeld={onReprint}
-            className="w-full rounded-xl bg-ink-800 px-4 py-5 text-lg font-semibold text-ink-200 kiosk:p-6 kiosk:text-2xl"
-          >
-            Hold to print a name tag
-          </HoldButton>
-        )}
-        {offer === 'spent' && (
-          <div className="w-full rounded-xl px-5 py-4 text-lg text-ink-500 kiosk:text-xl">
-            Name tag printed. A leader can print another.
-          </div>
-        )}
-
-        <button
-          type="button"
-          tabIndex={-1}
-          onPointerDown={(event) => {
-            event.preventDefault();
-            onBack();
-          }}
-          className="mt-4 shrink-0 rounded-xl px-8 py-4 text-xl text-ink-400 active:bg-ink-800"
-          style={{ touchAction: 'manipulation' }}
-        >
-          ← Back
-        </button>
-      </div>
+      <button
+        type="button"
+        tabIndex={-1}
+        onPointerDown={(event) => {
+          event.preventDefault();
+          onBack();
+        }}
+        className="mt-8 shrink-0 rounded-xl px-8 py-4 text-xl text-ink-400 active:bg-ink-800"
+        style={{ touchAction: 'manipulation' }}
+      >
+        ← Back
+      </button>
     </div>
   );
 }

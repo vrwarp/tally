@@ -26,7 +26,7 @@
  * land on the affordance rather than on the choice — the same reason the
  * shipping search screen dropped the ring from its quiet control.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { gradeDescription, haptic } from '@/lib/utils';
 import { Keyboard, type KioskKey } from '@/kiosk/components/Keyboard';
 import { useTapGuard } from '@/kiosk/components/tapGuard';
@@ -39,24 +39,16 @@ export interface ReprintOutcome {
   total: number;
 }
 
-/**
- * How long a reprint screen is left on the glass with nobody touching it.
+/*
+ * The inactivity return is not here.
  *
- * Nothing returned this surface to check-in on its own, and it was the only
- * screen in the kiosk with that hole in it: `SuccessScreen` has
- * `AUTO_RETURN_MS`, `RegistrationFlow` has `INACTIVITY_MS`. A volunteer called
- * away mid-reprint left a lobby tablet showing a keyboard, a list of children's
- * names and live Print controls — and the next parent up types a name, taps a
- * row, meets a screen with their child's name on it and a full-width blue
- * button, presses it, gets a sticker, and walks away believing they have
- * checked in. That is a family recorded absent.
- *
- * Shorter than the registration wizard's ninety seconds because there is
- * nothing half-typed here worth protecting: the volunteer is standing at the
- * kiosk while they use it, and everything this screen holds is one keystroke to
- * get back.
+ * It was, and it was also on the confirm screen and on neither of the other
+ * two, which is the whole argument for taking it off the screens: a clock per
+ * screen is a clock the fifth screen does not get. It is on the gate now —
+ * `StaffSession` — armed by the hold on Clear that opens this flow and
+ * disarmed when the flow closes, restarted by any pointer event rather than
+ * only by the keystrokes this screen can see.
  */
-const RETURN_MS = 45_000;
 
 function gradeLabel(grade: number | null): string {
   return grade === null ? '' : gradeDescription(grade);
@@ -66,7 +58,7 @@ export function ReprintScreen({
   buffer,
   outcome,
   presentIds,
-  sent,
+  sentId,
   printerNeedsAttention,
   onKey,
   onPick,
@@ -76,8 +68,14 @@ export function ReprintScreen({
   outcome: ReprintOutcome;
   /** Checked in tonight — context, never a gate: staff may reprint anybody. */
   presentIds: ReadonlySet<string>;
-  /** The last name tag sent to the printer, for the line that says so. */
-  sent: string | null;
+  /**
+   * The child whose name tag just went to the printer, for the line that says
+   * so — by id, never by rendered name. This list exists because a church has
+   * two Alvarezes in it; matching the receipt on "Ramona Alvarez" puts *Name
+   * tag sent* on both of any two children who share a display name, which is
+   * exactly the row a volunteer is about to press again.
+   */
+  sentId: string | null;
   /**
    * The printer, when it has stopped working.
    *
@@ -99,14 +97,6 @@ export function ReprintScreen({
   useEffect(() => {
     if (regionRef.current) regionRef.current.scrollTop = 0;
   }, [buffer, regionRef]);
-
-  /* Walked away. Any keystroke, any print, restarts the clock. */
-  const doneRef = useRef(onDone);
-  doneRef.current = onDone;
-  useEffect(() => {
-    const timer = setTimeout(() => doneRef.current(), RETURN_MS);
-    return () => clearTimeout(timer);
-  }, [buffer, sent]);
 
   const rows = outcome.results.length > 0;
   const truncated = outcome.total > outcome.results.length;
@@ -187,7 +177,7 @@ export function ReprintScreen({
                * row is where the volunteer's eye already is, having just come
                * back from the confirm for this child.
                */
-              const justSent = sent === `${student.firstName} ${student.lastName}`;
+              const justSent = sentId === student.id;
               return (
                 <button
                   key={student.id}
@@ -236,9 +226,14 @@ export function ReprintScreen({
             })}
           </div>
 
+          {/* What is true of the result set, not of the box. "More names than
+              fit" is read against a list with two rows of empty track under it
+              on the portrait kiosk — the cap is six because the *landscape*
+              kiosk's region holds three rows a column, and a sentence about
+              fitting is a sentence a volunteer can see is false. */}
           {truncated && (
             <div className="mx-auto w-full max-w-2xl pt-2 text-center text-base text-ink-400 kiosk:text-lg lg:max-w-5xl">
-              More names than fit — keep typing.
+              More names match — keep typing.
             </div>
           )}
         </div>

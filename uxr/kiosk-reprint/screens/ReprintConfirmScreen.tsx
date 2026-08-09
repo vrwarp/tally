@@ -17,16 +17,20 @@
  * came out at all. Showing what is about to be sent answers that before the tape
  * moves — and it is also what carries the identity, so the screen does not state
  * the child's name three times at three sizes with the loudest one redundant.
- * The heading says the act; the line under it says the thing the volunteer is
- * actually standing here to find out.
+ *
+ * There is no heading over it any more. "Print this name tag again" over a
+ * button reading "Print this name tag" is one sentence said twice a word apart,
+ * both of them wrapping to two ragged lines at the phone's measure, and at kiosk
+ * size the heading matched the sticker's own name in weight — which undoes the
+ * point of putting the name on the facsimile. What is left in that slot is the
+ * only line carrying information the volunteer came here for: when this child's
+ * tag last printed. The staff mark says what screen this is, and it says it
+ * beside the thing it marks rather than pinned to the top of a portrait kiosk
+ * with four hundred pixels of nothing under it.
  */
-import { useEffect, useRef } from 'react';
 import { haptic } from '@/lib/utils';
 import type { KioskStudent } from '@/kiosk/search';
 import { StaffMark } from './StaffMark';
-
-/** The same clock the reprint list runs on — see `ReprintScreen`. */
-const RETURN_MS = 45_000;
 
 export function ReprintConfirmScreen({
   student,
@@ -46,37 +50,28 @@ export function ReprintConfirmScreen({
   onPrint: () => void;
   onBack: () => void;
 }) {
-  const backRef = useRef(onBack);
-  backRef.current = onBack;
-  useEffect(() => {
-    const timer = setTimeout(() => backRef.current(), RETURN_MS);
-    return () => clearTimeout(timer);
-  }, []);
-
+  /* The inactivity return lives on the gate — see `StaffSession`. */
   return (
     <div
-      className="grid h-full w-full grid-rows-[auto_minmax(0,1fr)_auto_auto] justify-center justify-items-center p-8 pb-[max(2rem,18vh)] text-center"
+      className="grid h-full w-full grid-rows-[minmax(0,1fr)_auto_auto] justify-center justify-items-center p-8 pb-[max(2rem,18vh)] text-center"
       style={{ gridTemplateColumns: 'minmax(0, var(--confirm-measure, 28rem))' }}
     >
-      {/* This screen was the one in the flow with no staff marker on it, and it
-          is the one a parent is likeliest to meet: a child's name in 48px type
-          over a full-width blue button is the check-in screen as far as anybody
-          walking up is concerned. */}
-      <div className="w-full shrink-0">
-        <StaffMark />
-      </div>
-
       <div className="flex min-h-0 w-full flex-col items-center justify-end overflow-hidden pb-8">
+        {/* This screen was the one in the flow with no staff marker on it, and
+            it is the one a parent is likeliest to meet: a child's name in 48px
+            type over a full-width blue button is the check-in screen as far as
+            anybody walking up is concerned. It rides the same bottom-aligned
+            track as what it marks, so it is never four hundred pixels away
+            from it. */}
+        <div className="w-full shrink-0 pb-4">
+          <StaffMark />
+        </div>
+
         <div className="w-full shrink-0">
-          <div className="text-2xl/[1.2] font-semibold text-ink-100 kiosk:text-4xl/[1.2]">
-            Print this name tag again
-          </div>
-          {/* The only line here carrying new information — why the volunteer is
-              standing at the kiosk — used to be the smallest and dimmest thing
-              in the block, under a 48px repeat of a name the sticker below
-              already says. It does not repeat the name either: the sticker is
-              one line under it and says it in black on white. */}
-          <div className="pt-3 text-xl text-ink-300 kiosk:text-2xl">
+          {/* The one line carrying information — why the volunteer is standing
+              at the kiosk. It does not repeat the name: the sticker is one line
+              under it and says it in black on white. */}
+          <div className="text-xl text-ink-200 kiosk:text-2xl">
             {printedAt ? `Last printed at ${printedAt}.` : 'No name tag printed tonight.'}
           </div>
         </div>
@@ -86,7 +81,7 @@ export function ReprintConfirmScreen({
             an object in the room. It carries the identity — this is the check
             that the right Alvarez was tapped, and it is the one place the name
             appears exactly as it will on the paper. */}
-        <div className="mt-6 w-full shrink-0 rounded-xl bg-ink-50 px-6 py-5 text-ink-950">
+        <div className="mt-5 w-full shrink-0 rounded-xl bg-ink-50 px-6 py-5 text-ink-950">
           {lines.map((line, index) => (
             <div
               key={line}
@@ -129,7 +124,10 @@ export function ReprintConfirmScreen({
           className="w-full rounded-2xl bg-brand-600 p-7 text-3xl font-bold text-white active:bg-brand-500"
           style={{ touchAction: 'manipulation' }}
         >
-          Print this name tag
+          {/* Four words fitted the phone's measure on one line; five did not,
+              and a committing button that wraps ragged is the one control here
+              nobody should have to read twice. */}
+          Print name tag
         </button>
       </div>
 

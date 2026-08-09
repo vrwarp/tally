@@ -47,7 +47,17 @@ export function StaffScreen({
     printer === 'ready'
       ? { text: 'Ready', tone: 'text-present-400' }
       : printer === 'trouble'
-        ? { text: 'Needs attention', tone: 'text-warn-400' }
+        ? /*
+           * One word, because the row is a fixed 64px and the phone's column is
+           * 326 of them: "Needs attention" is 140px of nowrap type against a
+           * 146px label, and the pair overran the row's own `px-5` to within
+           * four pixels of the card's right edge — so the one state this row
+           * exists to render was the lopsided one, with the left label still
+           * on its inset. "Trouble" is the word this codebase already uses for
+           * the state, and the sentence that explains it lives one tap away on
+           * the printer screen, which is where somebody who cares is going.
+           */
+          { text: 'Trouble', tone: 'text-warn-400' }
         : { text: 'Not set up', tone: 'text-ink-500' };
 
   /*
@@ -60,8 +70,14 @@ export function StaffScreen({
     <div className="flex h-full flex-col items-center justify-center gap-8 p-8 text-center kiosk:gap-10">
       <div className="flex flex-col gap-2">
         <div className="text-4xl font-semibold text-ink-100 kiosk:text-5xl">Staff</div>
-        <p className="mx-auto max-w-xl text-xl text-ink-400 kiosk:text-2xl">
-          <span className="text-ink-200">{title}</span> · {eventWindow}
+        {/* One line on a phone. At `text-xl` the sentence ran two pixels past
+            the column and wrapped between "8:00" and "PM", orphaning the
+            meridiem on a centred second line; the window is also nowrap now, so
+            a longer gathering name breaks at the separator instead of inside a
+            time. The kiosk step is unchanged. */}
+        <p className="mx-auto max-w-xl text-lg text-ink-400 kiosk:text-2xl">
+          <span className="text-ink-200">{title}</span> ·{' '}
+          <span className="whitespace-nowrap">{eventWindow}</span>
         </p>
       </div>
 
@@ -90,10 +106,10 @@ export function StaffScreen({
           }}
           className="flex h-16 w-full items-center justify-between rounded-xl bg-ink-800 px-5 text-left text-xl font-semibold text-ink-100 active:bg-ink-700 kiosk:h-20 kiosk:text-2xl"
         >
-          <span className="whitespace-nowrap">Label printer</span>
+          <span className="min-w-0 truncate">Label printer</span>
           {/* The half that actually varies was the smallest type on the screen. */}
           <span
-            className={`pl-3 text-lg font-normal whitespace-nowrap kiosk:text-xl ${printerLine.tone}`}
+            className={`shrink-0 pl-3 text-lg font-normal whitespace-nowrap kiosk:text-xl ${printerLine.tone}`}
           >
             {printerLine.text}
           </span>

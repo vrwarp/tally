@@ -56,6 +56,7 @@ export const HOLD_MS = 2000;
 export function HoldButton({
   onHeld,
   onTap,
+  cancelOnStray = false,
   className = '',
   children,
   'aria-label': ariaLabel,
@@ -67,6 +68,23 @@ export function HoldButton({
    * Omitted, a press that does not reach two seconds does nothing at all.
    */
   onTap?: () => void;
+  /**
+   * Cancel on drift even though a press here means only one thing.
+   *
+   * The forgiveness described above is affordable where the hold is the point
+   * of the screen and the thumb is already on the button it means. It is not
+   * affordable where the control shares glass with a band a thumb travels
+   * through on its way somewhere else: with `touchAction: 'none'` the browser
+   * never calls the contact a scroll, and implicit pointer capture means
+   * `onPointerLeave` never fires on touch, so *any* contact that begins
+   * anywhere in the slab and lasts two seconds fires — a planted palm, a bag
+   * strap, a hand steadying a stand-mounted tablet, wherever it slides to.
+   *
+   * Passing this asks the same question of the gesture that a row in a list
+   * asks (`tapGuard.ts`'s slop, not a second answer), without giving a short
+   * press a meaning it does not have.
+   */
+  cancelOnStray?: boolean;
   className?: string;
   children: ReactNode;
   'aria-label'?: string;
@@ -103,14 +121,15 @@ export function HoldButton({
 
   const move = useCallback(
     (event: React.PointerEvent) => {
-      // Only where a press has a second meaning. A hold that stands alone is
-      // the more forgiving control on purpose: two seconds is still a long
-      // time to ask a thumb to hold still, and there is nothing under a
-      // committing button for a drift to have meant instead.
-      if (!tappedRef.current) return;
+      // Where a press has a second meaning, or where the caller has asked for
+      // the check anyway. A hold that stands alone is otherwise the more
+      // forgiving control on purpose: two seconds is a long time to ask a thumb
+      // to hold still, and on a screen whose whole point is this button there
+      // is nothing under it for a drift to have meant instead.
+      if (!tappedRef.current && !cancelOnStray) return;
       if (pressRef.current && strayed(pressRef.current, event)) cancel();
     },
-    [cancel],
+    [cancel, cancelOnStray],
   );
 
   const end = useCallback(
