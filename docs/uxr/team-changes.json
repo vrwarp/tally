@@ -1,0 +1,102 @@
+{
+  "title": "Tally — the Team screen, before and after",
+  "headline": "One screen, four rounds, and the <em>list nobody could read</em>",
+  "description": "A before-and-after record of the Team screen's refinement: who may sign in to a roster of minors, and what four rounds of critique changed about how that reads.",
+  "intro": [
+    "Who may sign in to Tally used to be the last card on the Settings page — below the prediction thresholds, a theme picker, kiosk pairing and two API connections. It is the most consequential thing an admin does in the product and the one thing on that page they come back to every season, and it was four scrolls past a colour picker.",
+    "So it became its own screen. That move was the easy part; what it exposed was harder. A card that had always been read at the bottom of something else turned out never to have been composed as a screen at all — three facts stacked in the left quarter of a laptop, a 20px checkbox controlling an adult's access to a roster of minors, and a suspended counselor marked only by the absence of a blue tick."
+  ],
+  "method": [
+    "The screen was mounted from src/ against a fixture of eleven staff and four invitations — a plausible mid-size ministry rather than the three-person seed, because every question this screen raises is about the shape of a list — and frozen into standalone HTML: real DOM, real stylesheet, no JavaScript.",
+    "Two critics read the frames each round, at 390×844 and at 1440×900. One asked whether the person the screen is for could finish their job on the device they were holding; the other asked whether the screen was composed. Both worked from measurements rather than impressions.",
+    "A third agent answered them in the prototypes and recorded what it declined, and why. Round one landed eleven changes against twelve major findings; round two, seven; round three, eight; round four, five. Then the round came back with nothing above minor on any of the four passes, which is where the loop stops.",
+    "Everything that survived was ported into the React component and the page re-frozen from the running app, so the “after” frames on this page are the code, not the prototype."
+  ],
+  "rounds": [
+    {
+      "label": "Round one",
+      "value": "12",
+      "note": "major findings"
+    },
+    {
+      "label": "Round two",
+      "value": "3",
+      "note": "major findings"
+    },
+    {
+      "label": "Round three",
+      "value": "1",
+      "note": "major, blocked by a security rule"
+    },
+    {
+      "label": "Round four",
+      "value": "0",
+      "note": "converged; loop stopped",
+      "settled": true
+    }
+  ],
+  "scenes": [
+    {
+      "scene": "team",
+      "title": "Team — the admin's view",
+      "audience": "Admin · start of a season",
+      "job": "Grant, change and revoke access to a roster of minors: invite the volunteer who starts Friday, promote somebody to core, switch off the counselor who left in June.",
+      "notes": [
+        {
+          "viewport": "desktop",
+          "headline": "Eleven people and four invitations on one screen, instead of six people and a scroll",
+          "why": "Each person's three facts were stacked inside a 754px-wide row, so a row cost 77px to show about 45 characters and three of the eleven fell below the fold. The admin could not hold the whole access surface in view while deciding what to change about it — on the screen whose entire subject is who can open a roster of minors.",
+          "changes": [
+            "The row became a table: identity, last seen, role, access, on aligned columns. A row is 53px instead of 77px, and the page is 933px instead of 1,192px — every profile and every invitation above the fold with no scroll.",
+            "It is switched by a container query on the card rather than a viewport breakpoint. The admin's roster shares its width with the 24rem invite column, so at 1024px the row has 296px and at 1440px it has 712px; a core member's is wide at both. One lg rule cannot be right for all three, and a container query asks the only question that matters — does this row have room.",
+            "A pointer-only hover wash binds the row. The toggle is a click 626px from the name it belongs to, and a click one row high revoked the wrong adult's access with nothing on screen to say so.",
+            "The role column marks the two elevated values in brand rather than dimming the nine plain ones: a select stripped of its ring at rest and its contrast reads as inert text.",
+            "The recency column dropped eleven repetitions of “Last seen” into one label in the card's header band, on the column's own edge, so the eye can rank durations instead of reading sentences."
+          ]
+        },
+        {
+          "viewport": "phone",
+          "headline": "Opens on the team, with the invite one tap away instead of two and a half viewports down",
+          "why": "The admin landed on 370px of prose — 44% of the screen — and then two of eleven people. The invite form, the one task likely to happen on a phone at all because it is the one that happens when somebody volunteers in a corridor, was 1,998px down the page. Marcus Webb, the June leaver and the one row that actually needed a tap, was 2.2 viewports away.",
+          "changes": [
+            "The boxed explainer became a one-line disclosure attached to the header. It is reference, not instruction, and it was a card-shaped peer of the two cards that carry the content.",
+            "The Invited card comes first and collapses to a 68px header with a 44px “＋ Invite someone”. Three names are now on the first screen and the June leaver is 1.3 viewports down; the page fell from 2,821px to 2,003px.",
+            "Shut, that header says “1 suspended” — an earlier round refused to cap the list because it would hide the one switched-off invitation, then shipped a collapse that hid all four.",
+            "The access checkbox and its word became one 44px labelled lane, 16px clear of the role select. It was a 20×20 target 12px from a 44px picker: a tap eight pixels off opened somebody else's permissions.",
+            "Withdraw moved to the opposite edge of its row from the toggle — 140px of daylight between a reversible control and one that destroys an address that then has to be retyped exactly — and wears a ring at rest, because a phone has no hover to say a word is a button."
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "team-core",
+      "title": "Team — the read-only view",
+      "audience": "Core team · any weekday",
+      "job": "Check who is on the team and who has never signed in. No controls: a core member can read this screen and change nothing on it.",
+      "notes": [
+        {
+          "viewport": "desktop",
+          "headline": "The question this screen exists for, answered without scrolling",
+          "why": "Hannah Boateng — the only person who has never signed in — was the eleventh of eleven rows, 471px below the fold, rendered in the dimmest text on the page at 2.4:1 and worded identically to “Last seen 3 hours ago”. The one fact the reader came for was the hardest thing on the screen to find, on a page 1,477px tall that used 8% of each row's width.",
+          "changes": [
+            "Never-signed-in is a badge in the recency column, not a sentence in the same grey as every other row — a fact, not a threshold, so it can be marked without the UI inventing a judgement about how stale is too stale.",
+            "The read-only row got its own three-column template instead of borrowing the admin's four and leaving one empty, and the card caps at 768px: the freed width belongs at the end of the row, not between a person and their data.",
+            "The page is 900px instead of 1,477px — all eleven people, and the answer, on one screen.",
+            "The card now says outstanding invitations are not listed here. It cannot list them: the invitations collection is get/list admin-only in the Firestore rules, so a count would be invented — but eleven profiles reading as the complete list of who can sign in was wrong, and that was round three's one major finding."
+          ]
+        },
+        {
+          "viewport": "phone",
+          "headline": "Three lines and two columns, instead of four stacked items and a badge",
+          "why": "The read-only screen opened with an eight-line paragraph explaining how an admin invites somebody — instructions for a task its reader cannot perform — above rows that were four left-aligned items each, with the role capsule the loudest mark in a row where nine of eleven people share the same role.",
+          "changes": [
+            "A badge here means an exception, never a role: Counselor is plain text, and rings are for elevated access, a suspended person and an address nobody has signed in with. The exceptions are the only capsules left, so the eye finds them.",
+            "The role moved onto the recency line's free right edge — the row is three lines with two columns, 77px instead of 105px, and the page 1,367px instead of 1,783px.",
+            "The address moved up the ink ramp to clear AA at 12px, and recency above it: on this screen the address is reference and the recency is the finding."
+          ]
+        }
+      ]
+    }
+  ],
+  "colophon": "<strong>Every frame on this page is the real application.</strong> The “before” shots are the screen as it was the day it was split out of Settings; the “after” shots were taken the same way, from the same mount, once four rounds of critique had been ported back into the component. Nothing here is a mockup, and nothing was re-drawn to make a point. The critiques themselves — including the twenty-two findings that were declined, and why — are committed in <code>uxr/rounds/team-r01</code> through <code>team-r04</code>."
+}

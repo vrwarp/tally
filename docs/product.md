@@ -258,7 +258,7 @@ them, and the screen names what it left out rather than quietly showing a shorte
 as good news.
 
 Restriction is a scope, not a substitute for membership. Removing somebody from Tally altogether is
-still deactivating them in Settings → Team.
+still deactivating them on the Team screen.
 
 ---
 
@@ -269,9 +269,15 @@ medical notes originate there, are read on demand, and are stored nowhere in Tal
 
 *Membership* is Tally's own — both of them. Who is a student is a document in `students/`,
 put there from **Students → Add from Planning Center**; who may sign in is an invitation an admin
-writes in **Settings → Team**, plus the addresses in `TALLY_ADMIN_EMAILS`. Both used to be Planning
+writes on the **Team** screen, plus the addresses in `TALLY_ADMIN_EMAILS`. Both used to be Planning
 Center Lists, which cannot express either: a List is generated from filter rules, so "these
 forty-three teenagers" is only sayable by inventing a custom field on every person in the church.
+
+Team is its own route rather than the last card on Settings, which is where it lived until it was
+the one thing on that page anybody came back to and the only one below a colour picker. Four rounds
+of critique on the split-out screen are recorded in [`uxr/rounds/`](../uxr/rounds/) — `team-r01`
+through `team-r04` — and the before/after is
+[`docs/uxr/team-changes.json`](uxr/team-changes.json), built with `npm run uxr:team-walkthrough`.
 
 Tally writes back only what the church asked for: by default it creates a Person for a quick-added
 visitor and changes nothing else.

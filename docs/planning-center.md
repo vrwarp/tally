@@ -505,7 +505,7 @@ a mailbox left signed in on a shared phone was a way in that nobody was watching
 
 ```mermaid
 flowchart LR
-  A["Admin invites an address<br/>Settings → Team"] --> B["invitations/{emailKey}<br/>email · role · active"]
+  A["Admin invites an address<br/>Team screen"] --> B["invitations/{emailKey}<br/>email · role · active"]
   C["TALLY_ADMIN_EMAILS<br/>deploy-time"] --> F
   D["Volunteer signs in with Google"] --> E["Firebase uid, no profile<br/>status: pending"]
   E --> F["provisionAccess<br/>callable"]
@@ -533,8 +533,8 @@ not been added yet is a normal thing to be.
 
 ### Inviting and revoking
 
-**Settings → Team** (admin only). Invite a Google address with a role; they appear in the "Signed in"
-list the first time they use it.
+**Team** (admin only, reached from the account menu). Invite a Google address with a role; they
+appear in the "Signed in" list the first time they use it.
 
 The two lists do different jobs, and the difference matters when somebody has to be removed:
 

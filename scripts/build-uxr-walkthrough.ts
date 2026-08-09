@@ -33,10 +33,27 @@ interface Scene {
   notes: Note[];
 }
 
+interface Round {
+  label: string;
+  value: string;
+  note: string;
+  /** Draws the value in the "this is the number we were driving to zero" tone. */
+  settled?: boolean;
+}
+
 interface Changes {
+  /** Page title and tab title. Defaults to the first refinement's. */
+  title?: string;
+  /** The `<h1>`, which may contain one `<em>`. */
+  headline?: string;
+  description?: string;
   intro: string[];
   method: string[];
+  /** The tiles above the method. Defaults to the first refinement's four. */
+  rounds?: Round[];
   scenes: Scene[];
+  /** The closing paragraph, when this refinement's frames were made differently. */
+  colophon?: string;
 }
 
 function escapeHtml(value: string): string {
@@ -71,8 +88,31 @@ async function dataUri(dir: string, file: string): Promise<string | null> {
   }
 }
 
-const changes = JSON.parse(await readFile(join(ROOT, 'changes.json'), 'utf8')) as Changes;
+/*
+ * One builder, more than one refinement.
+ *
+ * The first pass over this repo refined six screens at once and this script was
+ * written for exactly that page. The Team screen was refined on its own a
+ * couple of months later, against the same harness and the same two critics,
+ * and folding its four frames into the six-scene page would have meant a page
+ * whose title, round counts and closing note were true of neither refinement.
+ *
+ *   npx tsx scripts/build-uxr-walkthrough.ts [changes.json] [walkthrough.html]
+ *
+ * Both arguments are file names inside `docs/uxr/`, and both default to the
+ * first refinement's, so the original build is unchanged.
+ */
+const [changesFile = 'changes.json', outputFile = 'walkthrough.html'] = process.argv.slice(2);
+
+const changes = JSON.parse(await readFile(join(ROOT, changesFile), 'utf8')) as Changes;
 const available = new Set(await readdir(join(ROOT, 'before')));
+
+const ROUNDS: Round[] = changes.rounds ?? [
+  { label: 'Round one', value: '21', note: 'major findings' },
+  { label: 'Round two', value: '9', note: 'major findings' },
+  { label: 'Round three', value: '3', note: 'converged; loop stopped', settled: true },
+  { label: 'Landed', value: '35', note: 'changes, with 28 declined on the record' },
+];
 
 /* -------------------------------------------------------------------------- */
 /* The comparisons                                                            */
@@ -147,8 +187,11 @@ for (const [index, scene] of changes.scenes.entries()) {
 /* The page                                                                   */
 /* -------------------------------------------------------------------------- */
 
-const html = `<title>Tally — what the refinement changed</title>
-<meta name="description" content="A before-and-after record of a three-round UX refinement: touch on the phone, density on the laptop.">
+const html = `<title>${escapeHtml(changes.title ?? 'Tally — what the refinement changed')}</title>
+<meta name="description" content="${escapeHtml(
+  changes.description ??
+    'A before-and-after record of a three-round UX refinement: touch on the phone, density on the laptop.',
+)}">
 <style>
   /*
    * Neutrals carry a slate bias, borrowed from the app's own ink ramp, so the
@@ -514,33 +557,20 @@ const html = `<title>Tally — what the refinement changed</title>
 <div class="wrap">
   <header>
     <p class="eyebrow">Tally · design refinement</p>
-    <h1>Two audiences, one codebase, pulling in <em>opposite directions</em></h1>
+    <h1>${changes.headline ?? 'Two audiences, one codebase, pulling in <em>opposite directions</em>'}</h1>
     <div class="lede">
       ${changes.intro.map((line) => `<p>${markNumbers(line)}</p>`).join('\n      ')}
     </div>
   </header>
 
   <div class="rounds">
-    <div class="round">
-      <p class="round-label">Round one</p>
-      <p class="round-value">21</p>
-      <p class="round-note">major findings</p>
-    </div>
-    <div class="round">
-      <p class="round-label">Round two</p>
-      <p class="round-value">9</p>
-      <p class="round-note">major findings</p>
-    </div>
-    <div class="round">
-      <p class="round-label">Round three</p>
-      <p class="round-value is-zeroish">3</p>
-      <p class="round-note">converged; loop stopped</p>
-    </div>
-    <div class="round">
-      <p class="round-label">Landed</p>
-      <p class="round-value">35</p>
-      <p class="round-note">changes, with 28 declined on the record</p>
-    </div>
+    ${ROUNDS.map(
+      (round) => `<div class="round">
+      <p class="round-label">${escapeHtml(round.label)}</p>
+      <p class="round-value${round.settled ? ' is-zeroish' : ''}">${escapeHtml(round.value)}</p>
+      <p class="round-note">${escapeHtml(round.note)}</p>
+    </div>`,
+    ).join('\n    ')}
   </div>
 
   <div class="method">
@@ -550,12 +580,14 @@ const html = `<title>Tally — what the refinement changed</title>
 
   ${sections.join('\n')}
 
-  <p class="colophon">
-    <strong>Every frame on this page is the real application.</strong>
+  <p class="colophon">${
+    changes.colophon
+      ? changes.colophon
+      : `<strong>Every frame on this page is the real application.</strong>
     The “before” shots were captured from the running app against a seeded forty-five-student
     ministry; the “after” shots were captured the same way, from the same stack, once the changes
-    were implemented. Nothing here is a mockup, and nothing was re-drawn to make a point.
-  </p>
+    were implemented. Nothing here is a mockup, and nothing was re-drawn to make a point.`
+  }</p>
 </div>
 
 <script>
@@ -592,5 +624,5 @@ const html = `<title>Tally — what the refinement changed</title>
 </script>
 `;
 
-await writeFile(join(ROOT, 'walkthrough.html'), html, 'utf8');
-console.log(`${ROOT}/walkthrough.html — ${figureId} comparisons, ${(html.length / 1024 / 1024).toFixed(1)} MB`);
+await writeFile(join(ROOT, outputFile), html, 'utf8');
+console.log(`${ROOT}/${outputFile} — ${figureId} comparisons, ${(html.length / 1024 / 1024).toFixed(1)} MB`);

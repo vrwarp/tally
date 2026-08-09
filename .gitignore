@@ -77,9 +77,13 @@ uxr/renders/
 
 # Nor are the before/after captures of the finished work: `UXR_OUT=before|after
 # npm run uxr:capture` re-derives them from the running app, and what the
-# walkthrough actually ships is the optimised JPEGs under `docs/uxr/`.
+# walkthrough actually ships is the optimised JPEGs under `docs/uxr/`. The Team
+# refinement's pair comes from `npm run uxr:team` instead of the capture spec,
+# and is no more worth committing than the others.
 uxr/before/
 uxr/after/
+uxr/before-team/
+uxr/after-team/
 
 # Emitted JavaScript, kept ignored as a backstop.
 #
@@ -108,6 +112,7 @@ uxr/after/
 # inlined as base64. `docs/uxr/before` and `docs/uxr/after` ARE committed; this
 # rebuilds from them with `npm run uxr:walkthrough`.
 docs/uxr/walkthrough.html
+docs/uxr/team-walkthrough.html
 
 # UXR renders — regenerable from the prototypes with `uxr/shoot.ts`, and a round
 # is a few megabytes of PNG. The critiques themselves are the record and are

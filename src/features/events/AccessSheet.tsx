@@ -4,7 +4,7 @@
  * Opened from the check-in header, where a counselor stands at a door with a
  * new volunteer beside them, and from the event page, where a core member is
  * deciding what a team should see. Same component: a counselor gets the same
- * screen with fewer verbs, which is how `TeamList` already handles
+ * screen with fewer verbs, which is how `TeamPage` already handles
  * admin-versus-core, and which means nobody has to learn two layouts.
  *
  * ## The sentence that is not a footnote

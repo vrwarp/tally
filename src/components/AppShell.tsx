@@ -86,15 +86,26 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
       {can('core') ? (
         <>
-          {/* Review moved into the nav itself; Settings stays here, because it
-              is a thing somebody does twice a year rather than every week. */}
+          {/* Review moved into the nav itself; these two stay here, because
+              they are things somebody does a few times a year rather than every
+              week. Team is listed first and separately from Settings: it used
+              to be the last card on that page, which put "who can see a roster
+              of minors" below a colour picker and an API connection. */}
+          <NavLink
+            to="/team"
+            role="menuitem"
+            onClick={() => setMenuOpen(false)}
+            className="block px-3 py-2 text-ink-200 hover:bg-ink-800"
+          >
+            Team
+          </NavLink>
           <NavLink
             to="/settings"
             role="menuitem"
             onClick={() => setMenuOpen(false)}
             className="block px-3 py-2 text-ink-200 hover:bg-ink-800"
           >
-            Settings &amp; team
+            Settings
           </NavLink>
         </>
       ) : null}

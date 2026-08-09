@@ -1,0 +1,101 @@
+[
+  {
+    "scene": "team",
+    "viewport": "desktop",
+    "severity": "major",
+    "where": "the explainer paragraph in the ink-900 box between the page header and the two columns",
+    "finding": "Three prose blocks stack in the top 260px — the page subtitle, this boxed explainer, and each card's own subtitle — all in the same small grey band, and the explainer is the largest light mass above the fold. Squinting, the first sustained object on a screen whose job is 'switch off the counselor who left in June' is boilerplate the admin has read before. Its measure makes it worse: the lines run roughly 120 characters, so it is a paragraph nobody finishes occupying the position of a headline. It also sits at an equal 16px from the header above and the columns below, so it belongs to neither and reads as a third peer object rather than a footnote to the title.",
+    "evidence": "In the fold frame the boxed text spans x=272 to x=1132 across three full lines, and the first person's name does not appear until y=282, roughly a third of the way down the viewport; the page title 'Team' is two small words above a much brighter, much larger rectangle of text.",
+    "direction": "Demote it and narrow it. It should read as a note attached to the title — tighter measure (a readable column, not the full content width), lower contrast than the roster content, and bound to the header block by proximity rather than floating equidistant. If it must stay at full weight, it belongs where it is consulted, not in front of everything; the roster should be the first thing that arrives."
+  },
+  {
+    "scene": "team",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "right edge of the explainer box against the roster card and the page",
+    "finding": "The vertical stack presents three different right edges: the explainer stops at 1152, the roster card at 1012, the invite card at 1408. None of them is legible as a choice — the explainer's edge lands arbitrarily inside the right column's territory, which makes the two-column grid below look like it slipped rather than like it was set.",
+    "evidence": "The box is capped at a max width inherited from the old single-column Settings page (56rem) while the grid below is set to the full 72rem content width; the resulting 140px overhang past the roster card is visible in both fold and full frames.",
+    "direction": "Pick an edge the block shares with something: either the roster column's edge (so the explainer reads as belonging to the roster) or the full content width. A measure cap is right for the text, but it should be achieved without inventing a fourth vertical edge on the page."
+  },
+  {
+    "scene": "team",
+    "viewport": "desktop",
+    "severity": "major",
+    "where": "the Active checkbox column in the roster, and Marcus Webb's row in particular",
+    "finding": "The accent is applied to the rule and withheld from the exception. Ten saturated brand-blue checkboxes mark 'this person is normal'; the one person who is switched off is marked only by the absence of blue, with their name, email and last-seen rendered identically to everyone else. The composition therefore shouts the boring fact ten times and whispers the interesting one once. The same person in the read-only view carries a red 'Suspended' badge and is instantly findable — the admin screen, where the state actually matters, is the weaker signal of the two.",
+    "evidence": "In the fold frame, Marcus Webb (y=866) is distinguishable from Ana Beltrán directly above him only by a 20px grey square; in team-core--desktop-full the same person carries a danger-toned 'Suspended' badge beside his role.",
+    "direction": "Invert the emphasis: let 'active' be the silent default and let suspension announce itself on the row — the same badge treatment the read-only view already uses, and ideally a dimming of the row's identity block so the exception is findable at a squint down eleven rows. Reserve the brand accent for the one thing on this screen that is actually an action."
+  },
+  {
+    "scene": "team",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the word 'Active' repeated beside every checkbox in the roster and the invite list",
+    "finding": "The label is set brighter than the person's email and last-seen line beside it, and it is identical on all fifteen rows — it carries no information at all; only the box varies. A word that never changes, printed fifteen times at a higher contrast than the data that does change, is a column header that has been pasted into every cell.",
+    "evidence": "'Active' renders at ink-200 while the email below the name renders at ink-500 and the last-seen at ink-600; the crop of the right side of the roster shows a perfectly regular vertical column of the same word at near-name brightness.",
+    "direction": "On desktop, say it once at the top of the column and let the control stand alone in the rows, or drop the contrast of the repeated label well below the row's own data. The phone, where there is no column to head, can keep the inline label."
+  },
+  {
+    "scene": "team",
+    "viewport": "desktop",
+    "severity": "major",
+    "where": "the Invited card — the boundary between the invite form and the four outstanding invitations",
+    "finding": "One header covers two different things and gives the wrong one the top position. The header announces a list of four addresses; the body then opens with a form, and there is no rule, heading or change of ground between the Invite button and rosa.delgado. The list's dividers only appear between its items, so the first invitation reads as glued to the form — plausibly as its result — and the promised 'four' never visibly begins. The standing state of the screen (four people waiting) is subordinated to an occasional action.",
+    "evidence": "In the fold frame there is a hairline between rosa.delgado and ken.tanaka (y=597) and between every subsequent pair, but nothing at all between the Invite button (bottom y=482) and rosa.delgado (top y=518) — only whitespace of the same order as the form's internal gaps.",
+    "direction": "Give the two parts separate identities: either the list keeps the card the header describes and the form gets its own head above or below it, or the form is bounded by a divider and a ground change so the list has a visible start. Whichever way, the count in the header and the top of the list should be visibly the same object."
+  },
+  {
+    "scene": "team",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the eleven role selects in the roster versus the Role select in the invite form",
+    "finding": "The same control appears in two identities twelve pixels of gutter apart. The roster selects are dark wells punched below the card surface with the browser's native chevron; the invite form's select sits on the card surface with a drawn chevron and different horizontal padding. Side by side, the reader has to work out whether they are the same kind of thing. Separately, the eleven roster selects, being rings on a darker fill at a uniform width, form a strong vertical rail that arrives before the names do — a column of grey boxes rather than a list of people.",
+    "evidence": "The crop of the roster's right side shows the native double-chevron and an ink-950 fill; the invite Role field immediately to its right shows a thin drawn chevron on the ink-900 card ground.",
+    "direction": "One select appearance across the screen. And on desktop, where hover exists, let the roster control be quiet at rest — the current role as text with an affordance that firms up on hover or focus — so the eleven names outrank the eleven controls when you squint."
+  },
+  {
+    "scene": "team",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "Dana Ruiz's row, the first row of the roster",
+    "finding": "The first row does not obey the grid the other ten establish. Every other row puts its controls in a right-hand cluster; this one puts a pill plus a sentence of explanation left-aligned under the name, and is 30px taller as a result. The list therefore opens with what looks like a different component, and the sentence sits in the empty middle of a row that has a strong right rail everywhere else.",
+    "evidence": "Row heights are a consistent 77px from Miriam Achebe down; Dana Ruiz's is 108px, and 'Another admin has to change your own access.' ends at x=615 in a column whose content otherwise starts at x=799.",
+    "direction": "Keep the 'you' row in the same skeleton as its neighbours — role and state in the right cluster, disabled or stated rather than absent — and let the explanation ride with them there rather than restructuring the row around it."
+  },
+  {
+    "scene": "team",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the Active/Withdraw strip inside each invite row",
+    "finding": "The strip is left-aligned in a row that has been stretched to the card's full width, leaving roughly 180px of dead space to its right in all four rows — the row is neither a compact block nor a justified one, it just stops. Weight is also on the wrong item: 'Withdraw', the rarer and destructive action, is semibold while the state toggle beside it is regular, so the eye is drawn to the thing you least often want.",
+    "evidence": "In the fold frame the Withdraw buttons end at x=1215 while the card's inner edge is at x=1392; the same 177px gap repeats on every invite row.",
+    "direction": "Resolve the row: either justify the state to the left and the action to the right so the strip uses the width it was given, or let the pair sit as a compact cluster on one edge. Give the destructive action less weight than the state it sits beside."
+  },
+  {
+    "scene": "team",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the gutter between the roster column and the invite column",
+    "finding": "The column gutter is narrower than the cards' own corner radius and narrower than the vertical gap the page uses elsewhere, so the two rounded panels nearly touch and read as a seam splitting one card rather than as two independent regions. The page's spacing goes 16 vertically, 12 horizontally, for no reason a reader can see.",
+    "evidence": "The roster card ends at x=1012 and the invite card begins at x=1024 — a 12px gutter between two panels with 16px radii — while the header-to-explainer and explainer-to-grid gaps are both 16px.",
+    "direction": "The gutter between two independent columns should be at least as large as the vertical rhythm and comfortably larger than the radius, so the split reads as a decision. One spacing step for the whole page, with the column gutter at or above it."
+  },
+  {
+    "scene": "team-core",
+    "viewport": "desktop",
+    "severity": "major",
+    "where": "the Signed-in team card, every row",
+    "finding": "This is the phone card, stretched. Each row stacks name, email, last-seen and then the role badge on a fourth line, all inside the leftmost ~260px of a 1152px card, leaving nearly 900px of dark to the right of every one of eleven rows. That is not whitespace, it is an unfinished layout — and it costs the reader directly, because rows are 105px tall and only six of eleven people fit above the fold on a screen whose entire job is to see who is on the team. The badge dropping below the meta rather than sitting in the void beside it is the tell that nothing here was recomposed for the width.",
+    "evidence": "In team-core--desktop-full the card runs to x=1408 while the longest row content ('jonathan.oyelaran-whitmore@example.org') ends at x=529; the page scrolls to 1477px tall to show eleven people who would fit in one screen.",
+    "direction": "Make it read as a well-set table on pointer widths: identity in the first column, role and status on their own shared axis, last-seen on a right-hand axis, one line per person. Shorter rows, all eleven above the fold, and the width doing work. The stacked card stays as the phone layout."
+  },
+  {
+    "scene": "team-core",
+    "viewport": "desktop",
+    "severity": "major",
+    "where": "'Never signed in' on Hannah Boateng's row, and the last-seen line generally",
+    "finding": "The contrast ramp is doing no hierarchy work here. 'Never signed in' — the one fact this read-only screen exists to surface — is set in the dimmest ink on the page, character for character identical in weight and tone to 'Last seen 12 minutes ago' and 'Last seen 2 months ago'. Everything in that slot is treated as equally uninteresting, so a reader scanning for the person who has never turned up has to read all eleven lines rather than see one. It compounds with the row layout: the fact is also on the last line before the badge, at the bottom of the tallest thing on screen, on the eleventh of eleven rows.",
+    "evidence": "All eleven last-seen lines render at the same ink-600 in team-core--desktop-full; Hannah Boateng's differs only in wording, at y=1371, below the fold.",
+    "direction": "Let recency carry tone: 'never' and long-stale should step up out of the dimmest tier — using the existing warn/danger distance the way 'Suspended' already does — while 'twelve minutes ago' stays quiet. One ramp, three legible steps, rather than one flat grey for a fact that ranges from irrelevant to the whole point."
+  }
+]

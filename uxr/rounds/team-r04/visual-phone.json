@@ -1,0 +1,20 @@
+[
+  {
+    "scene": "team-core",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the third line of the roster card header — \"Outstanding invitations are not listed here.\" — at roughly y=290 CSS, directly under \"People with a Tally profile.\" and 18px above the first divider",
+    "finding": "This one sentence is the whole answer to round 3's major — it is the only thing that stops a core member concluding from \"Signed-in team 11\" that eleven people is the complete list of who can sign in. It is placed correctly, before the rows rather than after them, but it is ranked as the least important line on the card: it is the smallest type in the header and the same colour as the description above it, so the reader who skims the header takes in the title and the count and passes over the caveat that changes the conclusion. The phone is the harder case because it is the one being read at arm's length in whatever light the room has.",
+    "evidence": "Measured off team-core--phone-full at 2×: the caveat is `text-xs text-ink-500`, i.e. 12px at rgb(100,116,139) on the rgb(15,23,42) card — 3.75:1, below the 4.5:1 floor for text that size. The description immediately above it is the same rgb(100,116,139) at 14px, so within the header the ranking is title (ink-100, 16px) → description (ink-500, 14px) → caveat (ink-500, 12px), descending exactly opposite to the order in which the three lines matter. For comparison, the page deck was stepped ink-500 → ink-400 last round (~7:1) for this same reason, and the row recency values are ink-300 at 12:1.",
+    "direction": "Let the caveat outrank the description instead of trailing it — the same one-step move already made to the page deck (ink-500 → ink-400 gets it to ~7:1), and/or put it above \"People with a Tally profile.\" so the sentence that changes the conclusion is read before the sentence that only restates the title. No new element, no new count, nothing about the invitations themselves; the admin-only read on the collection stays blocked as declined."
+  },
+  {
+    "scene": "team",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the \"Withdraw\" button at the leading edge of each of the four invitation rows, visible only when the Invited card is open (first one at roughly y=649 CSS, x=16–114)",
+    "finding": "With the card open, \"Withdraw\" and the \"Active\" checkbox label sit on the same line in the same 14px medium ink-400, and one of them is a label for the control beside it while the other permanently destroys an invitation. On a touch screen there is no hover to separate them, so nothing in the resting frame says which of the two words is tappable. The admin who came to withdraw the stale wednesday.volunteer invitation has to guess that a word styled exactly like the label two thirds of a row away is a button. The codebase already knows touch needs resting chrome: the role select in the member rows carries `ring-1 ring-ink-700` at rest and drops it at `@2xl`, precisely because a pointer gets hover and a thumb does not — Withdraw is the invitation list's counterpart in the same leading-edge lane and gets nothing.",
+    "evidence": "From the open frame at 2×, halved: \"Withdraw\" is `bg-transparent text-ink-400 font-medium min-h-11 px-4 -ml-4`, so a 98×44 box (x=16–114) painted only with 14px ink-400 text; \"Active\" on the same line at x=272–366 is 14px ink-400 in an identical-looking word. The member rows one card down put a 110×44 ringed select in the same x-lane. Target size and the 158px of daylight between the two controls are both fine — this is affordance, not reach, and a miss lands on inert row space rather than on the toggle.",
+    "direction": "Give Withdraw the same resting outline the role select already wears on touch — an ink-700 ring at rest, dropped where `pointer: fine` means hover can do the work. Keep the colour and weight exactly where round 1 put them; the point is to say \"control\", not to make the destructive action louder."
+  }
+]

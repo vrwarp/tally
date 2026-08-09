@@ -1,0 +1,38 @@
+[
+  {
+    "scene": "team",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "the promoted 'Invited' card at the top of the page, and the 'Signed-in team' list underneath it",
+    "finding": "Round 1 promoted the whole invite card above the roster on the phone, and the whole card is 807 CSS px — so an admin now sees zero of their eleven people on the first screen. The brief gives this admin three jobs, and two of them (promote somebody to core, switch off the counselor who left in June) live in the roster. Marcus Webb's row — the June leaver, the one row on the page that is actually wrong and needs a tap — starts at y=1868 CSS, which is 2.2 full viewports of flicking on a page with no search and no sticky section label to tell you which of the two Active-checkbox lists you are currently in. The admin also cannot tell from the first screen whether the person they came for is even on the page. The invite-first decision was right; promoting 279px of empty form plus 456px of already-sent invitations to get to a single email field is what costs.",
+    "evidence": "390×844 viewport, fold render 780×1688 at 2×. Invited card top y=222; its header ends 293; the form (address label + input + two-line hint + Role label + select + Invite button) runs 294→573 = 279px; four invitation rows at 113px each run 573→1028. The 'Signed-in team' card starts at y=1043 and its first person row (Dana Ruiz, the viewer, the one row with no controls) at y=1114 — 1.3 viewports down. Editable member rows are 129px each (Ana 1219→1348), so the eleven-person list spans 1114→2512 and the page is 2693px tall, 3.2 viewports. Above the fold (content is cut by the bottom nav at ~780) the admin sees: page header, card header, the whole inert form, one complete invitation and half of a second. Team members visible: 0 of 11.",
+    "direction": "Keep the Invited card first below `lg` — that part worked — but stop spending a viewport on it. The form is the one thing on the card that is only needed on purpose: put it behind the same one-line disclosure pattern the explainer now uses ('＋ Invite someone', 44px, at the top of the card), so the field is one deliberate tap away instead of 279 scrolled pixels away for everyone who did not come to invite. That returns the first two or three names to the fold and puts Marcus Webb roughly one viewport closer. Alternatively cap the invitation list at two rows with a 'show all four' expander, since the count badge already says four."
+  },
+  {
+    "scene": "team",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the 'Active' toggle, compared between the four invitation rows and the ten editable member rows",
+    "finding": "The same control with the same consequence sits in two different horizontal lanes on one scrolling page, and the lane it vacates is occupied by a different control. On an invitation row the Active pill occupies x=32–119; on a member row that same band is the role select (x=31–143) and Active has moved right to x=158–243. Once the card headers have scrolled off there is nothing on screen that says which list the thumb is in — both are rows with a bold first line, a dim second line and a blue tick. A thumb that has learned 'far left = Active' from four invitation rows lands on a role picker on the members, and a thumb that has learned 'left-of-centre = role' from the members lands on Active on the invitations, which revokes an outstanding invitation's sign-in immediately and without a confirmation, per the page's own deck.",
+    "evidence": "Measured at 2× and halved. Invitation strip: checkbox 40–60 CSS, label pill ≈32–119, Withdraw 260–358, justify-between. Member row control line: select 31–143 (44px tall), 15px gap, Active pill 158–243 (44×85), then 115px of unused width to the card's content edge at 358. The two lanes are ~126px apart, and the member row is 129px tall against the invitation row's 113px, so vertical rhythm does not distinguish them either. Neither card header is sticky; the roster header is at y=1043 and the last member row at y=2384.",
+    "direction": "Give the two lists one control lane. The member row has 115px of spare width, so the member controls can also sit justify-between (role left, Active hard right) or the invitation strip can pack left with the same gap — either way, one x-position on this page should mean one thing. Sticky card headers on the phone would also stop the two lists blurring together at scroll depth."
+  },
+  {
+    "scene": "team",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the Invite button at the foot of the invite form, y≈538 CSS, first screen",
+    "finding": "The largest, most saturated, most button-shaped object on the admin's first screen is inert on arrival and has no way to say so on a touch device. It is a full-width brand-blue slab with the word 'Invite' rendered at 2.1:1 against its own fill; there is no cursor and no hover on a phone, so the only signal that it is disabled is that the label is hard to read — which reads as a rendering problem, not as a precondition. The admin who opened this screen because somebody just volunteered taps it, gets nothing, and gets no sentence telling them what is missing.",
+    "evidence": "Sampled from the fold frame: button fill is a solid (14,94,138) across 500×85 native px with no reduction in area or weight; the label pixels top out at (135,139,149), a 2.1:1 ratio against the fill. It sits directly above the four invitation rows, so it is the brightest mass in the card while being the only thing in the card that cannot be used.",
+    "direction": "On touch, let the button stay enabled and answer on tap — validate the address and show the hint that already exists under the field as an error — or drop the disabled state's fill to a ghost/outline so its appearance matches its behaviour. Either way the label needs to clear 4.5:1 in whichever state it is drawn in, because on a phone the label is the only channel left."
+  },
+  {
+    "scene": "team, team-core",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the email line on every member row, both the admin roster and the read-only core view",
+    "finding": "The address — the string Tally actually matches sign-in against, and the thing an admin checks before switching an adult's access off — is the least legible text on the phone: 12px at 3.75:1. Round 1 correctly promoted recency out of that band to ink-400 (7:1) and left the address behind at ink-500, which now makes the address the dimmest information on a screen about who may reach a roster of minors. On the core view, where the row is only three lines and there are no controls to read instead, it is the line a reader has to squint at to tell two similar accounts apart.",
+    "evidence": "Sampled on Ana Beltrán's row: name (248,250,252) at 14px semibold ≈17:1; recency (148,163,184) at 12px ≈7:1; email (100,116,139) at 12px on the (15,23,42) card = 3.75:1, below AA for body text. The same treatment repeats on all eleven rows of both scenes. Note the invitation rows do not have this problem — there the address is the row title at ink-50.",
+    "direction": "The address does not need to outrank the name, but at 12px it needs to clear 4.5:1 — one step up the ramp to ink-400 would put it level with recency, which is honest, since on this screen both are reference. If the ranking name > recency > address matters, the cheaper move is to keep the ink step and give the address 13–14px on the phone only; the row has vertical room for it in the core view, which is currently 105px for three short lines."
+  }
+]
