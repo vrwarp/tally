@@ -54,7 +54,20 @@ const SCENES: {
     query: 'buffer=Alva&present=1,2&sent=Ramona+Alvarez',
     views: ['phone', 'kiosktall'],
   },
+  /*
+   * The printer in trouble, on the two screens that spend a label. "The printer
+   * was down at check-in and is up now" is one of the four reasons anybody is
+   * here, so the state where it is still down has to be a state these screens
+   * are right in — and this is staff glass, where the no-errors-to-parents rule
+   * does not bind.
+   */
+  {
+    id: 'reprint-trouble',
+    query: 'buffer=Alva&present=2&printer=trouble',
+    views: ['phone', 'kioskwide'],
+  },
   { id: 'reprint-confirm', query: 'screen=confirm', views: ['phone', 'kiosktall', 'kioskwide'] },
+  { id: 'reprint-confirm-trouble', query: 'screen=confirm&printer=trouble', views: ['phone'] },
   /*
    * The parent-facing offer, which is the half of this proposal with a rule
    * already written against it. Both states are shot at every shape: the

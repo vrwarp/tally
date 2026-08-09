@@ -35,23 +35,37 @@ export function StaffScreen({
   onChangeEvent: () => void;
   onStay: () => void;
 }) {
+  /*
+   * One or two words, never a sentence.
+   *
+   * "Connected and ready" beside "Label printer" wrapped *both* halves of the
+   * row onto two lines inside its own fixed 64px height on a phone, which made
+   * the least important row the busiest object on the screen. The full sentence
+   * lives on the printer screen, which is where somebody who cares is going.
+   */
   const printerLine =
     printer === 'ready'
-      ? { text: 'Connected and ready', tone: 'text-present-400' }
+      ? { text: 'Ready', tone: 'text-present-400' }
       : printer === 'trouble'
         ? { text: 'Needs attention', tone: 'text-warn-400' }
         : { text: 'Not set up', tone: 'text-ink-500' };
 
+  /*
+   * This screen is the entrance to the reprint flow and was the only screen in
+   * the set taking no `kiosk:` step — 36px title and 20px labels on 800×1280
+   * glass read at arm's length, leading to screens with 80px rows and a 48px
+   * name on them. The entrance was set smaller than everything behind it.
+   */
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-8 p-8 text-center">
+    <div className="flex h-full flex-col items-center justify-center gap-8 p-8 text-center kiosk:gap-10">
       <div className="flex flex-col gap-2">
-        <div className="text-4xl font-semibold text-ink-100">Staff</div>
-        <p className="mx-auto max-w-xl text-xl text-ink-400">
+        <div className="text-4xl font-semibold text-ink-100 kiosk:text-5xl">Staff</div>
+        <p className="mx-auto max-w-xl text-xl text-ink-400 kiosk:text-2xl">
           <span className="text-ink-200">{title}</span> · {eventWindow}
         </p>
       </div>
 
-      <div className="flex w-full max-w-md flex-col gap-3">
+      <div className="flex w-full max-w-md flex-col gap-3 kiosk:max-w-lg kiosk:gap-4">
         {/* The reprint is first because it is the one thing on this screen a
             volunteer does mid-evening; the other two are setup. */}
         <button
@@ -62,7 +76,7 @@ export function StaffScreen({
             onReprint();
           }}
           disabled={printer === 'none'}
-          className="flex h-16 w-full items-center justify-center rounded-xl bg-ink-800 text-xl font-semibold text-ink-100 active:bg-ink-700 disabled:opacity-40"
+          className="flex h-16 w-full items-center justify-center rounded-xl bg-ink-800 text-xl font-semibold text-ink-100 active:bg-ink-700 disabled:opacity-40 kiosk:h-20 kiosk:text-2xl"
         >
           Reprint a name tag
         </button>
@@ -74,10 +88,13 @@ export function StaffScreen({
             haptic();
             onPrinter();
           }}
-          className="flex h-16 w-full items-center justify-between rounded-xl bg-ink-800 px-5 text-left text-xl font-semibold text-ink-100 active:bg-ink-700"
+          className="flex h-16 w-full items-center justify-between rounded-xl bg-ink-800 px-5 text-left text-xl font-semibold text-ink-100 active:bg-ink-700 kiosk:h-20 kiosk:text-2xl"
         >
-          <span>Label printer</span>
-          <span className={`pl-3 text-base font-normal ${printerLine.tone}`}>
+          <span className="whitespace-nowrap">Label printer</span>
+          {/* The half that actually varies was the smallest type on the screen. */}
+          <span
+            className={`pl-3 text-lg font-normal whitespace-nowrap kiosk:text-xl ${printerLine.tone}`}
+          >
             {printerLine.text}
           </span>
         </button>
@@ -89,7 +106,7 @@ export function StaffScreen({
             haptic();
             onChangeEvent();
           }}
-          className="flex h-14 w-full items-center justify-center rounded-xl bg-ink-800 text-lg font-semibold text-ink-200 active:bg-ink-700"
+          className="flex h-14 w-full items-center justify-center rounded-xl bg-ink-800 text-lg font-semibold text-ink-200 active:bg-ink-700 kiosk:h-16 kiosk:text-xl"
         >
           Change event
         </button>
@@ -97,7 +114,7 @@ export function StaffScreen({
 
       {/* The loud one is the way back to the door, as it is on the screen this
           replaces: everything else here costs somebody standing at the kiosk. */}
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-md kiosk:max-w-lg">
         <button
           type="button"
           tabIndex={-1}
@@ -105,7 +122,7 @@ export function StaffScreen({
             haptic();
             onStay();
           }}
-          className="flex h-16 w-full items-center justify-center rounded-xl bg-brand-600 text-xl font-semibold text-white active:bg-brand-500"
+          className="flex h-16 w-full items-center justify-center rounded-xl bg-brand-600 text-xl font-semibold text-white active:bg-brand-500 kiosk:h-20 kiosk:text-2xl"
         >
           Keep checking in
         </button>

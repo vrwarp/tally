@@ -46,7 +46,19 @@ const STUDENTS: KioskStudent[] = [
   { id: '11', firstName: 'Alonzo', lastName: 'Allred', grade: 9 },
 ] as KioskStudent[];
 
-const MAX_RESULTS = 8;
+/**
+ * Fewer than the parent screen's eight, and that is the reprint screen's own
+ * number rather than a shared one.
+ *
+ * The landscape kiosk leaves this list a 250px track, which is three rows at
+ * kiosk row height. Eight matches balance four-and-four across two columns, so
+ * the fourth row of both columns was under the ramp with a 23px scroll nobody
+ * would guess at; six balance three-and-three and the region shows all of them.
+ * The cost is that "more names than fit" fires two letters earlier — which on
+ * this screen is not a cost, because a volunteer standing here already knows
+ * the child's name and typing is the cheapest thing they can do.
+ */
+const MAX_RESULTS = 6;
 
 function outcomeFor(buffer: string) {
   const needle = buffer.toLowerCase();
@@ -78,13 +90,14 @@ export function Prototype() {
   };
 
   const screen = params.get('screen') ?? 'reprint';
+  const printer = (params.get('printer') as 'ready' | 'trouble' | 'none') ?? 'ready';
 
   if (screen === 'staff') {
     return (
       <StaffScreen
         title="Wednesday Night"
         window="6:30 – 8:00 PM"
-        printer={(params.get('printer') as 'ready' | 'trouble' | 'none') ?? 'ready'}
+        printer={printer}
         onReprint={() => {}}
         onPrinter={() => {}}
         onChangeEvent={() => {}}
@@ -99,6 +112,7 @@ export function Prototype() {
         student={STUDENTS[0]!}
         lines={['Ramona Alvarez', '7th grade', 'Wednesday Night', '6:30 PM']}
         printedAt={params.get('printedAt') ?? '6:41 PM'}
+        printerNeedsAttention={printer === 'trouble'}
         onPrint={() => {}}
         onBack={() => {}}
       />
@@ -120,7 +134,7 @@ export function Prototype() {
     return (
       <PrinterScreenProto
         recent={params.get('recent') === '0' ? [] : RECENT}
-        onReprint={() => {}}
+        onPick={() => {}}
         onDone={() => {}}
       />
     );
@@ -132,6 +146,7 @@ export function Prototype() {
       outcome={outcomeFor(buffer)}
       presentIds={new Set(params.get('present')?.split(',').filter(Boolean) ?? [])}
       sent={params.get('sent')}
+      printerNeedsAttention={printer === 'trouble'}
       onKey={onKey}
       onPick={() => {}}
       onDone={() => {}}

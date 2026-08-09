@@ -75,16 +75,22 @@ export function AlreadyCheckedInScreen({
       <div className="shrink-0 text-2xl font-semibold text-present-400">✓ Already checked in</div>
 
       <div className="mt-8 flex w-full shrink-0 flex-col items-center">
+        {/* `text-lg` on a phone because at `text-xl` the label wrapped onto two
+            lines inside its own button — the one control on this screen a
+            parent has to read as a single instruction. The `kiosk:` step is the
+            one the rest of this flow takes; the name and the tick above are
+            deliberately still `ConfirmScreen`'s, because this screen is that
+            screen with one thing added. */}
         {offer === 'offer' && (
           <HoldButton
             onHeld={onReprint}
-            className="w-full rounded-xl bg-ink-800 p-5 text-xl font-semibold text-ink-200"
+            className="w-full rounded-xl bg-ink-800 px-4 py-5 text-lg font-semibold text-ink-200 kiosk:p-6 kiosk:text-2xl"
           >
-            Hold to print their name tag
+            Hold to print a name tag
           </HoldButton>
         )}
         {offer === 'spent' && (
-          <div className="w-full rounded-xl px-5 py-4 text-lg text-ink-500">
+          <div className="w-full rounded-xl px-5 py-4 text-lg text-ink-500 kiosk:text-xl">
             Name tag printed. A leader can print another.
           </div>
         )}
