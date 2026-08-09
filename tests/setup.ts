@@ -48,6 +48,19 @@ if (!('vibrate' in navigator)) {
   Object.defineProperty(navigator, 'vibrate', { value: vi.fn(), writable: true });
 }
 
+/*
+ * jsdom implements `Blob` but not object URLs, and the CSV download needs both.
+ *
+ * Component tests mock `@/lib/download` at the module boundary rather than
+ * relying on this — a real anchor click on a `blob:` href makes jsdom log "Not
+ * implemented: navigation". This exists for `download.test.ts`, which is the one
+ * suite that drives the real helper.
+ */
+if (!URL.createObjectURL) {
+  URL.createObjectURL = vi.fn(() => 'blob:tally/test');
+  URL.revokeObjectURL = vi.fn();
+}
+
 if (!window.matchMedia) {
   Object.defineProperty(window, 'matchMedia', {
     writable: true,

@@ -86,8 +86,17 @@ const MAX_EVENTS = 24;
 const ALL = 'all';
 
 export function DashboardPage() {
-  const { students, events, series, settings, loading, rosterLoading, rosterSettled, canWork } =
-    useData();
+  const {
+    students,
+    events,
+    series,
+    settings,
+    loading,
+    rosterLoading,
+    rosterSettled,
+    rosterBackends,
+    canWork,
+  } = useData();
   const now = useNow(60_000);
   const [selected, setSelected] = useState<string>(ALL);
 
@@ -243,6 +252,16 @@ export function DashboardPage() {
   const incompleteRows = useMemo(
     () => computeIncompleteProfiles(students, parentContact.reachable),
     [students, parentContact.reachable],
+  );
+
+  /*
+   * The two session-held answers a follow-up file needs and its rows do not
+   * carry: who can be reached, and when each backend last answered. Assembled
+   * once here rather than in three cards, so all three files agree.
+   */
+  const exportContext = useMemo(
+    () => ({ reachable: parentContact.reachable, backends: rosterBackends }),
+    [parentContact.reachable, rosterBackends],
   );
   /*
    * Narrowed to the gathering the tabs are showing, like every other list here.
@@ -463,6 +482,7 @@ export function DashboardPage() {
                 threshold={settings.miaConsecutiveMisses}
                 gatheringTitle={activeGathering?.title ?? null}
                 onContactAdded={parentContact.refresh}
+                exportContext={exportContext}
               />
               {/*
                 Ordered by question on a phone, by column on a laptop.
@@ -494,6 +514,7 @@ export function DashboardPage() {
               gatheringTitle={activeGathering?.title ?? null}
               reachable={parentContact.reachable}
               onContactAdded={parentContact.refresh}
+              exportContext={exportContext}
             />
           ) : null}
 
@@ -516,6 +537,7 @@ export function DashboardPage() {
               error={parentContact.error}
               gatheringTitle={activeGathering?.title ?? null}
               onContactAdded={parentContact.refresh}
+              exportContext={exportContext}
             />
           )}
 
@@ -525,7 +547,11 @@ export function DashboardPage() {
           {!awaiting && (oneOffRecaps.length > 0 || oneOffOnly.length > 0) ? (
             <>
               <OneOffRecapList items={oneOffRecaps} className="order-6 lg:order-none" />
-              <OneOffOnlyList items={oneOffOnly} className="order-4 lg:order-none" />
+              <OneOffOnlyList
+                items={oneOffOnly}
+                className="order-4 lg:order-none"
+                exportContext={exportContext}
+              />
             </>
           ) : null}
         </div>

@@ -34,6 +34,7 @@ import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { EventEditorModal } from '@/features/events/EventEditorModal';
 import { EventHeroCard } from '@/features/events/EventHeroCard';
+import { AttendanceGridModal } from '@/features/events/AttendanceGridModal';
 import { ImportCheckInsModal } from '@/features/events/ImportCheckInsModal';
 import { PastGatherings } from '@/features/events/PastGatherings';
 import { useEventSnapshots } from '@/hooks/useEventSnapshots';
@@ -310,6 +311,7 @@ export function EventsPage() {
 
   const [editor, setEditor] = useState<EditorTarget | null>(null);
   const [importing, setImporting] = useState(false);
+  const [gridOpen, setGridOpen] = useState(false);
   const [uncancelling, setUncancelling] = useState<string | null>(null);
 
   /*
@@ -434,6 +436,11 @@ export function EventsPage() {
         <div className="flex items-center gap-2">
           {/* Quieter than "New event" on purpose: importing history happens a
               handful of times in an install's life, scheduling happens weekly. */}
+          {/* Same weight as Import, and for the same reason: a grid is
+              something a leader builds at the end of a term, not weekly. */}
+          <Button variant="secondary" onClick={() => setGridOpen(true)}>
+            Export
+          </Button>
           <Button variant="secondary" onClick={() => setImporting(true)}>
             Import
           </Button>
@@ -544,6 +551,8 @@ export function EventsPage() {
       />
 
       <ImportCheckInsModal open={importing} onClose={() => setImporting(false)} />
+
+      <AttendanceGridModal open={gridOpen} onClose={() => setGridOpen(false)} />
     </PageFrame>
   );
 }

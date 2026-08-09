@@ -37,17 +37,37 @@ export function CardHeader({
   /** The label for the second column. Only rendered when `columns` is given. */
   columnLabel?: string;
 }) {
+  /*
+   * The action leaves the title's line below `sm`, and that is not cosmetic.
+   *
+   * A card header used to be a title beside at most one button, and the row
+   * held. Give it two and, at 390px, the buttons claim two thirds of the width
+   * before the heading gets any: "Missing in action" came apart into a
+   * three-line ragged stack with its count badge orphaned mid-heading, the
+   * description broke into seven fragments of three words, and the header grew
+   * to 231px — enough to push every call row on the screen below the fold, on
+   * the one screen whose whole job is the call rows.
+   *
+   * So the title is served first and the actions take their own line under it
+   * when there is no room. Above `sm` nothing changes: there is width for both
+   * and the header stays the calm object it was.
+   */
   return (
     <header
       className={cn(
-        'flex items-start justify-between gap-3 border-b border-ink-800 px-4 py-3',
-        columns && `@2xl:grid @2xl:items-end @2xl:gap-4 ${columns}`,
+        'flex border-b border-ink-800 px-4 py-3',
+        // A table header keeps its row. `columns` cards label a grid and carry
+        // no action — see `TeamPage` — so there is nothing there to stack, and
+        // stacking would fight the template.
+        columns
+          ? `items-start justify-between gap-3 @2xl:grid @2xl:items-end @2xl:gap-4 ${columns}`
+          : 'flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3',
       )}
     >
       {/* A minimum of one target's height, so a card whose header carries a
           second line and one whose header does not still agree on their band. */}
-      <div className="flex min-h-11 flex-col justify-center">
-        <h2 className="flex items-center gap-2 text-base font-semibold text-ink-100">
+      <div className="flex min-h-11 min-w-0 flex-col justify-center">
+        <h2 className="flex flex-wrap items-center gap-2 text-base font-semibold text-ink-100">
           {title}
           {count !== undefined ? (
             <span className="rounded-full bg-ink-800 px-2 py-0.5 text-xs font-semibold text-ink-300">
@@ -62,7 +82,9 @@ export function CardHeader({
       {columns && columnLabel ? (
         <p className="hidden text-xs text-ink-500 @2xl:block">{columnLabel}</p>
       ) : null}
-      {action}
+      {/* Its own line below `sm`, so a wrapping action never squeezes the
+          heading; `shrink-0` keeps it whole beside the title above `sm`. */}
+      {action ? <div className="flex shrink-0 items-center gap-2">{action}</div> : null}
     </header>
   );
 }

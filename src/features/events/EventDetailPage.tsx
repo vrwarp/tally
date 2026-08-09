@@ -31,8 +31,12 @@ import { useToast } from '@/context/toastContext';
 import { EventDangerZone } from '@/features/events/EventDangerZone';
 import { EventEditorModal } from '@/features/events/EventEditorModal';
 import { RsvpManager } from '@/features/events/RsvpManager';
-import { useAttendance } from '@/hooks/useAttendance';
+import { buildRegisterCsv, registerRows } from '@/features/events/registerCsv';
+import { shortName, useTeam } from '@/features/events/useTeam';
+import { ExportCsvButton } from '@/components/ExportCsvButton';
+import { useAttendance, useRsvps } from '@/hooks/useAttendance';
 import { useNow } from '@/hooks/useNow';
+import { exportFilename } from '@/lib/csv';
 import { gatheringOptions } from '@/lib/gatherings';
 import { describeRecurrence } from '@/lib/recurrence';
 import { formatClock, formatEventDay, formatEventWindow, isCheckInOpen } from '@/lib/time';
@@ -51,7 +55,7 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 
 export function EventDetailPage() {
   const { eventId } = useParams();
-  const { events, series, students, loading, canWork, access } = useData();
+  const { events, series, students, loading, canWork, access, rosterBackends } = useData();
   const { user } = useAuth();
   const { show } = useToast();
   const navigate = useNavigate();
@@ -73,6 +77,30 @@ export function EventDetailPage() {
   const [accessOpen, setAccessOpen] = useState(false);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  /*
+   * The RSVP list, for the export only, and only where it means something.
+   *
+   * `RsvpManager` opens its own listener further down the page; this is the
+   * second on the same small subcollection and it exists because the export
+   * has to name the people who said yes and did not come, which is a question
+   * only a one-off has.
+   */
+  const { rsvps: exportRsvps } = useRsvps(
+    !locked && event?.mode === 'oneoff' ? (event?.id ?? null) : null,
+  );
+
+  /*
+   * Names for the uids on the register, fetched when somebody looks like they
+   * are about to need them rather than on every page view.
+   *
+   * `useTeam` is deliberately outside `DataProvider` — a listener on the whole
+   * team is not worth opening for every counselor on every screen. Arming it on
+   * hover means the names are usually in hand by the time the button is pressed,
+   * and the export never waits on them.
+   */
+  const [teamArmed, setTeamArmed] = useState(false);
+  const team = useTeam(teamArmed);
 
   if (!event) {
     if (loading || eventLoading) {
@@ -138,6 +166,23 @@ export function EventDetailPage() {
     .sort((a, b) => b.record.checkedInAt.getTime() - a.record.checkedInAt.getTime());
 
   const collected = attendance.filter((record) => record.checkedOutAt !== null);
+
+  const registerExportRows = registerRows(event, attendance, exportRsvps, studentsById);
+  const buildRegisterExport = () => ({
+    filename: exportFilename({ kind: 'register', scope: event.title, at: event.startAt }),
+    contents: buildRegisterCsv(registerExportRows, {
+      event,
+      // Resolved here rather than inside the builder, which has no business
+      // holding a Firestore subscription.
+      namesByUid: new Map(
+        [...team.byUid].flatMap(([uid, profile]) => {
+          const name = shortName(profile);
+          return name ? [[uid, name] as const] : [];
+        }),
+      ),
+      backends: rosterBackends,
+    }),
+  });
 
   const toggleStatus = async () => {
     if (!user) return;
@@ -281,7 +326,25 @@ export function EventDetailPage() {
       </Card>
 
       <Card>
-        <CardHeader title="Attendance" count={attendance.length} />
+        <CardHeader
+          title="Attendance"
+          count={attendance.length}
+          action={
+            // Not offered on a gathering nothing has been recorded against, and
+            // not on a projected one: `materialized === false` means this id
+            // names a document that does not exist, so a register read comes
+            // back empty and a file would assert nobody came.
+            event.materialized && !locked ? (
+              <div onPointerEnter={() => setTeamArmed(true)} onFocus={() => setTeamArmed(true)}>
+                <ExportCsvButton
+                  build={buildRegisterExport}
+                  count={registerExportRows.length}
+                  noun="check-ins"
+                />
+              </div>
+            ) : undefined
+          }
+        />
         <div className="flex flex-col gap-3 p-3">
           {attendanceError ? <ErrorBanner message={attendanceError} /> : null}
 

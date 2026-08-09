@@ -55,6 +55,34 @@ The list itself is
 [one precomputed document](data-model.md#kioskindexparticipation) — the kiosk holds no event
 history and could not download the code that reads it.
 
+## What the CSV exports contain
+
+The core team can download four files — the roster, one night's register, the follow-up lists, and
+an attendance grid. Every export is a statement about what leaves the app, so it belongs here.
+
+They carry names, grades, attendance and the Tally-owned annotations a screen already shows: the
+allergy **flag**, the notes a counselor typed, which backend holds each student and when it was last
+read. They deliberately do **not** carry a parent's name, phone or email, the allergy note itself, or
+a birthday.
+
+That is not an oversight to be corrected later. Tally holds none of the contact details — they live
+in the people backend and are read one student at a time, by a screen that shows them — so an export
+of four hundred students would mean four hundred upstream reads to place a screenful of parents'
+phone numbers on somebody's laptop, permanently and outside anything this app can see.
+[`contactList.ts`](../src/features/dashboard/contactList.ts) already refuses the same thing for a
+clipboard, which is the weaker case. What the follow-up files carry instead is
+`parent_contact_on_file`, a three-state column where blank means *nobody has looked* — the same
+distinction the badges draw on screen.
+
+The birthday is out for a second reason on top of the first: Tally stores `MM-DD` precisely because
+the year is the identifying half, and a birthday column in a spreadsheet invites an age column
+beside it.
+
+An export cannot widen anybody's reach. It is assembled in the browser out of data the reader
+already has, so `firestore.rules` and the per-gathering access lists bound it exactly as they bound
+the screen — a night whose register the reader may not see has no column in the grid, rather than a
+column of zeros.
+
 ## Leaving, and being removed
 
 A student who leaves the ministry is marked inactive in Planning Center and simply stops coming back

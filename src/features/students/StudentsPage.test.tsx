@@ -34,6 +34,14 @@ const useAuth = vi.hoisted(() => vi.fn());
 const useParentContact = vi.hoisted(() => vi.fn());
 const getPersonDetails = vi.hoisted(() => vi.fn());
 const updateStudent = vi.hoisted(() => vi.fn(async () => {}));
+const downloadCsv = vi.hoisted(() => vi.fn<(filename: string, contents: string) => void>());
+
+// Mocked at the module boundary: a real anchor click on a `blob:` href makes
+// jsdom log "Not implemented: navigation" and tells us nothing extra.
+vi.mock('@/lib/download', () => ({
+  downloadCsv,
+  downloadOpensInViewer: () => false,
+}));
 
 vi.mock('@/context/dataContext', () => ({ useData }));
 vi.mock('@/context/authContext', () => ({ useAuth }));
@@ -76,7 +84,11 @@ const AMBER = 'text-warn-400';
 /** Sat 14 March 2026, so the birthday windows are a fixed fortnight. */
 const TODAY = new Date(2026, 2, 14, 10, 0);
 
-function renderRoster(students: Student[], reachable: Record<string, boolean> = {}) {
+function renderRoster(
+  students: Student[],
+  reachable: Record<string, boolean> = {},
+  dataOverrides: Record<string, unknown> = {},
+) {
   vi.setSystemTime(TODAY);
 
   useData.mockReturnValue({
@@ -93,6 +105,7 @@ function renderRoster(students: Student[], reachable: Record<string, boolean> = 
     rosterFetchedAt: TODAY,
     rosterBackends: [],
     refreshRoster: vi.fn(async () => {}),
+    ...dataOverrides,
   });
   // `useAuth().user` is the Firebase Auth user, not the profile document —
   // `uid` is what every write in this feature stamps itself with.
@@ -379,5 +392,140 @@ describe('StudentsPage badge actions', () => {
     // router would have navigated and this panel would never have opened.
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: /Kylie/ }).length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * The export, and the two ways it could quietly hand somebody the wrong file.
+ *
+ * Both failures are invisible in the artefact: a CSV of the whole roster looks
+ * exactly like a CSV of the filtered rows, and a CSV taken while a backend was
+ * down looks exactly like a complete one.
+ */
+describe('StudentsPage export', () => {
+  const THREE = [
+    makeStudent({ id: 'pco_1', firstName: 'Amara', lastName: 'Okafor', grade: 9 }),
+    makeStudent({ id: 'pco_2', firstName: 'Ben', lastName: 'Cole', grade: 8 }),
+    makeStudent({ id: 'a32_3', firstName: 'Chidi', lastName: 'Eze', grade: 9 }),
+  ];
+
+  function exportButton() {
+    return screen.getByRole('button', { name: /Export CSV/ });
+  }
+
+  it('exports the rows on screen, not the whole roster', async () => {
+    const user = userEvent.setup();
+    renderRoster(THREE);
+
+    await user.type(screen.getByRole('searchbox', { name: /Search/i }), 'Amara');
+    await user.click(exportButton());
+
+    await waitFor(() => expect(downloadCsv).toHaveBeenCalled());
+    const [filename, contents] = downloadCsv.mock.calls.at(-1)!;
+    // One header row and one student, and the filename says it was narrowed.
+    expect(contents.trimEnd().split('\r\n')).toHaveLength(2);
+    expect(contents).toContain('Amara');
+    expect(contents).not.toContain('Chidi');
+    expect(filename).toMatch(/^tally-roster-\d{4}-\d{2}-\d{2}-filtered\.csv$/);
+  });
+
+  it('exports everything, unflagged, when nothing is filtered', async () => {
+    const user = userEvent.setup();
+    renderRoster(THREE);
+
+    await user.click(exportButton());
+
+    await waitFor(() => expect(downloadCsv).toHaveBeenCalled());
+    const [filename, contents] = downloadCsv.mock.calls.at(-1)!;
+    expect(contents.trimEnd().split('\r\n')).toHaveLength(4);
+    expect(filename).toMatch(/^tally-roster-\d{4}-\d{2}-\d{2}\.csv$/);
+  });
+
+  it('refuses outright when the roster read failed', () => {
+    renderRoster(THREE, {}, { rosterError: { message: 'Planning Center is unreachable' } });
+
+    // `students` here is a local copy of unknown age. A screen can carry a
+    // banner saying so; a file cannot, because it gets forwarded.
+    expect(exportButton()).toBeDisabled();
+  });
+
+  it('is disabled until the first read has settled', () => {
+    renderRoster([], {}, { rosterLoading: true, rosterSettled: false });
+    expect(exportButton()).toBeDisabled();
+  });
+
+  it('confirms before exporting a roster one backend could not answer for', async () => {
+    const user = userEvent.setup();
+    renderRoster(THREE, {}, {
+      rosterBackends: [
+        {
+          backendId: 'pco',
+          displayName: 'Planning Center',
+          ok: true,
+          error: null,
+          people: 2,
+          unresolved: 0,
+          missing: 0,
+          cached: false,
+          fetchedAt: TODAY.toISOString(),
+        },
+        {
+          backendId: 'a32',
+          displayName: 'Attendees',
+          ok: false,
+          error: 'timed out',
+          people: 1,
+          unresolved: 2,
+          missing: 0,
+          cached: true,
+          fetchedAt: new Date(2026, 2, 11).toISOString(),
+        },
+      ],
+    });
+
+    await user.click(exportButton());
+
+    // Nothing has been written yet — the confirmation has to come before the
+    // file exists, not as a toast after it.
+    expect(downloadCsv).not.toHaveBeenCalled();
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Attendees');
+    expect(dialog).toHaveTextContent('timed out');
+    // The students who are not rows at all get a sentence, since they cannot
+    // get a column.
+    expect(dialog).toHaveTextContent(/2 roster entries could not be named/);
+
+    await user.click(within(dialog).getByRole('button', { name: /Export anyway/ }));
+
+    await waitFor(() => expect(downloadCsv).toHaveBeenCalled());
+    const [filename, contents] = downloadCsv.mock.calls.at(-1)!;
+    expect(filename).toMatch(/-partial\.csv$/);
+    // And the fact travels per row, not just in the name.
+    expect(contents).toContain('source_read_at');
+  });
+
+  it('writes nothing when the confirmation is declined', async () => {
+    const user = userEvent.setup();
+    renderRoster(THREE, {}, {
+      rosterBackends: [
+        {
+          backendId: 'a32',
+          displayName: 'Attendees',
+          ok: false,
+          error: 'timed out',
+          people: 1,
+          unresolved: 0,
+          missing: 0,
+          cached: true,
+          fetchedAt: TODAY.toISOString(),
+        },
+      ],
+    });
+
+    await user.click(exportButton());
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: /Try again/ }));
+
+    expect(downloadCsv).not.toHaveBeenCalled();
   });
 });
