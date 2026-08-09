@@ -124,3 +124,4 @@ docs/uxr/team-walkthrough.html
 # read a rendered frame's geometry. They are a step in an argument, not a tool —
 # the numbers they produced are quoted in the round's critique, which is tracked.
 /uxr/_*
+/uxr/.measure-*
