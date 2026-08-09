@@ -27,7 +27,7 @@
  * finished search finds nobody anywhere. This screen renders the outcome it is
  * handed and offers the doors.
  *
- * The staff gate is a three-second hold on **Clear**, which opens the prompt
+ * The staff gate is a two-second hold on **Clear**, which opens the prompt
  * that leaves the gathering. It used to be an invisible square over the top-left
  * corner of the header — unfindable by anybody who had not been shown it, and
  * in the wrong place besides. A labelled key in a fixed position can be
@@ -178,7 +178,7 @@ export function SearchScreen({
   /** Opens the registration offer — the other door off this screen. */
   onRegister: () => void;
   /**
-   * The staff gate fired — **Clear**, held for three seconds.
+   * The staff gate fired — **Clear**, held for two seconds.
    *
    * Named for the gesture rather than for unbinding, because this screen no
    * longer decides what it means: it opens a prompt, and the prompt is what

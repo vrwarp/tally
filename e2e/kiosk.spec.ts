@@ -587,7 +587,7 @@ test.describe('the kiosk', () => {
       expect(await accent()).toBe(themed);
 
       // Rebinding to an unthemed gathering puts it all back. The staff gate is
-      // a three-second hold on Clear, and then leaving the gathering.
+      // a two-second hold on Clear, and then leaving the gathering.
       await hold(kiosk, '[data-key="clear"]');
       await kiosk.getByRole('button', { name: /^Leave / }).click();
       await bindTo(kiosk, /friday fellowship/i);

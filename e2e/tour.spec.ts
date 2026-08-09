@@ -375,7 +375,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
         who: 'The same family, at the end of the morning',
         title: 'A pickup is a hold, not a tap',
         caption:
-          'The same row, hours later, offering the only thing left to do with a child who is already here. Three seconds of deliberate pressure rather than one tap, and that is not ceremony: marking a child collected is a claim that somebody took them out of the building, made on an unattended screen in a lobby — and unlike a stray check-in it does not correct itself when the child walks back in. Undoing one needs a volunteer and the main app.',
+          'The same row, hours later, offering the only thing left to do with a child who is already here. Two seconds of deliberate pressure rather than one tap, and that is not ceremony: marking a child collected is a claim that somebody took them out of the building, made on an unattended screen in a lobby — and unlike a stray check-in it does not correct itself when the child walks back in. Undoing one needs a volunteer and the main app.',
       });
 
       await hold(kiosk, 'button:has-text("Hold to collect")');
@@ -793,7 +793,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       await shoot(kiosk, 'kiosk', {
         act: 'Going home',
         who: 'The same family, three hours later',
-        title: 'Three seconds, once, for the whole family',
+        title: 'Two seconds, once, for the whole family',
         caption:
           'A pickup holds where a check-in taps, and it still holds for three children at once. The asymmetry is deliberate: a stray check-in is self-correcting when the child walks in anyway, and a stray *collection* is a claim on an unattended lobby screen that somebody took a child out of the building. Undoing one needs a volunteer and the main app. The arrival also works the other way round — a child the four-digit guess would never call family, a cousin or a neighbour\'s boy who came in the same press, is offered here and ticked.',
       });

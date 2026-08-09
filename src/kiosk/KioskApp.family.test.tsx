@@ -8,7 +8,7 @@
  * What is pinned here is not the offer itself so much as its edges, which are
  * where a bulk action goes wrong: that it only ever offers what the button says
  * it will do, that a name unticked is a child left alone, that a family's
- * pickup still costs a three-second hold, and that one confirm produces one
+ * pickup still costs a two-second hold, and that one confirm produces one
  * write per child and no more.
  */
 import { act, fireEvent, render, screen } from '@testing-library/react';

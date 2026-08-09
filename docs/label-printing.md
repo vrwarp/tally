@@ -33,7 +33,7 @@ What follows is what that person has to do.
 ## Setting one up
 
 1. Plug the printer into the kiosk and turn it on.
-2. On the kiosk, **hold the Clear key on the search screen for three seconds**,
+2. On the kiosk, **hold the Clear key on the search screen for two seconds**,
    then answer **Leave …**. That is the staff gate — it returns to the event
    chooser. A tap on Clear still just clears the search box; only the hold asks.
 3. Press **Set up a label printer**.

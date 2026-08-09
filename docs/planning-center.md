@@ -247,6 +247,16 @@ the results again locally through the same accent- and punctuation-insensitive n
 collapse duplicate visitors. If several people match exactly, the church database already has
 duplicates and Tally links to the lowest id rather than adding a third.
 
+The **household** a self-registered family lands in is chosen by precedence: a sibling the family
+named, then the adult Tally resolved, then the children of this push. The middle one is a fix rather
+than a refinement. A family who registers twice — two visits, two kiosk sessions, one number —
+resolves to the same parent the second time, and the household lookup used to consult only the
+children, every one of whom had been created seconds earlier and had none. So it built a second one.
+What Planning Center held afterwards was a single person as `primary_contact` of two identically
+named households, one child in each, and **there is no merge for households**: they have to be
+emptied and deleted by hand. Tally now joins the household the parent already heads, and does not
+re-post a membership for one they are already in.
+
 A name Tally holds as `Benson “蔡秉洲”` is split back into `first_name` and `nickname` before any of
 this, because Planning Center stores those as two fields and its fuzzy search indexes them
 separately. Writing the composite into `first_name` would leave Planning Center holding
@@ -495,7 +505,7 @@ a mailbox left signed in on a shared phone was a way in that nobody was watching
 
 ```mermaid
 flowchart LR
-  A["Admin invites an address<br/>Settings → Team"] --> B["invitations/{emailKey}<br/>email · role · active"]
+  A["Admin invites an address<br/>Team screen"] --> B["invitations/{emailKey}<br/>email · role · active"]
   C["TALLY_ADMIN_EMAILS<br/>deploy-time"] --> F
   D["Volunteer signs in with Google"] --> E["Firebase uid, no profile<br/>status: pending"]
   E --> F["provisionAccess<br/>callable"]
@@ -523,8 +533,8 @@ not been added yet is a normal thing to be.
 
 ### Inviting and revoking
 
-**Settings → Team** (admin only). Invite a Google address with a role; they appear in the "Signed in"
-list the first time they use it.
+**Team** (admin only, reached from the account menu). Invite a Google address with a role; they
+appear in the "Signed in" list the first time they use it.
 
 The two lists do different jobs, and the difference matters when somebody has to be removed:
 

@@ -39,12 +39,15 @@
     "vite.config.ts",
     "vitest.config.ts",
     "eslint.config.js",
-    // The kiosk critique harness mounts the real screens, so it is browser
-    // React with the app's aliases — it belongs to this project even though the
-    // shooter that drives it, two files away, is Node and belongs to the e2e
-    // one. It fell between the two: `uxr` is globbed wholesale over there,
-    // where there is no `jsx` and no `@/`, and this project did not name it at
-    // all, so the only environment that saw it was the wrong one.
-    "uxr/kiosk-live/main.tsx"
+    // The critique harnesses that mount the real screens are browser React with
+    // the app's aliases, so they belong to this project even though the
+    // shooters that drive them, one file away, are Node and belong to the e2e
+    // one. They fall between the two: `uxr` is globbed wholesale over there,
+    // where there is no `jsx` and no `@/`, and a file this project does not
+    // name is seen only by the wrong environment.
+    "uxr/kiosk-live/main.tsx",
+    "uxr/team-live/main.tsx",
+    "uxr/team-live/stubs.tsx",
+    "uxr/team-live/fixture.ts"
   ]
 }

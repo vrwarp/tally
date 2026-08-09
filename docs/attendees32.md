@@ -94,13 +94,26 @@ costs no extra requests.
   membership document; an Attendees re-create mints a new id, so the roster membership migrates to
   a new `a32_{uuid}` document and attendance moves with it (`backends/studentMigration.ts`).
 - **No lists.** `listsSupported: false`; the roster-from-a-list import is Planning Center only.
-- **A grade-less student is created, never matched.** Both backends now push a child with no grade
-  rather than refusing and leaving them queued for ever. Planning Center still runs its duplicate
-  check for them, guarded by `child`; Attendees skips the check entirely, because it has no such
-  flag — *holding a grade at all* is the closest fact it keeps, which is exactly the fact missing
-  here. Matching on name alone would file a three-year-old as the volunteer who shares their name,
-  in the church's permanent database, silently. A duplicate somebody can merge is the better
-  failure.
+- **"Is this person a child" is a relation, not a flag** — and this is where the two backends now
+  say the same thing by different means. Planning Center answers with `child` on the person;
+  Attendees has no such field, so the nearest true fact is the relation somebody holds in their
+  family folk (`child` in a category-0 folk). Those edges ride on every `datagrid_data_attendee`
+  row, so asking costs nothing beyond the search that already happened.
+
+  Two checks lean on it, both of them ports of Planning Center behaviour rather than inventions.
+  A **grade-less student** is matched on name against candidates who are children *and* hold no
+  grade — the same pair of conditions `where[child]=true` plus a blank grade expresses upstream.
+  This used to skip the duplicate check outright, on the reasoning that Attendees could not tell a
+  nursery child from an equally grade-less adult volunteer and that filing a three-year-old as
+  their namesake was worse than a duplicate. The caution was right and the premise was wrong: the
+  fact was there as a relation. And the **parent search** in `createFamily` excludes children the
+  same way, which is what `where[child]=false` does on the other side — without it, the only
+  exclusion was the children of the registration being approved, so a father and son who share a
+  name could see the son corroborated as the father the moment his own mobile was on file.
+- **Corroboration reads every number.** `contactsOf` answers with the first phone-like slot, which
+  is right for "how do we reach this family" and wrong for "is this the same human": a parent whose
+  `phone1` is a work line and whose mobile sits in `phone2` is the same parent. The match uses
+  `allPhonesOf`, so both backends compare against every number on file, on the last ten digits.
 - **History import is per meet.** `Import` on the Events screen lists the assembly's meets; one
   meet becomes one recurrence-less chain of Tally events (`a32-meet-{slug}`, one child per
   gathering day), every attendee who attended joins the roster, and rows with category *scheduled*

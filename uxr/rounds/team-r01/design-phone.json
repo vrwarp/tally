@@ -1,0 +1,74 @@
+[
+  {
+    "scene": "team",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "the page deck and the grey explainer card between the H1 and the first section",
+    "finding": "Two stacked blocks of prose open the screen and together they own roughly half the first viewport. Worse, the explainer is set one step brighter than the page's own deck (ink-400 inside a ringed ink-900 card, against ink-500 for the deck), and it is wrapped in exactly the same container treatment — 2xl radius, ink-900 fill, ink-800 ring — as the two sections that carry the actual content. So a read-once paragraph is a peer of 'Signed-in team' in the container hierarchy and outranks the page description in contrast. This was defensible as the top of a settings card; as the top of a route it means the reader arrives at eleven lines of policy and two of eleven people.",
+    "evidence": "team--phone-fold: the H1 sits at the very top, the deck runs three lines, the explainer card runs nine, and the fold cuts off inside Sam Whitfield's row — Dana and Miriam are the only complete people on screen. The explainer's text is visibly lighter than the deck immediately above it. team-core--phone-fold is identical, and there the reader has no controls at all, so 40% of the screen is instructions for actions they cannot take.",
+    "direction": "The screen needs one voice of introduction, not two. Either the deck absorbs what the reader must know and the explainer card goes away, or the explainer stops being a card-shaped peer of the content and becomes something subordinate and collapsed — quieter than the deck, not brighter, and not competing for the same enclosure vocabulary. Whatever survives should cost a couple of lines, so the first viewport opens on the team rather than on policy."
+  },
+  {
+    "scene": "team",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "the role select in each of the eleven signed-in rows",
+    "finding": "Each row is composed control-first. The select is a filled, ringed, 44px-tall box on the recessed ink-950 surface — the heaviest object in the row by a wide margin — while the person's name is 14px semibold, the same size as the 'Active' label beside it, the select's own text, and the form labels further down. Squint at the full frame and you see a column of eleven identical grey boxes with eleven identical blue ticks; the names are the faint thing between them. And because every select looks the same whatever it says, role — the attribute an admin is here to change — cannot be read at a glance at all. The read-only core view, which uses tinted badges, actually tells you the shape of the team faster than the view where you act on it.",
+    "evidence": "team--phone-full: the boxed 'Counselor' / 'Core team' / 'Admin' selects form an unbroken visual column down the left of the list. Compare team-core--phone-full at the same rows, where the two Core team members and the two Admins are visible in one sweep because the badges are brand-tinted and the counselors are not.",
+    "direction": "Invert the weight inside the row: the name should be the first thing the eye lands on, a clear step above the surrounding UI text, and the role control should carry the value's identity rather than a box. The role's current value wants the same reading the core view's badges already give it — neutral for counselor, brand-tinted for the elevated roles — with the affordance to change it expressed as a light chevron on that value, not as a filled field. That also stops eleven containers from out-shouting eleven people."
+  },
+  {
+    "scene": "team",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "the 'Active' checkbox on Marcus Webb's row and on wednesday.volunteer@example.org",
+    "finding": "Switched-off is signalled only by the absence of the accent. Every other row carries a saturated brand tick, so the two rows that matter most on this screen — the counselor who left, the invitation gone stale — are identified by a hole in a pattern rather than by anything present. The reader has to notice a missing thing eleven times. Compounding it, the unchecked box does not render as an empty box: it renders as a solid warm-grey filled square, which reads as a disabled or indeterminate control, so at a glance Marcus's row looks like a row you cannot edit rather than a person who cannot sign in. Nothing else in the row — name, email, surface — differs at all.",
+    "evidence": "team--phone-full at Marcus Webb: identical name treatment, identical 'Counselor' box, and a filled grey square where the other ten rows have a blue tick. The same square appears on wednesday.volunteer. In team-core--phone-full the same person carries a red 'Suspended' badge and is unmissable — the read-only view states the exception better than the admin view does.",
+    "direction": "The suspended state should be present, not absent, and should be legible at the level of the row rather than of one control: the row should carry the state the core view already gives it in the danger token, and the person's identity should visibly recede. Separately, the off state of the checkbox needs to read as empty — an outlined box on the recessed surface — so that 'off' never borrows the appearance of 'unavailable'."
+  },
+  {
+    "scene": "team-core",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "the third metadata line of every signed-in row ('Last seen …' / 'Never signed in')",
+    "finding": "The row's three lines descend in contrast by position, not by importance: name at the brightest ink, email one step down, recency at ink-600, the dimmest text on the page. That means 'Never signed in' — the single fact this screen exists to surface for a core reader — and 'Last seen 2 months ago' are rendered in exactly the same whisper as 'Last seen 12 minutes ago'. Contrast is doing layout work instead of hierarchy work, so the exceptions are the hardest thing on the page to find and the reader must read all eleven lines to locate them.",
+    "evidence": "team-core--phone-full: Hannah Boateng's 'Never signed in' and Marcus Webb's 'Last seen 2 months ago' are visually indistinguishable from Grace Kim's 'Last seen 9 hours ago'; all three sit at the bottom of their row at the page's lowest contrast, below a brighter email address that nobody is scanning for.",
+    "direction": "Let the recency line's contrast follow its value rather than its slot — the routine recent ones can stay at the floor of the ramp, but 'never' and long-stale should step up the ink ramp toward the name, so the eye lands on them while sweeping the column. Ranking the email below the recency line would help too: the address is reference, the recency is the finding."
+  },
+  {
+    "scene": "team",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the Invited section: header, invite form, and the four invitations",
+    "finding": "The header says 'Invited 4' and then the four things it counts do not appear for another three controls; a form for creating a fifth is wedged between the label and the thing labelled. And the boundary is drawn in the wrong places — there is a rule under the header and rules between each invitation, but none between the Invite button and rosa.delgado, so the form and the list run together as one undifferentiated stack while the list's own internal seams are marked. The reader has to work out where composing ends and inventory begins.",
+    "evidence": "team--phone-full: the hairline dividers are clearly visible between rosa/ken/wednesday/noor, and clearly absent between the blue Invite button and rosa.delgado directly above it.",
+    "direction": "Put the four invitations directly under the header that counts them and let the compose form sit after them, or keep the order but mark the seam so the form reads as a distinct region of the card rather than as the list's first item. Either way the count and the counted should be adjacent."
+  },
+  {
+    "scene": "team",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the 'Google address' input and 'Role' select in the invite form, against the role selects in the rows above",
+    "finding": "Two different field treatments on one screen. Every select in the signed-in list sits on the recessed ink-950 surface and reads as an inset control; the invite input and its Role select are filled with the same ink-900 as the card behind them, so they are defined by a hairline ring alone and read flatter and less enterable than the eleven controls above. The screen's most important input — the one an admin came here to type into — is the least field-like object on the page.",
+    "evidence": "team--phone-full: the 'volunteer@example.org' field and the full-width 'Counselor' select show no fill change against the card, while the 'Counselor' selects in the rows above are visibly darker than their surroundings.",
+    "direction": "One recessed-field convention for the whole screen. The invite input should sit on the same surface step below its card that the row selects do, so entering text looks like the same kind of act everywhere."
+  },
+  {
+    "scene": "team",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the vertical gaps between the intro blocks and between the two sections",
+    "finding": "The rhythm contradicts the structure. Deck to explainer and explainer to first section are both 16, but section to section — the page's only top-level division, between a list of people and a list of invitations — is 12. The two things that are genuinely peers sit closer together than a paragraph does to a card, so the page reads as one continuous stack of four containers rather than as an intro plus two sections.",
+    "evidence": "team--phone-full: the gap above 'Signed-in team' is visibly larger than the gap between the bottom of the signed-in card and the top of the 'Invited' card.",
+    "direction": "The largest gap on the page should mark the largest division. Give the section-to-section break at least the intro's spacing and preferably more, and take the surplus out of the intro stack rather than adding overall height."
+  },
+  {
+    "scene": "team",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "Dana Ruiz's row — the 'Admin' badge and the note beneath it",
+    "finding": "The first row of the list teaches a vocabulary that no other row uses: it shows a badge where all ten rows below show a select, and it is also the tallest row. The explanation for that difference, 'Another admin has to change your own access.', is set at the page's dimmest ink — the same value as 'Last seen' — directly under the badge, so it parses as a fourth metadata line rather than as the reason the controls are missing. And because it was written to sit inline beside the badge and instead wraps, the space between badge and sentence is 6px, tighter than any other vertical gap in the row, which glues two unrelated things together.",
+    "evidence": "team--phone-fold: the badge sits alone on its line with the sentence pressed up under it, both dimmer than Miriam Achebe's controls in the next row down; the row occupies noticeably more height than its neighbours.",
+    "direction": "Make the exception read as an exception rather than as a broken row: the note should either step up out of the metadata floor so it is clearly an explanation, or be attached to the badge as an inline, obviously-secondary aside with the row keeping the same height and rhythm as the rest. The gap between the badge and its explanation should not be the tightest measure in the row."
+  }
+]

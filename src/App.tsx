@@ -51,6 +51,11 @@ const SettingsPage = lazy(() =>
     default: m.SettingsPage,
   })),
 );
+const TeamPage = lazy(() =>
+  import('@/features/team/TeamPage').then((m) => ({
+    default: m.TeamPage,
+  })),
+);
 const PairKioskPage = lazy(() =>
   import('@/features/settings/PairKioskPage').then((m) => ({
     default: m.PairKioskPage,
@@ -141,6 +146,18 @@ export default function App() {
                                 element={
                                   <RequireRole role="core">
                                     <SettingsPage />
+                                  </RequireRole>
+                                }
+                              />
+                              {/* Its own route rather than the foot of
+                                  Settings: access to a roster of minors is
+                                  revisited every season, and it was the only
+                                  card on that page that is. */}
+                              <Route
+                                path="team"
+                                element={
+                                  <RequireRole role="core">
+                                    <TeamPage />
                                   </RequireRole>
                                 }
                               />

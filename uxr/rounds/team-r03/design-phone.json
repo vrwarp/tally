@@ -1,0 +1,38 @@
+[
+  {
+    "scene": "team",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the page header block — the deck under \"Team\" and the \"How Tally decides who may sign in\" disclosure summary beneath it",
+    "finding": "The two lines are the same size, but value and weight rank them backwards. The deck is the sentence that tells you what this screen is and what a change here costs; the disclosure is optional background a reader may never open. As drawn the deck is the dimmest text in its own block and the optional line is brighter and medium weight, so the eye lands on the footnote and slides off the definition. Round 2 stepped the summary up so it would read as interactive, which was right, but it did that by borrowing value from the ramp and now it outranks the thing above it.",
+    "evidence": "In team--phone-fold, the three-line deck (\"Who may sign in to Tally…\") sits at a visibly lower value than the single line \"How Tally decides who may sign in\" directly below it; both are the same size, the lower one is heavier and lighter in ink. The header block reads top-to-bottom bright / dim / mid.",
+    "direction": "Either bring the deck up one step on the ramp so it clearly sits between the title and the disclosure, or let the summary say \"this opens\" through its marker and weight alone and drop back to the deck's value. Whichever way, the block should descend in emphasis, not dip and rise."
+  },
+  {
+    "scene": "team",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the collapsed \"Invited 4\" card and the header disclosure above it",
+    "finding": "There are two disclosures on this screen and they are drawn in two different vocabularies. The header one announces itself with a rotating ▸ marker. The Invited card, which hides a form and four outstanding invitations, has no marker at all — only a trailing \"＋ Invite someone\" action. So the card does not read as a closed container; it reads as a title bar with a button beside it, and the \"4\" beside \"Invited\" reads as inert metadata rather than as four things that are behind this row. The one visible affordance also names only half of what the tap reveals.",
+    "evidence": "team--phone-fold: the header summary carries ▸, the Invited summary carries nothing; the two card headers are also different heights (the Invited bar is noticeably taller than the \"Signed-in team\" header despite carrying the same title-plus-count) so they do not read as the same kind of object either.",
+    "direction": "Give the Invited summary the same disclosure marker the header disclosure uses, so one mark means \"this opens\" everywhere on the page, and let \"＋ Invite someone\" be the secondary, optional accent rather than the only sign the card has a body. Settle the two card headers on one height while you are there."
+  },
+  {
+    "scene": "team",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the unchecked Active checkbox on Marcus Webb's row (and the border on all eleven checkboxes)",
+    "finding": "The one control on the page that marks revoked access is the only object drawn in a colour Tally does not own. It is a neutral grey slab with a light grey border on a blue-black card — off the ink ramp entirely, and warm against everything around it. Worse for its job, it reads as filled rather than empty: it is a lighter, higher-contrast patch than the card it sits in, so the \"off\" state has more presence than the surface behind it instead of reading as a hole. This is not round 2's declined finding about stepping the checked tick down; it is that the box's declared styling is not landing at all, which also means nothing predicts what it becomes when the ramp flips for daylight.",
+    "evidence": "Sampled from team--phone-full: the unchecked box fills at rgb(59,59,59) with a rgb(133,133,133) border, against a card at rgb(15,23,42); the same rgb(59,59,59) border rings every checked box too. The markup already asks for `bg-ink-900 border-ink-600` and neither is visible — the user agent is painting it.",
+    "direction": "The empty state should be drawn from the ramp — a recess in the card with a ramp-coloured edge — so that it reads as absence and the distance from the brand tick grows rather than shrinks. The tick itself can stay exactly as it is."
+  },
+  {
+    "scene": "team, team-core",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the role lane: Dana's plain \"Admin\" against the ten role selects (team), and the plain \"Counselor\" against the \"Admin\" / \"Core team\" capsules (team-core)",
+    "finding": "The role is sometimes a bare word and sometimes a padded box, and the lane is set on the box's edge rather than on the word's, so the column of roles has no single edge to read down. On the admin page Dana's \"Admin\" starts on the row's text edge while every select's value starts about 12px to its right. On the read-only page the capsules' outer edges are flush right with the plain \"Counselor\", which puts the capsule words about 10px short of it. The same disagreement shows up vertically: a row whose role or recency is a capsule is a few pixels taller than its neighbours, so the divider rhythm wobbles with who happens to be an admin.",
+    "evidence": "team--phone-fold, Dana's row versus Ana's: \"Admin\" and the select's box share a left edge, but \"Admin\" and \"Counselor\" do not. team-core--phone-fold: badge and text right edges both land at 358, so the words end 10px apart. Measured row heights on team-core run 81, 77, 81, 82, 79, 77 CSS px — the taller ones are exactly the rows carrying a capsule; on team, Hannah's badge row is 132 against 129 everywhere else.",
+    "direction": "Decide which edge the lane is set on and hold it — most likely the words, letting the capsules overhang by their own padding so the role reads as one column whatever shape it wears. And keep the token inside the line box of the text it replaces, so a badge never buys its row extra height."
+  }
+]

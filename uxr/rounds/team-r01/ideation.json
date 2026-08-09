@@ -1,0 +1,162 @@
+{
+  "changes": [
+    {
+      "scene": "team, team-core",
+      "viewport": "desktop",
+      "addresses": [
+        "This is the phone card, stretched — name, email, last-seen and role stacked in the leftmost 260px of a 1152px card (design-desktop, major)",
+        "Only 6 of 11 core rows and 12 of 15 admin identities fit above the fold; Hannah 'Never signed in' is 471px below it (visual-desktop, major x2)",
+        "Lay the identity out horizontally so a row is ~48px and all eleven fit under the fold"
+      ],
+      "change": "Rebuilt the roster row as a four-column grid — identity (name over email) | last seen | role | access state — with aligned column starts. Row height fell from 77/105px to 53px; the admin page is now 927px tall (all 11 profiles plus all 4 invitations on one 900px screen) and team-core is 800px tall with all eleven visible without scrolling. The row is switched by a container query on the `<ul>` (`@container`, `@2xl` = 672px of row width), not by a viewport breakpoint. Control heights are `min-h-11 pointer-fine:min-h-9`, so the columns are 36px tall on a mouse and stay 44px on a touch laptop.",
+      "rationale": "A viewport breakpoint cannot express this honestly: the admin roster shares its width with the 24rem invite column, so at `lg` (1024px) the row has 296px and at 1440px it has 712px — the same `lg:` class would have to be right for both. `@container` asks the only question that matters, 'does this row have room', and it answers it correctly for the core member (1120px, always wide) and the admin (712px at 1440, stacked at 1280) without a second rule. I kept name and email stacked rather than inline: at 712px of row, putting the longest address (jonathan.oyelaran-whitmore@example.org, 232px) on the name's line forces truncation, and a truncated address on the screen that matches people *by* address is the wrong economy. Last-seen leaving the identity block is what buys the density and gives the eye the single strip both critics asked for.",
+      "breakpoint": "container `@2xl` (row >= 42rem), i.e. desktop only in practice; the phone and tablet stack is untouched",
+      "implementation": "`src/features/team/TeamPage.tsx`. Add `@container` to the roster `<ul>`. On the `<li>`: append `@2xl:grid @2xl:grid-cols-[minmax(0,1fr)_10.5rem_7.5rem_6.5rem] @2xl:items-center @2xl:gap-4 @2xl:py-2` to the existing classes, and apply them to every row, not just `editable` ones. Split the identity `<div className=\"min-w-0\">` into `<div className=\"min-w-0 @2xl:contents\">` wrapping (a) an inner `min-w-0` div with the name and email and (b) the last-seen `<p>` — `contents` promotes them to grid items at width and leaves the phone stack byte-identical. Wrap the editable controls in `<div className=\"flex shrink-0 flex-wrap items-center gap-4 @2xl:contents\">` and give the read-only badge cluster `@2xl:col-span-2`. Add `pointer-fine:min-h-9` to the role `<select>`."
+    },
+    {
+      "scene": "team",
+      "viewport": "phone, desktop",
+      "addresses": [
+        "Marcus Webb's suspended row is visually identical to an active one except for a 20px unchecked box; the read-only view shows a red 'Suspended' badge and the editable view does not (all four critiques, major)",
+        "The accent is applied to the rule and withheld from the exception"
+      ],
+      "change": "The `Suspended` danger badge now rides beside the person's name in both views, admin and core, instead of living only in the read-only badge cluster. Marcus Webb reads 'Marcus Webb [Suspended]' on all four frames; wednesday.volunteer carries the same badge on its meta line.",
+      "rationale": "The critics asked for one state vocabulary across both permission levels, and moving the badge onto the name line (rather than adding a second one in the control cluster) means state adheres to the person while role stays in the role column — the same reading in the admin grid and the core grid. I did not tint the whole row or dim the identity: an admin about to revoke access needs to read that name at full contrast, and a dimmed row on a list of adults with access to minors invites the wrong kind of skim.",
+      "breakpoint": "both",
+      "implementation": "`TeamPage.tsx`: make the name `<p>` a flex line — `flex min-w-0 items-center gap-1.5 text-sm font-semibold text-ink-50` with `<span className=\"min-w-0 truncate\">{displayName}</span>` — and render `{!member.active && <Badge tone=\"danger\">Suspended</Badge>}` inside it for every row, removing the badge from the read-only cluster. For invitations put the badge on the second line (`{role} · invited …`) instead: beside a 31-character address in a 24rem column it both truncated the address and pushed the card's min-content past the phone viewport."
+    },
+    {
+      "scene": "team",
+      "viewport": "phone",
+      "addresses": [
+        "The 'Active' checkbox is a 20x20 target 12px from a 44px select; a mis-tap opens another person's role picker (visual-phone, major)",
+        "'Active' is set brighter than the data beside it and is identical on all fifteen rows (design-desktop, minor)"
+      ],
+      "change": "The checkbox and its word are now one `<label>` pill: `flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-2 pointer-fine:min-h-9`, hit area 87x44 on the phone (measured) and 104x36 on the pointer. The gap to the role select went from 12px to 16px, and the label dropped from `text-ink-200` to `text-ink-400` so it no longer outranks the email and last-seen beside it.",
+      "rationale": "The height was coming from the checkbox-plus-word pattern, not from the checkbox; wrapping the pair in a label that spans the same 44px band the select occupies fixes the target without adding a new control type or a new box on a phone row that already has too many. 48px would have been more comfortable still, but it would push the select and the pill out of alignment on the row and cost ~50px per row of an already long phone page; 44 with 16px of separation is the honest trade.",
+      "breakpoint": "both, expressed as `min-h-11 pointer-fine:min-h-9` — 44px under a thumb, 36px under a mouse",
+      "implementation": "`TeamPage.tsx`: replace the two `CheckboxField` usages with a local `AccessToggle` (label-wraps-input, no shared-component change), and give the row's control cluster `gap-4` instead of `gap-3`. Do not change `CheckboxField` itself — it is right for forms, wrong for a row lane."
+    },
+    {
+      "scene": "team",
+      "viewport": "phone, desktop",
+      "addresses": [
+        "Withdraw sits 12px from the Active toggle, both under 44px, and destroys an address that then has to be retyped exactly (visual-phone, major)",
+        "The Active/Withdraw strip is left-aligned with ~180px of dead space, and the destructive action is the heavier of the two (design-desktop, minor)"
+      ],
+      "change": "The invitation strip is now `flex items-center justify-between`: state on the left edge, Withdraw on the right. That is 140px of daylight on the phone and 166px on desktop, and it uses the width the row was given. Withdraw grew to `min-h-11 px-4 pointer-fine:min-h-9` (44px on touch, 36 on pointer) and lost weight — `font-medium text-ink-400` instead of `font-semibold text-ink-300`.",
+      "rationale": "One change answers both critics: separating the reversible control from the destructive one is the same edit as resolving the strip's dead space. I did not hide Withdraw behind an overflow menu — a per-row menu is a new control pattern for this screen only, and 140px of separation plus a lighter weight already removes the slip.",
+      "breakpoint": "both",
+      "implementation": "`TeamPage.tsx`, invitation `<li>`: control div becomes `flex items-center justify-between gap-4`; the Withdraw `<Button variant=\"ghost\">` moves from `size=\"sm\"` to `size=\"md\"` and takes `className=\"font-medium text-ink-400\"`."
+    },
+    {
+      "scene": "team, team-core",
+      "viewport": "phone, desktop",
+      "addresses": [
+        "Two stacked blocks of prose own half the first viewport; the explainer is a card-shaped peer of the content and brighter than the page deck (design-phone, major)",
+        "The largest light mass above the fold is boilerplate at ~120 characters a line, floating equidistant from header and content (design-desktop, major)",
+        "40% of the read-only screen is instructions for a task its reader cannot perform (visual-phone / visual-desktop)"
+      ],
+      "change": "The boxed paragraph became a one-line disclosure attached to the header block: `<details class=\"group mt-2 max-w-2xl\">` with a `text-ink-500` summary, 'How Tally decides who may sign in', and the full text inside. No ring, no fill — it is no longer a container competing with the two cards. The roster now starts at ~222px instead of ~370px on the phone and at ~140px instead of 258px on desktop.",
+      "rationale": "One behaviour on both viewports rather than a breakpointed one: the text is reference, not instruction, and a reader who wants it on a laptop is one click from it. Collapsing it rather than deleting it keeps the recovery sentence ('that is the way back in if access is ever lost'), which is the only place in the product that says it. Losing the box also removes the fourth vertical edge the desktop critic counted — the disclosure has no visible edge at all.",
+      "breakpoint": "both",
+      "implementation": "`TeamPage.tsx`: replace the `<p className=\"rounded-xl bg-ink-900 …\">` with a `<details>` inside `<header>`. Summary: `flex cursor-pointer list-none items-center gap-1.5 py-3 text-sm text-ink-500 hover:text-ink-300 pointer-fine:py-1`, leading `▸` span with `group-open:rotate-90` (single character, per the app's no-icon-library rule). Needs `details > summary::-webkit-details-marker { display: none }` in `index.css`."
+    },
+    {
+      "scene": "team, team-core",
+      "viewport": "phone, desktop",
+      "addresses": [
+        "'Never signed in' — the one fact the read-only screen exists to surface — is the dimmest text on the page at 2.4:1, identical to 'Last seen 3 hours ago' (all four critiques, major/minor)",
+        "The address is reference, the recency is the finding"
+      ],
+      "change": "Recency moved from `text-ink-600` (2.4:1) to `text-ink-400` (~7:1), one step above the email at `text-ink-500`, so the row now ranks name > recency > address. 'Never signed in' is no longer a sentence at all: it is a `warn` Badge in the recency column, which on desktop makes it the one coloured thing in an otherwise grey strip of eleven.",
+      "rationale": "Two different kinds of fact should not share a treatment; only one of them is a to-do. The warn badge reuses the tone and the component the row already had a slot for, so nothing new is introduced.",
+      "breakpoint": "both",
+      "implementation": "`TeamPage.tsx`: last-seen `<p>` becomes `truncate text-xs text-ink-400`, and the null-`lastSeenAt` branch renders `<Badge tone=\"warn\">Never signed in</Badge>` instead of the string."
+    },
+    {
+      "scene": "team",
+      "viewport": "desktop",
+      "addresses": [
+        "Eleven ringed selects on a darker fill form a vertical rail that arrives before the names do (design-desktop, minor; design-phone major)",
+        "Let the roster control be quiet at rest — the current role as text with an affordance that firms up on hover"
+      ],
+      "change": "At `@2xl` the role select loses its fill and ring at rest (`@2xl:bg-transparent @2xl:ring-transparent`) and gets them back on hover (`@2xl:hover:bg-ink-950 @2xl:hover:ring-ink-700`); focus is unchanged. The native chevron stays, so the row still declares itself editable. On a phone the select keeps its full field.",
+      "rationale": "This is the pointer half of 'invert the weight inside the row', and it is only safe where hover exists — on a touch device a control with no resting affordance is a control nobody finds. With the names now on their own column and the boxes gone, the eleven people outrank the eleven controls at a squint. I did not do the phone half (see declines).",
+      "breakpoint": "container `@2xl` only",
+      "implementation": "`TeamPage.tsx`, role `<select>` className: append `@2xl:bg-transparent @2xl:ring-transparent @2xl:hover:bg-ink-950 @2xl:hover:ring-ink-700`."
+    },
+    {
+      "scene": "team",
+      "viewport": "phone",
+      "addresses": [
+        "The invite form is 2.4 viewports down the page — the one task likely to happen on a phone at all is the furthest thing from the thumb (visual-phone, major)"
+      ],
+      "change": "Below `lg`, the Invited card renders first: `order-first lg:order-none` on the section. DOM order is unchanged (roster then invitations), so reading order and the core-member case are untouched. Desktop keeps the roster on the left.",
+      "rationale": "An admin on a phone is away from their desk, and the reason they open this screen there is that somebody just volunteered. The roster is a reference list you scroll; the empty email field is the thing you came to type in. `order` rather than a DOM swap because the roster is still the semantic body of the page, and because a core member — who has no invite card — must land on the team.",
+      "breakpoint": "below `lg`",
+      "implementation": "`TeamPage.tsx`: add `order-first lg:order-none` to the invite `<Card>`'s className. The grid also goes `gap-3` → `gap-4 lg:gap-6`."
+    },
+    {
+      "scene": "team",
+      "viewport": "phone, desktop",
+      "addresses": [
+        "No rule or ground change between the Invite button and rosa.delgado, so the promised 'four' never visibly begins (both design critics, minor)",
+        "The column gutter (12px) is narrower than the card radius and than the vertical rhythm (16px) (design-desktop, minor)",
+        "Section-to-section (12) is tighter than intro-to-section (16) (design-phone, minor)"
+      ],
+      "change": "`border-b border-ink-800` on the invite form, so the list has a visible start under the header that counts it. Page grid `gap-3` → `gap-4 lg:gap-6`: the column gutter is now 24px, larger than the 16px radius and than the vertical rhythm, and the section-to-section break is no longer the tightest measure on the page.",
+      "rationale": "Both are one-class fixes that are obviously right. I kept the form above the list rather than moving it below: on the phone the whole card was just promoted precisely so the field is reachable, and putting it after four invitations would give that back.",
+      "breakpoint": "both (gutter is `lg` and up by definition — there is one column below it)",
+      "implementation": "`TeamPage.tsx`: `className=\"flex flex-col gap-3 border-b border-ink-800 px-4 py-3\"` on the invite `<form>`; grid wrapper `cn('grid gap-4', isAdmin && 'lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start lg:gap-6')`."
+    },
+    {
+      "scene": "team, team-core",
+      "viewport": "desktop",
+      "addresses": [
+        "The list is in no order the reader can use — not by name, role or last-seen, and there is no search (visual-desktop, minor)"
+      ],
+      "change": "Rows sorted A–Z by display name with the viewer pinned first: Dana Ruiz, then Ana Beltrán … Tobias Lund.",
+      "rationale": "Cheap, and it makes the list promise the reader where a name will be — the same promise the student roster makes. Sorting by name rather than by role or recency means changing somebody's role never moves their row under a pointer that is already travelling toward it.",
+      "breakpoint": "both",
+      "implementation": "`TeamPage.tsx`: sort `users` before mapping — self first, then `localeCompare` on `displayName || email`."
+    },
+    {
+      "scene": "team",
+      "viewport": "phone, desktop",
+      "addresses": [
+        "Dana's row teaches a vocabulary no other row uses, is 30px taller, and its explanation sits at the page's dimmest ink where it parses as a fourth metadata line (both design critics, minor)"
+      ],
+      "change": "The self row now uses the same grid skeleton as the other ten — badge and note land in the role column, on one line, at 53px like every other row. The note stepped up from `text-ink-600` to `text-ink-500` and was shortened to 'Another admin has to change this.' so it fits the column it now lives in.",
+      "rationale": "Falls out of the grid work; the copy trim is what keeps the exception from being the only row that wraps. Nothing is lost — the row is labelled '(you)'.",
+      "breakpoint": "both",
+      "implementation": "`TeamPage.tsx`: read-only cluster gets `@2xl:col-span-2`; note span `text-xs text-ink-500`; string shortened."
+    }
+  ],
+  "declined": [
+    {
+      "finding": "The banner promises 'some admins are pinned by the deployment itself and cannot be changed here' and no row ever says which; an admin can uncheck Active on a pinned address, get a success toast, and believe access is revoked (visual-desktop, major).",
+      "why": "Real, and not landable in the prototype without faking data the client does not hold. `TALLY_ADMIN_EMAILS` lives in the Functions config and is re-asserted on sign-in; nothing in `users/{id}` or in `useAuth` tells the browser that Eli Sandoval is pinned, so a disabled row here would be a picture of a state the app cannot currently compute. The implementation is a data change first: have the auth trigger that re-asserts the claim also write `pinned: true` onto the user document (or publish the list at a readable `config/access` doc), expose it on `UserProfile`, then in `TeamPage.tsx` treat `member.pinned` exactly like `isSelf` — no select, no toggle, the badge plus the one-line reason the self row already carries ('The deployment pins this admin.'), and an early return in `patchMember`. Until the flag exists, any UI here is a guess, and a wrong guess on this control is worse than the current silence."
+    },
+    {
+      "finding": "The unchecked checkbox renders as a solid warm-grey filled square, so 'off' borrows the appearance of 'unavailable'; it should read as an empty outlined box (design-phone, major sub-point).",
+      "why": "Chrome draws native checkboxes itself — `bg-*` and `border-*` do not reach the unchecked widget, so this cannot be fixed with classes. The honest fix is `appearance-none` plus a hand-drawn box and tick in `CheckboxField`, which is a shared control used by every form in the app and a new drawing for one screen's benefit. I addressed the reading instead: the suspended person now carries the danger `Suspended` badge on their name in both views, so the grey box is never the only signal. Worth doing properly as a design-system change, not in a screen round."
+    },
+    {
+      "finding": "On the phone the role select is still the heaviest object in the row; the name should be a clear step above the surrounding UI text (design-phone, major).",
+      "why": "Half-declined. The pointer half is done (quiet-at-rest select at `@2xl`). On touch I will not remove the select's fill — a control with no resting affordance is one nobody finds with a thumb — and the alternative, raising names to `text-base`, adds ~16px to each of eleven rows on the viewport that can least afford it. The competing weight came down instead: the 'Active' label dropped two steps to `text-ink-400`, and the exceptions (Suspended, Never signed in) are now the coloured things in the list, so the phone list no longer reads as eleven identical grey boxes with eleven identical blue ticks. Re-judge on the new frame."
+    },
+    {
+      "finding": "The invite form's input and select are filled with the same ink-900 as the card, so the screen's most important input is the least field-like object on it (design-phone, minor).",
+      "why": "Correct, and the fix is one token in `CONTROL` in `src/components/ui/Field.tsx` (`bg-ink-900` → `bg-ink-950`) — which changes every text field in Tally: check-in search, the student directory, review, settings. That is a design-system decision that should be taken with those screens in frame, not smuggled in through the Team round, and faking it with a per-instance `className` on this one form would create exactly the local exception the finding complains about."
+    },
+    {
+      "finding": "Nothing in the bottom nav is marked current, so /team reads as being nowhere, and the only route back is a 32px account chip in the top-right corner a thumb cannot reach (visual-phone, minor).",
+      "why": "Both halves live in `AppShell`/`PageFrame`, not in `TeamPage`. Team is deliberately not a nav destination — it is reached from the account menu — so marking a nav item active would be a lie, and adding a sixth item is an IA decision affecting all nine scenes. Growing the account chip to 44px is right and cheap, but it belongs in a shell round where every screen's critic can see it; changing it here would silently alter eight other frozen prototypes."
+    },
+    {
+      "finding": "Long-stale recency ('Last seen 2 months ago', '11 days ago') should step up the ramp toward warn/danger the way 'Suspended' does (both critics, minor).",
+      "why": "Tally has no defined staleness threshold for staff — nothing in the product says when a volunteer who has not signed in is a problem, and unlike a student's attendance drift there is no gathering cadence to measure against. Colouring 11 days amber would be the UI inventing a judgement the data does not support, which is the same class of error as the RSVP counts the brief forbids. 'Never' is different: it is a fact, not a threshold, and it now carries the badge."
+    }
+  ]
+}

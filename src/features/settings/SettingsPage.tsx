@@ -1,6 +1,10 @@
 /**
- * The core team's control panel: prediction thresholds, the people-backend
- * connections, and who is on the team.
+ * The core team's control panel: prediction thresholds, appearance, the kiosk,
+ * and the people-backend connections.
+ *
+ * Who is on the team used to be the last card here and is now its own screen —
+ * see `TeamPage`. It is the one thing on this page somebody comes back to every
+ * season, and it was the one thing below every card they do not.
  *
  * The thresholds are the only genuinely dangerous controls here — they silently
  * reshape what every counselor sees at the door — so each one is followed by a
@@ -8,6 +12,7 @@
  * Nobody should have to reason about "minAttended of ofLastN" at 6:55pm.
  */
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Button,
   Card,
@@ -23,7 +28,6 @@ import { useToast } from '@/context/toastContext';
 import { BackendsSection } from '@/features/settings/BackendsSection';
 import { KioskCard } from '@/features/settings/KioskCard';
 import { PlanningCenterCard } from '@/features/settings/PlanningCenterCard';
-import { TeamList } from '@/features/settings/TeamList';
 import { ThemeCard } from '@/features/settings/ThemeCard';
 import { ThresholdPreview } from '@/features/settings/ThresholdPreview';
 import { formatRelative } from '@/lib/time';
@@ -117,10 +121,17 @@ export function SettingsPage() {
   return (
     <PageFrame>
       <header>
-        <h1 className="text-xl font-bold text-ink-50">Settings &amp; team</h1>
+        <h1 className="text-xl font-bold text-ink-50">Settings</h1>
         <p className="mt-0.5 text-sm text-ink-500">
-          Thresholds and team changes apply to every counselor's phone immediately. Appearance is
-          yours alone.
+          Thresholds and connections apply to every counselor's phone immediately. Appearance is
+          yours alone. Who may sign in lives on{' '}
+          <Link
+            to="/team"
+            className="font-semibold text-brand-300 underline-offset-2 hover:underline"
+          >
+            Team
+          </Link>
+          .
         </p>
       </header>
 
@@ -226,8 +237,6 @@ export function SettingsPage() {
       <PlanningCenterCard />
 
       <BackendsSection />
-
-      <TeamList />
     </PageFrame>
   );
 }

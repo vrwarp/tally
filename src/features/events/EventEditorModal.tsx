@@ -374,6 +374,23 @@ export function EventEditorModal({
       icon: form.icon || null,
       mode: form.mode,
       seriesId: form.mode === 'recurring' ? form.seriesId || null : null,
+      /*
+       * Carried forward, like `status` below, and for a sharper reason.
+       *
+       * `buildEventPayload` writes this on every save, so leaving it off the
+       * draft nulled it — and `chainKey` falls through to the event's own id
+       * when it is null. An edit therefore cut the instance out of its own
+       * chain: the calendar started projecting it as a second gathering
+       * alongside the first, its past nights stopped predicting its roster, and
+       * `eventAccess/{chainKey}` no longer named it, which quietly opened a
+       * restricted register to the whole team.
+       *
+       * A projected occurrence already carries the resolved root — see `asEvent`
+       * in `lib/eventProjection.ts` — so this is right on both halves of the
+       * calendar. Null on a chain's own root, which is what it should be: the
+       * root is keyed on its own id.
+       */
+      recurrenceRootId: form.mode === 'recurring' ? (event?.recurrenceRootId ?? null) : null,
       predictFromChain: form.mode === 'oneoff' ? form.predictFromChain || null : null,
       recurrence: form.mode === 'recurring' ? form.recurrence : null,
       startAt: times.startAt,

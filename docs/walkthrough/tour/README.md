@@ -84,7 +84,7 @@ Painted optimistically — the write is already in flight and the screen does no
 
 *The same family, at the end of the morning*
 
-The same row, hours later, offering the only thing left to do with a child who is already here. Three seconds of deliberate pressure rather than one tap, and that is not ceremony: marking a child collected is a claim that somebody took them out of the building, made on an unattended screen in a lobby — and unlike a stray check-in it does not correct itself when the child walks back in. Undoing one needs a volunteer and the main app.
+The same row, hours later, offering the only thing left to do with a child who is already here. Two seconds of deliberate pressure rather than one tap, and that is not ceremony: marking a child collected is a claim that somebody took them out of the building, made on an unattended screen in a lobby — and unlike a stray check-in it does not correct itself when the child walks back in. Undoing one needs a volunteer and the main app.
 
 ![A pickup is a hold, not a tap — wide](shots/wide-08-a-pickup-is-a-hold-not-a-tap.png)
 
@@ -328,15 +328,15 @@ Arriving apart and leaving together is the ordinary case, not the exception — 
 
 <img src="shots/tall-31-and-she-is-one-tap-away-because-families-do.png" width="320" alt="And she is one tap away, because families do — tall">
 
-### 32. Three seconds, once, for the whole family
+### 32. Two seconds, once, for the whole family
 
 *The same family, three hours later*
 
 A pickup holds where a check-in taps, and it still holds for three children at once. The asymmetry is deliberate: a stray check-in is self-correcting when the child walks in anyway, and a stray *collection* is a claim on an unattended lobby screen that somebody took a child out of the building. Undoing one needs a volunteer and the main app. The arrival also works the other way round — a child the four-digit guess would never call family, a cousin or a neighbour's boy who came in the same press, is offered here and ticked.
 
-![Three seconds, once, for the whole family — wide](shots/wide-32-three-seconds-once-for-the-whole-family.png)
+![Two seconds, once, for the whole family — wide](shots/wide-32-two-seconds-once-for-the-whole-family.png)
 
-<img src="shots/tall-32-three-seconds-once-for-the-whole-family.png" width="320" alt="Three seconds, once, for the whole family — tall">
+<img src="shots/tall-32-two-seconds-once-for-the-whole-family.png" width="320" alt="Two seconds, once, for the whole family — tall">
 
 ## Act 6 — Who the door will find
 

@@ -44,6 +44,17 @@
  * leaders acting on the same night converge on one document instead of
  * splitting the night's attendance between two. It is the same reason an
  * attendance document's id *is* the student id.
+ *
+ * **Writing one night down decides nothing about any other.** Materialising an
+ * occurrence removes it from the projection and leaves the rest of the calendar
+ * exactly where it was — there is a test that asserts precisely that, over every
+ * occurrence in the window. It is the property that makes the other two safe to
+ * rely on, because materialising is not a thing a leader chooses: a counselor
+ * opening the check-in screen does it, and so does a kiosk being set up in a
+ * lobby. Every way the calendar has silently rearranged itself has been a way
+ * this was not true — a chain re-keyed by an edit and projected twice, a
+ * template still ahead of today hiding the weeks before it, a tally that
+ * restarted on whichever night was newest.
  */
 import type { KioskTheme } from './kioskTheme.js';
 import type { LabelTemplate } from './labelTemplate.js';
@@ -142,32 +153,108 @@ export interface ProjectedOccurrence {
   checkInClosesAt: Date;
 }
 
+/** What one chain is expanded from. */
+interface ChainProjection {
+  /**
+   * The instance the occurrences take their shape and their rule from: the
+   * chain's latest live one.
+   *
+   * The latest rather than the first, because an edit is meant to carry: a
+   * leader who moves Friday night to 19:30 has moved the Fridays still ahead,
+   * and the ones the calendar shows after it should be the 19:30 ones.
+   * Instances already held keep what they were held at, which is exactly what
+   * makes them history.
+   *
+   * The latest can be a night that has not happened yet — a leader edits *next*
+   * Friday far more often than last one, and a kiosk binds to a Sunday days
+   * before it. That is why the expansion reaches backwards as well as forwards
+   * (see `patternDates`): a template ahead of today has to describe the nights
+   * between here and it, not erase them.
+   */
+  template: OccurrenceSource;
+  /**
+   * The chain's earliest known instance, which is where a `COUNT` starts
+   * counting.
+   *
+   * Not the template, and that is the whole reason this exists. "Weekly, four
+   * times" means four nights from the night it began, but the template is
+   * whichever night is newest — so tallying from there handed the chain four
+   * more every time one of its nights became a document, and a bounded repeat
+   * never ended.
+   */
+  origin: OccurrenceSource;
+}
+
 /**
- * The template each chain is projected from: its latest live instance.
+ * Which chains have something to project, and what each is projected from.
  *
- * The latest rather than the first, because an edit is meant to carry: a leader
- * who moves Friday night to 19:30 has moved the Fridays still ahead, and the
- * ones the calendar shows after it should be the 19:30 ones. Instances already
- * held keep what they were held at, which is exactly what makes them history.
+ * Cancelled instances are skipped when there is anything live to prefer —
+ * calling off one Friday should not make the rest of the term inherit the shape
+ * of the night that did not happen. They are used when there is nothing else,
+ * because the alternative is worse: a leader who schedules a weekly gathering
+ * and then calls off its first night would otherwise have deleted the whole
+ * repeat, silently and with no way back but to un-cancel. Cancelling one date
+ * is meant to call off one date, which is what the danger zone promises.
  *
- * Cancelled instances are skipped as templates but still count as existing, so
- * calling one Friday off does not make it reappear in the projection.
+ * Either way a cancelled instance still counts as existing — `taken` below is
+ * built from every event, live or not — so this cannot put a called-off Friday
+ * back on the calendar.
  */
-function templatesByChain(
+function chainsToProject(
   events: readonly OccurrenceSource[],
-): Map<string, OccurrenceSource> {
-  const templates = new Map<string, OccurrenceSource>();
+): Map<string, ChainProjection> {
+  const live = new Map<string, OccurrenceSource>();
+  const cancelled = new Map<string, OccurrenceSource>();
+  const origins = new Map<string, OccurrenceSource>();
 
   for (const event of events) {
     if (event.mode !== 'recurring' || !event.recurrence) continue;
-    if (event.status === 'cancelled') continue;
 
     const key = chainKey(event);
-    const current = templates.get(key);
-    if (!current || event.startAt > current.startAt) templates.set(key, event);
+    const pool = event.status === 'cancelled' ? cancelled : live;
+    const latest = pool.get(key);
+    if (!latest || event.startAt > latest.startAt) pool.set(key, event);
+
+    /*
+     * The root document *is* the chain — its id is the chain key — so it is the
+     * first occurrence by definition and nothing earlier can turn up. Failing
+     * that, the earliest instance loaded, which is only the true beginning if
+     * the chain started inside the window the caller read. A chain older than
+     * that counts from too late and a bounded repeat runs on a little; that is
+     * a bounded error, and the alternative is reading the whole collection back
+     * to the ministry's first night on every tick of the clock.
+     */
+    const origin = origins.get(key);
+    if (!origin || (origin.id !== key && (event.id === key || event.startAt < origin.startAt))) {
+      origins.set(key, event);
+    }
   }
 
-  return templates;
+  const chains = new Map<string, ChainProjection>();
+  for (const [key, origin] of origins) {
+    const template = live.get(key) ?? cancelled.get(key);
+    if (template) chains.set(key, { template, origin });
+  }
+
+  return chains;
+}
+
+/**
+ * The last occurrence a `COUNT`-bounded rule permits, or null when nothing
+ * bounds it.
+ *
+ * Resolved to a date so the projection can compare against it directly, the way
+ * it already does with `UNTIL` — which is the shape a bound has to have here.
+ * A tally is a fact about a chain, and the projection expands one instance of
+ * it; the only way to carry "four times" onto a walk that starts somewhere in
+ * the middle is to work out ahead of time which night the fourth is.
+ */
+function countBound(rule: RecurrenceRule, origin: Date): Date | null {
+  if (rule.count === null) return null;
+  const dates = recurrenceOccurrences({ ...rule, count: null, until: null }, origin, {
+    limit: rule.count,
+  });
+  return dates[dates.length - 1] ?? origin;
 }
 
 export interface HorizonOptions {
@@ -210,9 +297,13 @@ export function projectOccurrences(
     if (event.mode === 'recurring') taken.add(occurrenceId(chainKey(event), event.startAt));
   }
 
-  for (const [key, template] of templatesByChain(events)) {
+  for (const [key, { template, origin }] of chainsToProject(events)) {
     const rule: RecurrenceRule | null = template.recurrence;
     if (!rule) continue;
+
+    // Worked out from the chain's beginning rather than from the template, and
+    // taken off the rule before it is expanded so the two cannot both apply.
+    const last = countBound(rule, origin.startAt);
 
     // Offsets rather than absolute times, so an occurrence keeps the shape of
     // the gathering it was projected from: a lock-in that runs past midnight
@@ -223,7 +314,9 @@ export function projectOccurrences(
 
     // Expanded from the template's own start: it is an occurrence of the rule
     // by construction, so the phase of "every 2 weeks" and the position of "the
-    // third Tuesday" both carry over without re-deriving them.
+    // third Tuesday" both carry over without re-deriving them. The walk reaches
+    // back to `from` as well as forward, so a template still ahead of today
+    // describes the nights between here and it rather than hiding them.
     //
     // Expansion starts *before* `now` by the length of one gathering, because a
     // gathering that has already started is the one that matters most: a
@@ -231,7 +324,7 @@ export function projectOccurrences(
     // starting at `now` would skip straight past it to next week. Anything
     // genuinely finished is dropped below.
     const tail = Math.max(0, template.checkInClosesAt.getTime() - template.startAt.getTime());
-    const dates = recurrenceOccurrences(rule, template.startAt, {
+    const dates = recurrenceOccurrences({ ...rule, count: null }, template.startAt, {
       // At most one occurrence can land per day, so the horizon plus the
       // lookback bounds how many there can be.
       limit: horizonDays + 2,
@@ -240,6 +333,7 @@ export function projectOccurrences(
 
     for (const startAt of dates) {
       if (startAt > horizon) break;
+      if (last && startAt > last) break;
 
       const endAt = new Date(startAt.getTime() + duration);
       const checkInClosesAt = new Date(endAt.getTime() + closesOffset);

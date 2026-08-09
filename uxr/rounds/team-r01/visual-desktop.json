@@ -1,0 +1,56 @@
+[
+  {
+    "scene": "team-core",
+    "viewport": "desktop",
+    "severity": "major",
+    "where": "the single 'Signed-in team' card, filling the content column from x=256 to x=1408",
+    "finding": "The core member's stated job is 'who is on the team and who has never signed in.' The only person who has never signed in — Hannah Boateng — is the last of eleven rows, at y≈1371 on a page 1489px tall, i.e. 471px below a 900px fold. So the one question this scene exists to answer is guaranteed to require a scroll to the very bottom, on a screen where the rows carrying the answer are using 8% of their own width. Six of eleven people are visible without scrolling; the read-only view of a team of eleven should be one glance.",
+    "evidence": "Content column is 1152px wide. Each row is ~105px tall (Dana 258–366, Miriam 366–472, Sam 472–577, Jonathan 577–682, Grace 682–788, Tobias 788–893) because four facts — name, email, last-seen, role badge — are stacked in four separate lines inside `flex flex-col gap-2 px-4 py-3`. The longest content on any row (jonathan.oyelaran-whitmore@example.org) ends at x=530, leaving ~875px of empty row. Page chrome above the first name costs 283px of the fold: h1 block to y=80, then the 87px-tall access-explainer paragraph (y=88–175, and it explains an invitation mechanism a core member has no control over), then the card header to y=258. Eleven rows at a single-line ~44px height would be 484px; with the 70px card header and even the current 190px of page chrome that is 744px — the whole team above the fold with room left.",
+    "direction": "At `lg`, make the read-only row one line instead of four: name, email, role badge and last-seen as columns across the width already there, with aligned column starts so the eye can run down 'last seen' as a single strip. The banner can be shorter or absent for a reader who cannot invite anybody."
+  },
+  {
+    "scene": "team",
+    "viewport": "desktop",
+    "severity": "major",
+    "where": "the 'Signed-in team' card, left column, x=256–1010",
+    "finding": "The admin came to see the full access surface — who can open a roster of minors right now. That is 15 identities (11 profiles, 4 invitations) and only 12 of them are on screen; Priya, Eli and Hannah sit below the fold. The reason is that each person's three facts are stacked vertically inside a 754px-wide row, so a row costs 77px to display about 45 characters. An admin doing the seasonal sweep ('promote somebody to core', 'switch off the counselor who left in June') has to scroll to find out whether the person they want is even on the list, and cannot hold the whole team in view while deciding.",
+    "evidence": "Rows are 77px tall (Miriam 366–443, Sam 443–520, Jonathan 520–598, Grace 598–675, Tobias 675–752, Ana 752–829). Name/email/last-seen are three stacked lines in a `min-w-0` block whose widest instance ends at x=530; the role select begins at x=800 — 270px of empty row at the widest, ~350px on a typical row like Grace Kim. Full page is 1192px against a 900px fold: a 292px scroll buys three more rows. The card header plus page chrome puts the first name at y=283, 31% of the fold gone before any data.",
+    "direction": "At `lg`, lay the identity block out horizontally — name and email on one line, last-seen in its own aligned column — so a row is ~48px and all eleven fit under the fold beside the invite column. Keep the 44px control targets; it is the text that is stacked, not the controls."
+  },
+  {
+    "scene": "team",
+    "viewport": "desktop",
+    "severity": "major",
+    "where": "Marcus Webb's row, y≈866, and every editable row's 'Active' checkbox at x≈930",
+    "finding": "Marcus Webb is suspended, and the admin's view of him is visually identical to an active member except for a 20px unchecked box at the far right. The read-only core-team view of the same person shows a red 'Suspended' badge — so the person who cannot act on the state gets the clear signal and the person who acts on it gets the weak one. Two consequences for the admin's job: verifying 'did the June deactivation stick?' means reading eleven 20px checkboxes rather than seeing a suspended row, and an accidental click on a checkbox that revokes access to a roster of minors — a change the page subtitle promises applies 'to every phone immediately' — leaves the row looking exactly as it did before.",
+    "evidence": "In team--desktop-full the Marcus row markup is name/email/'Last seen 2 months ago' plus a role select and an unchecked `size-5` (20px) input; no badge, no tone change, no dimming. In team-core--desktop-full the same person at y≈1081 renders `bg-danger-500/15 text-danger-400` 'Suspended' beside 'Counselor'. Eleven checkboxes share one x-position, so the only scannable signal for 'who is switched off' is a 20×20px fill difference at the right edge of a 754px row.",
+    "direction": "Give the editable row the same state vocabulary the read-only one has — a suspended row should read as suspended (badge and/or muted identity block) whether or not you can change it. The checkbox stays the control; it should not also be the only display."
+  },
+  {
+    "scene": "team",
+    "viewport": "desktop",
+    "severity": "major",
+    "where": "the explainer paragraph at y=88–175 versus the eleven editable rows below it",
+    "finding": "The banner tells the admin that 'some admins are pinned by the deployment itself and cannot be changed here,' and then the list never says which ones. Every non-self row renders the same live role select and the same live Active checkbox. If a deployment-pinned address other than the viewer is in the list, the admin can uncheck Active, get a success toast, and believe they have revoked access to a roster of minors when the claim is re-asserted on the next sign-in. That is the wrong-data failure mode for this exact screen. It stops short of a blocker only because in this seed the single pinned address is Dana, the viewer, whose row is already non-editable — the config is documented as a comma-separated list, so a second one is the normal case, not an edge one.",
+    "evidence": "The frame shows ten identical editable control clusters and one non-editable self row bearing 'Another admin has to change your own access.' — the only pinning the UI ever expresses. Nothing marks Eli Sandoval's Admin row as different from any other. TeamPage.tsx `patchMember` writes and then shows `${name} updated` with no pinned check; docs/planning-center.md describes TALLY_ADMIN_EMAILS as 'admins on every sign-in, whatever the database says.'",
+    "direction": "A pinned row should look pinned before it is touched: disabled controls with the same one-line reason the self row already carries. The screen already has the sentence pattern for 'you cannot change this here' — it just is not attached to the rows it describes."
+  },
+  {
+    "scene": "team",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the order of the eleven rows in 'Signed-in team', both scenes",
+    "finding": "The list is in no order the reader can use — not alphabetical by either name (Ruiz, Achebe, Whitfield, Oyelaran-Whitmore, Kim, Lund…), not by role, not by last-seen (12 min, 3h, 2d, 5d, 9h, 6d, 11d, 2mo, 4d, 1d, never). There is no search either. To find the counselor who left in June the admin reads every row, and since three rows are below the fold they cannot even complete the read in one view. At eleven people this is a few seconds of friction rather than a failure; it stops being minor at twenty-five, and it is the only list in the app that does not promise the reader where a name will be.",
+    "evidence": "Row order in team--desktop-full, top to bottom: Dana Ruiz, Miriam Achebe, Sam Whitfield, Jonathan Oyelaran-Whitmore, Grace Kim, Tobias Lund, Ana Beltrán, Marcus Webb, Priya Raman, Eli Sandoval, Hannah Boateng. Roles interleave (admin, core, counselor, counselor, core, counselor…), last-seen values interleave, and last names are unsorted.",
+    "direction": "Sort A–Z with self pinned first, as the student roster already does; once rows are one line, a pointer-only sort on the last-seen column would also serve the 'who has gone quiet' read directly."
+  },
+  {
+    "scene": "team-core",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the third line of each row — 'Never signed in' on Hannah Boateng, y≈1371",
+    "finding": "The fact the core member came for is rendered in the least prominent style on the row: 12px `text-ink-600`, third line, identical in size, colour and position to 'Last seen 3 hours ago'. After scrolling to the bottom they still have to read eleven grey lines and mentally sort 'never' from '2 months' from '3 hours'. Nothing counts, groups or marks the never-signed-in, so a reader who skims can miss the one row that matters.",
+    "evidence": "Hannah's 'Never signed in' and Dana's 'Last seen 12 minutes ago' use the same class (`text-xs text-ink-600`) at the same offset within the row. The row does carry a badge slot — it shows 'Counselor' — and the design system already uses `warn` and `danger` tones there, as Marcus's 'Suspended' badge proves two rows up.",
+    "direction": "Encode never-signed-in and long-stale as a badge or tone in the slot that already exists, so the answer is a colour the eye finds rather than a sentence the eye reads."
+  }
+]

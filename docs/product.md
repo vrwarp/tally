@@ -58,7 +58,7 @@ count rather than the head count (`12 in room · 18 checked in`), the two filter
 room" and "Checked out", and the one-tap button at the end of a present row changes verb from undo
 to **Out** — undo moves one tap deeper into the action strip, which is the right way round when
 collecting children is the gesture repeated forty times a morning. A parent can also collect their
-own child at the lobby kiosk, with a three-second hold rather than a tap: a stray check-in corrects
+own child at the lobby kiosk, with a two-second hold rather than a tap: a stray check-in corrects
 itself when the child walks in anyway, while a stray pickup claims somebody left the building.
 
 Two rules make it honest. **A missed check-out is not a miss** — attendance is untouched by any of
@@ -141,7 +141,18 @@ children of one name: whether the church already finds that row under this famil
 and whether the grade matches. A merge names who the child was folded into and offers the undo
 Tally has always had. And a family whose *parent* the backend refuses — usually for a reason no
 retry can fix — can be finished without them rather than retried for ever or discarded with children
-already upstream. Five rounds of critique are recorded in [`uxr/rounds/`](../uxr/rounds/); the last
+already upstream.
+
+The same screen now settles the two questions about the *family* that the backend was answering on
+its own in a Cloud Function. **Two cards that typed the same number** — a household who registered
+twice, which is the ordinary shape of a second child or a second visit — say so on both cards and
+can be approved together: every child in one push, one household, one adult. And **who the guardian
+already is** is offered as a list of the adults the church has under that name, marking the one
+whose number matches. Neither holds the button, and not answering leaves exactly the guess that has
+always run — but the sentence above the button says which way it will fall, because a reviewer
+should not have to press it to find out whether the church is about to get a second Rosa Salgado.
+The one answer this reaches that no matching ever could is the mother who is on file under the
+number she had last year. Five rounds of critique are recorded in [`uxr/rounds/`](../uxr/rounds/); the last
 two judged the shipping screen rather than a prototype.
 
 **Journey 2½ — the second child.** A parent whose next child is finally old enough finds their family
@@ -270,7 +281,7 @@ them, and the screen names what it left out rather than quietly showing a shorte
 as good news.
 
 Restriction is a scope, not a substitute for membership. Removing somebody from Tally altogether is
-still deactivating them in Settings → Team.
+still deactivating them on the Team screen.
 
 ---
 
@@ -281,9 +292,15 @@ medical notes originate there, are read on demand, and are stored nowhere in Tal
 
 *Membership* is Tally's own — both of them. Who is a student is a document in `students/`,
 put there from **Students → Add from Planning Center**; who may sign in is an invitation an admin
-writes in **Settings → Team**, plus the addresses in `TALLY_ADMIN_EMAILS`. Both used to be Planning
+writes on the **Team** screen, plus the addresses in `TALLY_ADMIN_EMAILS`. Both used to be Planning
 Center Lists, which cannot express either: a List is generated from filter rules, so "these
 forty-three teenagers" is only sayable by inventing a custom field on every person in the church.
+
+Team is its own route rather than the last card on Settings, which is where it lived until it was
+the one thing on that page anybody came back to and the only one below a colour picker. Four rounds
+of critique on the split-out screen are recorded in [`uxr/rounds/`](../uxr/rounds/) — `team-r01`
+through `team-r04` — and the before/after is
+[`docs/uxr/team-changes.json`](uxr/team-changes.json), built with `npm run uxr:team-walkthrough`.
 
 Tally writes back only what the church asked for: by default it creates a Person for a quick-added
 visitor and changes nothing else.

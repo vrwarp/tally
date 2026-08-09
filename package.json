@@ -26,6 +26,7 @@
     "functions:build": "npm --prefix functions run build",
     "functions:invokers": "tsx scripts/callable-invokers.ts",
     "prune:occurrences": "npm --prefix functions run build && node functions/lib/prune.js",
+    "repair:chains": "npm --prefix functions run build && node functions/lib/repair.js",
     "functions:install": "npm --prefix functions install",
     "emulators": "firebase emulators:start --project demo-tally --export-on-exit=./.emulator-data",
     "emulators:resume": "firebase emulators:start --project demo-tally --import=./.emulator-data --export-on-exit=./.emulator-data",
@@ -55,9 +56,11 @@
     "uxr:capture": "playwright test -c uxr/playwright.config.ts",
     "uxr:shoot": "tsx uxr/shoot.ts",
     "uxr:kiosk": "tsx uxr/kiosk-live/shoot.ts",
+    "uxr:team": "tsx uxr/team-live/freeze.ts",
     "uxr:measure": "tsx uxr/measure.ts uxr/before uxr/after",
     "uxr:shots": "tsx scripts/optimize-uxr-shots.ts",
-    "uxr:walkthrough": "tsx scripts/build-uxr-walkthrough.ts && tsx scripts/check-uxr-walkthrough.ts"
+    "uxr:walkthrough": "tsx scripts/build-uxr-walkthrough.ts && tsx scripts/check-uxr-walkthrough.ts",
+    "uxr:team-walkthrough": "tsx scripts/build-uxr-walkthrough.ts team-changes.json team-walkthrough.html && tsx scripts/check-uxr-walkthrough.ts docs/uxr/team-walkthrough.html"
   },
   "dependencies": {
     "@vrwarp/brother-ql-webusb": "^0.1.0",

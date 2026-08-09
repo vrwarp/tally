@@ -1,0 +1,29 @@
+[
+  {
+    "scene": "team-core",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the roster table's column proportions — the gap between each person's email and their 'Last seen' value",
+    "finding": "The read-only page reuses the admin's grid but drops two control columns, and all the freed width lands in the one column that should not stretch: the identity column. Every row now has a ~175px canyon between the email and the recency value, then a ~74px gap to the role, then ~50px of unused card to the right of it. The three facts in a row do not read as a set — the person floats alone on the left and their data sits in the middle distance, and the eye has to traverse an empty span eleven times to make an association the row is supposed to hand over for free. The admin page, with the same template in a narrower card, has 32px there and reads as a table; this one reads as a table stretched to fill a width it does not need.",
+    "evidence": "Longest email (jonathan.oyelaran-whitmore@…) ends at x=529; 'Last seen' values start at x=704; role values at x=886 and the longest ends at x=958; the card's inner right edge is x=1008 and the card itself stops at x=1024 with 384px of empty page beyond it. The gap sequence across the row is 175 / 74 / 50 — no system. The same grid on the admin frame gives 32 / 82 / 30.",
+    "direction": "Let the slack fall at the end of the row rather than between a name and their data: cap the identity column near its content so the three facts cluster and the leftover space becomes a trailing gutter inside the card. This is a proportion change within the existing 768px card, not a second column."
+  },
+  {
+    "scene": "team-core",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the roster card's header band — the 'Outstanding invitations are not listed here.' caveat and the 'Last seen' column label",
+    "finding": "The caveat and the column label are the same size, the same weight and the same colour, and they sit on the same baseline 430px apart. They read as one line of header text — a sentence with a stray phrase after it — rather than as a statement about the card plus a label bound to the column beneath it. The label loses the downward binding that is its whole job, and the caveat, which is the one piece of new information on this page, is diluted by being made to look like a table label. On the admin frame the same label pairs with the 14px deck and the size difference keeps them apart; here nothing does.",
+    "evidence": "Both are 12px at rgb(100,116,139); the caveat's cap-line sits at y=225 and 'Last seen' at y=227 — effectively one row. The header band grew from 68px (admin) to 85px (core) precisely because the caveat was added to the line the label already occupied.",
+    "direction": "Give the column label a treatment the header prose does not share — a step in weight, tone or case — or move it off the caveat's baseline so it sits alone at the foot of the band, directly over the values it names."
+  },
+  {
+    "scene": "team, team-core",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the page deck under the 'Team' title",
+    "finding": "The deck sets as one very long line followed by a two-word widow. The first line runs past the measure at which a reader stops tracking, and the second is short enough that the block reads as a line that overflowed rather than a paragraph that was set. It is the first sentence on the page and the one that says what a change here costs, so its shape matters more than its length suggests.",
+    "evidence": "Line 1 spans x=256→880 (624px, roughly 85 characters, ending on 'every'); line 2 spans x=256→392 (136px, 'phone immediately.'). Same on both frames.",
+    "direction": "Tighten the deck's measure so it breaks into two lines of comparable length and the first lands inside a comfortable reading width — the sentence is short enough to balance."
+  }
+]

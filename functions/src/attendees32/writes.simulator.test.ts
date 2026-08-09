@@ -23,6 +23,8 @@ import { a32Config } from '../testing/a32Config.js';
 import {
   addParent,
   checkPerson,
+  createFamily,
+  findAdultCandidates,
   pushStudent,
   recreateStudent,
   setParentContact,
@@ -92,11 +94,9 @@ describe('pushStudent', () => {
    * `upstreamPushPending` for ever — a queue that never drains rather than a
    * visible failure.
    */
-  it('creates a grade-less child, and does not try to match one', async () => {
-    // A same-named attendee upstream. Attendees has no `child` flag — holding
-    // a grade at all is the closest fact it keeps, which is exactly the fact
-    // missing here — so matching on name alone could file a three-year-old as
-    // the volunteer who shares their name. The duplicate check is skipped.
+  it('creates a grade-less child rather than matching a same-named person who has a grade', async () => {
+    // The seeded Priya is in 9th, so she is not this child whatever the names
+    // say — a grade-less student only ever matches a grade-less record.
     const before = store.attendees.size;
     db.seed('students/nursery-1', {
       firstName: 'Priya',
@@ -115,6 +115,68 @@ describe('pushStudent', () => {
     const created = store.attendees.get(result.pcoPersonId!)!;
     expect((created.infos.fixed as Record<string, unknown>).grade).toBeUndefined();
     expect(db.get('students/nursery-1')!.upstreamPushPending).toBe(false);
+  });
+
+  /*
+   * The grade-less duplicate check, which used to be skipped entirely.
+   *
+   * The reasoning for skipping it was that Planning Center has a `child` flag
+   * to tell a nursery child from an equally grade-less adult volunteer and
+   * Attendees has nothing of the kind. It does — as a relation rather than a
+   * field — so the same guard Planning Center applies is available here, and a
+   * grade-less visitor arriving a second time now lands on their own record.
+   */
+  it('matches a grade-less child onto the grade-less child already on file', async () => {
+    const existing = store.seedStudent({
+      firstName: 'Ayo',
+      lastName: 'Balogun',
+      grade: null,
+      parents: [{ firstName: 'Folake' }],
+    });
+    const before = store.attendees.size;
+    db.seed('students/nursery-2', {
+      firstName: 'Ayo',
+      lastName: 'Balogun',
+      status: 'active',
+      upstreamPushPending: true,
+    });
+
+    const result = await pushStudent({ db, client, config, cache, studentId: 'nursery-2' });
+
+    expect(result.status).toBe('updated');
+    expect(result.pcoPersonId).toBe(existing.id);
+    expect(store.attendees.size).toBe(before);
+  });
+
+  it('never matches a grade-less child onto a same-named adult', async () => {
+    // The volunteer and the three-year-old who share a name: the case the
+    // skipped check was protecting, and the one the relation guard now covers
+    // without giving up on the duplicate.
+    store.seedStudent({
+      firstName: 'Ayo',
+      lastName: 'Balogun',
+      grade: null,
+      parents: [{ firstName: 'Ayo', lastName: 'Balogun' }],
+    });
+    const before = store.attendees.size;
+    db.seed('students/nursery-3', {
+      firstName: 'Ayo',
+      lastName: 'Balogun',
+      status: 'active',
+      upstreamPushPending: true,
+    });
+
+    const result = await pushStudent({ db, client, config, cache, studentId: 'nursery-3' });
+
+    // The child on file wins over the adult of the same name — and either way
+    // the adult is never the answer.
+    const landedOn = store.attendees.get(result.pcoPersonId!)!;
+    expect(
+      store.folkAttendees.some(
+        (edge) => edge.attendeeId === landedOn.id && edge.roleId === 27 && !edge.isRemoved,
+      ),
+    ).toBe(true);
+    expect(store.attendees.size).toBeLessThanOrEqual(before + 1);
   });
 
   it('links to the person the office already typed in rather than duplicating them', async () => {
@@ -428,5 +490,183 @@ describe('recreateStudent + checkPerson', () => {
       outcome: 'exists',
       personId: idOf('Priya'),
     });
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* createFamily — the same judgement as Planning Center, over folks            */
+/* -------------------------------------------------------------------------- */
+
+describe('createFamily', () => {
+  /** A child Tally pushed a moment ago: linked, in the folk the push minted. */
+  const pushed = async (studentId: string, firstName: string, lastName: string) => {
+    db.seed(`students/${studentId}`, {
+      firstName,
+      lastName,
+      grade: 8,
+      status: 'active',
+      upstreamPushPending: true,
+    });
+    const result = await pushStudent({ db, client, config, cache, studentId });
+    return result.pcoPersonId!;
+  };
+
+  const build = (patch: {
+    studentIds: string[];
+    parentPersonId?: string;
+    createNewParent?: boolean;
+    phone?: string;
+  }) =>
+    createFamily({
+      db,
+      client,
+      config,
+      cache,
+      firstName: 'Test',
+      lastName: 'Person',
+      ...patch,
+    });
+
+  /*
+   * The Attendees half of the bug a real Planning Center showed: one family
+   * registering twice on one night, approved a card at a time, ending with one
+   * adult at the head of two families.
+   */
+  it('puts a second registration in the family the first one built', async () => {
+    const first = await pushed('t-1', 'Testtwo', 'Person');
+    const one = await build({ studentIds: ['t-1'], phone: '(123) 123-1234' });
+    expect(one.status).toBe('created');
+
+    const second = await pushed('t-2', 'Testthree', 'Person');
+    const before = store.folks.size;
+
+    const two = await build({ studentIds: ['t-2'], phone: '123-123-1234' });
+
+    expect(two.status).toBe('joined');
+    expect(two.parentPersonId).toBe(one.parentPersonId);
+    expect(two.createdHousehold).toBe(false);
+    // No new folk, and the parent holds exactly one family membership.
+    expect(store.folks.size).toBe(before);
+    const parentFamilies = store
+      .familyFolksOf(one.parentPersonId!)
+      .filter((folk) => folk.category === 0);
+    expect(parentFamilies).toHaveLength(1);
+    expect(store.familyFolksOf(second).map((folk) => folk.id)).toContain(parentFamilies[0]!.id);
+    expect(store.familyFolksOf(first).map((folk) => folk.id)).toContain(parentFamilies[0]!.id);
+  });
+
+  it('never corroborates a child as the parent, even one of another family', async () => {
+    /*
+     * The screenshot's confusion, in the backend with no `child` flag: a child
+     * already on file who shares the guardian's whole name *and* has a phone
+     * number of their own. Planning Center filters these out with
+     * `where[child]=false`; here the family relation has to say it.
+     */
+    store.seedStudent({
+      firstName: 'Test',
+      lastName: 'Person',
+      grade: 10,
+      contacts: { phone1: '(123) 123-1234' },
+      parents: [{ firstName: 'Someone' }],
+    });
+    await pushed('t-9', 'Testfour', 'Person');
+
+    const result = await build({ studentIds: ['t-9'], phone: '(123) 123-1234' });
+
+    expect(result.status).toBe('created');
+    expect(result.createdPerson).toBe(true);
+  });
+
+  it('corroborates on a number in any slot, not only the first', async () => {
+    const parent = store.createAttendee({
+      firstName: 'Test',
+      lastName: 'Person',
+      infos: { contacts: { phone1: '(555) 999-0000', phone2: '(123) 123-1234' } },
+    });
+    await pushed('t-10', 'Testfive', 'Person');
+
+    const result = await build({ studentIds: ['t-10'], phone: '(123) 123-1234' });
+
+    expect(result.status).toBe('joined');
+    expect(result.parentPersonId).toBe(parent.id);
+  });
+
+  it('uses the adult a reviewer named, and reports one Attendees no longer has', async () => {
+    const chosen = store.createAttendee({ firstName: 'Test', lastName: 'Person' });
+    await pushed('t-11', 'Testsix', 'Person');
+
+    const named = await build({ studentIds: ['t-11'], parentPersonId: chosen.id });
+    expect(named.status).toBe('joined');
+    expect(named.parentPersonId).toBe(chosen.id);
+
+    await pushed('t-12', 'Testseven', 'Person');
+    const missing = await build({ studentIds: ['t-12'], parentPersonId: 'no-such-attendee' });
+    expect(missing.status).toBe('parent-not-found');
+  });
+
+  it('creates a fresh adult when a reviewer overrules the corroboration', async () => {
+    const twin = store.createAttendee({
+      firstName: 'Test',
+      lastName: 'Person',
+      infos: { contacts: { phone1: '(123) 123-1234' } },
+    });
+    await pushed('t-13', 'Testeight', 'Person');
+
+    const result = await build({
+      studentIds: ['t-13'],
+      createNewParent: true,
+      phone: '(123) 123-1234',
+    });
+
+    expect(result.status).toBe('created');
+    expect(result.parentPersonId).not.toBe(twin.id);
+  });
+});
+
+describe('findAdultCandidates', () => {
+  it('offers adults with the phone evidence attached, and no children', async () => {
+    const child = store.seedStudent({
+      firstName: 'Test',
+      lastName: 'Person',
+      grade: 9,
+      parents: [{ firstName: 'Other' }],
+    });
+    const matching = store.createAttendee({
+      firstName: 'Test',
+      lastName: 'Person',
+      infos: { contacts: { phone1: '(123) 123-1234' } },
+    });
+    const namesake = store.createAttendee({ firstName: 'Test', lastName: 'Person' });
+
+    const candidates = await findAdultCandidates({
+      db,
+      client,
+      config,
+      cache,
+      firstName: 'Test',
+      lastName: 'Person',
+      phone: '(123) 123-1234',
+    });
+
+    const ids = candidates.map((candidate) => candidate.personId);
+    expect(ids).toContain(matching.id);
+    expect(ids).toContain(namesake.id);
+    expect(ids).not.toContain(child.id);
+    expect(candidates.find((c) => c.personId === matching.id)?.corroborated).toBe(true);
+    expect(candidates.find((c) => c.personId === namesake.id)?.corroborated).toBe(false);
+  });
+
+  it('leaves out the family’s own children', async () => {
+    const parent = store.createAttendee({ firstName: 'Test', lastName: 'Person' });
+    const candidates = await findAdultCandidates({
+      db,
+      client,
+      config,
+      cache,
+      firstName: 'Test',
+      lastName: 'Person',
+      excludePersonIds: [parent.id],
+    });
+    expect(candidates).toEqual([]);
   });
 });

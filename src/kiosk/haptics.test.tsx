@@ -159,7 +159,7 @@ describe('the press-and-hold gate', () => {
 
     vi.advanceTimersByTime(HOLD_MS);
 
-    // Three seconds is long enough that a thumb needs telling when it may
+    // Two seconds is long enough that a thumb needs telling when it may
     // leave, and a buzz on contact would say the gesture had already happened.
     expect(vibrate).toHaveBeenCalledTimes(1);
     expect(onHeld).toHaveBeenCalledTimes(1);

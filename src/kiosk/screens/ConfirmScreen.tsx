@@ -6,7 +6,7 @@
  * present who then walks in anyway. Undo lives with the staff in the main app,
  * deliberately not here.
  *
- * A pickup holds for three seconds instead, and that is not ceremony. Marking
+ * A pickup holds for two seconds instead, and that is not ceremony. Marking
  * a child collected is a claim that somebody took them out of the building,
  * made on an unattended screen in a lobby — and unlike a stray check-in it is
  * not self-correcting when the child walks in anyway. Undoing one needs a

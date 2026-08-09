@@ -178,7 +178,7 @@ async function tap(text: RegExp | string): Promise<void> {
 /**
  * Press and hold, for the controls that need it.
  *
- * A collection is a three-second hold rather than a tap — marking a child
+ * A collection is a two-second hold rather than a tap — marking a child
  * collected is a claim that somebody took them out of the building — so this has
  * to run the clock, not just touch the glass.
  */

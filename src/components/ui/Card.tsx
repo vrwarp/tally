@@ -13,12 +13,29 @@ export function CardHeader({
   title,
   count,
   description,
+  descriptionClassName,
   action,
+  columns,
+  columnLabel,
 }: {
   title: string;
   count?: number;
   description?: string;
+  /** Overrides the description's own classes, for a card that ranks it differently. */
+  descriptionClassName?: string;
   action?: ReactNode;
+  /**
+   * The grid template of the rows below, when this card's list is a table.
+   *
+   * A table wants its columns labelled, and the alternative — a label row
+   * between the header and the first row — puts a second stripe under the
+   * title for one word. Sharing the rows' template lets the band that already
+   * exists carry the label, on the column's own edge. Container-query classes,
+   * so the card decides by its own width; see `TeamPage`.
+   */
+  columns?: string;
+  /** The label for the second column. Only rendered when `columns` is given. */
+  columnLabel?: string;
 }) {
   /*
    * The action leaves the title's line below `sm`, and that is not cosmetic.
@@ -36,8 +53,20 @@ export function CardHeader({
    * and the header stays the calm object it was.
    */
   return (
-    <header className="flex flex-col gap-2 border-b border-ink-800 px-4 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-      <div className="min-w-0">
+    <header
+      className={cn(
+        'flex border-b border-ink-800 px-4 py-3',
+        // A table header keeps its row. `columns` cards label a grid and carry
+        // no action — see `TeamPage` — so there is nothing there to stack, and
+        // stacking would fight the template.
+        columns
+          ? `items-start justify-between gap-3 @2xl:grid @2xl:items-end @2xl:gap-4 ${columns}`
+          : 'flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3',
+      )}
+    >
+      {/* A minimum of one target's height, so a card whose header carries a
+          second line and one whose header does not still agree on their band. */}
+      <div className="flex min-h-11 min-w-0 flex-col justify-center">
         <h2 className="flex flex-wrap items-center gap-2 text-base font-semibold text-ink-100">
           {title}
           {count !== undefined ? (
@@ -46,8 +75,13 @@ export function CardHeader({
             </span>
           ) : null}
         </h2>
-        {description ? <p className="mt-0.5 text-sm text-ink-500">{description}</p> : null}
+        {description ? (
+          <p className={cn('mt-0.5 text-sm text-ink-500', descriptionClassName)}>{description}</p>
+        ) : null}
       </div>
+      {columns && columnLabel ? (
+        <p className="hidden text-xs text-ink-500 @2xl:block">{columnLabel}</p>
+      ) : null}
       {/* Its own line below `sm`, so a wrapping action never squeezes the
           heading; `shrink-0` keeps it whole beside the title above `sm`. */}
       {action ? <div className="flex shrink-0 items-center gap-2">{action}</div> : null}

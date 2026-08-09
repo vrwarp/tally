@@ -26,7 +26,12 @@ import { createPcoClient, type PcoClient } from './client.js';
 import { FakeFirestore } from '../testing/fakeFirestore.js';
 import { fetchPersonDetails } from './roster.js';
 import { createTtlCache } from './cache.js';
-import { addParent, createFamily, type AddParentOptions } from './household.js';
+import {
+  addParent,
+  createFamily,
+  findAdultCandidates,
+  type AddParentOptions,
+} from './household.js';
 
 function config(writeBack: PcoWriteBackMode): PcoConfig {
   return {
@@ -375,6 +380,8 @@ describe('createFamily against the simulator', () => {
     anchorStudentIds?: string[];
     firstName?: string;
     lastName?: string;
+    parentPersonId?: string;
+    createNewParent?: boolean;
     phone?: string;
   }) =>
     createFamily({
@@ -464,5 +471,181 @@ describe('createFamily against the simulator', () => {
     const result = await build({ studentIds: ['t-new'], anchorStudentIds: ['t-ghost'] });
     expect(result.status).toBe('created');
     expect(h.store.householdsForPerson(newChild.id)).toHaveLength(1);
+  });
+
+  /*
+   * The bug a real church database showed, reproduced end to end.
+   *
+   * One family registered at the kiosk twice on the same night, same phone
+   * number, one child each time. Approved one card at a time, the *parent* was
+   * correctly deduplicated — name plus a matching number is the same human —
+   * and then a second household was built around them anyway, because the only
+   * households consulted belonged to children created seconds earlier. What
+   * Planning Center held afterwards was one adult as `primary_contact` of two
+   * households named `Person Household`, one sibling stranded in each, and no
+   * merge for households to undo it with.
+   */
+  it('puts a second registration in the household the first one built', async () => {
+    const first = h.store.createPerson({ first_name: 'Robin', last_name: 'Fields', child: true });
+    h.db.seed('students/t-1', annotation({ pcoPersonId: first.id }));
+    const one = await build({ studentIds: ['t-1'], phone: '(510) 555-0142' });
+    expect(one.status).toBe('created');
+
+    // The second visit: a new child, pushed a moment ago, in no household.
+    const second = h.store.createPerson({ first_name: 'Sam', last_name: 'Fields', child: true });
+    h.db.seed('students/t-2', annotation({ pcoPersonId: second.id }));
+    const before = h.store.householdCount;
+
+    const two = await build({ studentIds: ['t-2'], phone: '(510) 555-0142' });
+
+    // The same adult, and — the part that was broken — the same household.
+    expect(two.status).toBe('joined');
+    expect(two.parentPersonId).toBe(one.parentPersonId);
+    expect(two.createdHousehold).toBe(false);
+    expect(h.store.householdCount).toBe(before);
+    expect(h.store.householdsForPerson(one.parentPersonId!)).toHaveLength(1);
+    expect(h.store.householdsForPerson(second.id).map((household) => household.id)).toEqual(
+      h.store.householdsForPerson(first.id).map((household) => household.id),
+    );
+    // The parent, both children, and no second membership for the parent.
+    const household = h.store.householdsForPerson(one.parentPersonId!)[0]!;
+    expect(h.store.membershipsForHousehold(household.id)).toHaveLength(3);
+  });
+
+  /* ---- What a reviewer settles, rather than what the lobby guesses -------- */
+
+  it('uses the adult a reviewer named, without corroborating anything', async () => {
+    /*
+     * The case no phone matching reaches: the mother is on file under the
+     * number she had last year, so the family types one the church has never
+     * seen. Left to itself this creates a second Dana Whitfield; a reviewer
+     * looking at the candidates can say which one she is.
+     */
+    const dana = h.store.createPerson({
+      first_name: 'Dana',
+      last_name: 'Whitfield',
+      child: false,
+    });
+    h.store.addPhone(dana.id, '(510) 555-0142');
+    const child = h.store.createPerson({ first_name: 'Ada', last_name: 'Fields', child: true });
+    h.db.seed('students/t-new', annotation({ pcoPersonId: child.id }));
+    const before = h.store.people.length;
+    const phonesBefore = h.store.phonesFor(dana.id).length;
+
+    const result = await build({
+      studentIds: ['t-new'],
+      parentPersonId: dana.id,
+      phone: '(510) 555-9999',
+    });
+
+    expect(result.status).toBe('joined');
+    expect(result.parentPersonId).toBe(dana.id);
+    expect(result.createdPerson).toBe(false);
+    expect(h.store.people).toHaveLength(before);
+    expect(h.store.householdsForPerson(child.id)).toHaveLength(1);
+    // The chosen adult's own record is read with their contacts, so the new
+    // number is reported as skipped rather than added beside the one on file.
+    expect(result.skipped).toEqual(['phone']);
+    expect(h.store.phonesFor(dana.id)).toHaveLength(phonesBefore);
+  });
+
+  it('reports a chosen adult Planning Center no longer has, rather than inventing one', async () => {
+    const child = h.store.createPerson({ first_name: 'Ada', last_name: 'Fields', child: true });
+    h.db.seed('students/t-new', annotation({ pcoPersonId: child.id }));
+    const before = h.store.people.length;
+
+    const result = await build({ studentIds: ['t-new'], parentPersonId: '99999999' });
+
+    // Not a quiet fallback to creating somebody: the reviewer said *that*
+    // person, and a different adult of the same name is not a smaller version
+    // of doing what they asked.
+    expect(result.status).toBe('parent-not-found');
+    expect(h.store.people).toHaveLength(before);
+    expect(h.store.householdsForPerson(child.id)).toHaveLength(0);
+  });
+
+  it('refuses a chosen "adult" who is a child', async () => {
+    const child = h.store.createPerson({ first_name: 'Ada', last_name: 'Fields', child: true });
+    h.db.seed('students/t-new', annotation({ pcoPersonId: child.id }));
+
+    const result = await build({ studentIds: ['t-new'], parentPersonId: MARCUS });
+    expect(result.status).toBe('parent-not-found');
+  });
+
+  it('creates a fresh adult when a reviewer says none of the candidates is them', async () => {
+    // Corroboration would have joined this one — same name, same number — and
+    // `createNewParent` is a person overruling exactly that.
+    const twin = h.store.createPerson({ first_name: 'Dana', last_name: 'Whitfield', child: false });
+    h.store.addPhone(twin.id, '(510) 555-0142');
+    const child = h.store.createPerson({ first_name: 'Ada', last_name: 'Fields', child: true });
+    h.db.seed('students/t-new', annotation({ pcoPersonId: child.id }));
+
+    const result = await build({
+      studentIds: ['t-new'],
+      createNewParent: true,
+      phone: '(510) 555-0142',
+    });
+
+    expect(result.status).toBe('created');
+    expect(result.parentPersonId).not.toBe(twin.id);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* findAdultCandidates — the read a reviewer decides from                      */
+/* -------------------------------------------------------------------------- */
+
+describe('findAdultCandidates against the simulator', () => {
+  let h: Harness;
+
+  beforeEach(() => {
+    h = harness();
+  });
+
+  it('carries the phone evidence without acting on it', async () => {
+    const matching = h.store.createPerson({ first_name: 'Dana', last_name: 'Whitfield', child: false });
+    h.store.addPhone(matching.id, '(510) 555-0142');
+    const namesake = h.store.createPerson({ first_name: 'Dana', last_name: 'Whitfield', child: false });
+
+    const candidates = await findAdultCandidates({
+      client: h.client,
+      firstName: 'Dana',
+      lastName: 'Whitfield',
+      phone: '510-555-0142',
+    });
+
+    expect(candidates.map((candidate) => candidate.personId)).toEqual(
+      expect.arrayContaining([matching.id, namesake.id]),
+    );
+    expect(candidates.find((c) => c.personId === matching.id)?.corroborated).toBe(true);
+    expect(candidates.find((c) => c.personId === namesake.id)?.corroborated).toBe(false);
+    expect(candidates.find((c) => c.personId === namesake.id)?.reachable).toBe(false);
+  });
+
+  it('never offers a child as somebody’s parent', async () => {
+    // The screenshot's confusion: a child who shares the guardian's whole name.
+    // Planning Center answers this with the flag; the search asks for it both
+    // server-side and again locally.
+    h.store.createPerson({ first_name: 'Test', last_name: 'Person', child: true });
+    const parent = h.store.createPerson({ first_name: 'Test', last_name: 'Person', child: false });
+
+    const candidates = await findAdultCandidates({
+      client: h.client,
+      firstName: 'Test',
+      lastName: 'Person',
+    });
+
+    expect(candidates.map((candidate) => candidate.personId)).toEqual([parent.id]);
+  });
+
+  it('leaves out the family’s own children', async () => {
+    const parent = h.store.createPerson({ first_name: 'Test', last_name: 'Person', child: false });
+    const candidates = await findAdultCandidates({
+      client: h.client,
+      firstName: 'Test',
+      lastName: 'Person',
+      excludePersonIds: [parent.id],
+    });
+    expect(candidates).toEqual([]);
   });
 });

@@ -155,6 +155,54 @@ describe('projectOccurrences', () => {
     expect(next?.source.location).toBe('Youth room');
   });
 
+  /*
+   * The nights between here and a template that has not happened yet.
+   *
+   * A chain is expanded from its latest live instance, and the latest is very
+   * often ahead of today — a leader edits *next* Friday far more than last one,
+   * un-cancels one, or a kiosk in a lobby binds to a Sunday days early, and
+   * each of those writes the document. The expansion only ever walked forwards
+   * from it, so every Friday between now and the one that had been touched
+   * simply stopped being on the calendar: not cancelled, not hidden, absent.
+   */
+  it('does not erase the nights before a template that is still ahead', () => {
+    const original = friday();
+    // Somebody opened the Friday four weeks out and edited it.
+    const ahead = friday({
+      id: 'friday-fellowship-2026-08-21',
+      startAt: new Date(2026, 7, 21, 19, 0),
+      endAt: new Date(2026, 7, 21, 21, 0),
+      checkInOpensAt: new Date(2026, 7, 21, 18, 0),
+      checkInClosesAt: new Date(2026, 7, 21, 22, 0),
+    });
+
+    const projected = ids(projectOccurrences([original, ahead], FRIDAY));
+
+    expect(projected.slice(0, 3)).toEqual([
+      'friday-fellowship-2026-07-31',
+      'friday-fellowship-2026-08-07',
+      'friday-fellowship-2026-08-14',
+    ]);
+    // And the edited night itself is a document now, so it is not projected.
+    expect(projected).not.toContain('friday-fellowship-2026-08-21');
+  });
+
+  /*
+   * The invariant the two rules in this module's docblock add up to, and the
+   * cheapest way to catch a regression in either: writing a night down says
+   * *that this night was acted on*, and nothing else. It is not a decision
+   * about any other night, so the calendar either side of it must not move.
+   */
+  it('is unchanged by materialising any one of its own occurrences', () => {
+    const seed = friday();
+    const baseline = projectOccurrences([seed], FRIDAY);
+
+    for (const occurrence of baseline) {
+      const after = projectOccurrences(materialized([seed], [occurrence]), FRIDAY);
+      expect(ids(after)).toEqual(ids(baseline).filter((id) => id !== occurrence.id));
+    }
+  });
+
   it('follows a rule that was changed, with nothing left over', () => {
     // The whole reason the calendar is computed. Turning the weekly gathering
     // monthly used to leave eight materialised Fridays standing.
@@ -198,6 +246,77 @@ describe('projectOccurrences', () => {
 
     expect(ids(projected)).not.toContain('friday-fellowship-2026-07-31');
     expect(ids(projected)).toContain('friday-fellowship-2026-08-07');
+  });
+
+  /*
+   * Cancelling one date is cancelling one date.
+   *
+   * A cancelled instance is passed over as a template, so that calling off a
+   * Friday does not hand the rest of the term the shape of the night that did
+   * not happen. When it is the *only* instance there is nothing to pass over
+   * to, and the chain had no template at all — so a leader who scheduled a
+   * weekly gathering and then called off its first night deleted the entire
+   * repeat, with nothing on screen saying so.
+   */
+  it('keeps the repeat when the only instance is cancelled', () => {
+    const projected = projectOccurrences([friday({ status: 'cancelled' })], FRIDAY);
+
+    expect(ids(projected)).toContain('friday-fellowship-2026-07-31');
+    // Its own night stays off, which is what cancelling asked for.
+    expect(ids(projected)).not.toContain('friday-fellowship-2026-07-24');
+  });
+
+  it('still prefers a live instance over a cancelled one as the template', () => {
+    const cancelled = friday({
+      id: 'friday-fellowship-2026-07-31',
+      status: 'cancelled',
+      startAt: new Date(2026, 6, 31, 16, 0),
+      endAt: new Date(2026, 6, 31, 18, 0),
+      location: 'The night that did not happen',
+    });
+
+    const [next] = projectOccurrences([friday(), cancelled], FRIDAY);
+
+    expect(next?.startAt).toEqual(new Date(2026, 7, 7, 19, 0));
+    expect(next?.source.location).not.toBe('The night that did not happen');
+  });
+
+  /*
+   * A tally is a fact about the chain, not about whichever night is newest.
+   *
+   * `COUNT` was expanded from the template, and the template is the latest
+   * instance — so every night that became a document restarted the tally and
+   * handed the chain N more. "Weekly, four times" ran forever, four Fridays at
+   * a time.
+   */
+  describe('a repeat bounded by a tally', () => {
+    const bounded = { ...WEEKLY, count: 4 };
+
+    it('stops after the fourth Friday from the one it began on', () => {
+      expect(ids(projectOccurrences([friday({ recurrence: bounded })], FRIDAY))).toEqual([
+        'friday-fellowship-2026-07-31',
+        'friday-fellowship-2026-08-07',
+        'friday-fellowship-2026-08-14',
+      ]);
+    });
+
+    it('does not gain four more each time one of its nights is written down', () => {
+      const root = friday({ recurrence: bounded });
+      let all: readonly TallyEvent[] = [root];
+
+      // Every Friday of the repeat gets checked into, in order.
+      for (let round = 0; round < 4; round += 1) {
+        all = materialized(all, projectOccurrences(all, FRIDAY).slice(0, 1));
+      }
+
+      expect(projectOccurrences(all, FRIDAY)).toEqual([]);
+      expect(ids(all)).toEqual([
+        'friday-fellowship-2026-07-24',
+        'friday-fellowship-2026-07-31',
+        'friday-fellowship-2026-08-07',
+        'friday-fellowship-2026-08-14',
+      ]);
+    });
   });
 
   it('keeps two series in their own chains', () => {

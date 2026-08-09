@@ -339,7 +339,7 @@ test('capture the theme walkthrough', async ({ browser, page, signedInAs }) => {
       }
 
       for (const room of ROOMS) {
-        // Back to the chooser through the staff gate — a three-second hold on
+        // Back to the chooser through the staff gate — a two-second hold on
         // Clear, then leaving the gathering. The same path a volunteer uses.
         await hold(kiosk, '[data-key="clear"]');
         await kiosk.getByRole('button', { name: /^Leave / }).click();
