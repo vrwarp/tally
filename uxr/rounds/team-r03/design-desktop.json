@@ -1,0 +1,38 @@
+[
+  {
+    "scene": "team-core, team",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the recency column of the Signed-in team table (eleven rows on both permission levels), and the empty right half of the card's header band",
+    "finding": "Answering the question deferred from round 2: yes, the column has earned a heading — but a narrow one, not a full header row. Ten of the eleven cells open with the identical string 'Last seen ', which is wider than the datum that follows it on most rows, so the column reads at squint as a block of same-length grey sentences with the varying part buried in the middle. Blur the frame and the recency column has no shape at all; the eye cannot rank 12 minutes against 2 months without reading eleven prefixes. It also flattens the one exception: Hannah's amber 'Never signed in' has to out-shout ten sentences of comparable length instead of being the only phrase in a column of bare durations. Where I would stop: the role column and the Active column label themselves ('Counselor', 'Active') and need no heading — a band of column labels over the admin's two controls would just add a second header stripe under the card title, and the eleven 'Active' words must stay, because a bare checkbox beside a person's name does not say what it grants.",
+    "evidence": "team-core--desktop-fold: 'Last seen' repeats at x=705 on ten consecutive rows; the variable text begins ~62px into a 168px cell. The one row that differs (Hannah, y=470) carries a badge no wider than the sentences above and below it. The card header band is title plus subtitle on the left and roughly 500px of unused width on the right, directly above the columns that would use it.",
+    "direction": "Drop the constant from the cells at table widths and let the duration lead the cell. Give it its label in the header band that already exists — a small quiet 'Last seen' sitting on the subtitle's line, at the recency column's left edge — rather than inserting a new row between the header and the first person. Below the container width, where there is no column to lean on, the prefix stays in the cell. One label, one column; leave the other two alone."
+  },
+  {
+    "scene": "team",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "Dana Ruiz's row (the self row), first in the Signed-in team table",
+    "finding": "The row that describes the reader is the only one that does not sit on the table's grid, and it breaks it twice. Its role word is plain text where the ten below are select values, so it hangs about 13px left of the column of role words it belongs to — a ragged left edge at the very top of the column, where the eye establishes the lane. And 'Admin' plus its note wrap to two lines in a cell sized for one, which makes the row 6px taller than every other and leaves the recency, vertically centred, floating between the two role lines instead of sharing a baseline with either. The cost is small but it lands on the first row: the table announces itself with an exception that looks like a mistake rather than a distinction.",
+    "evidence": "team--desktop-fold: 'Admin' starts at x=744, the ten select values at x=756–757. Row divider spacing is 59px for this row against a uniform 53px for the other ten. 'Admin' occupies y=245–256, the note y=266–278, and 'Last seen 12 minutes ago' y=256–268 — between them, level with neither.",
+    "direction": "Make the self row's role cell an intentional shape rather than the residue of a wrap: align the static role word to the same optical left edge as the select values below it, and decide whether the note is a second line of that cell (in which case top-align the cell and let the recency align to the name line as it does everywhere else) or short enough to sit inline. Either way the row should keep the table's row height."
+  },
+  {
+    "scene": "team-core, team",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the badges in the recency and role columns — 'Never signed in', 'Admin', 'Core team' — against the plain text in the same columns",
+    "finding": "Where a column mixes a badge with plain text, the badge's own padding pushes its label about 6px right of the words above and below it, so both value columns have two left edges. In a table this is the alignment the reader relies on to scan a column, and it is broken precisely on the rows that matter most — the exception and the elevated roles are the ones that fail to line up with everything else.",
+    "evidence": "team-core--desktop-fold: 'Counselor' begins at x=889 while the 'Admin' and 'Core team' labels begin at x=894–895; in the recency column 'Last seen' begins at x=705 and 'Never signed in' at x=711. The badge boxes themselves start at 887 and 703, so nothing lines up: not the box, not the label.",
+    "direction": "Let the badge label, not the badge box, own the column's left edge — pull the capsule back by its own inline padding when it sits in a column of text. The pill keeps its shape; the column gets one edge."
+  },
+  {
+    "scene": "team, team-core",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the role column on the admin page compared with the same column on the read-only page",
+    "finding": "One column, two ranks. On the admin page the role value is the largest and second-brightest text in the row after the name, so a word that reads 'Counselor' on eight of eleven rows outranks the recency beside it — a repeated constant drawn louder than the fact the reader came for. On the read-only page the same word is the quietest thing in the row, below the recency. Seeing the two frames side by side, the pair does not read as one screen with and without controls; the internal hierarchy of the row inverts depending on who is looking.",
+    "evidence": "team--desktop-fold: the select values sit at 14px near-white, the recency at 12px in a distinctly dimmer grey; ten rows of 'Counselor' form the brightest vertical run on the right of the table. team-core--desktop-fold: 'Counselor' is 12px and dimmer than the recency it sits beside.",
+    "direction": "Pick one rank for the pair and hold it: within a row the order should be name, then the fact that varies, then the role. Closing the gap from the recency side is safer than dimming the select — a select already stripped of its ring at rest cannot also lose its value's contrast without reading as inert. Note that this resolves itself largely for free if the recency cell loses its 'Last seen' prefix and gains the presence a bare value can carry."
+  }
+]
