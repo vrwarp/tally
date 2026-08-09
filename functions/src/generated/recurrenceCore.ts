@@ -149,10 +149,21 @@ export function weekdayOrdinalInMonth(date: Date): number {
  * A fifth Wednesday only exists in some months, so a rule pinned to "the fifth"
  * would silently skip most of the year. "Last" is what someone picking a date
  * in the final week of a month means, and it lands every month.
+ *
+ * "Last" is asked as *is there another one of these after it*, rather than as
+ * "is it the fifth", and the difference is load-bearing rather than cosmetic.
+ * The projection re-derives this from whichever instance it is expanding from
+ * (see `lib/materialize.ts`), so the answer has to be the same for every date
+ * the rule lands on. Asked the old way it was not: the last Friday of July 2026
+ * is the fifth and reads as "last", the last Friday of August is the fourth and
+ * read as "the fourth Friday" — so a gathering held on the last Friday of the
+ * month quietly became a fourth-Friday one the first time it met in a month
+ * with four, and stayed that way.
  */
 export function monthlyWeekdayPosition(date: Date): number {
-  const ordinal = weekdayOrdinalInMonth(date);
-  return ordinal >= 5 ? -1 : ordinal;
+  const lastOfItsWeekday =
+    date.getDate() + 7 > daysInMonth(date.getFullYear(), date.getMonth());
+  return lastOfItsWeekday ? -1 : weekdayOrdinalInMonth(date);
 }
 
 /**
@@ -308,76 +319,140 @@ export function recurrenceEquals(
 /* -------------------------------------------------------------------------- */
 
 /**
- * Every date the pattern lands on, in order, starting with the anchor itself.
- * Ignores `UNTIL`/`COUNT` — those bound the caller's loop, not this one.
+ * How many whole periods to start the walk before the anchor, given how many
+ * periods away `from` is. Never positive: reaching *forward* is what the
+ * caller's `from` filter already does, and moving the start of the walk would
+ * change which occurrence a `COUNT` is counted from.
+ *
+ * One period of margin, because `periods` is measured between two points inside
+ * their periods rather than between period boundaries — a `from` in the middle
+ * of a week is still inside the week whose earlier days it wants.
  */
-function* patternDates(rule: RecurrenceRule, anchor: Date): Generator<Date> {
+function stepsBefore(periods: number, interval: number): number {
+  if (periods >= 0) return 0;
+  return Math.max(-MAX_CANDIDATE_STEPS, Math.floor(periods / interval) - 1);
+}
+
+/**
+ * Every date the pattern lands on, in order, including the anchor itself.
+ *
+ * Ignores `UNTIL`/`COUNT` — those bound the caller's loop, not this one.
+ *
+ * The walk starts at the anchor unless `from` is earlier, in which case it
+ * reaches back far enough to cover it. Reaching back is what lets the projection
+ * expand a chain from an instance that is still ahead — see `chainsToProject`
+ * in `lib/materialize.ts`. Everything the pattern means is derived from the
+ * anchor (the wall-clock time, the day of the month, the position of the
+ * weekday within it), so stepping back by whole periods rather than re-anchoring
+ * is what keeps a rule saying the same thing in both directions.
+ */
+function* patternDates(rule: RecurrenceRule, anchor: Date, from: Date): Generator<Date> {
   const hours = anchor.getHours();
   const minutes = anchor.getMinutes();
   const year = anchor.getFullYear();
   const month = anchor.getMonth();
   const day = anchor.getDate();
   const at = (y: number, mo: number, d: number) => new Date(y, mo, d, hours, minutes, 0, 0);
-
-  // The anchor is occurrence one by construction: it is a real gathering with a
-  // document of its own. The pattern only has to say what comes after it.
-  yield anchor;
   const anchorTime = anchor.getTime();
 
-  switch (rule.frequency) {
-    case 'weekly': {
-      // Weeks are measured from the Sunday of the anchor's own week, so
-      // "every 2 weeks" alternates around the event rather than around an
-      // arbitrary epoch.
-      const sunday = day - anchor.getDay();
-      for (let block = 0; block <= MAX_CANDIDATE_STEPS; block += 1) {
-        for (const weekday of rule.weekdays) {
-          const date = at(year, month, sunday + block * 7 * rule.interval + weekday);
-          // Days earlier in the anchor's own week are in the past for this
-          // event; the anchor itself was already yielded.
-          if (date.getTime() > anchorTime) yield date;
+  function* walk(): Generator<Date> {
+    switch (rule.frequency) {
+      case 'weekly': {
+        // Weeks are measured from the Sunday of the anchor's own week, so
+        // "every 2 weeks" alternates around the event rather than around an
+        // arbitrary epoch.
+        const sunday = day - anchor.getDay();
+        // Rounded rather than floored: a week is 167 or 169 hours across a
+        // clock change, and the question being asked is how many whole weeks
+        // apart these two dates are.
+        const weeks = Math.round(
+          (from.getTime() - at(year, month, sunday).getTime()) / (7 * 86_400_000),
+        );
+        for (
+          let block = stepsBefore(weeks, rule.interval);
+          block <= MAX_CANDIDATE_STEPS;
+          block += 1
+        ) {
+          for (const weekday of rule.weekdays) {
+            yield at(year, month, sunday + block * 7 * rule.interval + weekday);
+          }
         }
+        return;
       }
-      return;
-    }
 
-    case 'monthly': {
-      const position = monthlyWeekdayPosition(anchor);
-      const weekday = anchor.getDay();
+      case 'monthly': {
+        const position = monthlyWeekdayPosition(anchor);
+        const weekday = anchor.getDay();
+        const months = (from.getFullYear() - year) * 12 + (from.getMonth() - month);
 
-      for (let step = 1; step <= MAX_CANDIDATE_STEPS; step += 1) {
-        const absolute = month + step * rule.interval;
-        const y = year + Math.floor(absolute / 12);
-        const mo = ((absolute % 12) + 12) % 12;
+        for (
+          let step = stepsBefore(months, rule.interval);
+          step <= MAX_CANDIDATE_STEPS;
+          step += 1
+        ) {
+          const absolute = month + step * rule.interval;
+          const y = year + Math.floor(absolute / 12);
+          const mo = ((absolute % 12) + 12) % 12;
 
-        if (rule.monthlyMode === 'dayOfWeek') {
-          const found = nthWeekdayOfMonth(y, mo, weekday, position);
-          if (found !== null) yield at(y, mo, found);
-          continue;
+          if (rule.monthlyMode === 'dayOfWeek') {
+            const found = nthWeekdayOfMonth(y, mo, weekday, position);
+            if (found !== null) yield at(y, mo, found);
+            continue;
+          }
+
+          // RFC 5545 skips a month that is too short rather than clamping: a
+          // rule set on the 31st means the 31st, and February simply has none.
+          if (day <= daysInMonth(y, mo)) yield at(y, mo, day);
         }
-
-        // RFC 5545 skips a month that is too short rather than clamping: a rule
-        // set on the 31st means the 31st, and February simply has none.
-        if (day <= daysInMonth(y, mo)) yield at(y, mo, day);
+        return;
       }
-      return;
-    }
 
-    case 'yearly': {
-      for (let step = 1; step <= MAX_CANDIDATE_STEPS; step += 1) {
-        const y = year + step * rule.interval;
-        // 29 February in a common year, skipped for the same reason.
-        if (day <= daysInMonth(y, month)) yield at(y, month, day);
+      case 'yearly': {
+        const years = from.getFullYear() - year;
+        for (
+          let step = stepsBefore(years, rule.interval);
+          step <= MAX_CANDIDATE_STEPS;
+          step += 1
+        ) {
+          const y = year + step * rule.interval;
+          // 29 February in a common year, skipped for the same reason.
+          if (day <= daysInMonth(y, month)) yield at(y, month, day);
+        }
+        return;
       }
-      return;
     }
   }
+
+  /*
+   * The anchor is an occurrence whether or not the pattern would have produced
+   * it: it is a real gathering with a document of its own, and a weekly rule
+   * naming Monday and Wednesday can sit on an event somebody moved to a Friday.
+   * So it is spliced into the walk at its own place in the order, and the
+   * pattern's own copy of it — which is the usual case — is dropped rather than
+   * yielded twice.
+   */
+  let pending = true;
+  for (const date of walk()) {
+    if (pending && date.getTime() >= anchorTime) {
+      pending = false;
+      yield anchor;
+      if (date.getTime() === anchorTime) continue;
+    }
+    yield date;
+  }
+  if (pending) yield anchor;
 }
 
 export interface OccurrenceOptions {
   /** How many dates to return. */
   limit: number;
-  /** Only return occurrences at or after this instant. Defaults to the anchor. */
+  /**
+   * Only return occurrences at or after this instant. Defaults to the anchor.
+   *
+   * A `from` *earlier* than the anchor is a real request and not a no-op: it
+   * asks for the occurrences the same rule put before the instance being
+   * expanded from. See `patternDates`.
+   */
   from?: Date;
 }
 
@@ -387,6 +462,12 @@ export interface OccurrenceOptions {
  * `count` is tallied from the anchor regardless of `from`, so asking for "the
  * next three after today" out of a rule that runs five times total correctly
  * returns however few are left rather than three more.
+ *
+ * Occurrences the walk reached *before* the anchor are outside that tally, for
+ * the same reason: they are not among the N that started there. A caller that
+ * needs a `COUNT` measured from somewhere else has to say where — which is what
+ * `projectOccurrences` does, because a chain counts from the night it began and
+ * not from whichever of its nights happens to be the newest.
  */
 export function recurrenceOccurrences(
   candidate: RecurrenceRule,
@@ -399,10 +480,12 @@ export function recurrenceOccurrences(
   const found: Date[] = [];
 
   let emitted = 0;
-  for (const date of patternDates(rule, anchor)) {
+  for (const date of patternDates(rule, anchor, from)) {
     if (until && date > until) break;
-    emitted += 1;
-    if (rule.count !== null && emitted > rule.count) break;
+    if (date >= anchor) {
+      emitted += 1;
+      if (rule.count !== null && emitted > rule.count) break;
+    }
     if (date >= from) found.push(date);
     if (found.length >= options.limit) break;
   }

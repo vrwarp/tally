@@ -228,3 +228,50 @@ describe('EventEditorModal: a one-off borrowing a gathering', () => {
     expect(screen.getByRole('option', { name: /already chosen/i })).toBeInTheDocument();
   });
 });
+
+/*
+ * What an edit must not quietly change about *which gathering this is*.
+ *
+ * `chainKey` reads `seriesId ?? recurrenceRootId ?? id`, and almost everything
+ * that treats a run of Fridays as one gathering is keyed on it: the projection
+ * of the dates ahead, the predictive roster's history, `skippedNights`, and
+ * `eventAccess`. `buildEventPayload` writes every field on every save, so a
+ * field the form forgets to carry is a field the save nulls — and nulling this
+ * one cut the instance out of its own chain.
+ */
+describe('EventEditorModal: the chain an edit belongs to', () => {
+  const saturday = calendar[1]!;
+
+  it('carries the recurrence root through an ordinary edit', async () => {
+    const user = userEvent.setup();
+    show(saturday);
+
+    await user.clear(screen.getByLabelText(/^Next start/));
+    await user.type(screen.getByLabelText(/^Next start/), '2026-02-07T10:30');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => expect(updateEvent).toHaveBeenCalled());
+    expect(updateEvent.mock.calls.at(-1)![1]).toMatchObject({
+      mode: 'recurring',
+      recurrenceRootId: 'saturday-root',
+    });
+  });
+
+  it('still drops it when the gathering becomes a one-off, which is a real move', async () => {
+    // The mirror image, and the one case where losing the chain is the point: a
+    // trip happens once, so it is keyed on itself. The security rules check the
+    // chain either side of the write, so this is not a way out of a restricted
+    // gathering — see `allow update` in firestore.rules.
+    const user = userEvent.setup();
+    show(saturday);
+
+    await user.selectOptions(typeSelect('Type'), 'oneoff');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => expect(updateEvent).toHaveBeenCalled());
+    expect(updateEvent.mock.calls.at(-1)![1]).toMatchObject({
+      mode: 'oneoff',
+      recurrenceRootId: null,
+    });
+  });
+});

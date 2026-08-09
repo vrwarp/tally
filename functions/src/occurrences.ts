@@ -283,6 +283,125 @@ export async function materializeOccurrence(
 }
 
 /* -------------------------------------------------------------------------- */
+/* Repairing chains an edit cut in half                                        */
+/* -------------------------------------------------------------------------- */
+
+/** An id `materializeOccurrence` derived: a chain key and a calendar day. */
+const DERIVED_ID = /^(.+)-\d{4}-\d{2}-\d{2}$/;
+
+/** Firestore's write batch tops out at 500. Same headroom as `eventDeletion`. */
+const BATCH_LIMIT = 400;
+
+export interface RepairResult {
+  /** Instances put back into the chain their id names. */
+  repaired: { id: string; chain: string }[];
+  /**
+   * Ones whose id names a chain nothing else in the collection knows about, so
+   * there is nothing to be confident it belongs to. Reported, never written.
+   */
+  unknown: string[];
+}
+
+/**
+ * Puts back the `recurrenceRootId` an edit used to strip.
+ *
+ * `buildEventPayload` writes every field on every save, and the event editor's
+ * draft did not carry this one — so saving an instance nulled it, and `chainKey`
+ * fell through to the instance's own id. The gathering became a second chain
+ * with the same rule: the calendar projected both, so every date ahead appeared
+ * twice and each further edit added another; the predictive roster stopped
+ * reading its own past nights; and `eventAccess/{chainKey}` no longer named it,
+ * which quietly opened a restricted register to the whole team. The editor no
+ * longer does this. The documents it already did it to are still detached, and
+ * nothing on a screen can reattach them.
+ *
+ * The id is what makes the repair safe. A materialised occurrence is written
+ * under `{chain}-{YYYY-MM-DD}` and the id never changes afterwards — not when
+ * the night is moved, not when it is cancelled — so a detached instance is
+ * still carrying the name of the chain it came from. Everything else is a
+ * refusal to guess:
+ *
+ * **Only an instance with no chain left.** A `seriesId` or a surviving
+ * `recurrenceRootId` means `chainKey` already has an answer, and it is not this
+ * function's business to disagree with it.
+ *
+ * **Only an id that names a chain something else still knows about** — a
+ * document with that id, or another event pointing at it. A prefix nothing
+ * recognises is far more likely to be a gathering whose title happens to end in
+ * a date than a chain, so it is listed for a human instead.
+ *
+ * **Only `recurrenceRootId`.** No `updatedAt`, no `updatedBy`: nobody edited
+ * these gatherings, and the editor keys its form reset on `updatedAt`.
+ *
+ * Reports rather than writes unless `apply` is set, like the prune below.
+ */
+export async function repairDetachedOccurrences(
+  firestore: FirestoreLike,
+  logger: FunctionLogger,
+  options: { apply?: boolean } = {},
+): Promise<RepairResult> {
+  const snapshot = await firestore.collection(EVENTS).get();
+
+  /*
+   * Every chain the collection still knows about.
+   *
+   * Three sources, because a chain can be named from three directions and only
+   * one of them has to have survived: the root document's own id, and the
+   * `seriesId`/`recurrenceRootId` of any instance that was never detached — or
+   * of one that was detached and has already been repaired on an earlier pass.
+   */
+  const chains = new Set<string>();
+  for (const doc of snapshot.docs) {
+    const data = doc.data();
+    if (!data) continue;
+    chains.add(doc.id);
+    const series = str(data.seriesId);
+    if (series) chains.add(series);
+    const root = str(data.recurrenceRootId);
+    if (root) chains.add(root);
+  }
+
+  const result: RepairResult = { repaired: [], unknown: [] };
+  const pending: { id: string; chain: string }[] = [];
+
+  for (const doc of snapshot.docs) {
+    const data = doc.data();
+    if (!data) continue;
+    if (data.mode === 'oneoff') continue;
+    if (str(data.seriesId) || str(data.recurrenceRootId)) continue;
+
+    const chain = DERIVED_ID.exec(doc.id)?.[1];
+    if (!chain) continue;
+
+    if (!chains.has(chain)) {
+      result.unknown.push(doc.id);
+      continue;
+    }
+
+    pending.push({ id: doc.id, chain });
+  }
+
+  if (options.apply) {
+    for (let index = 0; index < pending.length; index += BATCH_LIMIT) {
+      const batch = firestore.batch();
+      for (const entry of pending.slice(index, index + BATCH_LIMIT)) {
+        batch.update(firestore.doc(`${EVENTS}/${entry.id}`), { recurrenceRootId: entry.chain });
+      }
+      await batch.commit();
+    }
+  }
+
+  result.repaired.push(...pending);
+
+  logger.info(options.apply ? 'Reattached detached occurrences' : 'Repair dry run', {
+    repaired: result.repaired.length,
+    unknown: result.unknown.length,
+  });
+
+  return result;
+}
+
+/* -------------------------------------------------------------------------- */
 /* The one-time migration                                                      */
 /* -------------------------------------------------------------------------- */
 
