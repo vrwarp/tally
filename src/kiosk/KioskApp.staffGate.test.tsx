@@ -136,7 +136,7 @@ async function tapClear(): Promise<void> {
   await settle();
 }
 
-/** A hold on Clear: contact, and three seconds of it. */
+/** A hold on Clear: contact, and two seconds of it. */
 async function holdClear(): Promise<void> {
   await act(async () => {
     fireEvent.pointerDown(clearKey());

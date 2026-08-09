@@ -476,7 +476,11 @@
  * press by a wide margin, and it should not flash a progress bar at anybody;
  * only a press that outlives an ordinary one starts drawing. The duration
  * comes from `--hold-ms`, set inline from `HOLD_MS`, so the bar and the timer
- * that fires cannot disagree.
+ * that fires cannot disagree — *minus* the delay, because the bar has to
+ * finish when the gate opens rather than 400ms after it. Subtracting it was
+ * once a rounding error on a three-second hold; on a two-second one it is a
+ * fifth of the gesture, and a fill still visibly short of the end when the
+ * screen changes teaches a thumb to hold longer than it has to.
  */
 @keyframes tally-hold-fill {
   from {
@@ -499,7 +503,7 @@
    * A white wash, for the same reason HoldButton's bar is one: the key is
    * already `active:bg-ink-600` while it is held, so a fill tinted anywhere
    * near the ink ramp composites to the pressed key's own colour and the hold
-   * becomes three seconds of a button doing visibly nothing. `e2e/support`
+   * becomes two seconds of a button doing visibly nothing. `e2e/support`
    * asserts this in pixels — it samples 6% and 94% across the key mid-hold and
    * demands they differ — because that is the only thing that tells a working
    * fill from an invisible one.
@@ -507,11 +511,11 @@
   background-image: linear-gradient(rgb(255 255 255 / 0.35), rgb(255 255 255 / 0.35));
   background-repeat: no-repeat;
   background-size: 0% 100%;
-  animation: tally-hold-fill var(--hold-ms, 3000ms) linear 400ms forwards;
+  animation: tally-hold-fill calc(var(--hold-ms, 2000ms) - 400ms) linear 400ms forwards;
 }
 
 /*
- * Nothing crawls for three seconds where somebody asked for less motion. The
+ * Nothing crawls for two seconds where somebody asked for less motion. The
  * gate still works — the timer is not the animation — it simply stops being
  * drawn.
  */

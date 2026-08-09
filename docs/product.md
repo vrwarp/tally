@@ -58,7 +58,7 @@ count rather than the head count (`12 in room · 18 checked in`), the two filter
 room" and "Checked out", and the one-tap button at the end of a present row changes verb from undo
 to **Out** — undo moves one tap deeper into the action strip, which is the right way round when
 collecting children is the gesture repeated forty times a morning. A parent can also collect their
-own child at the lobby kiosk, with a three-second hold rather than a tap: a stray check-in corrects
+own child at the lobby kiosk, with a two-second hold rather than a tap: a stray check-in corrects
 itself when the child walks in anyway, while a stray pickup claims somebody left the building.
 
 Two rules make it honest. **A missed check-out is not a miss** — attendance is untouched by any of

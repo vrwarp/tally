@@ -4,7 +4,7 @@
  * The event is chosen by a person, never by the clock — the same product rule
  * as the main app's chooser. The gathering whose check-in window is open is
  * ringed and sorted first, but somebody still has to pick it, and confirming
- * is a three-second hold so a wandering hand cannot re-point the kiosk.
+ * is a two-second hold so a wandering hand cannot re-point the kiosk.
  *
  * The hold is on the rows as well as on the button: holding a gathering sets
  * the kiosk to it outright, so the usual setup is one gesture rather than a tap
