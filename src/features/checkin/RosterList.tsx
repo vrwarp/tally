@@ -118,7 +118,12 @@ export const RosterList = memo(function RosterList({
       {entries.length === 0 ? (
         <p className="px-3 py-3 text-sm text-ink-500">{emptyLabel}</p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        /* The hairline is for the first row's ring, which is painted outside its
+           card and therefore in the last pixel of the heading above it — and the
+           heading is a near-opaque sticky band, so it covered it. Every row but
+           the first drew a whole outline and the one at the top of the list drew
+           three sides of one. */
+        <ul className="flex flex-col gap-2 pt-px">
           {entries.map((entry) => (
             <StudentRow
               key={entry.student.id}

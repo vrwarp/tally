@@ -49,6 +49,16 @@ export interface FilterBarProps {
   checkedOutCount?: number;
 }
 
+/*
+ * The outline is drawn *inside* the chip, for the same reason the focus ring is
+ * — see `index.css`. A ring is painted outside the border box, and the two
+ * surfaces this row sits between both eat it: the scroller below is exactly one
+ * chip tall and clips in both axes, so a chip kept the arcs at its ends and lost
+ * the straight runs along its top and bottom; the opaque search band above ends
+ * flush with the chips and painted over whatever was left. An inset line has
+ * nothing to clip and nothing to hide it, and at 1px on a 36px pill it is not a
+ * shape anybody can tell apart from the one it replaces.
+ */
 function Chip({
   active,
   label,
@@ -67,12 +77,12 @@ function Chip({
       aria-pressed={active}
       aria-label={label}
       className={cn(
-        'flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-xs font-semibold ring-1 transition-colors pointer-fine:min-h-9',
+        'flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-xs font-semibold inset-ring-1 transition-colors pointer-fine:min-h-9',
         active
-          ? 'bg-brand-500/20 text-brand-200 ring-brand-500/40'
+          ? 'bg-brand-500/20 text-brand-200 inset-ring-brand-500/40'
           // Hover, because these are the same chips the Students toolbar draws
           // and a pointer gets a response there.
-          : 'bg-ink-900 text-ink-400 ring-ink-800 hover:bg-ink-800 active:bg-ink-800',
+          : 'bg-ink-900 text-ink-400 inset-ring-ink-800 hover:bg-ink-800 active:bg-ink-800',
       )}
     >
       {children}

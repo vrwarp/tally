@@ -131,11 +131,13 @@ export function GradeFilter({ grades, onChange, available }: GradeFilterProps) {
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         aria-label={`Filter by grade, ${summarise(grades).toLowerCase()}`}
+        /* Inset, like the chips beside it — the sticky search band ends flush
+           with the top of this row and painted over an outside ring. */
         className={cn(
-          'flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-xs font-semibold ring-1 transition-colors pointer-fine:min-h-9',
+          'flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-xs font-semibold inset-ring-1 transition-colors pointer-fine:min-h-9',
           active
-            ? 'bg-brand-500/20 text-brand-200 ring-brand-500/40'
-            : 'bg-ink-900 text-ink-400 ring-ink-800 hover:bg-ink-800 active:bg-ink-800',
+            ? 'bg-brand-500/20 text-brand-200 inset-ring-brand-500/40'
+            : 'bg-ink-900 text-ink-400 inset-ring-ink-800 hover:bg-ink-800 active:bg-ink-800',
         )}
       >
         {summarise(grades)}
