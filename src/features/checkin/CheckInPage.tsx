@@ -780,7 +780,12 @@ export function CheckInPage() {
           here — a counselor reads that on arrival and then works the queue for
           an hour without needing it again, so it is the one part of the screen
           that can afford to cost nothing once it has been read. */}
-      <div className={cn(BAND, 'pt-4 lg:pt-6')}>
+      {/* The odd `pb-px` is the hairline the header's own controls need. Their
+          rings are painted outside the border box, the search band below is
+          opaque and starts exactly where this block ends, and so the row of
+          pills at the bottom of the header — Everyone, Change, the event picker
+          — was drawn with three sides and a gap along the bottom. */}
+      <div className={cn(BAND, 'pt-4 pb-px lg:pt-6')}>
         <EventHeader
           event={event}
           selectableEvents={selectableEvents}
