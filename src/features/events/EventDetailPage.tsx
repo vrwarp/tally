@@ -337,11 +337,9 @@ export function EventDetailPage() {
             event.materialized && !locked ? (
               <div onPointerEnter={() => setTeamArmed(true)} onFocus={() => setTeamArmed(true)}>
                 <ExportCsvButton
-                  size="sm"
                   build={buildRegisterExport}
                   count={registerExportRows.length}
                   noun="check-ins"
-                  label="Export"
                 />
               </div>
             ) : undefined

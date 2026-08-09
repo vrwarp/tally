@@ -95,7 +95,6 @@ export function NewVisitorList({
               })}
               count={items.length}
               noun="students"
-              label="Export"
             />
           ) : undefined
         }

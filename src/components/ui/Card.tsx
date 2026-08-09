@@ -20,10 +20,25 @@ export function CardHeader({
   description?: string;
   action?: ReactNode;
 }) {
+  /*
+   * The action leaves the title's line below `sm`, and that is not cosmetic.
+   *
+   * A card header used to be a title beside at most one button, and the row
+   * held. Give it two and, at 390px, the buttons claim two thirds of the width
+   * before the heading gets any: "Missing in action" came apart into a
+   * three-line ragged stack with its count badge orphaned mid-heading, the
+   * description broke into seven fragments of three words, and the header grew
+   * to 231px — enough to push every call row on the screen below the fold, on
+   * the one screen whose whole job is the call rows.
+   *
+   * So the title is served first and the actions take their own line under it
+   * when there is no room. Above `sm` nothing changes: there is width for both
+   * and the header stays the calm object it was.
+   */
   return (
-    <header className="flex items-start justify-between gap-3 border-b border-ink-800 px-4 py-3">
-      <div>
-        <h2 className="flex items-center gap-2 text-base font-semibold text-ink-100">
+    <header className="flex flex-col gap-2 border-b border-ink-800 px-4 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+      <div className="min-w-0">
+        <h2 className="flex flex-wrap items-center gap-2 text-base font-semibold text-ink-100">
           {title}
           {count !== undefined ? (
             <span className="rounded-full bg-ink-800 px-2 py-0.5 text-xs font-semibold text-ink-300">
@@ -33,7 +48,9 @@ export function CardHeader({
         </h2>
         {description ? <p className="mt-0.5 text-sm text-ink-500">{description}</p> : null}
       </div>
-      {action}
+      {/* Its own line below `sm`, so a wrapping action never squeezes the
+          heading; `shrink-0` keeps it whole beside the title above `sm`. */}
+      {action ? <div className="flex shrink-0 items-center gap-2">{action}</div> : null}
     </header>
   );
 }

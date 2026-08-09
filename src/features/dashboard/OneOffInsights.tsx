@@ -11,7 +11,14 @@
  */
 import { Link } from 'react-router-dom';
 import { Card, CardHeader, EmptyState, EventIcon } from '@/components/ui';
+import { ExportCsvButton } from '@/components/ExportCsvButton';
 import { CopyContactsButton, FollowUpActions } from '@/features/dashboard/FollowUpActions';
+import {
+  buildOneOffOnlyCsv,
+  NO_EXPORT_CONTEXT,
+  type FollowUpCsvContext,
+} from '@/features/dashboard/followUpCsv';
+import { exportFilename } from '@/lib/csv';
 import type { OneOffOnlyStudent, OneOffRecap } from '@/features/dashboard/insights';
 import { formatRelative, formatShortDate } from '@/lib/time';
 import { gradeLabel, initials } from '@/lib/utils';
@@ -89,7 +96,11 @@ export interface OneOffOnlyListProps {
  * out of the window. Rendered only when it has somebody in it — a permanent
  * empty card here would just be a reminder that retreats exist.
  */
-export function OneOffOnlyList({ items, className }: OneOffOnlyListProps & { className?: string }) {
+export function OneOffOnlyList({
+  items,
+  className,
+  exportContext = NO_EXPORT_CONTEXT,
+}: OneOffOnlyListProps & { className?: string; exportContext?: FollowUpCsvContext }) {
   if (items.length === 0) return null;
 
   const students = items.map((item) => item.student);
@@ -101,10 +112,24 @@ export function OneOffOnlyList({ items, className }: OneOffOnlyListProps & { cla
         count={items.length}
         description="Came to a one-off and has not been to a regular gathering since."
         action={
-          <CopyContactsButton
-            students={students}
-            title={`Invite — ${items.length} we met once:`}
-          />
+          // The same pair as every other list card. Presence and absence in
+          // this slot look like a decision, so it has to be one: any list of
+          // students a leader might want in a spreadsheet gets the same two
+          // controls, in the same order, at the same weight.
+          <>
+            <CopyContactsButton
+              students={students}
+              title={`Invite — ${items.length} we met once:`}
+            />
+            <ExportCsvButton
+              build={() => ({
+                filename: exportFilename({ kind: 'follow-up', scope: 'met-once', at: new Date() }),
+                contents: buildOneOffOnlyCsv(items, exportContext),
+              })}
+              count={items.length}
+              noun="students"
+            />
+          </>
         }
       />
 

@@ -87,7 +87,6 @@ export function IncompleteProfileList({
               })}
               count={students.length}
               noun="students"
-              label="Export"
             />
           ) : undefined
         }

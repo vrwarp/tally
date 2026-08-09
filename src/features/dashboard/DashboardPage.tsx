@@ -547,7 +547,11 @@ export function DashboardPage() {
           {!awaiting && (oneOffRecaps.length > 0 || oneOffOnly.length > 0) ? (
             <>
               <OneOffRecapList items={oneOffRecaps} className="order-6 lg:order-none" />
-              <OneOffOnlyList items={oneOffOnly} className="order-4 lg:order-none" />
+              <OneOffOnlyList
+                items={oneOffOnly}
+                className="order-4 lg:order-none"
+                exportContext={exportContext}
+              />
             </>
           ) : null}
         </div>

@@ -34,6 +34,7 @@ import { isUnreachable } from '@/features/dashboard/insights';
 import { isoDate, toCsv, type CsvColumn } from '@/lib/csv';
 import { gradeLabel } from '@/lib/utils';
 import type { RosterBackendStatus } from '@/services/functions';
+import type { OneOffOnlyStudent } from '@/features/dashboard/insights';
 import type { MiaStudent, NewVisitor, Student } from '@/types';
 
 export interface FollowUpCsvContext {
@@ -121,6 +122,28 @@ export function buildNewVisitorCsv(
       { header: 'first_event_id', value: (item) => item.firstEventId },
       { header: 'via_one_off', value: (item) => item.viaOneOff },
       ...workColumns<NewVisitor>(),
+    ],
+    items,
+  );
+}
+
+/**
+ * The friend brought along on the bus, invisible in every other view.
+ *
+ * `met_at` and `missed_since` rather than a streak: they belong to no chain of
+ * repeats, so "missed three in a row" is not a sentence about them.
+ */
+export function buildOneOffOnlyCsv(
+  items: readonly OneOffOnlyStudent[],
+  context: FollowUpCsvContext,
+): string {
+  return toCsv(
+    [
+      ...studentColumns<OneOffOnlyStudent>((item) => item.student, context),
+      { header: 'met_at', value: (item) => isoDate(item.metAt) },
+      { header: 'met_at_event', value: (item) => item.events[0]?.title ?? '' },
+      { header: 'missed_since', value: (item) => item.missedSince },
+      ...workColumns<OneOffOnlyStudent>(),
     ],
     items,
   );

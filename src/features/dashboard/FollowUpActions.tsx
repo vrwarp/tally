@@ -256,9 +256,18 @@ export function CopyContactsButton({ students, title }: CopyContactsButtonProps)
     }
   };
 
+  /*
+   * Ghost, and small, to match `ExportCsvButton`.
+   *
+   * The two sit together in a card header, above a column of `Call`/`Text`
+   * pills that act on one student. At secondary weight they were the same
+   * object as those, so a list-level act and a student-level act wore one
+   * uniform and only position told them apart. Both step down together: the
+   * pair stays parallel, and the header reads as subordinate to its heading.
+   */
   return (
     <Button
-      variant="secondary"
+      variant="ghost"
       size="md"
       onClick={() => void copy()}
       disabled={students.length === 0}

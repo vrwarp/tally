@@ -63,7 +63,21 @@ export function ExportCsvButton({
   blockedReason,
   confirm,
   label = 'Export CSV',
-  variant = 'secondary',
+  // Ghost by default, and that is the scope showing.
+  //
+  // On Insights these sit in a card header, above a column of `Call`/`Text`
+  // pills that act on one student. Drawn at the same secondary weight they were
+  // indistinguishable from those — a header cluster reading as just the top row
+  // of a long column of identical pills, with nothing but position to say that
+  // `Export` acts on the whole list. A lighter register within the same ink
+  // ramp is what lets the eye tell a list-level act from a student-level one
+  // without reading the label.
+  variant = 'ghost',
+  // `md`, not `sm`. The lighter register the critics asked for is about *fill*,
+  // not size — and `sm` is a flat 36px, under the 44px floor a thumb needs.
+  // `md` is 44px where there is a thumb and steps down to 36px under
+  // `pointer-fine:`, which is the same object on a laptop and a real target on
+  // a phone.
   size = 'md',
   className,
 }: ExportCsvButtonProps) {

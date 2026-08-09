@@ -65,8 +65,9 @@ export function MiaList({
           items.length > 0 ? (
             // Two, and deliberately not a menu: the clipboard copy goes to the
             // group chat, the file goes to whoever is tracking who called whom.
-            // Different destinations, both one press away.
-            <div className="flex shrink-0 items-center gap-2">
+            // Different destinations, both one press away — and parallel, so
+            // they read as a designed pair rather than an accumulated one.
+            <>
               <CopyContactsButton
                 students={students}
                 title={`Follow-up — ${items.length} students we have not seen:`}
@@ -82,9 +83,8 @@ export function MiaList({
                 })}
                 count={items.length}
                 noun="students"
-                label="Export"
               />
-            </div>
+            </>
           ) : undefined
         }
       />

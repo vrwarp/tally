@@ -118,7 +118,10 @@ export function AttendanceGridModal({ open, onClose }: AttendanceGridModalProps)
       description="One gathering, students down and nights across — for a spreadsheet."
       footer={
         <ExportCsvButton
+          // The exception to the ghost default: in a modal footer this is the
+          // act the dialog exists for, not a utility beside a heading.
           variant="primary"
+          size="md"
           build={() => ({
             filename: exportFilename({
               kind: 'attendance',
