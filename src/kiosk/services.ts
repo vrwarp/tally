@@ -39,6 +39,7 @@ import {
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/functions';
 import { parseStudentId } from '@/lib/backendIds';
 import { missingKeys, parseFirebaseConfig } from '@/lib/firebaseConfig';
+import type { KioskGround, KioskPalette } from '@/lib/kioskTheme';
 import { sanitizeLabelTemplate, type LabelTemplate } from '@/lib/labelTemplate';
 import { paths } from '@/lib/paths';
 import {
@@ -56,6 +57,7 @@ import type {
 } from '@/types';
 import type { KioskBinding } from './binding';
 import { joinKioskRoster } from './roster';
+import { sanitizeKioskPalette } from './theme';
 import type { KioskStudent } from './search';
 import {
   KIOSK_KEYS,
@@ -155,6 +157,13 @@ export interface KioskEventEntry {
    * drop the answer.
    */
   allergiesSupported?: boolean;
+  /**
+   * The gathering's look, resolved server-side. Both absent when nobody themed
+   * it, which is most gatherings — see `KioskEventEntry` in
+   * `functions/src/kiosk/events.ts`.
+   */
+  ground?: KioskGround;
+  palette?: KioskPalette;
 }
 
 const startKioskPairing = httpsCallable<void, { code: string; secret: string; expiresInSeconds: number }>(
@@ -268,6 +277,13 @@ export async function bindEntry(entry: KioskEventEntry): Promise<KioskBinding> {
     // Only ever an explicit true: absent, null, or anything else a stale
     // server sent reads as "don't ask" (see the entry field's comment).
     allergiesSupported: entry.allergiesSupported === true,
+    // Sanitised even though the server sent it, on the same argument as the
+    // template above: this is what the kiosk reads back out of localStorage for
+    // the rest of the evening, and it ends up in `setProperty`.
+    // Only ever a ground the server actually named, so a binding for a
+    // gathering nobody themed says nothing about colour at all.
+    kioskGround: entry.ground === 'light' || entry.ground === 'dark' ? entry.ground : undefined,
+    kioskPalette: sanitizeKioskPalette(entry.palette),
     boundAtMs: Date.now(),
   };
 }

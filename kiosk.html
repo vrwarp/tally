@@ -28,8 +28,14 @@
       to preserve exactly that — network first for this document, the cache
       answering only once the network has had its chance and failed.
 
-      Still no theme resolver: the kiosk is a fixed dark screen. See
-      src/kiosk/main.tsx.
+      `data-theme` above is the pre-paint default, not the final answer. A
+      gathering can lend the kiosk its own colours, and src/kiosk/main.tsx puts
+      them on this element from the stored binding before the first render —
+      early enough that a themed lobby screen never boots navy and repaints. An
+      unbound or unthemed kiosk is exactly this: dark, and the status-bar colour
+      below. There is still no theme *resolver* here, and there is not going to
+      be one: the palette arrives from the server as finished hex, so wearing it
+      is a loop over setProperty. See src/kiosk/theme.ts.
     -->
     <link rel="manifest" href="/kiosk.webmanifest" />
     <meta name="apple-mobile-web-app-capable" content="yes" />

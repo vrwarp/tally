@@ -13,6 +13,7 @@
  * the gathering is as real as any other.
  */
 import type { FirestoreLike, FunctionLogger } from '../firestore.js';
+import { kioskPalette, type KioskGround, type KioskPalette } from '../generated/kioskTheme.js';
 import type { LabelTemplate } from '../generated/labelTemplate.js';
 import {
   chainKey,
@@ -83,6 +84,28 @@ export interface KioskEventEntry {
    * an answer.
    */
   allergiesSupported: boolean;
+  /**
+   * The look this gathering lends the screen, already worked out.
+   *
+   * Absent on a gathering nobody themed, which is most of them — the ordinary
+   * case adds nothing to this payload.
+   *
+   * Resolved *here*, and that is the whole point of it being here. The event
+   * stores four names (`{ ground, accent, confirm, backdrop }`); turning those
+   * into colours means OKLCH, a hue rotation and a gamut search, and the kiosk
+   * is a screen on a shelf running on whatever hardware the church had spare.
+   * So it happens on the way out, the same way occurrence projection does and
+   * for the same reason: the kiosk never reads an event document, and what it
+   * cannot compute cheaply it should simply be told. What lands on the row is
+   * finished hex, which the lobby screen validates and hands to `setProperty`.
+   *
+   * `scripts/check-kiosk-budget.mjs` fails the build if `lib/kioskTheme` ever
+   * turns up in the kiosk's own graph, because the saving here is bytes at
+   * first paint and it would vanish silently.
+   */
+  ground?: KioskGround;
+  /** `--color-ink-950` → `#0e0406`, and only the slots that actually moved. */
+  palette?: KioskPalette;
 }
 
 export const DEFAULT_KIOSK_EVENT_DAYS = 7;
@@ -110,6 +133,24 @@ function predictsFromOf(
   return typeof named === 'string' && named.length > 0 ? named : null;
 }
 
+/**
+ * The two theme keys, or neither.
+ *
+ * Spread rather than assigned so an unthemed gathering — nearly all of them —
+ * carries no `ground` and no `palette` at all rather than a pair of nulls. The
+ * chooser can list a month of evenings, and this is the difference between the
+ * common case costing nothing and costing two keys a row.
+ */
+function kioskLook(
+  theme: OccurrenceSource['kioskTheme'],
+): { ground?: KioskGround; palette?: KioskPalette } {
+  if (!theme) return {};
+  const palette = kioskPalette(theme);
+  // A gathering can theme its ground and leave every hue alone, which is a real
+  // answer and not an unthemed one: `data-theme` still has to move.
+  return palette ? { ground: theme.ground, palette } : { ground: theme.ground };
+}
+
 function entryFromSource(
   source: OccurrenceSource,
   data: Record<string, unknown> | null,
@@ -129,6 +170,7 @@ function entryFromSource(
     requiresCheckOut: source.requiresCheckOut,
     labelTemplate: source.labelTemplate,
     allergiesSupported,
+    ...kioskLook(source.kioskTheme),
   };
 }
 
@@ -208,6 +250,7 @@ export async function listKioskEvents(
       requiresCheckOut: occurrence.source.requiresCheckOut,
       labelTemplate: occurrence.source.labelTemplate,
       allergiesSupported,
+      ...kioskLook(occurrence.source.kioskTheme),
     });
   }
 

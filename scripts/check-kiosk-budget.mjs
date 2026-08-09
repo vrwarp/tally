@@ -126,6 +126,40 @@ if (fullFirestore.length > 0) {
 }
 
 /*
+ * The colour maths must never reach the kiosk.
+ *
+ * A gathering's theme is four hue names on the event document; turning those
+ * into colours means OKLCH, a hue rotation and a gamut search, and all of it
+ * happens in `functions/src/kiosk/events.ts` while the chooser row is built.
+ * The kiosk is handed finished hex and does nothing but validate it and call
+ * `setProperty` — see `src/kiosk/theme.ts`.
+ *
+ * That split is worth exactly what it saves and nothing more, which is why it
+ * needs a guard: one `import { kioskPalette }` instead of `import type` would
+ * undo it, and the module is small enough to disappear under the headroom below
+ * without moving any number a human is watching.
+ *
+ * Matched on the sRGB↔OKLab matrix constants rather than on a chunk name or an
+ * identifier. `lib/kioskTheme` is bundled into a shared chunk rather than one of
+ * its own, and a minifier renames every export it can — but it cannot rename a
+ * float. Two of them, because tree-shaking may drop either direction alone.
+ */
+const OKLAB_MATRIX = /0\.4122214708|4\.0767416621/;
+
+const withColourMaths = [...reachable].filter((name) =>
+  OKLAB_MATRIX.test(readFileSync(join(DIST, `assets/${name}`), 'utf8')),
+);
+if (withColourMaths.length > 0) {
+  console.error(
+    `The kiosk graph reaches the colour maths: ${withColourMaths.join(', ')}\n` +
+      'Something under src/kiosk/ imports a value from lib/kioskTheme. It may import ' +
+      'the types (which cost nothing at build time) and nothing else: palettes are ' +
+      'resolved on the server and arrive on the chooser row as finished hex.',
+  );
+  process.exit(1);
+}
+
+/*
  * The printing subgraph: what a kiosk downloads *only* because it has a printer.
  *
  * Found by walking the graph a second time without traversing into the printing

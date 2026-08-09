@@ -180,6 +180,7 @@ export function eventDoc(overrides: Partial<TallyEventDoc> = {}): TallyEventDoc 
     requiresRsvp: false,
     requiresCheckOut: false,
     labelTemplate: null,
+    kioskTheme: null,
     status: 'scheduled',
     createdAt: T0,
     updatedAt: T0,

@@ -95,6 +95,7 @@ export function makeEvent(overrides: Partial<TallyEvent> = {}): TallyEvent {
     requiresRsvp: pick(overrides, 'requiresRsvp', false),
     requiresCheckOut: pick(overrides, 'requiresCheckOut', false),
     labelTemplate: pick(overrides, 'labelTemplate', null),
+    kioskTheme: pick(overrides, 'kioskTheme', null),
     status: pick(overrides, 'status', 'scheduled'),
     createdAt: pick(overrides, 'createdAt', new Date('2026-01-01T12:00:00')),
     updatedAt: pick(overrides, 'updatedAt', new Date('2026-01-01T12:00:00')),

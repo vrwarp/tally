@@ -45,6 +45,7 @@
  * splitting the night's attendance between two. It is the same reason an
  * attendance document's id *is* the student id.
  */
+import type { KioskTheme } from './kioskTheme.js';
 import type { LabelTemplate } from './labelTemplate.js';
 import { recurrenceOccurrences, toDateOnlyValue, type RecurrenceRule } from './recurrenceCore.js';
 
@@ -77,6 +78,8 @@ export interface OccurrenceSource {
   requiresCheckOut: boolean;
   /** Carried the same way, and for the same reason. */
   labelTemplate: LabelTemplate | null;
+  /** And this, which is what a kiosk bound to the occurrence will wear. */
+  kioskTheme: KioskTheme | null;
 }
 
 /**

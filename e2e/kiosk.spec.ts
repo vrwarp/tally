@@ -545,6 +545,60 @@ test.describe('the kiosk', () => {
     }
   });
 
+  /*
+   * The whole path in one gesture: hue names on the event document, resolved to
+   * hex by the callable that builds the chooser row, carried into the binding,
+   * and set on <html>. Nothing here is stubbed, so this is also the check that
+   * the four names never reach the kiosk as names.
+   */
+  test('wears the gathering’s colours, and takes them off again', async ({
+    browser,
+    page,
+    signedInAs,
+  }) => {
+    await signedInAs('core');
+    const { context, page: kiosk } = await openKiosk(browser);
+
+    try {
+      await pairKiosk(kiosk, page);
+
+      const accent = () =>
+        kiosk.evaluate(() =>
+          getComputedStyle(document.documentElement).getPropertyValue('--color-brand-400').trim(),
+        );
+
+      // Unbound, on the chooser: the kiosk that shipped. Read rather than
+      // asserted against a literal, so this stays true if the stylesheet moves.
+      await expect(kiosk.locator('html')).toHaveAttribute('data-theme', 'dark');
+      const shipped = await accent();
+      expect(shipped).toMatch(/^#[0-9a-f]{6}$/i);
+
+      // The seeded nursery is the themed one — light ground, ember accent.
+      await bindTo(kiosk, /nursery/i);
+      await expect(kiosk.locator('html')).toHaveAttribute('data-theme', 'light');
+      const themed = await accent();
+      expect(themed).toMatch(/^#[0-9a-f]{6}$/i);
+      expect(themed).not.toBe(shipped);
+
+      // And it survives the reload, applied before the first paint rather than
+      // from an effect afterwards.
+      await kiosk.reload();
+      await expect(kiosk.locator('html')).toHaveAttribute('data-theme', 'light');
+      expect(await accent()).toBe(themed);
+
+      // Rebinding to an unthemed gathering puts it all back. The staff gate is
+      // a three-second hold on Clear, and then leaving the gathering.
+      await hold(kiosk, '[data-key="clear"]');
+      await kiosk.getByRole('button', { name: /^Leave / }).click();
+      await bindTo(kiosk, /friday fellowship/i);
+
+      await expect(kiosk.locator('html')).toHaveAttribute('data-theme', 'dark');
+      expect(await accent()).toBe(shipped);
+    } finally {
+      await context.close();
+    }
+  });
+
   test('survives a reload, painting the roster before Firebase resolves', async ({
     browser,
     page,

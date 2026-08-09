@@ -12,6 +12,7 @@
  */
 import type { Timestamp } from 'firebase/firestore';
 import { parseStudentId, type BackendId } from '@/lib/backendIds';
+import type { KioskTheme } from '@/lib/kioskTheme';
 import type { LabelTemplate } from '@/lib/labelTemplate';
 
 /* -------------------------------------------------------------------------- */
@@ -525,6 +526,22 @@ export interface TallyEventDoc {
    * are collected from is exactly the kind of gathering that repeats.
    */
   labelTemplate: LabelTemplate | null;
+
+  /**
+   * The look this gathering lends a lobby kiosk, or null for the default dark.
+   *
+   * A ground and three hues — what you touch, what just happened, and the wash
+   * on the page — so a bright Sunday nursery and a Friday youth night stop
+   * being the same slab of navy on two shelves. Stored by hue *name*, the way
+   * `icon` is, so a colour can be corrected without rewriting anybody's events.
+   *
+   * Null is the ordinary answer and costs nothing anywhere: the resolver hands
+   * back no palette, the chooser row carries no extra keys, and the kiosk is
+   * the kiosk that shipped. Carried onto projected occurrences alongside
+   * `labelTemplate`, because a themed nursery is exactly the kind of gathering
+   * that repeats. See `lib/kioskTheme.ts`.
+   */
+  kioskTheme: KioskTheme | null;
 
   status: EventStatus;
 
