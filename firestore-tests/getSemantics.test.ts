@@ -1,6 +1,6 @@
 /**
- * The one assumption `eventAccess` is built on — and the answer is not the
- * convenient one.
+ * The one assumption `eventAccess` is built on — and Firestore has since
+ * changed half of its answer.
  *
  * `eventAccess/{chainKey}` uses an *absent* document to mean "this gathering is
  * open to the whole team". That is what makes the feature deployable with no
@@ -9,25 +9,29 @@
  * as it was.
  *
  * Which puts the entire feature on one question — what does `get()` do at a
- * path where nothing lives? The tempting answer is `null`, which would let
- * `onChain()` say `a == null || …` and let absence fall through to "open".
+ * path where nothing lives?
  *
- * **It does not return null. It raises**, and a raised lookup denies. Written
- * the tempting way, every rule guarding a gathering would deny for every chain
- * nobody had restricted — a total outage on a database with not one ACL in it,
- * arriving the moment the rules deployed rather than the first time somebody
- * used the feature.
+ * It used to raise, and a raised lookup denies. Written the tempting way —
+ * `get(p) == null || …` — every rule guarding a gathering would have denied for
+ * every chain nobody had restricted: a total outage on a database with not one
+ * ACL in it. The Firestore emulator that ships with firebase-tools 15 answers
+ * differently. `get()` at an absent path now returns `null`, and comparing it
+ * against null is a legal question with a true answer.
  *
- * So absence has to be asked about with `exists()` first, and the `||` that
- * follows has to carry the `get()`. That is the shape `onChain()` uses in
- * firestore.rules, and these tests are why. The guard is not defensive
- * programming; it is the difference between the feature working and the app
- * going dark.
+ * That does **not** retire the guard, for two reasons. A null is only safe to
+ * *compare* against; reading *through* it still denies, so
+ * `get(p).data.get(…)` at an absent path fails exactly as it always did — and
+ * that dereference is the one `onChain()` would reach without `exists()` in
+ * front of it. And this suite pins the emulator's behaviour, not production's;
+ * `exists()` is correct under both answers, which is reason enough to keep it.
+ *
+ * So `onChain()` in firestore.rules is unchanged, and these tests still say
+ * why. What moved is which of the two wrong shapes fails loudly: comparing a
+ * lookup against null used to deny everything, and now quietly allows it — the
+ * more dangerous of the two mistakes, and worth pinning on its own.
  *
  * This suite tests Firestore, not Tally, against its own tiny ruleset in its
- * own project. If it ever goes green on the first case, Firestore changed its
- * mind and `onChain()` could be simplified — but nothing breaks by leaving it
- * as it is.
+ * own project.
  */
 import { afterAll, beforeAll, describe, it } from 'vitest';
 import {
@@ -72,8 +76,8 @@ service cloud.firestore {
 
     /*
      * The shape firestore.rules actually uses. exists() answers the question
-     * get() raises on, and || carries the lookup so it is never reached when
-     * the document is absent.
+     * without a lookup at all, and || carries the get() so it is never reached
+     * when the document is absent.
      */
     function onChain(id) {
       return !exists(aclPath(id))
@@ -81,9 +85,14 @@ service cloud.firestore {
         || request.auth.uid in get(aclPath(id)).data.get('members', []);
     }
 
-    // The tempting form. Must DENY, on a path with nothing behind it.
-    match /unguarded/{id} {
+    // Comparing an absent lookup against null. ALLOWS: get() returns null.
+    match /comparedToNull/{id} {
       allow get: if get(/databases/$(database)/documents/acl/missing) == null;
+    }
+
+    // Reading through that same null. Still DENIES.
+    match /readThroughNull/{id} {
+      allow get: if get(aclPath('missing')).data.get('restricted', false) != true;
     }
 
     // The guarded form over an absent document: falls through to open.
@@ -133,12 +142,20 @@ function asSomeone(uid: string): Firestore {
 }
 
 describe('get() at a path with no document', () => {
-  it('raises rather than returning null, so an unguarded lookup denies', async () => {
-    // The load-bearing negative. If this ever starts succeeding, Firestore
-    // changed `get()` to return null for a missing document and onChain()
-    // could drop its exists() guard. Until then, absence must be asked about
-    // with exists() — not compared against null.
-    await assertFails(getDoc(doc(asSomeone(UID_OUTSIDER), 'unguarded/any')));
+  it('returns null rather than raising, so a comparison against null passes', async () => {
+    // This assertion used to run the other way. It is kept pointed at the
+    // current answer so that a Firestore which changes its mind back — or a
+    // production database that never agreed — shows up here rather than as a
+    // gathering nobody can open.
+    await assertSucceeds(getDoc(doc(asSomeone(UID_OUTSIDER), 'comparedToNull/any')));
+  });
+
+  it('still denies when that null is read through', async () => {
+    // The half that did not change, and the half onChain() is built on: the
+    // lookup may now be compared, but it still cannot be dereferenced. Without
+    // the exists() guard in front of it, this is the expression onChain() would
+    // evaluate for every unrestricted chain.
+    await assertFails(getDoc(doc(asSomeone(UID_OUTSIDER), 'readThroughNull/any')));
   });
 
   it('is guarded by exists(), which lets an absent ACL mean open', async () => {
