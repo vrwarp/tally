@@ -1,7 +1,7 @@
 /**
  * A press-and-hold control, for the presses worth being sure about.
  *
- * Three seconds of continuous contact, with visible progress, cancelled by
+ * Two seconds of continuous contact, with visible progress, cancelled by
  * lifting or leaving. Not authentication: the kiosk belongs to a small church
  * lobby, and the gate only has to be beyond a wandering toddler and an
  * accidental brush, not beyond an adult who could also just unplug the thing.
@@ -14,12 +14,12 @@
  * this control on a dark surface — `bg-brand-600` on the two committing buttons,
  * `bg-ink-900` on the chooser's rows — so a fill tinted in the brand ramp
  * composites to within nothing of the button it covers, and the hold becomes
- * three seconds of a button doing visibly nothing. Which is not a subtle bug:
- * nobody keeps their thumb down for three seconds against no feedback, so the
+ * two seconds of a button doing visibly nothing. Which is not a subtle bug:
+ * nobody keeps their thumb down for two seconds against no feedback, so the
  * control reads as broken rather than as slow. Whatever this fill is, it must
  * contrast with the button under it.
  *
- * Completion buzzes; arming does not. Three seconds is long enough that a thumb
+ * Completion buzzes; arming does not. Two seconds is long enough that a thumb
  * wants to be told when it may leave, and a buzz on contact would say the
  * gesture had happened when it had only started.
  *
@@ -41,7 +41,17 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { haptic } from '@/lib/utils';
 import { strayed, type Press } from './tapGuard';
 
-export const HOLD_MS = 3000;
+/**
+ * Long enough to be deliberate, short enough that nobody lets go early.
+ *
+ * This was three seconds, and three seconds is past where a held button stops
+ * reading as *counting* and starts reading as *stuck*: a thumb on a lobby
+ * screen wonders whether it missed the button, lifts, and starts again. Two is
+ * about the ceiling for a pressure gesture. Nothing the length defends against
+ * survives it either — a toddler's palm, a coat sleeve, a hand steadying the
+ * tablet are all gone well before one second.
+ */
+export const HOLD_MS = 2000;
 
 export function HoldButton({
   onHeld,
@@ -54,7 +64,7 @@ export function HoldButton({
   /**
    * What a short press means, for a control that has a second, lighter answer.
    * Fires on lift, and only if the finger stayed put — see the note above.
-   * Omitted, a press that does not reach three seconds does nothing at all.
+   * Omitted, a press that does not reach two seconds does nothing at all.
    */
   onTap?: () => void;
   className?: string;
@@ -94,9 +104,9 @@ export function HoldButton({
   const move = useCallback(
     (event: React.PointerEvent) => {
       // Only where a press has a second meaning. A hold that stands alone is
-      // the more forgiving control on purpose: three seconds is a long time to
-      // ask a thumb to hold still, and there is nothing under a committing
-      // button for a drift to have meant instead.
+      // the more forgiving control on purpose: two seconds is still a long
+      // time to ask a thumb to hold still, and there is nothing under a
+      // committing button for a drift to have meant instead.
       if (!tappedRef.current) return;
       if (pressRef.current && strayed(pressRef.current, event)) cancel();
     },

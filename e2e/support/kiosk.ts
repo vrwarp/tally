@@ -30,7 +30,7 @@ import { expect, type Browser, type BrowserContext, type Locator, type Page } fr
 export const KIOSK_PATH = '/kiosk.html';
 
 /** `HOLD_MS` in components/HoldButton.tsx, plus room for a slow CI machine. */
-const HOLD_MS = 3000;
+const HOLD_MS = 2000;
 const HOLD_SLACK_MS = 700;
 
 /**
@@ -92,7 +92,7 @@ export async function hold(
  * else. The fill was `bg-brand-600/40` over buttons already painted
  * `bg-brand-600`, so it composited to the button's own colour to the last unit:
  * the element was in the DOM, the transition was running, the transform was
- * animating, and the screen showed three seconds of a button doing nothing.
+ * animating, and the screen showed the whole hold as a button doing nothing.
  * Nobody holds through that, so the control read as broken on every device it
  * was tried on while the specs stayed green. What reaches the screen is the
  * only thing that distinguishes that from working, so that is what is asserted.
@@ -171,7 +171,7 @@ export async function readPairingCode(kiosk: Page): Promise<string> {
 }
 
 /**
- * Binds the kiosk to a gathering by name — the row, then the three-second hold.
+ * Binds the kiosk to a gathering by name — the row, then the two-second hold.
  *
  * The two-gesture route on purpose, even though holding the row does the whole
  * thing now: this is the path with the labelled button on it, and it is the one

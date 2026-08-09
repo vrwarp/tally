@@ -2,7 +2,7 @@
  * The label printer, for whoever set the kiosk up.
  *
  * Reached from the event chooser, which is already behind the staff gate — the
- * three-second hold on the search screen's Clear key — deliberately reusing that
+ * two-second hold on the search screen's Clear key — deliberately reusing that
  * gate rather than inventing a second gesture nobody would be told about.
  * Everything here is staff-facing: a parent never sees this screen, and a parent
  * never sees a printer error anywhere else either.
