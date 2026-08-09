@@ -43,10 +43,29 @@ away from it.
 
 On top of `BRIEF.md`'s list:
 
-- **A parent must never meet a reprint control.** The rule this codebase already
-  states: "a parent-facing reprint button is a roll of labels on the floor." A
-  parent re-tapping a child who is already checked in gets a statement, not a
-  button, and that must stay true.
+- **A parent meets a reprint control in one window and nowhere else.** The rule
+  this codebase states is "a parent-facing reprint button is a roll of labels on
+  the floor", and round 2 blocked the first attempt at an exception: a cap of
+  one per *child* is not a cap on a *person*, so anybody in the lobby could walk
+  the register and produce forty-five badges carrying a minor's name, grade,
+  gathering and start time.
+
+  The exception that was taken instead is narrow, and it is the size of the
+  failure it serves — *I checked in just now and no sticker came out*:
+
+  > The offer appears on the already-checked-in screen **only for a child
+  > checked in at this kiosk within the last ten minutes**, and only where a
+  > label would actually come out. Once per child, spent by any label that
+  > leaves the printer for them, staff reprints included.
+
+  Outside that window — every other child, and the same child eleven minutes
+  later — the screen is a statement pointing at the desk, and there is nothing
+  to press. A roster-walk therefore reaches only children checked in at this
+  kiosk in the last ten minutes, which is a queue somebody is standing in.
+
+  Everything else about a parent-facing control still holds: no printer state
+  may leak to them, nothing may touch the register, and the ✓ that answers the
+  question they came with stays the heaviest thing on the screen.
 - **A reprint must not touch attendance.** No check-in, no check-out, no
   arrival id, nothing written upstream. It is one sticker and nothing else.
 - **The kiosk stays bound.** Any solution that requires leaving the gathering to
@@ -71,6 +90,9 @@ On top of `BRIEF.md`'s list:
 | `reprint-sent` | volunteer | A name tag has just gone to the printer and there may be a sibling to do next. |
 | `reprint-confirm` | volunteer | The one press that spends a label, with what is about to print shown. |
 | `printer-recent` | volunteer | The printer screen, with the evening's labels listed in place of *Reprint the last label*. |
+| `done-offer` | **parent** | They checked in a minute ago, no sticker came out, and they have tapped their child again. The one window where a parent may print. |
+| `done-spent` | **parent** | Inside the window, but that child's label has already been printed again. |
+| `done-none` | **parent** | Outside the window, or nowhere a label would come out: the screen that ships today, plus one line saying where a name tag comes from. |
 
 ## Viewports
 
