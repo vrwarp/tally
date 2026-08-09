@@ -55,6 +55,16 @@ const SCENES: {
     views: ['phone', 'kiosktall'],
   },
   { id: 'reprint-confirm', query: 'screen=confirm', views: ['phone', 'kiosktall', 'kioskwide'] },
+  /*
+   * The parent-facing offer, which is the half of this proposal with a rule
+   * already written against it. Both states are shot at every shape: the
+   * question is not whether the control fits but whether a parent meeting it
+   * reads a statement with something quiet under it or a second button to
+   * press, and that is a composition question at every size.
+   */
+  { id: 'done-offer', query: 'screen=done&offer=offer', views: ['phone', 'kiosktall', 'kioskwide'] },
+  { id: 'done-spent', query: 'screen=done&offer=spent', views: ['phone', 'kiosktall'] },
+  { id: 'done-none', query: 'screen=done&offer=none', views: ['phone'] },
   { id: 'printer-recent', query: 'screen=printer', views: ['phone', 'kiosktall', 'kioskwide'] },
 ];
 

@@ -10,12 +10,13 @@
  *
  * Every knob is a query parameter, because the shooter addresses states by URL:
  *
- *   ?screen=staff|reprint|confirm|printer   which screen        (default reprint)
+ *   ?screen=staff|reprint|confirm|printer|done   which screen    (default reprint)
  *   ?buffer=Alva                            what has been typed      (default "")
  *   ?sent=Ramona+Alvarez                    the line after a print lands
  *   ?present=1,2                            ids already checked in tonight
  *   ?printer=trouble|none                   what the staff screen says about it
  *   ?recent=0                               a printer screen with nothing on it
+ *   ?offer=offer|spent|none                 the parent-facing offer's three states
  */
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -26,6 +27,7 @@ import { StaffScreen } from './screens/StaffScreen';
 import { ReprintScreen } from './screens/ReprintScreen';
 import { ReprintConfirmScreen } from './screens/ReprintConfirmScreen';
 import { PrinterScreenProto, type PrintedLabel } from './screens/PrinterScreenProto';
+import { AlreadyCheckedInScreen, type ReprintOffer } from './screens/AlreadyCheckedInScreen';
 
 const params = new URLSearchParams(location.search);
 
@@ -98,6 +100,17 @@ export function Prototype() {
         lines={['Ramona Alvarez', '7th grade', 'Wednesday Night', '6:30 PM']}
         printedAt={params.get('printedAt') ?? '6:41 PM'}
         onPrint={() => {}}
+        onBack={() => {}}
+      />
+    );
+  }
+
+  if (screen === 'done') {
+    return (
+      <AlreadyCheckedInScreen
+        student={STUDENTS[0]!}
+        offer={(params.get('offer') as ReprintOffer) ?? 'offer'}
+        onReprint={() => {}}
         onBack={() => {}}
       />
     );
