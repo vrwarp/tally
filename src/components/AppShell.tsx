@@ -164,13 +164,22 @@ export function AppShell({ children }: { children: ReactNode }) {
       data-rail={showNav ? '' : undefined}
       className="group/shell flex min-h-dvh flex-col bg-ink-950 lg:flex-row"
     >
-      {/* Desktop: a persistent sidebar. */}
+      {/*
+       * Desktop: a persistent sidebar — window-height and pinned, not
+       * page-height. The shell is one document scroller, so a sidebar left to
+       * stretch takes the height of whatever page it sits beside, and `mt-auto`
+       * then parks the account button at the bottom of a student's four screens
+       * of attendance rather than at the bottom of the monitor, which is the one
+       * place it is worth having. Five nav items never come close to filling a
+       * window, so nothing is lost by capping it; `overflow-y-auto` is only
+       * there so a sixth on a short laptop scrolls rather than disappears.
+       */}
       {showNav ? (
-        <aside className="hidden lg:flex lg:w-56 lg:shrink-0 lg:flex-col lg:gap-1 lg:border-r lg:border-ink-800 lg:px-3 lg:py-4">
+        <aside className="hidden lg:sticky lg:top-0 lg:flex lg:h-dvh lg:w-56 lg:shrink-0 lg:flex-col lg:gap-1 lg:self-start lg:border-r lg:border-ink-800 lg:px-3 lg:py-4">
           <span className="px-2 pb-4 text-sm font-bold uppercase tracking-widest text-brand-400">
             Tally
           </span>
-          <nav className="flex flex-col gap-1">
+          <nav className="flex min-h-0 flex-col gap-1 overflow-y-auto">
             {items.map((item) => (
               <NavLink
                 key={item.to}

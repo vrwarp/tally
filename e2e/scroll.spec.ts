@@ -102,6 +102,51 @@ test.describe('scrolling', () => {
     ).toBeLessThanOrEqual(offset + 24);
   });
 
+  test('the desktop sidebar stays put while the page scrolls', async ({ page }) => {
+    /*
+     * The sidebar only exists above `lg`; on a phone the same navigation is the
+     * bottom tab bar, which `sticky bottom-0` already pins.
+     */
+    test.skip(test.info().project.name.includes('mobile'), 'the sidebar is desktop-only');
+
+    await openCheckIn(page);
+    await longRoster(page);
+
+    /*
+     * The account button is the bottom of the sidebar, and it is the part that
+     * gave the game away: with the sidebar taking its height from the document
+     * rather than the window, `mt-auto` parked it below four screens of roster,
+     * so signing out meant scrolling to the end of the page to find the control.
+     */
+    const account = page.locator('aside button[aria-haspopup="menu"]');
+    const viewport = () => page.evaluate(() => window.innerHeight);
+
+    await expect(account).toBeVisible();
+    const height = await viewport();
+    const start = (await account.boundingBox())!;
+    expect(
+      start.y + start.height,
+      'the account button starts below the fold, so the sidebar is taller than the window',
+    ).toBeLessThanOrEqual(height + 1);
+
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(200);
+
+    const moved = (await account.boundingBox())!;
+    await expect(account).toBeVisible();
+    expect(
+      moved.y + moved.height,
+      'the account button scrolled off with the page instead of holding the bottom of the window',
+    ).toBeLessThanOrEqual((await viewport()) + 1);
+
+    // And the nav itself came along, rather than the whole rail scrolling away.
+    const checkIn = page.locator('aside').getByRole('link', { name: 'Check in' });
+    expect(
+      (await checkIn.boundingBox())!.y,
+      'the sidebar links scrolled out of the window with the page',
+    ).toBeGreaterThanOrEqual(-1);
+  });
+
   test('leaving a scrolled roster for Students starts at the top', async ({ page }) => {
     /*
      * Mobile WebKit has no wheel to dispatch — Playwright refuses `mouse.wheel`
