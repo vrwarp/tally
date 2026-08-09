@@ -183,6 +183,44 @@ export async function patchPhonesNow(
 }
 
 /**
+ * Takes a family back out of four digits they should never have answered to.
+ *
+ * The counterpart of `patchPhonesNow`, and it exists for exactly one caller: a
+ * reviewer correcting the number a parent mistyped at the kiosk
+ * (`amend.ts`). Without it the correction is additive — the children start
+ * answering to the right digits and go on answering to the wrong ones, which
+ * means a *stranger* who types their own last four at the lobby is handed
+ * somebody else's children, correctly spelled, by name. That is the failure the
+ * kiosk's whole search screen is built to avoid, so a correction that leaves it
+ * behind is not a correction.
+ *
+ * Safe on exactly these students because they are held: nothing about them has
+ * reached a backend, so the only reason they are in this map at all is the
+ * patch their own registration made.
+ *
+ * One key, written back as a shorter list — the same read-modify-write on the
+ * same document as `patchPhonesNow`, with the same benign race. A bucket that
+ * empties is left as `[]` rather than removed, because a merged write has no
+ * way to say "this key is gone" without `FieldValue`, which nothing in
+ * `functions/src` uses; an empty bucket answers nobody, and the nightly rebuild
+ * rewrites the map from scratch anyway.
+ */
+export async function dropFromPhonesNow(
+  db: FirestoreLike,
+  last4: string,
+  studentIds: readonly string[],
+): Promise<void> {
+  const ref = db.doc(PHONE_INDEX_DOC);
+  const snapshot = await ref.get();
+  const existing = ((snapshot.data()?.last4 ?? {}) as Record<string, unknown>)[last4];
+  if (!Array.isArray(existing)) return;
+  const dropping = new Set(studentIds);
+  const kept = existing.filter((id): id is string => typeof id === 'string' && !dropping.has(id));
+  if (kept.length === existing.length) return;
+  await ref.set({ last4: { [last4]: kept.sort() } }, { merge: true });
+}
+
+/**
  * Folds the overlay into a freshly built map, and drops what it no longer owes.
  *
  * An entry leaves on either of two conditions: the backends now answer for

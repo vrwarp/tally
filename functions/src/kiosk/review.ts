@@ -102,6 +102,17 @@ export interface PendingRegistrationChild extends RegistrationChild {
   allergies: string | null;
   /** Active students who already have this name. Suspicion, not a verdict. */
   possibleDuplicates: ReviewStudentSummary[];
+  /**
+   * How the family typed this child, when a reviewer has since corrected them.
+   *
+   * Null when nobody has, which is the ordinary case and also the honest
+   * default — a card claiming to show "the form as the family filled it in"
+   * must stop claiming that the moment somebody edits it. What this buys is the
+   * second reviewer: *Michael* reading "typed Micheal" understands at a glance
+   * why the roster's Michael was not offered as a duplicate at the door, which
+   * is the difference between trusting the correction and undoing it.
+   */
+  typedAs: RegistrationChild | null;
 }
 
 /**
@@ -152,6 +163,17 @@ export interface PendingRegistration {
   /** Milliseconds until the sweep deletes this record. Negative means overdue. */
   expiresInMs: number | null;
   guardian: { firstName: string; lastName: string; phone: string } | null;
+  /**
+   * The adult's name as the family typed it, when a reviewer has corrected it.
+   *
+   * The name only, and deliberately. The *number* they typed is not kept — a
+   * mistyped one is a stranger's, and this collection's whole posture is that a
+   * phone number lives here for as long as it can help and not one day longer.
+   * `phoneCorrected` is what a second reviewer actually needs from it.
+   */
+  typedGuardianName: { firstName: string; lastName: string } | null;
+  /** Whether a reviewer replaced the number the family typed. */
+  phoneCorrected: boolean;
   /** The four digits the family types at the kiosk. */
   last4: string;
   children: PendingRegistrationChild[];
@@ -339,8 +361,23 @@ export async function listPendingRegistrations(
     const children: PendingRegistrationChild[] = await Promise.all(
       record.children.map(async (child, index) => {
         const student = students[index];
+        /*
+         * Reported only when it still says something. `typedChildren` is
+         * written whole on the first correction, so five of six children on a
+         * card carry an "as typed" identical to what is on screen — and a
+         * caption saying "typed: Robin Fields" under the name *Robin Fields*
+         * is noise on a screen whose whole job is to make one difference
+         * visible.
+         */
+        const typed = record.typedChildren?.[index] ?? null;
+        const corrected =
+          typed !== null &&
+          (typed.firstName !== child.firstName ||
+            typed.lastName !== child.lastName ||
+            typed.grade !== child.grade);
         return {
           ...child,
+          typedAs: corrected ? typed : null,
           studentId: student?.exists ? student.studentId : null,
           pendingReview: student?.data.pendingReview === true,
           mergedIntoStudentId:
@@ -370,6 +407,14 @@ export async function listPendingRegistrations(
           ? null
           : createdAt.getTime() + REGISTRATION_DOC_TTL_MS - now.getTime(),
       guardian: record.guardian,
+      typedGuardianName:
+        record.typedGuardianName !== null &&
+        record.guardian !== null &&
+        (record.typedGuardianName.firstName !== record.guardian.firstName ||
+          record.typedGuardianName.lastName !== record.guardian.lastName)
+          ? record.typedGuardianName
+          : null,
+      phoneCorrected: record.phoneCorrected,
       last4: record.last4,
       children,
       anchors: await Promise.all(record.anchorStudentIds.map((id) => summarise(db, id))),

@@ -30,6 +30,10 @@
     "uxr/kiosk-live/main.tsx",
     "uxr/team-live/main.tsx",
     "uxr/team-live/stubs.tsx",
-    "uxr/team-live/fixture.ts"
+    "uxr/team-live/fixture.ts",
+    "uxr/review-live/main.tsx",
+    "uxr/review-live/Toast.tsx",
+    "uxr/review-live/stubs.tsx",
+    "uxr/review-live/fixture.ts"
   ]
 }

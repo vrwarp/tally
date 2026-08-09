@@ -100,6 +100,12 @@ import {
   type RegisterFamilyResult,
 } from './kiosk/registration.js';
 import {
+  amendRegistration as runAmendRegistration,
+  type AmendChild,
+  type AmendGuardian,
+  type AmendRegistrationResult,
+} from './kiosk/amend.js';
+import {
   parseRecordVisitorParentRequest,
   recordVisitorParent as runRecordVisitorParent,
   type RecordVisitorParentResult,
@@ -2741,6 +2747,51 @@ export const approveRegistration = onCall<
     uid: request.auth!.uid,
     logger,
   });
+});
+
+/**
+ * Not yet: fix what the family typed first.
+ *
+ * The third answer this screen was missing. Approve is permanent and discard
+ * loses the family, so a misspelling used to have no proportionate response —
+ * see `kiosk/amend.ts` for what a correction has to carry with it, which is
+ * considerably more than the field being corrected.
+ *
+ * Core team, like every other write on this screen: it renames a roster row and
+ * it can move which four digits find a family at the lobby.
+ */
+export const amendRegistration = onCall<
+  {
+    registrationId: string;
+    child?: AmendChild;
+    guardian?: AmendGuardian;
+  },
+  Promise<AmendRegistrationResult>
+>({ timeoutSeconds: 120, memory: '256MiB' }, async (request) => {
+  await requireCoreTeam(request.auth?.uid);
+  const registrationId = request.data?.registrationId;
+  if (typeof registrationId !== 'string' || registrationId.trim().length === 0) {
+    throw new HttpsError('invalid-argument', 'registrationId is required.');
+  }
+
+  try {
+    return await runAmendRegistration({
+      db: db(),
+      registrationId: registrationId.trim(),
+      // Passed through as they arrived: every field is parsed by the door's own
+      // rules inside the call, so a shape check here would be a second, weaker
+      // copy of the one that matters.
+      child: request.data?.child,
+      guardian: request.data?.guardian,
+      uid: request.auth!.uid,
+      logger,
+    });
+  } catch (error) {
+    if (error instanceof RegistrationInputError) {
+      throw new HttpsError('invalid-argument', error.message);
+    }
+    throw error;
+  }
 });
 
 /** No: take them off the roster, and forget the phone number. */

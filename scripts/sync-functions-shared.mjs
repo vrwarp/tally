@@ -38,6 +38,7 @@ export const SHARED_FILES = [
   'kioskTheme.ts',
   'materialize.ts',
   'phoneDigits.ts',
+  'registrationFields.ts',
   'participation.ts',
   'eventAccess.ts',
 ];

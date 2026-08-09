@@ -148,6 +148,87 @@ test.describe('reviewing a family the kiosk recorded', () => {
     }
   });
 
+  test('corrects a misspelled child, and re-asks the roster about the corrected name', async ({
+    browser,
+    page,
+    signedInAs,
+  }) => {
+    /*
+     * The whole point of correcting on this screen, end to end.
+     *
+     * A parent typing on a lobby keyboard misspells their own child, and the
+     * misspelling is *why* the door reported no collision: the duplicate scan
+     * matched on the name as typed. Fixing it has to re-ask the roster in the
+     * same breath, or a reviewer gets a clean-looking card and a released
+     * approve button over a duplicate the fix itself created.
+     */
+    const SURNAME = `Okonkwo${RUN}`;
+    await signedInAs('core');
+    const { context, page: kiosk } = await openKiosk(browser);
+
+    try {
+      await pairKiosk(kiosk, page);
+      await bindTo(kiosk, /nursery/i);
+      // The one the church will already have, registered and approved first so
+      // it is an ordinary roster row by the time the misspelling arrives.
+      await registerAtKiosk(kiosk, 'Michael', SURNAME);
+
+      await gotoReady(page, '/review');
+      const first = page.locator('section', { hasText: `Renata ${SURNAME}` }).first();
+      await expect(first).toBeVisible({ timeout: 30_000 });
+      await first.getByRole('button', { name: /Approve and add/i }).click();
+      await first.getByRole('button', { name: /^Yes — add/i }).click();
+      await expect(first).toBeHidden({ timeout: 30_000 });
+
+      // And now the typo, from a second run through the wizard.
+      await registerAtKiosk(kiosk, 'Micheal', SURNAME);
+
+      await gotoReady(page, '/review');
+      const card = page.locator('section', { hasText: `Renata ${SURNAME}` }).first();
+      await expect(card).toBeVisible({ timeout: 30_000 });
+      // No collision, because `Micheal` collides with nobody.
+      await expect(card.getByText(/shares this name/i)).toBeHidden();
+      await expect(card.getByRole('button', { name: /Approve and add/i })).toBeEnabled();
+
+      /* ---- The correction ------------------------------------------------ */
+
+      await card.getByRole('button', { name: new RegExp(`Correct Micheal ${SURNAME}`, 'i') }).click();
+      // Everything else on the card is held while a correction is open: its
+      // facts are in flux, and the approve caption names children by names
+      // somebody is in the middle of changing.
+      await expect(card.getByRole('button', { name: /Approve and add/i })).toBeDisabled();
+
+      const firstName = card.getByLabel('First name');
+      await firstName.fill('Michael');
+      await card.getByRole('button', { name: /Save the correction/i }).click();
+
+      /* ---- What the correction cost -------------------------------------- */
+
+      // The roster row moved with it, and so did the collision the door missed.
+      await expect(card.getByText(`Michael ${SURNAME}`).first()).toBeVisible({ timeout: 30_000 });
+      await expect(card.getByText(/shares this name/i)).toBeVisible({ timeout: 30_000 });
+      // Held on a duplicate that did not exist thirty seconds ago, which is the
+      // reason the caption above Save says the roster will be re-asked.
+      await expect(card.getByRole('button', { name: /Approve and add/i })).toBeDisabled();
+      // And the card stops claiming to be the form the family filled in.
+      await expect(card.getByText(new RegExp(`Typed at the kiosk as Micheal ${SURNAME}`))).toBeVisible();
+
+      const students = await readCollection('students');
+      // By name rather than by "the held one": other specs leave families
+      // waiting on this same screen, which is the state it exists for.
+      const corrected = students.find(
+        (doc) => doc.data.searchName === `michael ${SURNAME}`.toLowerCase() &&
+          doc.data.pendingReview === true,
+      );
+      // The kiosk searches on `searchName`. A name corrected on Tuesday that
+      // stopped being findable on Friday would be worse than the typo.
+      expect(corrected, 'the corrected child is findable under the new name').toBeDefined();
+      expect(corrected!.data.firstName).toBe('Michael');
+    } finally {
+      await context.close();
+    }
+  });
+
   test('takes a family off the roster, and forgets them, when they are not ours', async ({
     browser,
     page,
