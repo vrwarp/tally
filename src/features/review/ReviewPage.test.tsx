@@ -846,3 +846,70 @@ describe('a parent taken at a door', () => {
     );
   });
 });
+
+/**
+ * The two cards that have nobody held and are still not about the adult.
+ *
+ * Both were caught by `triage-stress.spec.ts` rather than by anything here,
+ * which is the wrong way round for a distinction the whole foot reads off.
+ */
+describe('what is not a parent-only card', () => {
+  it('keeps talking about the children when a push failed and the hold came off', async () => {
+    // Approving clears the hold before it pushes, so a family whose backend was
+    // down is left unheld with their children still absent upstream. The retry
+    // is about the children, and the button has to keep saying so.
+    listPendingRegistrations.mockResolvedValue({
+      data: [
+        registration({
+          settled: true,
+          lastError: 'Planning Center is unavailable.',
+          lastErrorKind: 'children',
+          children: [
+            {
+              firstName: 'Robin',
+              lastName: 'Fields',
+              grade: 4,
+              studentId: 'held-1',
+              pendingReview: false,
+              mergedIntoStudentId: null,
+              allergies: null,
+              possibleDuplicates: [],
+            },
+          ],
+        }),
+      ],
+    });
+    mount();
+
+    expect(await screen.findByRole('button', { name: /Finish adding them/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Add Dana$/ })).not.toBeInTheDocument();
+  });
+
+  it('does not promise a roster row to a registration whose children were never written', async () => {
+    // A registration that died between claiming its id and committing its
+    // batch. "Robin stays on the roster" would be a sentence about a child who
+    // is not on it.
+    listPendingRegistrations.mockResolvedValue({
+      data: [
+        registration({
+          children: [
+            {
+              firstName: 'Robin',
+              lastName: 'Fields',
+              grade: 4,
+              studentId: null,
+              pendingReview: false,
+              mergedIntoStudentId: null,
+              allergies: null,
+              possibleDuplicates: [],
+            },
+          ],
+        }),
+      ],
+    });
+    mount();
+
+    expect(await screen.findByRole('button', { name: /Not ours/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Forget the number/i })).not.toBeInTheDocument();
+  });
+});

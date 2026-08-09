@@ -392,8 +392,26 @@ function RegistrationCard({
    * threat against a child this press cannot touch — the discard callable
    * deliberately leaves an unheld student alone — so the foot says what will
    * actually happen instead.
+   *
+   * "Nobody is held" is not enough to say that, though, and the two cards it
+   * gets wrong are the two worth naming:
+   *
+   *   - **The children were never written.** A registration that died between
+   *     claiming its id and committing its batch names student documents that
+   *     do not exist. Nothing is held because there is nothing at all, and
+   *     "Émile stays on the roster" would be a sentence about a child who is
+   *     not on it. Hence `studentId !== null`.
+   *   - **The push failed and the hold came off.** Approving clears the hold
+   *     *before* it pushes, deliberately, so a family whose backend was down is
+   *     left unheld with their children still absent upstream. The retry is
+   *     about the children, and the button has to keep saying so.
    */
-  const parentOnly = held.length === 0 && row.guardian !== null;
+  const parentOnly =
+    row.guardian !== null &&
+    row.children.length > 0 &&
+    row.children.every((child) => child.studentId !== null && !child.pendingReview) &&
+    row.lastErrorKind !== 'children' &&
+    row.lastErrorKind !== 'both';
   /** The children this card is *about*, held or not — for a sentence to name. */
   const named = listNames(held.length > 0 ? held : row.children);
   /*
