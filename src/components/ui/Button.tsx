@@ -5,7 +5,18 @@ type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
 type Size = 'sm' | 'md' | 'lg';
 
 const VARIANTS: Record<Variant, string> = {
-  primary: 'bg-brand-500 text-white hover:bg-brand-400 active:bg-brand-600',
+  /*
+   * The disabled primary sheds presence, not legibility.
+   *
+   * The shared `disabled:opacity-50` fades a filled button and its label by the
+   * same amount, which on the brand fill left the label at about 2:1 against
+   * its own background — the least readable text in the app, printed on its
+   * largest colour field, on the one control that is not yet usable. A button
+   * waiting for input should get quieter, not harder to read.
+   */
+  primary:
+    'bg-brand-500 text-white hover:bg-brand-400 active:bg-brand-600 ' +
+    'disabled:bg-ink-800 disabled:text-ink-400 disabled:opacity-100',
   secondary: 'bg-ink-800 text-ink-100 ring-1 ring-ink-700 hover:bg-ink-700',
   ghost: 'bg-transparent text-ink-300 hover:bg-ink-800 hover:text-ink-100',
   danger: 'bg-danger-600 text-white hover:bg-danger-500',

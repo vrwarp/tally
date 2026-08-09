@@ -625,7 +625,26 @@ export function CheckboxField({ label, hint, className, ...rest }: CheckboxField
       <input
         id={id}
         type="checkbox"
-        className={cn('mt-0.5 size-5 shrink-0 rounded border-ink-600 bg-ink-900 accent-brand-500', className)}
+        /*
+         * Drawn, not delegated.
+         *
+         * `border-ink-600 bg-ink-900 accent-brand-500` were three classes that
+         * never reached the pixel: a native checkbox is painted by the user
+         * agent, so what shipped was Chrome's own control — a warm grey slab
+         * off Tally's ramp, reading as *filled* where it means empty, and with
+         * no answer at all for the light theme, since the ramp flips and the
+         * widget does not. `appearance-none` is what makes the box ours: an
+         * ink-950 recess with a ramp-coloured edge, and the same brand fill it
+         * already had when checked.
+         */
+        className={cn(
+          'mt-0.5 size-5 shrink-0 appearance-none rounded bg-ink-950 ring-1 ring-inset ring-ink-600',
+          'checked:bg-brand-500 checked:ring-brand-500',
+          // The tick itself is one rule in `index.css` — an arbitrary `bg-[url(…)]`
+          // holding an inline SVG does not survive Tailwind's value parser.
+          'ui-check',
+          className,
+        )}
         {...rest}
       />
       <label htmlFor={id} className="text-sm text-ink-200">

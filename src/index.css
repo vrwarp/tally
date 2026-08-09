@@ -347,6 +347,23 @@
 }
 
 @layer utilities {
+  /*
+   * The tick inside a checkbox Tally draws itself.
+   *
+   * `CheckboxField` is `appearance-none` — see the note there — which buys the
+   * empty state a ramp colour and costs it the user agent's checkmark. This
+   * draws the mark back on. It lives here rather than in the class list because
+   * an inline SVG in an arbitrary `bg-[url(…)]` does not survive Tailwind's
+   * value parser: the class is emitted, silently, with no rule behind it, and
+   * what ships is a filled blue square that says nothing.
+   */
+  .ui-check:checked {
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2016%2016'%20fill='none'%20stroke='white'%20stroke-width='2.5'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='m3.5%208.5%203%203%206-6'/%3E%3C/svg%3E");
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 0.875rem;
+  }
+
   .pb-safe {
     padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
   }

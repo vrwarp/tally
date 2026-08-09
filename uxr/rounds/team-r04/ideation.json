@@ -1,0 +1,79 @@
+{
+  "changes": [
+    {
+      "scene": "team-core",
+      "viewport": "phone, desktop",
+      "addresses": [
+        "The caveat is ranked as the least important line on the card whose conclusion it corrects — smallest type, same tone as the description above it (visual-phone)",
+        "Two subtitle lines at one tone, ranked backwards: the line that restates the title is larger than the line that adds the fact (design-phone)",
+        "The caveat and the 'Last seen' column label are the same size, weight and colour on the same baseline, so they read as one line of header text (design-desktop)"
+      ],
+      "change": "On the read-only roster card the description `People with a Tally profile.` is gone and the caveat takes its place and its treatment: one line, `mt-0.5 text-sm text-ink-400`, directly under `Signed-in team 11`. Measured after: the caveat is now 14px at rgb(148,163,184) (~7:1, the same value the page deck was stepped to in round 3), the `Last seen` label stays 12px ink-500, and the header band drops from 91px to 71px — the admin card's band is 70px, so the two pages' roster headers now agree.",
+      "rationale": "Both phone critics offered the same two options — promote the caveat, or let the description give way — and taking both at once costs one element instead of adding a fourth tone to a three-line grey stack. The description says nothing the title and the count do not; the caveat is the only sentence on the page that changes what the count means. Collapsing to one line also settles the desktop finding without inventing a treatment for the column label: the caveat/label pair now differs by 2px of size and one ramp step, which is exactly the separation the critic said already works on the admin frame. I did not give `Last seen` uppercase or a weight step — this app has no small-caps column labels anywhere, and adding one on the quietest page would be a new visual language for a problem that a size difference has already solved.",
+      "breakpoint": "both — read-only permission only; the admin card keeps `description=\"People with a Tally profile.\"` and its `hidden lg:block`",
+      "implementation": "`TeamPage.tsx`: the roster `<CardHeader>` gets `description={isAdmin ? 'People with a Tally profile.' : 'Outstanding invitations are not listed here.'}`, and the `hidden lg:block` on the description applies only on the admin branch. `Card.tsx`: whichever element carries the read-only line renders as `<p className=\"mt-0.5 text-sm text-ink-400\">` — 14px, one ramp step above the shared `text-ink-500` description. Round 3's separate 12px `note` element is no longer needed."
+    },
+    {
+      "scene": "team",
+      "viewport": "desktop, phone",
+      "addresses": [
+        "Four of eleven members hold elevated access and all eleven role values are painted identically; the stronger treatment is on the hypothetical grant in the Invited card and the flat one is on the live access (visual-desktop)"
+      ],
+      "change": "Mark the two elevated values, do not dim the nine plain ones. (a) The role `<select>` renders its value in `text-brand-300` when the role is not `counselor` — Eli (Admin), Grace and Miriam (Core team); Counselor stays `text-ink-100`. (b) Dana's static `Admin` in the self row becomes the same brand chip the read-only page gives her, pulled back by `-ml-1.5` so its label lands at x=756, the same optical edge as the ten select values below it.",
+      "rationale": "The critic's own framing, taken literally, because round 3 was right that stepping a select value down at rest makes a control read as inert text — stepping the exceptions up has the opposite property. Brand is already this page's word for elevated access: the Invited card's pending Core team wears it, and the read-only page's Admin and Core team wear it. Dana gets a chip rather than brand text because hers is the one value in that column that is not a control, and the chip is what says so — it also makes the same person read identically on both pages. Chip over text costs 1px of row height on the self row only (54px against the grid's 53); I left it, because the alternatives were a badge with no vertical padding or dropping the chip, and both cost more than a pixel on one row.",
+      "breakpoint": "both — the tone is data-driven, not width-driven; the chip's `@2xl:pl-3` lane from round 3 is unchanged",
+      "implementation": "`TeamPage.tsx`, roster row. Editable branch: the `<select>` className gains `cn(member.role === 'counselor' ? 'text-ink-100' : 'text-brand-300')` in place of the fixed `text-ink-100`. Self/non-editable branch: replace the static role span with `<Badge tone={member.role === 'counselor' ? 'neutral' : 'brand'} className=\"-ml-1.5\">{ROLE_LABEL[member.role]}</Badge>` — `-ml-1.5`, not round 3's `-mx-1.5`, because this badge leads a line of prose rather than standing alone in a column, and cancelling its right padding butts the chip's ring against 'Another admin has to change this.'"
+    },
+    {
+      "scene": "team",
+      "viewport": "phone",
+      "addresses": [
+        "Withdraw and the 'Active' checkbox label are the same 14px medium ink-400 on the same line, and nothing in the resting frame says which of the two words is tappable; the role select already carries a ring at rest for exactly this reason (visual-phone)"
+      ],
+      "change": "The Withdraw button wears `ring-1 ring-ink-700` at rest and gives up its `-ml-4` so the ringed box sits on the card's content edge — measured at x=32, the same lane as the 110×44 role select in the member rows one card down. Where the pointer is fine, the ring goes transparent and the `-ml-4` comes back, so the desktop frame is byte-for-byte what it was. Colour, weight and the 98×44 target are untouched.",
+      "rationale": "This is the codebase's existing answer to the same question, applied to the control that was missed: `ring-1 ring-ink-700` at rest, dropped where hover can do the work. The negative margin had to go with it — a ring on a box pulled 16px left would draw against the card's own border — and dropping it puts the box, not the label, on the content edge, which is precisely how the ringed select next door is aligned. Nothing about the destructive action gets louder.",
+      "breakpoint": "below `pointer: fine` (touch). At `pointer: fine` — every desktop and laptop — unchanged.",
+      "implementation": "`TeamPage.tsx`, the Withdraw `<Button variant=\"ghost\" size=\"sm\">`: `className=\"ring-1 ring-ink-700 pointer-fine:-ml-4 pointer-fine:ring-transparent\"`, replacing the bare `-ml-4`."
+    },
+    {
+      "scene": "team, team-core",
+      "viewport": "desktop",
+      "addresses": [
+        "The deck sets as one 624px line followed by a two-word widow; the first line runs past the measure at which a reader stops tracking (design-desktop)"
+      ],
+      "change": "The deck gains `text-balance` inside its existing `max-w-2xl`. It now sets as two lines of comparable length on the laptop and three even lines on the phone, with no widow, and the cap stays where it was.",
+      "rationale": "A measure cap set to this sentence's length would be a number chosen from this seed's copy; `text-wrap: balance` is the same fix expressed as a rule, and it stays right if the sentence changes. One class, no layout change, no new tone.",
+      "breakpoint": "both — it improves the phone's ragging too, at no cost",
+      "implementation": "`TeamPage.tsx`, the page deck `<p>`: `className=\"mt-0.5 max-w-2xl text-balance text-sm text-ink-400\"`."
+    },
+    {
+      "scene": "team-core",
+      "viewport": "desktop",
+      "addresses": [
+        "Dropping two control columns put all the freed width in the identity column: a ~175px canyon between the email and the recency value, gap sequence 175/74/50 with no system (design-desktop)"
+      ],
+      "change": "The read-only row template caps its identity track: `@2xl:grid-cols-[minmax(0,20rem)_10.5rem_7.5rem]` in place of `minmax(0,1fr)`, on the card header and all eleven rows. Measured after: the canyon closes from 175px to 78px, the sequence is 78 / 74 / 96 — a trailing gutter inside the card rather than a hole in the middle of the row — and `Last seen` moves with the column it labels, to x=656 over its values.",
+      "rationale": "The critic's own prescription: cap the identity column, let the slack fall at the end of the row, no second column and no change to the 768px card. 20rem rather than the ~18rem that would put 32px after the longest email, because the header shares this grid and the caveat is 302px of unbreakable sentence — at 18rem it wrapped to two lines and the band grew back to 91px. 20rem is the widest thing the column actually has to hold, which is the honest cap; the longest email keeps 62px of slack and `truncate` still handles a longer one.",
+      "breakpoint": "container `@2xl` and up — desktop only in practice; the phone stack is unaffected. Read-only page only.",
+      "implementation": "`TeamPage.tsx`: the shared column-template string passed to the roster rows and to `CardHeader`'s `columns` prop becomes `'@2xl:grid-cols-[minmax(0,20rem)_10.5rem_7.5rem]'` on the non-admin branch. The admin branch keeps `'@2xl:grid-cols-[minmax(0,1fr)_10.5rem_7.5rem_6.5rem]'`."
+    }
+  ],
+  "declined": [
+    {
+      "finding": "The closed Invited header's three elements sit on three baselines and the '1 suspended' badge starts on a fourth left edge (design-phone, minor).",
+      "why": "Agreed with the finding, and with the read on the fix: this is `CardHeader`'s internal layout — the title block, the trailing action slot and their alignment against each other — shared by every card in Tally. Re-cutting how a shared header aligns an action against a two-line title block in a tidying pass is how a converged loop un-converges, and the payoff is 6px of badge inset on one card in one state. Worth doing when `CardHeader` is next opened for its own reasons."
+    },
+    {
+      "finding": "The two card headers inset their titles differently — 13px against 22.5px — because a single-line title block gets centred in a 44px minimum (design-phone, minor).",
+      "why": "Same reason, and the diagnosis is right: the `min-h-11 flex-col justify-center` round 3 added to settle the two band heights is what produces the variance. Replacing centring with a constant top inset is a change to every card's padding model in the app, evaluated on four screens I am not shooting this round. Recorded as the next thing to do to `CardHeader`, with round 3's height-equalising as the thing to undo when it happens. Note that this round shortens the read-only roster header by a line, which removes one of the three cases."
+    },
+    {
+      "finding": "Give the 'Last seen' column label a treatment the header prose does not share — a step in weight, tone or case (design-desktop, minor).",
+      "why": "Half taken. The pair is now separated by size and tone because the caveat moved up to 14px/ink-400, which is the condition the critic themselves said already works on the admin frame. The other half — uppercase or a weight step on the label — would be the app's first small-caps column heading, and the brief is explicit that a new visual language is not what a refinement round is for."
+    },
+    {
+      "finding": "Dana's self row is now 54px against the other ten rows' 53px, because a brand chip's line box is 1px taller than the 14px static text it replaced.",
+      "why": "Created by this round, declared here rather than patched. The fixes available were a badge with `py-0` — which would make it the only chip in Tally with no vertical padding — or dropping the chip, which loses the finding it answers. One pixel on the first row of an eleven-row grid is below what the frame shows."
+    }
+  ]
+}
