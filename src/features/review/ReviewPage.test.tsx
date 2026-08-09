@@ -765,3 +765,84 @@ describe('what the card refuses to claim', () => {
     );
   });
 });
+
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A parent contact a counselor took at a door.
+ *
+ * The narrower card, and the one whose every sentence had to be rewritten: its
+ * child is not held, so the foot's stock phrasing — "adds Robin", "takes Robin
+ * off the roster" — would promise things this press cannot do. The claims below
+ * are that a reviewer is told what the two buttons actually touch.
+ */
+function counselorRow(): PendingRegistration {
+  return registration({
+    registrationId: 'reg-door',
+    source: 'counselor',
+    guardian: { firstName: 'Rosa', lastName: 'Delgado', phone: '5550134422' },
+    last4: '4422',
+    children: [
+      {
+        firstName: 'Maya',
+        lastName: 'Chen',
+        grade: 9,
+        studentId: 'live-1',
+        // Never held: the counselor's own device wrote them, and the ordinary
+        // trigger pushed them minutes later.
+        pendingReview: false,
+        mergedIntoStudentId: null,
+        allergies: null,
+        possibleDuplicates: [],
+      },
+    ],
+    settled: true,
+  });
+}
+
+describe('a parent taken at a door', () => {
+  beforeEach(() => {
+    listPendingRegistrations.mockResolvedValue({ data: [counselorRow()] });
+  });
+
+  it('says where the child already is, so nobody reads the card as being about them', async () => {
+    mount();
+    expect(await screen.findByText(/Taken at the door/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/already on the roster and already queued for the church/i),
+    ).toBeInTheDocument();
+  });
+
+  it('offers to add the adult, not the child', async () => {
+    mount();
+    // "Approve and add" would be a promise about children who need nothing.
+    expect(await screen.findByRole('button', { name: /^Add Rosa$/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Approve and add/i })).not.toBeInTheDocument();
+  });
+
+  it('names the roster row the parent is about to be attached to', async () => {
+    const user = userEvent.setup();
+    mount();
+    await user.click(await screen.findByRole('button', { name: /^Add Rosa$/ }));
+
+    expect(screen.getByText(/attached to Maya/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^Yes — add Rosa$/ }));
+    await waitFor(() => expect(approveRegistration).toHaveBeenCalledWith({ registrationId: 'reg-door' }));
+  });
+
+  it('discards a number rather than a child', async () => {
+    const user = userEvent.setup();
+    mount();
+
+    // "Not ours" over a card showing a child's name reads as "remove this
+    // child" — and the callable deliberately leaves an unheld student alone.
+    expect(screen.queryByRole('button', { name: /Not ours/i })).not.toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: /^Forget the number$/ }));
+    expect(screen.getByText(/Maya stays on the roster/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /^Yes, forget the number$/ }));
+    await waitFor(() =>
+      expect(discardRegistration).toHaveBeenCalledWith({ registrationId: 'reg-door' }),
+    );
+  });
+});

@@ -145,6 +145,12 @@ export interface ParsedRegistration {
 /**
  * Where a registration record came from.
  *
+ * `'kiosk'` is a family who typed themselves in at the lobby screen, children
+ * and all. `'counselor'` is the narrower one: a leader at a door quick-added a
+ * visitor — that child is already on the roster and already queued upstream in
+ * the ordinary way — and then took down a parent's name and number, which has
+ * nowhere else in Tally to go. Only the adult is waiting on that record.
+ *
  * `'qr'` is legacy: the phone form that wrote it was retired in Aug 2026, and
  * nothing writes it any more — but records live 30 days, and the read side
  * (this union, `readRegistration`, the review card's "from their own phone"
@@ -152,7 +158,7 @@ export interface ParsedRegistration {
  * exist. Tolerant reads of old shapes are this codebase's standing posture;
  * the union costs three lines.
  */
-export type RegistrationSource = 'kiosk' | 'qr';
+export type RegistrationSource = 'kiosk' | 'qr' | 'counselor';
 
 export interface RegisteredChild {
   studentId: string;
@@ -218,7 +224,7 @@ function refuse(message: string): never {
  * would put that on a sticker. Apostrophes and hyphens are kept — O'Brien and
  * Anne-Marie are names, and the kiosk keyboard has both keys for this reason.
  */
-function parseName(raw: unknown, field: string): string {
+export function parseName(raw: unknown, field: string): string {
   if (typeof raw !== 'string') refuse(`${field} is required.`);
   const value = raw.normalize('NFC').trim().replace(/\s+/g, ' ');
   if (value.length === 0) refuse(`${field} is required.`);
@@ -445,7 +451,7 @@ export function readRegistration(data: Record<string, unknown>): RegistrationRec
   const rawDuplicates = (data.possibleDuplicateOf ?? {}) as Record<string, unknown>;
   return {
     status: data.status === 'complete' ? 'complete' : 'pending',
-    source: data.source === 'qr' ? 'qr' : 'kiosk',
+    source: data.source === 'qr' || data.source === 'counselor' ? data.source : 'kiosk',
     eventId: typeof data.eventId === 'string' ? data.eventId : null,
     studentIds: ids,
     childCount: typeof data.childCount === 'number' ? data.childCount : ids.length,

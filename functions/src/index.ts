@@ -100,6 +100,11 @@ import {
   type RegisterFamilyResult,
 } from './kiosk/registration.js';
 import {
+  parseRecordVisitorParentRequest,
+  recordVisitorParent as runRecordVisitorParent,
+  type RecordVisitorParentResult,
+} from './kiosk/visitorParent.js';
+import {
   approveRegistration as runApproveRegistration,
   discardRegistration as runDiscardRegistration,
   listPendingRegistrations as listPending,
@@ -2604,6 +2609,47 @@ export const registerFamily = onCall<Record<string, unknown>, Promise<RegisterFa
     }
   },
 );
+
+/**
+ * A parent contact a counselor was given at the door.
+ *
+ * The quick-add itself is still a client write — three fields, an atomic batch,
+ * a green row before the network has answered — and it stays that way. This is
+ * the optional second half: a leader standing next to the adult who brought the
+ * child takes down a name and a number, and there is nowhere on a student
+ * document those may live (`noMirroredPersonalData` in `firestore.rules`, and
+ * that is the point rather than an obstacle). So they land on a registration
+ * record, held for the Review screen, exactly as a lobby family's do.
+ *
+ * `requireMember`, not `requireCoreTeam`: a counselor who may put a child on
+ * the roster may certainly write down a phone number for somebody else to act
+ * on. What they cannot do is the acting — `addParent` decides which David Kim
+ * this is, and that stays core team, on a screen, on a Tuesday.
+ */
+export const recordVisitorParent = onCall<
+  Record<string, unknown>,
+  Promise<RecordVisitorParentResult>
+>({ timeoutSeconds: 120, memory: '256MiB' }, async (request) => {
+  await requireMember(request.auth?.uid);
+  const uid = request.auth?.uid;
+  if (typeof uid !== 'string') {
+    throw new HttpsError('unauthenticated', 'Sign in first.');
+  }
+
+  try {
+    return await runRecordVisitorParent({
+      db: db(),
+      request: parseRecordVisitorParentRequest(request.data),
+      uid,
+      logger,
+    });
+  } catch (error) {
+    if (error instanceof RegistrationInputError) {
+      throw new HttpsError('invalid-argument', error.message);
+    }
+    throw error;
+  }
+});
 
 /* -------------------------------------------------------------------------- */
 /* Reviewing what the door recorded                                            */

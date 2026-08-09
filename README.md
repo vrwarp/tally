@@ -22,7 +22,10 @@ door who sees an empty screen concludes the app is broken.
   students who actually come to *this* gathering. A tap flashes green before the write lands, and
   the row does not move. Undo is one tap, no dialog.
 - **Quick-add a visitor** — first name, last name, grade — as a single atomic write that also checks
-  them in, flags the profile incomplete, and queues a push upstream.
+  them in, flags the profile incomplete, and queues a push upstream. A parent's name and number can
+  be taken alongside it when the adult is standing there, optionally and behind a disclosure; it
+  waits on the same review queue a lobby registration does, because which household a parent joins
+  is a decision for somebody with the church's directory open.
 - **One-off trips** carry their own RSVP list, so the counselor at the bus door sees the trip list
   rather than the whole ministry.
 - **Check-out**, per gathering, for rooms where children are handed back: absent, in the room,
