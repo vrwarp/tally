@@ -25,6 +25,7 @@ result portable back into `src/`.
 | `playwright.config.ts` | The end-to-end stack, at phone (390×844) and desktop (1440×900). |
 | `shoot.ts` | Renders prototype HTML to PNG. `-fold` is what fits without scrolling; `-full` is the whole page. |
 | `kiosk-live/` | The kiosk's screens mounted from `src/` and shot straight, state by state. See below. |
+| `team-live/` | The Team screen mounted from `src/` against a fixture, and frozen from there. Same argument as the kiosk: two subscriptions and a profile is not worth an emulator suite. |
 | `measure.ts` | Re-runs the walkthrough's measurements against the frozen scenes: how far each page scrolls, and whether it scrolls sideways. |
 | `baseline/` | The frozen app as it was. Never edited. |
 | `prototype/` | The working copy the ideation agent edits. |
@@ -77,6 +78,22 @@ scrolls sideways. A fixed-height row whose contents are wider than the glass
 takes the whole grid with it rather than clipping, and the frame looks identical
 either way — it is the viewport in both cases. The shooter exits non-zero
 instead.
+
+## The team screen is mounted, not walked to
+
+```bash
+npm run uxr:team -- --out uxr/prototype-team      # freeze it from a live mount
+npm run uxr:shoot -- uxr/prototype-team --out uxr/renders/team-r01
+```
+
+`TeamPage` is two Firestore subscriptions and a profile, so `team-live/` aliases
+those four modules to a fixture — eleven staff, four invitations, every state
+the screen has — mounts the real component, and freezes the result through the
+same `snapshot.ts` the capture spec uses. The files it writes are ordinary
+prototypes: `uxr/shoot.ts` reads them, the ideation agent edits them.
+
+Re-run it after porting a round back into `src/` and it re-freezes what actually
+shipped, which is the only honest input to the before/after page.
 
 ## The before/after page
 

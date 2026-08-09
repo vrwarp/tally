@@ -55,6 +55,7 @@
     "uxr:capture": "playwright test -c uxr/playwright.config.ts",
     "uxr:shoot": "tsx uxr/shoot.ts",
     "uxr:kiosk": "tsx uxr/kiosk-live/shoot.ts",
+    "uxr:team": "tsx uxr/team-live/freeze.ts",
     "uxr:measure": "tsx uxr/measure.ts uxr/before uxr/after",
     "uxr:shots": "tsx scripts/optimize-uxr-shots.ts",
     "uxr:walkthrough": "tsx scripts/build-uxr-walkthrough.ts && tsx scripts/check-uxr-walkthrough.ts"

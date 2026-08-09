@@ -79,6 +79,8 @@ icon library — icons are single characters and emoji, deliberately.
 | `events` | core team | See what is on, schedule next Friday, find the gathering from three weeks ago. |
 | `students` | core team | Find one student among forty-five, see who has no parent contact, open a record. |
 | `review` | core team | Decide five families the lobby screen recorded and could not judge — duplicates, a half-failed push, a record about to be swept — knowing approval is irreversible upstream. |
+| `team` | admin | Grant, change and revoke access to a roster of minors: invite the new volunteer who starts Friday, promote somebody to core, and switch off the counselor who left in June — for a ministry of eleven with four invitations outstanding. |
+| `team-core` | core team | The same screen with no controls on it: a core member checking who is on the team and who has never signed in. |
 
 ## How the loop works
 
