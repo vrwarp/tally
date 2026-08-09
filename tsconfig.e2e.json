@@ -23,8 +23,13 @@
   // `uxr` is the same kind of code — Node driving a browser, on the e2e
   // fixtures — so it types against the same environment rather than the app's.
   "include": ["e2e", "playwright.config.ts", "uxr"],
-  // Except the one file under `uxr` that is not Node: the kiosk harness entry
-  // mounts the real components, so it is browser React with the app's aliases
-  // and types against the app's project instead.
-  "exclude": ["uxr/kiosk-live/main.tsx"]
+  // Except the files under `uxr` that are not Node: the harness entries that
+  // mount the real components are browser React with the app's aliases, and
+  // type against the app's project instead. Their shooters stay here.
+  "exclude": [
+    "uxr/kiosk-live/main.tsx",
+    "uxr/team-live/main.tsx",
+    "uxr/team-live/stubs.tsx",
+    "uxr/team-live/fixture.ts"
+  ]
 }
