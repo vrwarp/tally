@@ -67,6 +67,14 @@ import {
   type FirestoreLike,
   type FunctionLogger,
 } from '../firestore.js';
+import {
+  ALLERGIES_MAX_LENGTH,
+  NAME_MAX_LENGTH,
+  checkAllergyNote,
+  checkGrade,
+  checkName,
+  checkPhone,
+} from '../generated/registrationFields.js';
 import { last4ForStudents, patchPhonesNow, recordPendingLast4 } from './phoneIndex.js';
 import { bumpPulse, type PulseChannel } from './pulse.js';
 
@@ -82,11 +90,14 @@ export const REGISTRATIONS_COLLECTION = 'kioskRegistrations';
  */
 export const MAX_REGISTRATION_CHILDREN = 6;
 
-/** Long enough for any real name, short enough that nothing is a paragraph. */
-export const NAME_MAX_LENGTH = 40;
-
-/** Held for the reviewer on the registration record, then sent upstream. */
-export const ALLERGIES_MAX_LENGTH = 200;
+/*
+ * The field rules themselves live in `generated/registrationFields.ts`, shared
+ * verbatim with the app: the Review screen edits these same fields, and a
+ * second copy of "a name may not contain digits" would be a form that accepts
+ * what this module refuses. Re-exported here so nothing that already imports
+ * them from the door has to learn a new path.
+ */
+export { ALLERGIES_MAX_LENGTH, NAME_MAX_LENGTH };
 
 /**
  * How long a registration document is kept before the sweep takes it.
@@ -211,47 +222,32 @@ function refuse(message: string): never {
 }
 
 /**
- * A name as a person typed it on a lobby keyboard.
+ * The shared checks, in this module's grammar.
  *
- * Digits are refused rather than stripped: "Room 3" and "555-0123" in a name
- * field are somebody misreading the question, and silently keeping "Room"
- * would put that on a sticker. Apostrophes and hyphens are kept — O'Brien and
- * Anne-Marie are names, and the kiosk keyboard has both keys for this reason.
+ * Every rule below is `generated/registrationFields.ts`; all this adds is the
+ * throw. The door wants a refusal to abandon the request, and the Review
+ * screen's form wants the same sentence painted under the box that caused it,
+ * which is why the rule itself answers rather than throws.
  */
-function parseName(raw: unknown, field: string): string {
-  if (typeof raw !== 'string') refuse(`${field} is required.`);
-  const value = raw.normalize('NFC').trim().replace(/\s+/g, ' ');
-  if (value.length === 0) refuse(`${field} is required.`);
-  if (value.length > NAME_MAX_LENGTH) refuse(`${field} is too long.`);
-  if (/\d/.test(value)) refuse(`${field} cannot contain numbers.`);
-  if (!/\p{L}/u.test(value)) refuse(`${field} needs at least one letter.`);
-  return value;
+function taken<T>(result: { ok: true; value: T } | { ok: false; error: string }): T {
+  if (!result.ok) refuse(result.error);
+  return result.value;
 }
 
-function parseGrade(raw: unknown): number | null {
-  if (raw === null || raw === undefined) return null;
-  if (typeof raw !== 'number' || !Number.isInteger(raw) || raw < 0 || raw > 12) {
-    refuse('grade must be a whole number from 0 to 12, or null.');
-  }
-  return raw;
+export function parseName(raw: unknown, field: string): string {
+  return taken(checkName(raw, field));
 }
 
-/**
- * Ten digits, however they were punctuated.
- *
- * A repdigit — 0000000000, 5555555555 — is refused because it is what somebody
- * types to get past a field they do not want to answer, and the whole point of
- * the number is that four of its digits are a key their family will use next
- * week. A leading US country code is dropped rather than refused: 1 followed by
- * ten digits is the same number written longer.
- */
+export function parseGrade(raw: unknown): number | null {
+  return taken(checkGrade(raw));
+}
+
 export function parseRegistrationPhone(raw: unknown): string {
-  if (typeof raw !== 'string') refuse('A phone number is required.');
-  let digits = raw.replace(/\D/g, '');
-  if (digits.length === 11 && digits.startsWith('1')) digits = digits.slice(1);
-  if (digits.length !== 10) refuse('Enter a 10-digit phone number.');
-  if (/^(\d)\1{9}$/.test(digits)) refuse('That does not look like a phone number.');
-  return digits;
+  return taken(checkPhone(raw));
+}
+
+export function parseAllergyNote(raw: unknown): string | null {
+  return taken(checkAllergyNote(raw));
 }
 
 function parseAllergies(raw: unknown, childCount: number): (string | null)[] {
@@ -259,14 +255,7 @@ function parseAllergies(raw: unknown, childCount: number): (string | null)[] {
   if (!Array.isArray(raw) || raw.length !== childCount) {
     refuse('allergies must line up with children.');
   }
-  return raw.map((entry) => {
-    if (entry === null || entry === undefined) return null;
-    if (typeof entry !== 'string') refuse('allergies must be text.');
-    const value = entry.trim();
-    if (value.length === 0) return null;
-    if (value.length > ALLERGIES_MAX_LENGTH) refuse('That allergy note is too long.');
-    return value;
-  });
+  return raw.map((entry) => parseAllergyNote(entry));
 }
 
 /**
@@ -428,6 +417,30 @@ export interface RegistrationRecord {
   possibleDuplicateOf: Record<string, string[]>;
   /** Verified siblings, when this was an "add a brother or sister". */
   anchorStudentIds: string[];
+  /**
+   * The children exactly as the family typed them, kept from the first
+   * correction onwards and null until then.
+   *
+   * A reviewer may fix a name (`amend.ts`), and the moment they do, `children`
+   * above stops being what the card claims it is — "the form as the family
+   * filled it in", which is the evidence the merge judgement rests on. A
+   * colleague opening the same card on Thursday has to be able to see that
+   * *Michael* was typed *Micheal*, because that is why the roster's Michael was
+   * not offered as a duplicate at the door.
+   */
+  typedChildren: RegistrationChild[] | null;
+  /**
+   * The adult's name as the family typed it, on the same terms.
+   *
+   * The name only. The *number* they typed is deliberately not kept: a
+   * mistyped one is a stranger's, and holding a stranger's phone number for
+   * thirty days to caption a correction is precisely the retention this
+   * document's TTL exists to prevent. That a number was corrected is recorded
+   * instead, which is all a second reviewer needs.
+   */
+  typedGuardianName: { firstName: string; lastName: string } | null;
+  /** Whether a reviewer has replaced the number the family typed. */
+  phoneCorrected: boolean;
   /** Why the last approval attempt did not finish, if one did not. */
   lastError: string | null;
   /** Which half of the last approval failed — see `PendingRegistration`. */
@@ -438,10 +451,21 @@ function readStringArray(raw: unknown): string[] {
   return Array.isArray(raw) ? raw.filter((entry): entry is string => typeof entry === 'string') : [];
 }
 
+function readChildren(raw: unknown): RegistrationChild[] {
+  return (Array.isArray(raw) ? raw : []).map((entry) => {
+    const child = (entry ?? {}) as Record<string, unknown>;
+    return {
+      firstName: typeof child.firstName === 'string' ? child.firstName : '',
+      lastName: typeof child.lastName === 'string' ? child.lastName : '',
+      grade: typeof child.grade === 'number' ? child.grade : null,
+    };
+  });
+}
+
 export function readRegistration(data: Record<string, unknown>): RegistrationRecord {
   const ids = readStringArray(data.studentIds);
   const rawGuardian = (data.guardian ?? null) as Record<string, unknown> | null;
-  const rawChildren = Array.isArray(data.children) ? data.children : [];
+  const rawTypedGuardian = (data.typedGuardianName ?? null) as Record<string, unknown> | null;
   const rawDuplicates = (data.possibleDuplicateOf ?? {}) as Record<string, unknown>;
   return {
     status: data.status === 'complete' ? 'complete' : 'pending',
@@ -460,14 +484,17 @@ export function readRegistration(data: Record<string, unknown>): RegistrationRec
             phone: typeof rawGuardian.phone === 'string' ? rawGuardian.phone : '',
           }
         : null,
-    children: rawChildren.map((entry) => {
-      const child = (entry ?? {}) as Record<string, unknown>;
-      return {
-        firstName: typeof child.firstName === 'string' ? child.firstName : '',
-        lastName: typeof child.lastName === 'string' ? child.lastName : '',
-        grade: typeof child.grade === 'number' ? child.grade : null,
-      };
-    }),
+    children: readChildren(data.children),
+    typedChildren: Array.isArray(data.typedChildren) ? readChildren(data.typedChildren) : null,
+    typedGuardianName:
+      rawTypedGuardian && typeof rawTypedGuardian.firstName === 'string'
+        ? {
+            firstName: rawTypedGuardian.firstName,
+            lastName:
+              typeof rawTypedGuardian.lastName === 'string' ? rawTypedGuardian.lastName : '',
+          }
+        : null,
+    phoneCorrected: data.phoneCorrected === true,
     allergies: Array.isArray(data.allergies)
       ? data.allergies.map((entry) => (typeof entry === 'string' ? entry : null))
       : [],

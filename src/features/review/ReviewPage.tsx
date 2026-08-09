@@ -22,8 +22,19 @@
  * do it. **Approve** pushes every child and then builds one household for the
  * family. **Merge** folds a child into the roster row they duplicate. **Not
  * ours** takes the whole registration off the roster and forgets the number.
+ *
+ * And a fourth thing that is deliberately not one of them. All three above
+ * decide *identity*; none of them says **the details are wrong**, which is the
+ * commonest thing about a form a stranger typed on a lobby touchscreen with a
+ * queue behind them. A card reading "Micheal Okonkwo" used to leave a reviewer
+ * choosing between a misspelling made permanent in a database with no delete
+ * and discarding a real family along with the only phone number Tally holds for
+ * them. **Correct** is the proportionate answer: one person at a time, in
+ * place, with the rest of the card held while it is open — see
+ * `functions/src/kiosk/amend.ts` for why it is a callable rather than a field
+ * write, and docs/review-corrections.md for the journeys it serves.
  */
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { PageFrame } from '@/components/PageFrame';
 import {
@@ -33,21 +44,29 @@ import {
   CardHeader,
   EmptyState,
   ErrorBanner,
+  PhoneField,
+  SelectField,
   SkeletonRows,
+  TextAreaField,
+  TextField,
 } from '@/components/ui';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
+import { checkAllergyNote, checkName, checkPhone } from '@/lib/registrationFields';
 import { formatRelative } from '@/lib/time';
-import { cn, gradeSentence, initials } from '@/lib/utils';
+import { cn, formatPhoneInput, gradeDescription, gradeSentence, initials } from '@/lib/utils';
 import {
+  amendRegistration,
   approveRegistration,
   discardRegistration,
   listPendingRegistrations,
   mergeStudents,
+  type AmendRegistrationResult,
   type PendingRegistration,
   type PendingRegistrationChild,
   type ReviewStudentSummary,
 } from '@/services/functions';
+import { GRADES } from '@/types';
 
 const DAY_MS = 24 * 60 * 60_000;
 /** Under a week left before the sweep takes the record. */
@@ -123,6 +142,46 @@ export function ReviewPage() {
         (b.registeredAt ?? 0) - (a.registeredAt ?? 0),
     );
   }, [rows]);
+
+  /**
+   * A correction, which is deliberately not one of the three decisions.
+   *
+   * It does not go through `act` and it does not take the card's busy lock,
+   * because everything `act` guards against is a press that reaches the
+   * church's database and this one cannot: it renames a row Tally owns and
+   * re-asks a question Tally asked itself. What it *does* do is reload the
+   * queue, because a corrected name is a fresh duplicate scan and a corrected
+   * number regroups the whole screen — the card a reviewer is looking at is
+   * genuinely a different card afterwards.
+   *
+   * A refusal is handed back rather than shown here. The callable answers in
+   * the door's own words — "The child's first name cannot contain numbers." —
+   * and that sentence belongs under the box that caused it, not in a toast at
+   * the edge of the screen with the form still holding the value it refused.
+   */
+  const amend = useCallback(
+    async (
+      registrationId: string,
+      payload: Omit<Parameters<typeof amendRegistration>[0], 'registrationId'>,
+    ): Promise<AmendRegistrationResult> => {
+      try {
+        const { data } = await amendRegistration({ registrationId, ...payload });
+        if (data.status === 'amended') {
+          show(data.message, { tone: 'success' });
+          await load();
+        }
+        return data;
+      } catch (error) {
+        return {
+          status: 'refused',
+          possibleDuplicates: null,
+          last4Changed: false,
+          message: refusalOf(error),
+        };
+      }
+    },
+    [load, show],
+  );
 
   const act = async (registrationId: string, run: () => Promise<string>) => {
     if (busy) return;
@@ -239,6 +298,7 @@ export function ReviewPage() {
                     return data.message;
                   })
                 }
+                onAmend={(payload) => amend(row.registrationId, payload)}
               />
             ))}
           </div>
@@ -277,6 +337,26 @@ interface RegistrationCardProps {
   onDiscard: () => void;
   onMerge: (keeperId: string, foldId: string) => void;
   onUnmerge: (foldId: string) => void;
+  /** One person corrected, answered with what the server made of it. */
+  onAmend: (
+    payload: Omit<Parameters<typeof amendRegistration>[0], 'registrationId'>,
+  ) => Promise<AmendRegistrationResult>;
+}
+
+/**
+ * The sentence a refused correction gets to show.
+ *
+ * A callable's `invalid-argument` carries the door's own wording, which is the
+ * whole point of the form and the server sharing `lib/registrationFields.ts`.
+ * Anything else — a network failure, an `internal` — has no sentence worth
+ * repeating, and a reviewer reading "internal" under a name box learns nothing
+ * except that the app is talking to itself.
+ */
+function refusalOf(error: unknown): string {
+  const message = error instanceof Error ? error.message.trim() : '';
+  return message.length > 0 && message !== 'internal' && !message.startsWith('INTERNAL')
+    ? message
+    : 'Could not save that correction. Try again in a moment.';
 }
 
 /**
@@ -318,6 +398,337 @@ const CAPTION = 'text-sm text-ink-400 lg:text-xs';
  */
 const STRIP = 'rounded-xl bg-ink-800/50 px-3 py-2 text-sm text-ink-300 ring-1 ring-ink-700';
 
+/* -------------------------------------------------------------------------- */
+/* Correcting what the family typed                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The way into an editor, in the same material as Undo.
+ *
+ * Deliberately not a Button. Everything drawn as one on this card either writes
+ * to the church's database or refuses to; this opens a form, and giving it the
+ * same weight as "Approve and add" would put the least consequential control on
+ * the screen in the most consequential clothes. It is still a 44px target,
+ * because a reviewer holding a phone has to be able to hit it.
+ *
+ * `label` is the accessible name — "Correct Robin Fields's details" — because
+ * six identical "Correct"s down a card is a screen reader's list of nothing.
+ */
+function CorrectButton({
+  label,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      aria-label={label}
+      onClick={onClick}
+      className="flex min-h-11 shrink-0 items-center rounded-lg px-3 text-sm text-brand-400 ring-1 ring-ink-800 transition-colors hover:bg-ink-900 disabled:opacity-60 pointer-fine:min-h-8"
+    >
+      Correct
+    </button>
+  );
+}
+
+/** One child as the editor holds them — every field, never a patch. */
+export interface ChildFields {
+  firstName: string;
+  lastName: string;
+  grade: number | null;
+  allergies: string | null;
+}
+
+/**
+ * The foot of an editor, in the card's own grammar.
+ *
+ * A sentence bound to each control, Cancel in the slot the "Correct" button
+ * was, and the commit second. Saving is not one of this screen's three
+ * decisions — nothing here reaches the church's database — and the caption's
+ * job is to say so out loud, because a form on a card whose other buttons are
+ * permanent is a form somebody will hesitate over.
+ */
+function EditorActions({
+  caption,
+  saving,
+  onCancel,
+}: {
+  caption: ReactNode;
+  saving: boolean;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="mt-1 flex flex-col gap-5 border-t border-ink-800 pt-4 lg:grid lg:grid-cols-2 lg:gap-6">
+      <Decision caption="Leaves this family exactly as the kiosk recorded them.">
+        <Button
+          variant="secondary"
+          className="mt-auto min-h-12 w-full lg:w-auto"
+          onClick={onCancel}
+          disabled={saving}
+        >
+          Cancel
+        </Button>
+      </Decision>
+      <Decision caption={caption}>
+        <Button
+          type="submit"
+          className="mt-auto min-h-12 w-full lg:w-auto"
+          disabled={saving}
+          aria-busy={saving || undefined}
+        >
+          Save the correction
+        </Button>
+      </Decision>
+    </div>
+  );
+}
+
+/**
+ * One child, corrected.
+ *
+ * The three questions the kiosk asked, plus the allergy note, in the order it
+ * asked them — a reviewer is reading a form somebody else filled in, and
+ * reordering the fields would mean reading it twice.
+ *
+ * Validated here against `lib/registrationFields.ts`, which is the same module
+ * the Cloud Function validates with. That is the point of the shared file: a
+ * digit typed into a name is refused under the box that holds it rather than a
+ * round trip later in a toast, and it is refused for the same reason and in the
+ * same words either way.
+ */
+function ChildEditor({
+  child,
+  onCancel,
+  onSave,
+}: {
+  child: PendingRegistrationChild;
+  onCancel: () => void;
+  onSave: (fields: ChildFields) => Promise<AmendRegistrationResult>;
+}) {
+  const [firstName, setFirstName] = useState(child.firstName);
+  const [lastName, setLastName] = useState(child.lastName);
+  const [grade, setGrade] = useState<number | null>(child.grade);
+  const [allergies, setAllergies] = useState(child.allergies ?? '');
+  const [errors, setErrors] = useState<Record<string, string | undefined>>({});
+  /** What the server refused, which is never about one box in particular. */
+  const [refusal, setRefusal] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const renaming = firstName.trim() !== child.firstName || lastName.trim() !== child.lastName;
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (saving) return;
+    const first = checkName(firstName, "The child's first name");
+    const last = checkName(lastName, "The child's last name");
+    const note = checkAllergyNote(allergies);
+    setErrors({
+      firstName: first.ok ? undefined : first.error,
+      lastName: last.ok ? undefined : last.error,
+      allergies: note.ok ? undefined : note.error,
+    });
+    if (!first.ok || !last.ok || !note.ok) return;
+
+    setRefusal(null);
+    setSaving(true);
+    try {
+      const result = await onSave({
+        firstName: first.value,
+        lastName: last.value,
+        grade,
+        allergies: note.value,
+      });
+      if (result.status === 'refused' || result.status === 'not-found') {
+        setRefusal(result.message);
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-3">
+      <p className="text-sm font-semibold text-ink-200">Correcting {nameOf(child)}</p>
+      {refusal ? <ErrorBanner message={refusal} /> : null}
+
+      <div className="grid gap-3 lg:grid-cols-3">
+        <TextField
+          label="First name"
+          autoFocus
+          autoComplete="off"
+          value={firstName}
+          error={errors.firstName ?? null}
+          onChange={(event) => setFirstName(event.target.value)}
+        />
+        <TextField
+          label="Last name"
+          autoComplete="off"
+          value={lastName}
+          error={errors.lastName ?? null}
+          onChange={(event) => setLastName(event.target.value)}
+        />
+        <SelectField
+          label="Grade"
+          value={grade === null ? '' : String(grade)}
+          onChange={(event) =>
+            setGrade(event.target.value === '' ? null : Number(event.target.value))
+          }
+        >
+          {/* First, and an answer rather than a blank: a child too young for a
+              grade has none, and the roster stores that as no grade at all. */}
+          <option value="">No grade</option>
+          {GRADES.map((value) => (
+            <option key={value} value={value}>
+              {gradeDescription(value)}
+            </option>
+          ))}
+        </SelectField>
+      </div>
+
+      <TextAreaField
+        label="Allergies"
+        rows={2}
+        value={allergies}
+        error={errors.allergies ?? null}
+        hint="Goes into the church’s database with them when this family is approved."
+        onChange={(event) => setAllergies(event.target.value)}
+      />
+
+      <EditorActions
+        saving={saving}
+        onCancel={onCancel}
+        caption={
+          renaming
+            ? /* The half a reviewer does not expect. Correcting a spelling is
+                 also *asking the roster again*, and the answer can hold the
+                 approve button that was free a moment ago — which reads as the
+                 app breaking unless the button that caused it said so first. */
+              'Renames this row on Tally’s roster and asks the roster again whether anybody already has that name. Nothing is sent to the church’s database.'
+            : 'Corrects this child on Tally’s roster. Nothing is sent to the church’s database.'
+        }
+      />
+    </form>
+  );
+}
+
+/**
+ * The adult, corrected.
+ *
+ * The number is the interesting field and it is not a display string: its last
+ * four are the key this family types at the lobby kiosk to find themselves, so
+ * changing it moves them between buckets in an index the door reads. The
+ * caption says which four, both ways round, because "their old digits stop
+ * working" is a thing a reviewer may need to tell the family on the phone.
+ */
+function GuardianEditor({
+  guardian,
+  onCancel,
+  onSave,
+}: {
+  guardian: { firstName: string; lastName: string; phone: string };
+  onCancel: () => void;
+  onSave: (fields: {
+    firstName: string;
+    lastName: string;
+    phone: string;
+  }) => Promise<AmendRegistrationResult>;
+}) {
+  const [firstName, setFirstName] = useState(guardian.firstName);
+  const [lastName, setLastName] = useState(guardian.lastName);
+  const [phone, setPhone] = useState(formatPhoneInput(guardian.phone));
+  const [errors, setErrors] = useState<Record<string, string | undefined>>({});
+  const [refusal, setRefusal] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const digits = phone.replace(/\D/g, '');
+  const oldLast4 = guardian.phone.slice(-4);
+  const newLast4 = digits.length === 10 ? digits.slice(-4) : null;
+  const movingDigits = newLast4 !== null && newLast4 !== oldLast4;
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (saving) return;
+    const first = checkName(firstName, "The parent's first name");
+    const last = checkName(lastName, "The parent's last name");
+    const number = checkPhone(phone);
+    setErrors({
+      firstName: first.ok ? undefined : first.error,
+      lastName: last.ok ? undefined : last.error,
+      phone: number.ok ? undefined : number.error,
+    });
+    if (!first.ok || !last.ok || !number.ok) return;
+
+    setRefusal(null);
+    setSaving(true);
+    try {
+      const result = await onSave({
+        firstName: first.value,
+        lastName: last.value,
+        phone: number.value,
+      });
+      if (result.status === 'refused' || result.status === 'not-found') {
+        setRefusal(result.message);
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="rounded-xl bg-ink-950 px-3 py-3 ring-1 ring-brand-500/40">
+      <div className="flex flex-col gap-3">
+        <p className="text-sm font-semibold text-ink-200">Correcting the parent</p>
+        {refusal ? <ErrorBanner message={refusal} /> : null}
+
+        <div className="grid gap-3 lg:grid-cols-3">
+          <TextField
+            label="First name"
+            autoFocus
+            autoComplete="off"
+            value={firstName}
+            error={errors.firstName ?? null}
+            onChange={(event) => setFirstName(event.target.value)}
+          />
+          <TextField
+            label="Last name"
+            autoComplete="off"
+            value={lastName}
+            error={errors.lastName ?? null}
+            onChange={(event) => setLastName(event.target.value)}
+          />
+          <PhoneField
+            label="Phone"
+            value={phone}
+            error={errors.phone ?? null}
+            hint="The last four are what this family types at the kiosk."
+            onValueChange={setPhone}
+          />
+        </div>
+
+        <EditorActions
+          saving={saving}
+          onCancel={onCancel}
+          caption={
+            movingDigits
+              ? /* The consequence that outlives the card. The record is deleted
+                   at approval; the index entry is what the family meets at the
+                   door next Friday, and a correction that only fixed the
+                   spelling would leave them unfindable under the right number
+                   and findable under somebody else's. */
+                `Changes the digits this family types at the kiosk from ${oldLast4} to ${newLast4} — the old four stop finding them. Nothing is sent to the church’s database.`
+              : 'Corrects the adult recorded on this registration. Nothing is sent to the church’s database.'
+          }
+        />
+      </div>
+    </form>
+  );
+}
+
 /** The children a reviewer's decision would still act on. */
 function stillHeld(row: PendingRegistration): PendingRegistrationChild[] {
   return row.children.filter((child) => child.pendingReview && !child.mergedIntoStudentId);
@@ -340,9 +751,24 @@ function RegistrationCard({
   onDiscard,
   onMerge,
   onUnmerge,
+  onAmend,
 }: RegistrationCardProps) {
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
   const [confirmingApprove, setConfirmingApprove] = useState(false);
+  /**
+   * Which person on this card is open for correction, if any.
+   *
+   * At most one, and everything else on the card is held while it is open. Two
+   * open forms on a phone is a wall of boxes with two Saves in it, and — the
+   * real reason — a card mid-correction is a card whose facts are in flux: the
+   * duplicate candidates below belong to the name currently on the roster, and
+   * the approve button's sentence names children by names somebody is in the
+   * middle of changing. Nothing here should be pressable until the correction
+   * has landed or been abandoned.
+   */
+  const [editing, setEditing] = useState<{ kind: 'child'; index: number } | { kind: 'guardian' } | null>(
+    null,
+  );
   /**
    * What a reviewer has said about each flagged child, this session.
    *
@@ -376,6 +802,14 @@ function RegistrationCard({
   const daysLeft = Math.max(1, Math.ceil((row.expiresInMs ?? 0) / DAY_MS));
 
   const held = stillHeld(row);
+  /**
+   * Everything on this card that is a judgement, held while one is being typed.
+   *
+   * `disabled` already means "some card on the screen is mid-write". This adds
+   * the local reason, and the two are the same thing from a control's point of
+   * view: not now.
+   */
+  const locked = disabled || editing !== null;
   /*
    * The adult is what the backend refused, which is usually refused for a
    * reason no retry can fix.
@@ -541,17 +975,78 @@ function RegistrationCard({
         */}
         {row.lastError ? <p className={STRIP}>Last attempt did not finish: {row.lastError}</p> : null}
 
-        {row.guardian ? (
+        {row.guardian && editing?.kind === 'guardian' ? (
+          <GuardianEditor
+            guardian={row.guardian}
+            /*
+              Held children only. Correcting the adult on a family whose
+              children are already upstream would change a copy that is about
+              to be deleted and nothing the church can see, and the callable
+              refuses it — so the card does not offer it either.
+            */
+            onCancel={() => setEditing(null)}
+            onSave={async (guardian) => {
+              const result = await onAmend({ guardian });
+              if (result.status !== 'refused') {
+                setEditing(null);
+                /*
+                  The two judgements this card holds that were *about* the old
+                  details. Which adult upstream is "the same person" was
+                  answered against a name and a number that have just changed,
+                  and which other cards are this family was answered by the
+                  server from the digits — so both go back to unanswered rather
+                  than quietly staying selected under new evidence.
+                */
+                setGuardianChoice(null);
+                if (result.last4Changed) setSameFamily([]);
+              }
+              return result;
+            }}
+          />
+        ) : row.guardian ? (
           /*
             The number, and only the number. The guardian's name is the card's
             own title one line above, so a two-row grid was carrying one new
             fact and a label column whose width pushed the values onto a fourth
             left edge that lined up with nothing.
           */
-          <p className="flex flex-wrap items-baseline gap-x-3 text-sm">
-            <span className="text-ink-500">Phone</span>
-            <span className="tabular-nums text-ink-200">{formatPhone(row.guardian.phone)}</span>
-          </p>
+          <div className="flex flex-col gap-1">
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+              <p className="flex flex-wrap items-baseline gap-x-3 text-sm">
+                <span className="text-ink-500">Phone</span>
+                <span className="tabular-nums text-ink-200">{formatPhone(row.guardian.phone)}</span>
+              </p>
+              {/*
+                Offered only while the family is still held. A settled card's
+                adult has already been written into the church's database or
+                refused by it, and a box that edits Tally's expiring copy of
+                them would promise a correction it cannot deliver.
+              */}
+              {row.settled ? null : (
+                <CorrectButton
+                  label={`Correct ${nameOf(row.guardian)}’s details`}
+                  disabled={locked}
+                  onClick={() => setEditing({ kind: 'guardian' })}
+                />
+              )}
+            </div>
+            {/*
+              What the family typed, once it is no longer what the card says.
+              A second reviewer has to be able to tell a correction from the
+              form — it is the difference between trusting this row and undoing
+              it — and the number is described rather than repeated, because a
+              mistyped one belongs to a stranger and Tally does not keep it.
+            */}
+            {row.typedGuardianName || row.phoneCorrected ? (
+              <p className={CAPTION}>
+                {row.typedGuardianName
+                  ? `Typed at the kiosk as ${nameOf(row.typedGuardianName)}.`
+                  : ''}
+                {row.typedGuardianName && row.phoneCorrected ? ' ' : ''}
+                {row.phoneCorrected ? 'The number was corrected here.' : ''}
+              </p>
+            ) : null}
+          </div>
         ) : row.anchors.length > 0 ? (
           /*
             No guardian, and nothing wrong with that: this is a parent adding a
@@ -628,7 +1123,7 @@ function RegistrationCard({
                     <Button
                       variant={together ? 'primary' : 'secondary'}
                       className="min-h-9 px-3 text-sm"
-                      disabled={disabled || waiting}
+                      disabled={locked || waiting}
                       aria-pressed={together}
                       onClick={() =>
                         setSameFamily((chosen) =>
@@ -689,7 +1184,7 @@ function RegistrationCard({
                     <Button
                       variant={picked ? 'primary' : 'secondary'}
                       className="min-h-9 px-3 text-sm"
-                      disabled={disabled}
+                      disabled={locked}
                       aria-pressed={picked}
                       onClick={() => setGuardianChoice(picked ? null : adult.personId)}
                     >
@@ -703,7 +1198,7 @@ function RegistrationCard({
                 <Button
                   variant={guardianChoice === 'new' ? 'primary' : 'secondary'}
                   className="min-h-9 px-3 text-sm"
-                  disabled={disabled}
+                  disabled={locked}
                   aria-pressed={guardianChoice === 'new'}
                   onClick={() => setGuardianChoice(guardianChoice === 'new' ? null : 'new')}
                 >
@@ -719,8 +1214,35 @@ function RegistrationCard({
             <ChildRow
               key={child.studentId ?? `${child.firstName}:${index}`}
               child={child}
-              disabled={disabled}
+              disabled={locked}
               onUnmerge={onUnmerge}
+              /*
+                Correctable exactly while a correction can still matter. A child
+                who has been pushed, or folded into another row, is one the
+                callable refuses — see `kiosk/amend.ts` — and a button whose
+                only outcome is a refusal is worse than no button.
+              */
+              correctable={child.pendingReview && !child.mergedIntoStudentId}
+              editing={editing?.kind === 'child' && editing.index === index}
+              onEdit={() => setEditing({ kind: 'child', index })}
+              onCancelEdit={() => setEditing(null)}
+              onSaveChild={async (fields) => {
+                const result = await onAmend({ child: { index, ...fields } });
+                if (result.status !== 'refused') {
+                  setEditing(null);
+                  /*
+                    This reviewer's own answer about this child, dropped.
+                    "None of them — Micheal is new" was an assertion about a
+                    name that no longer exists, and leaving it standing would
+                    walk a corrected spelling straight past the collision the
+                    correction itself just created.
+                  */
+                  if (child.studentId) {
+                    setResolution(({ [child.studentId!]: _dropped, ...rest }) => rest);
+                  }
+                }
+                return result;
+              }}
               resolution={child.studentId ? resolution[child.studentId] : undefined}
               onResolve={(choice) => {
                 if (!child.studentId) return;
@@ -778,7 +1300,7 @@ function RegistrationCard({
                     setConfirmingApprove(false);
                     onApprove(approveDecision());
                   }}
-                  disabled={disabled}
+                  disabled={locked}
                   aria-busy={busy || undefined}
                 >
                   Yes — add {held.length === 1 ? listNames(held) : `${held.length} children`}
@@ -808,7 +1330,7 @@ function RegistrationCard({
                   variant={guardianRefused ? 'secondary' : 'primary'}
                   className="mt-auto min-h-12 w-full lg:w-auto"
                   onClick={() => setConfirmingApprove(true)}
-                  disabled={disabled || unsettled.length > 0}
+                  disabled={locked || unsettled.length > 0}
                   aria-busy={busy || undefined}
                 >
                   {guardianRefused
@@ -835,7 +1357,7 @@ function RegistrationCard({
                       variant="danger"
                       className="min-h-12 w-full lg:w-auto"
                       onClick={onDiscard}
-                      disabled={disabled}
+                      disabled={locked}
                     >
                       Yes, take them off
                     </Button>
@@ -860,7 +1382,7 @@ function RegistrationCard({
                     variant="secondary"
                     className="mt-auto min-h-12 w-full lg:w-auto"
                     onClick={() => setConfirmingDiscard(true)}
-                    disabled={disabled}
+                    disabled={locked}
                   >
                     Not ours
                   </Button>
@@ -908,7 +1430,7 @@ function RegistrationCard({
                     ...(sameFamily.length > 0 ? { withRegistrationIds: sameFamily } : {}),
                   })
                 }
-                disabled={disabled}
+                disabled={locked}
               >
                 Add the children without {row.guardian.firstName}
               </Button>
@@ -939,6 +1461,11 @@ function ChildRow({
   resolution,
   onResolve,
   onUnmerge,
+  correctable,
+  editing,
+  onEdit,
+  onCancelEdit,
+  onSaveChild,
 }: {
   child: PendingRegistrationChild;
   disabled: boolean;
@@ -946,8 +1473,31 @@ function ChildRow({
   resolution: string | 'new' | undefined;
   onResolve: (choice: string | 'new') => void;
   onUnmerge: (foldId: string) => void;
+  /** Whether this child is still Tally's alone to correct. */
+  correctable: boolean;
+  editing: boolean;
+  onEdit: () => void;
+  onCancelEdit: () => void;
+  onSaveChild: (fields: ChildFields) => Promise<AmendRegistrationResult>;
 }) {
   const candidates = candidatesFor(child);
+
+  /*
+    The editor takes the whole row rather than opening beside it.
+
+    The candidates below are the roster's answer about the name *currently* on
+    the row, and the name is what is being typed — so leaving them up would
+    have a reviewer comparing a half-typed spelling against a list computed
+    from the old one. They come back, recomputed by the server, the moment the
+    correction lands.
+  */
+  if (editing) {
+    return (
+      <li className="rounded-xl bg-ink-950 px-3 py-3 ring-1 ring-brand-500/40">
+        <ChildEditor child={child} onCancel={onCancelEdit} onSave={onSaveChild} />
+      </li>
+    );
+  }
 
   return (
     <li className="rounded-xl bg-ink-950 px-3 py-2.5 ring-1 ring-ink-800">
@@ -979,6 +1529,21 @@ function ChildRow({
           {child.allergies ? (
             <span className="mt-0.5 block text-xs text-ink-300">{child.allergies}</span>
           ) : null}
+          {/*
+            What the family typed, once the row stops being what they typed.
+            Under the name it corrects, in the caption voice — it is provenance,
+            not a fact about the child, and the row's brightest run must stay on
+            the name a reviewer is about to approve.
+          */}
+          {child.typedAs ? (
+            <span className={cn('mt-0.5 block', CAPTION)}>
+              Typed at the kiosk as {nameOf(child.typedAs)}
+              {child.typedAs.grade !== child.grade
+                ? `, ${gradeSentence(child.typedAs) ?? 'no grade'}`
+                : ''}
+              .
+            </span>
+          ) : null}
         </span>
         {/*
           A plain label, not a pill: the filled ringed chip belongs to the card
@@ -989,6 +1554,13 @@ function ChildRow({
         {child.mergedIntoStudentId ? null : child.pendingReview ? null : (
           <span className="shrink-0 text-xs text-ink-400">Added</span>
         )}
+        {correctable ? (
+          <CorrectButton
+            label={`Correct ${nameOf(child)}\u2019s details`}
+            disabled={disabled}
+            onClick={onEdit}
+          />
+        ) : null}
       </div>
 
       {/*

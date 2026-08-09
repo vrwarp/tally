@@ -155,6 +155,26 @@ The one answer this reaches that no matching ever could is the mother who is on 
 number she had last year. Five rounds of critique are recorded in [`uxr/rounds/`](../uxr/rounds/); the last
 two judged the shipping screen rather than a prototype.
 
+**And the answer the screen was missing, which is none of the three.** Every button above decides
+*identity*; none of them says **the details are wrong**. A card reading `Micheal Okonkwo` left a
+reviewer choosing between approving the misspelling into a database with no delete and discarding a
+real family along with the only phone number Tally holds for them, so a reviewer took the first and
+the ministry accumulated *Micheal*, *MOM SMITH*, and a seven-year-old filed as a kindergartener.
+Each person on a card can now be corrected in place — a child's name, grade and allergy note, or the
+adult's name and number — under the same grammar as everything else here: one person at a time, the
+rest of the card held while it is open, a sentence above Save saying what it costs, and the door's
+own field rules refusing a digit in a name under the box that holds it rather than a round trip
+later. Two consequences are said out loud because a reviewer would not otherwise expect them.
+**Correcting a name asks the roster again** — a fixed spelling is exactly what reveals the collision
+the door missed, so the approve button a reviewer was reaching for can be held by the fix itself, and
+the caption says so before the press. **Correcting a number moves the family's four digits at the
+kiosk**, into the ones they will type next week and out of the ones they mistyped, which now belong
+to a stranger who could otherwise be handed somebody else's children by name. Nothing corrected here
+touches the church's database — that is what makes it safe, and why a child who has already been
+pushed is sent to their own page instead. The card keeps the names the family typed, and pointedly
+not the number they typed: a mistyped one is a stranger's. The five journeys and the ten rules the
+screen follows are written up in [review-corrections.md](review-corrections.md).
+
 **Journey 2½ — the second child.** A parent whose next child is finally old enough finds their family
 by phone as usual, taps a name, and finds **"Anyone else?"** already asked on the confirm screen —
 the children the kiosk guessed, ending in **"+ Another child"**. Which of them arrive *ticked* is a

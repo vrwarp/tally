@@ -149,6 +149,8 @@ happens when a family asks to be removed — is **[docs/minors-data.md](docs/min
 | [docs/architecture.md](docs/architecture.md) | Repository layout, what is live versus fetched once, what needs a server, the kiosk |
 | [docs/data-model.md](docs/data-model.md) | Every collection, who may write it, and why it is shaped that way |
 | [docs/configuration.md](docs/configuration.md) | The two config surfaces and which file applies when |
+| [docs/review-corrections.md](docs/review-corrections.md) | Correcting a self-registered family before approving them: the journeys, and the rules the screen follows |
+| [docs/walkthrough/corrections](docs/walkthrough/corrections/README.md) | The same five journeys, frame by frame, captured from the running screen |
 | [docs/minors-data.md](docs/minors-data.md) | What Tally stores about children, and what it refuses to |
 | [docs/planning-center.md](docs/planning-center.md) | Tokens, configuration, roster modes, write-back, troubleshooting |
 | [docs/backends.md](docs/backends.md) | The people-backend abstraction: ids, capabilities, partial failure, adding one |

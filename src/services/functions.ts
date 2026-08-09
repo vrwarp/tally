@@ -765,6 +765,14 @@ export interface PendingRegistrationChild {
   mergedInto?: ReviewStudentSummary | null;
   allergies: string | null;
   possibleDuplicates: ReviewStudentSummary[];
+  /**
+   * How the family typed this child, when a reviewer has since corrected them.
+   *
+   * Null when nobody has — and absent entirely from an older callable, which is
+   * the same thing. The card stops claiming to be "the form as the family
+   * filled it in" the moment this is set, and shows what was typed instead.
+   */
+  typedAs?: { firstName: string; lastName: string; grade: number | null } | null;
 }
 
 /** Mirrors `AdultCandidate` in functions/src/pco/household.ts. */
@@ -802,6 +810,13 @@ export interface PendingRegistration {
   /** Milliseconds until the record is swept. Negative means overdue. */
   expiresInMs: number | null;
   guardian: { firstName: string; lastName: string; phone: string } | null;
+  /**
+   * The adult's name as the family typed it, when a reviewer corrected it.
+   * The number they typed is deliberately never kept; `phoneCorrected` says
+   * that one was replaced, which is all a second reviewer needs.
+   */
+  typedGuardianName?: { firstName: string; lastName: string } | null;
+  phoneCorrected?: boolean;
   last4: string;
   children: PendingRegistrationChild[];
   anchors: ReviewStudentSummary[];
@@ -917,6 +932,49 @@ export const discardRegistration = httpsCallable<
   { registrationId: string },
   DiscardRegistrationResult
 >(functions, 'discardRegistration');
+
+/** Mirrors `AmendRegistrationResult` in functions/src/kiosk/amend.ts. */
+export interface AmendRegistrationResult {
+  status: 'amended' | 'unchanged' | 'not-found' | 'refused';
+  /**
+   * How many roster rows the corrected name now collides with, or null for an
+   * amendment that cannot have changed any. A correction can *create* the
+   * collision this screen exists to catch, and the person who just typed it is
+   * the one who will not be expecting that.
+   */
+  possibleDuplicates: number | null;
+  /** Whether the four digits the family types at the kiosk moved. */
+  last4Changed: boolean;
+  message: string;
+}
+
+/**
+ * Corrects one person on a family who has not been approved yet.
+ *
+ * One person per call — a child by their index on the registration, or the
+ * adult — and every field of them, because a cleared grade and a cleared
+ * allergy note are answers rather than omissions.
+ *
+ * Considerably more than a field write, which is why it is a callable: a
+ * corrected name re-runs the roster duplicate scan (a fixed spelling can reveal
+ * the collision the door missed), and a corrected number moves the family
+ * between buckets in the kiosk's phone index — into the digits they will type
+ * next week, and out of the ones that are now a stranger's.
+ */
+export const amendRegistration = httpsCallable<
+  {
+    registrationId: string;
+    child?: {
+      index: number;
+      firstName: string;
+      lastName: string;
+      grade: number | null;
+      allergies: string | null;
+    };
+    guardian?: { firstName: string; lastName: string; phone: string };
+  },
+  AmendRegistrationResult
+>(functions, 'amendRegistration');
 
 /** Mirrors `MergeStudentsResult` in functions/src/backends/mergeStudents.ts. */
 export interface MergeStudentsResult {

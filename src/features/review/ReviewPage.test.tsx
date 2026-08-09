@@ -18,6 +18,7 @@ const listPendingRegistrations = vi.hoisted(() => vi.fn());
 const approveRegistration = vi.hoisted(() => vi.fn());
 const discardRegistration = vi.hoisted(() => vi.fn());
 const mergeStudents = vi.hoisted(() => vi.fn());
+const amendRegistration = vi.hoisted(() => vi.fn());
 const show = vi.hoisted(() => vi.fn());
 
 vi.mock('@/services/functions', () => ({
@@ -25,6 +26,7 @@ vi.mock('@/services/functions', () => ({
   approveRegistration,
   discardRegistration,
   mergeStudents,
+  amendRegistration,
 }));
 vi.mock('@/context/toastContext', () => ({ useToast: () => ({ show }) }));
 vi.mock('@/context/dataContext', () => ({
@@ -75,6 +77,9 @@ beforeEach(() => {
   approveRegistration.mockResolvedValue({ data: { status: 'approved', message: 'Added them.' } });
   discardRegistration.mockResolvedValue({ data: { status: 'discarded', message: 'Taken off.' } });
   mergeStudents.mockResolvedValue({ data: { status: 'merged', message: 'Merged.' } });
+  amendRegistration.mockResolvedValue({
+    data: { status: 'amended', possibleDuplicates: 0, last4Changed: false, message: 'Saved.' },
+  });
 });
 
 describe('what a reviewer sees', () => {
@@ -763,5 +768,195 @@ describe('what the card refuses to claim', () => {
         withRegistrationIds: ['reg-2'],
       }),
     );
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The third answer this screen was missing.
+ *
+ * Approve is permanent and "Not ours" loses the family, so a misspelled name
+ * had no proportionate response — and the misspelling is the commonest thing
+ * wrong with a form a stranger typed on a lobby touchscreen. What is asserted
+ * below is not that the boxes exist: it is that a correction cannot be
+ * mistaken for a decision, that the card stops offering its irreversible
+ * button while one is being typed, and that a corrected row still says what
+ * the family actually wrote.
+ */
+describe('correcting what the family typed', () => {
+  it('sends the whole child, from the row they are on', async () => {
+    const user = userEvent.setup();
+    mount();
+
+    await user.click(await screen.findByRole('button', { name: /Correct Robin Fields/i }));
+    const first = screen.getByLabelText('First name');
+    await user.clear(first);
+    await user.type(first, 'Robyn');
+    await user.click(screen.getByRole('button', { name: /Save the correction/i }));
+
+    // Every field, every time. A sparse patch would have to answer "what does
+    // an absent grade mean?" next to a child who genuinely has none.
+    await waitFor(() =>
+      expect(amendRegistration).toHaveBeenCalledWith({
+        registrationId: 'reg-1',
+        child: {
+          index: 0,
+          firstName: 'Robyn',
+          lastName: 'Fields',
+          grade: 4,
+          allergies: null,
+        },
+      }),
+    );
+  });
+
+  it('refuses a digit in a name without asking the server', async () => {
+    const user = userEvent.setup();
+    mount();
+
+    await user.click(await screen.findByRole('button', { name: /Correct Robin Fields/i }));
+    const first = screen.getByLabelText('First name');
+    await user.clear(first);
+    await user.type(first, 'Room 3');
+    await user.click(screen.getByRole('button', { name: /Save the correction/i }));
+
+    // The door's own sentence, under the box that caused it — the point of the
+    // form and the callable sharing `lib/registrationFields.ts`.
+    expect(await screen.findByText(/cannot contain numbers/i)).toBeInTheDocument();
+    expect(amendRegistration).not.toHaveBeenCalled();
+  });
+
+  it('holds the irreversible button while a correction is being typed', async () => {
+    const user = userEvent.setup();
+    mount();
+
+    await user.click(await screen.findByRole('button', { name: /Correct Robin Fields/i }));
+
+    // A card mid-correction is a card whose facts are in flux: the approve
+    // caption names children by names somebody is in the middle of changing.
+    expect(screen.getByRole('button', { name: /Approve and add/i })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: /^Cancel$/ }));
+    expect(await screen.findByRole('button', { name: /Approve and add/i })).toBeEnabled();
+  });
+
+  it('says which four digits a corrected number moves the family to', async () => {
+    const user = userEvent.setup();
+    mount();
+
+    await user.click(await screen.findByRole('button', { name: /Correct Dana Fields/i }));
+    const phone = screen.getByLabelText('Phone');
+    await user.clear(phone);
+    await user.type(phone, '5550103355');
+
+    // The consequence that outlives the record: the registration is deleted at
+    // approval, and the index entry is what the family meets at the door.
+    expect(
+      screen.getByText(/from 3344 to 3355 — the old four stop finding them/i),
+    ).toBeInTheDocument();
+  });
+
+  it('reports a collision the correction itself created', async () => {
+    const user = userEvent.setup();
+    amendRegistration.mockResolvedValue({
+      data: {
+        status: 'amended',
+        possibleDuplicates: 1,
+        last4Changed: false,
+        message: 'Saved — and one student on the roster now shares Michael’s name.',
+      },
+    });
+    mount();
+
+    await user.click(await screen.findByRole('button', { name: /Correct Robin Fields/i }));
+    await user.click(screen.getByRole('button', { name: /Save the correction/i }));
+
+    await waitFor(() =>
+      expect(show).toHaveBeenCalledWith(expect.stringContaining('now shares'), {
+        tone: 'success',
+      }),
+    );
+    // And the queue is re-read, because a corrected name is a fresh duplicate
+    // scan and the card underneath the reviewer is genuinely a different card.
+    await waitFor(() => expect(listPendingRegistrations).toHaveBeenCalledTimes(2));
+  });
+
+  it('shows a refusal in the form, not in a toast at the edge of the screen', async () => {
+    const user = userEvent.setup();
+    amendRegistration.mockResolvedValue({
+      data: {
+        status: 'refused',
+        possibleDuplicates: null,
+        last4Changed: false,
+        message: 'This child has already been added to the church’s database.',
+      },
+    });
+    mount();
+
+    await user.click(await screen.findByRole('button', { name: /Correct Robin Fields/i }));
+    await user.click(screen.getByRole('button', { name: /Save the correction/i }));
+
+    expect(await screen.findByText(/already been added to the church/i)).toBeInTheDocument();
+    // Still open, still holding what they typed — a form that closes on a
+    // refusal has thrown the correction away along with the reason.
+    expect(screen.getByLabelText('First name')).toBeInTheDocument();
+  });
+
+  it('stops claiming to be the form once somebody has corrected it', async () => {
+    listPendingRegistrations.mockResolvedValue({
+      data: [
+        registration({
+          children: [
+            {
+              firstName: 'Robin',
+              lastName: 'Fields',
+              grade: 4,
+              studentId: 'held-1',
+              pendingReview: true,
+              mergedIntoStudentId: null,
+              allergies: null,
+              possibleDuplicates: [],
+              typedAs: { firstName: 'Robyn', lastName: 'Feilds', grade: 4 },
+            },
+          ],
+          typedGuardianName: { firstName: 'Dana', lastName: 'Feilds' },
+          phoneCorrected: true,
+        }),
+      ],
+    });
+    mount();
+
+    // The evidence a second reviewer needs to tell a correction from a form.
+    expect(await screen.findByText(/Typed at the kiosk as Robyn Feilds/)).toBeInTheDocument();
+    expect(screen.getByText(/Typed at the kiosk as Dana Feilds/)).toBeInTheDocument();
+    expect(screen.getByText(/The number was corrected here/)).toBeInTheDocument();
+  });
+
+  it('offers no correction on a child who is already upstream', async () => {
+    listPendingRegistrations.mockResolvedValue({
+      data: [
+        registration({
+          settled: true,
+          children: [
+            {
+              firstName: 'Robin',
+              lastName: 'Fields',
+              grade: 4,
+              studentId: 'held-1',
+              pendingReview: false,
+              mergedIntoStudentId: null,
+              allergies: null,
+              possibleDuplicates: [],
+            },
+          ],
+        }),
+      ],
+    });
+    mount();
+
+    // Tally could rename its own copy; the church's database would keep the old
+    // spelling, and a button whose only outcome is a refusal is worse than none.
+    expect(await screen.findByText('Robin Fields')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Correct/i })).toBeNull();
   });
 });

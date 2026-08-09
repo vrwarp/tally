@@ -21,6 +21,18 @@ import type {
   WriteBatchLike,
 } from '../firestore.js';
 
+/**
+ * A map, as against a `Timestamp`, a `Date`, an array or a scalar.
+ *
+ * The prototype check is what keeps a `Timestamp` — which is an object with
+ * fields — from being merged field-by-field into the one it replaces.
+ */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const proto = Object.getPrototypeOf(value) as object | null;
+  return proto === Object.prototype || proto === null;
+}
+
 export class FakeFirestore implements FirestoreLike {
   readonly data = new Map<string, Record<string, unknown>>();
   readonly writes: Array<{ path: string; data: Record<string, unknown> }> = [];
@@ -48,8 +60,39 @@ export class FakeFirestore implements FirestoreLike {
     };
   }
 
+  /**
+   * The real SDK's merge, which recurses into maps and replaces everything else.
+   *
+   * This used to be one spread deep, and the divergence was not academic: the
+   * kiosk phone index is a single document holding one big `last4` map, so
+   * every patch of one bucket looked here like a write that erased every other
+   * bucket. A test asserting that a corrected family stops answering to their
+   * mistyped digits *without* taking the rest of the ministry with them could
+   * not be written at all, because the double had already taken it.
+   *
+   * Arrays are values, not maps — the real SDK replaces them wholesale, and a
+   * union would be `FieldValue.arrayUnion`, which nothing here uses.
+   */
+  private static merged(
+    held: Record<string, unknown>,
+    value: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const next = { ...held };
+    for (const [key, incoming] of Object.entries(value)) {
+      const existing = next[key];
+      next[key] =
+        isPlainObject(existing) && isPlainObject(incoming)
+          ? FakeFirestore.merged(existing, incoming)
+          : incoming;
+    }
+    return next;
+  }
+
   private write(path: string, value: Record<string, unknown>, merge: boolean): void {
-    this.data.set(path, merge ? { ...(this.data.get(path) ?? {}), ...value } : { ...value });
+    this.data.set(
+      path,
+      merge ? FakeFirestore.merged(this.data.get(path) ?? {}, value) : { ...value },
+    );
     this.writes.push({ path, data: value });
   }
 
