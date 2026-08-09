@@ -95,7 +95,7 @@ Every script is in [the reference table](docs/development.md#scripts).
 ```
 src/types/        the domain model — the contract every layer shares
 src/services/     all Firestore reads and writes; nothing else talks to Firebase
-src/features/     one folder per screen: checkin, dashboard, events, students, settings, roster
+src/features/     one folder per screen: checkin, dashboard, events, students, settings, kiosk, roster
 src/kiosk/        the lobby kiosk — its own entry, its own installable app, its own byte budget
 src/lib/          paths, time helpers, the pure derivations the whole app agrees on
 functions/        Cloud Functions — a separate npm package, with the people-backend integrations

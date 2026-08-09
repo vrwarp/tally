@@ -48,8 +48,8 @@ const TROUBLE_TEXT: Record<PairingTrouble, string> = {
   'no-code': 'Can’t reach Tally right now. Trying again shortly…',
   stuck:
     'This kiosk has its code, but the pairing isn’t completing. If a leader has already ' +
-    'approved it, they should open Settings → Check-in kiosk in Tally, which will say ' +
-    'whether anything needs fixing.',
+    'approved it, they should open Tally, tap their name and choose Check-in kiosk, which ' +
+    'will say whether anything needs fixing.',
 };
 
 export function PairingScreen({
@@ -135,9 +135,17 @@ export function PairingScreen({
           >
             {code}
           </div>
+          {/*
+            * The instruction has to name a screen the reader can actually
+            * open. It used to say "Settings → Pair a kiosk", and Settings is
+            * core-team only — so on the Friday evenings when the person next to
+            * the kiosk is a counselor, which is most of them, this sentence
+            * named a door they had no key to. Kiosk is in the account menu for
+            * every active member; see `uxr/JOURNEY-kiosk.md`.
+            */}
           <div className="max-w-md text-lg leading-relaxed text-ink-300">
-            A leader enters this code in Tally under{' '}
-            <span className="font-semibold text-ink-100">Settings → Pair a kiosk</span>.
+            In Tally, tap your name and choose{' '}
+            <span className="font-semibold text-ink-100">Kiosk</span>, then enter this code.
           </div>
           {/* The code stays up: it is still the right code, and a leader may be
               mid-approval. This only adds why nothing is happening. */}

@@ -84,6 +84,20 @@ export function AppShell({ children }: { children: ReactNode }) {
           {profile?.role}
         </span>
       </div>
+      {/* Every active member, unlike the two below it.
+          Pairing a kiosk is open to anybody the attendance rules already trust
+          — the person who arrives first on a Friday and finds the lobby iPad
+          asking to be claimed is usually a counselor — and until this item
+          existed there was no link to that screen for one. The kiosk's own
+          screen sent them to Settings, which a counselor cannot open. */}
+      <NavLink
+        to="/pair-kiosk"
+        role="menuitem"
+        onClick={() => setMenuOpen(false)}
+        className="block px-3 py-2 text-ink-200 hover:bg-ink-800"
+      >
+        Kiosk
+      </NavLink>
       {can('core') ? (
         <>
           {/* Review moved into the nav itself; these two stay here, because

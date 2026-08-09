@@ -84,6 +84,8 @@ uxr/before/
 uxr/after/
 uxr/before-team/
 uxr/after-team/
+uxr/before-kiosk/
+uxr/after-kiosk/
 
 # Emitted JavaScript, kept ignored as a backstop.
 #
