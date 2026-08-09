@@ -23,6 +23,7 @@
  */
 import { useState } from 'react';
 import { Button, type ButtonProps } from '@/components/ui';
+import { cn } from '@/lib/utils';
 import { useToast } from '@/context/toastContext';
 import { downloadCsv, downloadOpensInViewer } from '@/lib/download';
 
@@ -121,7 +122,23 @@ export function ExportCsvButton({
       onClick={() => void run()}
       disabled={disabled}
       loading={busy}
-      className={className}
+      /*
+       * A boundary without a fill.
+       *
+       * `ghost` alone is bare text, and bare text is not a control on a phone:
+       * `hover:bg-ink-800` never fires on a touch screen, and nothing else on
+       * Insights is a bare-text action — the gathering chips, the stat tiles and
+       * the rows all carry a box. A solitary "Export CSV" under a title and a
+       * description read as a third line of caption, worst on the two cards
+       * where it has no partner beside it to look like a toolbar.
+       *
+       * `ring-1 ring-ink-800` is the app's own "this is a surface you can touch"
+       * token — what the stat tiles and chips wear — so it returns the only
+       * affordance a touch screen has, makes the 44px hit box visible, and stays
+       * clearly quieter than the filled `bg-ink-800 ring-ink-700` secondaries it
+       * sits beside.
+       */
+      className={cn(variant === 'ghost' && 'ring-1 ring-ink-800', className)}
       title={blockedReason ?? undefined}
       aria-label={
         empty ? `${label} — nothing to export` : `${label} — ${count} ${noun}`

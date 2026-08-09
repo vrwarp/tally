@@ -271,7 +271,8 @@ export function CopyContactsButton({ students, title }: CopyContactsButtonProps)
       size="md"
       onClick={() => void copy()}
       disabled={students.length === 0}
-      className="shrink-0 whitespace-nowrap"
+      // The ring is the touch affordance `ghost` gives up; see `ExportCsvButton`.
+      className="shrink-0 whitespace-nowrap ring-1 ring-ink-800"
     >
       Copy list
     </Button>
