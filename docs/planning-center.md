@@ -154,11 +154,23 @@ would put "6th" under every adult in the church.
 
 ### How a name is written
 
-Planning Center composes a display name as `first_name “nickname” last_name` — `Benson “蔡秉洲” Tsai`
-— treating the nickname as an addition rather than a replacement. Tally follows that exactly, so the
-name on a roster row is the name on the profile page. Because `searchName` is built from the same
-string, either spelling finds the student; and because write-back splits the halves apart again
-before sending them, the two fields Planning Center actually stores are never conflated.
+Planning Center keeps `first_name` and `nickname` as two fields and composes neither into the
+`name` it returns: a person stored as `first_name: "Benson"`, `nickname: "蔡秉洲"`, `last_name: "Tsai"`
+comes back with `name: "Benson Tsai"`.
+
+Tally writes the two together anyway, as `Benson “蔡秉洲”`, and holds that composite in
+`Student.firstName`. That convention is **Tally's own**, and this page once said it was Planning
+Center's. Worth correcting rather than quietly fixing: the belief that Tally was merely mirroring the
+profile page is what put the composite onto printed labels, where it does not belong.
+
+What it is actually for is search. `searchName` is built from the composite, so either spelling finds
+the student at a kiosk or on the roster — which matters in a congregation where half the volunteers
+know a child by one name and half by the other. Write-back splits the halves apart again before
+sending them, so the two fields Planning Center stores are never conflated.
+
+Where the composite is *not* wanted is a printed label: `{{firstName}}` on a check-in sticker
+resolves to `Benson`, with `{{nickname}}` available as a token of its own. See
+[Label printing](label-printing.md#names-with-two-halves).
 
 Adding goes through a callable rather than a direct write. The document id is a claim about which
 real child a row refers to, so the security rules forbid a browser asserting it; the server checks
@@ -236,9 +248,11 @@ collapse duplicate visitors. If several people match exactly, the church databas
 duplicates and Tally links to the lowest id rather than adding a third.
 
 A name Tally holds as `Benson “蔡秉洲”` is split back into `first_name` and `nickname` before any of
-this: the server's fuzzy search indexes the halves separately, and writing the composite into
-`first_name` would render as `Benson “蔡秉洲” “蔡秉洲” Tsai` on the next read and stop the matcher
-recognising the person at all — which is how a duplicate child gets created.
+this, because Planning Center stores those as two fields and its fuzzy search indexes them
+separately. Writing the composite into `first_name` would leave Planning Center holding
+`first_name: "Benson “蔡秉洲”"` beside the untouched `nickname: "蔡秉洲"` — which `displayFirstName`
+then composes *again* on the next read, giving `Benson “蔡秉洲” “蔡秉洲”`, and which stops the matcher
+recognising the person at all. That is how a duplicate child gets created.
 
 ### Editing a linked student (`full` only)
 

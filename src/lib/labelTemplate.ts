@@ -91,6 +91,18 @@ export const MAX_LABEL_LINE_LENGTH = 120;
  * of `firestore.rules`. Adding either of those to a label is a change to what a
  * shelf in a public room is allowed to display, not a new entry in this list.
  *
+ * `firstName` and `nickname` are two tokens because the roster row holds them as
+ * one field. Tally stores a child with a second name as `Benson “蔡秉洲”` — a
+ * composite of its own making, and not, as this was once documented, Planning
+ * Center's: that API keeps `first_name` and `nickname` apart and composes neither
+ * into its own `name`. The composite earns its place on a roster row, where it is
+ * what makes both spellings findable. It does not earn it on a sticker. The name
+ * line is there to be read across a room at `xl`, and quotes with a second script
+ * inside them are what push that line — and then, once `labelRender.ts` gives up
+ * on shrinking one line, the whole label — down toward the legibility floor. So
+ * `firstName` is the first name, `nickname` is the other half, and a gathering
+ * that wants both puts them on two lines at two sizes.
+ *
  * `allergy` is the exception, and it is one that had to be argued for rather
  * than assumed.
  *
@@ -114,6 +126,7 @@ export const MAX_LABEL_LINE_LENGTH = 120;
  */
 export const LABEL_TOKENS = [
   'firstName',
+  'nickname',
   'lastName',
   'lastInitial',
   'grade',
