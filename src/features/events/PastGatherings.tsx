@@ -18,10 +18,13 @@ import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { Badge, ErrorBanner } from '@/components/ui';
 import { EventIcon } from '@/components/ui/EventIcon';
+import { LockedChainGroup } from '@/features/events/LockedChainGroup';
+import { partitionBand } from '@/features/events/lockedChains';
 import { useEventSnapshots } from '@/hooks/useEventSnapshots';
 import { useData } from '@/context/dataContext';
 import { usePastEvents } from '@/hooks/usePastEvents';
 import { formatEventWindow } from '@/lib/time';
+import { cn } from '@/lib/utils';
 import type { TallyEvent } from '@/types';
 
 /** "July 2026" — the ruler the rows hang off, so each row only needs a day. */
@@ -62,6 +65,14 @@ function groupByMonth(events: readonly TallyEvent[]): MonthGroup[] {
  * — it does not count as a miss and it does not feed the prediction (see
  * `lib/sessionHistory.ts`) — so printing a bold `0` beside it would state a
  * turnout the app does not itself believe.
+ *
+ * The fourth state, `locked`, has exactly one caller left.
+ *
+ * On the events calendar it was fourteen copies of one sentence down the margin
+ * of a list, and the fact belongs to the chain rather than to the row — see
+ * `LockedChainGroup`. On the check-in screen's catch-up tail it is at most five
+ * rows, on a screen where the reader is standing at a door and any grouping
+ * would cost a tap; there the caption is still the cheapest true thing to say.
  */
 function AttendanceStat({
   event,
@@ -112,24 +123,30 @@ function AttendanceStat({
   }
 
   /*
-   * A footnote, not the headline.
+   * A footnote, not the headline — and then one step back up.
    *
-   * This used to be `text-xl font-bold text-present-400` — a full type step
-   * above the gathering it annotated, in the green that means "this student is
-   * checked in right now". Squint at a list of these and you read
-   * "16 24 18 26 21" as a column and the names second, which is backwards: the
-   * thing being chosen is the gathering, and the count is a total from a night
-   * that is over. Demoting it also matters for the wrong-Friday risk — when two
-   * rows share a title, the date is the only discriminator, and it was the
-   * quietest mark in the row.
+   * This used to be `text-xl font-bold text-present-400`, a full type step above
+   * the gathering it annotated, in the green that means "this student is checked
+   * in right now". Squint at a list of those and you read "16 24 18 26 21" as a
+   * column and the names second, which is backwards: the thing being chosen is
+   * the gathering.
+   *
+   * Demoting it went one notch too far for the reader this list is hardest for.
+   * On a calendar where most chains are somebody else's, this can be the only
+   * number on the page, and it was set two steps below the title of its own row
+   * — the answer to "what was the head count three weeks ago" quieter than a
+   * name the reader already knew. It is the brightest thing in its row now and
+   * `checked in` carries the demotion, at `ink-400` rather than `ink-500`
+   * because at 11px on `ink-900` the fainter token is 3.9:1 and this is the word
+   * that distinguishes 32 checked in from 32 of anything else.
    */
   return (
     <span className="block text-right leading-tight">
-      <span aria-hidden="true" className="text-sm font-semibold tabular-nums text-ink-400">
+      <span aria-hidden="true" className="text-base font-bold tabular-nums text-ink-100">
         {count}
       </span>
       <span className="sr-only">{count} students checked in</span>
-      <span aria-hidden="true" className="block text-[11px] leading-none text-ink-500">
+      <span aria-hidden="true" className="block text-[11px] leading-none text-ink-400">
         checked in
       </span>
     </span>
@@ -148,14 +165,18 @@ export function PastEventRow({
 }: {
   event: TallyEvent;
   count: number | undefined;
-  /** Not this reader's gathering — the head count was never asked for. */
+  /**
+   * Not this reader's gathering — the head count was never asked for. Only the
+   * check-in screen's catch-up tail passes this; the calendar below groups its
+   * locked gatherings by chain instead. See `AttendanceStat`.
+   */
   locked?: boolean;
 }) {
   return (
     <li>
       <Link
         to={`/event/${event.id}`}
-        className="flex min-h-16 min-w-0 items-center gap-3 rounded-xl bg-ink-900 px-3 py-2.5 ring-1 ring-ink-800 active:bg-ink-800"
+        className="flex min-h-16 min-w-0 items-center gap-3 rounded-xl bg-ink-900 px-3 py-2.5 ring-1 ring-ink-800 hover:bg-ink-800/40 active:bg-ink-800"
       >
         <EventIcon name={event.icon} size="md" />
 
@@ -240,28 +261,49 @@ export function PastGatherings({ before }: PastGatheringsProps) {
     <section aria-labelledby="past-gatherings">
       {/* A half of the calendar, at the same rank as "Upcoming" opposite it —
           not a group inside one. */}
-      <h2 id="past-gatherings" className="pb-3 text-base font-semibold text-ink-100">
+      <h2 id="past-gatherings" className="pb-3 text-lg font-bold text-ink-50">
         Past gatherings
       </h2>
 
       <div className="flex flex-col gap-5">
-        {groups.map((group) => (
-          <div key={group.key}>
-            <h3 className="pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-500">
-              {group.label}
-            </h3>
-            <ul className="flex flex-col gap-2">
-              {group.events.map((event) => (
-                <PastEventRow
-              key={event.id}
-              event={event}
-              count={counts.get(event.id)}
-              locked={!canWork(event)}
-            />
-              ))}
-            </ul>
-          </div>
-        ))}
+        {groups.map((group) => {
+          // Descending: this list reads backwards, so the date a locked chain's
+          // head advertises is the latest one gone by.
+          const { own, locked } = partitionBand(group.events, canWork, 'desc');
+
+          return (
+            <div key={group.key}>
+              {/* One eyebrow style for both halves of the calendar. This was a
+                  step quieter and a step lighter than the bands opposite it,
+                  which put the structure at the same value as the rows it
+                  governs. */}
+              <h3 className="pb-2 text-xs font-bold uppercase tracking-wider text-ink-400">
+                {group.label}
+              </h3>
+              <ul className="flex flex-col gap-2">
+                {own.map((event) => (
+                  <PastEventRow key={event.id} event={event} count={counts.get(event.id)} />
+                ))}
+              </ul>
+
+              {/* Below a rule when the month has one of the reader's own in it,
+                  and flush when it does not — the rule is the demotion boundary,
+                  and a rule under nothing is a rule about nothing. */}
+              {locked.length > 0 ? (
+                <ul
+                  className={cn(
+                    'flex flex-col gap-2',
+                    own.length > 0 && 'mt-2 border-t border-ink-800 pt-2',
+                  )}
+                >
+                  {locked.map((chain) => (
+                    <LockedChainGroup key={chain.key} chain={chain} lead="latest" />
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          );
+        })}
       </div>
 
       {error ? (
@@ -305,14 +347,15 @@ export function PastGatherings({ before }: PastGatheringsProps) {
         <button
           type="button"
           onClick={loadMore}
-          className="mt-2 min-h-12 w-full rounded-xl bg-ink-900 text-sm font-semibold text-ink-300 ring-1 ring-ink-800 active:bg-ink-800"
+          className="mt-2 min-h-12 w-full rounded-xl bg-ink-900 text-sm font-semibold text-ink-300 ring-1 ring-ink-800 hover:bg-ink-800/40 active:bg-ink-800 pointer-fine:min-h-9"
         >
           Load older gatherings
         </button>
       ) : null}
 
+      {/* Left-aligned, like everything else in this column. */}
       {!hasMore && !loading && events.length > 0 ? (
-        <p className="pt-4 pb-1 text-center text-xs text-ink-500">
+        <p className="pt-4 pb-1 text-xs text-ink-500">
           That is every gathering Tally has a record of.
         </p>
       ) : null}

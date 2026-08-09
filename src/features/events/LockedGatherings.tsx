@@ -22,8 +22,8 @@
  */
 import { EventIcon } from '@/components/ui';
 import { useData } from '@/context/dataContext';
-import { shortName, useTeam } from '@/features/events/useTeam';
-import { chainKey } from '@/lib/materialize';
+import { approvers } from '@/features/events/approvers';
+import { useTeam } from '@/features/events/useTeam';
 import { formatEventWindow } from '@/lib/time';
 import type { TallyEvent } from '@/types';
 
@@ -36,38 +36,6 @@ export interface LockedGatheringsProps {
    * note above.
    */
   hasOwn: boolean;
-}
-
-/**
- * "Miriam or Dana can add you."
- *
- * Two names at most. A list of eight is not more actionable than a list of two,
- * and this is one line under a row on a phone. The core team come first when
- * there are more than two, because they can do everything a counselor on the
- * gathering can and more besides — but a counselor on it can add somebody too,
- * and on a Friday night they are the one standing next to you.
- */
-function approvers(
-  event: TallyEvent,
-  access: ReturnType<typeof useData>['access'],
-  byUid: ReturnType<typeof useTeam>['byUid'],
-): string | null {
-  const list = access.get(chainKey(event));
-  if (!list) return null;
-
-  const names = [...list.members]
-    .map((uid) => byUid.get(uid))
-    .filter((profile): profile is NonNullable<typeof profile> => profile !== undefined)
-    .sort((a, b) => {
-      const rank = (role: string) => (role === 'admin' ? 0 : role === 'core' ? 1 : 2);
-      return rank(a.role) - rank(b.role);
-    })
-    .map(shortName)
-    .filter((name): name is string => name !== null);
-
-  if (names.length === 0) return null;
-  if (names.length === 1) return `${names[0]} can add you`;
-  return `${names[0]} or ${names[1]} can add you`;
 }
 
 export function LockedGatherings({ events, hasOwn }: LockedGatheringsProps) {
@@ -86,7 +54,13 @@ export function LockedGatherings({ events, hasOwn }: LockedGatheringsProps) {
           <span id="not-yours">
             Not yours · {events.length} {hasOwn ? 'more ' : ''}today
           </span>
-          <span aria-hidden className="transition-transform group-open:rotate-180">
+          {/* Turned about the arrowhead's ink, not its em box. `⌄` hangs low in
+              its square, so a plain 180° flip throws the mark to cap height and
+              it visibly jumps ~6px when the section opens. */}
+          <span
+            aria-hidden
+            className="origin-[50%_69%] transition-transform group-open:rotate-180"
+          >
             ⌄
           </span>
         </summary>
