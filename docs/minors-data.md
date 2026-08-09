@@ -14,6 +14,12 @@ card numbers, no fees, no record of who has paid. Waivers and payments are not T
 those live on a clipboard and in a cash box, and a stale second copy in an app is worse than none.
 Nothing is stored that would not already be on a church check-in card.
 
+One parent contact can now be taken at a door as well as at the kiosk — quick-add asks for it,
+optionally, when the adult who brought the child is standing there. It is held exactly where the
+kiosk's is: on a TTL'd registration record no client can read, until a core-team member attaches it
+to a household upstream. Nothing about it reaches a student document, and no screen a counselor can
+open ever reads one back.
+
 Most of that list is not Tally's to hold. Names, grades, parent contact and allergies live in
 Planning Center and are read when needed; `students/{id}` holds only what Tally owns — notes, when
 they first turned up — plus the complete record for a quick-added visitor who does not exist

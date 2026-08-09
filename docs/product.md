@@ -43,6 +43,23 @@ Center. **No grade** is one of the answers, not a blank to be filled in later �
 one has none, and on a gathering that tracks check-out the field opens there. The push carries them
 upstream either way; the grade is simply omitted rather than sent as a zero.
 
+**Journey 3b — and the parent is standing right there.** The commonest thing a counselor learns at a
+door is a phone number, and until now Tally had nowhere to put it: the profile went into the
+incomplete list and somebody rang round on Tuesday, if they got to it. Quick-add therefore carries a
+fourth, optional thing — **＋ Add parent contact**, closed until it is asked for, three fields when
+it opens (parent first name, surname carried across from the child, phone). Skipping it is the
+default and costs nothing; opening it and typing nothing is also fine, because a parent who walks off
+mid-sentence must not strand a counselor at a required field.
+
+What it is not is a write into the church's database. Tally holds no parent contact on a student —
+`firestore.rules` refuses one, deliberately — and the question behind "add this parent" is *which*
+David Kim this is, which the core team's own screen asks out loud with the directory in front of it.
+So the number goes to the same review queue a lobby family goes to, as a card about an adult rather
+than a card about a child: the visitor is on the roster and queued upstream before the card exists,
+approving attaches the parent to their household, and discarding forgets the number and touches
+nothing else. The immediate payoff lands anyway — those four digits work at the lobby kiosk the next
+morning, because the phone index is patched on the way past.
+
 **Journey 4 — the retreat bus.** A one-off event carries its own guest list, and restricts its roster
 to the students who RSVP'd yes or maybe: the counselor at the bus door sees the trip list, not the
 whole ministry. A student who declines keeps their row on the list — parents reverse a "no" often

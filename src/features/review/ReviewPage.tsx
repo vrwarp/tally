@@ -147,9 +147,10 @@ export function ReviewPage() {
           {rows !== null && rows.length > 0 ? <Badge tone="neutral">{rows.length}</Badge> : null}
         </h1>
         <p className="mt-0.5 max-w-2xl text-sm text-ink-500">
-          Registered at the kiosk by the family themselves. They are on the roster and were
-          checked in — nothing has gone into the church&rsquo;s database yet. Soonest to be
-          cleared first.
+          Two doors, one queue: families who put themselves on the roster at the lobby kiosk, and
+          parent contacts a counselor was given beside a visitor they quick-added. Everybody named
+          here is on the roster and was checked in — no adult has gone into the church&rsquo;s
+          database yet. Soonest to be cleared first.
         </p>
       </header>
 
@@ -174,7 +175,7 @@ export function ReviewPage() {
         <Card>
           <EmptyState
             title="Nothing waiting."
-            description="When a family puts themselves on the roster at the lobby kiosk, they appear here until somebody approves them."
+            description="A family who registers at the lobby kiosk, or a parent’s details a counselor takes at a door, waits here until somebody approves them."
           />
         </Card>
       ) : (
@@ -376,6 +377,43 @@ function RegistrationCard({
   const daysLeft = Math.max(1, Math.ceil((row.expiresInMs ?? 0) / DAY_MS));
 
   const held = stillHeld(row);
+  /**
+   * A card whose only outstanding half is the adult.
+   *
+   * Two kinds of record arrive here, and they want the same sentences. A parent
+   * contact a counselor took down beside a quick-added visitor was never about
+   * the child — that child was on the roster and queued upstream before the
+   * card existed. A kiosk family whose children landed and whose guardian did
+   * not has ended up in the same place from the other direction.
+   *
+   * Every sentence in the foot was written for the first kind of card and reads
+   * off `held`: "Adds Maya to the church's database", "Takes Maya off the
+   * roster". With nobody held those become a promise about an empty list and a
+   * threat against a child this press cannot touch — the discard callable
+   * deliberately leaves an unheld student alone — so the foot says what will
+   * actually happen instead.
+   *
+   * "Nobody is held" is not enough to say that, though, and the two cards it
+   * gets wrong are the two worth naming:
+   *
+   *   - **The children were never written.** A registration that died between
+   *     claiming its id and committing its batch names student documents that
+   *     do not exist. Nothing is held because there is nothing at all, and
+   *     "Émile stays on the roster" would be a sentence about a child who is
+   *     not on it. Hence `studentId !== null`.
+   *   - **The push failed and the hold came off.** Approving clears the hold
+   *     *before* it pushes, deliberately, so a family whose backend was down is
+   *     left unheld with their children still absent upstream. The retry is
+   *     about the children, and the button has to keep saying so.
+   */
+  const parentOnly =
+    row.guardian !== null &&
+    row.children.length > 0 &&
+    row.children.every((child) => child.studentId !== null && !child.pendingReview) &&
+    row.lastErrorKind !== 'children' &&
+    row.lastErrorKind !== 'both';
+  /** The children this card is *about*, held or not — for a sentence to name. */
+  const named = listNames(held.length > 0 ? held : row.children);
   /*
    * The adult is what the backend refused, which is usually refused for a
    * reason no retry can fix.
@@ -440,6 +478,20 @@ function RegistrationCard({
             ? `joins ${wouldJoin.name}, whose number matches`
             : 'is added as a new person';
 
+  /**
+   * What a press does to the adult, as a sentence rather than a clause.
+   *
+   * On a parent-only card the adult *is* the press, so the clause that hangs off
+   * the end of a kiosk card's sentence has to become the subject of its own —
+   * "Adds Rosa Delgado to the church's database, who is added as a new person"
+   * says "added" twice and reads as two different additions.
+   */
+  const adultSentence = !row.guardian
+    ? ''
+    : guardianClause
+      ? `${nameOf(row.guardian)} ${guardianClause}, attached to ${named}.`
+      : `Adds ${nameOf(row.guardian)} to the church’s database, attached to ${named}.`;
+
   const approveDecision = (): ApproveDecision => ({
     ...(sameFamily.length > 0 ? { withRegistrationIds: sameFamily } : {}),
     ...(guardianChoice && guardianChoice !== 'new' ? { guardianPersonId: guardianChoice } : {}),
@@ -457,7 +509,19 @@ function RegistrationCard({
               : 'A family'
         }
         description={[
-          when ? `Registered ${formatRelative(when)}` : null,
+          /*
+            How it arrived, because it changes what the card is asking. A
+            counselor's card is a phone number somebody was given at a door
+            beside a child who is already on the roster; a kiosk card is a whole
+            family waiting to exist. Same queue, different question.
+          */
+          row.source === 'counselor'
+            ? when
+              ? `Taken at the door ${formatRelative(when)}`
+              : 'Taken at the door'
+            : when
+              ? `Registered ${formatRelative(when)}`
+              : null,
           gatheringTitle ? `at ${gatheringTitle}` : null,
           // Legacy: the phone form was retired, but its records live 30 days
           // and a reviewer deciding one still deserves to know how it arrived.
@@ -514,8 +578,28 @@ function RegistrationCard({
         */}
         {expiringSoon ? (
           <p className={STRIP}>
-            When it clears, the phone number goes with it — and the children stay on
+            When it clears, the phone number goes with it — and{' '}
+            {parentOnly && row.children.length === 1 ? `${named} stays` : 'the children stay'} on
             Tally&rsquo;s roster with nobody attached to them.
+          </p>
+        ) : null}
+
+        {/*
+          What this card is, when it is the narrow kind.
+
+          A reviewer who reads "Rosa Delgado · 555-0134" and a child's name will
+          reach for the same instrument they use on a kiosk family — approve the
+          children, or take them off the roster — and neither is what this card
+          holds. Saying where the child already is, first, is what stops "Not
+          ours" being read as the way to reject a phone number.
+        */}
+        {row.source === 'counselor' ? (
+          <p className={STRIP}>
+            A counselor added {named} at the door and was given a parent&rsquo;s details.{' '}
+            {held.length === 0
+              ? `${named} is already on the roster and already queued for the church’s database`
+              : `${named} is on the roster`}{' '}
+            — the adult below is the only thing waiting on you.
           </p>
         ) : null}
 
@@ -661,7 +745,7 @@ function RegistrationCard({
           will fall — a reviewer should not have to press a button to find out
           whether the church is about to get a second Rosa Salgado.
         */}
-        {row.guardian && adults.length > 0 && !row.settled ? (
+        {row.guardian && adults.length > 0 && (!row.settled || parentOnly) ? (
           <div className={STRIP}>
             <p>
               The church already has {adults.length === 1 ? 'somebody' : `${adults.length} people`}{' '}
@@ -758,18 +842,25 @@ function RegistrationCard({
               </Decision>
               <Decision
                 caption={
-                  <span className="text-warn-400">
-                    {listNames(held)} {held.length === 1 ? 'goes' : 'go'} into the church&rsquo;s
-                    database now
-                    {sameFamily.length > 0
-                      ? `, with the ${sameFamily.length === 1 ? 'other registration' : `${sameFamily.length} other registrations`} as one family`
-                      : ''}
-                    {/* The adult, named, in the sentence they are agreeing to —
-                        it is the half of this press with no undo and the half
-                        the card was silent about. */}
-                    {guardianClause ? `, and ${row.guardian!.firstName} ${guardianClause}` : ''}.
-                    Nothing added there can be deleted or taken back.
-                  </span>
+                  parentOnly ? (
+                    <span className="text-warn-400">
+                      {adultSentence} Nothing added to the church&rsquo;s database can be deleted or
+                      taken back.
+                    </span>
+                  ) : (
+                    <span className="text-warn-400">
+                      {listNames(held)} {held.length === 1 ? 'goes' : 'go'} into the church&rsquo;s
+                      database now
+                      {sameFamily.length > 0
+                        ? `, with the ${sameFamily.length === 1 ? 'other registration' : `${sameFamily.length} other registrations`} as one family`
+                        : ''}
+                      {/* The adult, named, in the sentence they are agreeing to —
+                          it is the half of this press with no undo and the half
+                          the card was silent about. */}
+                      {guardianClause ? `, and ${row.guardian!.firstName} ${guardianClause}` : ''}.
+                      Nothing added there can be deleted or taken back.
+                    </span>
+                  )
                 }
               >
                 <Button
@@ -781,7 +872,9 @@ function RegistrationCard({
                   disabled={disabled}
                   aria-busy={busy || undefined}
                 >
-                  Yes — add {held.length === 1 ? listNames(held) : `${held.length} children`}
+                  {parentOnly
+                    ? `Yes — add ${row.guardian!.firstName}`
+                    : `Yes — add ${held.length === 1 ? listNames(held) : `${held.length} children`}`}
                 </Button>
               </Decision>
             </>
@@ -801,6 +894,14 @@ function RegistrationCard({
                           instrument that ends the job is below it.
                         */
                         `Tries ${row.guardian?.firstName ?? 'the parent'} again. The last attempt was refused, and nothing about the refusal has changed on its own.`
+                      : parentOnly
+                        ? /*
+                            The narrow card's sentence. Nothing here is about the
+                            child — they are on the roster either way — so the
+                            promise is about the adult, and it still names the
+                            household the press is about to build.
+                          */
+                          `${adultSentence} Nothing added to the church’s database can be taken back.`
                       : `Adds ${listNames(held)}${sameFamily.length > 0 ? ' and the family they were registered with' : ''} to the church’s database${guardianClause ? `, and ${row.guardian!.firstName} ${guardianClause}` : ''}. Nothing added there can be taken back.`
                 }
               >
@@ -813,21 +914,31 @@ function RegistrationCard({
                 >
                   {guardianRefused
                     ? `Try ${row.guardian?.firstName ?? 'the parent'} again`
-                    : row.settled
-                      ? 'Finish adding them'
-                      : 'Approve and add'}
+                    : parentOnly
+                      ? `Add ${row.guardian!.firstName}`
+                      : row.settled
+                        ? 'Finish adding them'
+                        : 'Approve and add'}
                 </Button>
               </Decision>
 
               {confirmingDiscard ? (
                 <Decision
                   caption={
-                    <span className="text-warn-400">
-                      Takes {listNames(held)} off the roster
-                      {row.guardian ? ` and forgets ${formatPhone(row.guardian.phone)}` : ''} for
-                      good. Their check-in history is kept, and only a new registration at the
-                      kiosk brings them back.
-                    </span>
+                    parentOnly ? (
+                      <span className="text-warn-400">
+                        Forgets {formatPhone(row.guardian!.phone)} for good — it is the only copy.{' '}
+                        {named} stays on the roster exactly as they are, and nobody is added to the
+                        church&rsquo;s database.
+                      </span>
+                    ) : (
+                      <span className="text-warn-400">
+                        Takes {listNames(held)} off the roster
+                        {row.guardian ? ` and forgets ${formatPhone(row.guardian.phone)}` : ''} for
+                        good. Their check-in history is kept, and only a new registration at the
+                        kiosk brings them back.
+                      </span>
+                    )
                   }
                 >
                   <div className="mt-auto flex w-full flex-col gap-2 lg:w-auto lg:flex-row">
@@ -837,7 +948,7 @@ function RegistrationCard({
                       onClick={onDiscard}
                       disabled={disabled}
                     >
-                      Yes, take them off
+                      {parentOnly ? 'Yes, forget the number' : 'Yes, take them off'}
                     </Button>
                     <Button
                       variant="ghost"
@@ -851,9 +962,15 @@ function RegistrationCard({
               ) : (
                 <Decision
                   caption={
-                    row.guardian
-                      ? `Takes ${listNames(held)} off the roster and forgets ${formatPhone(row.guardian.phone)} for good.`
-                      : `Takes ${listNames(held)} off the roster. No number was given, so nothing else is lost.`
+                    parentOnly
+                      ? // The one card where "Not ours" cannot mean "take them
+                        // off the roster": the discard leaves an unheld student
+                        // alone, deliberately, and a leader who wants that child
+                        // gone does it on the Students screen looking at them.
+                        `Forgets ${formatPhone(row.guardian!.phone)} for good. ${named} stays on the roster.`
+                      : row.guardian
+                        ? `Takes ${listNames(held)} off the roster and forgets ${formatPhone(row.guardian.phone)} for good.`
+                        : `Takes ${listNames(held)} off the roster. No number was given, so nothing else is lost.`
                   }
                 >
                   <Button
@@ -862,7 +979,7 @@ function RegistrationCard({
                     onClick={() => setConfirmingDiscard(true)}
                     disabled={disabled}
                   >
-                    Not ours
+                    {parentOnly ? 'Forget the number' : 'Not ours'}
                   </Button>
                 </Decision>
               )}
