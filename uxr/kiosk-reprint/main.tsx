@@ -186,6 +186,11 @@ export function Prototype() {
         title="Wednesday Night"
         window="6:30 – 8:00 PM"
         printer={(params.get('printer') as 'ready' | 'trouble' | 'none') ?? 'ready'}
+        /* `PrinterState`'s own sentence, which is what the app threads through —
+           the staff screen names the fault rather than only reporting that there
+           is one, because out of labels, cover open and unplugged are three
+           different next moves. */
+        trouble={trouble ? 'The cover is open.' : null}
         onReprint={() => {}}
         onPrinter={() => {}}
         onChangeEvent={() => {}}

@@ -1532,6 +1532,7 @@ export function KioskApp() {
                   ? 'ready'
                   : 'trouble'
             }
+            trouble={printerState?.kind === 'trouble' ? printerState.message : null}
             onReprint={() => {
               setBuffer('');
               setSentId(null);

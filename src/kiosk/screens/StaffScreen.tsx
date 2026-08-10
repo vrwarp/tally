@@ -65,8 +65,13 @@ const ROW =
  * pressed it and got nothing, which is the frozen-tablet reading the slab was
  * replaced to avoid. Dimming alone can only ever mean unavailable; absent has to
  * be a different shape.
+ *
+ * `ink-200`, not `ink-400`: at 400 it tied with the status word it exists to
+ * excuse *and* with the time range in the header, so the one sentence that is
+ * the whole point of the state sat at the bottom of the value ladder and
+ * dropped out of a squint. The ladder is doors, then this, then status and time.
  */
-const STATEMENT = 'px-5 text-left text-lg text-ink-400 kiosk:px-6 kiosk:text-2xl';
+const STATEMENT = 'px-5 text-left text-lg text-ink-200 kiosk:px-6 kiosk:text-2xl';
 
 const DOOR = `${ROW} bg-ink-800 text-ink-100 active:bg-ink-700`;
 
@@ -74,6 +79,7 @@ export function StaffScreen({
   title,
   window: eventWindow,
   printer,
+  trouble,
   onReprint,
   onPrinter,
   onChangeEvent,
@@ -89,6 +95,16 @@ export function StaffScreen({
    * says what it knows first.
    */
   printer: 'ready' | 'trouble' | 'none';
+  /**
+   * What is actually wrong, when something is — `PrinterState`'s own sentence,
+   * the one the printer screen has always shown.
+   *
+   * "Out of labels", "cover open" and "unplugged" are three different next
+   * moves, and a warning that says only *something is wrong* sends a volunteer
+   * through the printer door to find out which. The fault costs nothing to say
+   * here and can save the trip.
+   */
+  trouble?: string | null;
   onReprint: () => void;
   onPrinter: () => void;
   onChangeEvent: () => void;
@@ -176,8 +192,15 @@ export function StaffScreen({
                * warning three screens later. This is staff glass; it can say so
                * in a sentence.
                */
-              <p className="px-5 pt-2 text-left text-lg text-warn-400 kiosk:px-6 kiosk:text-2xl">
-                The printer needs attention — a name tag may not come out.
+              /* No top padding: the line box's own half-leading is the only gap
+                 wanted here. At `pt-2` the sentence sat 14px under its door and
+                 20px above the next one, and a 1.3x differential is inside the
+                 noise of the leading — so the pair was held together by colour
+                 and a shared left edge rather than by proximity, and the row
+                 below wears the same amber. */
+              <p className="px-5 text-left text-lg text-warn-400 kiosk:px-6 kiosk:text-2xl">
+                {(trouble ?? 'The printer needs attention').replace(/\.$/, '')} — a name tag
+                may not come out.
               </p>
             )}
           </div>
