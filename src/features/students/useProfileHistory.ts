@@ -88,30 +88,62 @@ async function resolve(
   const chains = [...new Set(chained.map(chainKey))];
 
   const [registries, since] = await Promise.all([
-    chains.length > 0 ? fetchSkippedNights(chains) : Promise.resolve(new Map<string, SkippedNights>()),
+    chains.length > 0
+      ? fetchSkippedNights(chains)
+      : Promise.resolve({ byChain: new Map<string, SkippedNights>(), denied: new Set<string>() }),
     fetchStudentAttendanceSince(student.id, windowStart),
   ]);
 
   const attended = since.eventIds;
   /*
-   * Chains the server refused, arriving from the cheap half.
+   * Chains this reader is not on, from both halves at once.
    *
-   * It knows exactly what it withheld — it read the parent events to decide —
-   * which is better than the client reconstructing it from an absence. Nights
-   * of these chains are dropped from the history rather than shown empty.
+   * The callable knows exactly what it withheld — it read the parent events to
+   * decide — which is better than the client reconstructing it from an absence.
+   * The registry read knows the chains its own documents were refused for, which
+   * is a wider set: it covers a restricted gathering this student never attended,
+   * and the callable has nothing to say about those because there was no record
+   * of theirs to withhold.
+   *
+   * Both belong in one set, because the two reads disagree about nothing — they
+   * are refused by the same rule over the same gathering — and a night of either
+   * is a night dropped from the history rather than shown empty.
    */
-  const refusedChains = since.withheld;
+  const refusedChains =
+    registries.denied.size === 0
+      ? since.withheld
+      : new Set([...since.withheld, ...registries.denied]);
 
   const held = new Set<string>();
   const unexamined: TallyEvent[] = [];
+  const fromChains = new Set<string>();
 
   for (const event of events) {
+    /*
+     * Refused first, and nothing else asked about it.
+     *
+     * Not `unexamined`: a night of a gathering the reader is not on is one
+     * whose register is gated by the same rule that just refused its registry,
+     * so reading it is a round trip to be told the same thing again — a few
+     * hundred of them on a year's profile. And not `held` or `skipped` either,
+     * because both of those are claims, and the honest answer here is that this
+     * reader was not shown the night at all.
+     *
+     * `chainKey` rather than the chained-only key: it falls back to the event's
+     * own id for a one-off, which is exactly the key a restricted one-off is
+     * keyed on and exactly what the callable would name in `withheld`.
+     */
+    if (refusedChains.has(chainKey(event))) {
+      fromChains.add(event.id);
+      continue;
+    }
+
     if (!isChained(event)) {
       unexamined.push(event);
       continue;
     }
 
-    switch (outcomeOf(registries.get(chainKey(event)), event)) {
+    switch (outcomeOf(registries.byChain.get(chainKey(event)), event)) {
       case 'held':
         held.add(event.id);
         break;
@@ -122,10 +154,6 @@ async function resolve(
         break;
     }
   }
-
-  const fromChains = new Set(
-    events.filter((event) => refusedChains.has(chainKey(event))).map((event) => event.id),
-  );
 
   if (unexamined.length === 0) {
     return { attended, held, withheld: fromChains };
@@ -157,7 +185,7 @@ async function resolve(
       ? unexamined
       : unexamined.filter((event) => !registers.denied.has(event.id));
 
-  await recordExaminations(examined, registers.byEvent, registries, windowStart);
+  await recordExaminations(examined, registers.byEvent, registries.byChain, windowStart);
 
   return {
     attended,
