@@ -11,6 +11,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_LABEL_TEMPLATE } from '@/lib/labelTemplate';
 import {
   MAX_LABEL_AGE_MS,
+  MAX_PRINTED_HISTORY,
   MAX_QUEUED_LABELS,
   createLabelQueue,
   type LabelJob,
@@ -20,6 +21,7 @@ import {
 function job(studentId: string, firstName = studentId): LabelJob {
   return {
     studentId,
+    name: firstName,
     template: DEFAULT_LABEL_TEMPLATE,
     values: { firstName, eventTitle: 'Sunday Nursery' },
   };
@@ -333,67 +335,116 @@ describe('the label queue', () => {
     });
   });
 
-  describe('reprint', () => {
-    it('has nothing to reprint before anything has printed', async () => {
+  describe("the evening's log", () => {
+    it('is empty before anything has printed', () => {
+      const queue = createLabelQueue({ raster: fakeRaster().fn, send: fakeSend().fn });
+
+      expect(queue.printedTonight()).toEqual([]);
+    });
+
+    it('records what came out, newest first', async () => {
       const send = fakeSend();
       const queue = createLabelQueue({ raster: fakeRaster().fn, send: send.fn });
 
-      expect(queue.lastPrinted()).toBeNull();
-      queue.reprintLast();
+      queue.print(job('ada', 'Ada'));
       await queue.idle();
-      expect(send.sent).toHaveLength(0);
+      queue.print(job('marcus', 'Marcus'));
+      await queue.idle();
+
+      expect(queue.printedTonight().map((entry) => entry.name)).toEqual(['Marcus', 'Ada']);
+      expect(queue.printedTonight().every((entry) => !entry.failed)).toBe(true);
     });
 
-    it('sends the same bytes again without rebuilding them', async () => {
-      const raster = fakeRaster();
-      const send = fakeSend();
-      const queue = createLabelQueue({ raster: raster.fn, send: send.fn });
-
-      queue.print(job('ada'));
-      await queue.idle();
-      queue.reprintLast();
-      await queue.idle();
-
-      expect(raster.fn).toHaveBeenCalledTimes(1);
-      expect(send.sent).toHaveLength(2);
-      expect(send.sent[0]).toBe(send.sent[1]);
-    });
-
-    it('is not subject to the staleness rule', async () => {
-      // Somebody is standing at the printer having watched one jam. Whatever
-      // the clock says, this is the label they want.
-      const clock = fakeClock();
-      const raster = fakeRaster();
-      const send = fakeSend();
-      const onDropped = vi.fn();
-      const queue = createLabelQueue({
-        raster: raster.fn,
-        send: send.fn,
-        now: clock.now,
-        onDropped,
-      });
-
-      queue.print(job('ada'));
-      await queue.idle();
-
-      clock.advance(MAX_LABEL_AGE_MS * 10);
-      queue.reprintLast();
-      await queue.idle();
-
-      expect(onDropped).not.toHaveBeenCalled();
-      expect(send.sent).toHaveLength(2);
-    });
-
-    it('does not remember a label that failed to print', async () => {
+    /*
+     * The row a volunteer is most often looking for.
+     *
+     * A label that jammed is the commonest reason anybody opens this screen, and
+     * a log of successes could not answer it: the child with no sticker would be
+     * the one name absent from the list of names.
+     */
+    it('records a label that did not come out, and says so', async () => {
       const queue = createLabelQueue({
         raster: fakeRaster().fn,
         send: () => Promise.reject(new Error('cover open')),
         onFailure: () => {},
       });
 
-      queue.print(job('ada'));
+      queue.print(job('ada', 'Ada'));
       await queue.idle();
-      expect(queue.lastPrinted()).toBeNull();
+
+      expect(queue.printedTonight()).toEqual([
+        expect.objectContaining({ studentId: 'ada', name: 'Ada', failed: true }),
+      ]);
+    });
+
+    it('records one dropped as stale as an attempt that failed', async () => {
+      const clock = fakeClock();
+      const send = fakeSend();
+
+      let release = () => {};
+      const blocked = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+
+      const queue = createLabelQueue({
+        raster: fakeRaster().fn,
+        // The first send hangs, modelling a printer with its lid open, so the
+        // second is still waiting when the clock passes the staleness rule.
+        send: async (result) => {
+          if (result.job[0] === 1) await blocked;
+          await send.fn(result);
+        },
+        now: clock.now,
+        onDropped: () => {},
+      });
+
+      queue.print(job('ada', 'Ada'));
+      queue.print(job('noah', 'Noah'));
+      clock.advance(MAX_LABEL_AGE_MS + 1);
+      release();
+      await queue.idle();
+
+      // Ada's went out late but was already on the wire. Noah's never was — and
+      // Noah is the child standing at the desk with no sticker, so his is the
+      // row somebody has to be able to find.
+      expect(queue.printedTonight()).toEqual([
+        expect.objectContaining({ name: 'Noah', failed: true }),
+        expect.objectContaining({ name: 'Ada', failed: false }),
+      ]);
+    });
+
+    /* A sticker about the printer is not a sticker about a child. */
+    it('does not log a job with no name on it, which is what a test print is', async () => {
+      const queue = createLabelQueue({ raster: fakeRaster().fn, send: fakeSend().fn });
+
+      const { name: _name, ...unnamed } = job('__test__1');
+      queue.print(unnamed);
+      await queue.idle();
+
+      expect(queue.printedTonight()).toEqual([]);
+    });
+
+    it('holds the most recent MAX_PRINTED_HISTORY and no more', async () => {
+      const queue = createLabelQueue({ raster: fakeRaster().fn, send: fakeSend().fn });
+
+      for (let index = 0; index < MAX_PRINTED_HISTORY + 4; index += 1) {
+        queue.print(job(`child-${index}`, `Child ${index}`));
+        await queue.idle();
+      }
+
+      const log = queue.printedTonight();
+      expect(log).toHaveLength(MAX_PRINTED_HISTORY);
+      expect(log[0]?.name).toBe(`Child ${MAX_PRINTED_HISTORY + 3}`);
+    });
+
+    it('forgets the evening when the kiosk leaves the gathering', async () => {
+      const queue = createLabelQueue({ raster: fakeRaster().fn, send: fakeSend().fn });
+
+      queue.print(job('ada', 'Ada'));
+      await queue.idle();
+      queue.forgetPrinted();
+
+      expect(queue.printedTonight()).toEqual([]);
     });
   });
 });

@@ -112,6 +112,8 @@ describe('confirming at the kiosk', () => {
         intent="check-in"
         family={[]}
         skipped={new Set()}
+        reprintOffer="none"
+        onReprint={() => {}}
         onToggle={vi.fn()}
         onConfirm={onConfirm}
         onBack={vi.fn()}
@@ -133,6 +135,8 @@ describe('confirming at the kiosk', () => {
         intent="done"
         family={[]}
         skipped={new Set()}
+        reprintOffer="none"
+        onReprint={() => {}}
         onToggle={vi.fn()}
         onConfirm={vi.fn()}
         onBack={vi.fn()}

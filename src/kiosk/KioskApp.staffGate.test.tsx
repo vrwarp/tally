@@ -11,6 +11,13 @@
  * from that trade. The key kept its first job, so a tap must still only clear.
  * The gesture became findable, so it must ask before it acts — and declining
  * has to land back on the search screen rather than on the event chooser.
+ *
+ * What the hold *opens* changed with the reprint work. It used to open **Change
+ * event?** directly, which made leaving the gathering the only thing behind the
+ * gate: every staff errand — a second name tag, a look at the printer — was on
+ * the far side of shutting the door on the queue. It opens the staff screen now
+ * and leaving is one of its doors, so the prompt below is two taps away rather
+ * than one, and everything that was true of it is still true when it arrives.
  */
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -177,12 +184,31 @@ describe('the staff gate', () => {
     // parent makes to fix a mistyped name, and it happens far more often than
     // the gesture layered on top of it.
     expect(screen.getByText(PLACEHOLDER)).toBeTruthy();
-    expect(screen.queryByText(/Change event\?/i)).toBeNull();
+    expect(screen.queryByText('Staff')).toBeNull();
   });
 
-  it('asks before it acts when Clear is held', async () => {
+  it('opens the staff screen when Clear is held, and changes nothing', async () => {
     await mount();
     await holdClear();
+
+    // The doors, not the one door. A volunteer who came to print a name tag
+    // never has to touch the one that shuts the kiosk.
+    expect(screen.getByText('Staff')).toBeTruthy();
+    expect(screen.getByText(/Reprint a name tag/i)).toBeTruthy();
+    expect(screen.getByText(/Label printer/i)).toBeTruthy();
+    expect(screen.getByText(/Change event/i)).toBeTruthy();
+    // Named, because a volunteer holding a lobby tablet needs to know which
+    // gathering they are standing on.
+    expect(screen.getByText('Sunday Nursery')).toBeTruthy();
+    expect(screen.queryByText(PLACEHOLDER)).toBeNull();
+    // Looking is not leaving: the binding is untouched, and so is the register.
+    expect(localStorage.getItem(KIOSK_KEYS.binding)).not.toBeNull();
+  });
+
+  it('asks before it acts when Change event is chosen', async () => {
+    await mount();
+    await holdClear();
+    await tap(/Change event/i);
 
     expect(screen.getByText(/Change event\?/i)).toBeTruthy();
     // Named, because a volunteer holding a lobby tablet needs to know which
@@ -247,6 +273,7 @@ describe('the staff gate', () => {
     await mount();
     await type('ada');
     await holdClear();
+    await tap(/Change event/i);
     expect(screen.getByText(/Change event\?/i)).toBeTruthy();
 
     await tap(/Keep checking in/i);
@@ -271,6 +298,7 @@ describe('the staff gate', () => {
     await mount();
     await type('ada');
     await holdClear();
+    await tap(/Change event/i);
 
     await tap(/Leave Sunday Nursery/i);
 
@@ -292,6 +320,7 @@ describe('the staff gate', () => {
      * their child's name holds Clear to wipe a misspelling — and must not be
      * asked whether they would like to take the kiosk off the gathering.
      */
+    expect(screen.queryByText('Staff')).toBeNull();
     expect(screen.queryByText(/Change event\?/i)).toBeNull();
   });
 });

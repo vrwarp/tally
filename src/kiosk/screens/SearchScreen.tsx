@@ -38,35 +38,13 @@ import { gradeDescription, haptic } from '@/lib/utils';
 import { Keyboard, type KioskKey } from '../components/Keyboard';
 import { useTapGuard } from '../components/tapGuard';
 import type { KioskRefresh } from '../KioskApp';
-import { windowHasClosed, type KioskBinding } from '../binding';
+import { eventWindow, windowHasClosed, type KioskBinding } from '../binding';
 import { MAX_RESULTS, type KioskSearchOutcome, type KioskStudent } from '../search';
 
 function gradeLabel(grade: number | null): string {
   return grade === null ? '' : gradeDescription(grade);
 }
 
-/**
- * "6:30 – 8:00 PM" — when this gathering runs.
- *
- * `Intl` rather than the `date-fns` helper the rest of the app formats times
- * with, and that is a deliberate cost: `src/lib/time.ts` would pull the whole
- * library into a bundle with a hard gzipped budget (see
- * `scripts/check-kiosk-budget.mjs`) for one line of text. The browser already
- * has this.
- *
- * The meridiem is written once when both ends share it, because "6:30 PM –
- * 8:00 PM" is the same fact said twice and this line sits under a title it
- * must not compete with.
- */
-function eventWindow(binding: KioskBinding): string {
-  const clock = (ms: number) =>
-    new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  const start = clock(binding.startAtMs);
-  const end = clock(binding.endAtMs);
-  const meridiem = /\s?([AP]M)$/i.exec(start);
-  const shared = meridiem && end.toUpperCase().endsWith(meridiem[1]!.toUpperCase());
-  return `${shared ? start.slice(0, meridiem.index) : start} – ${end}`;
-}
 
 /**
  * **Search everyone**, in the two places it has to be.

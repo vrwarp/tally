@@ -50,6 +50,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { gradeDescription, haptic } from '@/lib/utils';
 import { HoldButton } from '../components/HoldButton';
+import type { ReprintOffer } from '../reprintOffer';
 import { useTapGuard } from '../components/tapGuard';
 import type { KioskIntent } from '../KioskApp';
 import type { KioskStudent } from '../search';
@@ -65,6 +66,8 @@ export function ConfirmScreen({
   family,
   skipped,
   onToggle,
+  reprintOffer,
+  onReprint,
   onConfirm,
   onFindSibling,
   onBack,
@@ -86,6 +89,16 @@ export function ConfirmScreen({
    * thumb outlives the screen they made it on.
    */
   skipped: ReadonlySet<string>;
+  /**
+   * Whether this already-checked-in child may have a name tag printed again,
+   * and by whom — see `reprintOffer.ts`, which is the whole of the answer to
+   * "why is there a print control on a parent's screen at all".
+   *
+   * Only ever anything but `'none'` on the `done` branch: a check-in prints a
+   * label of its own, and a collection prints nothing.
+   */
+  reprintOffer: ReprintOffer;
+  onReprint: () => void;
   onToggle: (studentId: string) => void;
   /** Everyone the parent is confirming, the tapped student first. */
   onConfirm: (chosen: KioskStudent[]) => void;
@@ -329,10 +342,107 @@ export function ConfirmScreen({
         </div>
 
         {whoElse}
+
+        {/*
+          * The dead end, given one thing to press — inside one narrow window.
+          *
+          * This branch is a statement and nothing else, and that is right: a
+          * parent who taps a child the register already holds is *checking*, and
+          * the answer is on the screen. It is also the exact spot where somebody
+          * notices the sticker is missing — the child is standing there and their
+          * name is already on the glass — and until now the only way to a second
+          * copy was to find a volunteer who would take the kiosk off the door.
+          *
+          * Who it appears *for* is `reprintOffer.ts`'s question. What it looks
+          * like has three rules, and each of them is a thing that was wrong first:
+          *
+          * It rides the flexible track **above** the statement, not the row below
+          * it, so the ✓ keeps `ConfirmScreen`'s constant distance from the bezel
+          * in every state and the frame with no offer is this screen unchanged.
+          *
+          * It stays a step under the statement at every size. A filled slab at
+          * the full measure carrying the same 24px semibold as the tick reads,
+          * squinted, as name → slab → green line: the wrong order for a screen
+          * whose job is to answer a question.
+          *
+          * And it is a hold that cancels on drift, because this is glass people
+          * lean on and without the check any contact persisting two seconds
+          * anywhere inside the control prints.
+          */}
+        {intent === 'done' && reprintOffer !== 'none' && (
+          <div className="mt-8 w-full shrink-0">
+            {reprintOffer === 'offer' ? (
+              <HoldButton
+                onHeld={onReprint}
+                cancelOnStray
+                /*
+                 * The drift check without a way back is a dead end: `cancel()`
+                 * can only be undone by a fresh `pointerdown`, so a parent whose
+                 * thumb wandered twelve pixels — on a control they have never
+                 * seen before, over two seconds — was pressing a button that had
+                 * stopped counting, with an empty bar and no buzz, for as long
+                 * as they cared to keep pressing. `haptic()` is
+                 * `navigator.vibrate`, which the iPads these kiosks are do not
+                 * implement, so silence is all they got.
+                 */
+                strayHint="Lift, then hold again"
+                className="rounded-xl bg-ink-800 px-6 py-4 text-lg font-semibold text-ink-200 active:bg-ink-700 kiosk:px-8 kiosk:py-5 kiosk:text-xl"
+              >
+                Hold to print a name tag
+              </HoldButton>
+            ) : reprintOffer === 'ask' ? (
+              /*
+               * The common case, and the only thing added to it: where a name
+               * tag comes from. Until this line existed a parent whose child's
+               * badge was on the floor of the hall had no way of knowing a
+               * second copy was possible at all.
+               */
+              <div className="text-base text-balance text-ink-400 kiosk:text-lg">
+                Name tags come from the check-in desk.
+              </div>
+            ) : (
+              /*
+               * Two arrivals, two tenses.
+               *
+               * One parent has just held the button for two seconds, and this is
+               * the only signal they get. A receipt that arrived as the dimmest
+               * line in the frame is how somebody concludes nothing happened and
+               * goes to fetch a leader, which is how one held button becomes two
+               * labels. The other pressed nothing: their child's tag was
+               * reprinted at the desk and the counter is shared, so for them the
+               * first line is news and the second is the way on — a place to walk
+               * to rather than a role to find.
+               *
+               * "sent", because the kiosk only knows it queued the job.
+               */
+              <div className="w-full">
+                <div className="text-lg font-semibold text-brand-300 kiosk:text-xl">
+                  Name tag sent for {student.firstName}.
+                </div>
+                <div className="pt-2 text-base text-ink-400 kiosk:text-lg">
+                  For another, ask at the check-in desk.
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {intent === 'done' ? (
-        <div className="shrink-0 text-2xl font-semibold text-present-400">✓ Already checked in</div>
+        /*
+          * The answer, in the slot the commit occupies on every other version of
+          * this screen — and occupying the whole of it.
+          *
+          * `min-h-23` is the green `Check in` button's own height (p-7 around a
+          * text-3xl line). Without it the clear band above the commit is measured
+          * against a 32px line of text rather than against the 92px button, so
+          * anything this branch adds above the statement sits where the green
+          * button's top edge would be: exactly where a parent who taps a child
+          * *because they think they still need to check in* is aiming.
+          */
+        <div className="flex min-h-23 w-full shrink-0 items-center justify-center text-2xl font-semibold text-present-400">
+          ✓ Already checked in
+        </div>
       ) : intent === 'check-out' ? (
         <HoldButton
           onHeld={() => onConfirm(chosen)}

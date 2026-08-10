@@ -31,7 +31,14 @@ import type { PrinterState } from './printing';
 // The same arrangement again for the registration wizard: a screen most
 // families never reach must not sit on the path to the one they all use.
 import type * as RegistrationModule from './registration';
-import { bindingIsLive, clearBinding, readBinding, writeBinding, type KioskBinding } from './binding';
+import {
+  bindingIsLive,
+  clearBinding,
+  eventWindow,
+  readBinding,
+  writeBinding,
+  type KioskBinding,
+} from './binding';
 import { applyKioskTheme } from './theme';
 import type { KioskKey } from './components/Keyboard';
 import { sortByName } from '@/lib/utils';
@@ -54,6 +61,11 @@ import {
 } from './storage';
 import { keepScreenAwake } from './wakeLock';
 import { ConfirmScreen } from './screens/ConfirmScreen';
+import { StaffScreen } from './screens/StaffScreen';
+import { ReprintScreen, MAX_REPRINT_RESULTS } from './screens/ReprintScreen';
+import { ReprintConfirmScreen } from './screens/ReprintConfirmScreen';
+import { StaffSession } from './components/StaffSession';
+import { reprintOffer } from './reprintOffer';
 import { SiblingScreen } from './screens/SiblingScreen';
 import { EventChooser } from './screens/EventChooser';
 import { PairingScreen } from './screens/PairingScreen';
@@ -128,9 +140,37 @@ export type KioskRefresh = 'idle' | 'refreshing' | 'done' | 'failed';
  */
 type SiblingOverlay = { kind: 'sibling'; from: ConfirmOverlay };
 
+/**
+ * Where a reprint confirm was opened from, so Back is a return.
+ *
+ * The two doors onto the same act — find a name, or pick a row out of the
+ * evening's log — go through one confirm, and a volunteer who backs out of it
+ * belongs on the screen they came from rather than on whichever one the code
+ * happens to name first.
+ */
+type ReprintFrom = 'reprint' | 'printer';
+
 type Overlay =
   | ConfirmOverlay
   | SiblingOverlay
+  /**
+   * The staff flow: what the two-second hold on Clear opens, and the three
+   * screens behind it.
+   *
+   * All four are overlays rather than phases, which is the whole point of the
+   * work — the kiosk stays bound to its gathering while a volunteer prints a
+   * name tag, so the door does not shut on the queue standing at it. The old
+   * route to a reprint went out through `unbind` and the chooser, and the
+   * kiosk was out of service for the whole errand.
+   *
+   * Being overlays also keeps `idleRef` honest for free: a kiosk with a
+   * volunteer on it is not idle, so the binding cannot expire and the nightly
+   * reload cannot fire underneath them.
+   */
+  | { kind: 'staff' }
+  | { kind: 'reprint' }
+  | { kind: 'reprint-confirm'; student: KioskStudent; from: ReprintFrom }
+  | { kind: 'printer' }
   | { kind: 'success'; students: KioskStudent[]; intent: KioskIntent }
   /**
    * The staff gate's question — see ChangeEventScreen.
@@ -267,6 +307,36 @@ export function KioskApp() {
   const [buffer, setBuffer] = useState('');
   const [overlay, setOverlay] = useState<Overlay>(null);
   const [refresh, setRefresh] = useState<KioskRefresh>('idle');
+
+  /*
+   * When this kiosk checked each child in tonight, and who has had a second
+   * name tag since.
+   *
+   * Both exist for one question — may the parent standing here print a name tag
+   * again — and `reprintOffer.ts` is where that question is answered. Its first
+   * condition is *this kiosk checked them in*, not *they are on the register*,
+   * which is why this is a timestamp written beside the tick rather than
+   * anything read back from Firestore: a child checked in at the other kiosk, or
+   * by a leader in the app, is not this screen's business.
+   *
+   * `reprintedIds` is the shared counter. A staff reprint spends it exactly as a
+   * parent's own hold does, because the cap is one label per child and not one
+   * per surface.
+   */
+  const [checkedInAtMs, setCheckedInAtMs] = useState<ReadonlyMap<string, number>>(new Map());
+  const [reprintedIds, setReprintedIds] = useState<ReadonlySet<string>>(new Set());
+  /*
+   * The child whose name tag just went to the printer, for the line on their
+   * row. By id, never by rendered name: this list exists because a church has
+   * two Alvarezes in it.
+   */
+  const [sentId, setSentId] = useState<string | null>(null);
+  /*
+   * Bumped whenever a label is queued, so the printer screen's list re-reads.
+   * The log lives in the printing module's queue — it is the same list the
+   * evening's check-ins wrote — and nothing about it is React state.
+   */
+  const [printTick, setPrintTick] = useState(0);
   /**
    * A registration in progress: the wizard, with the id it will submit under.
    *
@@ -982,6 +1052,20 @@ export function KioskApp() {
         for (const student of chosen) next.set(student.id, arrivalId);
         return next;
       });
+      /*
+       * And when, which the arrival id does not carry.
+       *
+       * This is the clock the parent's ten-minute reprint window is measured
+       * against, and it is written here — beside the tick, for the children this
+       * kiosk itself checked in — rather than read back from the register. See
+       * `reprintOffer.ts`.
+       */
+      const checkedInAt = Date.now();
+      setCheckedInAtMs((held) => {
+        const next = new Map(held);
+        for (const student of chosen) next.set(student.id, checkedInAt);
+        return next;
+      });
 
       for (const student of chosen) {
         void services
@@ -1018,6 +1102,10 @@ export function KioskApp() {
         if (prints) {
           try {
             printing?.printLabel(student, binding);
+            // The printer screen lists what has been attempted tonight, and the
+            // log is the queue's rather than React's — this is what tells a
+            // screen that is open to read it again.
+            setPrintTick((tick) => tick + 1);
           } catch {
             // Deliberately swallowed. See above.
           }
@@ -1026,6 +1114,87 @@ export function KioskApp() {
     },
     [services, printing, prints, binding, uid],
   );
+
+  /**
+   * Print this child's name tag again.
+   *
+   * The one place a reprint happens, whichever of the three doors asked for it:
+   * the by-name staff screen, a row of the evening's log, or the parent's hold
+   * inside their ten minutes. All three spend the same counter, because the cap
+   * is one label per child rather than one per surface.
+   *
+   * Nothing here touches the register — no check-in, no check-out, no arrival
+   * id, nothing upstream. That is the promise the staff screen makes in words
+   * and the reason the parent's version is allowed to exist at all.
+   */
+  const reprintFor = useCallback(
+    (student: KioskStudent) => {
+      if (!binding || !printing) return;
+      try {
+        printing.reprintLabel(student, binding);
+      } catch {
+        // Same reasoning as the check-in path: a sticker may never reach back
+        // into the screen that asked for it.
+      }
+      setReprintedIds((held) => new Set(held).add(student.id));
+      setSentId(student.id);
+      setPrintTick((tick) => tick + 1);
+    },
+    [binding, printing],
+  );
+
+  /**
+   * The reprint screen's own search: the whole roster, and six of it.
+   *
+   * Not `searchable`. The scope exists so a parent is not shown a stranger's
+   * children; a volunteer already knows the name of the child in front of them,
+   * and a child whose family came to Sunday nursery is exactly the case where
+   * the label went missing.
+   */
+  const reprintOutcome = useMemo(() => {
+    const found = searchStudents(buffer, students as KioskStudent[], last4Index);
+    return {
+      results: found.results.slice(0, MAX_REPRINT_RESULTS),
+      total: found.total ?? found.results.length,
+    };
+  }, [buffer, students, last4Index]);
+
+  /** The evening's attempts. Held by the queue, not by React — see `printTick`. */
+  const printedTonight = useMemo(() => {
+    void printTick;
+    return printing?.printedTonight() ?? [];
+  }, [printing, printTick]);
+
+  /**
+   * When this child's name tag last came out, and what the next one would say.
+   *
+   * Both are for the confirm, and both are the reason it is a confirm rather
+   * than a button: a volunteer is usually here because they suspect something
+   * did not print, or printed wrong, and these are the two answers to that
+   * available before the tape moves.
+   */
+  const lastPrintedAt = useCallback(
+    (studentId: string): string | null => {
+      const entry = printedTonight.find((row) => row.studentId === studentId && !row.failed);
+      return entry
+        ? new Date(entry.atMs).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+        : null;
+    },
+    [printedTonight],
+  );
+
+  const labelLinesFor = useCallback(
+    (student: KioskStudent): string[] =>
+      binding && printing ? printing.labelPreview(student, binding) : [],
+    [binding, printing],
+  );
+
+  /** Leaving the staff flow, by hand or by the gate's own clock. */
+  const leaveStaff = useCallback(() => {
+    setOverlay(null);
+    setBuffer('');
+    setSentId(null);
+  }, []);
 
   /* ---- Registration ------------------------------------------------------- */
 
@@ -1150,6 +1319,14 @@ export function KioskApp() {
     return (
       <PrinterScreen
         printing={printing}
+        /*
+         * Setup, reached from the chooser, so this kiosk is not on a gathering:
+         * there is no evening to list and nothing a reprint could be aimed at.
+         * The same screen mid-service — reached from the staff gate, with the
+         * binding still in place — carries both.
+         */
+        printedTonight={[]}
+        onReprint={() => {}}
         // Defaults for a kiosk being set up for the first time — the QL-810W and
         // the 62x29mm name badge, which is what `device.ts` says is likeliest.
         config={printerConfig ?? { model: DEFAULT_PRINTER_MODEL, label: DEFAULT_PRINTER_LABEL }}
@@ -1249,6 +1426,121 @@ export function KioskApp() {
         />
       );
     }
+    /*
+     * The staff flow, behind one clock.
+     *
+     * `StaffSession` hands the kiosk back after forty-five seconds of nothing
+     * happening, and it wraps the whole flow rather than each screen in it: a
+     * timer per screen is a timer the next screen does not get, and the screen
+     * that missed out was the printer screen — which, left up, is a lobby tablet
+     * showing five children's names and arrival times to whoever walks past.
+     */
+    if (
+      overlay?.kind === 'staff' ||
+      overlay?.kind === 'reprint' ||
+      overlay?.kind === 'reprint-confirm' ||
+      overlay?.kind === 'printer'
+    ) {
+      const staffScreen =
+        overlay.kind === 'staff' ? (
+          <StaffScreen
+            title={binding.title}
+            window={eventWindow(binding)}
+            printer={
+              printerState === null || printerState.kind === 'idle' || printerState.kind === 'unpaired'
+                ? 'none'
+                : printerState.kind === 'ready'
+                  ? 'ready'
+                  : 'trouble'
+            }
+            onReprint={() => {
+              setBuffer('');
+              setSentId(null);
+              setOverlay({ kind: 'reprint' });
+            }}
+            onPrinter={() => setOverlay({ kind: 'printer' })}
+            onChangeEvent={() => setOverlay({ kind: 'unbind' })}
+            onStay={leaveStaff}
+          />
+        ) : overlay.kind === 'reprint' ? (
+          <ReprintScreen
+            buffer={buffer}
+            outcome={reprintOutcome}
+            presentIds={presentIds}
+            sentId={sentId}
+            printerNeedsAttention={printerState?.kind === 'trouble'}
+            onKey={onKey}
+            onPick={(student) => {
+              // Warmed on the tap, the same trick the confirm screen plays: the
+              // rasterising is a few hundred thousand pixels in a worker and
+              // this is the slack while the confirm is on its way up.
+              printing?.warmLabel(student, binding);
+              setOverlay({ kind: 'reprint-confirm', student, from: 'reprint' });
+            }}
+            onDone={leaveStaff}
+          />
+        ) : overlay.kind === 'reprint-confirm' ? (
+          <ReprintConfirmScreen
+            student={overlay.student}
+            lines={labelLinesFor(overlay.student)}
+            printedAt={lastPrintedAt(overlay.student.id)}
+            printerNeedsAttention={printerState?.kind === 'trouble'}
+            onPrint={() => {
+              reprintFor(overlay.student);
+              setOverlay({ kind: overlay.from === 'printer' ? 'printer' : 'reprint' });
+            }}
+            onBack={() => {
+              // Backed out, so the raster warmed on the way in is not wanted.
+              printing?.forgetLabel(overlay.student.id);
+              setOverlay({ kind: overlay.from === 'printer' ? 'printer' : 'reprint' });
+            }}
+          />
+        ) : (
+          <PrinterScreen
+            printing={printing!}
+            config={printerConfig ?? { model: DEFAULT_PRINTER_MODEL, label: DEFAULT_PRINTER_LABEL }}
+            printedTonight={printedTonight}
+            onReprint={(label) => {
+              /*
+               * A row of the log opens the same confirm the by-name path opens.
+               * It used to print on contact, inside a pane that has to be
+               * scrolled to reach the rest of itself — so the first touch of a
+               * scroll gesture spent a label for whichever child the thumb
+               * pushed off with, and this device has no undo.
+               *
+               * A child who has left the roster since cannot be re-rastered, so
+               * their row does nothing rather than printing something built from
+               * a name.
+               */
+              const student = students.find((row) => row.id === label.studentId);
+              if (student) {
+                printing?.warmLabel(student, binding);
+                setOverlay({ kind: 'reprint-confirm', student, from: 'printer' });
+              }
+            }}
+            onReprintByName={() => {
+              setBuffer('');
+              setSentId(null);
+              setOverlay({ kind: 'reprint' });
+            }}
+            onDone={() => {
+              setPrinterConfig(readPrinterConfig());
+              setOverlay({ kind: 'staff' });
+            }}
+          />
+        );
+
+      return (
+        <StaffSession onReturn={leaveStaff}>
+          {overlay.kind === 'printer' && !printing ? (
+            <div className="flex h-full items-center justify-center text-ink-500">Loading…</div>
+          ) : (
+            staffScreen
+          )}
+        </StaffSession>
+      );
+    }
+
     if (overlay?.kind === 'success') {
       return (
         <SuccessScreen
@@ -1300,6 +1592,25 @@ export function KioskApp() {
         <ConfirmScreen
           student={overlay.student}
           intent={overlay.intent}
+          /*
+           * The one window in which a parent may print, decided when the screen
+           * renders rather than when the row was tapped: the ten minutes are
+           * measured from the check-in, and a parent who stands here reading is
+           * spending them.
+           *
+           * `prints` is the standing condition — a gathering with a template and
+           * a printing module — and the printer being in trouble is the other
+           * half of it. A parent is never told about a printer, so where a label
+           * would not come out the control is absent rather than disappointing.
+           */
+          reprintOffer={reprintOffer({
+            studentId: overlay.student.id,
+            now: Date.now(),
+            checkedInAtMs,
+            reprintedIds,
+            labelWouldPrint: prints && printerState?.kind !== 'trouble',
+          })}
+          onReprint={() => reprintFor(overlay.student)}
           family={overlay.family}
           skipped={overlay.skipped}
           onToggle={(studentId) => {
@@ -1344,13 +1655,18 @@ export function KioskApp() {
           onStay={() => setOverlay(null)}
           onLeave={() => {
             // A kiosk that has left a gathering has no business still holding
-            // notes about the children who were at it.
-            printing?.forgetAllergies();
+            // notes about the children who were at it — nor the evening's list
+            // of who had a name tag printed, which is the same argument about
+            // the same names.
+            printing?.forgetGathering();
             clearBinding();
             setBinding(null);
             setBuffer('');
             setOverlay(null);
             setPresentIds(new Set());
+            setCheckedInAtMs(new Map());
+            setReprintedIds(new Set());
+            setSentId(null);
             setPhase('choosing');
           }}
         />
@@ -1408,7 +1724,15 @@ export function KioskApp() {
           }
           setOverlay({ kind: 'confirm', student, intent, family, skipped });
         }}
-        onStaffGate={() => setOverlay({ kind: 'unbind' })}
+        /*
+         * The hold on Clear used to open **Change event?** directly, so every
+         * staff errand was on the far side of unbinding the kiosk: to get one
+         * child a second sticker a volunteer shut the door on the queue, walked
+         * out through the chooser, and held a row for two seconds to put the
+         * kiosk back where it already was. It opens the doors now, and leaving
+         * the gathering is one of them rather than all of them.
+         */
+        onStaffGate={() => setOverlay({ kind: 'staff' })}
       />
     );
   }

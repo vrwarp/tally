@@ -66,8 +66,10 @@ const printing = {
   currentState: vi.fn(() => ({ kind: 'ready' as const, config: { model: 'QL-810W', label: '62x29' } })),
   subscribe: vi.fn(() => () => {}),
   ready: vi.fn(async () => ({ kind: 'ready' as const, config: { model: 'QL-810W', label: '62x29' } })),
-  canReprint: vi.fn(() => false),
-  reprintLast: vi.fn(),
+  reprintLabel: vi.fn(),
+  printedTonight: vi.fn(() => []),
+  labelPreview: vi.fn(() => []),
+  forgetGathering: vi.fn(),
   testPrint: vi.fn(),
   // Handed the allergy callable by KioskApp once both chunks have landed —
   // `services.ts` is the only module allowed to import Firebase, so the

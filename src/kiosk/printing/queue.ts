@@ -37,8 +37,35 @@ export interface LabelJob {
    * from being each other.
    */
   studentId: string;
+  /**
+   * Who it is for, in words, for the evening's log.
+   *
+   * The printer screen lists what has been printed so somebody can print one
+   * again, and a list of student ids is a list nobody can read. Omitted, the job
+   * is not logged at all — which is what a test label wants: it is a sticker
+   * about the printer rather than about a child.
+   */
+  name?: string;
   template: LabelTemplate;
   values: LabelTokenValues;
+}
+
+/**
+ * One attempt, as the printer screen lists it.
+ *
+ * Attempts rather than successes, because the row a volunteer is most often
+ * looking for is the one that did not come out. `failed` covers every way a
+ * label fails to reach the tape — the send threw, the queue dropped it as stale,
+ * the queue dropped it to keep the spool short — because from the far side of
+ * the glass those are one fact: there is a child with no sticker.
+ */
+export interface PrintedLabel {
+  /** This attempt, so a row is addressable and React has a key. */
+  id: string;
+  studentId: string;
+  name: string;
+  atMs: number;
+  failed: boolean;
 }
 
 /** A built job, ready for the wire. */
@@ -67,6 +94,17 @@ export const MAX_LABEL_AGE_MS = 120_000;
  * spool that will all come out at once when it recovers.
  */
 export const MAX_QUEUED_LABELS = 8;
+
+/**
+ * How much of the evening the printer screen can show.
+ *
+ * Long enough to cover the family who arrived while the roll was out and the one
+ * whose sticker fell off on the way to the room; short enough that it is a list
+ * somebody reads rather than scrolls. It is also memory on a device that runs
+ * for weeks — names, not rasters, but a lobby with three hundred children
+ * through it is still a list nobody wants held.
+ */
+export const MAX_PRINTED_HISTORY = 8;
 
 /** How many warm-but-unprinted rasters to hold before evicting the oldest. */
 const MAX_WARM_LABELS = 8;
@@ -102,9 +140,17 @@ export interface LabelQueue {
   warm(job: LabelJob): void;
   print(job: LabelJob): void;
   forget(studentId: string): void;
-  /** The last job actually sent, for the staff reprint button. */
-  lastPrinted(): RasterResult | null;
-  reprintLast(): void;
+  /**
+   * The evening's attempts, most recent first, for the printer screen.
+   *
+   * This replaces a `lastPrinted`/`reprintLast` pair, and the reason is the
+   * whole of why the reprint work happened: *the last label* is a guess about
+   * which label anybody wants, and by the time a volunteer has walked to the
+   * kiosk it is whoever checked in behind them.
+   */
+  printedTonight(): readonly PrintedLabel[];
+  /** A kiosk that has left a gathering keeps no list of who was at it. */
+  forgetPrinted(): void;
   /** Waiting labels, for tests and for the printer screen. */
   depth(): number;
   /** Resolves when nothing is in flight. Tests only; nothing awaits printing. */
@@ -118,7 +164,21 @@ export function createLabelQueue(options: QueueOptions): LabelQueue {
   const warm = new Map<string, WarmEntry>();
   const pending: QueuedLabel[] = [];
   let pumping: Promise<void> | null = null;
-  let last: { job: LabelJob; result: RasterResult } | null = null;
+  const printed: PrintedLabel[] = [];
+  let nextRecordId = 0;
+
+  /** Newest first, bounded, and only for jobs that are about a child. */
+  function record(job: LabelJob, failed: boolean): void {
+    if (!job.name) return;
+    printed.unshift({
+      id: `p${(nextRecordId += 1)}`,
+      studentId: job.studentId,
+      name: job.name,
+      atMs: now(),
+      failed,
+    });
+    if (printed.length > MAX_PRINTED_HISTORY) printed.length = MAX_PRINTED_HISTORY;
+  }
 
   /**
    * Start rasterising, or hand back the raster already under way.
@@ -150,6 +210,10 @@ export function createLabelQueue(options: QueueOptions): LabelQueue {
       if (!next) break;
 
       if (now() - next.queuedAtMs > MAX_LABEL_AGE_MS) {
+        // Logged as an attempt that failed, because that is what it is from the
+        // far side of the glass: a child with no sticker, and somebody who can
+        // now see so and print it again.
+        record(next.job, true);
         options.onDropped?.('stale', next.job);
         continue;
       }
@@ -157,12 +221,13 @@ export function createLabelQueue(options: QueueOptions): LabelQueue {
       try {
         const result = await next.result;
         await send(result);
-        last = { job: next.job, result };
+        record(next.job, false);
       } catch (error) {
         // One label failing must not stall the ones behind it. A jam usually
         // means the next will fail too, and the state the controller keeps is
         // what stops that being silent — but the loop keeps going either way,
         // because the alternative is a queue that never recovers on its own.
+        record(next.job, true);
         options.onFailure?.(error, next.job);
       }
     }
@@ -191,7 +256,10 @@ export function createLabelQueue(options: QueueOptions): LabelQueue {
 
       if (pending.length >= MAX_QUEUED_LABELS) {
         const dropped = pending.shift();
-        if (dropped) options.onDropped?.('overflow', dropped.job);
+        if (dropped) {
+          record(dropped.job, true);
+          options.onDropped?.('overflow', dropped.job);
+        }
       }
       pending.push({ job, result, queuedAtMs: now() });
       pump();
@@ -201,27 +269,12 @@ export function createLabelQueue(options: QueueOptions): LabelQueue {
       warm.delete(studentId);
     },
 
-    lastPrinted() {
-      return last?.result ?? null;
+    printedTonight() {
+      return printed;
     },
 
-    /**
-     * Send the last label's bytes again.
-     *
-     * Queued fresh, so it is stamped now and cannot be dropped as stale — this
-     * is somebody standing at the printer having watched one jam, which is
-     * exactly the case the staleness rule must not apply to. The bytes are
-     * reused rather than rebuilt: the child may have left the roster since, and
-     * the point is another copy of *that* sticker.
-     */
-    reprintLast() {
-      if (!last) return;
-      pending.push({
-        job: last.job,
-        result: Promise.resolve(last.result),
-        queuedAtMs: now(),
-      });
-      pump();
+    forgetPrinted() {
+      printed.length = 0;
     },
 
     depth() {
