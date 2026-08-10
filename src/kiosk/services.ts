@@ -49,11 +49,11 @@ import {
   studentDatePatch,
   type CheckInStudent,
 } from '@/services/attendancePayloads';
-import type {
-  Grade,
-  PcoRosterPerson,
-  RegisterFamilyRequest,
-  RegisterFamilyResult,
+import {
+  asGrade,
+  type PcoRosterPerson,
+  type RegisterFamilyRequest,
+  type RegisterFamilyResult,
 } from '@/types';
 import type { KioskBinding } from './binding';
 import { joinKioskRoster } from './roster';
@@ -716,7 +716,7 @@ export function applyRegistration(result: {
     id: child.studentId,
     firstName: child.firstName,
     lastName: child.lastName,
-    grade: child.grade as Grade | null,
+    grade: asGrade(child.grade),
     searchName: child.searchName,
     // The callable's echo, because nothing else knows tonight: the roster
     // read answers false for every Tally-owned student by rule, and the note
@@ -867,9 +867,11 @@ export async function performCheckIn(args: {
     id: student.id,
     firstName: student.firstName,
     lastName: student.lastName,
-    // Straight through. `KioskStudent.grade` has always been nullable; it was
-    // the domain model underneath that could not hold the answer.
-    grade: student.grade as Grade | null,
+    // `KioskStudent.grade` has always been nullable; it was the domain model
+    // underneath that could not hold the answer. Checked rather than asserted,
+    // because this argument is also the replay path — a queued write is JSON
+    // off the disk, and it can be older than the build reading it.
+    grade: asGrade(student.grade),
     searchName: student.searchName,
     firstAttendedAt: dates.firstAttendedAt,
     lastAttendedAt: dates.lastAttendedAt,

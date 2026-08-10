@@ -4,8 +4,9 @@
  */
 import { describe, expect, it } from 'vitest';
 import { MAX_RESULTS, searchStudents, type KioskStudent } from '@/kiosk/search';
+import type { Grade } from '@/types';
 
-function student(id: string, firstName: string, lastName: string, grade: number | null = 9): KioskStudent {
+function student(id: string, firstName: string, lastName: string, grade: Grade | null = 9): KioskStudent {
   return {
     id,
     firstName,

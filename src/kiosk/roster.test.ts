@@ -98,6 +98,24 @@ describe('a visitor Tally created', () => {
     expect(rows[0]!.grade).toBe(7);
   });
 
+  /*
+   * A number is not a grade. The kiosk drew "-1th grade" on the lobby glass for
+   * a child whose backend derived one from a graduation year years out, and
+   * then wrote that number onto their permanent record at check-in. Fixed
+   * upstream too — this is the row's own guard, and it is the one that covers a
+   * document some older sync already wrote a nonsense grade into.
+   */
+  it('shows no grade rather than a number outside K-12', () => {
+    const fromBackend = joinKioskRoster([], [person({ grade: -1 })]);
+    expect(fromBackend[0]!.grade).toBeNull();
+
+    const fromDocument = joinKioskRoster([document('student-bree-sandoval', { grade: 14 })], []);
+    expect(fromDocument[0]!.grade).toBeNull();
+
+    // Kindergarten is a grade, and zero is not "no grade".
+    expect(joinKioskRoster([], [person({ grade: 0 })])[0]!.grade).toBe(0);
+  });
+
   it('follows the generic linkage, not only the Planning Center one', () => {
     const rows = joinKioskRoster(
       [

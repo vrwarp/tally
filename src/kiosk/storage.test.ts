@@ -92,4 +92,23 @@ describe('readCachedRosterOfAnyVersion', () => {
 
     expect(readCachedRosterOfAnyVersion()).toBeNull();
   });
+
+  it('drops a grade an older build cached that is not a grade', () => {
+    // A cache is the one input that can be older than the code reading it. A
+    // build before the guard stored whatever the backend offered — including
+    // the `-1` a graduation year derives for a child not yet in school — and
+    // this is the copy the screen paints from at boot and the only one it has
+    // when the network is down.
+    localStorage.setItem(
+      KIOSK_KEYS.roster,
+      JSON.stringify({
+        version: KIOSK_ROSTER_VERSION,
+        fetchedAtMs: Date.now(),
+        students: [{ ...ADA, grade: -1 }],
+      }),
+    );
+
+    expect(readCachedRosterOfAnyVersion()?.students[0]!.grade).toBeNull();
+    expect(readCachedRoster()?.students[0]!.grade).toBeNull();
+  });
 });

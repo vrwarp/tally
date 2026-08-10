@@ -212,6 +212,15 @@ anything still outside it is null, which loses information but says something tr
 A graduation year still counts as a grade: the mapper derives one, and deriving is not inventing.
 Only a person with neither is grade-less.
 
+**Deriving stops at both ends of school.** The arithmetic is a straight line and school is not, so
+it keeps counting past K and past 12: the class of 2040 is a toddler and derived to `-1`, which the
+kiosk drew as "-1th grade" beside a real child's name and then wrote onto their record at check-in;
+a senior who graduated six years ago derived to 18th the same way. Their class year is a fact about
+them, but the grade it implies outside K–12 is not, so `pcoGrade` answers null there — the same
+answer it gives for a child too young to have one, which every screen already knows how to render.
+A grade Planning Center *holds* outright is still reported as it stands, in or out of the band; the
+bound applies only to what Tally derives.
+
 **A grade-less student is still pushed.** Creating one used to be refused — on the reasoning that
 every student queued for a create had a grade typed at quick-add — which left a nursery child sitting
 on `upstreamPushPending` for ever, a queue that never drains rather than a visible failure. The create now

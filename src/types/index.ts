@@ -41,6 +41,21 @@ export function isGrade(value: unknown): value is Grade {
   return typeof value === 'number' && GRADES.includes(value as Grade);
 }
 
+/**
+ * The grade in a value that may not hold one — and `null` for anything that is
+ * not a grade Tally can represent.
+ *
+ * For the boundaries where a number arrives from somewhere Tally does not own:
+ * a backend's own field, a cached row written by an older build, a document
+ * some earlier sync wrote. Out of range is *no grade* rather than the nearest
+ * one, for the reason `Grade` gives: the alternative is printing a number
+ * nobody claims beside a child's name, which is how a toddler in the class of
+ * 2040 came to be shown as "-1th grade" on the kiosk.
+ */
+export function asGrade(value: unknown): Grade | null {
+  return isGrade(value) ? value : null;
+}
+
 export type StudentStatus = 'active' | 'inactive';
 
 /**

@@ -167,6 +167,22 @@ describe('mapPersonToStudent', () => {
     expect(mapped.grade).toBe(9);
   });
 
+  it('will not extrapolate a graduation year past either end of school', () => {
+    // A toddler in the class of 2040 is not in "-1th grade" — they are not in
+    // school. The kiosk printed exactly that beside a child's name, because the
+    // derivation is a straight line and school is not.
+    const toddler = person('1', { first_name: 'Rue', last_name: 'Lin', graduation_year: 2040 });
+    expect(mapPersonToStudent(toddler, { ...RANGE, now: NOW }).grade).toBeNull();
+
+    // Kindergarten still derives, being a real grade — the bound is K, not 1st.
+    const kindergartener = person('2', { first_name: 'Ada', last_name: 'Lin', graduation_year: 2038 });
+    expect(mapPersonToStudent(kindergartener, { ...RANGE, now: NOW }).grade).toBe(0);
+
+    // And the other end: somebody who graduated years ago is not in 18th grade.
+    const alum = person('3', { first_name: 'Nia', last_name: 'Lin', graduation_year: 2020 });
+    expect(mapPersonToStudent(alum, { ...RANGE, now: NOW }).grade).toBeNull();
+  });
+
   it('answers null when nothing is known, rather than the bottom of the band', () => {
     const mapped = mapPersonToStudent(person('1', { first_name: 'Ada', last_name: 'Lin' }), RANGE);
 
@@ -331,6 +347,19 @@ describe('pcoGrade', () => {
   it('reports what Planning Center holds, unclamped', () => {
     expect(pcoGrade(person('1', { grade: 3 }))).toBe(3);
     expect(pcoGrade(person('1', { graduation_year: 2030 }), NOW)).toBe(8);
+  });
+
+  it('derives a grade only inside K-12, and says nothing outside it', () => {
+    expect(pcoGrade(person('1', { graduation_year: 2038 }), NOW)).toBe(0);
+    expect(pcoGrade(person('1', { graduation_year: 2039 }), NOW)).toBeNull();
+    expect(pcoGrade(person('1', { graduation_year: 2026 }), NOW)).toBe(12);
+    expect(pcoGrade(person('1', { graduation_year: 2025 }), NOW)).toBeNull();
+    // Garbage upstream is absent, not a number nobody typed. See the fuzz suite.
+    expect(pcoGrade(person('1', { graduation_year: Infinity }), NOW)).toBeNull();
+
+    // A grade Planning Center holds outright is still reported as it stands:
+    // the band is the roster's business to filter, not this function's.
+    expect(pcoGrade(person('1', { grade: 14 }))).toBe(14);
   });
 });
 

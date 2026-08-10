@@ -11,14 +11,23 @@
  */
 import { isPhoneQuery } from '@/lib/phoneDigits';
 import { createSearchMatcher, sortByName } from '@/lib/utils';
+import type { Grade } from '@/types';
 
 /** The one row shape everything on the kiosk renders. */
 export interface KioskStudent {
   id: string;
   firstName: string;
   lastName: string;
-  /** Null when nobody holds a real grade — never show a clamp as a fact. */
-  grade: number | null;
+  /**
+   * Null when nobody holds a real grade — never show a clamp as a fact.
+   *
+   * `Grade` rather than a bare number, so the only way to build a row is
+   * through `asGrade` at the edge. It was a number, and every number a backend
+   * offered reached the glass: a graduation year for a child not yet in school
+   * derived to `-1` upstream, and the lobby screen read "-1th grade" beside
+   * their name — then wrote it onto their permanent record at check-in.
+   */
+  grade: Grade | null;
   searchName: string;
   /**
    * *That* there is an allergy on file, never what it is — the same split the
