@@ -155,10 +155,32 @@ npm run uxr:shots                                  # → docs/uxr/{before,after}
 npm run uxr:team-walkthrough                       # → docs/uxr/team-walkthrough.html
 ```
 
+A screen whose *component was replaced* cannot skip the worktree, even though it
+is mounted: `kiosk-setup-live/scene.tsx` names the component being photographed
+in one line, and the component the before-frames want no longer exists here. So
+the worktree gets a copy of the harness with that line pointing at the old
+screen, and the freeze runs from there into this repo's `uxr/before-kiosk/`.
+
+```bash
+git worktree add ../tally-before <the-commit-before-the-work>
+ln -s "$PWD/node_modules" ../tally-before/node_modules
+cp -r uxr/kiosk-setup-live ../tally-before/uxr/                 # then point its
+                                                               # scene.tsx at the
+                                                               # old component
+(cd ../tally-before && npx tsx uxr/kiosk-setup-live/freeze.ts --out "$OLDPWD/uxr/before-kiosk")
+npm run uxr:kiosk-setup -- --out uxr/after-kiosk                # once it has shipped
+npx tsx uxr/measure.ts uxr/before-kiosk uxr/after-kiosk
+npm run uxr:shoot -- uxr/before-kiosk --out uxr/renders/before
+npm run uxr:shoot -- uxr/after-kiosk  --out uxr/renders/after
+npm run uxr:shots                                  # → docs/uxr/{before,after}/*.jpg
+npm run uxr:kiosk-walkthrough                      # → docs/uxr/kiosk-walkthrough.html
+```
+
 `scripts/build-uxr-walkthrough.ts` takes the changes file and the output name as
 arguments, both defaulting to the first refinement's, so each refinement gets
 its own page rather than a shared one whose title and round counts are true of
-neither. `docs/uxr/team-changes.json` is the Team screen's.
+neither. `docs/uxr/team-changes.json` is the Team screen's;
+`docs/uxr/kiosk-changes.json` is the kiosk screen's.
 
 Both sides have to be captured by the same harness. The first before/after pair
 was not: the before frames came from an earlier revision of `capture.spec.ts`
