@@ -207,7 +207,7 @@ for (const step of steps) {
 }
 sections.push('</div></section>');
 
-const html = `<title>Tally — correcting a family</title>
+const html = `<title>Tally — reprinting a name tag</title>
 <style>
   :root {
     --paper: #f6f7f9; --raised: #ffffff; --ink: #12192a; --muted: #5a6579;
