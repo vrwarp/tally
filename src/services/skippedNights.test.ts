@@ -15,18 +15,24 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   clearSkippedNight,
+  fetchSkippedNights,
   outcomeOf,
   recordExamination,
   type SkippedNights,
 } from '@/services/skippedNights';
 
 const setDoc = vi.hoisted(() => vi.fn(async () => {}));
+const getDoc = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/firebase', () => ({ db: {} }));
 vi.mock('firebase/firestore', () => ({
   doc: (_db: unknown, path: string) => ({ path }),
-  getDoc: vi.fn(),
+  getDoc,
   setDoc,
+  // `toSkippedNights` reads its stored dates through `toDateOrNull`, which
+  // asks `instanceof Timestamp` before anything else. The stub is enough:
+  // these tests store plain `Date`s, which is the branch after it.
+  Timestamp: class {},
   serverTimestamp: () => 'server-timestamp',
   arrayUnion: (...ids: string[]) => ({ union: ids }),
   arrayRemove: (...ids: string[]) => ({ remove: ids }),
@@ -80,6 +86,74 @@ describe('outcomeOf', () => {
 
   it('covers a night landing exactly on the watermark', () => {
     expect(outcomeOf(registry(), { id: 'edge', startAt: AUGUST })).toBe('held');
+  });
+});
+
+/**
+ * These documents are gated on the gathering, so being refused one is an
+ * ordinary thing to happen to a counselor who works Fridays and not Sundays.
+ * What that refusal must never do is take the read down with it — see the test
+ * below for what a rejection here cost the screen above it.
+ */
+describe('fetchSkippedNights', () => {
+  const found = (data: Record<string, unknown>) => ({ exists: () => true, data: () => data });
+  const missing = { exists: () => false, data: () => undefined };
+  const refused = Object.assign(new Error('Missing or insufficient permissions.'), {
+    code: 'permission-denied',
+  });
+
+  beforeEach(() => {
+    getDoc.mockReset();
+  });
+
+  it('reads each chain once and keeps a chain nobody has examined absent', async () => {
+    getDoc.mockImplementation(async ({ path }: { path: string }) =>
+      path === 'skippedNights/friday' ? found({ skipped: ['snowed-off'], examinedFrom: AUGUST }) : missing,
+    );
+
+    const read = await fetchSkippedNights(['friday', 'sunday-school', 'friday']);
+
+    expect(getDoc).toHaveBeenCalledTimes(2);
+    expect(read.byChain.get('friday')?.skipped).toEqual(new Set(['snowed-off']));
+    // Absent, not empty: an empty entry would claim the chain was examined and
+    // nothing was skipped, which is the opposite conclusion.
+    expect(read.byChain.has('sunday-school')).toBe(false);
+    expect(read.denied.size).toBe(0);
+  });
+
+  /*
+   * The one this shape exists for.
+   *
+   * Rejecting the batch is what this did before, and a profile resolves its
+   * whole year through one `Promise.all` — so a core member who is not on one
+   * restricted gathering got "Could not load attendance history" and "No
+   * gatherings on record yet" on *every* student, including students who have
+   * never been near that gathering, because the chain list comes from the
+   * calendar rather than from the student.
+   */
+  it('names the chain it was refused rather than failing the whole read', async () => {
+    getDoc.mockImplementation(async ({ path }: { path: string }) => {
+      if (path === 'skippedNights/sunday-school') throw refused;
+      return found({ skipped: [], examinedFrom: AUGUST });
+    });
+
+    const read = await fetchSkippedNights(['friday', 'sunday-school']);
+
+    expect(read.denied).toEqual(new Set(['sunday-school']));
+    // And the gathering this reader *is* on still arrives.
+    expect(read.byChain.get('friday')?.examinedFrom).toEqual(AUGUST);
+    // Refused is not absent. Absent sends the caller off to read every night of
+    // the chain one register at a time, and every one of those is gated by the
+    // same rule that just refused this.
+    expect(read.byChain.has('sunday-school')).toBe(false);
+  });
+
+  it('still fails on a read that went wrong rather than was refused', async () => {
+    getDoc.mockRejectedValue(new Error('network'));
+
+    // Worth retrying and worth saying out loud, unlike a refusal, which is a
+    // settled fact about who the reader is.
+    await expect(fetchSkippedNights(['friday'])).rejects.toThrow('network');
   });
 });
 

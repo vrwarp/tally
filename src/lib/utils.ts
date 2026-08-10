@@ -500,3 +500,10 @@ export function partition<T>(items: readonly T[], predicate: (item: T) => boolea
   for (const item of items) (predicate(item) ? pass : fail).push(item);
   return [pass, fail];
 }
+
+/** "Friday", "Friday and Sunday", "Friday, Sunday and Wednesday" — for prose. */
+export function joinList(parts: readonly string[]): string {
+  if (parts.length <= 1) return parts[0] ?? '';
+  if (parts.length === 2) return `${parts[0]} and ${parts[1]}`;
+  return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+}

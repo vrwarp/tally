@@ -217,7 +217,7 @@ function DeleteGatheringModal({
             ) : null}
             <p className="text-sm leading-relaxed text-ink-300">
               The dates ahead go too. They are not saved anywhere — the calendar works them out
-              from this gathering's own nights — so once the last one is gone, nothing puts a{' '}
+              from the ones it has already held — so once the last one is gone, nothing puts a{' '}
               {event.title} back on the calendar.
             </p>
           </>

@@ -397,8 +397,16 @@ attendance arriving by any route that never taps a phone, an import included.
 Adds and removes are `arrayUnion` / `arrayRemove`, never a rewritten array, so a device examining a
 year cannot undo a correction another device made while it was reading.
 
-**Who writes:** counselor and up. Readable by anyone active. Deletes are refused — forgetting the
+**Who writes:** counselor and up, on a gathering they work. Deletes are refused — forgetting the
 document silently un-examines a year, and the way to correct one night is to remove one night.
+
+**Who reads:** anyone active who works the gathering — `onChain(chainKey)`, the same gate as the
+registers this summarises. So a counselor off one gathering is refused its registry, and that
+refusal has to be a channel of its own rather than an absent document: absent means "nobody has
+examined this chain", which sends the reader off to read its nights one register at a time, every
+one of which the same gate refuses in turn. `fetchSkippedNights` returns the refused chains
+alongside the ones it read, and a student's profile drops those nights — it does not fail the whole
+year's read over them, and it does not call them cancelled.
 
 ### `eventAccess/{chainKey}`
 

@@ -269,8 +269,8 @@ export function ImportCheckInsModal({ open, onClose }: ImportCheckInsModalProps)
       title={multiSource ? 'Import history' : 'Import from Planning Center'}
       description={
         multiSource
-          ? "Bring an event's whole attendance history into Tally: every night it met, everyone who attended, and every check-in. The source is only read — nothing there changes."
-          : "Bring a Check-Ins event's whole history into Tally: every night it met, everyone who attended, and every check-in. Planning Center is only read — nothing there changes."
+          ? "Bring an event's whole attendance history into Tally: every time it met, everyone who attended, and every check-in. The source is only read — nothing there changes."
+          : "Bring a Check-Ins event's whole history into Tally: every time it met, everyone who attended, and every check-in. Planning Center is only read — nothing there changes."
       }
       footer={
         <Button variant="secondary" onClick={onClose} disabled={importingId !== null}>

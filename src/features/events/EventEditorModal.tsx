@@ -476,7 +476,7 @@ export function EventEditorModal({
             ? 'The dates ahead follow the schedule; this changes them from here on.'
             : 'Changes apply to this gathering only.'
           : form.mode === 'recurring'
-            ? 'Recurring gatherings predict their roster from their own past nights.'
+            ? 'Recurring gatherings predict their roster from their own past gatherings.'
             : 'A trip borrows its predicted roster from a gathering that repeats.'
       }
       size="lg"
@@ -546,7 +546,7 @@ export function EventEditorModal({
             onChange={(changed) => handleModeChange(changed.target.value as EventMode)}
             hint={
               form.mode === 'recurring'
-                ? 'Everyone active is on the roster, and its own past nights mark the regulars “Recent”.'
+                ? 'Everyone active is on the roster, and its own past gatherings mark the regulars “Recent”.'
                 : 'Happens once. Can borrow another gathering’s regulars, and limit its roster to the students who RSVP’d.'
             }
           >
