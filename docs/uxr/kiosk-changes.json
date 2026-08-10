@@ -1,0 +1,139 @@
+{
+  "title": "Tally — the kiosk screen, before and after",
+  "headline": "The one screen a counselor was <em>told to open and could not</em>",
+  "description": "A before-and-after record of the kiosk screen's refinement: how a lobby iPad gets paired, who could reach the screen that pairs it, and what four rounds of critique changed.",
+  "intro": [
+    "It is 6:40pm on a Friday. The first person into the building carries the lobby iPad out of the cupboard, wedges it into its stand and opens Tally on it. The iPad shows six characters 96px tall and one sentence: <em>a leader enters this code in Tally under Settings → Pair a kiosk</em>. Doors open at seven.",
+    "Getting to that field meant the account chip in the top-right corner of a phone, then Settings, then two scrolls past a panel of prediction steppers and a colour picker, then four lines of prose, then an underlined phrase in the middle of a sentence, then a second screen. Seven pieces of furniture in front of one step of work.",
+    "And for the person most likely to be standing there, it was worse than buried. Settings is core-team only. A counselor's account menu held exactly one item — <em>Sign out</em> — so the screen the kiosk sends them to had no route to it at all. The instruction on the lobby iPad named a door they had no key to. Pairing itself was never restricted: the callable behind it accepts any active member, deliberately, because the person setting up the lobby screen on a Friday evening is a counselor. Only the way in was."
+  ],
+  "method": [
+    "Kiosk became its own destination in the account menu, beside Team, for every active member — and the screen behind it became the union of what two places used to hold: the code field, the deployment's signing status, and the phone-search index.",
+    "That screen was then mounted from src/ inside the real AppShell, with the four modules it reads from Firebase aliased to a fixture, and frozen into standalone HTML — real DOM, real stylesheet, no JavaScript. The shell rather than a hand-drawn frame, because the finding that started this was the route to the screen, and the route is the account menu: the shooter clicks it open before freezing.",
+    "Two critics read the frames each round, at 390×844 and at 1440×900. One asked whether the person the screen is for could finish their job on the device they were holding; the other asked whether the screen was composed. Five scenes: the menu as an admin and as a counselor, and the screen as an admin, as a counselor, and on a deployment that cannot sign kiosk tokens.",
+    "A third agent answered them in the prototypes and recorded what it declined, and why. Round one landed ten changes against seventeen major findings; round two, twelve; round three, eight. Round four came back with nothing above minor from any of the four passes, which is where the loop stops — then a polish pass took seven of its eleven agreed minors.",
+    "Everything that survived was ported into React and the screen re-frozen from the running app through the same harness, so the “after” frames on this page are the code. The “before” frames were frozen by the same harness from a worktree at the commit before the work, in the same browser, at the same two viewports."
+  ],
+  "rounds": [
+    { "label": "Round one", "value": "17", "note": "major findings" },
+    { "label": "Round two", "value": "5", "note": "major findings" },
+    { "label": "Round three", "value": "2", "note": "major findings" },
+    { "label": "Round four", "value": "0", "note": "converged; loop stopped", "settled": true }
+  ],
+  "scenes": [
+    {
+      "scene": "kiosk-menu-counselor",
+      "title": "The account menu — a counselor's",
+      "audience": "Counselor · Friday, 6:40pm",
+      "job": "Find, from anywhere in Tally, the screen the lobby iPad has just told you to open.",
+      "notes": [
+        {
+          "viewport": "phone",
+          "headline": "One item, and it was Sign out",
+          "why": "This is the whole finding, in one frame. A counselor's account menu held a single row, and pressing it ended their session. /pair-kiosk existed and would have accepted them — the callable requires an active member and nothing more — but no screen in the app linked to it for a counselor, because the only link lived on Settings, which is core-team only. The kiosk's own screen told them to open Settings → Pair a kiosk. Their choices were to type a URL nobody had given them or to phone an admin, at 6:40pm, with a code on screen that expires in ten minutes.",
+          "changes": [
+            "Kiosk is a destination in the account menu for every active member, so the menu now holds one destination and one account action rather than one account action alone.",
+            "Below lg the menu is a bottom sheet rather than a panel hanging off a chip in the top-right corner — the corner of a 390px phone that a thumb reaches worst, and the first of the two taps on the only route there is.",
+            "Rows are 48px on touch, up from 36px, and back to 36px wherever there is a pointer.",
+            "Sign out left the list for the identity block it belongs to. As the last row of a sheet it would have been the nearest thing on the screen to a thumb, one aiming error from the row this journey depends on — and 21% of that row's width, on a menu with nothing between them."
+          ]
+        },
+        {
+          "viewport": "desktop",
+          "headline": "The same menu, on the laptop a leader debugs from",
+          "why": "The rail-less shell — what a counselor sees at any width, because the shell hides navigation for a role with one destination — put the account chip in the far top-right of a 1440px window and nothing else. The menu under it was the app's entire navigation for that person, and it led nowhere.",
+          "changes": [
+            "Kiosk is in the menu at every width; the popover keeps its pointer size while the phone gets the sheet.",
+            "The identity block lost its “Signed in as” caption and its filled role chip, so it stops outweighing the destinations it introduces and nothing inert wears a pressable shape."
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "kiosk-setup",
+      "title": "The kiosk screen — an admin's",
+      "audience": "Core team · a laptop, on the way to a Sunday",
+      "job": "Type six characters read off a screen across the room, and find out why a kiosk that has a code is not signing itself in.",
+      "notes": [
+        {
+          "viewport": "desktop",
+          "headline": "A form in the corner of a 1440px window becomes a screen that answers the question people arrive with",
+          "why": "The old page was a phone layout centred in a laptop: a heading, a card called “Enter the code”, a full-width text input holding a value that can never exceed six characters, and a closing sentence about retiring a kiosk. It ended 340px down a 900px window. The second job this screen exists for — a kiosk that has a code and will not pair — was answered on a different screen entirely, one card down a core-team-only Settings page, which is the screen the kiosk's own error message pointed at by name.",
+          "changes": [
+            "The form is the page rather than a card on it, and the field is capped to the width of its own content above lg instead of running the full column.",
+            "Below a rule, a subordinate register at one body size: the deployment's signing status on three fifths, and on two fifths the reasons a paired kiosk keeps waiting and the phone-search index.",
+            "The status names the project and the service account even when the answer is yes. “Ready to pair” used to be a green badge and nothing else — identical in staging and in production, on the one screen somebody opens because a lobby iPad is not pairing.",
+            "“Check again” replaced a reload, with a reserved reply under it that says when the deployment was last asked; an IAM grant takes thirty to a hundred and twenty seconds to propagate, so two of the first three checks are supposed to still say no.",
+            "The healthy badge lost its green. Success here is the absence of a problem, and absence should not be the loudest thing on a screen whose accent belongs on the path through the job."
+          ]
+        },
+        {
+          "viewport": "phone",
+          "headline": "The field is set at the size of what it receives",
+          "why": "The pairing code was a generic full-width input at body size with a mono placeholder reading ABC123 in the same grey as every paragraph on the page — at arm's length in a dim hallway it read as a field already filled, above a button greyed out with nothing saying why. The one thing on the screen being transcribed from across a room was the least considered element in the frame, and the brightest object on the page was the button that rebuilds a search index.",
+          "changes": [
+            "30px mono, centred, six slots marked at the weight of the glyphs that replace them, on a surface that steps toward the reader rather than matching the page behind it.",
+            "The resting primary keeps a brand identity instead of the shared disabled grey, so it reads as waiting for a code rather than as furniture — and no longer loses to the enabled secondary buttons below it.",
+            "The standing hint under the button is the live region: the verdict replaces it rather than arriving beneath it, so nothing on the page moves while somebody is looking at the kiosk rather than at their phone."
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "kiosk-setup-counselor",
+      "title": "The kiosk screen — a counselor's",
+      "audience": "Counselor · standing next to the iPad",
+      "job": "Pair the kiosk, know it worked, and get to the door.",
+      "notes": [
+        {
+          "viewport": "phone",
+          "headline": "A page that answered nothing and led nowhere",
+          "why": "Having arrived — by URL, since nothing linked here — a counselor got a screen with no way off it: no rail, no tab bar, a wordmark that was a <span>, and an account menu holding only Sign out. It was also the page's own dead end: if the kiosk kept asking to be paired after she typed the code, nothing on the screen said why. The most likely reason is that the iPad has Tally installed to its home screen, which gives the installed app storage of its own and a second pairing of its own.",
+          "changes": [
+            "“If the kiosk still waits” is on this page, not behind the core-team gate. Its two causes are static prose the app already knew, and neither is a call to the diagnostics callable that genuinely is core-only.",
+            "A “Check in” link, because the shell draws no navigation for this role and she is due at the door.",
+            "The shell stopped reserving 96px at the foot of the page for a tab bar this role never gets."
+          ]
+        },
+        {
+          "viewport": "desktop",
+          "headline": "One card in a 1440px window, with the frame disagreeing about where left is",
+          "why": "With the rail hidden the page had no left anchor: the header bar started at 16px and the content column was centred, so the two structural elements on screen disagreed, and a card 1216px wide held a six-character field. 53% of the window was empty below the fold.",
+          "changes": [
+            "Without the core-team register the page takes a measure that suits its content instead of the window, and the rail-less header takes the same one, so the wordmark and the heading share a left edge.",
+            "The reference material moved under the action rather than closing the page after it."
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "kiosk-setup-denied",
+      "title": "When the deployment cannot sign kiosk tokens",
+      "audience": "Admin · the failure nobody sees coming",
+      "job": "Work out why an approved code leaves the lobby screen still asking, and get the fix to a terminal.",
+      "notes": [
+        {
+          "viewport": "phone",
+          "headline": "The screen that pairs a kiosk now says when pairing cannot work",
+          "why": "Without one IAM grant, pairing hangs at the very last step: the code is approved, and the kiosk keeps polling. The kiosk cannot report it — its poll loop treats the refusal as flaky lobby wifi, by design — and the pairing screen said nothing at all, because the diagnosis lived on Settings. So the person doing the pairing typed six characters, watched nothing happen, and read the code again.",
+          "changes": [
+            "The verdict is carried into the form, above the field, so it is read before the six characters are typed rather than after: a code lives ten minutes, and finding out afterwards is a walk back to the lobby.",
+            "The remedy sits above the command rather than below it. The command is read and copied; the button that has to be pressed while a grant propagates is aimed at, and at the foot of a phone page it was 55% covered by the tab bar.",
+            "The command breaks at shell continuations rather than wherever the browser chooses — a wrap inside the service account's own address is a grant that fails for a reason nobody is looking for."
+          ]
+        },
+        {
+          "viewport": "desktop",
+          "headline": "One condition, said once",
+          "why": "On Settings the same state was a red badge immediately above an amber panel whose first sentence repeated it, with the gcloud command clipped mid-token at the container's edge — the visible line ended “…serviceAccountToke”, silently, with no ellipsis and no scrollbar. The hidden tail was the end of the role name the sentence above it says is missing.",
+          "changes": [
+            "One accent for the state, carried by the verdict; the explanation and the command sit in the ordinary ramp beneath it.",
+            "The whole command is legible, wrapped at its own continuations, in a block that hangs into the gutter rather than crowding the column.",
+            "“If the kiosk still waits” is sequenced behind the grant rather than contradicting it: after the role propagates, those are the reasons that remain."
+          ]
+        }
+      ]
+    }
+  ],
+  "colophon": "Both sides of every slider were frozen by the same harness — <code>uxr/kiosk-setup-live/</code>, which mounts the real screen inside the real app shell and clicks the account menu open on the way past — in the same browser, at the same two viewports. The “before” side comes from a worktree at the commit before the work; the “after” side from the running code, re-frozen after the port rather than taken from the prototypes the loop argued over."
+}
