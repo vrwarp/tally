@@ -382,6 +382,37 @@ describe('a line that would print its caption alone', () => {
       expect(screen.getByLabelText(/^Length/)).toBeTruthy();
     });
 
+    it('lets the length be emptied for retyping, without ticking itself off', async () => {
+      // The box cannot store its empty state — absent is how the tick box above
+      // says "off" — so clearing it used to snap straight back to 50 and there
+      // was no way to type a length that did not start with one.
+      const user = userEvent.setup();
+      render(<Harness initial={{ ...DEFAULT_LABEL_TEMPLATE, fixedLengthMm: 100 }} />);
+
+      const length = screen.getByLabelText(/^Length/);
+      await user.clear(length);
+
+      expect(length).toHaveValue(null);
+      expect(screen.getByLabelText(/Same length every time/)).toBeChecked();
+      // Not written up half-typed: the template holds the last length that was
+      // a length, until a new one is.
+      expect(stored()?.fixedLengthMm).toBe(100);
+
+      await user.type(length, '35');
+      expect(stored()?.fixedLengthMm).toBe(35);
+    });
+
+    it('takes the default from a length left empty', async () => {
+      const user = userEvent.setup();
+      render(<Harness initial={{ ...DEFAULT_LABEL_TEMPLATE, fixedLengthMm: 100 }} />);
+
+      await user.clear(screen.getByLabelText(/^Length/));
+      await user.tab();
+
+      expect(stored()?.fixedLengthMm).toBe(DEFAULT_FIXED_LENGTH_MM);
+      expect(screen.getByLabelText(/^Length/)).toHaveValue(DEFAULT_FIXED_LENGTH_MM);
+    });
+
     it('says when the previewed roll is going to ignore all this', async () => {
       // The preview is about to look exactly as though the tick did nothing,
       // because on die-cut media it did.
