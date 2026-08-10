@@ -89,4 +89,45 @@ describe('searchEventIcons', () => {
   it('is empty rather than everything when nothing matches', () => {
     expect(searchEventIcons('zzzzz')).toHaveLength(0);
   });
+
+  /*
+   * The catalogue is curated, so its coverage is a decision rather than a
+   * consequence — and a decision worth pinning. These are the words a leader
+   * types into the picker for the gatherings a church actually runs; each one
+   * finding nothing is the failure this catches, and the reason somebody would
+   * conclude the icons "don't have" what they need.
+   */
+  it.each([
+    'youth',
+    'children',
+    'kids',
+    'nursery',
+    'baby',
+    'toddler',
+    'bible',
+    'study',
+    'worship',
+    'prayer',
+    'christian',
+    'jesus',
+    'church',
+    'small group',
+    'fellowship',
+    'friends',
+    'activities',
+    'games',
+    'food',
+    'meal',
+    'snack',
+    'breakfast',
+    'lunch',
+    'dinner',
+    'potluck',
+    'camp',
+    'camping',
+    'retreat',
+    'outdoors',
+  ])('has something to offer for "%s"', (query) => {
+    expect(searchEventIcons(query).length).toBeGreaterThan(0);
+  });
 });
