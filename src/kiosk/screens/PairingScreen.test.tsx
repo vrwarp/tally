@@ -97,7 +97,7 @@ describe('PairingScreen', () => {
     expect(screen.getByText(STUCK)).toBeInTheDocument();
   });
 
-  it('points a leader at Settings once the pairing will not complete', async () => {
+  it('points a leader at the kiosk screen once the pairing will not complete', async () => {
     // What a missing token-signing grant produces, on every poll, forever.
     const poll = vi.fn(async () => {
       throw callableFailure();

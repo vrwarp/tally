@@ -29,6 +29,9 @@
   "exclude": [
     "uxr/kiosk-live/main.tsx",
     "uxr/kiosk-reprint/main.tsx",
+    "uxr/kiosk-setup-live/main.tsx",
+    "uxr/kiosk-setup-live/scene.tsx",
+    "uxr/kiosk-setup-live/stubs.tsx",
     "uxr/team-live/main.tsx",
     "uxr/team-live/stubs.tsx",
     "uxr/team-live/fixture.ts",

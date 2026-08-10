@@ -1,0 +1,65 @@
+[
+  {
+    "scene": "kiosk-setup",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "the pairing code field and the \"Approve this kiosk\" button, as one group",
+    "finding": "The rank inside the form is inverted. The button — which cannot be pressed until six characters exist — is now the brightest, largest, most saturated object in the frame: a full-width blue-filled slab with a bold light-blue label. The field it is waiting on is the faintest object in its own group: an ink-900 box on ink-950 with an ink-700 ring and six ink-700 dots that are almost the same value as the ring around them. Squint and the screen says \"press this\", when the only thing a reader can actually do is type. The r01 direction asked the resting primary to read as waiting for a code rather than as furniture; it has gone past that into out-shouting the control it depends on, and the field it was meant to defer to never gained the presence it was asked for.",
+    "evidence": "Fold frame: at a squint the only two objects visible below the lede are the blue button and the grey label; the input is a dark rectangle whose placeholder dots read as dust rather than as six waiting slots. The same relationship holds in the counselor and denied frames, where the button is the second-loudest thing on the page after a red panel.",
+    "direction": "Rebalance inside the group rather than repainting either element alone. The empty field is the screen's starting point and should look occupied-in-waiting — a boundary and an interior that step toward the reader, and six slot marks legible at arm's length in a dim hallway — while the resting button holds its brand identity at a weight that clearly sits below the field until a code exists. Also settle the two objects' widths: a 210px field stacked over a 358px button leaves a stepped edge and a dead rectangle beside the field with nothing in it."
+  },
+  {
+    "scene": "kiosk-setup",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the reserved verdict line between the button and the \"Codes last ten minutes\" hint",
+    "finding": "The reserved slot is the right idea in the wrong place in the rhythm. In its resting (empty) state it opens roughly 36px between the button and the hint, while the page break below the hint is roughly 26px — so the sentence that tells you what to do when a code is refused sits closer to the section rule beneath it than to the control it belongs to. It reads as a stray paragraph floating between the form and the divider rather than as the form's own footnote, and the gap itself matches nothing else in the stack (the page runs on 12 and 24).",
+    "evidence": "Fold frame: measured from the button's bottom edge to the hint's first line, and from the hint's last line to the hairline rule, the space above the hint is visibly larger than the space below it.",
+    "direction": "Reserve the verdict's height without letting its emptiness become a break. Either fold the reserved line into space the group already owns between the form and the rule, or bind the hint to the button and let the verdict claim its room above the hint rather than between them. The resting state should show the same grouping the populated state will."
+  },
+  {
+    "scene": "kiosk-setup",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the Project / Service account / Checked list in \"This deployment\"",
+    "finding": "Three facts, three different left edges for their values, because each row is a term and a value laid side by side with no shared column. The result is not a list, it is three sentences of different lengths. Worse, the longest value — the service account, the one fact a reader might compare character by character against a console — is squeezed into whatever the widest term leaves behind, so it breaks mid-identifier and its continuation hangs at an indent that aligns with nothing on the page, in a column that had 240px of unused width on the line above.",
+    "evidence": "Fold frame: values begin at three visibly different x positions; \"tally-\" sits alone on one line using about a fifth of the available width, and \"76406@appspot.gserviceaccount.com\" runs full width underneath it, starting well right of the page's left edge.",
+    "direction": "Give the pairs one structure — either a real two-column arrangement with a single value edge, or terms set above their values — so the block reads as a table of facts, and let the long identifier have the full measure instead of a gutter. Whatever wrapping remains should break at a point a reader can rejoin."
+  },
+  {
+    "scene": "kiosk-setup",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the \"Ready to pair\" status chip against the \"Check again\" button below it",
+    "finding": "Now that the badge has lost its chroma it has inherited the exact costume of the page's outline buttons: a rounded box, a 1px ink-700 ring, semibold ink-300 type, no fill of its own. \"Check again\" sits about 100px below it wearing the same three things. One is a verdict you read, the other is a control you press, and nothing in their treatment separates them — the chip is the first thing the eye reaches in the block and it invites a tap that does nothing. The same collision repeats in the denied frame, where a red ringed pill sits above two identical outline buttons.",
+    "evidence": "Fold frame: \"Ready to pair\" and \"Check again\" read as a small button and a large button in one column; in the denied frame \"Cannot sign kiosk tokens\" reads as a red button above \"Copy command\" and \"Check again\".",
+    "direction": "Let the status stop being a chip, or let the buttons stop being rings. A verdict can be carried by type — weight and position, in the ink or accent ramp — without borrowing the one shape on this page that means pressable. Whichever way it goes, in this block only the things that respond to a tap should have an outline."
+  },
+  {
+    "scene": "kiosk-setup",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the two sections under the rule, and the same region in the denied frame",
+    "finding": "The subordinate register is set by the headings only; the bodies underneath them do not keep the promise. Both sections wear the identical 12px uppercase ink-500 whisper heading, but under the first sits a 14px ink-500 sentence, under the second a 12px ink-500 paragraph, and in the denied state the first carries a 14px ink-300 paragraph — the same size and the same colour as the page's own lede. So the region is a different weight in every instance, and in the denied frame the largest block of body text on the screen sits below the rule under the quietest label on the screen. In the healthy frame the caveat sentence is also the biggest type in the block it belongs to, above both the verdict and the facts it qualifies.",
+    "evidence": "Fold frames: \"Tally can hand a kiosk a session…\" is visibly larger than \"Only the last four digits…\" directly beneath the same style of heading; in the denied fold, \"The functions service account is missing…\" matches \"On the kiosk device, open /kiosk…\" in both size and lightness across a rule that is supposed to demote it.",
+    "direction": "Decide what the register below the rule is and hold it for both sections — one prose size, one prose lightness, with the facts and the verdict ranked above the caveat that qualifies them. If a fault means the block has to speak at full voice, let it step up as a whole, heading included, rather than putting a full-voice paragraph under a whispered label."
+  },
+  {
+    "scene": "kiosk-setup-counselor",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "\"Approve this kiosk\" and the \"✓ Check in\" control below the rule",
+    "finding": "They are twins: same full width, same height, same radius, same semibold label at the same size, stacked with one hairline between them. Composed like that they read as two options of equal standing, and the brighter label belongs to the one that leaves the page — the exit's text is the near-white end of the ink ramp while the primary's is a pale blue on a 20% fill. On a screen whose whole content is one field and one action, the second-largest object being a peer-shaped way out flattens the page into a choice it is not offering. The rules bracketing it compound this: one lone button, given 24px above and 24px below and a hairline on each side, becomes a titled section without a title.",
+    "evidence": "Counselor fold frame: two identical full-width pills 60px apart; at a squint the lower one is the more legible of the two.",
+    "direction": "The exit should be recognisably a lesser object than the job — narrower, or lighter, or set as a link-weight control rather than a second slab — and it should not need its own bracketed band to sit in. Whatever it becomes, it should read as the same class of thing as the other secondary controls in this round, which are currently a different outline treatment again."
+  },
+  {
+    "scene": "kiosk-menu",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the bottom sheet, from the identity block down to \"Sign out\"",
+    "finding": "The sheet's contrast range runs backwards from top to bottom. The identity block receded past reading — \"Signed in as\" and a 10px uppercase role chip both land in the dim middle of the ramp on a lighter panel, so the chip is the least legible text in the frame — while the loudest element in the whole panel is the destructive one: \"Sign out\" is the only chroma in the sheet and it sits on the bottom row, the single most reachable band on the phone. A surface whose reason for existing is three destinations puts its accent on the exit and its lowest contrast on the thing that says which account you are about to act as.",
+    "evidence": "Menu fold frame: squinting the sheet, the red \"Sign out\" arrives first and \"Kiosk\", \"Team\" and \"Settings\" arrive together as one grey block; the ADMIN chip is barely separable from its own background.",
+    "direction": "Let the separation and the label carry the destructive item rather than making it the brightest thing in a navigation panel — its rule and its own group already do that work — and bring the identity back to a lightness that can be read at a glance, since it is the fact the whole panel is predicated on. The three destinations should be what the sheet presents first."
+  }
+]

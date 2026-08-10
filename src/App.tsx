@@ -56,9 +56,9 @@ const TeamPage = lazy(() =>
     default: m.TeamPage,
   })),
 );
-const PairKioskPage = lazy(() =>
-  import('@/features/settings/PairKioskPage').then((m) => ({
-    default: m.PairKioskPage,
+const KioskPage = lazy(() =>
+  import('@/features/kiosk/KioskPage').then((m) => ({
+    default: m.KioskPage,
   })),
 );
 const ReviewPage = lazy(() =>
@@ -174,9 +174,16 @@ export default function App() {
                                   </RequireRole>
                                 }
                               />
-                              {/* Any active member: the person setting up the
-                                  lobby kiosk on a Friday night is a counselor. */}
-                              <Route path="pair-kiosk" element={<PairKioskPage />} />
+                              {/* Any active member, and the only core-team-ish
+                                  screen that is: the person setting up the
+                                  lobby kiosk on a Friday night is a counselor,
+                                  and Settings — where this used to be reached
+                                  from — is not open to them. The screen shows a
+                                  counselor less; it never refuses them the code
+                                  field. The path keeps its old name so that
+                                  every kiosk already in a lobby, and the
+                                  documentation next to it, still resolve. */}
+                              <Route path="pair-kiosk" element={<KioskPage />} />
 
                               <Route
                                 path="*"

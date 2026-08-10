@@ -24,6 +24,20 @@ export type SigningState = 'ok' | 'denied' | 'unknown';
 
 export interface SigningStatus {
   state: SigningState;
+  /**
+   * Which deployment answered, and as whom.
+   *
+   * Both were once read only on the way to a remedy, on the argument that
+   * signing usually works and the metadata server has no part in saying so.
+   * That left "Ready to pair" — a green badge and nothing else — identical in
+   * staging and in production, on the one screen somebody opens *because* a
+   * lobby iPad is not pairing and they are no longer sure which of the two
+   * they are looking at. Either may be null: there is no metadata server on a
+   * laptop or in the emulator, and an answer about IAM must not hang waiting
+   * for one.
+   */
+  project: string | null;
+  serviceAccount: string | null;
   /** Null when signing works; otherwise the reason, in plain language. */
   problem: string | null;
   /** The remedy, when there is one a leader can hand to whoever runs the project. */
@@ -152,9 +166,12 @@ export function isSigningDenial(error: unknown): boolean {
  *
  * `mint` is injected so this stays a unit rather than a deploy: the callable
  * passes `createCustomToken`, the tests pass a function that throws whatever a
- * real refusal looks like. `describeIdentity` is injected for the same reason,
- * and is only ever called on the one path that needs it — signing usually
- * works, and nothing should touch the metadata server to say so.
+ * real refusal looks like. `describeIdentity` is injected for the same reason.
+ * It is now asked on every path rather than only on a refusal: the answer names
+ * the deployment it is about, and "signing works" is exactly as ambiguous
+ * between staging and production as "signing does not" — see `SigningStatus`.
+ * The read is cached per instance and bounded by a one-second timeout, so the
+ * cost is one link-local request on the first call of an instance's life.
  *
  * The minted token is discarded here and never leaves the function. It is a
  * real credential for as long as it exists, so the uid it names is one no
@@ -165,12 +182,14 @@ export async function probeSigning(
   mint: (uid: string) => Promise<string>,
   describeIdentity: () => Promise<RuntimeIdentity> = resolveRuntimeIdentity,
 ): Promise<SigningStatus> {
+  const identity = await describeIdentity();
+  const where = { project: identity.project, serviceAccount: identity.serviceAccount };
+
   try {
     await mint(SIGNING_PROBE_UID);
-    return { state: 'ok', problem: null, remedy: null, command: null };
+    return { state: 'ok', ...where, problem: null, remedy: null, command: null };
   } catch (error) {
     if (isSigningDenial(error)) {
-      const identity = await describeIdentity();
       // The runtime's own answer first: it is what these functions authenticate
       // as. The refusal's wording is the fallback, for when there is no
       // metadata server to ask.
@@ -178,6 +197,10 @@ export async function probeSigning(
       const { remedy, command } = remedyFor(identity, account);
       return {
         state: 'denied',
+        ...where,
+        // A refusal can name the account when the metadata server could not, and
+        // that is the one this reader has to act on.
+        serviceAccount: account,
         problem:
           'This project cannot sign kiosk tokens, so pairing a kiosk will hang at the last ' +
           'step — the code stays on screen after it is approved.',
@@ -187,6 +210,7 @@ export async function probeSigning(
     }
     return {
       state: 'unknown',
+      ...where,
       problem:
         'Tally could not tell whether kiosk tokens can be signed: ' +
         textOf(error).slice(0, 200),

@@ -65,7 +65,14 @@ describe('isSigningDenial', () => {
 describe('probeSigning', () => {
   it('reports ok when a token can be signed', async () => {
     const status = await probeSigning(async () => 'a.signed.token', identity());
-    expect(status).toEqual({ state: 'ok', problem: null, remedy: null, command: null });
+    expect(status).toEqual({
+      state: 'ok',
+      project: 'tally-76406',
+      serviceAccount: '481516234-compute@developer.gserviceaccount.com',
+      problem: null,
+      remedy: null,
+      command: null,
+    });
   });
 
   it('never returns the token it minted', async () => {
@@ -73,12 +80,23 @@ describe('probeSigning', () => {
     expect(JSON.stringify(status)).not.toContain('a.signed.token');
   });
 
-  it('does not go looking for an identity it has no use for', async () => {
+  it('says which deployment answered, even when the answer is yes', async () => {
     const describe_ = vi.fn(identity());
-    await probeSigning(async () => 'a.signed.token', describe_);
-    // Signing works on almost every call, and the metadata server has no part
-    // in saying so.
-    expect(describe_).not.toHaveBeenCalled();
+    const status = await probeSigning(async () => 'a.signed.token', describe_);
+    // "Ready to pair" is read by somebody whose lobby iPad is not pairing, and
+    // a green badge that could equally be staging tells them nothing.
+    expect(describe_).toHaveBeenCalled();
+    expect(status.project).toBe('tally-76406');
+  });
+
+  it('answers at all where there is no metadata server', async () => {
+    // A laptop, the emulator, a test: every lookup falls back to null and the
+    // check still has to report whether signing works.
+    const status = await probeSigning(
+      async () => 'a.signed.token',
+      identity({ serviceAccount: null, project: null }),
+    );
+    expect(status).toMatchObject({ state: 'ok', project: null, serviceAccount: null });
   });
 
   it('signs for a uid no real account can hold', async () => {

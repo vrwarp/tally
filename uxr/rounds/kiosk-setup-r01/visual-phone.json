@@ -1,0 +1,83 @@
+[
+  {
+    "scene": "kiosk-menu",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "the account chip in the header and the four items of the menu it opens, top-right of the 390×844 screen",
+    "finding": "The whole route to the kiosk screen — the only route there is — is executed in the corner of the phone a thumb cannot reach, with targets below the marginal floor. The counselor is holding the iPad in her other hand at 6:40pm; getting to the code field means shifting grip twice, and this is not a once-a-year path (the journey lists wipe, restore, re-install, second campus as re-pair triggers). Two taps, both top-right, both undersized, every time.",
+    "evidence": "Chip background runs y=14–82 in the 2× frame → 7–41 CSS, i.e. 34px tall (py-1 around a size-6 avatar), against a 44 floor. The menu items are `px-3 py-2 text-sm` = 20px line-height + 16px padding = 36px tall; measured text bands sit at 132–143 (Kiosk), 168–179 (Team), 204–218 (Settings), 240–254 CSS, a uniform 36px pitch. Every item's hit box lives between 128 and 272 CSS on an 844px screen — the top 32%, right edge.",
+    "direction": "The chip can stay where it is (it is the shell's convention), but on phone the surface it opens does not have to hang off it. Anchor the menu to the bottom of the viewport as a sheet so the items land in the bottom third, and give each item a touch-sized row (min-h-11 with the same `pointer-fine:` shrink the buttons on this screen already use) so the desktop popover is untouched."
+  },
+  {
+    "scene": "kiosk-menu",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "\"Settings\" and \"Sign out\", the last two rows of the open account menu",
+    "finding": "A destructive item sits flush against a navigational one with no gap and no separator, in 36px rows. A tap that lands 8px low on Settings signs the counselor out — and at 6:40pm in a dim lobby that is not a recoverable slip: she is back at an email-link sign-in with the iPad already showing a code that expires in ten minutes. Same adjacency threatens the item directly above Kiosk's neighbours.",
+    "evidence": "Settings text band 204–218 CSS, Sign out 240–254 CSS: 36px pitch, zero margin between hit boxes, no divider drawn in the frame. Sign out is `text-danger-400` — it is coloured as destructive but spaced as if it were not. The 8px overshoot the brief names is a quarter of a row here.",
+    "direction": "Separate the destructive item from the navigation: a divider plus real space (the sheet in the previous finding buys the room for it), and give the rows the same target height as everything else the phone gets."
+  },
+  {
+    "scene": "kiosk-setup-counselor",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "the whole document — header, and the absence of a nav rail or tab bar",
+    "finding": "The counselor's version of this screen contains no link to anywhere. She pairs the kiosk at 6:45, and there is no visible way to the check-in roster she has to be running at 7:00. The shell drops the tab bar because only one destination survives, but the surviving destination is the one she is not on, so it is displayed nowhere. Her only navigational control is the 34px account chip in the top-right corner, and the menu behind it (per the admin frame) lists Kiosk / Team / Settings / Sign out — no Check in. Browser back is the entire recovery, and the journey explicitly contemplates Tally installed to a home screen, where there is no back button.",
+    "evidence": "The counselor prototype's body contains zero `<a>` elements; the wordmark is a `<span>`, and the header's only interactive node is the chip `<button>`. The frame shows no tab bar, yet `main` still carries `pb-24` — 96 CSS px of padding reserved for a bar that this role never gets, which is why the page ends at 588 CSS with 255px of empty screen under it.",
+    "direction": "When the shell has one destination and you are not on it, that destination is exactly what needs to be on screen. A single \"Check in\" affordance low on the page — or in the account sheet — costs nothing to the admin layout and closes the loop back to the door."
+  },
+  {
+    "scene": "kiosk-setup-counselor / kiosk-setup",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "the \"Pair a kiosk\" card — the field, the hint, and the Approve button",
+    "finding": "Nothing on this screen can tell the person the pairing worked. There is no live region, no status slot, no success affordance in the markup at all — the card is label, input, hint, button and nothing else. She taps Approve, looks up at an iPad across the room that flips on its own polling interval, and in the meantime her phone shows her exactly what it showed her before. The failure mode is re-typing a code that already paired, or walking away from one that did not; and the re-pair case the journey names (installed-to-home-screen gets its own second pairing) means she will do this twice in a row and needs to tell the two attempts apart.",
+    "evidence": "In all three setup prototypes the pair `<form>` holds only `label`, `input#_r_0_`, `p#_r_0_-hint` and the submit button. The only `aria-live` region anywhere in the file is the empty span next to \"Copy command\" in the denied card — a core-team control. No frame in this round shows a post-submit state, because there is no element for one to occupy.",
+    "direction": "Give the card a persistent status line under the button that survives a glance from a metre away — paired / not paired, with the code echoed — not a toast that fires while she is looking at the iPad. Wording must not drift into claiming the lobby screen is fine; \"this kiosk is signed in as Dana\" is the honest scope."
+  },
+  {
+    "scene": "kiosk-setup-counselor",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "vertical placement of the code field (340–390 CSS) and the Approve button (440–484 CSS), with 255px of empty page below",
+    "finding": "The only two things a counselor came here to touch sit in the middle band of the screen, behind 324px of prose, while the bottom third — thumb territory — is blank. Worse, the moment she taps the field a keyboard eats roughly 300–340px from the bottom; the Approve button's bottom edge at 484 CSS is then at or under the keyboard line, so after transcribing six characters she has to dismiss the keyboard or scroll to commit them. The prose she is reading past is an explanation of what a kiosk is, delivered to somebody standing in front of one that is already showing a code.",
+    "evidence": "Measured from the 2× fold frame: input ring y=680–780 → 340–390 CSS; button y=880–968 → 440–484 CSS (44px, exactly at the marginal floor, and only 178 CSS wide inside a 342px card, leaving 164px of unused card beside it). \"Pairing code\" label starts at 324 CSS — 38% of the screen is the h1, a four-line page description and a three-line card description. Last content pixel at 588 CSS on an 844 screen.",
+    "direction": "For the person with no core-team cards, the pair form is the page: hoist it above the explanatory prose (or demote that prose below the card), and let the primary action be full-card-width and low enough to stay clear of a keyboard. The admin frame can keep the current order — the difference is which card is first, not a different component."
+  },
+  {
+    "scene": "kiosk-setup-denied",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "the \"Pair a kiosk\" card sitting above \"This deployment\", which reads \"Cannot sign kiosk tokens\"",
+    "finding": "The person arrives on this screen because the kiosk has a code and will not pair — that is the second job the journey names — and the first thing the screen offers is a fully live code field that is guaranteed to fail, with the diagnosis in the card below it. They will type the six characters again before they read the reason. And for the counselor the situation is worse: her build of this screen has no deployment card, so a pairing that fails because of a project IAM grant produces, on her phone, nothing at all. The constraint that diagnostics stay core-team blocks the obvious fix of showing her the status card, so the answer has to come from the submit failure, not from the diagnostic.",
+    "evidence": "In the denied prototype the pair form's input and submit carry no disabled or warning state; the markup is byte-identical to the healthy frame. The danger badge renders at ~645 CSS — visible at the fold, but the remedy sentence is cut off by the fold at 844 and \"Copy command\" is ~886 CSS down, a full screen of scroll. The counselor prototype contains no status card and no error slot in the form.",
+    "direction": "When the deployment cannot sign tokens, the pair card should say so where the person is already looking — an inline line in the form, not only a card underneath — and for a counselor the submit failure needs a plain sentence naming a human remedy (\"ask a core team member to check kiosk setup\") rather than a raw callable error, since the diagnostic itself must stay server-guarded."
+  },
+  {
+    "scene": "kiosk-setup-denied",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "\"Copy command\" under the gcloud block in the deployment card",
+    "finding": "The one control that carries the remedy off this phone is the smallest target on the page, and the command itself is unreadable here — roughly a third of it fits, in a horizontal scroll region nested inside a vertically scrolling page, which is a two-handed gesture.",
+    "evidence": "The button is `min-h-9 px-3` = 36 CSS px tall with no touch/fine split, unlike the sibling \"Rebuild phone search index\" which is `min-h-11 pointer-fine:min-h-9` (44 on touch). The `<pre>` is one 155-character line at `text-xs` mono in a 342px card — about 48 characters visible, ~31% of the command.",
+    "direction": "Match the other buttons' touch height, and let the command wrap rather than scroll — nobody needs it on one line on a phone, and the person who will run it is reading it to decide whether to trust it, not to select it."
+  },
+  {
+    "scene": "kiosk-setup / kiosk-setup-counselor",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the empty code field showing placeholder \"ABC123\" above a greyed-out \"Approve this kiosk\"",
+    "finding": "The placeholder is styled like a real code — same mono face, same 0.2em tracking, six characters — so at arm's length in a dim lobby the field reads as already filled, and the button beneath it is disabled with nothing saying why. The person taps a dead button before they think to tap the field.",
+    "evidence": "Input is `font-mono tracking-[0.2em] placeholder:text-ink-500` with value `\"\"`; the submit is `disabled` with `disabled:bg-ink-800 disabled:text-ink-400 disabled:opacity-100`, i.e. deliberately full-opacity grey — visually a button, not an absence.",
+    "direction": "Either make the empty state read as empty (a dimmer, non-code-shaped hint) or let the button say what it is waiting for — six characters — rather than only going grey."
+  },
+  {
+    "scene": "kiosk-setup / kiosk-setup-counselor",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "\"Codes live for ten minutes; the kiosk refreshes its own when one lapses\", directly under the field",
+    "finding": "The sentence that explains the most common way this journey fails — she typed the code the iPad was showing four minutes ago — is the smallest, lowest-contrast text on the card, which is precisely the reading condition (dim hallway, glance, no time) it has to survive.",
+    "evidence": "`text-xs leading-snug text-ink-500` — 12px against the brief's ~13px floor for informational text, in the same ink-500 used for decorative descriptions, on an ink-900 card.",
+    "direction": "This fact is not a footnote; it belongs at the same weight as the label, or attached to the failure message where it actually gets read."
+  }
+]

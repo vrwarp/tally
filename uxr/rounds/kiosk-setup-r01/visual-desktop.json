@@ -1,0 +1,56 @@
+[
+  {
+    "scene": "kiosk-setup-denied",
+    "viewport": "desktop",
+    "severity": "major",
+    "where": "the `gcloud` line inside the amber remedy box in the 'This deployment' card, roughly y=525–555, running to the right edge of the box at x≈1381",
+    "finding": "The one artefact on this screen that has to leave the screen — the IAM command somebody must run in a terminal — is horizontally clipped, and clipped in the worst possible place: the visible line ends '...--role=roles/iam.serviceAccountToke', cut mid-glyph against the box border. The hidden tail is 'nCreator', i.e. the end of the exact role name the sentence two lines above says is missing. An admin who is about to change an IAM policy on a production project reads the command before running it; here they can read every part of it except the part that is the point. Worse, the clip is silent — no ellipsis, no fade, no visible scrollbar in a static/overlay-scrollbar browser — so it does not read as truncated, it reads as a command that ends at 'serviceAccountToken'. The person who retypes it on the machine that actually has gcloud (rarely the same machine) gets a role that does not exist, and now has a failed grant plus a kiosk still not pairing.",
+    "evidence": "The `pre` is `overflow-x-auto` with no wrapping. The command is 158 characters; at `text-xs` mono (12px, ~7.2px advance) that is ~1138px of text in a box whose inner width measures ~1092px (x≈289 to x≈1381), so ~46px — six to eight characters — is off the end. This is not a stray edge case: the content column is capped at `max-w-7xl` and, with the 224px rail, measures 1152px at a 1440px window, so the command overflows even at the widest layout the app allows, and a 1280px laptop hides ~130px more of it. Meanwhile the page ends at y≈815 in a 900px window — vertical room is free.",
+    "direction": "Let the command wrap rather than scroll (`whitespace-pre-wrap` + `break-all`, or explicit backslash continuations) — two lines at 12px mono costs ~20px of the 85px already empty below. Separately, surface the project id and the service account email as their own labelled facts in the card, so the three moving parts are readable even if the command string is not. Keep 'Copy command' — it is the thing that currently rescues this — and consider a copied-state confirmation so a person who cannot read the whole string can still trust it went to the clipboard."
+  },
+  {
+    "scene": "kiosk-setup-denied",
+    "viewport": "desktop",
+    "severity": "major",
+    "where": "reading order of the page: 'Pair a kiosk' card at y=113–330 sits above the 'Cannot sign kiosk tokens' badge at y=440",
+    "finding": "When the deployment cannot sign kiosk tokens, the screen still leads with a fully live pairing form and puts the reason it will fail 110px below the submit button. The admin who came here because the lobby iPad is showing a code does the obvious thing — reads the code off the iPad, types six characters, presses Approve — and only then learns that no code will ever work on this deployment. That is a wasted round trip against a code with a ten-minute life, and it happens at exactly the moment the person is most hurried. The form gives no hint of the problem: the input, the hint text and the button are byte-identical to the healthy frame.",
+    "evidence": "Comparing the two DOMs, the `Pair a kiosk` section markup in `kiosk-setup-denied--desktop.html` is unchanged from `kiosk-setup--desktop.html` — same enabled input, same submit, no warning, no `aria-describedby` pointing at the failure. The failure state exists only as a `danger` badge and an amber box in the *next* section down, 110px below the Approve button, and it is introduced by a heading ('This deployment') that does not tell the reader it concerns the form above it.",
+    "direction": "Carry the deployment's verdict into the pairing card when it is bad — a single line above the code field saying pairing cannot succeed right now, with the remedy anchored below — so the failure is read before the six characters are typed rather than after. Do not remove or disable the code field for a counselor: the journey's 'any active member may pair a kiosk' rule and the 'diagnostics stay core-team' rule together mean a counselor cannot be shown this diagnostic, so whatever the counselor sees in this state has to be a plain 'this will not work, ask a leader' with no project detail — that state is not in any frame and should be."
+  },
+  {
+    "scene": "kiosk-setup",
+    "viewport": "desktop",
+    "severity": "major",
+    "where": "the 'This deployment' card, y=347–462, second of the three stacked cards",
+    "finding": "The laptop's own job on this screen is the second job in the journey — 'find out why a kiosk that has a code is not signing itself in' — and in the healthy state the card that owns that job answers with three words in a 1152px-wide band and stops. There is no project id, no service account, no time the check was made, and no way to re-run it. So an admin who has just granted the IAM role has to reload a lazily-loaded route to see whether it took (the denied copy literally instructs 'reload this page'), and an admin staring at a green 'Ready to pair' while the lobby screen still fails has no way to confirm they are even looking at the deployment the iPad is pointed at — staging and production render an identical badge. Every one of those facts exists client-side in the denied state (project `tally-76406`, the appspot service account) but only buried inside the command string, and vanishes entirely when the answer is 'yes'.",
+    "evidence": "The card is 1152×115px; its body row is 1152×43px and contains a single 96×18px badge — under 2% ink. The whole page ends at y≈660 in a 900px window, leaving ~240px of unused height with nothing below the fold, so the density cost here is not scrolling, it is a laptop-sized card carrying one boolean. The `pointer-fine` variants in the markup show the design system already has a desktop register; this card uses none of it.",
+    "direction": "Turn the body row into a short definition list beside the badge — project, service account, checked at — which the 1152px width absorbs at zero scroll cost, plus a 'Check again' control so verifying a grant does not mean reloading the route. Keep the existing framing verbatim: the header's 'It says nothing about the screen in the lobby' is what keeps this inside the 'nothing here may claim a kiosk is healthy' rule, and added facts must be about the deployment, never about the iPad."
+  },
+  {
+    "scene": "kiosk-menu",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the sidebar rail: five nav rows ending at y≈285, the account chip at y=845, the popover opening upward over y=607–820",
+    "finding": "On a pointer device, the destination this whole round exists to create is the only one not visible. The rail has roughly 560px of empty space below 'Review', and 'Kiosk' is nonetheless a click away inside an account popover — a menu whose other three items are session and admin affairs. Pairing is not a once-a-year act (the journey lists wipes, restores, campus handoffs and the second pairing an iOS home-screen install forces), so a core-team member returning to this screen pays a click plus a scan of a four-item popover every time, on the one device where a permanent row would cost 44px of otherwise blank rail.",
+    "evidence": "The five rail rows occupy y=62–285 of a 900px viewport; the popover is 200×213px with a 36px row pitch. The `nav` markup contains no `aria-current` and no active styling anywhere, so while a member is on the kiosk screen the rail shows five unselected items and no representation of where they are — the H1 is the only 'you are here'.",
+    "direction": "At `lg:` and up, promote Kiosk into the rail for anyone who can reach the route, and give the rail a current-item state; leave the account-menu entry in place for the phone, where the rail does not exist. This is a responsive difference, not a change to the phone route the journey specifies."
+  },
+  {
+    "scene": "kiosk-setup-counselor",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the whole page: header bar, one card at y=170–388, everything below y=443",
+    "finding": "With the rail suppressed, the counselor's kiosk screen on a laptop offers no visible way back into the app: the 'Tally' wordmark top-left is a `<span>`, not a link, and the only interactive element in the header is the account chip in the far top-right. Having paired the kiosk, the counselor's next move is check-in, and the page has no route to it that they can see. The consequence is small on a laptop — browser back exists — but this is the shell behaviour, and it is the same shell that will render for them on the device they actually hold.",
+    "evidence": "`kiosk-setup-counselor--desktop.html` renders the shell with no `<aside>`; the header contains exactly one `<span>` wordmark and one account button. Content occupies y=76–443 of 900px, leaving ~457px empty, with a single 1216×218px card whose only real content is one input and one button.",
+    "direction": "When the rail is suppressed, make the wordmark a link home, or give the page an explicit 'Back to check-in' affordance. The remaining emptiness is not itself a fault — this screen is a six-character form and should not be padded out — but the page should not be a dead end."
+  },
+  {
+    "scene": "kiosk-setup",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the 'Pairing code' input, x=272–1391 in the admin frame (1119px) and x=128–1312 in the counselor frame (1184px)",
+    "finding": "The single widest element on the page is a `maxlength=6` field. The laptop's width is being spent on the one control that needs the least of it, and the field's shape actively misinforms: a 1119px box with a left-aligned caret reads as free text or search, not as 'six characters, exactly'. The person is glancing back and forth at an iPad across the room; the field gives no visual count of how many characters are expected or how many have landed, which is the one piece of feedback that transcription off a distant screen actually wants.",
+    "evidence": "The input carries `w-full` inside a card that spans the full 1152px (admin) / 1216px (counselor) content column; the six-character placeholder 'ABC123' at `font-mono tracking-[0.2em]` occupies ~90px of it, about 8% of the box.",
+    "direction": "Cap the field's width at `lg:` to roughly the width of the code it holds, and let the character count be visible in the shape of the control. Leave the phone as it is — full width is right there."
+  }
+]

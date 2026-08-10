@@ -15,7 +15,7 @@ does. What is *stored*, and why each collection is shaped that way, is
 | `src/services/` | All Firestore reads and writes, plus the callable-function clients. Nothing else talks to Firebase. |
 | `src/context/` | `useAuth`, `useData`, `useToast` — the three app-wide providers. |
 | `src/hooks/` | Live-data hooks: active event, series history, attendance, RSVPs, ticking clock. |
-| `src/features/` | One folder per screen: `auth`, `checkin`, `dashboard`, `events`, `students`, `settings`, `team`, `roster`. |
+| `src/features/` | One folder per screen: `auth`, `checkin`, `dashboard`, `events`, `students`, `settings`, `team`, `kiosk`, `roster`. `features/kiosk` is the *team's* view of the lobby screen — pairing a device and the diagnostics behind it; the kiosk itself is `src/kiosk/`. |
 | `src/kiosk/` | The lobby kiosk — its own entry (`kiosk.html`), its own screens, its own tiny Firebase surface, and its own installable app (manifest, icons and service worker in `public/`). Nothing here imports the main app's providers, and `scripts/check-kiosk-budget.mjs` holds it to a byte budget. |
 | `src/kiosk/printing/` | Brother QL label printing over WebUSB: a rasteriser in a Web Worker, a transport on the main thread, and a serial queue between them. Behind a dynamic import gated on the device having a printer at all. |
 | `src/components/ui/` | The design system: buttons, fields, modals, badges, cards, empty and loading states. |

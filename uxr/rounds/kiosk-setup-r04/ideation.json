@@ -1,0 +1,99 @@
+{
+  "changes": [
+    {
+      "scene": "kiosk-setup, kiosk-setup-counselor, kiosk-setup-denied, kiosk-menu, kiosk-menu-counselor",
+      "viewport": "both",
+      "addresses": [
+        "visual-phone, minor: 'its opening item repeats, in different words, the sentence she read twenty seconds earlier under the button… a list whose first entry is something the reader has already been told is a list she stops reading — which costs her items two and three'",
+        "visual-desktop, minor: 'the two are near-verbatim and 150px apart on her page… the item that explains her most common repeat-pairing case is pushed to second position at 12px'"
+      ],
+      "change": "The first item of 'If the kiosk still waits' — 'A code expires ten minutes after the kiosk shows it. Read the one on screen now.' — is gone. The list is two items: the home-screen install that keeps its own storage, and the deactivated approver. Nothing else in the section moved.",
+      "rationale": "Both critics offered 'reorder' or 'drop'; drop is right, and for a reason stronger than the duplication they measured. This section is read by somebody whose code was *accepted* and whose iPad is still waiting. A code that had expired would have been refused at the button — the field's own hint covers that at rest, and the refusal itself covers it in flight ('That code has expired. The kiosk will already be showing a fresh one.'). So the item was not merely a restatement of the hint 150px above; it was the one entry on the list that cannot be the cause of the state the list is about. Removing it puts the home-screen case — the trigger the journey names, and the one nothing else in the app explains — at the top of the counselor's only reference block. The list loses 40px on her page, which now ends 44px inside the fold rather than scrolling by 59px.",
+      "breakpoint": "both. One list, both roles, both widths.",
+      "implementation": "KioskPage.tsx, StuckKioskCard: delete the first `<li>`. The stale-code fact now lives in exactly two places, both attached to the field — the TextField `hint` at rest and the `expired` / `not-found` lines in OUTCOME_LINES when a code is refused. Do not restore it here if the hint is ever shortened; move it, or the duplication comes back."
+    },
+    {
+      "scene": "kiosk-setup, kiosk-setup-counselor, kiosk-setup-denied, kiosk-menu, kiosk-menu-counselor",
+      "viewport": "desktop",
+      "addresses": [
+        "design-desktop, minor: 'the block that just became this role's whole reference is the only prose on the page with no measure… it runs to the column edge, setting 12px type at about a hundred characters a line and overhanging the paragraph directly beneath it by 120px'"
+      ],
+      "change": "The `ul` takes `max-w-prose`, like every sibling paragraph on the page. On the counselor's 1440px page the two items now wrap at 482px instead of 603px and the page has one right ragged edge; on the admin builds the 448px column was already narrower than the cap, so nothing moves.",
+      "rationale": "Straightforwardly right and one class. The critic's last sentence is the important half — the cap belongs on the block, not on the column, because the same markup renders in a 448px column on one build and a 672px column on the other, and only the block knows what measure 12px prose wants.",
+      "breakpoint": "both in the markup; visible only at lg, because below lg the 358px column is already narrower than 65ch.",
+      "implementation": "KioskPage.tsx, StuckKioskCard: the `ul` becomes `flex max-w-prose flex-col gap-2 text-xs leading-relaxed text-ink-400`."
+    },
+    {
+      "scene": "kiosk-setup-denied",
+      "viewport": "both",
+      "addresses": [
+        "design-desktop, minor: 'the sentence saying they are not in force is the faintest object in the column… a qualifier read after the thing it qualifies does not qualify it'",
+        "visual-desktop, minor: 'the sentence that says none of these is your problem yet is drawn at label weight and the three false errands are drawn at body weight'",
+        "design-phone, minor: 'the caveat is bound to the heading no more tightly than the items are to each other… what the reader sees is a run of paragraphs of which one happens to be a shade dimmer'"
+      ],
+      "change": "The qualifier steps up one, `text-ink-500` → `text-ink-300`, so it is now brighter than the items it demotes rather than dimmer; and the `ul` takes `mt-1`, so the interval runs heading →8px→ qualifier →12px→ list, with 8px between items. Measured at 1440: qualifier y=380.5–419.5, item one starts 431.5, item two 478.5.",
+      "rationale": "Three critics, one element, and design-phone's warning that contrast alone would make it worse was the binding constraint — raising the qualifier to ink-400 would have erased the only difference it had. ink-300 is the page's body value (the lede and the deployment explanation both use it), which is the right rank for a sentence that governs a list: above the list, below the verdict, and not a fourth register. On the composition I took the critic's second branch — give the list a form the qualifier does not share — rather than the first, binding the qualifier tighter to the heading, because a 4px heading-to-deck interval would have broken the register's single heading-to-body interval that design-desktop asks for in the same round. As it stands the two columns' first body lines both begin at y=380.5 and the list is the only block in the section set off by more than its own internal gap.",
+      "breakpoint": "both",
+      "implementation": "KioskPage.tsx, StuckKioskCard: when `ok === false` the qualifier renders as `<p className=\"max-w-prose text-xs leading-relaxed text-ink-300\">` and the `ul` gains `mt-1` in the same branch (`className={cn('flex max-w-prose flex-col gap-2 text-xs leading-relaxed text-ink-400', ok === false && 'mt-1')}`). On the healthy page and on a counselor's page, where there is no qualifier, the list keeps no top margin and sits at the section's 8px."
+    },
+    {
+      "scene": "kiosk-setup, kiosk-setup-denied, kiosk-menu",
+      "viewport": "desktop",
+      "addresses": [
+        "design-desktop, minor: 'the heading binds to its section no more tightly than the section's own parts bind to each other; it floats at the top of an evenly spaced run… the row's shared top edge survives the headings and breaks on the first body line, 5px apart across a 32px gutter'"
+      ],
+      "change": "One heading-to-body interval across the register: 8px, and it is now the tightest gap in either column. The deployment section is `flex flex-col gap-2` with its h2 and a single body wrapper as children; the wrapper holds the verdict group, the action group, the command and the identifiers at the 12px they had. Nothing changed size or order. Measured on kiosk-setup--desktop: both h2s at y=304.5–320.5, both columns' first body box at y=328.5 — the 5px break is gone.",
+      "rationale": "The alternative was to loosen the right column to 12px, which would have given every heading in the register the same weak binding the left one had. Making 8px the constant and 12px the grouping interval is the version where a heading always belongs to what follows it, and it is one wrapper rather than a re-spacing of four sections. The columns landing level is a consequence, as the critic said it would be, not a separate correction — which is why it will survive the next time the deployment block gains or loses a child.",
+      "breakpoint": "both in the markup; the alignment it produces is an lg-and-up effect, since below lg the sections stack.",
+      "implementation": "KioskPage.tsx, SigningCard: `<section className=\"flex flex-col gap-2\">` with `<h2>` then `<div className=\"flex flex-col gap-3\">` wrapping the verdict group, the actions group, the `pre` and the `dl`. The 'facts come last' order inside the wrapper is unchanged. StuckKioskCard and PhoneIndexCard already sit at `gap-2` and need no edit."
+    },
+    {
+      "scene": "kiosk-setup, kiosk-setup-counselor, kiosk-setup-denied, kiosk-menu, kiosk-menu-counselor",
+      "viewport": "both",
+      "addresses": [
+        "design-phone, minor: 'the page's only two structural dividers are drawn identically and spaced differently… the rule looks less like a considered register change than like the point where the stack ran out of room'"
+      ],
+      "change": "The footer's rule takes the same clearance as the section rule above it: `border-t border-ink-800 pt-4` → `pt-6`. Both breaks are now 24px above and 24px below on every page and both viewports.",
+      "rationale": "Of the critic's two options — hold one clearance, or make the difference big enough to read as a rank — the first is correct here, because the register change is already carried by the type: the footnote is 12px ink-500 under a section of 12px ink-400 under a page of 14px ink-300. A second, spatial statement of the same demotion was never needed, and at 24/16 it was too small to be read as one anyway. Costs 8px of page height on every build.",
+      "breakpoint": "both",
+      "implementation": "KioskPage.tsx, the closing footnote `div`: `flex flex-col gap-2 border-t border-ink-800 pt-6`."
+    },
+    {
+      "scene": "kiosk-menu, kiosk-menu-counselor",
+      "viewport": "both",
+      "addresses": [
+        "design-desktop, minor: 'the role badge is a filled, rounded box, and it now sits 8px from the sign-out control… hovering the exit produces a second identical box beside the first. This is the one place on a navigation surface where something inert dresses as pressable'",
+        "design-phone, minor: 'the shape that means press me belongs to the label and the thing that is actually pressable is loose text beside it… the reader's aim goes to the badge, which is inert, and the miss to the right of it is the one control on the screen that cannot be undone'"
+      ],
+      "change": "The role stopped being a chip and rejoined the identity. Line one of the block is now `email · ROLE` — the email `truncate` at 12px ink-400, the role beside it at 11px uppercase ink-500 with no fill, no radius, no padding. Sign out has line two to itself: same place on the left, same 44px box (32px under a fine pointer), same `text-danger-400`, plus `w-fit` so its hover surface is the width of the word rather than the panel. The block's height is unchanged — the badge was only ever borrowing the button's line — so the header still sits shorter than the destination list that r03 spent a change on.",
+      "rationale": "Both critics named the same first branch and it is the honest one: a role is an attribute of the identity, not a peer of the exit. Stripping the fill and the radius means the only object in the panel that can be pressed is the only object that ever wears a surface, at rest or on hover — the hover-collision the desktop critic found disappears rather than being spaced around. `w-fit` matters more than it looks: a bare `flex` button would have stretched the exit across the sheet, which would have handed the right-hand thumb column back the one irreversible control r03 moved out of it. Colour untouched, per the note that the exit's chroma was set deliberately two rounds ago.",
+      "breakpoint": "both — the bottom sheet below lg and the popover at lg are the same block in two containers.",
+      "implementation": "AppShell.tsx, the `accountMenu` identity block. Replace the email `<p>` and the badge row with: `<div className=\"flex items-baseline gap-2\"><p className=\"truncate text-xs text-ink-400\">{profile?.email}</p><span className=\"shrink-0 text-[11px] uppercase tracking-wide text-ink-500\">{profile?.role}</span></div>` followed by the sign-out `<button className=\"-ml-2 mt-1 flex w-fit min-h-11 items-center rounded-lg px-2 text-sm font-medium text-danger-400 hover:bg-ink-800 pointer-fine:min-h-8\">`. The `Badge` component is no longer used here. Note a real cost the frames show: in the lg popover (`w-52`, and `lg:w-full` at the rail's 224px) a long address truncates to about 14 characters to make room for the role — `dana.ruiz@exampl…`. That is the element's existing `truncate` doing its job and it is acceptable; if the implementer disagrees, widen the popover rather than reinstating the two-object line."
+    },
+    {
+      "scene": "kiosk-setup-counselor, kiosk-menu-counselor",
+      "viewport": "both",
+      "addresses": [
+        "visual-phone, minor: 'its second half names a control a counselor does not have — deactivation lives on the Team screen, which is core-gated. It is the second instruction on this page that points a counselor at something she cannot reach, and the whole point of the scene was to stop doing that.'"
+      ],
+      "change": "On a counselor's build the retirement footnote is one clause: 'To retire a kiosk, clear the browser's site data on the device.' Core keeps the full sentence with '— or deactivate and reactivate your account to cut every session loose.'",
+      "rationale": "Exactly the defect the scene exists to remove, in the last paragraph on the page, and it is prose rather than a call so no constraint is near it. r03 unified the sentence to stop the fact being stated twice; the unification carried one clause too far. Splitting on the clause, not on the paragraph, keeps the half she can act on where she can find it.",
+      "breakpoint": "both",
+      "implementation": "KioskPage.tsx, footnote: `To retire a kiosk, clear the browser's site data on the device{core ? ' — or deactivate and reactivate your account to cut every session loose' : ''}.` Third role-conditional on the page, after SigningCard and PhoneIndexCard; unlike those two it is a wording difference, not a gate."
+    }
+  ],
+  "declined": [
+    {
+      "finding": "visual-phone, minor (second half): 'on the build with no core section, let the list sit at the page's body register (14px, ink-300/ink-400) rather than the reference register it inherited; the shared-component rule is satisfied by a role difference, not a global size change'.",
+      "why": "Declining the size, having taken the rest of the finding. The redundancy half is fixed and it was doing most of the damage — the counselor's list now opens with the cause she has no other way of learning instead of the sentence she just read. On the type: 12px ink-400 is the app's reference register and it is what every footnote and every secondary column on every other scene uses; making one block 14px for one role gives a shared component two body scales that no breakpoint explains, and the next screen that ungates a reference block inherits the argument. The register is also honest about when it is read — this section sits under a rule, below the job and below the way onward, and it is read standing still after the primary path already failed, not glanced at with a queue waiting. If 12px reference prose is too small in a dim hallway, that is a finding about the type ramp and belongs to the design system, not to this one list."
+    },
+    {
+      "finding": "design-phone, minor (first branch): 'bind the caveat to the heading it qualifies — closer to it than the items are to each other, so it reads as the section's own preface'.",
+      "why": "Took the second branch instead — give the items a form the caveat does not share — and the reason is a conflict inside this round. Binding the caveat at 4px would put the denied page's first right-column body line 4px above the healthy page's, and 4px above the left column's, which is precisely the slip design-desktop asks to be removed in the same round. The demotion is now carried by a step of the ramp and a 12px interval against the list's own 8px, with the heading-to-body interval held at 8px everywhere."
+    },
+    {
+      "finding": "design-phone, minor (aside): 'the list carries no markers to separate a member from a non-member'.",
+      "why": "No bullets. The app has no list markers anywhere and no icon library by design; adding discs here to solve a spacing problem would introduce a visual language for one block on one screen. The 12px interval and the contrast step do the same work with nothing new."
+    }
+  ]
+}
