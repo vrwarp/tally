@@ -558,9 +558,20 @@ test.describe('the kiosk', () => {
       const reprintRow = await findOnKiosk(kiosk, LABELLED);
       await reprintRow.click();
 
-      // The confirm shows what will print before the tape moves.
-      await expect(kiosk.getByRole('button', { name: /Print name tag/i })).toBeVisible();
-      await kiosk.getByRole('button', { name: /Print name tag/i }).click();
+      /*
+       * The confirm shows what will print before the tape moves — and the
+       * commit is addressed by its accessible name rather than by its face,
+       * which is the stronger assertion of the two. The button reads "Print name
+       * tag" because the sticker beside it says whose; its `aria-label` carries
+       * the child, so what a screen reader and a test both get is "Print Nia
+       * Washington's name tag". Matching that proves the confirm is bound to the
+       * row that was tapped.
+       */
+      const commit = kiosk.getByRole('button', {
+        name: new RegExp(`Print ${LABELLED}'s name tag`, 'i'),
+      });
+      await expect(commit).toBeVisible();
+      await commit.click();
 
       await expectLabelCount(kiosk, 2);
 
