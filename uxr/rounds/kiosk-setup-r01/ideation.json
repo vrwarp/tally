@@ -1,0 +1,155 @@
+{
+  "changes": [
+    {
+      "scene": "kiosk-setup, kiosk-setup-counselor, kiosk-setup-denied, kiosk-menu",
+      "viewport": "both",
+      "addresses": [
+        "design-phone/desktop: the three sections are the identical object — nothing says which one is the screen; the page carries two titles for one subject ('Check-in kiosk' and 'Pair a kiosk') 100px apart",
+        "design-desktop: 'one of these is the screen and two are references… let the pairing block own the page, ideally not boxed at all but simply the page's content'",
+        "visual-phone: 38% of the counselor's screen is prose explaining what a kiosk is to somebody standing in front of one"
+      ],
+      "change": "The h1 is now 'Pair a kiosk' and the sentence under it is the instruction ('open /kiosk, it shows a six-character code'), set at ink-300 rather than the ink-500 prose floor. The pairing form lost its card entirely: it is the page's own content, sitting directly on ink-950. The two core-team blocks moved below a `border-t` rule into a subordinate register — no card chrome, `text-xs uppercase tracking-wide text-ink-500` headings — and the definitional paragraph about what /kiosk is has been shortened and moved into a small-print block at the foot, next to the retirement note, which now has an owner instead of trailing the page as a homeless paragraph.",
+      "rationale": "Both design critics asked for the same thing from opposite viewports, and the cheapest honest way to give the pairing block a weight the others cannot reach is to stop making it a peer object: one block is the page, two are references under a rule. Renaming the h1 also removes the duplicate titling in one move — the route is /pair-kiosk and the job is pairing; 'Check-in kiosk' survives as the first words of the small print. Ranking the grey layer falls out of this: instruction is ink-300 next to the control, background is text-xs ink-500 at the foot.",
+      "breakpoint": "both — the ordering and the register are the same at every width; only the subordinate region's arrangement is responsive",
+      "implementation": "src/features/kiosk/KioskPage.tsx. Change the h1 to 'Pair a kiosk' and the subtitle to the instruction (`text-sm text-ink-300 max-w-prose`, the /kiosk literal as `font-mono` one step up the ramp). Drop `<Card>/<CardHeader>` from PairCard — it becomes a bare `<section className=\"flex flex-col gap-3\">`. SigningCard and PhoneIndexCard lose Card/CardHeader too and become `<section className=\"flex flex-col gap-2\">` with an `<h2 className=\"text-xs font-semibold uppercase tracking-wide text-ink-500\">`, wrapped together in the divided region described below. The trailing paragraph and a compressed 'what /kiosk is' sentence go into a `border-t border-ink-800 pt-4` footer block at `text-xs text-ink-500 max-w-prose`. PageFrame's `gap-4` becomes `gap-6`."
+    },
+    {
+      "scene": "kiosk-setup, kiosk-setup-counselor, kiosk-setup-denied, kiosk-menu",
+      "viewport": "both",
+      "addresses": [
+        "design-phone: 'this field receives exactly six characters read off a screen across the room, and it is set as a generic full-width text input at body size'; the placeholder reads as a value already in the box",
+        "design-desktop / visual-desktop: 'the single widest element on the page is a maxlength=6 field'; 'a 1119px box with a left-aligned caret reads as free text or search'",
+        "design-desktop: the hint is wedged between the field and its button, in the path the reader's hand is moving through"
+      ],
+      "change": "The field is sized to its content — `max-w-[7em]`, `text-3xl`, centred, mono, 0.2em tracking, `py-3` — so it is the largest type in the composition and its shape says 'six characters'. The placeholder dropped from a code-shaped 'ABC123' at ink-500 to six middle dots at ink-700, so an empty field reads as empty. At `lg` the Approve button sits on the same row as the field, immediately to its right; below `lg` it is full-bleed directly under the field. The ten-minute hint moved out from between them to below the button.",
+      "rationale": "One control, two correct answers: on a phone the button is full width and directly under the field because the thumb needs the target, and it must stay above the keyboard line — which is why the form is hoisted rather than pushed to the bottom third. The moment the field is focused the keyboard owns the bottom ~340px, so 'put the primary where the hand is' would put it under the keyboard; reach is bought with width instead. At lg the pair sits on one row and the page gets 100px shorter.",
+      "breakpoint": "below lg the button is `w-full` under the field; at lg and up `lg:flex-row lg:items-end` puts them side by side and the button is `lg:w-auto`. Field sizing is the same at both widths.",
+      "implementation": "KioskPage.tsx PairCard + src/components/ui/Field.tsx. TextField needs to accept an input className (or a `size=\"code\"` preset) carrying `max-w-[7em] text-center font-mono text-3xl tracking-[0.2em] text-ink-50 placeholder:text-ink-700 px-4 py-3`. Wrap label+field and the Button in `flex flex-col gap-3 lg:flex-row lg:items-end lg:gap-4`; Button gets `w-full lg:w-auto` and size `lg`. Move the hint out of TextField's `hint` slot into a paragraph after the button."
+    },
+    {
+      "scene": "kiosk-setup, kiosk-setup-counselor, kiosk-setup-denied, kiosk-menu",
+      "viewport": "both",
+      "addresses": [
+        "design-phone: 'the most button-like thing on the screen is the one that rebuilds a search index'; the primary loses its identity the moment the field is empty",
+        "design-desktop: 'the Approve label reads ~ink-400, the Rebuild label ~ink-100, on identical ink-800 fills'"
+      ],
+      "change": "The disabled primary keeps a brand identity — `disabled:bg-brand-500/20 disabled:text-brand-200` instead of the neutral ink-800/ink-400 shell — so it reads as waiting for a code rather than as furniture. The two maintenance buttons ('Rebuild phone search index', 'Copy command') dropped from the filled `secondary` to an outline treatment: no fill, `text-ink-300 ring-1 ring-ink-700`.",
+      "rationale": "The rank inversion was caused by a fill, not by a size, so the fix is a fill: give the primary back its hue at low saturation and take the fill away from the utilities. Contrast improves rather than degrades — brand-200 on brand-500/20 over ink-950 is about 11:1, against 4:1 for the ink-400-on-ink-800 it replaces — which keeps the Button.tsx comment's promise that a disabled primary sheds presence and not legibility. Both colours are existing tokens; nothing new enters the palette.",
+      "breakpoint": "both",
+      "implementation": "src/components/ui/Button.tsx: change the `primary` variant's disabled clause to `disabled:bg-brand-500/20 disabled:text-brand-200 disabled:opacity-100`, and add an `outline` variant `text-ink-300 ring-1 ring-ink-700 hover:bg-ink-800 hover:text-ink-100`. KioskPage.tsx: the Rebuild and Copy buttons move from `variant=\"secondary\"` to `variant=\"outline\"`."
+    },
+    {
+      "scene": "kiosk-setup, kiosk-setup-counselor, kiosk-setup-denied, kiosk-menu",
+      "viewport": "both",
+      "addresses": [
+        "visual-phone: 'nothing on this screen can tell the person the pairing worked… she taps Approve, looks up at an iPad across the room, and her phone shows her exactly what it showed her before'",
+        "visual-phone: the ten-minute fact is the smallest, lowest-contrast text on the card and it is the most common way this journey fails"
+      ],
+      "change": "A persistent verdict line now has a reserved place in the layout: an `aria-live=\"polite\"` paragraph with `min-h-5 text-sm font-medium text-ink-100`, directly under the button and above the hint (empty in every frame, because no frame is post-submit). The hint under it was rewritten and promoted from `text-xs text-ink-500` to `text-sm text-ink-400`, and now carries the recovery as well as the fact: 'Codes last ten minutes. If this one is refused, read the code the kiosk is showing now and try again.'",
+      "rationale": "The live region exists in the implementation but had no reserved slot, so the result appeared by pushing the page around at the moment the reader has looked away at the iPad. Giving it a fixed height and a fixed place — under the button, at ink-100, the brightest text on the page after the h1 — makes it survivable at a glance from a metre. The wording it must carry is bounded by what is true: 'Code ABC123 approved — the kiosk signs itself in on its next poll', never 'the kiosk is signed in', because approval and token minting are separate calls. Merging the lifetime fact with the retry instruction fixes the second finding without adding a sixth grey paragraph.",
+      "breakpoint": "both",
+      "implementation": "KioskPage.tsx PairCard: render the outcome element unconditionally with `min-h-5` rather than conditionally, keep `aria-live=\"polite\"`, and place it between the button row and the hint. Success copy must name the code and stop at 'approved'."
+    },
+    {
+      "scene": "kiosk-setup, kiosk-menu",
+      "viewport": "both",
+      "addresses": [
+        "design-phone/desktop: 'the green Ready to pair chip is the only saturated colour in the frame and it is attached to the card the reader did not come for… it lends a green all-clear to a page forbidden from claiming a kiosk is healthy'",
+        "visual-desktop: 'a 1152×115px card whose body carries one boolean — no project id, no service account, no time the check was made, and no way to re-run it'"
+      ],
+      "change": "The healthy badge lost its chroma: `bg-ink-800 text-ink-300 ring-ink-700` instead of the `present` green, with the caveat sentence moved onto the same line as the badge. Under it the block now states three facts inline — Project `tally-76406`, Service account `tally-76406@appspot.gserviceaccount.com`, Checked 6:41 pm — and carries a 'Check again' button so verifying an IAM grant no longer means reloading a lazily-loaded route.",
+      "rationale": "Success here is the absence of a problem, and absence should not be the loudest thing on the screen; accent is now reserved for the denied state, which is the only state that needs to be found. The three facts are the ones that answer 'am I looking at the deployment the iPad is pointed at' — they were already client-side, buried inside the command string in the denied state and absent entirely when the answer was yes. They stay strictly about the deployment: no claim about the lobby screen, and the caveat sentence survives verbatim in meaning.",
+      "breakpoint": "both — the facts stack below lg and run as one row at lg",
+      "implementation": "KioskPage.tsx SigningCard: Badge tone goes from `present` to a neutral tone when `ok`, keeping `danger` when not. Render `project` and `serviceAccount` from the existing getKioskStatus payload as a `<dl className=\"flex flex-col gap-1 text-xs lg:flex-row lg:flex-wrap lg:gap-6\">` with `shrink-0` terms, 'Checked' from the query's `dataUpdatedAt`, and a `variant=\"outline\"` button wired to `refetch()`."
+    },
+    {
+      "scene": "kiosk-setup-denied",
+      "viewport": "both",
+      "addresses": [
+        "visual-desktop/visual-phone: 'the screen leads with a fully live pairing form and puts the reason it will fail 110px below the submit button'",
+        "design-phone/desktop: 'one condition stated twice, in two different accent colours'; 'three nested containers deep — card, amber panel, code block'",
+        "visual-desktop/design-desktop: the gcloud command is clipped mid-glyph at '…serviceAccountToke' with no ellipsis and no visible scrollbar",
+        "visual-phone: 'Copy command' is the smallest target on the page"
+      ],
+      "change": "The deployment's verdict is carried into the pairing form: a line above the field, in the same `danger` accent as the badge, saying that this deployment cannot sign a kiosk in, that approving a code still records it, and that the lobby screen keeps waiting until the role is granted. Below the rule, the amber panel is gone — the danger badge alone states the condition and the explanation is plain ink-300 body copy — so one accent and one fewer nested box. The `pre` is `whitespace-pre-wrap break-words`, so the command wraps to two lines instead of being clipped, and 'Copy command' is now `min-h-11 pointer-fine:min-h-9` like every other button on the page, beside a 'Check again'.",
+      "rationale": "The person arrives here because a kiosk will not pair; the reason has to be read before six characters are typed, not after. The field stays live and enabled — any active member may pair, and approval genuinely does succeed on this deployment — so the line describes what will and will not happen rather than refusing the control. Picking `danger` over `warn` for both elements resolves the two-severity conflict in favour of the badge, which is the element with the verdict; the remedy earns its rank from position and size instead of a second hue. Wrapping the command costs 20px of a page that ends 250px above the fold and removes the only silent truncation on the screen.",
+      "breakpoint": "both — the verdict line and the wrap are unconditional; only the two-column arrangement below the rule is responsive",
+      "implementation": "KioskPage.tsx: hoist the `getKioskStatus` result to KioskPage and pass `canSign` into PairCard so the form can render the pre-submit warning (core team only — the callable is `requireCoreTeam`). For a counselor the same slot is fed by the submit failure instead, with no project detail: 'Approved, but this kiosk cannot be signed in — ask a core team member to check kiosk setup.' In SigningCard, delete the `bg-warn-500/10 … ring-warn-500/25` wrapper and render its paragraphs as `text-sm text-ink-300`; the `<pre>` swaps `overflow-x-auto` for `whitespace-pre-wrap break-words`; the copy Button goes from `size=\"sm\"` to the default `md`."
+    },
+    {
+      "scene": "kiosk-setup, kiosk-setup-denied, kiosk-menu",
+      "viewport": "desktop",
+      "addresses": [
+        "design-desktop: 'let deployment status and the phone-search utility drop to a subordinate register… or moved to a side column so they read as margin notes rather than steps'",
+        "design-desktop: 'two paragraphs run to the full 1152px column, giving lines of roughly 160 characters'"
+      ],
+      "change": "Below the rule the two core-team blocks became a `lg:grid lg:grid-cols-3` with the deployment on two thirds and phone search on the last third; below `lg` they stack as before. Every paragraph on the page is capped with `max-w-prose`.",
+      "rationale": "Density here is not more rows, it is fewer scrolls and a shorter eye path: the healthy admin page now ends at y≈620 of 900 with the pairing job, the deployment facts and the utility all above the fold, and the denied page ends at y≈790 with the whole remedy — including the full command — visible without scrolling. Giving the deployment two thirds rather than half keeps the block a person actually came for from being priced the same as an index rebuild.",
+      "breakpoint": "lg and up for the grid; the measure cap applies at both widths but only bites at lg",
+      "implementation": "KioskPage.tsx: wrap the two core sections in `<div className=\"flex flex-col gap-6 border-t border-ink-800 pt-6 lg:grid lg:grid-cols-3 lg:items-start lg:gap-8\">` with `lg:col-span-2` on SigningCard's section. Add `max-w-prose` to the h1 subtitle, the hint, both small-print paragraphs and the denied explanation."
+    },
+    {
+      "scene": "kiosk-menu",
+      "viewport": "phone",
+      "addresses": [
+        "visual-phone: 'the whole route to the kiosk screen is executed in the corner of the phone a thumb cannot reach, with targets below the marginal floor' — 36px rows between 128 and 272 CSS on an 844px screen",
+        "visual-phone: 'a destructive item sits flush against a navigational one with no gap and no separator'",
+        "design-phone: 'the most visual mass in a navigation surface belongs to information you cannot act on'"
+      ],
+      "change": "Below `lg` the account menu is a bottom-anchored sheet: `fixed inset-x-0 bottom-0`, full width, rounded top, over a `bg-ink-950/60` scrim, with `pb-safe`. Every item is a 48px row (`min-h-12 px-4 text-base`, `pointer-fine:min-h-9 pointer-fine:px-3 pointer-fine:text-sm`), so all four destinations land between 620 and 800 CSS — thumb territory — instead of 128–272. Sign out is separated from the destinations by a `border-t` and its own padding, and the identity block receded (ink-600/ink-400) behind a rule of its own. At `lg` the rail popover is unchanged in position, size and type.",
+      "rationale": "This is the only route to the screen and the journey says it is walked again on every wipe, restore, re-install and campus handoff, so it is not a corner-of-the-screen path. The change is right for all four items on every screen the shell renders, not just this one: Team and Settings are reached the same way and Sign out is the item a mis-tap must not reach. Note what the prototype exposed: the sticky header carries `backdrop-blur`, which makes it a containing block for `position: fixed`, so the sheet cannot stay a DOM child of the header — it renders at the bottom of the header instead of the bottom of the viewport. The sheet has to be portalled.",
+      "breakpoint": "below lg the surface is a portalled bottom sheet; at lg and up it is the existing popover opening upward from the rail chip, untouched. Row sizing is a `pointer-fine` split, not a width split, so a touch laptop keeps the 48px rows.",
+      "implementation": "src/components/AppShell.tsx. The account menu already renders twice — once in the `lg:hidden` header, once in the rail — so this is two presentations of one item list, not one element with two positions. Extract the identity block and the four items into a shared component; the header instance renders it through `createPortal(..., document.body)` as `fixed inset-x-0 bottom-0 z-50 rounded-t-2xl pb-safe` with a `fixed inset-0 z-40 bg-ink-950/60` scrim, both `lg:hidden`; the rail instance keeps its current `absolute … lg:bottom-full` popover and its transparent click-catcher. Items become `flex min-h-12 items-center px-4 text-base pointer-fine:min-h-9 pointer-fine:px-3 pointer-fine:text-sm`; Sign out is wrapped in `mt-1 border-t border-ink-800 pt-1 pb-2`; the identity block gets `border-b border-ink-800` and drops to `text-ink-600` with the email at `text-ink-400`."
+    },
+    {
+      "scene": "kiosk-setup-counselor",
+      "viewport": "both",
+      "addresses": [
+        "visual-phone: 'the counselor's version of this screen contains no link to anywhere… she pairs the kiosk at 6:45 and there is no visible way to the check-in roster she has to be running at 7:00'",
+        "visual-desktop: 'the Tally wordmark is a span, not a link, and the only interactive element in the header is the account chip'",
+        "visual-phone: main still carries pb-24 — 96px reserved for a bar this role never gets"
+      ],
+      "change": "Three things. The wordmark is an `<a href=\"/\">` in both shell slots, on every screen. `<main>` drops `pb-24` when no tab bar is rendered, which returns 96px to the counselor's page. And when the shell renders neither a rail nor a tab bar, the page carries its own way out: a full-width 'Check in' control with the rail's own ✓ glyph, under the same rule that separates the core-team region on the admin build.",
+      "rationale": "When the shell has one destination and you are not on it, that destination is what needs to be on screen. It goes in the slot the admin's core-team blocks occupy, so both roles are the same composition — a job, a rule, then whatever else this role has — rather than the admin page with holes in it. It is placed after the form and not floated to the bottom because it is tapped once, when the keyboard is gone. No new glyphs: ✓ is the same character the rail and tab bar already use for check-in.",
+      "breakpoint": "both. The wordmark link and the `pb-24` fix are shell-wide and role-independent; the on-page exit is scoped to the rail-less shell, which today means counselors on any screen that is not check-in.",
+      "implementation": "AppShell.tsx: wordmark becomes a `<Link to=\"/\">` in both the header and the rail; `<main>` gets `pb-24` only when the tab bar renders (`showTabs ? 'pb-24 lg:pb-8' : 'pb-8'`). KioskPage.tsx: when `!core`, render a `border-t border-ink-800 pt-6` block containing a Link styled as an `outline` size-`lg` button, `w-full lg:w-auto`, in the slot SigningCard/PhoneIndexCard occupy for core."
+    },
+    {
+      "scene": "kiosk-setup-counselor",
+      "viewport": "desktop",
+      "addresses": [
+        "design-desktop: 'the wordmark sits at x=16 in an edge-to-edge bar; the content column is centred and starts at x=112, so the only two structural elements on screen disagree about where left is… a single card floats in a 1440×900 field that is 53% empty'"
+      ],
+      "change": "With no rail, the column comes in to `lg:max-w-2xl` instead of `lg:max-w-7xl`, and the header's contents are constrained to the same measure, so the wordmark, the chip and the page share one left and one right edge. The bar itself stays full-bleed, as chrome.",
+      "rationale": "A screen whose entire job is one field should not pretend to be a wide app shell; capping the measure turns the emptiness from unfinished layout into margin, and aligning the bar's contents with the column resolves the disagreement about where left is without moving the shell's furniture. The admin build is untouched — with the rail present the column is still left-aligned at `max-w-7xl`, because there the width is carrying two more blocks.",
+      "breakpoint": "lg and up; below lg both measures already exceed the viewport, so nothing changes on a phone",
+      "implementation": "src/components/PageFrame.tsx / pageFrameWidth.ts: when the shell has no rail (`data-rail` absent), cap at `lg:max-w-2xl` rather than `lg:max-w-7xl`. AppShell.tsx: in the rail-less header, wrap the wordmark and chip in `mx-auto flex w-full max-w-lg items-center justify-between gap-3 lg:max-w-2xl`."
+    }
+  ],
+  "declined": [
+    {
+      "finding": "visual-desktop, minor: 'At lg and up, promote Kiosk into the rail for anyone who can reach the route… a permanent row would cost 44px of otherwise blank rail.'",
+      "why": "Out of scope by decision: where this destination lives is already settled. Kiosk sits in the account menu beside Team for the same reason Team does, and splitting them across two navigations at lg would make the menu inconsistent with itself on the one device where both are visible at once. The reachability half of the complaint is answered on the phone, where it actually costs something, by the bottom sheet."
+    },
+    {
+      "finding": "visual-desktop, minor: 'the nav markup contains no aria-current and no active styling anywhere, so the rail shows five unselected items and no representation of where they are.'",
+      "why": "Real, and a shell bug worth fixing — but it is a change to every screen's rail with no bearing on this scene (the kiosk route has no rail row to mark, by the decision above). It belongs to a shell round, not to a kiosk round; landing it here would put a fourth new thing in front of the next critic for no gain on this journey."
+    },
+    {
+      "finding": "design-desktop, minor: 'either the menu's destinations adopt the rail's alphabet — same glyph column, same rhythm — or the menu stops pretending to be nav.'",
+      "why": "Taking the second option rather than the first. The app has no icon library and its glyphs are chosen one at a time; inventing three characters for Kiosk, Team and Settings to make a four-item menu look like the rail is exactly the new visual language this round should not introduce. The grouping the finding also asks for — identity separated, destructive item separated — is done, and it is what stops the red being the loudest thing in the panel."
+    },
+    {
+      "finding": "visual-phone, major (partial): 'there is no live region, no status slot, no success affordance in the markup at all.'",
+      "why": "Reframed rather than declined: the live region exists and renders only after a submit, so no frame in this round can contain one. What was actually missing — a reserved, legible place for it to appear, and wording bounded by what the server actually confirms — is changed above. No frame will show it populated until a round captures a post-submit state."
+    },
+    {
+      "finding": "visual-desktop, major (residue): 'whatever the counselor sees in the denied state has to be a plain \"this will not work, ask a leader\" with no project detail — that state is not in any frame and should be.'",
+      "why": "Agreed, and specified in the implementation note for the denied change, but not built as a frame: there is no kiosk-setup-counselor-denied prototype and adding a ninth file would put a scene in front of the critics that no round has been briefed on. The counselor's denied state is a submit failure, not a diagnostic, so it belongs to the round that captures a post-submit frame."
+    },
+    {
+      "finding": "design-desktop, major (residue): 'centre it optically in the frame — a screen whose entire job is one field can be a centred, generously-scaled focal composition.'",
+      "why": "Took the narrow measure and the shared left edge, not the vertical centring. Centring the block in 900px would put the field somewhere different from where it sits on every other screen in the app and somewhere different again on a 1080px window; the page is short because the job is short, and that is honest."
+    }
+  ]
+}

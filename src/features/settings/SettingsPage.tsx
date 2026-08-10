@@ -1,10 +1,11 @@
 /**
- * The core team's control panel: prediction thresholds, appearance, the kiosk,
- * and the people-backend connections.
+ * The core team's control panel: prediction thresholds, appearance and the
+ * people-backend connections.
  *
- * Who is on the team used to be the last card here and is now its own screen —
- * see `TeamPage`. It is the one thing on this page somebody comes back to every
- * season, and it was the one thing below every card they do not.
+ * Two things have left this page for screens of their own, for the same reason
+ * both times — a card here is read after every card above it. Who is on the
+ * team is `TeamPage`; the lobby kiosk is `KioskPage`, and that one was worse
+ * than buried, because this page is core-team only and pairing a kiosk is not.
  *
  * The thresholds are the only genuinely dangerous controls here — they silently
  * reshape what every counselor sees at the door — so each one is followed by a
@@ -26,7 +27,6 @@ import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { BackendsSection } from '@/features/settings/BackendsSection';
-import { KioskCard } from '@/features/settings/KioskCard';
 import { PlanningCenterCard } from '@/features/settings/PlanningCenterCard';
 import { ThemeCard } from '@/features/settings/ThemeCard';
 import { ThresholdPreview } from '@/features/settings/ThresholdPreview';
@@ -131,6 +131,13 @@ export function SettingsPage() {
           >
             Team
           </Link>
+          , and the lobby screen on{' '}
+          <Link
+            to="/pair-kiosk"
+            className="font-semibold text-brand-300 underline-offset-2 hover:underline"
+          >
+            Kiosk
+          </Link>
           .
         </p>
       </header>
@@ -231,8 +238,6 @@ export function SettingsPage() {
       </Card>
 
       <ThemeCard />
-
-      <KioskCard />
 
       <PlanningCenterCard />
 

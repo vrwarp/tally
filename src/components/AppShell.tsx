@@ -6,6 +6,16 @@ import { useHeightVar } from '@/hooks/useHeightVar';
 import { cn } from '@/lib/utils';
 import { ErrorBanner } from '@/components/ui';
 
+/**
+ * One destination in the account surface.
+ *
+ * 48px on touch, because the surface it sits in is a sheet in the thumb's band
+ * and these are the only rows in the app a person navigates by from a standing
+ * start; back to the popover's own 36px wherever there is a pointer.
+ */
+const MENU_ITEM =
+  'flex min-h-12 items-center px-4 text-base text-ink-100 hover:bg-ink-800 pointer-fine:min-h-9 pointer-fine:px-3 pointer-fine:text-sm';
+
 interface NavItem {
   to: string;
   label: string;
@@ -72,18 +82,53 @@ export function AppShell({ children }: { children: ReactNode }) {
   const displayName = profile?.displayName || profile?.email || 'Signed in';
   const initial = displayName.charAt(0).toUpperCase();
 
-  const accountMenu = (
-    <div
-      role="menu"
-      className="absolute right-0 z-20 mt-2 w-52 overflow-hidden rounded-xl bg-ink-900 py-1 text-sm shadow-xl ring-1 ring-ink-700 lg:bottom-full lg:right-auto lg:left-0 lg:mb-2 lg:mt-0 lg:w-full"
-    >
-      <div className="px-3 py-2 text-xs text-ink-500">
-        Signed in as
-        <span className="block truncate text-ink-300">{profile?.email}</span>
-        <span className="mt-1 inline-block rounded bg-ink-800 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-ink-400">
-          {profile?.role}
-        </span>
+  /*
+   * What the account surface holds, in one place, because it is drawn twice:
+   * as a popover beside the control that opens it on a pointer, and as a sheet
+   * at the bottom of the phone.
+   *
+   * The identity block is a caption, not a destination: it lost "Signed in as"
+   * and its role chip so that it stops outweighing the list it introduces, and
+   * the role now sits beside the email as a label rather than as a filled box
+   * that reads as pressable.
+   *
+   * Sign out belongs to the identity rather than to the list. On a phone the
+   * items sit in the thumb's band, and the counselor's menu holds exactly one
+   * destination — so as the last row of a bottom sheet, the irreversible act
+   * would be nearer the thumb than the wanted one, with a mis-tap costing an
+   * email sign-in while a pairing code expires. `w-fit` is what keeps it from
+   * stretching back into the thumb's column.
+   */
+  const accountItems = (
+    <>
+      <div className="border-b border-ink-800 px-4 pb-2 pt-1 pointer-fine:px-3">
+        <div className="flex items-baseline gap-2">
+          <p className="truncate text-xs text-ink-400">{profile?.email}</p>
+          <span className="shrink-0 text-[11px] uppercase tracking-wide text-ink-500">
+            {profile?.role}
+          </span>
+        </div>
+        <button
+          type="button"
+          role="menuitem"
+          onClick={() => {
+            setMenuOpen(false);
+            void signOut();
+          }}
+          className="-ml-2 mt-1 flex min-h-11 w-fit items-center rounded-lg px-2 text-sm font-medium text-danger-400 hover:bg-ink-800 pointer-fine:min-h-8"
+        >
+          Sign out
+        </button>
       </div>
+      {/* Every active member, unlike the two below it.
+          Pairing a kiosk is open to anybody the attendance rules already trust
+          — the person who arrives first on a Friday and finds the lobby iPad
+          asking to be claimed is usually a counselor — and until this item
+          existed there was no link to that screen for one. The kiosk's own
+          screen sent them to Settings, which a counselor cannot open. */}
+      <NavLink to="/pair-kiosk" role="menuitem" onClick={() => setMenuOpen(false)} className={MENU_ITEM}>
+        Kiosk
+      </NavLink>
       {can('core') ? (
         <>
           {/* Review moved into the nav itself; these two stay here, because
@@ -91,50 +136,41 @@ export function AppShell({ children }: { children: ReactNode }) {
               week. Team is listed first and separately from Settings: it used
               to be the last card on that page, which put "who can see a roster
               of minors" below a colour picker and an API connection. */}
-          <NavLink
-            to="/team"
-            role="menuitem"
-            onClick={() => setMenuOpen(false)}
-            className="block px-3 py-2 text-ink-200 hover:bg-ink-800"
-          >
+          <NavLink to="/team" role="menuitem" onClick={() => setMenuOpen(false)} className={MENU_ITEM}>
             Team
           </NavLink>
           <NavLink
             to="/settings"
             role="menuitem"
             onClick={() => setMenuOpen(false)}
-            className="block px-3 py-2 text-ink-200 hover:bg-ink-800"
+            className={MENU_ITEM}
           >
             Settings
           </NavLink>
         </>
       ) : null}
-      <button
-        type="button"
-        role="menuitem"
-        onClick={() => {
-          setMenuOpen(false);
-          void signOut();
-        }}
-        // Last item in a `rounded-xl overflow-hidden` panel, so its focus ring
-        // has to follow the panel's curve or the menu clips the two bottom
-        // corners off it. `lg` is the same shape the other way up, and the
-        // panel's own `py-1` is why 8px rather than the panel's 12px.
-        className="block w-full rounded-b-lg px-3 py-2 text-left text-danger-400 hover:bg-ink-800"
-      >
-        Sign out
-      </button>
-    </div>
+    </>
   );
 
-  const accountButton = (
+  /**
+   * The chip, and the popover it opens on a pointer.
+   *
+   * `anchored` is the rail's copy, which opens upward and takes the rail's
+   * width; the bar's copy opens downward at its own. Only one of the two is on
+   * screen above `lg` — the rail when there is one, the bar when there is not —
+   * so only that one draws a popover, and below `lg` neither does: the sheet
+   * at the foot of the shell is the phone's surface.
+   */
+  const accountButton = (anchored: boolean) => (
     <div className="relative">
       <button
         type="button"
         onClick={() => setMenuOpen((open) => !open)}
         aria-expanded={menuOpen}
         aria-haspopup="menu"
-        className="flex items-center gap-2 rounded-full bg-ink-900 py-1 pl-3 pr-1 text-xs text-ink-300 ring-1 ring-ink-800 lg:w-full lg:justify-start lg:rounded-xl lg:py-2"
+        // 44px on touch. It is the first of the two taps on the only route to
+        // the kiosk screen, and it is in the corner a thumb reaches worst.
+        className="flex min-h-11 items-center gap-2 rounded-full bg-ink-900 py-1 pl-3 pr-1 text-xs text-ink-300 ring-1 ring-ink-800 pointer-fine:min-h-8 lg:w-full lg:justify-start lg:rounded-xl lg:py-2"
       >
         <span className="max-w-32 truncate lg:order-2 lg:max-w-none lg:flex-1 lg:text-left">
           {displayName}
@@ -143,11 +179,19 @@ export function AppShell({ children }: { children: ReactNode }) {
           {initial}
         </span>
       </button>
-      {menuOpen ? (
-        <>
+      {menuOpen && (anchored || !showNav) ? (
+        <div className="hidden lg:block">
           <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} aria-hidden="true" />
-          {accountMenu}
-        </>
+          <div
+            role="menu"
+            className={cn(
+              'absolute right-0 z-20 mt-2 w-52 overflow-hidden rounded-xl bg-ink-900 py-1 text-sm shadow-xl ring-1 ring-ink-700',
+              anchored && 'lg:bottom-full lg:right-auto lg:left-0 lg:mb-2 lg:mt-0 lg:w-full',
+            )}
+          >
+            {accountItems}
+          </div>
+        </div>
       ) : null}
     </div>
   );
@@ -212,22 +256,34 @@ export function AppShell({ children }: { children: ReactNode }) {
               </NavLink>
             ))}
           </nav>
-          <div className="mt-auto pt-4">{accountButton}</div>
+          <div className="mt-auto pt-4">{accountButton(true)}</div>
         </aside>
       ) : null}
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Phone: a top bar for identity, since navigation lives at the bottom.
-            Also the only chrome a counselor with one tab ever sees. */}
+            Also the only chrome a counselor with one tab ever sees — and at that
+            width, with no rail to anchor to, its contents take the page's own
+            measure rather than the window's, so the wordmark and the heading
+            below it start on the same edge instead of 32px apart. */}
         <header
           ref={header}
           className={cn(
-            'sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-ink-800 bg-ink-950/95 px-4 py-2 pt-safe backdrop-blur',
-            showNav && 'lg:hidden',
+            'sticky top-0 z-30 border-b border-ink-800 bg-ink-950/95 px-4 py-2 pt-safe backdrop-blur',
+            showNav ? 'flex items-center justify-between gap-3 lg:hidden' : 'lg:px-0',
           )}
         >
-          <span className="text-sm font-bold uppercase tracking-widest text-brand-400">Tally</span>
-          {accountButton}
+          {showNav ? (
+            <>
+              <Wordmark />
+              {accountButton(false)}
+            </>
+          ) : (
+            <div className="mx-auto flex w-full max-w-lg items-center justify-between gap-3 lg:max-w-2xl lg:px-8">
+              <Wordmark />
+              {accountButton(false)}
+            </div>
+          )}
         </header>
 
         {error ? (
@@ -236,7 +292,10 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         ) : null}
 
-        <main className="flex-1 pb-24 lg:pb-8">{children}</main>
+        {/* The 96px is the tab bar's, and only the tab bar's. A role with one
+            destination gets no bar and was still paying for it — a fifth of a
+            phone screen of nothing, on the shortest screens in the app. */}
+        <main className={cn('flex-1', showNav ? 'pb-24 lg:pb-8' : 'pb-8')}>{children}</main>
 
         {/* Phone: bottom tabs, within thumb reach. */}
         {showNav ? (
@@ -264,7 +323,43 @@ export function AppShell({ children }: { children: ReactNode }) {
             </ul>
           </nav>
         ) : null}
+
+        {/*
+         * Phone: the account surface as a sheet at the foot of the screen.
+         *
+         * A panel hanging off a chip in the top-right corner put the only route
+         * to this app's non-tab destinations in the one place a thumb does not
+         * reach, at 36px a row. It is a sheet below `lg` and the popover it
+         * always was above it, and it sits here — outside the header — because
+         * the header carries `backdrop-blur`, which makes it a containing block
+         * for `position: fixed` and would trap the sheet inside a 44px bar.
+         */}
+        {menuOpen ? (
+          <>
+            <div
+              className="fixed inset-0 z-40 bg-ink-950/60 lg:hidden"
+              onClick={() => setMenuOpen(false)}
+              aria-hidden="true"
+            />
+            <div
+              role="menu"
+              className="fixed inset-x-0 bottom-0 z-50 overflow-hidden rounded-t-2xl bg-ink-900 pb-safe pt-2 text-sm shadow-xl ring-1 ring-ink-700 lg:hidden"
+            >
+              {accountItems}
+            </div>
+          </>
+        ) : null}
       </div>
     </div>
+  );
+}
+
+/** The app's name, and — since it is the only thing in the bar that is not the
+ *  account chip — the way back to check-in when the shell draws no navigation. */
+function Wordmark() {
+  return (
+    <NavLink to="/" className="text-sm font-bold uppercase tracking-widest text-brand-400">
+      Tally
+    </NavLink>
   );
 }

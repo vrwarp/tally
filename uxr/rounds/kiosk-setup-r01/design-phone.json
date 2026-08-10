@@ -1,0 +1,92 @@
+[
+  {
+    "scene": "kiosk-setup",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "the three sibling cards — \"Pair a kiosk\", \"This deployment\", \"Phone search\"",
+    "finding": "All three are the identical object: same rounded-2xl ink-900 body, same ring, same header with a border-b, same text-base semibold ink-100 heading, same ink-500 sub-paragraph, and the same 16px gap between them as between everything else on the page. Nothing in the composition says one of them is the reason a person opened this screen at 6:40pm and the other two are chores. The page reads as a list of three equal topics, so the eye has to read all three headings to find the one it came for — and it has to do that while the page also carries two titles for one subject, \"Check-in kiosk\" and \"Pair a kiosk\", 100px apart at two sizes.",
+    "evidence": "In the full-page frame the three cards are visually interchangeable blocks stacked at even 16px intervals; squinting, the only differentiator is height. The first card is 47% of the page's content height but is given no more prominence than the card whose entire body is one 130px chip.",
+    "direction": "Make the pairing block the subject of the page rather than one of three peers: it should own the top of the screen at a weight the other two cannot reach — and the two maintenance blocks should drop a tier together, below a real break, as quieter, lower-contrast objects (or one grouped region) rather than as full-dress cards. Collapse the duplicate titling so the page names its subject once. Let the vertical gaps do grouping work instead of running a single 16px note from header to footnote."
+  },
+  {
+    "scene": "kiosk-setup",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "the \"Pairing code\" input",
+    "finding": "This field receives exactly six characters read off a screen across the room, and it is set as a generic full-width text input at body size — 326px wide to hold about 70px of content, with a mono placeholder in ink-500, the same grey as every paragraph on the page. The shape of the field tells the reader nothing about what it wants, and because the placeholder is set in the body-prose grey with letter-spacing applied, \"A B C 1 2 3\" reads as a value already in the box rather than as a hint. On a screen whose one job is this field, it is the least considered element in the frame.",
+    "evidence": "In the fold frame the input is the widest empty object on the page and its placeholder sits at the same lightness as the hint sentence directly beneath it and the card's description directly above it; the disabled button below is the only thing that betrays the field is empty.",
+    "direction": "Type the field like the six characters it takes: step the character size up well above body text, set it to a width its content can fill (centred, six-slot-legible) rather than to the column, and push the placeholder down the ink ramp so it can never be mistaken for an entered code. This is the one thing on the page being transcribed from a distance — it should be the largest type in the composition, not the same size as the disclaimer."
+  },
+  {
+    "scene": "kiosk-setup",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "\"Approve this kiosk\" against \"Rebuild phone search index\"",
+    "finding": "The page's primary action and a maintenance action resolve to the same object — same pill radius, same ink-800 fill, same size — and the maintenance button is the brighter of the two, because it is enabled at ink-100 while the primary's disabled state is a flat ink-800/ink-400 with opacity forced to 100. Scanning the frame, the most button-like thing on the screen is the one that rebuilds a search index. The primary loses its identity the moment the field is empty, which is exactly the moment the reader arrives.",
+    "evidence": "In the full-page frame the two grey pills are near-identical rectangles; the only difference is that the lower one's label is white and the upper one's is grey — the opposite of the intended rank.",
+    "direction": "Keep the primary recognisably the primary in its resting state — a dimmed brand identity rather than a neutral grey shell — so it reads as \"waiting for a code\", not as furniture; and drop the maintenance action to a genuinely low-emphasis treatment so nothing on the page can outrank the button that finishes the job. Both are expressible on the existing brand/ink ramp."
+  },
+  {
+    "scene": "kiosk-setup",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "the green \"Ready to pair\" chip in \"This deployment\"",
+    "finding": "It is the only saturated colour anywhere in the frame, so it arrives first — and it is attached to the card the reader did not come for, describing a fact the card's own subtitle says means nothing about the lobby screen. Colour here is doing hierarchy work in the wrong direction: the accent is on the diagnostic, while the field and button that are the actual job are entirely monochrome. It also lends a green all-clear to a page that is forbidden from claiming a kiosk is healthy.",
+    "evidence": "In the full-page frame the eye lands on the green pill before it lands on the code field, despite the pill being 11px type in the second card; nothing above it carries any chroma at all.",
+    "direction": "Reserve the frame's chroma for the path through the job — the field and its action — and let the deployment fact state itself in the neutral ramp when it is fine, saving accent colour for when it is not (as the denied frame already does). Success here is the absence of a problem, and absence should not be the loudest thing on the screen."
+  },
+  {
+    "scene": "kiosk-setup",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the ink-500 prose layer — page description, three card subtitles, the field hint, and the trailing paragraph",
+    "finding": "Six separate blocks of text at the same size and the same grey are doing six different jobs, so the grey layer has no internal rank and the reader cannot tell at a glance which sentences are instructions and which are background. The trailing four-line paragraph belongs to no container at all — it sits outside every card at the page's left edge and simply ends the page on a footnote. The definitional opening paragraph, which explains what a kiosk is to somebody already holding one, is the single largest block of text above the fold. Within the same layer, the literal `/kiosk` is set as mono ink-300 in the page description and then as plain ink-500 prose in the card 60px below it.",
+    "evidence": "Fold frame: from the top of the h1 to the top of the input, roughly 40% of the visible screen is grey explanatory text at one size. The two `/kiosk` mentions render as visibly different objects in the same column.",
+    "direction": "Rank the grey layer: instructions that sit next to a control should read closer to the reader than background that could be read once and forgotten, and the definitional opening should shrink or move below the work rather than preceding it. Give the trailing disclaimer an owner — it is currently a paragraph with no home. Set repeated literals like `/kiosk` one way."
+  },
+  {
+    "scene": "kiosk-setup",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the divider inside the \"Pair a kiosk\" card",
+    "finding": "The sentence that tells you what to do (\"open /kiosk … enter it here\") sits above a full-width rule, and the field it instructs sits below it. The one hard horizontal line inside the card is drawn precisely between the instruction and the thing being instructed, so the divider groups against the meaning. The heading is also only 2px from its subtitle while every other gap in the card is 12–16px, which compresses title and description into a single lump rather than a pair.",
+    "evidence": "Fold frame: the rule at the card's midpoint reads as a section break between two unrelated halves; the field looks like the start of a new block rather than the answer to the sentence above it.",
+    "direction": "Either lose the rule in this card so instruction and field read as one movement, or move the split so what is separated is genuinely separable. And bring the heading/subtitle spacing onto the same scale as the rest of the card."
+  },
+  {
+    "scene": "kiosk-setup-counselor",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the whole composition below the single card",
+    "finding": "With two cards removed, what is left is not a screen — it is the admin page with holes in it. The one card stops just past the middle of the viewport, a homeless four-line disclaimer trails after it, and then roughly the bottom third — the part of the screen a thumb actually occupies — is empty ink-950. Meanwhile the top third is still the definitional paragraph written for somebody browsing. The page's mass is in the wrong half, and the void beneath it reads as unfinished layout rather than as breathing room.",
+    "evidence": "Counselor fold frame: content ends around 590px of an 845px viewport, with nothing below it and no bottom nav; the card occupies barely a quarter of the frame's height while the emptiest region is the most reachable one.",
+    "direction": "Compose this as a single-purpose screen rather than a filtered one. With only one block on the page, that block should not need a card around it — let the pairing task own the full column, put the field and its action where the hand is, and let the explanatory prose and the disclaimer sit at the top or bottom as small print, not as half the screen's ink."
+  },
+  {
+    "scene": "kiosk-setup-denied",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the red \"Cannot sign kiosk tokens\" chip above the amber diagnostic panel",
+    "finding": "One condition is stated twice, in two different accent colours, 20px apart: a danger-red chip, then an amber panel whose first sentence repeats the chip almost word for word. Two accents fighting in one view, and the more alarming of the two is on the smaller, less useful element, so severity and information point in opposite directions. Inside the panel a second amber value at reduced opacity is used to rank two paragraphs, adding a third chromatic step to a block that is already the loudest object on the page.",
+    "evidence": "Full-page frame: red chip immediately above an amber box, the chip's text and the panel's opening clause reading as the same sentence in two colours; the panel's two paragraphs sit at visibly different amber lightnesses.",
+    "direction": "Let one element carry the condition and one carry the remedy — either the chip states it and the panel is neutral instruction, or the panel states it and the chip goes. Pick a single accent for this state rather than handing the label one colour and the fix another, and rank the panel's paragraphs by size or position rather than by a second shade of the same accent."
+  },
+  {
+    "scene": "kiosk-setup-denied",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the `gcloud` command block inside the amber panel",
+    "finding": "The command is clipped hard at the container's right edge mid-token, with no fade, no wrap and no visible indication that anything continues. It reads as a truncated string rather than as a scrollable one, and it sits at the third level of nested rounded container on the page (page column → card → amber panel → code box), which makes an already busy region feel boxed-in-boxes.",
+    "evidence": "Full-page frame: the line ends at \"…add-iam-policy-binding ta\" flush against the box edge with a clean vertical cut.",
+    "direction": "Make the overflow legible as overflow — a soft edge or a wrapped line — so the reader knows the command is whole, and flatten one level of container so the code sits inside the message rather than inside a box inside a panel inside a card."
+  },
+  {
+    "scene": "kiosk-menu",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the identity block at the top of the account menu, against the four items below it",
+    "finding": "\"Signed in as / dana.ruiz@example.org / ADMIN\" uses the same horizontal padding and the same vertical pitch as the menu items and carries no separator, so the panel reads as one five-line list of which the first three lines happen to be untappable. The identity block is also the tallest, most detailed thing in the panel — three stacked elements including a badge — while the destinations, which are the reason the menu is open, are four bare words at 14px. The most visual mass in a navigation surface belongs to information you cannot act on.",
+    "evidence": "Menu frame: the gap from the ADMIN badge to \"Kiosk\" is essentially the same as the gap between \"Kiosk\" and \"Team\"; the email is set at nearly the same lightness as the item labels.",
+    "direction": "Separate the who from the where — a real break in rhythm or a rule between the identity block and the first destination — and let the identity block recede in mass and contrast so the four destinations are what the panel presents. The newly added \"Kiosk\" item currently has to be found by reading; it should be arrived at by looking."
+  }
+]

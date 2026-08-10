@@ -715,6 +715,12 @@ export const refreshKioskPhoneIndex = httpsCallable<
 /** Mirrors `SigningStatus` in functions/src/kiosk/signing.ts. */
 export interface KioskStatus {
   state: 'ok' | 'denied' | 'unknown';
+  /**
+   * Which deployment answered, and as whom. Either may be null — there is no
+   * metadata server on a laptop or in the emulator.
+   */
+  project: string | null;
+  serviceAccount: string | null;
   problem: string | null;
   remedy: string | null;
   /** The remedy as a command to paste into a terminal, when it can be written. */
