@@ -197,7 +197,7 @@ describe('a name that already exists', () => {
     // — the church's database gets a second heading in the same block when it
     // has anybody to offer.
     expect(screen.getByText(/Who is Robin\?/i)).toBeInTheDocument();
-    expect(screen.getByText(/On Tally’s roster/i)).toBeInTheDocument();
+    expect(screen.getByText(/One student on the roster shares this name/i)).toBeInTheDocument();
     expect(screen.getByText(/Merging can be undone/i)).toBeInTheDocument();
   });
 

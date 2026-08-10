@@ -2043,8 +2043,10 @@ function ChildRow({
             them at the press.
           */}
           {candidates.length > 0 ? (
-            <p className="mt-3 text-xs font-semibold tracking-wide text-ink-500 uppercase">
-              On Tally&rsquo;s roster
+            <p className={cn('mt-3', CAPTION)}>
+              {candidates.length === 1
+                ? 'One student on the roster shares this name.'
+                : `${candidates.length} students on the roster share this name.`}
             </p>
           ) : null}
           <ul
@@ -2077,8 +2079,19 @@ function ChildRow({
 
           {upstream.length > 0 ? (
             <>
-              <p className="mt-3 text-xs font-semibold tracking-wide text-ink-500 uppercase">
-                In the church&rsquo;s database
+              {/*
+                The count and the reason, in the group's own words.
+
+                Both halves of this block name how many and on what evidence,
+                because "who is this child" is answered by comparing — and a
+                reviewer scanning a queue needs to know there are two before
+                they have read either. The grade is named here and not above:
+                it is what this search matched on and the roster's did not.
+              */}
+              <p className={cn('mt-3', CAPTION)}>
+                {upstream.length === 1
+                  ? 'One person in the church’s database has this name and grade.'
+                  : `${upstream.length} people in the church’s database have this name and grade.`}
               </p>
               <ul
                 className={cn(
@@ -2121,11 +2134,17 @@ function ChildRow({
                             {gradeSentence(candidate) ?? 'no grade on file'}
                           </span>
                         </span>
-                        <span className="mt-0.5 text-sm text-ink-500 lg:text-xs">
-                          {isDefault
-                            ? 'The one we would link by default.'
-                            : 'Not on Tally’s roster.'}
-                        </span>
+                        {/*
+                          Only the default says anything. "Not on Tally's
+                          roster" under every one of them repeated the heading
+                          directly above in a quieter voice, which is noise in a
+                          set the reader is meant to compare.
+                        */}
+                        {isDefault ? (
+                          <span className="mt-0.5 text-sm text-ink-500 lg:text-xs">
+                            The one we would link by default.
+                          </span>
+                        ) : null}
                       </button>
                     </li>
                   );
