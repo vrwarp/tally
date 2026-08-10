@@ -103,9 +103,12 @@ export function ReprintConfirmScreen({
           height of its contents on a phone, and it pushed the heading up over
           the staff marker. */}
       <div className="w-full shrink-0">
+        {/* The dash is bound to the word before it. Balanced across two lines on
+            the phone it opened line two, so the one warning attached to the
+            control that spends a label read for a beat as a bullet. */}
         {printerNeedsAttention && (
           <div className="pb-3 text-base font-semibold text-balance text-warn-400 kiosk:text-lg">
-            Printer needs attention — this may not print.
+            Printer needs attention&nbsp;— this may not print.
           </div>
         )}
         <button

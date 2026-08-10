@@ -20,6 +20,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { KioskApp, type KioskPrinting, type KioskServices } from '@/kiosk/KioskApp';
 import { HOLD_MS } from '@/kiosk/components/HoldButton';
+import { OFFER_WINDOW_MS } from '@/kiosk/reprintOffer';
 import { DEFAULT_LABEL_TEMPLATE } from '@/lib/labelTemplate';
 import { KIOSK_KEYS, KIOSK_ROSTER_VERSION } from '@/kiosk/storage';
 import type { KioskBinding } from '@/kiosk/binding';
@@ -60,6 +61,16 @@ function binding(overrides: Partial<KioskBinding> = {}): KioskBinding {
   };
 }
 
+/**
+ * Kept rather than dropped, so a test can push a state the way the real module
+ * does. The kiosk re-renders on one of these, which is the cheapest honest way
+ * to land a re-render in the middle of a two-second hold — the register poll
+ * that does it in the lobby runs every five minutes, and reproducing *that*
+ * inside two seconds means driving a clock past a boundary the hold itself is
+ * racing.
+ */
+const printerListeners: ((state: unknown) => void)[] = [];
+
 const printing = {
   warmLabel: vi.fn(),
   printLabel: vi.fn(),
@@ -78,7 +89,10 @@ const printing = {
    */
   subscribe: vi.fn((listener: (state: unknown) => void) => {
     listener(printing.currentState());
-    return () => {};
+    printerListeners.push(listener);
+    return () => {
+      printerListeners.splice(printerListeners.indexOf(listener), 1);
+    };
   }),
   ready: vi.fn(async () => ({ kind: 'ready' as const, config: { model: 'QL-810W', label: '62x29' } })),
   reprintLabel: vi.fn(),
@@ -210,6 +224,7 @@ async function checkInAda(): Promise<void> {
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.clearAllMocks();
+  printerListeners.length = 0;
   localStorage.clear();
   configurePrinter();
 });
@@ -383,6 +398,64 @@ describe('the parent’s ten minutes', () => {
     // What is left is the one line this screen is allowed to add — where a name
     // tag comes from, which is the whole of the discoverability fix.
     expect(screen.getByText(/check-in desk/i)).toBeTruthy();
+  });
+
+  /*
+   * The ten minutes are counted to the tap, not to the paint.
+   *
+   * A parent nine minutes in taps their child's row and then reads the screen —
+   * the name, the grade, the tick — and the boundary falls while they are still
+   * standing there. Recomputed per render, the control in front of them became a
+   * sentence about the check-in desk between one register poll and the next, and
+   * if their thumb was already down when it went, every signal that would have
+   * told them so is one this kiosk does not have: `haptic()` is
+   * `navigator.vibrate`, which these iPads do not implement, and the fill goes
+   * with the button. What is left is a tablet that ignored them.
+   *
+   * The re-renders are pushed the way the printing module pushes one, because
+   * the hazard needs a render and does not care where it comes from — the
+   * five-minute register poll that supplies one in the lobby is the same event
+   * from this screen's side.
+   */
+  it('does not take the offer away under a thumb already holding it', async () => {
+    await mount();
+    await checkInAda();
+
+    await type('ada');
+    await pickRow('Ada Lovelace');
+    expect(screen.getByText(/Hold to print a name tag/i)).toBeTruthy();
+
+    // The window closes while the screen is up, and something re-renders.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(OFFER_WINDOW_MS + 60_000);
+    });
+    await act(async () => {
+      for (const listener of [...printerListeners]) listener(printing.currentState());
+    });
+    await settle();
+
+    const button = screen.getByText(/Hold to print a name tag/i).closest('button')!;
+    await act(async () => {
+      fireEvent.pointerDown(button);
+    });
+
+    // And again with a second of the hold still to run.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(HOLD_MS / 2);
+    });
+    await act(async () => {
+      for (const listener of [...printerListeners]) listener(printing.currentState());
+    });
+    await settle();
+    expect(screen.getByText(/Hold to print a name tag/i)).toBeTruthy();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(HOLD_MS);
+    });
+    await settle();
+
+    expect(printing.reprintLabel).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/Name tag sent for Ada/i)).toBeTruthy();
   });
 
   /*

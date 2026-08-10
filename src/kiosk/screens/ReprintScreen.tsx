@@ -143,7 +143,17 @@ export function ReprintScreen({
       <div className="px-6 pt-[max(1rem,var(--spacing-safe-top))] pb-2 text-center">
         <div className="flex flex-col items-center lg:flex-row lg:justify-center lg:gap-5">
           <StaffMark />
-          <div className="pt-2 text-base text-ink-500 kiosk:text-lg lg:pt-0">
+          {/*
+            * One ink step up at kiosk size, and balanced.
+            *
+            * This is the sentence that makes a volunteer comfortable pressing a
+            * row while a parent watches, and at `ink-500` on the landscape kiosk
+            * it was the dimmest text in the frame at about 4.1:1 — under the
+            * 4.5:1 the rest of this screen clears, on the promise that has to be
+            * read to do its job. It also set ragged, leaving one word alone on
+            * the last line on every phone frame.
+            */}
+          <div className="pt-2 text-base text-balance text-ink-500 kiosk:text-lg kiosk:text-ink-400 lg:pt-0">
             Nobody is checked in or out from this screen.
           </div>
         </div>
@@ -209,7 +219,10 @@ export function ReprintScreen({
                     * exists to remove. The register guarantee stays: it is the
                     * reason this screen is allowed to exist.
                     */}
-                  <p className="mx-auto max-w-md pt-3 text-lg text-ink-400 kiosk:text-xl">
+                  {/* Balanced, because it set ragged on both kiosk shapes with
+                      "changes." alone on the last line — the invitation is the
+                      only prose on an empty screen, so the rag is the frame. */}
+                  <p className="mx-auto max-w-md pt-3 text-lg text-balance text-ink-400 kiosk:text-xl">
                     Tap a name to see what will print, then confirm. Nothing about the register
                     changes.
                   </p>

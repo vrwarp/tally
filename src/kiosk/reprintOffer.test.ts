@@ -10,20 +10,33 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { OFFER_WINDOW_MS, reprintOffer } from './reprintOffer';
+import { OFFER_WINDOW_MS, reprintOffer, reprintStanding } from './reprintOffer';
 
 const NOW = Date.parse('2026-05-08T19:12:00Z');
 
+/**
+ * The two halves put back together, which is what the confirm screen shows.
+ *
+ * The split is about *when* each half is read, not about what the answer is —
+ * see `reprintStanding` — so the cases below are still written as one question
+ * with one answer, and the seam has a test of its own at the bottom.
+ */
 function offerFor(
-  overrides: Partial<Parameters<typeof reprintOffer>[0]> = {},
+  overrides: Partial<
+    Parameters<typeof reprintStanding>[0] & { reprintedIds: ReadonlySet<string> }
+  > = {},
 ): ReturnType<typeof reprintOffer> {
+  const { reprintedIds = new Set<string>(), ...standing } = overrides;
+  const studentId = standing.studentId ?? 'ada';
   return reprintOffer({
-    studentId: 'ada',
-    now: NOW,
-    checkedInAtMs: new Map([['ada', NOW - 60_000]]),
-    reprintedIds: new Set(),
-    labelWouldPrint: true,
-    ...overrides,
+    standing: reprintStanding({
+      studentId,
+      now: NOW,
+      checkedInAtMs: new Map([['ada', NOW - 60_000]]),
+      labelWouldPrint: true,
+      ...standing,
+    }),
+    spent: reprintedIds.has(studentId),
   });
 }
 
@@ -91,5 +104,37 @@ describe('the parent-facing reprint offer', () => {
    */
   it('treats a timestamp in the future as inside the window', () => {
     expect(offerFor({ checkedInAtMs: new Map([['ada', NOW + 5_000]]) })).toBe('offer');
+  });
+
+  /*
+   * And the seam itself: which half moves.
+   *
+   * A standing answer is a photograph of the world taken when the row was
+   * tapped, so nothing the world does afterwards develops it differently — the
+   * whole point, because the thing it feeds is a two-second hold. What the
+   * parent does on the screen is the other half, and that one has to move: the
+   * receipt is the only signal a held button gives.
+   */
+  it('reads the window once and the counter every time', () => {
+    const standing = reprintStanding({
+      studentId: 'ada',
+      now: NOW,
+      checkedInAtMs: new Map([['ada', NOW - 60_000]]),
+      labelWouldPrint: true,
+    });
+
+    expect(reprintOffer({ standing, spent: false })).toBe('offer');
+    expect(reprintOffer({ standing, spent: true })).toBe('spent');
+
+    // An hour on, the same standing answers the same way: it was settled when
+    // somebody tapped a row, and no clock re-opens or closes it after that.
+    expect(reprintOffer({ standing, spent: false })).toBe('offer');
+  });
+
+  it('never turns a refusal into an offer, whatever the counter says', () => {
+    for (const standing of ['ask', 'none'] as const) {
+      expect(reprintOffer({ standing, spent: false })).toBe(standing);
+      expect(reprintOffer({ standing, spent: true })).toBe(standing);
+    }
   });
 });

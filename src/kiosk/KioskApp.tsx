@@ -65,7 +65,7 @@ import { StaffScreen } from './screens/StaffScreen';
 import { ReprintScreen, MAX_REPRINT_RESULTS } from './screens/ReprintScreen';
 import { ReprintConfirmScreen } from './screens/ReprintConfirmScreen';
 import { StaffSession } from './components/StaffSession';
-import { reprintOffer } from './reprintOffer';
+import { reprintOffer, reprintStanding, type ReprintStanding } from './reprintOffer';
 import { SiblingScreen } from './screens/SiblingScreen';
 import { EventChooser } from './screens/EventChooser';
 import { PairingScreen } from './screens/PairingScreen';
@@ -119,6 +119,12 @@ type ConfirmOverlay = {
    * screen they made it on.
    */
   skipped: ReadonlySet<string>;
+  /**
+   * Whether a parent-facing reprint is on the table, decided here for the same
+   * reason `intent` and `family` are — see `reprintStanding`. Only whether the
+   * *one label* has since been spent is read live.
+   */
+  standing: ReprintStanding;
 };
 
 /**
@@ -1673,22 +1679,16 @@ export function KioskApp() {
           student={overlay.student}
           intent={overlay.intent}
           /*
-           * The one window in which a parent may print, decided when the screen
-           * renders rather than when the row was tapped: the ten minutes are
-           * measured from the check-in, and a parent who stands here reading is
-           * spending them.
-           *
-           * `prints` is the standing condition — a gathering with a template and
-           * a printing module — and the printer being in trouble is the other
-           * half of it. A parent is never told about a printer, so where a label
-           * would not come out the control is absent rather than disappointing.
+           * Half of this was decided when the row was tapped and half is read
+           * here, and which half is which is the whole of `reprintOffer.ts`: the
+           * window and the printer are the world's answer and must not move
+           * under a thumb already two seconds into a hold; the one label having
+           * been spent is the parent's own answer, given on this screen, and a
+           * receipt they have to leave and come back for is no receipt.
            */
           reprintOffer={reprintOffer({
-            studentId: overlay.student.id,
-            now: Date.now(),
-            checkedInAtMs,
-            reprintedIds,
-            labelWouldPrint: prints && printerState?.kind !== 'trouble',
+            standing: overlay.standing,
+            spent: reprintedIds.has(overlay.student.id),
           })}
           onReprint={() => reprintFor(overlay.student)}
           family={overlay.family}
@@ -1777,7 +1777,19 @@ export function KioskApp() {
             printing?.warmLabel(student, binding);
             for (const member of taking) printing?.warmLabel(member, binding);
           }
-          setOverlay({ kind: 'confirm', student, intent, family, skipped });
+          setOverlay({
+            kind: 'confirm',
+            student,
+            intent,
+            family,
+            skipped,
+            standing: reprintStanding({
+              studentId: student.id,
+              now: Date.now(),
+              checkedInAtMs,
+              labelWouldPrint: prints && printerState?.kind !== 'trouble',
+            }),
+          });
         }}
         /*
          * The hold on Clear used to open **Change event?** directly, so every

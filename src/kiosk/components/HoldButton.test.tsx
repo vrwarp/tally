@@ -23,7 +23,7 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { HOLD_MS, HoldButton } from './HoldButton';
+import { HOLD_MS, HoldButton, STRAY_HINT_MS } from './HoldButton';
 import { TAP_SLOP_PX } from './tapGuard';
 
 beforeEach(() => {
@@ -51,6 +51,26 @@ async function holdFrom(
   await act(async () => {
     await vi.advanceTimersByTimeAsync(HOLD_MS + 50);
   });
+}
+
+/**
+ * Which of the two strings the control is actually saying.
+ *
+ * Both are in the DOM at once — the hidden one is what keeps the button from
+ * narrowing when the other takes over — so `getByText` alone answers "is this
+ * string rendered", which is now always yes. What a person sees, and what a
+ * screen reader reads, is the cell that is not hidden.
+ */
+function saying(): string {
+  // The cells, not the wrapper that holds them and not the fill bar: both of
+  // those are spans too, and the wrapper's text is every string at once.
+  const label = screen
+    .getByRole('button')
+    .querySelectorAll<HTMLElement>('span > span:not([aria-hidden])');
+  return [...label]
+    .map((node) => node.textContent ?? '')
+    .join('')
+    .trim();
 }
 
 describe('a hold that stands alone', () => {
@@ -117,19 +137,74 @@ describe('a hold that shares glass with something else', () => {
       </HoldButton>,
     );
     const button = screen.getByText('Hold me');
+    expect(saying()).toBe('Hold me');
 
     await holdFrom(button, { dx: TAP_SLOP_PX + 1 });
-    expect(screen.getByText('Lift, then hold again')).toBeTruthy();
+    expect(saying()).toBe('Lift, then hold again');
 
     // The finger comes off to read it, and the sentence is still there.
     await act(async () => {
       fireEvent.pointerUp(button, { pointerId: 1 });
     });
-    expect(screen.getByText('Lift, then hold again')).toBeTruthy();
+    expect(saying()).toBe('Lift, then hold again');
 
     // One press re-arms it, and the label comes back with the count.
-    await holdFrom(screen.getByText('Lift, then hold again'));
+    await holdFrom(button);
     expect(onHeld).toHaveBeenCalledTimes(1);
-    expect(screen.getByText('Hold me')).toBeTruthy();
+    expect(saying()).toBe('Hold me');
+  });
+
+  /*
+   * The instruction is addressed to a hand, and outlives it by seconds rather
+   * than by the evening.
+   *
+   * Nothing else on this screen has a clock, so a parent whose thumb wandered
+   * and who then walked off used to leave *Lift, then hold again* on the glass
+   * for the next family — on the one element that would otherwise have told them
+   * a name tag was there for the asking.
+   */
+  it('puts the label back a few seconds after the hand comes off', async () => {
+    render(
+      <HoldButton onHeld={vi.fn()} cancelOnStray strayHint="Lift, then hold again">
+        Hold me
+      </HoldButton>,
+    );
+    const button = screen.getByText('Hold me');
+
+    await holdFrom(button, { dx: TAP_SLOP_PX + 1 });
+    await act(async () => {
+      fireEvent.pointerUp(button, { pointerId: 1 });
+    });
+    expect(saying()).toBe('Lift, then hold again');
+
+    // Still there while somebody could plausibly be reading it.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(STRAY_HINT_MS - 500);
+    });
+    expect(saying()).toBe('Lift, then hold again');
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+    expect(saying()).toBe('Hold me');
+  });
+
+  /*
+   * And the clock belongs to the gesture: a thumb still down is somebody still
+   * reading, and the sentence must not go while they are looking at it.
+   */
+  it('does not start that clock while the finger is still down', async () => {
+    render(
+      <HoldButton onHeld={vi.fn()} cancelOnStray strayHint="Lift, then hold again">
+        Hold me
+      </HoldButton>,
+    );
+    const button = screen.getByText('Hold me');
+
+    await holdFrom(button, { dx: TAP_SLOP_PX + 1 });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(STRAY_HINT_MS * 2);
+    });
+    expect(saying()).toBe('Lift, then hold again');
   });
 });

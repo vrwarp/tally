@@ -3,8 +3,9 @@
 What was built, why it is shaped this way, and what the critique loop threw out
 on the way. The design was refined in `uxr/kiosk-reprint/` — four rounds, three
 critics a round, thirty frames a round at the shapes a lobby tablet actually
-takes. The rounds are in [`uxr/rounds/reprint-r01`](../uxr/rounds/reprint-r01)
-through `r04`; the brief they were judged against is
+takes, and a fifth pass that closed the residue they left. The rounds are in
+[`uxr/rounds/reprint-r01`](../uxr/rounds/reprint-r01)
+through `r05`; the brief they were judged against is
 [`uxr/BRIEF-reprint.md`](../uxr/BRIEF-reprint.md); and the journey it produced,
 frame by frame, is the
 [walkthrough](walkthrough/reprint/README.md).
@@ -239,24 +240,40 @@ reaches the printing module on a kiosk that has no printer.
 
 ---
 
-## Known minors at convergence
+## The minors at convergence, and what became of them
 
 Round 4 produced no finding above `minor`, which is where the loop stops. Five
-of the nine are cheap and belong in the implementation rather than in another
-round — they are listed in full in
-[`uxr/rounds/reprint-r04/critique.md`](../uxr/rounds/reprint-r04/critique.md):
+of the nine were cheap and belonged in the implementation rather than in another
+round; they are listed in full in
+[`uxr/rounds/reprint-r04/critique.md`](../uxr/rounds/reprint-r04/critique.md) and
+all five are now done. What each one measured before and after is
+[`uxr/rounds/reprint-r05/critique.md`](../uxr/rounds/reprint-r05/critique.md) —
+measured on the live harness, because every one of them is a claim about pixels.
 
-- the offer pill narrows by 43px when the hint replaces its label, so the target
-  moves at the moment a parent is told to press it again;
-- nothing restores the offer's own words — a parent who drifts and walks away
-  leaves the kiosk showing *Lift, then hold again* to nobody;
-- the clear band above the commit is measured against this branch's ✓ rather
-  than against the 60px-taller `Check in` on the sibling state, so it is 4px
-  rather than the 48px the file calls an invariant;
-- two multi-line strings orphan their last word, where `done-none`'s line was
-  balanced;
-- on the phone the confirm's caution breaks with the em dash opening the second
-  line.
+- **the offer pill narrowed by 43px when the hint replaced its label**, so the
+  target moved at the moment a parent was told to press it again. Both strings
+  share one grid cell now, one of them `invisible`: 297.9px either way on the
+  phone, 341.6px on both kiosk shapes.
+- **nothing restored the offer's own words** — a parent who drifted and walked
+  away left the kiosk showing *Lift, then hold again* to nobody. `STRAY_HINT_MS`
+  after the contact ends, the label comes back; the clock starts on the lift
+  rather than on the drift, because a thumb still down is a person still reading.
+- **the clear band above the commit** was measured against this branch's ✓ rather
+  than against the 60px-taller `Check in` on the sibling state, leaving 4px where
+  the file calls 48 an invariant. `min-h-23` reserves the button's own height:
+  48.0px at all three shapes.
+- **two multi-line strings orphaned their last word.** Balanced: 170/188 on the
+  phone's standing promise, 250/251/249 and 278/279/277 on the idle invitation.
+- **the confirm's caution broke with the em dash opening the second line** on the
+  phone, so the one warning attached to the control that spends a label read for
+  a beat as a bullet. A non-breaking space binds the dash to the word before it.
+
+One of the four filed as *noted, not obviously worth acting on* was done too,
+because it was an accessibility floor rather than a preference: the standing
+promise measured 4.24:1 on the landscape kiosk, under the 4.5 the rest of the
+screen clears, on the sentence that makes a volunteer comfortable pressing a row
+while a parent watches. One ink step at `kiosk:` takes it to 7.87:1. The other
+three stand, for the reasons round 4 gives.
 
 ## What was thrown out
 

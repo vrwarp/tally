@@ -60,6 +60,19 @@ import { strayed, type Press } from './tapGuard';
  */
 export const HOLD_MS = 2000;
 
+/**
+ * How long the cancellation notice outlives the hand that caused it.
+ *
+ * A drift is not always followed by a second attempt. Somebody whose thumb
+ * wandered and who then walked off leaves the kiosk showing *Lift, then hold
+ * again* — an instruction addressed to a person who has gone, on the one element
+ * that would otherwise say a name tag is available, read by whoever walks up
+ * next. Long enough that the sentence is still there when a finger comes off to
+ * read it, short enough that it belongs to the gesture rather than to the
+ * screen.
+ */
+export const STRAY_HINT_MS = 6000;
+
 export function HoldButton({
   onHeld,
   onTap,
@@ -109,6 +122,10 @@ export function HoldButton({
    * back*. It is a label swap rather than a new colour or a new mark, because
    * the kiosk's palette is a distance from the reader and a cancelled gesture
    * is not an error.
+   *
+   * It stands until the next press or `STRAY_HINT_MS` after the hand comes off,
+   * whichever is first, and the control is sized to hold either string without
+   * moving.
    */
   strayHint?: ReactNode;
   className?: string;
@@ -116,10 +133,12 @@ export function HoldButton({
   'aria-label'?: string;
 }) {
   const [holding, setHolding] = useState(false);
-  /* Set by a drift, cleared by the next press — never by the lift, so the
-     sentence is still there when the thumb comes off to read it. */
+  /* Set by a drift; cleared by the next press, or by `STRAY_HINT_MS` of no
+     contact — never by the lift itself, so the sentence is still there when the
+     thumb comes off to read it. */
   const [slipped, setSlipped] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const restoreRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pressRef = useRef<Press | null>(null);
   const heldRef = useRef(onHeld);
   heldRef.current = onHeld;
@@ -135,6 +154,8 @@ export function HoldButton({
 
   const start = useCallback((event: React.PointerEvent) => {
     event.preventDefault();
+    if (restoreRef.current) clearTimeout(restoreRef.current);
+    restoreRef.current = null;
     pressRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
     setSlipped(false);
     setHolding(true);
@@ -167,16 +188,39 @@ export function HoldButton({
     [cancel, cancelOnStray],
   );
 
+  /*
+   * The hand comes off, and the notice starts its own clock.
+   *
+   * Not when the drift happens: a thumb still down is a person still reading,
+   * and a sentence that vanished while they were looking at it would be the
+   * second thing this control did without explanation. `start` clears the timer,
+   * so a press inside the window puts the label back rather than racing it.
+   */
+  const release = useCallback(() => {
+    cancel();
+    if (restoreRef.current) clearTimeout(restoreRef.current);
+    restoreRef.current = setTimeout(() => {
+      restoreRef.current = null;
+      setSlipped(false);
+    }, STRAY_HINT_MS);
+  }, [cancel]);
+
   const end = useCallback(
     (event: React.PointerEvent) => {
       const wasTap = !strayed(pressRef.current, event);
-      cancel();
+      release();
       if (wasTap) tappedRef.current?.();
+    },
+    [release],
+  );
+
+  useEffect(
+    () => () => {
+      cancel();
+      if (restoreRef.current) clearTimeout(restoreRef.current);
     },
     [cancel],
   );
-
-  useEffect(() => cancel, [cancel]);
 
   return (
     <button
@@ -194,8 +238,8 @@ export function HoldButton({
       onPointerDown={start}
       onPointerMove={move}
       onPointerUp={end}
-      onPointerLeave={cancel}
-      onPointerCancel={cancel}
+      onPointerLeave={release}
+      onPointerCancel={release}
     >
       <span
         aria-hidden
@@ -205,7 +249,35 @@ export function HoldButton({
           transition: holding ? `transform ${HOLD_MS}ms linear` : 'none',
         }}
       />
-      <span className="relative block">{slipped && strayHint ? strayHint : children}</span>
+      {strayHint === undefined ? (
+        <span className="relative block">{children}</span>
+      ) : (
+        /*
+         * Both strings, one cell, one of them hidden — so the control is as wide
+         * as the longer of the two whichever is showing.
+         *
+         * Sized to its own words, the pill stepped inward by the difference at
+         * the exact moment its sentence told a parent to press it again: the
+         * target moves as the instruction to hit it arrives. A grid cell holds
+         * the width without holding the ink, and `visibility` rather than
+         * `display` is what keeps the hidden twin out of the accessibility tree
+         * while it goes on taking up room.
+         */
+        <span className="relative grid">
+          <span
+            aria-hidden={slipped || undefined}
+            className={`col-start-1 row-start-1${slipped ? ' invisible' : ''}`}
+          >
+            {children}
+          </span>
+          <span
+            aria-hidden={!slipped || undefined}
+            className={`col-start-1 row-start-1${slipped ? '' : ' invisible'}`}
+          >
+            {strayHint}
+          </span>
+        </span>
+      )}
     </button>
   );
 }

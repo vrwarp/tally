@@ -27,7 +27,9 @@
  * The parent-facing offer is addressed by the *facts* that produce it rather
  * than by name, and `reprintOffer` — the shipped policy — decides. A critique
  * cannot judge a cap it cannot see hold, and a frame that took `offer=spent`
- * from a query string was a claim rather than evidence.
+ * from a query string was a claim rather than evidence. The app settles the
+ * window half when a row is tapped, so the harness settles it here, once, for
+ * the same reason: a frame is a screen somebody arrived on.
  */
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -36,7 +38,7 @@ import type { KioskKey } from '@/kiosk/components/Keyboard';
 import type { KioskPrinting } from '@/kiosk/KioskApp';
 import type { PrintedLabel } from '@/kiosk/printing';
 import type { KioskStudent } from '@/kiosk/search';
-import { reprintOffer } from '@/kiosk/reprintOffer';
+import { reprintOffer, reprintStanding } from '@/kiosk/reprintOffer';
 import { ConfirmScreen } from '@/kiosk/screens/ConfirmScreen';
 import { PrinterScreen } from '@/kiosk/screens/PrinterScreen';
 import { ReprintConfirmScreen } from '@/kiosk/screens/ReprintConfirmScreen';
@@ -220,11 +222,13 @@ export function Prototype() {
         family={[]}
         skipped={new Set()}
         reprintOffer={reprintOffer({
-          studentId: '1',
-          now: NOW,
-          checkedInAtMs: new Map([['1', NOW - Number(params.get('checkedInAgo') ?? 3) * 60_000]]),
-          reprintedIds: new Set(params.get('reprinted') === '1' ? ['1'] : []),
-          labelWouldPrint: params.get('printer') !== 'none' && !trouble,
+          standing: reprintStanding({
+            studentId: '1',
+            now: NOW,
+            checkedInAtMs: new Map([['1', NOW - Number(params.get('checkedInAgo') ?? 3) * 60_000]]),
+            labelWouldPrint: params.get('printer') !== 'none' && !trouble,
+          }),
+          spent: params.get('reprinted') === '1',
         })}
         onReprint={() => {}}
         onToggle={() => {}}
