@@ -1317,7 +1317,11 @@ export const listPlanningCenterLists = onCall<
  * This exists for the case where a leader wants the *next* read to be fresh too.
  */
 export const refreshPlanningCenter = onCall<void, Promise<{ status: 'ok' }>>(
-  { timeoutSeconds: 30, memory: '256MiB' },
+  // Same omission as `listPendingRegistrations` above, with a smaller blast
+  // radius and the same shape: without the secrets `registry.ids()` is empty,
+  // so the loop below resets nothing at all and still answers `ok`. A
+  // best-effort call may miss the other instances; it should not miss its own.
+  { secrets: BACKEND_SECRETS, timeoutSeconds: 30, memory: '256MiB' },
   async (request) => {
     await requireCoreTeam(request.auth?.uid);
     const registry = await createRegistry(db());
@@ -2675,7 +2679,24 @@ export const recordVisitorParent = onCall<
  * attention, and a registration nobody reviewed still has to expire.
  */
 export const listPendingRegistrations = onCall<void, Promise<PendingRegistration[]>>(
-  { timeoutSeconds: 120, memory: '256MiB' },
+  /*
+   * The secrets are what make the registry more than a shell.
+   *
+   * A declared secret reaches a function's environment only when that function
+   * asks for it, and this one did not — so `createRegistry` read an empty
+   * `PCO_APP_ID`, wrote a `configError`, and handed back a registry with no
+   * Planning Center in it. Nothing failed: `defaultPush()` answered with an
+   * error, `namesFromUpstream` returned on the first line, and every card came
+   * back with `guardianCandidates: []` — indistinguishable, by design, from a
+   * church that has never heard of this parent. The screen then quietly
+   * promised a new person for a mother Planning Center already holds, which is
+   * the second household this whole path exists to prevent.
+   *
+   * The emulator hides it perfectly: `readValue` falls back to `process.env`,
+   * and `.env.demo-tally` sets both values, so every test and the end-to-end
+   * suite exercise a fully configured registry. Only a deploy is missing them.
+   */
+  { secrets: BACKEND_SECRETS, timeoutSeconds: 120, memory: '256MiB' },
   async (request) => {
     await requireCoreTeam(request.auth?.uid);
     const database = db();
