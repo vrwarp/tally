@@ -642,15 +642,84 @@ describe('choosing the adult', () => {
     expect(screen.getByText(/joins Dana Fields, whose number matches/)).toBeInTheDocument();
   });
 
-  it('sends the adult a reviewer picked', async () => {
+  it('shows the backend’s own answer as the selected option', async () => {
+    listPendingRegistrations.mockResolvedValue({
+      data: [registration({ guardianCandidates: candidates })],
+    });
+    mount();
+
+    /*
+     * The corroborated candidate is the one `createFamily` would resolve to
+     * unaided, so the chooser opens on them rather than on nothing. A blank
+     * chooser made "the backend will join Dana" and "nobody has decided" look
+     * like different states, and they never were.
+     */
+    expect(await screen.findByRole('button', { name: /^This is them$/i })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: /^Add as new$/i })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+  });
+
+  it('falls back to adding a new person when nobody’s number matches', async () => {
+    listPendingRegistrations.mockResolvedValue({
+      data: [
+        registration({
+          guardianCandidates: [
+            { personId: '900', name: 'Dana Fields', reachable: true, corroborated: false },
+          ],
+        }),
+      ],
+    });
+    mount();
+
+    // Two adults sharing a name and a number reach here too: `createFamily`
+    // declines to pick between them and creates a third. Selected rather than
+    // buried, so the reviewer meets that before pressing rather than after.
+    expect(await screen.findByRole('button', { name: /^Adding as new$/i })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByText(/is added as a new person/)).toBeInTheDocument();
+  });
+
+  it('sends the pre-selected adult without anybody pressing the chooser', async () => {
     const user = userEvent.setup();
     listPendingRegistrations.mockResolvedValue({
       data: [registration({ guardianCandidates: candidates })],
     });
     mount();
 
-    const [, second] = await screen.findAllByRole('button', { name: /^Same person$/i });
-    await user.click(second!);
+    await user.click(await screen.findByRole('button', { name: /Approve and add/i }));
+    await user.click(screen.getByRole('button', { name: /^Yes — add/i }));
+
+    /*
+     * Named rather than left to the backend to re-derive. The rule is the same
+     * one either way; sending the id means a person merged away upstream is
+     * refused by `createFamily` instead of silently replaced by a new adult.
+     */
+    await waitFor(() =>
+      expect(approveRegistration).toHaveBeenCalledWith({
+        registrationId: 'reg-1',
+        guardianPersonId: '900',
+      }),
+    );
+  });
+
+  it('sends the adult a reviewer picked over the pre-selected one', async () => {
+    const user = userEvent.setup();
+    listPendingRegistrations.mockResolvedValue({
+      data: [registration({ guardianCandidates: candidates })],
+    });
+    mount();
+
+    // The one whose number does *not* match — "yes, that is her, she has
+    // changed her number", the answer no amount of matching reaches.
+    await user.click(await screen.findByRole('button', { name: /^Same person$/i }));
+    expect(screen.getByText(/joins Dana Fields, who the church already has/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Approve and add/i }));
     await user.click(screen.getByRole('button', { name: /^Yes — add/i }));
 
@@ -660,6 +729,25 @@ describe('choosing the adult', () => {
         guardianPersonId: '901',
       }),
     );
+  });
+
+  it('keeps a choice selected when it is pressed again', async () => {
+    const user = userEvent.setup();
+    listPendingRegistrations.mockResolvedValue({
+      data: [registration({ guardianCandidates: candidates })],
+    });
+    mount();
+
+    // Deselecting would land back on the default — often the same option,
+    // redrawn identically — which reads as a control that did nothing.
+    await user.click(await screen.findByRole('button', { name: /^Same person$/i }));
+    await user.click(screen.getByRole('button', { name: /^This is them$/i }));
+
+    expect(screen.getByRole('button', { name: /^This is them$/i })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByText(/joins Dana Fields, who the church already has/)).toBeInTheDocument();
   });
 
   it('sends "none of these" as its own decision', async () => {

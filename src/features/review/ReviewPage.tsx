@@ -790,10 +790,10 @@ function RegistrationCard({
   /**
    * Which adult the reviewer says the guardian already is.
    *
-   * `null` is the meaningful default — nobody has been asked, so the backend
-   * makes its own careful guess, exactly as it did before this control existed.
-   * A person id and the literal `'new'` are both decisions, and the caption
-   * under the approve button says which one is about to be acted on.
+   * `null` means they have not touched the control — which is *not* a third
+   * answer, and used to be presented as one. See `effectiveChoice` below for
+   * what the card shows and sends while this is null, and why the difference
+   * was never visible in the church's database anyway.
    */
   const [guardianChoice, setGuardianChoice] = useState<string | 'new' | null>(null);
   const when = row.registeredAt === null ? null : new Date(row.registeredAt);
@@ -887,30 +887,56 @@ function RegistrationCard({
    */
   const corroborated = adults.filter((adult) => adult.corroborated);
   const wouldJoin = corroborated.length === 1 ? corroborated[0]! : null;
-  const chosenAdult = adults.find((adult) => adult.personId === guardianChoice) ?? null;
+
+  /**
+   * The option the card shows as selected, and the one an approve press sends.
+   *
+   * Pre-selected rather than left blank, and the argument is that there was
+   * never anything for a blank to mean. `createFamily` resolves the adult as
+   * `chosen ?? (exactly one corroborated candidate) ?? a new person` — so an
+   * untouched card was already going to do one of the two things on screen,
+   * decided by the same rule spelled out just above. Showing three options
+   * where one is a hidden alias for another is the confusion; the outcomes were
+   * always two.
+   *
+   * What this gives up is that the server re-ran that rule at press time, on a
+   * search fresher than this page. The window is a review session, it only
+   * moves the answer when somebody upstream edits the very person in question,
+   * and it cuts both ways: a stale *person* is checked — `createFamily` reloads
+   * the chosen id and refuses rather than inventing a replacement — where a
+   * stale *guess* silently created a second Rosa Salgado. It also drags into
+   * the open the case where two adults share the name and the number, which
+   * `corroborated.length === 1` declines and resolves by creating a third.
+   *
+   * Null only where there is nothing to choose between. An empty candidate list
+   * is not "the church has nobody" — it is equally "write-back is not full" and
+   * "the backend did not answer" — so no chooser is drawn and nothing about the
+   * adult is claimed or sent. That refusal is the one part of this the change
+   * leaves exactly as it was.
+   */
+  const effectiveChoice: string | 'new' | null =
+    adults.length === 0 ? null : (guardianChoice ?? wouldJoin?.personId ?? 'new');
+  const chosenAdult = adults.find((adult) => adult.personId === effectiveChoice) ?? null;
 
   /**
    * What the approve press will actually do about the adult, in one clause.
    *
-   * Null where the card cannot honestly say. An empty candidate list is not
-   * "the church has nobody" — it is equally "write-back is not full" and "the
-   * backend did not answer" — so promising a new person on the strength of it
-   * would put an assertion in the one sentence a reviewer reads before an
-   * irreversible press, and let the backend contradict it a second later by
-   * joining a corroborated adult. Said only when somebody chose, or when
-   * candidates came back and the guess can be read off them.
+   * The two join clauses are keyed on the evidence rather than on who picked:
+   * "whose number matches" is *why* this candidate is the one selected, and a
+   * reviewer reading it before an irreversible press wants that, not a note on
+   * whether they clicked. For an adult chosen against the numbers — she is on
+   * file under the phone she had last year, which no matching will ever reach —
+   * the honest clause is the weaker one.
    */
   const guardianClause = !row.guardian
     ? null
     : chosenAdult
-      ? `joins ${chosenAdult.name}, who the church already has`
-      : guardianChoice === 'new'
+      ? chosenAdult.corroborated
+        ? `joins ${chosenAdult.name}, whose number matches`
+        : `joins ${chosenAdult.name}, who the church already has`
+      : effectiveChoice === 'new'
         ? 'is added as a new person'
-        : adults.length === 0
-          ? null
-          : wouldJoin
-            ? `joins ${wouldJoin.name}, whose number matches`
-            : 'is added as a new person';
+        : null;
 
   /**
    * What a press does to the adult, as a sentence rather than a clause.
@@ -928,8 +954,8 @@ function RegistrationCard({
 
   const approveDecision = (): ApproveDecision => ({
     ...(sameFamily.length > 0 ? { withRegistrationIds: sameFamily } : {}),
-    ...(guardianChoice && guardianChoice !== 'new' ? { guardianPersonId: guardianChoice } : {}),
-    ...(guardianChoice === 'new' ? { createNewGuardian: true } : {}),
+    ...(effectiveChoice && effectiveChoice !== 'new' ? { guardianPersonId: effectiveChoice } : {}),
+    ...(effectiveChoice === 'new' ? { createNewGuardian: true } : {}),
   });
 
   return (
@@ -1078,8 +1104,11 @@ function RegistrationCard({
                   details. Which adult upstream is "the same person" was
                   answered against a name and a number that have just changed,
                   and which other cards are this family was answered by the
-                  server from the digits — so both go back to unanswered rather
-                  than quietly staying selected under new evidence.
+                  server from the digits — so both are dropped rather than
+                  quietly staying selected under new evidence. Dropping the
+                  adult now means falling back to the default, which the refetch
+                  recomputes from candidates found under the corrected details:
+                  still the right answer to forget, and no longer a blank.
                 */
                 setGuardianChoice(null);
                 if (result.last4Changed) setSameFamily([]);
@@ -1245,10 +1274,12 @@ function RegistrationCard({
           there is somebody, and they can answer the case no matching ever
           reaches: the mother who is on file under the number she had last year.
 
-          Nothing is held on it. Not answering leaves the same guess that has
-          always run, and the caption under the approve button says which way it
-          will fall — a reviewer should not have to press a button to find out
-          whether the church is about to get a second Rosa Salgado.
+          Nothing is held on it: one option is already selected when the card
+          opens, and it is the one the backend would have settled on by itself.
+          A reviewer who agrees presses nothing, and a reviewer who does not can
+          see what they are changing it *from* — which is the part a blank
+          chooser could not show, since "none of these selected" and "add as new
+          selected" were different-looking states with the same consequence.
         */}
         {row.guardian && adults.length > 0 && (!row.settled || parentOnly) ? (
           <div className={STRIP}>
@@ -1258,7 +1289,7 @@ function RegistrationCard({
             </p>
             <ul className="mt-2 flex flex-col gap-2">
               {adults.map((adult) => {
-                const picked = guardianChoice === adult.personId;
+                const picked = effectiveChoice === adult.personId;
                 return (
                   <li
                     key={adult.personId}
@@ -1280,7 +1311,15 @@ function RegistrationCard({
                       className="min-h-9 px-3 text-sm"
                       disabled={locked}
                       aria-pressed={picked}
-                      onClick={() => setGuardianChoice(picked ? null : adult.personId)}
+                      /*
+                        Selects, never deselects. These are alternatives to one
+                        another, so a press that cleared the choice would land
+                        back on whichever option the default picks — very often
+                        the one just deselected, redrawn identically. A control
+                        that appears not to respond is worse on this card than
+                        on any other in the app.
+                      */
+                      onClick={() => setGuardianChoice(adult.personId)}
                     >
                       {picked ? 'This is them' : 'Same person'}
                     </Button>
@@ -1288,15 +1327,22 @@ function RegistrationCard({
                 );
               })}
               <li className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-ink-400">None of them is this parent.</span>
+                {/*
+                  Named as an option rather than asserted as a fact. "None of
+                  them is this parent" is a sentence the card is in no position
+                  to say, and reads especially oddly sitting there pre-selected
+                  — which is exactly what it now does whenever no candidate's
+                  number matches.
+                */}
+                <span className="text-ink-400">Nobody on this list</span>
                 <Button
-                  variant={guardianChoice === 'new' ? 'primary' : 'secondary'}
+                  variant={effectiveChoice === 'new' ? 'primary' : 'secondary'}
                   className="min-h-9 px-3 text-sm"
                   disabled={locked}
-                  aria-pressed={guardianChoice === 'new'}
-                  onClick={() => setGuardianChoice(guardianChoice === 'new' ? null : 'new')}
+                  aria-pressed={effectiveChoice === 'new'}
+                  onClick={() => setGuardianChoice('new')}
                 >
-                  {guardianChoice === 'new' ? 'Adding as new' : 'Add as new'}
+                  {effectiveChoice === 'new' ? 'Adding as new' : 'Add as new'}
                 </Button>
               </li>
             </ul>
