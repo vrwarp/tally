@@ -46,12 +46,7 @@ import type { KioskTheme } from '@/lib/kioskTheme';
 import type { LabelTemplate } from '@/lib/labelTemplate';
 import { defaultRecurrence, retimeRecurrence, validateRecurrence } from '@/lib/recurrence';
 import { cn } from '@/lib/utils';
-import {
-  addMinutes,
-  fromDateTimeLocalValue,
-  nextSeriesOccurrence,
-  toDateTimeLocalValue,
-} from '@/lib/time';
+import { addMinutes, fromDateTimeLocalValue, toDateTimeLocalValue } from '@/lib/time';
 import { createEvent, ensureMaterialized, updateEvent, type EventDraft } from '@/services/events';
 import type { EventMode, RecurrenceRule, TallyEvent } from '@/types';
 
@@ -66,6 +61,12 @@ interface EditorForm {
   /** A Material Symbols name from `lib/eventIcons`, or `''` for none. */
   icon: string;
   mode: EventMode;
+  /**
+   * Carried, never chosen. Nothing on the form sets this any more — the picker
+   * that did is gone, and the note standing where it was says why — but the
+   * value still has to survive an edit, because `chainKey` reads it first and
+   * dropping it would cut a seeded Friday out of its own chain.
+   */
   seriesId: string;
   /** A `chainKey`, or `''`. The gathering a one-off borrows its regulars from. */
   predictFromChain: string;
@@ -252,7 +253,7 @@ export function EventEditorModal({
   defaults,
   onSaved,
 }: EventEditorModalProps) {
-  const { events, series, canWork } = useData();
+  const { events, series } = useData();
   const { user } = useAuth();
   const { show } = useToast();
 
@@ -332,39 +333,6 @@ export function EventEditorModal({
     }));
   };
 
-  const handleSeriesChange = (seriesId: string) => {
-    const picked = series.find((candidate) => candidate.id === seriesId) ?? null;
-
-    setForm((current) => {
-      // Editing an existing Friday must not silently move it to next Friday.
-      if (!picked || isEditing) return { ...current, seriesId };
-
-      const occurrence = nextSeriesOccurrence(picked, new Date());
-      return {
-        ...current,
-        seriesId,
-        title: picked.title,
-        // The series *is* a weekly pattern — that is what `dayOfWeek` means —
-        // so picking one fills the rule in rather than making somebody restate
-        // it directly underneath.
-        recurrence: {
-          frequency: 'weekly',
-          interval: 1,
-          weekdays: [picked.dayOfWeek],
-          monthlyMode: 'dayOfMonth',
-          until: null,
-          count: null,
-        },
-        start: toDateTimeLocalValue(occurrence.startAt),
-        end: toDateTimeLocalValue(occurrence.endAt),
-        checkInOpens: toDateTimeLocalValue(occurrence.checkInOpensAt),
-        checkInCloses: toDateTimeLocalValue(occurrence.checkInClosesAt),
-        opensPinned: picked.checkInOpensMinutesBefore !== OPENS_BEFORE_MIN,
-        closesPinned: picked.checkInClosesMinutesAfter !== CLOSES_AFTER_MIN,
-      };
-    });
-  };
-
   const save = async (times: ParsedTimes) => {
     if (!user) return;
 
@@ -373,6 +341,10 @@ export function EventEditorModal({
       description: form.description.trim() || null,
       icon: form.icon || null,
       mode: form.mode,
+      // No control sets this any more, which makes it easy to mistake for dead
+      // weight. It is not: it arrives from `defaults` or from the event being
+      // edited, and the paragraph below applies to it word for word — `chainKey`
+      // reads `seriesId` before it reads the root.
       seriesId: form.mode === 'recurring' ? form.seriesId || null : null,
       /*
        * Carried forward, like `status` below, and for a sharper reason.
@@ -448,18 +420,12 @@ export function EventEditorModal({
 
   const formId = `event-editor-${event?.id ?? 'new'}`;
 
-  // An inactive series stays selectable while it is the one already on the
-  // event, otherwise editing would silently detach it from its history.
-  const seriesOptions = series.filter(
-    (candidate) => candidate.active || candidate.id === form.seriesId,
-  );
-
   // The gatherings a trip can borrow its regulars from. Only offered on a
   // one-off, so it costs nothing to compute for the other half of the form.
   const chains = gatheringOptions(events, series);
-  // The same rule as the inactive series above, for the same reason: a chain
-  // whose last night is older than the loaded window is no longer in this list,
-  // and dropping it on open would quietly unset the field on the next save.
+  // A chain whose last night is older than the loaded window is not in this
+  // list, and dropping it on open would quietly unset the field on the next
+  // save — so what was already chosen stays choosable.
   const chainOptions =
     form.predictFromChain && !chains.some((chain) => chain.key === form.predictFromChain)
       ? [...chains, { key: form.predictFromChain, title: 'The gathering already chosen' }]
@@ -555,53 +521,34 @@ export function EventEditorModal({
           </SelectField>
 
           {/*
-            * Which gathering this *is*, not whether it predicts.
+            * There was a "Series" picker here, and it is gone.
             *
-            * It used to say "No series — no predicted roster", which was a
-            * leftover from when prediction keyed on the series document alone.
-            * It has not been true since history started grouping by the repeat
-            * chain: a weekly gathering scheduled here predicts from its own past
-            * nights whether or not a series exists to name it. What picking one
-            * actually does is join this to that series' history — Fridays under
-            * `friday-fellowship` are one gathering because they share it.
+            * It listed the `eventSeries` documents, and nothing in the app has
+            * ever created one — `scripts/seed.ts` is the only writer in the
+            * repository. So in any real deployment it offered exactly one
+            * choice, "Not part of one", forever: a control that could not be
+            * used, sat between Type and the dates, on the form a leader fills in
+            * most often.
+            *
+            * Nothing was lost with it, because the thing it looked like it
+            * governed was already governed elsewhere. Prediction groups history
+            * by the repeat chain, and `chainKey` falls through to
+            * `recurrenceRootId` — so a weekly gathering scheduled here predicts
+            * from its own past nights with no series document anywhere near it.
+            * See the note on `gatheringOptions` in `lib/gatherings.ts`, which was
+            * rewritten to read events rather than series for the same reason.
+            *
+            * What a series still did was join two separately-created gatherings
+            * into one shared history. That is a real capability and this gives it
+            * up knowingly: it was unreachable without a database console, and an
+            * empty picker is not a feature.
+            *
+            * `form.seriesId` outlives the control on purpose. `EventsPage`'s
+            * quick actions still open this form with one in `defaults`, and an
+            * event that already carries one — every seeded Friday — must keep it
+            * through an edit, for the reason spelled out over `recurrenceRootId`
+            * in `save` above.
             */}
-          {form.mode === 'recurring' ? (
-            <SelectField
-              label="Series"
-              value={form.seriesId}
-              onChange={(changed) => handleSeriesChange(changed.target.value)}
-              hint={
-                form.seriesId
-                  ? 'Its roster is predicted from that series’ past gatherings.'
-                  : 'Optional. Either way this predicts from its own past gatherings — pick one to share an existing gathering’s history.'
-              }
-            >
-              <option value="">Not part of one</option>
-              {/*
-                Marked where the choice is made, not after the form.
-
-                `events: create` and `events: update` are both gated on the
-                chain, so picking a series the writer is not on means filling in
-                a title, a room, two dates and a recurrence rule and then being
-                refused at save. Disabled rather than hidden: the series exists,
-                it is on the calendar two inches away, and a gathering that
-                silently vanishes from a picker is the bug this app's whole
-                access design argues against.
-              */}
-              {seriesOptions.map((candidate) => {
-                const mine = canWork({
-                  id: candidate.id,
-                  seriesId: candidate.id,
-                  recurrenceRootId: null,
-                });
-                return (
-                  <option key={candidate.id} value={candidate.id} disabled={!mine}>
-                    {mine ? candidate.title : `${candidate.title} — not yours`}
-                  </option>
-                );
-              })}
-            </SelectField>
-          ) : null}
 
           {/*
             * "Next start" rather than "Starts", for a recurring gathering.
