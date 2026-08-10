@@ -93,6 +93,15 @@ const COLLECTED = 'Caleb Okafor';
 const LABELLED = 'Nia Washington';
 /** Checked in on Friday Fellowship, which does not print. */
 const UNLABELLED = 'Micah Sullivan';
+/**
+ * Checked in on the Nursery and then given a second sticker from the staff
+ * gate. Hers rather than `LABELLED`'s for the reason at the top of this block:
+ * the reprint walk starts by checking somebody in, and the printing test above
+ * has already spent `LABELLED` on the same gathering — a reprint test that
+ * inherited her would meet *Already checked in* where it expects a *Check in*,
+ * and only when the two happened to land in that order.
+ */
+const REPRINTED = 'Zoe Lindqvist';
 
 /** Searches by name and returns that student's row. */
 async function findOnKiosk(kiosk: Page, name: string) {
@@ -543,7 +552,7 @@ test.describe('the kiosk', () => {
       await bindTo(kiosk, /nursery/i);
 
       // Check one in the ordinary way, so there is an evening to reprint from.
-      const row = await findOnKiosk(kiosk, LABELLED);
+      const row = await findOnKiosk(kiosk, REPRINTED);
       await row.click();
       await kiosk.getByRole('button', { name: /^Check in$/ }).click();
       await expect(kiosk.getByText(/welcome/i)).toBeVisible();
@@ -555,7 +564,7 @@ test.describe('the kiosk', () => {
       await kiosk.getByRole('button', { name: /Reprint a name tag/i }).click();
       await expect(kiosk.getByText(/reprint a name tag/i).first()).toBeVisible();
 
-      const reprintRow = await findOnKiosk(kiosk, LABELLED);
+      const reprintRow = await findOnKiosk(kiosk, REPRINTED);
       await reprintRow.click();
 
       /*
@@ -563,12 +572,12 @@ test.describe('the kiosk', () => {
        * commit is addressed by its accessible name rather than by its face,
        * which is the stronger assertion of the two. The button reads "Print name
        * tag" because the sticker beside it says whose; its `aria-label` carries
-       * the child, so what a screen reader and a test both get is "Print Nia
-       * Washington's name tag". Matching that proves the confirm is bound to the
+       * the child, so what a screen reader and a test both get is "Print Zoe
+       * Lindqvist's name tag". Matching that proves the confirm is bound to the
        * row that was tapped.
        */
       const commit = kiosk.getByRole('button', {
-        name: new RegExp(`Print ${LABELLED}'s name tag`, 'i'),
+        name: new RegExp(`Print ${REPRINTED}'s name tag`, 'i'),
       });
       await expect(commit).toBeVisible();
       await commit.click();
@@ -732,8 +741,18 @@ test.describe('the kiosk', () => {
       await expect(kiosk.getByText(/Change event\?/i)).toBeVisible();
       await expect(kiosk.getByText(/Nobody can check in here/i)).toBeVisible();
 
-      // Declining lands back on the search screen, still on the gathering —
-      // the queue standing at the kiosk loses the seconds and nothing else.
+      /*
+       * Declining lands back on the menu it was opened from, not out at the
+       * front door — a volunteer who mis-tapped the row above the one they
+       * wanted is one tap from the right one, rather than another two-second
+       * hold with a parent standing there. The way out of the menu is its own
+       * tap, and that one does reach the search screen, still on the gathering:
+       * the queue loses the seconds and nothing else.
+       */
+      await kiosk.getByRole('button', { name: /Keep checking in/i }).click();
+      await expect(kiosk.getByText(/Change event\?/i)).toHaveCount(0);
+      await expect(kiosk.getByText('Staff')).toBeVisible();
+
       await kiosk.getByRole('button', { name: /Keep checking in/i }).click();
       await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
 
