@@ -55,8 +55,18 @@ const ROW =
   'flex h-16 w-full items-center justify-between gap-3 rounded-xl px-5 text-left ' +
   'text-xl font-semibold kiosk:h-24 kiosk:px-6 kiosk:text-3xl';
 
-/** A row that is a fact rather than a door — see the `none` branch below. */
-const STATEMENT = `${ROW} bg-ink-900 font-normal text-ink-400`;
+/**
+ * A fact, set as prose on the group's shared inset.
+ *
+ * Deliberately *not* the row class. The first attempt at this was the row's own
+ * slab with a dimmer fill and a dimmer label, which is the conventional signal
+ * for a control that is switched off — so the copy said *there is nothing here*
+ * while the shape said *there is a button here and it is off*, and a volunteer
+ * pressed it and got nothing, which is the frozen-tablet reading the slab was
+ * replaced to avoid. Dimming alone can only ever mean unavailable; absent has to
+ * be a different shape.
+ */
+const STATEMENT = 'px-5 text-left text-lg text-ink-400 kiosk:px-6 kiosk:text-2xl';
 
 const DOOR = `${ROW} bg-ink-800 text-ink-100 active:bg-ink-700`;
 
@@ -97,10 +107,18 @@ export function StaffScreen({
    */
   const printerLine =
     printer === 'ready'
-      ? { text: 'Ready', tone: 'text-present-400' }
+      ? /*
+         * Settled, so it recedes. It was `present-400`, which made the one
+         * chromatic object on the calm screen a word confirming that nothing had
+         * happened — on the setup door nobody walked over for. An accent that
+         * marks *where the status lives* rather than *that something changed* is
+         * decoration wearing hierarchy's clothes.
+         */
+        { text: 'Ready', tone: 'text-ink-400' }
       : printer === 'trouble'
         ? { text: 'Trouble', tone: 'text-warn-400' }
-        : { text: 'Not set up', tone: 'text-ink-500' };
+        : /* The statement above this row is carrying the news in this state. */
+          { text: 'Not set up', tone: 'text-ink-400' };
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-8 p-8 text-center kiosk:gap-10">
@@ -128,9 +146,11 @@ export function StaffScreen({
            * next move is to press it again, then fetch somebody. What the
            * volunteer actually needs is the sentence.
            */
-          <div className={STATEMENT}>No printer on this kiosk</div>
+          <p className={STATEMENT}>
+            No printer on this kiosk — set one up below to print name tags here.
+          </p>
         ) : (
-          <>
+          <div className="flex flex-col">
             <button
               type="button"
               tabIndex={-1}
@@ -142,6 +162,7 @@ export function StaffScreen({
             >
               Reprint a name tag
             </button>
+            {/* One slot in the group's rhythm, not two. */}
             {printer === 'trouble' && (
               /*
                * The condition, on the door it gates.
@@ -155,11 +176,11 @@ export function StaffScreen({
                * warning three screens later. This is staff glass; it can say so
                * in a sentence.
                */
-              <p className="px-5 text-left text-base text-warn-400 kiosk:px-6 kiosk:text-xl">
+              <p className="px-5 pt-2 text-left text-lg text-warn-400 kiosk:px-6 kiosk:text-2xl">
                 The printer needs attention — a name tag may not come out.
               </p>
             )}
-          </>
+          </div>
         )}
 
         <button

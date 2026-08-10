@@ -414,3 +414,31 @@ describe('the parent’s ten minutes', () => {
     expect(screen.queryByText(/check-in desk/i)).toBeNull();
   });
 });
+
+/*
+ * The trap the end-to-end critique found, pinned where it is cheap to run.
+ *
+ * The printing module is fetched on `phase === 'printer' || hasConfiguredPrinter()`,
+ * and the staff screen opens the printer as an *overlay* — the kiosk stays bound —
+ * which met neither clause on a kiosk that has never had a printer. The screen
+ * then sat on `Loading…` with nothing on it to press, and the gate's inactivity
+ * clock re-arms on every pointer event, so tapping the dead-looking tablet is
+ * exactly what held it there.
+ */
+describe('the printer screen, opened from the staff gate', () => {
+  it('fetches the printing module on a kiosk that has never had one', async () => {
+    localStorage.removeItem(KIOSK_KEYS.printer);
+    await mount();
+    await holdClear();
+
+    // No printer, so the reprint door is a sentence — and the printer door is
+    // still a door, because setting one up for the first time is what it is for.
+    expect(screen.getByText(/No printer on this kiosk/i)).toBeTruthy();
+    await tap(/Label printer/i);
+
+    // The screen resolves rather than sitting on a spinner nothing will end.
+    await settle();
+    expect(screen.queryByText(/^Loading…$/)).toBeNull();
+    expect(screen.getByText(/Label printer/i)).toBeTruthy();
+  });
+});

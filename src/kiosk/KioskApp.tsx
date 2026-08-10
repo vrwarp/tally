@@ -403,7 +403,19 @@ export function KioskApp() {
    * printer for the first time has nothing in localStorage to gate on, and the
    * module is what knows how to ask the browser for a device.
    */
-  const wantsPrinting = phase === 'printer' || hasConfiguredPrinter();
+  /*
+   * The overlay counts as well as the phase, and leaving it out was a trap.
+   *
+   * The reasoning above is why `phase === 'printer'` is here at all: a kiosk
+   * being given a printer for the first time has nothing in localStorage to gate
+   * on. The staff screen opens the same screen as an overlay — the kiosk stays
+   * bound — which bypassed that clause, so on a kiosk that has never had a
+   * printer the module was never fetched and the screen sat on `Loading…` with
+   * nothing on it to press. The gate's own clock is no way out either: it
+   * re-arms on every pointer event, so tapping a dead-looking tablet is what
+   * holds it there.
+   */
+  const wantsPrinting = phase === 'printer' || overlay?.kind === 'printer' || hasConfiguredPrinter();
 
   useEffect(() => {
     if (!wantsPrinting) return;
