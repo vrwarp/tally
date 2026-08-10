@@ -28,6 +28,7 @@
   // type against the app's project instead. Their shooters stay here.
   "exclude": [
     "uxr/kiosk-live/main.tsx",
+    "uxr/kiosk-reprint/main.tsx",
     "uxr/kiosk-setup-live/main.tsx",
     "uxr/kiosk-setup-live/scene.tsx",
     "uxr/kiosk-setup-live/stubs.tsx",

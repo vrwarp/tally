@@ -156,8 +156,10 @@ before the write lands; the label goes last, wrapped, after the attendance write
 printer problem surfaces as an amber dot in the corner of the search screen and a sentence on the
 staff printer screen — never beside the green tick, where a red line reads as "your check-in failed"
 to somebody who cannot fix a printer anyway. A check-out prints nothing at all: the sticker went on at
-the door, and a parent re-tapping a child who is already checked in is a runaway reprint loop rather
-than a request.
+the door, and a parent re-tapping a child who is already checked in does not print either — except
+inside the ten minutes after this kiosk checked them in, once, which is the whole of the exception
+and is [reasoned out here](kiosk-reprint.md). Reprinting for a named child is a staff screen behind
+the same held **Clear**, and it no longer costs the kiosk its gathering.
 
 Setting a printer up, and what a label may say, is [label printing](label-printing.md).
 

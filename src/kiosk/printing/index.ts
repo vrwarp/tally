@@ -39,17 +39,17 @@ import {
   watchConnectionEvents,
   type PrinterStatus,
 } from '@vrwarp/brother-ql-webusb/printer-core';
-import type { LabelTemplate } from '@/lib/labelTemplate';
+import { fillLabelTokens, type LabelTemplate } from '@/lib/labelTemplate';
 import type { KioskBinding } from '../binding';
 import type { KioskStudent } from '../search';
-import { allergyFor, forgetAllergy, startAllergyLookup } from './allergy';
+import { allergyFor, forgetAllergies, forgetAllergy, startAllergyLookup } from './allergy';
 import { tokenValuesFor } from './tokens';
 import {
   readPrinterConfig,
   writePrinterConfig,
   type PrinterConfig,
 } from './device';
-import { createLabelQueue, type LabelJob, type RasterResult } from './queue';
+import { createLabelQueue, type LabelJob, type PrintedLabel, type RasterResult } from './queue';
 import RasterWorker from './raster.worker?worker';
 import type { RasterReply, RasterRequest } from './raster.worker';
 
@@ -64,6 +64,7 @@ export { tokenValuesFor } from './tokens';
  * it reaches everything else here — through the one dynamically imported handle.
  */
 export { ALLERGY_UNREAD, forgetAllergies, setAllergySource } from './allergy';
+export type { PrintedLabel } from './queue';
 export type { AllergySource } from './allergy';
 
 /*
@@ -431,7 +432,16 @@ function jobFor(
   binding: KioskBinding,
   template: LabelTemplate,
 ): LabelJob {
-  return { studentId: student.id, template, values: tokenValuesFor(student, binding) };
+  return {
+    studentId: student.id,
+    // What the printer screen's log will call them. The roster's own display
+    // name, not the sticker's — a template may print a first name and an
+    // initial, and a volunteer looking for the label that did not come out is
+    // looking for the child they can see.
+    name: `${student.firstName} ${student.lastName}`.trim(),
+    template,
+    values: tokenValuesFor(student, binding),
+  };
 }
 
 /**
@@ -475,13 +485,59 @@ export function forgetLabel(studentId: string): void {
   forgetAllergy(studentId);
 }
 
-export function canReprint(): boolean {
-  return queue.lastPrinted() !== null;
+/**
+ * Print this child's name tag again.
+ *
+ * Same path as `printLabel`, and deliberately not the old `reprintLast`, which
+ * re-sent the bytes of whatever came out most recently. Two things follow from
+ * re-rastering instead. It can be aimed: a volunteer names the child rather than
+ * hoping nobody has checked in behind them. And it prints what the label *should
+ * say now* — a child whose allergy note was still in flight when the first
+ * sticker was drawn gets the note on the second, which is one of the four
+ * reasons anybody asks for one.
+ *
+ * Reachable only from behind the staff gate, and from the ten-minute window on
+ * the already-checked-in screen. See `reprintOffer.ts` for what bounds the
+ * second one, and `docs/kiosk-reprint.md` for why a wider parent-facing reprint
+ * is a roll of labels on the floor.
+ */
+export function reprintLabel(student: KioskStudent, binding: KioskBinding): void {
+  printLabel(student, binding);
 }
 
-/** Staff only. A parent-facing reprint button is a roll of labels on the floor. */
-export function reprintLast(): void {
-  queue.reprintLast();
+/**
+ * What this child's sticker would say, line by line, for the reprint confirm.
+ *
+ * The same fill the rasteriser does, minus the drawing: a volunteer standing at
+ * a printer that produced something blank is checking a suspicion, and the
+ * cheapest way to answer it is to show them the words before the tape moves.
+ * Lines that come to nothing are dropped exactly as the renderer drops them, so
+ * the preview cannot promise a line the label will not have.
+ */
+export function labelPreview(student: KioskStudent, binding: KioskBinding): string[] {
+  const template = binding.labelTemplate;
+  if (!template) return [];
+  const values = tokenValuesFor(student, binding);
+  return template.lines
+    .map((line) => fillLabelTokens(line.text, values))
+    .filter((text) => text.length > 0);
+}
+
+/**
+ * Unbinding: a kiosk that has left a gathering keeps nothing about who was at it.
+ *
+ * The allergy notes were already dropped here. The evening's label log goes with
+ * them, and for the same reason — it is a list of children's names, held in
+ * memory on a device that sits in a lobby for weeks.
+ */
+export function forgetGathering(): void {
+  forgetAllergies();
+  queue.forgetPrinted();
+}
+
+/** The evening's attempts, newest first, for the printer screen. */
+export function printedTonight(): readonly PrintedLabel[] {
+  return queue.printedTonight();
 }
 
 /**

@@ -86,6 +86,22 @@ export async function hold(
 }
 
 /**
+ * Off the gathering and back on the chooser, the way a volunteer does it.
+ *
+ * Three steps rather than two since the staff gate stopped opening one door.
+ * Holding **Clear** opens the staff screen — reprint a name tag, look at the
+ * printer, or leave — and *Change event* is where the warning that used to greet
+ * the hold now lives, because it belongs to that choice rather than to the act
+ * of looking. Everything a spec used this gesture for is on the far side of one
+ * more tap, and a helper is what stops four specs learning that separately.
+ */
+export async function leaveGathering(kiosk: Page): Promise<void> {
+  await hold(kiosk, '[data-key="clear"]');
+  await kiosk.getByRole('button', { name: /Change event/i }).click();
+  await kiosk.getByRole('button', { name: /^Leave /i }).click();
+}
+
+/**
  * Half way through a hold, the bar has to be somewhere a person can see it.
  *
  * Pixels, not styles, because the bug this exists to catch passed everything

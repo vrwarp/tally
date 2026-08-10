@@ -245,12 +245,26 @@ A parent is never told. A red line beside a green tick reads as "your check-in
 failed", and a parent cannot fix a printer anyway.
 
 What appears instead is a small **amber dot in the top-right corner of the search
-screen**. Hold the opposite corner, open the printer screen, and it says what is
-actually wrong — cover open, out of media, unplugged, or another program holding
-the device.
+screen**. Hold **Clear** for two seconds, open the printer screen from the staff
+screen, and it says what is actually wrong — cover open, out of media, unplugged,
+or another program holding the device. The staff reprint screens say so in words,
+because a volunteer standing there *can* do something about it.
 
-**Reprint the last label** is on that screen and nowhere else. A parent-facing
-reprint button is a roll of labels on the floor.
+## Printing one again
+
+Hold **Clear** for two seconds and the staff screen offers **Reprint a name tag**:
+type the child's name, tap the row, and a confirm shows what the sticker will say
+before the tape moves. The printer screen lists **Name tags tonight** — the
+evening's attempts, including the ones that never came out, which is the row
+somebody is usually looking for — and any of them opens the same confirm.
+
+The kiosk stays on its gathering the whole time. It used to have to leave.
+
+A parent gets one narrow window of their own: for ten minutes after this kiosk
+checks their child in, tapping that child again offers a hold-to-print control,
+once. Outside it the screen says name tags come from the check-in desk and there
+is nothing to press. The reasoning, and the wider parent-facing reprint that was
+refused twice, are in [kiosk-reprint.md](kiosk-reprint.md).
 
 Labels are not queued across a reboot, deliberately and unlike check-ins. A
 sticker for a child collected twenty minutes ago is litter; one printed after a

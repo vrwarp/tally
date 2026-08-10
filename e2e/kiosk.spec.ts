@@ -19,6 +19,7 @@ import {
   bindTo,
   expectLabelCount,
   hold,
+  leaveGathering,
   openKiosk,
   pairKiosk,
   recordLabels,
@@ -92,6 +93,15 @@ const COLLECTED = 'Caleb Okafor';
 const LABELLED = 'Nia Washington';
 /** Checked in on Friday Fellowship, which does not print. */
 const UNLABELLED = 'Micah Sullivan';
+/**
+ * Checked in on the Nursery and then given a second sticker from the staff
+ * gate. Hers rather than `LABELLED`'s for the reason at the top of this block:
+ * the reprint walk starts by checking somebody in, and the printing test above
+ * has already spent `LABELLED` on the same gathering — a reprint test that
+ * inherited her would meet *Already checked in* where it expects a *Check in*,
+ * and only when the two happened to land in that order.
+ */
+const REPRINTED = 'Zoe Lindqvist';
 
 /** Searches by name and returns that student's row. */
 async function findOnKiosk(kiosk: Page, name: string) {
@@ -515,6 +525,73 @@ test.describe('the kiosk', () => {
     }
   });
 
+  /**
+   * A second sticker for a named child, and the two things it must not cost.
+   *
+   * The reprint this replaced could not be aimed — it re-sent whatever came out
+   * last — and reaching it meant leaving the gathering, so a volunteer printing
+   * one label shut the door on everybody queueing at the kiosk. Both of those
+   * are asserted here in the negative: the binding survives, and the register
+   * does not move.
+   */
+  test('reprints a named child from the staff gate, and leaves the register alone', async ({
+    browser,
+    browserName,
+    page,
+    signedInAs,
+  }) => {
+    test.skip(browserName !== 'chromium', 'WebUSB is Chromium-only.');
+    await signedInAs('core');
+    const { context, page: kiosk } = await openKiosk(browser);
+
+    try {
+      await recordLabels(kiosk);
+      await kiosk.reload();
+
+      await pairKiosk(kiosk, page);
+      await bindTo(kiosk, /nursery/i);
+
+      // Check one in the ordinary way, so there is an evening to reprint from.
+      const row = await findOnKiosk(kiosk, REPRINTED);
+      await row.click();
+      await kiosk.getByRole('button', { name: /^Check in$/ }).click();
+      await expect(kiosk.getByText(/welcome/i)).toBeVisible();
+      await expectLabelCount(kiosk, 1);
+      await kiosk.getByText(/welcome/i).click();
+
+      // The staff gate, and the door that was not there before.
+      await hold(kiosk, '[data-key="clear"]');
+      await kiosk.getByRole('button', { name: /Reprint a name tag/i }).click();
+      await expect(kiosk.getByText(/reprint a name tag/i).first()).toBeVisible();
+
+      const reprintRow = await findOnKiosk(kiosk, REPRINTED);
+      await reprintRow.click();
+
+      /*
+       * The confirm shows what will print before the tape moves — and the
+       * commit is addressed by its accessible name rather than by its face,
+       * which is the stronger assertion of the two. The button reads "Print name
+       * tag" because the sticker beside it says whose; its `aria-label` carries
+       * the child, so what a screen reader and a test both get is "Print Zoe
+       * Lindqvist's name tag". Matching that proves the confirm is bound to the
+       * row that was tapped.
+       */
+      const commit = kiosk.getByRole('button', {
+        name: new RegExp(`Print ${REPRINTED}'s name tag`, 'i'),
+      });
+      await expect(commit).toBeVisible();
+      await commit.click();
+
+      await expectLabelCount(kiosk, 2);
+
+      // Back to the parent's screen, on the same gathering it never left.
+      await kiosk.getByRole('button', { name: /back to check-in/i }).click();
+      await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
+    } finally {
+      await context.close();
+    }
+  });
+
   test('prints nothing for a gathering with no label template', async ({
     browser,
     browserName,
@@ -587,9 +664,8 @@ test.describe('the kiosk', () => {
       expect(await accent()).toBe(themed);
 
       // Rebinding to an unthemed gathering puts it all back. The staff gate is
-      // a two-second hold on Clear, and then leaving the gathering.
-      await hold(kiosk, '[data-key="clear"]');
-      await kiosk.getByRole('button', { name: /^Leave / }).click();
+      // a two-second hold on Clear, then Change event, then leaving.
+      await leaveGathering(kiosk);
       await bindTo(kiosk, /friday fellowship/i);
 
       await expect(kiosk.locator('html')).toHaveAttribute('data-theme', 'dark');
@@ -645,18 +721,42 @@ test.describe('the kiosk', () => {
       await pairKiosk(kiosk, page);
       await bindTo(kiosk, /nursery/i);
 
-      // The hold is the gate; the question is what makes a findable gate safe.
+      // The hold is the gate, and what it opens is the doors: a volunteer who
+      // came to print a name tag never touches the one that shuts the kiosk.
       await hold(kiosk, '[data-key="clear"]');
+      await expect(kiosk.getByText('Staff')).toBeVisible();
+      await expect(kiosk.getByRole('button', { name: /Label printer/i })).toBeVisible();
+      /*
+       * This kiosk was never given a printer, so the reprint door is a sentence
+       * rather than a dead control — a greyed slab that answers a press with
+       * nothing is a frozen tablet as far as anybody standing there can tell.
+       * The kiosk that *does* print is the one in the reprint test above.
+       */
+      await expect(kiosk.getByText(/No printer on this kiosk/i)).toBeVisible();
+      await expect(kiosk.getByRole('button', { name: /Reprint a name tag/i })).toHaveCount(0);
+
+      // The warning belongs to the choice rather than to the act of looking, so
+      // it is on the far side of Change event.
+      await kiosk.getByRole('button', { name: /Change event/i }).click();
       await expect(kiosk.getByText(/Change event\?/i)).toBeVisible();
       await expect(kiosk.getByText(/Nobody can check in here/i)).toBeVisible();
 
-      // Declining lands back on the search screen, still on the gathering —
-      // the queue standing at the kiosk loses the seconds and nothing else.
+      /*
+       * Declining lands back on the menu it was opened from, not out at the
+       * front door — a volunteer who mis-tapped the row above the one they
+       * wanted is one tap from the right one, rather than another two-second
+       * hold with a parent standing there. The way out of the menu is its own
+       * tap, and that one does reach the search screen, still on the gathering:
+       * the queue loses the seconds and nothing else.
+       */
+      await kiosk.getByRole('button', { name: /Keep checking in/i }).click();
+      await expect(kiosk.getByText(/Change event\?/i)).toHaveCount(0);
+      await expect(kiosk.getByText('Staff')).toBeVisible();
+
       await kiosk.getByRole('button', { name: /Keep checking in/i }).click();
       await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
 
-      await hold(kiosk, '[data-key="clear"]');
-      await kiosk.getByRole('button', { name: /^Leave /i }).click();
+      await leaveGathering(kiosk);
       await expect(kiosk.getByText(/which gathering/i)).toBeVisible();
     } finally {
       await context.close();
