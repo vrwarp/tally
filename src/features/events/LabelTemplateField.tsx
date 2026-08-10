@@ -80,6 +80,12 @@ function blankLine(): LabelLine {
   return { text: '', size: 'md', bold: false, align: 'center', requiresValue: false };
 }
 
+function numberOrUndefined(raw: string): number | undefined {
+  if (raw.trim() === '') return undefined;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
 /** What the checkbox that drops a line is called, quoted in the hint below. */
 const REQUIRES_VALUE_LABEL = 'Only if filled in';
 
@@ -94,6 +100,60 @@ const REQUIRES_VALUE_LABEL = 'Only if filled in';
  */
 function leftoverText(text: string): string {
   return tokensIn(text).length === 0 ? '' : fillLabelTokens(text, {});
+}
+
+/**
+ * The length of a fixed-length label, which is allowed to be empty while it is
+ * being retyped.
+ *
+ * Its own component because it needs its own draft, and it needs a draft
+ * because `undefined` already means something here that it does not mean for
+ * the margins beside it. There, absent is "no opinion, let the renderer decide"
+ * — so an emptied box can simply store nothing and show the default faded
+ * behind. Here, absent is the *off* state of the tick box above, and the
+ * condition this field is rendered under at all: storing it on the first
+ * backspace would untick the box and pull the input out from under the caret.
+ *
+ * So an empty box is held locally rather than written up. The template keeps the
+ * last length that parsed — a half-typed number is not a shape anybody asked to
+ * print — and blur decides what an abandoned empty box meant: the default,
+ * because turning the setting off is what the tick box is for.
+ */
+function FixedLengthField({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (next: number) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+
+  return (
+    <TextField
+      label="Length (mm)"
+      type="number"
+      inputMode="decimal"
+      min={MIN_LABEL_FIXED_LENGTH_MM}
+      max={MAX_LABEL_FIXED_LENGTH_MM}
+      step={1}
+      className="w-36"
+      value={draft ?? String(value)}
+      placeholder={String(DEFAULT_FIXED_LENGTH_MM)}
+      onChange={(changed) => {
+        setDraft(changed.target.value);
+        const parsed = numberOrUndefined(changed.target.value);
+        if (parsed !== undefined) onChange(parsed);
+      }}
+      onBlur={() => {
+        if (draft !== null && numberOrUndefined(draft) === undefined) {
+          onChange(DEFAULT_FIXED_LENGTH_MM);
+        }
+        // Back to following the template, so a length changed from elsewhere —
+        // or the box ticked again after being cleared — shows up here.
+        setDraft(null);
+      }}
+    />
+  );
 }
 
 export function LabelTemplateField({
@@ -192,12 +252,6 @@ export function LabelTemplateField({
       if (entry === undefined) delete next[key as keyof LabelTemplate];
     }
     onChange(next);
-  };
-
-  const numberOrUndefined = (raw: string): number | undefined => {
-    if (raw.trim() === '') return undefined;
-    const parsed = Number(raw);
-    return Number.isFinite(parsed) ? parsed : undefined;
   };
 
   const insertToken = (index: number, token: string) => {
@@ -524,21 +578,9 @@ export function LabelTemplateField({
                       }
                     />
                     {value.fixedLengthMm === undefined ? null : (
-                      <TextField
-                        label="Length (mm)"
-                        type="number"
-                        inputMode="decimal"
-                        min={MIN_LABEL_FIXED_LENGTH_MM}
-                        max={MAX_LABEL_FIXED_LENGTH_MM}
-                        step={1}
-                        className="w-36"
+                      <FixedLengthField
                         value={value.fixedLengthMm}
-                        onChange={(changed) =>
-                          patchShape({
-                            fixedLengthMm:
-                              numberOrUndefined(changed.target.value) ?? DEFAULT_FIXED_LENGTH_MM,
-                          })
-                        }
+                        onChange={(next) => patchShape({ fixedLengthMm: next })}
                       />
                     )}
                   </div>
