@@ -69,10 +69,26 @@ function painted(theme: KioskTheme): Record<string, string> {
   return { ...base, ...(kioskPalette(theme) ?? {}) };
 }
 
-/** One hue as it would land in a given slot, for the swatch. */
+/**
+ * One hue as it would land in a given slot, for the swatch.
+ *
+ * `brand` and `present` are read at 400 on either ground. `ink` cannot be, and
+ * the reason is the ramp rather than a preference: it inverts between the two
+ * grounds, so `ink-700` is a mid slate on a dark ground (L .37, C .039) but a
+ * near-white on a light one (L .87, C .028) — and a hue turn that close to
+ * white is a turn nobody can see, whatever chroma it carries. It made the light
+ * room row nine circles of the same pale grey.
+ *
+ * So the light ground reads `ink-500` instead, which is where that ramp keeps
+ * its chroma (C .041 — what the dark row has always shown, so the two rows
+ * separate by the same amount). It is a step the light kiosk really paints,
+ * secondary text on the cards, so the circle is still the room's own colour and
+ * not a swatch-only invention. What the wash itself looks like is the preview's
+ * job, and the preview is underneath.
+ */
 function swatch(theme: KioskTheme, slot: Slot, hue: string): string {
   const family = slot === 'accent' ? 'brand' : slot === 'confirm' ? 'present' : 'ink';
-  const step = slot === 'backdrop' ? '700' : '400';
+  const step = slot !== 'backdrop' ? '400' : theme.ground === 'light' ? '500' : '700';
   return painted({ ...theme, [slot]: hue })[`--color-${family}-${step}`];
 }
 
