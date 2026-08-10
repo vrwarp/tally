@@ -781,12 +781,27 @@ describe('who each child already is', () => {
   });
 
   it('asks nothing about a child the push already linked', async () => {
+    // Cast for the same reason every other `fetchRoster` double here is cast:
+    // `RosterResult` carries five bookkeeping fields this assertion has no
+    // opinion about, and spelling them out would bury what the test is for.
     const backend = backendWith({
       findStudentCandidates: vi.fn(async () => []),
       fetchRoster: vi.fn(async () => ({
-        people: [{ pcoPersonId: '55', firstName: 'Robin', lastName: 'Fields', grade: 4 }],
+        people: [
+          {
+            id: 'pco_55',
+            pcoPersonId: '55',
+            backendId: 'pco' as const,
+            firstName: 'Robin',
+            lastName: 'Fields',
+            grade: 4,
+            status: 'active' as const,
+            searchName: 'robin fields',
+          },
+        ],
+        unresolved: [],
       })),
-    });
+    } as unknown as Partial<PeopleBackend>);
     const db = dbWithRegistration({}, ['held-1']);
     db.seed('students/held-1', {
       firstName: 'Robin',
