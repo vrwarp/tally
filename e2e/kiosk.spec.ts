@@ -716,7 +716,15 @@ test.describe('the kiosk', () => {
       // came to print a name tag never touches the one that shuts the kiosk.
       await hold(kiosk, '[data-key="clear"]');
       await expect(kiosk.getByText('Staff')).toBeVisible();
-      await expect(kiosk.getByRole('button', { name: /Reprint a name tag/i })).toBeVisible();
+      await expect(kiosk.getByRole('button', { name: /Label printer/i })).toBeVisible();
+      /*
+       * This kiosk was never given a printer, so the reprint door is a sentence
+       * rather than a dead control — a greyed slab that answers a press with
+       * nothing is a frozen tablet as far as anybody standing there can tell.
+       * The kiosk that *does* print is the one in the reprint test above.
+       */
+      await expect(kiosk.getByText(/No printer on this kiosk/i)).toBeVisible();
+      await expect(kiosk.getByRole('button', { name: /Reprint a name tag/i })).toHaveCount(0);
 
       // The warning belongs to the choice rather than to the act of looking, so
       // it is on the far side of Change event.
