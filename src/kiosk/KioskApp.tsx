@@ -1189,6 +1189,23 @@ export function KioskApp() {
     [binding, printing],
   );
 
+  /**
+   * Whether a staff surface should say the printer may not come through.
+   *
+   * Broader than the amber dot a parent gets, and deliberately so. That dot is
+   * `kind === 'trouble'` only — "a kiosk with no printer is not a kiosk with a
+   * broken one, and neither is one whose printer is simply unpaired" — because a
+   * parent can do nothing about any of it and a warning beside a green tick
+   * reads as a failed check-in.
+   *
+   * A volunteer is not a parent. `unpaired` is the state a browser restart
+   * leaves behind, and it is exactly when somebody standing at the printer wants
+   * to be told that the next press may produce nothing — while still being
+   * allowed to try, because the queue's `send` reopens the device for this case
+   * rather than failing.
+   */
+  const printerUnready = printerState !== null && printerState.kind !== 'ready';
+
   /** Leaving the staff flow, by hand or by the gate's own clock. */
   const leaveStaff = useCallback(() => {
     setOverlay(null);
@@ -1446,8 +1463,25 @@ export function KioskApp() {
           <StaffScreen
             title={binding.title}
             window={eventWindow(binding)}
+            /*
+             * `none` means *there is nothing here to print*, and nothing else.
+             *
+             * It used to include `unpaired`, which was wrong in the direction
+             * that costs a volunteer a label: a kiosk whose printer is
+             * configured but not currently claimed — a browser restarted, a
+             * device replugged without a connect event landing — reports
+             * `unpaired`, and the queue's `send` deliberately reopens rather
+             * than failing for exactly that case. So the door was refusing a
+             * reprint the printer would have made, and the person standing
+             * there was told to go away by a kiosk that worked.
+             *
+             * A printer that is configured and not ready is a printer that
+             * needs attention, which is what the word says. The reprint screens
+             * carry the same warning, and the attempt is what discovers the
+             * truth.
+             */
             printer={
-              printerState === null || printerState.kind === 'idle' || printerState.kind === 'unpaired'
+              !prints || printerState === null || printerState.kind === 'idle'
                 ? 'none'
                 : printerState.kind === 'ready'
                   ? 'ready'
@@ -1468,7 +1502,7 @@ export function KioskApp() {
             outcome={reprintOutcome}
             presentIds={presentIds}
             sentId={sentId}
-            printerNeedsAttention={printerState?.kind === 'trouble'}
+            printerNeedsAttention={printerUnready}
             onKey={onKey}
             onPick={(student) => {
               // Warmed on the tap, the same trick the confirm screen plays: the
@@ -1484,7 +1518,7 @@ export function KioskApp() {
             student={overlay.student}
             lines={labelLinesFor(overlay.student)}
             printedAt={lastPrintedAt(overlay.student.id)}
-            printerNeedsAttention={printerState?.kind === 'trouble'}
+            printerNeedsAttention={printerUnready}
             onPrint={() => {
               reprintFor(overlay.student);
               setOverlay({ kind: overlay.from === 'printer' ? 'printer' : 'reprint' });

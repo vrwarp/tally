@@ -68,7 +68,18 @@ const printing = {
   forgetAllergies: vi.fn(),
   forgetGathering: vi.fn(),
   currentState: vi.fn(() => ({ kind: 'ready' as const, config: { model: 'QL-810W', label: '62x29' } })),
-  subscribe: vi.fn(() => () => {}),
+  /*
+   * Pushes on subscribe, because the real one does (`printing/index.ts`), and a
+   * fake that does not is a kiosk that never learns its printer state — which is
+   * how a door disabled in every browser stayed green in every unit test. jsdom
+   * dispatches `pointerdown` at a disabled button and React runs the handler;
+   * a real browser does neither, so the end-to-end suite failed on a control
+   * these tests had been happily pressing.
+   */
+  subscribe: vi.fn((listener: (state: unknown) => void) => {
+    listener(printing.currentState());
+    return () => {};
+  }),
   ready: vi.fn(async () => ({ kind: 'ready' as const, config: { model: 'QL-810W', label: '62x29' } })),
   reprintLabel: vi.fn(),
   printedTonight: vi.fn(() => []),
@@ -243,6 +254,39 @@ describe('the staff reprint flow', () => {
     expect(localStorage.getItem(KIOSK_KEYS.binding)).not.toBeNull();
     expect(screen.getByText('Sunday Nursery')).toBeTruthy();
     expect(screen.queryByText(/Staff · reprint a name tag/i)).toBeNull();
+  });
+
+  /*
+   * The gating bug the end-to-end suite found, pinned where it is cheap to run.
+   *
+   * A kiosk whose printer is configured but not currently claimed — a browser
+   * restarted, a device replugged without a connect event landing — reports
+   * `unpaired`, and the queue's `send` reopens for exactly that case rather than
+   * failing. Refusing the door on that state told a volunteer to go away from a
+   * kiosk that would have printed.
+   */
+  it('opens the reprint door on a printer that is configured but not claimed', async () => {
+    vi.mocked(printing.currentState).mockReturnValue({ kind: 'unpaired' });
+    await mount();
+    await holdClear();
+
+    const door = screen.getByText(/Reprint a name tag/i).closest('button')!;
+    expect(door).not.toBeDisabled();
+    // And it says what it knows, because this is staff glass — one word beside
+    // the printer's own door, and the sentence itself on the screen behind it.
+    expect(screen.getByText(/^Trouble$/i)).toBeTruthy();
+
+    await tap(/Reprint a name tag/i);
+    expect(screen.getByText(/Staff · reprint a name tag/i)).toBeTruthy();
+    expect(screen.getByText(/Printer needs attention/i)).toBeTruthy();
+  });
+
+  /* The other direction: nothing to print to, so nothing to press. */
+  it('offers no reprint door on a gathering that prints nothing', async () => {
+    await mount(binding({ labelTemplate: undefined }));
+    await holdClear();
+
+    expect(screen.getByText(/Reprint a name tag/i).closest('button')).toBeDisabled();
   });
 
   it('hands the kiosk back on its own when the volunteer walks away', async () => {

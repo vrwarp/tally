@@ -320,23 +320,30 @@ export function PrinterScreen({
             </div>
           </details>
 
-          {/* The saturated control on a screen about reprinting used to be
-              **Choose a different printer** — the one that unbinds the printer —
-              and a hurried volunteer aims at colour. It is the by-name reprint
-              instead: the door this screen is now open for. */}
+          {/*
+            * The saturated control on a screen about reprinting used to be
+            * **Choose a different printer** — the one that unbinds the printer —
+            * and a hurried volunteer aims at colour. It is the by-name reprint
+            * instead: the door this screen is now open for.
+            *
+            * Not gated on the device, unlike its two neighbours. This is the
+            * one control in the column that goes to another screen rather than
+            * talking to the printer, and a door disabled because a transport is
+            * not claimed is a door that refuses the errand the reprint screen
+            * exists to report on.
+            */}
           {onReprintByName && (
-          <button
-            type="button"
-            tabIndex={-1}
-            disabled={state.kind !== 'ready'}
-            onPointerDown={() => {
-              haptic();
-              onReprintByName();
-            }}
-            className="flex h-16 w-full shrink-0 items-center justify-center rounded-xl bg-brand-600 text-lg font-semibold text-white active:bg-brand-500 disabled:opacity-50 kiosk:h-20 kiosk:text-xl"
-          >
-            Reprint a name tag
-          </button>
+            <button
+              type="button"
+              tabIndex={-1}
+              onPointerDown={() => {
+                haptic();
+                onReprintByName();
+              }}
+              className="flex h-16 w-full shrink-0 items-center justify-center rounded-xl bg-brand-600 text-lg font-semibold text-white active:bg-brand-500 kiosk:h-20 kiosk:text-xl"
+            >
+              Reprint a name tag
+            </button>
           )}
 
           {/* One size across the three secondary doors, and let colour do the
