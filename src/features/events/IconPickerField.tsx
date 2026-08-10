@@ -8,7 +8,7 @@
  * disclosure: a row stating the current choice, which opens a searchable grid
  * underneath it and collapses again the moment something is picked.
  *
- * The grid is capped and scrolls on its own. Seventy-eight icons is four
+ * The grid is capped and scrolls on its own. A hundred-odd icons is five
  * screens of thumb-sized tiles, and a picker that pushes the Save button off
  * the bottom of the form is a picker people close without choosing anything.
  */
