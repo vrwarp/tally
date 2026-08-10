@@ -45,7 +45,15 @@ const SCENES: {
   scrollToEnd?: boolean;
 }[] = [
   { id: 'staff', query: 'screen=staff', views: ['phone', 'kiosktall', 'kioskwide'] },
-  { id: 'staff-trouble', query: 'screen=staff&printer=trouble', views: ['phone'] },
+  /*
+   * The three states of the one row that carries state, at the sizes where the
+   * group is read as a group. The staff screen is four controls that mean four
+   * different things, and the only one that ever changes is the middle: if the
+   * set does not hold together across `Ready` / `Trouble` / `Not set up`, it
+   * does not hold together at all.
+   */
+  { id: 'staff-trouble', query: 'screen=staff&printer=trouble', views: ['phone', 'kiosktall', 'kioskwide'] },
+  { id: 'staff-none', query: 'screen=staff&printer=none', views: ['phone', 'kiosktall'] },
   { id: 'reprint-idle', query: '', views: ['phone', 'kiosktall', 'kioskwide'] },
   { id: 'reprint-typed', query: 'buffer=Alva&present=2', views: ['phone', 'kiosktall', 'kioskwide'] },
   { id: 'reprint-capped', query: 'buffer=Al&present=2', views: ['phone', 'kioskwide'] },
