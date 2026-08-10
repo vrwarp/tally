@@ -57,6 +57,19 @@ beforeEach(() => {
   recordExamination.mockClear();
 });
 
+/**
+ * What the registry read hands back: the chains it could read, and the chains
+ * it was refused. Refusals are a channel of their own — see `SkippedNightsRead`
+ * — so a mock that returns a bare map is a mock of something that cannot happen.
+ */
+const read = (
+  byChain: Map<string, unknown> = new Map(),
+  denied: string[] = [],
+): { byChain: Map<string, unknown>; denied: Set<string> } => ({
+  byChain,
+  denied: new Set(denied),
+});
+
 /** A registry that has examined the whole window and found `skipped` empty. */
 const covering = (skipped: string[] = []) =>
   new Map([
@@ -68,7 +81,7 @@ const covering = (skipped: string[] = []) =>
 
 describe('useProfileHistory, when the registry covers the chain', () => {
   it('reads no registers at all', async () => {
-    fetchSkippedNights.mockResolvedValue(covering(['nobody']));
+    fetchSkippedNights.mockResolvedValue(read(covering(['nobody'])));
 
     const { result } = renderHook(() =>
       useProfileHistory(STUDENT, [CAME, MISSED, NOBODY], WINDOW_START),
@@ -82,7 +95,7 @@ describe('useProfileHistory, when the registry covers the chain', () => {
   });
 
   it('tells the three kinds of night apart', async () => {
-    fetchSkippedNights.mockResolvedValue(covering(['nobody']));
+    fetchSkippedNights.mockResolvedValue(read(covering(['nobody'])));
 
     const { result } = renderHook(() =>
       useProfileHistory(STUDENT, [CAME, MISSED, NOBODY], WINDOW_START),
@@ -104,7 +117,7 @@ describe('useProfileHistory, when the registry covers the chain', () => {
   });
 
   it('writes nothing back when it learned nothing new', async () => {
-    fetchSkippedNights.mockResolvedValue(covering(['nobody']));
+    fetchSkippedNights.mockResolvedValue(read(covering(['nobody'])));
 
     const { result } = renderHook(() => useProfileHistory(STUDENT, [CAME, MISSED], WINDOW_START));
 
@@ -117,16 +130,18 @@ describe('useProfileHistory, when the registry has not examined a night', () => 
   it('reads the nights it does not know, and only those', async () => {
     // Covered from January, so December is beyond the watermark.
     fetchSkippedNights.mockResolvedValue(
-      new Map([
-        [
-          'friday',
-          {
-            chainKey: 'friday',
-            skipped: new Set<string>(),
-            examinedFrom: new Date('2026-01-01T00:00:00'),
-          },
-        ],
-      ]),
+      read(
+        new Map([
+          [
+            'friday',
+            {
+              chainKey: 'friday',
+              skipped: new Set<string>(),
+              examinedFrom: new Date('2026-01-01T00:00:00'),
+            },
+          ],
+        ]),
+      ),
     );
     const december = night('december', '2025-12-12');
     fetchAttendanceByEvent.mockResolvedValue({
@@ -143,7 +158,7 @@ describe('useProfileHistory, when the registry has not examined a night', () => 
   });
 
   it('writes down what it found so nobody pays for it again', async () => {
-    fetchSkippedNights.mockResolvedValue(new Map());
+    fetchSkippedNights.mockResolvedValue(read());
     fetchAttendanceByEvent.mockResolvedValue({
       byEvent: new Map([
         ['came', { present: new Set(['ada']), checkedOut: new Set() }],
@@ -166,7 +181,7 @@ describe('useProfileHistory, when the registry has not examined a night', () => 
   });
 
   it('does not let a failed write break a page whose numbers are right', async () => {
-    fetchSkippedNights.mockResolvedValue(new Map());
+    fetchSkippedNights.mockResolvedValue(read());
     fetchAttendanceByEvent.mockResolvedValue({
       byEvent: new Map([['came', { present: new Set(['ada']), checkedOut: new Set() }]]),
       denied: new Set(),
@@ -193,7 +208,7 @@ describe('useProfileHistory, when a gathering is not the reader’s', () => {
      * that ran perfectly well never happened, and would quietly stop counting
      * it against anybody's attendance.
      */
-    fetchSkippedNights.mockResolvedValue(new Map());
+    fetchSkippedNights.mockResolvedValue(read());
     fetchAttendanceByEvent.mockResolvedValue({
       byEvent: new Map([['came', { present: new Set(['ada']), checkedOut: new Set() }]]),
       denied: new Set(['sunday']),
@@ -222,7 +237,7 @@ describe('useProfileHistory, when a gathering is not the reader’s', () => {
      *
      * One reader's missing permission becomes everybody's wrong history.
      */
-    fetchSkippedNights.mockResolvedValue(new Map());
+    fetchSkippedNights.mockResolvedValue(read());
     fetchAttendanceByEvent.mockResolvedValue({
       byEvent: new Map([['came', { present: new Set(['ada']), checkedOut: new Set() }]]),
       denied: new Set(['sunday']),
@@ -238,13 +253,74 @@ describe('useProfileHistory, when a gathering is not the reader’s', () => {
     expect(chains).toContain('friday');
     expect(chains).not.toContain('sunday-school');
   });
+
+  /*
+   * The registry read is refused by the same rule as the register — `allow get:
+   * if isActive() && onChain(chainKey)` — and it happens first, in the same
+   * `Promise.all` as the callable. So this is the refusal a real profile meets,
+   * and until it was given a channel of its own it rejected the whole resolve:
+   * a core member off one restricted gathering got "Could not load attendance
+   * history" over "No gatherings on record yet", on every student, including the
+   * ones they had checked in that morning.
+   */
+  it('loses the gathering it was refused, not the year around it', async () => {
+    fetchSkippedNights.mockResolvedValue(read(covering(), ['sunday-school']));
+
+    const { result } = renderHook(() =>
+      useProfileHistory(STUDENT, [CAME, MISSED, SUNDAY], WINDOW_START),
+    );
+
+    await waitFor(() => expect(result.current.snapshots).toHaveLength(2));
+    expect(result.current.error).toBeNull();
+    expect(result.current.snapshots.map((snapshot) => snapshot.event.id)).toEqual([
+      'came',
+      'missed',
+    ]);
+    expect(result.current.withheld).toEqual(new Set(['sunday']));
+  });
+
+  it('does not go on to read the registers of a chain it was just refused', async () => {
+    // Every one of those nights is gated by the rule that refused the registry,
+    // so reading them is a few hundred round trips to be told the same thing.
+    fetchSkippedNights.mockResolvedValue(read(covering(), ['sunday-school']));
+
+    const { result } = renderHook(() =>
+      useProfileHistory(STUDENT, [CAME, SUNDAY], WINDOW_START),
+    );
+
+    await waitFor(() => expect(result.current.snapshots).toHaveLength(1));
+    expect(fetchAttendanceByEvent).not.toHaveBeenCalled();
+    // And the watermark stays unwritten for it, for the reason above.
+    const chains = (recordExamination.mock.calls as unknown as Array<[{ chainKey: string }]>).map(
+      ([args]) => args.chainKey,
+    );
+    expect(chains).not.toContain('sunday-school');
+  });
+
+  it('drops the nights of a chain the callable withheld without reading them', async () => {
+    // The other half's refusal, which the callable states outright. Same
+    // gathering, same rule, same conclusion — so it takes the same path.
+    fetchSkippedNights.mockResolvedValue(read(covering()));
+    fetchStudentAttendanceSince.mockResolvedValue({
+      eventIds: new Set(['came']),
+      withheld: new Set(['sunday-school']),
+    });
+
+    const { result } = renderHook(() =>
+      useProfileHistory(STUDENT, [CAME, SUNDAY], WINDOW_START),
+    );
+
+    await waitFor(() => expect(result.current.snapshots).toHaveLength(1));
+    expect(result.current.withheld).toEqual(new Set(['sunday']));
+    expect(fetchAttendanceByEvent).not.toHaveBeenCalled();
+  });
 });
 
 describe('useProfileHistory, on a one-off', () => {
   it('reads it directly rather than inventing a chain for it', async () => {
     // `chainKey` falls back to the event's own id for a one-off, so a registry
     // would be one document per event and would save nothing.
-    fetchSkippedNights.mockResolvedValue(new Map());
+    fetchSkippedNights.mockResolvedValue(read());
     const retreat = makeEvent({
       id: 'retreat',
       mode: 'oneoff',

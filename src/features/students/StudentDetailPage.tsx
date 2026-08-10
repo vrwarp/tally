@@ -62,7 +62,7 @@ import { chainKey } from '@/lib/materialize';
 import { pcoPersonUrl } from '@/lib/planningCenter';
 import { sessionOutcome, type SessionOutcome } from '@/lib/sessionHistory';
 import { formatRelative, formatShortDate } from '@/lib/time';
-import { cn, formatPhone, gradeLabel, initials } from '@/lib/utils';
+import { cn, formatPhone, gradeLabel, initials, joinList } from '@/lib/utils';
 import {
   addRosterMember,
   pushStudentToPlanningCenter,
@@ -145,9 +145,42 @@ export function StudentDetailPage() {
    */
   const {
     snapshots,
+    withheld,
     loading: historyLoading,
     error: historyError,
   } = useProfileHistory(student, recentEvents, historyWindowStart(now));
+
+  /**
+   * The gatherings left out of everything above, by name.
+   *
+   * A profile that quietly drops a gathering is a profile that under-reports
+   * somebody's attendance to the person deciding whether to ring their family:
+   * the streak, the last-seen date and the grid are all built from the same
+   * snapshots, and none of them can carry a night this reader was never shown.
+   * So the omission is stated, and stated by name — "some of this is missing"
+   * leaves a leader guessing at how much.
+   *
+   * Named from `series` first, exactly as `groupByGathering` does, so a
+   * gathering reads the same here as it does in the headers below.
+   */
+  const withheldTitles = useMemo(() => {
+    if (withheld.size === 0) return [];
+
+    const seriesTitles = new Map(series.map((entry) => [entry.id, entry.title]));
+    const byChain = new Map<string, string>();
+
+    for (const event of recentEvents) {
+      if (!withheld.has(event.id)) continue;
+      const key = chainKey(event);
+      if (byChain.has(key)) continue;
+      byChain.set(
+        key,
+        (event.seriesId ? seriesTitles.get(event.seriesId) : undefined) ?? event.title,
+      );
+    }
+
+    return [...byChain.values()].sort((a, b) => a.localeCompare(b));
+  }, [withheld, recentEvents, series]);
 
   /**
    * When this student was first and last actually seen.
@@ -758,6 +791,21 @@ export function StudentDetailPage() {
         {historyError ? (
           <div className="px-4 pb-3">
             <ErrorBanner message={`Could not load attendance history. ${historyError}`} />
+          </div>
+        ) : null}
+
+        {withheldTitles.length > 0 ? (
+          <div className="px-4 pb-3">
+            {/* Not an error — being off one gathering is an ordinary thing to
+                be, and a red banner over it would read as a fault to fix. It
+                is a footnote on the numbers, so it looks like one. */}
+            <p className="rounded-xl bg-ink-950 px-3 py-2 text-xs text-ink-400 ring-1 ring-ink-800">
+              {joinList(withheldTitles)}{' '}
+              {withheldTitles.length === 1 ? 'is' : 'are'} left out — not{' '}
+              {withheldTitles.length === 1 ? 'a gathering' : 'gatherings'} you work. Nothing above
+              counts those nights, so this is a shorter history than somebody on{' '}
+              {withheldTitles.length === 1 ? 'it' : 'them'} would see.
+            </p>
           </div>
         ) : null}
 

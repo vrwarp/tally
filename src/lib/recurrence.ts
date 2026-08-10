@@ -20,6 +20,7 @@ import {
   type RecurrenceFrequency,
   type RecurrenceRule,
 } from '@/lib/recurrenceCore';
+import { joinList } from '@/lib/utils';
 
 export * from '@/lib/recurrenceCore';
 
@@ -63,12 +64,6 @@ export function retimeRecurrence(
 /* -------------------------------------------------------------------------- */
 /* Describing                                                                  */
 /* -------------------------------------------------------------------------- */
-
-function joinList(parts: readonly string[]): string {
-  if (parts.length <= 1) return parts[0] ?? '';
-  if (parts.length === 2) return `${parts[0]} and ${parts[1]}`;
-  return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
-}
 
 /** "the third Tuesday" / "the last Friday", phrased from the anchor. */
 export function describeMonthlyWeekday(anchor: Date): string {

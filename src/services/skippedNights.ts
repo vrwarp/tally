@@ -44,6 +44,7 @@
 import { arrayRemove, arrayUnion, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { paths } from '@/lib/paths';
+import { isPermissionDenied } from '@/lib/permissionDenied';
 import { toDateOrNull } from '@/services/converters';
 
 /** What one chain's document says about its own nights. */
@@ -92,27 +93,65 @@ function toSkippedNights(chainKey: string, data: Record<string, unknown> | undef
 }
 
 /**
+ * What a registry read came back with, and what it was refused.
+ *
+ * Two channels, the same shape as `EventAttendanceRead` and for the same
+ * reason. These documents are gated on the gathering — `skippedNights` allows
+ * `get` only `if isActive() && onChain(chainKey)` — so a reader who is not on
+ * one gathering out of five is refused its registry, and that refusal is a
+ * settled fact about them rather than a fault.
+ *
+ * A refusal must not arrive as an absent entry. Absent means "nobody has
+ * examined this chain", which sends the caller off to read the chain's nights
+ * one register at a time — every one of which is gated on the same chain and
+ * will be refused in turn. The caller has to be able to tell "unknown" from
+ * "not yours", so it is told.
+ */
+export interface SkippedNightsRead {
+  byChain: Map<string, SkippedNights>;
+  /** Chain keys whose registry the caller may not read. */
+  denied: Set<string>;
+}
+
+/**
  * Reads the document for each chain, newest state, one read apiece.
  *
  * A chain with no document yet comes back absent rather than empty — absent
  * means "nothing has been examined", and an empty document would mean "examined,
  * nothing skipped", which is the opposite conclusion.
+ *
+ * Per chain, not per batch. Rejecting the whole read on the first refusal is
+ * what this used to do, and it meant one restricted Sunday took down a whole
+ * year of every student's history — on a profile that then said "no gatherings
+ * on record yet" over a student somebody had checked in that morning. Only a
+ * refusal is swallowed; a network failure still rejects, because that is worth
+ * retrying and worth saying out loud.
  */
 export async function fetchSkippedNights(
   chainKeys: readonly string[],
-): Promise<Map<string, SkippedNights>> {
+): Promise<SkippedNightsRead> {
   const unique = [...new Set(chainKeys)];
+  const denied = new Set<string>();
 
   const entries = await Promise.all(
     unique.map(async (chainKey) => {
-      const snapshot = await getDoc(doc(db, paths.skippedNights(chainKey)));
-      return snapshot.exists()
-        ? ([chainKey, toSkippedNights(chainKey, snapshot.data())] as const)
-        : null;
+      try {
+        const snapshot = await getDoc(doc(db, paths.skippedNights(chainKey)));
+        return snapshot.exists()
+          ? ([chainKey, toSkippedNights(chainKey, snapshot.data())] as const)
+          : null;
+      } catch (cause) {
+        if (!isPermissionDenied(cause)) throw cause;
+        denied.add(chainKey);
+        return null;
+      }
     }),
   );
 
-  return new Map(entries.filter((entry): entry is NonNullable<typeof entry> => entry !== null));
+  return {
+    byChain: new Map(entries.filter((entry): entry is NonNullable<typeof entry> => entry !== null)),
+    denied,
+  };
 }
 
 /**

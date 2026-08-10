@@ -11,6 +11,11 @@
  * whether or not it is near, and that the way to fix it is the same
  * `EditBirthday` the roster badge opens — behind the same gate, which the
  * server answers and this page never guesses at.
+ *
+ * Below that, the other thing this page must not be quiet about: the gatherings
+ * its reader was not shown. Same principle as the birthday — the profile is the
+ * screen that says what is true about a student, so what it cannot see it has
+ * to name rather than leave as a shorter-looking history.
  */
 import type { ReactNode } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -22,7 +27,7 @@ import { DataContext, type DataContextValue } from '@/context/dataContext';
 import { ToastContext, type ToastContextValue } from '@/context/toastContext';
 import { StudentDetailPage } from '@/features/students/StudentDetailPage';
 import type { PcoPersonDetails, Student } from '@/types';
-import { makeSettings, makeStudent } from '../../../tests/factories';
+import { makeEvent, makeSettings, makeStudent } from '../../../tests/factories';
 
 const updateStudentProfile = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<{ data: { status: string; wrote: string[]; message: string } }>>(
@@ -51,8 +56,17 @@ vi.mock('@/services/students', () => ({ setStudentStatus: vi.fn(), updateStudent
  * say about a birthday, and importing them reaches the service layer, which
  * calls `initializeApp` at module scope.
  */
+const profileHistory = vi.hoisted(() => ({
+  /** Event ids the reader was refused, as `useProfileHistory` reports them. */
+  withheld: new Set<string>(),
+}));
 vi.mock('@/features/students/useProfileHistory', () => ({
-  useProfileHistory: () => ({ snapshots: [], loading: false, error: null }),
+  useProfileHistory: () => ({
+    snapshots: [],
+    withheld: profileHistory.withheld,
+    loading: false,
+    error: null,
+  }),
 }));
 vi.mock('@/features/students/EarlierAttendance', () => ({ EarlierAttendance: () => null }));
 
@@ -106,7 +120,7 @@ function linked(overrides: Partial<Student> = {}): Student {
   });
 }
 
-function openProfile(student: Student) {
+function openProfile(student: Student, over: Partial<DataContextValue> = {}) {
   vi.setSystemTime(NOW);
 
   const data = {
@@ -123,6 +137,7 @@ function openProfile(student: Student) {
     rosterFetchedAt: null,
     refreshRoster,
     applyRosterPerson,
+    ...over,
   } as unknown as DataContextValue;
 
   const auth = { user: { uid: 'core-1' }, can: () => true } as unknown as AuthContextValue;
@@ -154,6 +169,56 @@ beforeEach(() => {
   show.mockClear();
   personDetails.current = details();
   personDetails.loading = false;
+  profileHistory.withheld = new Set<string>();
+});
+
+/**
+ * What the profile says about the part of the history it was not shown.
+ *
+ * Per-gathering access means a counselor who works Fridays and not Sundays is
+ * refused the Sunday register — by design, and an ordinary thing to be. What is
+ * not ordinary is a page that silently answers a shorter question: the streak,
+ * the last-seen date and the grid are all built from the nights that came back,
+ * so a dropped gathering makes a student look like they come less than they do,
+ * on the screen somebody reads before deciding whether to ring their family.
+ */
+describe('a gathering the reader is not on', () => {
+  const friday = makeEvent({
+    id: 'friday-night',
+    title: 'Friday Fellowship',
+    seriesId: 'friday',
+    startAt: new Date(2026, 2, 6, 19, 0),
+    endAt: new Date(2026, 2, 6, 21, 0),
+  });
+  const sunday = makeEvent({
+    id: 'sunday-morning',
+    title: 'A title nobody typed',
+    seriesId: 'sunday-school',
+    startAt: new Date(2026, 2, 8, 9, 0),
+    endAt: new Date(2026, 2, 8, 11, 0),
+  });
+  const series = [
+    { id: 'friday', title: 'Friday Fellowship' },
+    { id: 'sunday-school', title: 'Sunday School' },
+  ];
+
+  it('names it, and says the numbers above do not count it', () => {
+    profileHistory.withheld = new Set(['sunday-morning']);
+
+    openProfile(linked(), { events: [friday, sunday], series } as Partial<DataContextValue>);
+
+    // By name — "some of this is missing" leaves a leader guessing at how much.
+    // The series title, not the occurrence's own, so it reads the same here as
+    // in the gathering headers below it.
+    expect(screen.getByText(/Sunday School is left out/)).toBeInTheDocument();
+    expect(screen.getByText(/Nothing above counts those nights/)).toBeInTheDocument();
+  });
+
+  it('says nothing at all when the whole history was theirs to see', () => {
+    openProfile(linked(), { events: [friday, sunday], series } as Partial<DataContextValue>);
+
+    expect(screen.queryByText(/left out/)).not.toBeInTheDocument();
+  });
 });
 
 describe('the birthday on a student profile', () => {
