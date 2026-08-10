@@ -31,7 +31,7 @@ import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { readCollection, writeDocument, type WritableValue } from './support/emulator';
 import { test } from './support/fixtures';
-import { bindTo, hold, openKiosk, pairKiosk, typeOnKiosk } from './support/kiosk';
+import { bindTo, leaveGathering, openKiosk, pairKiosk, typeOnKiosk } from './support/kiosk';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT_DIR = join(repoRoot, 'docs', 'walkthrough', 'themes');
@@ -340,9 +340,9 @@ test('capture the theme walkthrough', async ({ browser, page, signedInAs }) => {
 
       for (const room of ROOMS) {
         // Back to the chooser through the staff gate — a two-second hold on
-        // Clear, then leaving the gathering. The same path a volunteer uses.
-        await hold(kiosk, '[data-key="clear"]');
-        await kiosk.getByRole('button', { name: /^Leave / }).click();
+        // Clear, the staff screen, then leaving the gathering. The same path a
+        // volunteer uses.
+        await leaveGathering(kiosk);
         await bindTo(kiosk, new RegExp(room.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
 
         // A mis-bind would photograph the wrong room in the right colours, which

@@ -44,7 +44,7 @@ import { expect } from '@playwright/test';
 import { gotoReady, openCheckIn, signIn, TEAM } from './support/auth';
 import { deleteDocument, readCollection, writeDocument } from './support/emulator';
 import { test } from './support/fixtures';
-import { bindTo, hold, openKiosk, pairKiosk, typeOnKiosk } from './support/kiosk';
+import { bindTo, hold, leaveGathering, openKiosk, pairKiosk, typeOnKiosk } from './support/kiosk';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT_DIR = join(repoRoot, 'docs', 'walkthrough', 'tour');
@@ -1125,12 +1125,12 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       /*
        * The way back to the chooser is the staff gate: **Clear**, held. A tap
        * still clears the buffer, so a parent leaning on it loses a half-typed
-       * name and nothing else — and the hold only opens a question, which is
-       * what makes a findable gesture safe. `bindTo` assumes the chooser is
-       * already up, so the gate is opened and answered first.
+       * name and nothing else — and the hold only opens the staff screen, whose
+       * doors ask before they act, which is what makes a findable gesture safe.
+       * `bindTo` assumes the chooser is already up, so the gate is opened and
+       * answered first.
        */
-      await hold(kiosk, '[data-key="clear"]');
-      await kiosk.getByRole('button', { name: /^Leave /i }).click();
+      await leaveGathering(kiosk);
       await bindTo(kiosk, /doors closed/i);
       await expect(kiosk.getByText(/Check-in window has closed/i)).toBeVisible({ timeout: 60_000 });
       await shoot(kiosk, 'kiosk', {
