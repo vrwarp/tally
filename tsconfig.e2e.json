@@ -38,6 +38,9 @@
     "uxr/review-live/main.tsx",
     "uxr/review-live/Toast.tsx",
     "uxr/review-live/stubs.tsx",
-    "uxr/review-live/fixture.ts"
+    "uxr/review-live/fixture.ts",
+    "uxr/identity-live/main.tsx",
+    "uxr/identity-live/stubs.tsx",
+    "uxr/identity-live/fixtures.ts"
   ]
 }

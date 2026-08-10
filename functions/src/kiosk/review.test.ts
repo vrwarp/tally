@@ -749,6 +749,102 @@ describe('two registrations, one household', () => {
 /* The adult, decided by a person rather than by a phone number                */
 /* -------------------------------------------------------------------------- */
 
+describe('who each child already is', () => {
+  it('offers the people the backend has, and never one the roster already holds', async () => {
+    const backend = backendWith({
+      findStudentCandidates: vi.fn(async () => [
+        { personId: '55', name: 'Robin Fields', grade: 4, wouldMatch: true },
+        // Already a roster row below, so already offered — under the *other*
+        // heading, as a merge. Asking about the same person twice, in two
+        // framings with two different consequences, is the confusion this
+        // suppression exists to prevent.
+        { personId: '7', name: 'Robin Fields', grade: 4, wouldMatch: false },
+      ]),
+    });
+    const db = dbWithRegistration({}, ['held-1']);
+    db.seed('students/pco_7', { firstName: 'Robin', lastName: 'Fields', status: 'active' });
+
+    const [row] = await listPendingRegistrations(db, NOW, { registry: registryOf(backend) });
+
+    expect(row!.children[0]!.upstreamCandidates.map((c) => c.personId)).toEqual(['55']);
+  });
+
+  it('asks once for children who share a name and a grade', async () => {
+    const backend = backendWith({ findStudentCandidates: vi.fn(async () => []) });
+    const db = dbWithRegistration({}, ['held-1', 'held-2']);
+
+    await listPendingRegistrations(db, NOW, { registry: registryOf(backend) });
+
+    // Two children, two distinct names, two searches — but a queue full of
+    // repeats collapses to one apiece, which is what keeps this affordable.
+    expect(backend.findStudentCandidates).toHaveBeenCalledTimes(2);
+  });
+
+  it('asks nothing about a child the push already linked', async () => {
+    // Cast for the same reason every other `fetchRoster` double here is cast:
+    // `RosterResult` carries five bookkeeping fields this assertion has no
+    // opinion about, and spelling them out would bury what the test is for.
+    const backend = backendWith({
+      findStudentCandidates: vi.fn(async () => []),
+      fetchRoster: vi.fn(async () => ({
+        people: [
+          {
+            id: 'pco_55',
+            pcoPersonId: '55',
+            backendId: 'pco' as const,
+            firstName: 'Robin',
+            lastName: 'Fields',
+            grade: 4,
+            status: 'active' as const,
+            searchName: 'robin fields',
+          },
+        ],
+        unresolved: [],
+      })),
+    } as unknown as Partial<PeopleBackend>);
+    const db = dbWithRegistration({}, ['held-1']);
+    db.seed('students/held-1', {
+      firstName: 'Robin',
+      lastName: 'Fields',
+      status: 'active',
+      pendingReview: false,
+      upstreamPersonId: '55',
+      registrationId: ID,
+    });
+
+    const [row] = await listPendingRegistrations(db, NOW, { registry: registryOf(backend) });
+
+    // A counselor's card: the trigger pushed this child minutes after the door,
+    // so the question is closed. It is *named* rather than re-asked.
+    expect(backend.findStudentCandidates).not.toHaveBeenCalled();
+    expect(row!.children[0]!.linkedTo).toEqual({ personId: '55', name: 'Robin Fields' });
+  });
+
+  it('leaves the queue standing when the backend cannot answer', async () => {
+    const backend = backendWith({
+      findStudentCandidates: vi.fn(async () => {
+        throw new Error('Planning Center is down.');
+      }),
+    });
+
+    const [row] = await listPendingRegistrations(dbWithRegistration({}, ['held-1']), NOW, {
+      registry: registryOf(backend),
+    });
+
+    expect(row!.children[0]!.upstreamCandidates).toEqual([]);
+  });
+
+  it('asks nobody when the deployment takes no writes at all', async () => {
+    const backend = backendWith({ writeBack: 'off', findStudentCandidates: vi.fn(async () => []) });
+
+    await listPendingRegistrations(dbWithRegistration({}, ['held-1']), NOW, {
+      registry: registryOf(backend),
+    });
+
+    expect(backend.findStudentCandidates).not.toHaveBeenCalled();
+  });
+});
+
 describe('who the guardian already is', () => {
   it('offers the adults the backend already has, with the phone evidence', async () => {
     const backend = backendWith({

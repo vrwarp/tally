@@ -22,7 +22,13 @@ import type { PcoWriteBackMode } from '../config.js';
 import type { FirestoreLike, FunctionLogger } from '../firestore.js';
 import type { BackendId } from '../generated/backendIds.js';
 import type { CheckInsEventSummary, CheckInsImportSummary } from '../pco/checkins.js';
-import type { AdultCandidate, AddParentResult, CreateFamilyResult } from '../pco/household.js';
+import type {
+  AdultCandidate,
+  AddParentResult,
+  CreateFamilyResult,
+  HouseholdChoice,
+  HouseholdSummary,
+} from '../pco/household.js';
 import type { PcoListSummary } from '../pco/lists.js';
 import type { SetParentContactResult } from '../pco/parentContact.js';
 import type { StudentProfilePatch, UpdateStudentProfileResult } from '../pco/profile.js';
@@ -33,7 +39,11 @@ import type {
   RosterPerson,
   RosterResult,
 } from '../pco/roster.js';
-import type { PushPendingResult, PushStudentResult } from '../pco/pushStudents.js';
+import type {
+  PushPendingResult,
+  PushStudentResult,
+  StudentCandidate,
+} from '../pco/pushStudents.js';
 import type { RecreateStudentResult } from '../pco/recreate.js';
 
 export type { BackendId } from '../generated/backendIds.js';
@@ -43,6 +53,8 @@ export type {
   CheckInsEventSummary,
   CheckInsImportSummary,
   CreateFamilyResult,
+  HouseholdChoice,
+  HouseholdSummary,
   ParentContactStatus,
   PcoListSummary,
   PersonDetails,
@@ -53,6 +65,7 @@ export type {
   RosterPerson,
   RosterResult,
   SetParentContactResult,
+  StudentCandidate,
   StudentProfilePatch,
   UpdateStudentProfileResult,
 };
@@ -137,7 +150,22 @@ export interface PeopleBackend {
 
   /* ---- Writes ----------------------------------------------------------- */
 
-  pushStudent(args: { studentId: string; logger?: FunctionLogger }): Promise<PushStudentResult>;
+  pushStudent(args: {
+    studentId: string;
+    /**
+     * The upstream person a reviewer said this child already is.
+     *
+     * Passing nothing keeps the unaided behaviour every other caller relies on
+     * — the trigger, the sweep, a manual push and `recreateStudent` all run
+     * with nobody to ask, and the name-and-grade match is the best answer
+     * available there. Set, it is *the* answer: no search runs, and a person
+     * the backend no longer has is reported rather than replaced with a create.
+     */
+    personId?: string | null;
+    /** A reviewer who saw the candidates and said this child is new. */
+    createNew?: boolean;
+    logger?: FunctionLogger;
+  }): Promise<PushStudentResult>;
   pushPendingStudents(args: {
     logger?: FunctionLogger;
     limit?: number;
@@ -234,6 +262,16 @@ export interface PeopleBackend {
      * finally old enough". Ignored by a backend with no households.
      */
     anchorStudentIds?: readonly string[];
+    /**
+     * Which family this lot joins, when a reviewer answered.
+     *
+     * Unset leaves the precedence a backend applies on its own — anchors, then
+     * the adult's own, then the children's, oldest id first within each. That
+     * rule is right whenever there is one answer; it is a coin toss dressed as
+     * a decision when the chosen adult heads two households that the backend
+     * gives the same name.
+     */
+    householdChoice?: HouseholdChoice;
     firstName: string;
     lastName: string;
     /** Digits only. Written onto the adult, never over something already there. */
@@ -267,6 +305,31 @@ export interface PeopleBackend {
     excludePersonIds?: readonly string[];
     logger?: FunctionLogger;
   }): Promise<AdultCandidate[]>;
+
+  /**
+   * Children the backend already holds under a name and grade, for a reviewer
+   * to choose between before anything is written.
+   *
+   * The child-side twin of `findAdultCandidates`, and it exists for the same
+   * reason: `pushStudent` already runs this search, already finds these people,
+   * and already picks one — the oldest — with nobody to ask. That rule is right
+   * for the trigger and the sweep, where nobody *is* there. On the Review screen
+   * somebody is, and the question the rule stands in for is one they can answer.
+   *
+   * What it adds over the roster's own duplicate hints is reach:
+   * `findRosterDuplicates` searches Tally's students, so a child the church has
+   * and Tally does not — anyone outside the configured grade band, for instance
+   * — is invisible to the card and matched anyway on push.
+   *
+   * Never writes. Present iff the backend can push students at all.
+   */
+  findStudentCandidates?(args: {
+    firstName: string;
+    lastName: string;
+    /** Null for a child too young to have one; the matcher leans on `child`. */
+    grade: number | null;
+    logger?: FunctionLogger;
+  }): Promise<StudentCandidate[]>;
 
   /** Planning Center Lists. Present iff `capabilities.listsSupported`. */
   fetchLists?(args: { search?: string; limit?: number }): Promise<PcoListSummary[]>;

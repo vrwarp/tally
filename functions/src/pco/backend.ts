@@ -28,7 +28,7 @@ import { setParentContact } from './parentContact.js';
 import { collectPhoneLast4 } from './phoneIndex.js';
 import { followPersonLink, isPersonGoneError } from './personLink.js';
 import { updateStudentProfile } from './profile.js';
-import { pushPendingStudents, pushStudent } from './pushStudents.js';
+import { findStudentCandidates, pushPendingStudents, pushStudent } from './pushStudents.js';
 import { recreateStudent } from './recreate.js';
 import {
   fetchAllergyNotes,
@@ -140,7 +140,8 @@ export function createPcoBackend(args: BackendContext & { config: PcoConfig }): 
       }
     },
 
-    pushStudent: ({ studentId, logger }) => pushStudent({ db, client, config, studentId, logger }),
+    pushStudent: ({ studentId, personId, createNew, logger }) =>
+      pushStudent({ db, client, config, studentId, personId, createNew, logger }),
     pushPendingStudents: ({ logger, limit }) =>
       pushPendingStudents({ db, client, config, logger, limit }),
     updateStudentProfile: ({ studentId, logger, ...patch }) =>
@@ -170,6 +171,7 @@ export function createPcoBackend(args: BackendContext & { config: PcoConfig }): 
       lastName,
       parentPersonId,
       createNewParent,
+      householdChoice,
       phone,
       email,
       logger,
@@ -184,12 +186,15 @@ export function createPcoBackend(args: BackendContext & { config: PcoConfig }): 
         lastName,
         parentPersonId,
         createNewParent,
+        householdChoice,
         phone,
         email,
         logger,
       }),
     findAdultCandidates: ({ firstName, lastName, phone, excludePersonIds }) =>
       findAdultCandidates({ client, firstName, lastName, phone, excludePersonIds }),
+    findStudentCandidates: ({ firstName, lastName, grade }) =>
+      findStudentCandidates({ client, config, firstName, lastName, grade }),
 
     fetchLists: ({ search, limit }) => fetchLists({ client, search, limit }),
     fetchListMemberIds: (listId) => fetchListMemberIds(client, listId),

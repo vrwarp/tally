@@ -41,6 +41,7 @@ import {
   contactFieldsOnFile,
   displayFirstName,
   findParentCandidate,
+  getIncluded,
   nameGradeKey,
   phoneNumbersOf,
 } from './mapping.js';
@@ -53,7 +54,12 @@ import {
 import { loadPersonWithHousehold } from './roster.js';
 import { followPersonLink, isPersonGoneError } from './personLink.js';
 import { readThroughMerges, resolveStudentPerson } from './studentPerson.js';
-import { PCO_TYPES, type PcoHousehold, type PcoPerson } from './types.js';
+import {
+  PCO_TYPES,
+  type PcoHousehold,
+  type PcoHouseholdMembership,
+  type PcoPerson,
+} from './types.js';
 import { SILENT_LOGGER, type FirestoreLike, type FunctionLogger } from '../firestore.js';
 
 export type AddParentStatus =
@@ -100,6 +106,28 @@ export interface AdultCandidate {
   reachable: boolean;
   /** Whether one of their numbers is the one the family typed at the kiosk. */
   corroborated: boolean;
+  /**
+   * The families this adult already heads, when there is more than one.
+   *
+   * Absent for the ordinary adult, and that absence is the point: the household
+   * this family lands in is only a *question* when the answer is ambiguous, and
+   * finding out who is in each one costs a request per household. So it is
+   * hydrated only past the threshold that makes it worth asking — see
+   * `withHouseholds`.
+   *
+   * `memberNames` rather than the name alone because the name does not
+   * discriminate: Planning Center calls both of them `Person Household`, and a
+   * reviewer choosing between two identical labels is choosing at random.
+   */
+  households?: HouseholdSummary[];
+}
+
+/** One family a candidate already heads, named well enough to choose between. */
+export interface HouseholdSummary {
+  id: string;
+  name: string;
+  /** Everyone else already in it, so two identical names can be told apart. */
+  memberNames: string[];
 }
 
 export interface AddParentResult {
@@ -263,19 +291,82 @@ export async function findAdultCandidates(options: {
   const excluded = new Set(options.excludePersonIds ?? []);
   const { people, index } = await searchAdultsNamed(options.client, firstName, lastName);
 
-  return people
+  const candidates = people
     .filter((person) => !excluded.has(person.id))
-    .map((person) => {
+    .map((person): { person: PcoPerson; candidate: AdultCandidate } => {
       const onFile = contactFieldsOnFile(person, index);
       return {
-        personId: person.id,
-        name: personName(person) ?? `${firstName} ${lastName}`.trim(),
-        reachable: onFile.phone || onFile.email,
-        corroborated: phone
-          ? phoneNumbersOf(person, index).some((held) => sameNumber(held, phone))
-          : false,
+        person,
+        candidate: {
+          personId: person.id,
+          name: personName(person) ?? `${firstName} ${lastName}`.trim(),
+          reachable: onFile.phone || onFile.email,
+          corroborated: phone
+            ? phoneNumbersOf(person, index).some((held) => sameNumber(held, phone))
+            : false,
+        },
       };
     });
+
+  for (const entry of candidates) {
+    entry.candidate.households = await withHouseholds(options.client, entry.person, index);
+  }
+  return candidates.map((entry) => entry.candidate);
+}
+
+/**
+ * The families an adult heads — but only when which one matters.
+ *
+ * A candidate in one household, or none, has nothing to choose between, and the
+ * precedence in `createFamily` will land on the only answer there is. Asking
+ * Planning Center who is in it would be a request per household per candidate
+ * per card, spent to render a control that would have one option.
+ *
+ * Past one, it is worth the requests, because the alternative is the state this
+ * exists to fix: two records both called `Person Household`, one child filed
+ * into the older by an id comparison, and nothing anywhere saying which. The
+ * names come off the memberships themselves (`person_name`), so this is one
+ * request per household and no `include` at all.
+ *
+ * Undefined rather than `[]` when there is nothing to say, and every failure is
+ * silent: a reviewer who cannot see the households gets the screen exactly as it
+ * was before they existed.
+ */
+async function withHouseholds(
+  client: PcoClient,
+  person: PcoPerson,
+  index: ReturnType<typeof buildIncludedIndex>,
+): Promise<HouseholdSummary[] | undefined> {
+  const householdIds = householdIdsOf(person);
+  if (householdIds.length < 2) return undefined;
+
+  const summaries: HouseholdSummary[] = [];
+  for (const householdId of householdIds) {
+    const household = getIncluded<PcoHousehold>(index, PCO_TYPES.household, householdId);
+    const memberNames: string[] = [];
+    try {
+      for await (const page of client.paginate<PcoHouseholdMembership>(
+        `/households/${encodeURIComponent(householdId)}/household_memberships`,
+        {},
+      )) {
+        for (const membership of page.data) {
+          const name = trimmed(membership.attributes?.person_name);
+          // Everyone *else*: "the household with Dana Fields" said to Dana
+          // Fields distinguishes nothing.
+          if (name && name !== personName(person)) memberNames.push(name);
+        }
+      }
+    } catch {
+      // Named by whatever we already had. A household with no members listed
+      // is still a real option, and refusing to offer it would be worse.
+    }
+    summaries.push({
+      id: householdId,
+      name: trimmed(household?.attributes?.name) ?? 'Household',
+      memberNames,
+    });
+  }
+  return summaries;
 }
 
 /** The households the student is already in, oldest id first for determinism. */
@@ -577,10 +668,31 @@ export interface CreateFamilyOptions {
   parentPersonId?: string | null;
   /** A reviewer who saw the candidates and said none of them is the parent. */
   createNewParent?: boolean;
+  /**
+   * Which family this lot joins, when a reviewer said.
+   *
+   * The precedence below is a rule for deciding with nobody to ask, and its
+   * tie-break inside a group is the lowest id — the *oldest* household. That is
+   * deterministic and, to the person reading the card, arbitrary: an adult who
+   * heads two households has two equally plausible answers and Planning Center
+   * calls both of them `Person Household`. Set, this replaces the whole
+   * precedence result; unset, nothing changes.
+   *
+   * `kind: 'new'` is the other answer a rule cannot reach — "these are not that
+   * family" — and reaching the create branch deliberately rather than only as a
+   * fallback is the whole of it.
+   */
+  householdChoice?: HouseholdChoice;
   phone?: string | null;
   email?: string | null;
   logger?: FunctionLogger;
 }
+
+/** A reviewer's answer to "which family?", or their answer that it is a new one. */
+export type HouseholdChoice =
+  | { kind: 'existing'; id: string }
+  /** `name` only when somebody typed one; the default is what it always was. */
+  | { kind: 'new'; name?: string | null };
 
 function familyResult(
   status: CreateFamilyStatus,
@@ -918,13 +1030,26 @@ export async function createFamily(options: CreateFamilyOptions): Promise<Create
    * household outrank an anchor the family had just told us about.
    */
   const parentHouseholds = parentPerson ? householdIdsOf(parentPerson) : [];
-  const [householdId] = [
-    anchors.flatMap((child) => householdIdsOf(child.loaded.person)),
-    parentHouseholds,
-    linked.flatMap((child) => householdIdsOf(child.loaded.person)),
-  ]
-    .map((group) => [...group].sort(compareIds))
-    .find((group) => group.length > 0) ?? [];
+  /*
+   * A reviewer's answer wins outright, including their answer that none of
+   * these is the family. `'new'` deliberately resolves to no household at all,
+   * which is how it reaches the create branch below — the same branch the
+   * fallback uses, so a household asked for and a household defaulted into are
+   * built identically.
+   */
+  const chosenHousehold = options.householdChoice;
+  const [householdId] =
+    chosenHousehold?.kind === 'existing'
+      ? [chosenHousehold.id]
+      : chosenHousehold?.kind === 'new'
+        ? []
+        : ([
+            anchors.flatMap((child) => householdIdsOf(child.loaded.person)),
+            parentHouseholds,
+            linked.flatMap((child) => householdIdsOf(child.loaded.person)),
+          ]
+            .map((group) => [...group].sort(compareIds))
+            .find((group) => group.length > 0) ?? []);
   let createdHousehold = false;
 
   if (householdId) {
@@ -963,7 +1088,18 @@ export async function createFamily(options: CreateFamilyOptions): Promise<Create
       data: {
         type: PCO_TYPES.household,
         attributes: {
-          name: `${lastName || personName(parentPerson) || 'Tally'} Household`,
+          /*
+           * A name somebody typed, when they did.
+           *
+           * The default is unchanged and right for the ordinary family. It is
+           * wrong for the one case that can now reach here deliberately: a
+           * reviewer building a *second* household for an adult who already has
+           * one gets another record called `Person Household`, which is the
+           * exact ambiguity the picker upstream of this exists to resolve.
+           */
+          name:
+            (chosenHousehold?.kind === 'new' ? trimmed(chosenHousehold.name ?? null) : null) ??
+            `${lastName || personName(parentPerson) || 'Tally'} Household`,
           primary_contact_id: parentId,
         },
         relationships: {
