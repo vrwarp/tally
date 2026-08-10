@@ -27,6 +27,8 @@ result portable back into `src/`.
 | `kiosk-live/` | The kiosk's screens mounted from `src/` and shot straight, state by state. See below. |
 | `team-live/` | The Team screen mounted from `src/` against a fixture, and frozen from there. Same argument as the kiosk: two subscriptions and a profile is not worth an emulator suite. |
 | `measure.ts` | Re-runs the walkthrough's measurements against the frozen scenes: how far each page scrolls, and whether it scrolls sideways. |
+| `kiosk-setup-live/` | The team's side of the kiosk — the pairing screen — mounted from `src/` inside the real app shell, with the account menu opened on the way past. See below. |
+| `JOURNEY-kiosk.md` | The brief for that scene: the Friday-evening moment, the person, and what the app used to do with it. |
 | `baseline/` | The frozen app as it was. Never edited. |
 | `prototype/` | The working copy the ideation agent edits. |
 | `rounds/` | One directory per round: what the critics found, what the ideator did about it. |
@@ -95,6 +97,32 @@ prototypes: `uxr/shoot.ts` reads them, the ideation agent edits them.
 Re-run it after porting a round back into `src/` and it re-freezes what actually
 shipped, which is the only honest input to the before/after page.
 
+## The kiosk screen is mounted inside the real shell
+
+```bash
+npm run uxr:kiosk-setup -- --out uxr/prototype-kiosk-setup   # freeze it from a live mount
+npm run uxr:shoot -- uxr/prototype-kiosk-setup --out uxr/renders/ks-r01
+```
+
+`kiosk-setup-live/` is `team-live/` with one difference, and the difference is
+the point. Team re-draws the app frame by hand, because that screen is reached
+the way every other core screen is and the frame only has to be the right size.
+The kiosk screen's problem *was the route to it*: it lived behind a text link in
+a paragraph on the third card of Settings, and Settings is core-team only, so
+the counselor the kiosk's own screen sends there could not get there at all. So
+this harness mounts the real `AppShell`, aliases the four modules it reads from
+Firebase, and opens the account menu with a click before freezing — because the
+menu is the finding.
+
+Five scenes: the menu (admin and counselor), and the screen as an admin, as a
+counselor and on a deployment that cannot sign kiosk tokens. `scene.tsx` is one
+line naming the component being photographed, and it is its own file so that
+the before-frames of a refinement and the after-frames come out of the same
+harness, the same browser and the same two viewports.
+
+The brief for the scene is `JOURNEY-kiosk.md`; the rounds are
+`rounds/kiosk-setup-r0*`.
+
 ## The before/after page
 
 Once the result is ported into `src/`, the walkthrough is built from two fresh
@@ -127,10 +155,32 @@ npm run uxr:shots                                  # → docs/uxr/{before,after}
 npm run uxr:team-walkthrough                       # → docs/uxr/team-walkthrough.html
 ```
 
+A screen whose *component was replaced* cannot skip the worktree, even though it
+is mounted: `kiosk-setup-live/scene.tsx` names the component being photographed
+in one line, and the component the before-frames want no longer exists here. So
+the worktree gets a copy of the harness with that line pointing at the old
+screen, and the freeze runs from there into this repo's `uxr/before-kiosk/`.
+
+```bash
+git worktree add ../tally-before <the-commit-before-the-work>
+ln -s "$PWD/node_modules" ../tally-before/node_modules
+cp -r uxr/kiosk-setup-live ../tally-before/uxr/                 # then point its
+                                                               # scene.tsx at the
+                                                               # old component
+(cd ../tally-before && npx tsx uxr/kiosk-setup-live/freeze.ts --out "$OLDPWD/uxr/before-kiosk")
+npm run uxr:kiosk-setup -- --out uxr/after-kiosk                # once it has shipped
+npx tsx uxr/measure.ts uxr/before-kiosk uxr/after-kiosk
+npm run uxr:shoot -- uxr/before-kiosk --out uxr/renders/before
+npm run uxr:shoot -- uxr/after-kiosk  --out uxr/renders/after
+npm run uxr:shots                                  # → docs/uxr/{before,after}/*.jpg
+npm run uxr:kiosk-walkthrough                      # → docs/uxr/kiosk-walkthrough.html
+```
+
 `scripts/build-uxr-walkthrough.ts` takes the changes file and the output name as
 arguments, both defaulting to the first refinement's, so each refinement gets
 its own page rather than a shared one whose title and round counts are true of
-neither. `docs/uxr/team-changes.json` is the Team screen's.
+neither. `docs/uxr/team-changes.json` is the Team screen's;
+`docs/uxr/kiosk-changes.json` is the kiosk screen's.
 
 Both sides have to be captured by the same harness. The first before/after pair
 was not: the before frames came from an earlier revision of `capture.spec.ts`

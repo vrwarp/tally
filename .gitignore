@@ -84,6 +84,8 @@ uxr/before/
 uxr/after/
 uxr/before-team/
 uxr/after-team/
+uxr/before-kiosk/
+uxr/after-kiosk/
 
 # Emitted JavaScript, kept ignored as a backstop.
 #
@@ -113,6 +115,7 @@ uxr/after-team/
 # rebuilds from them with `npm run uxr:walkthrough`.
 docs/uxr/walkthrough.html
 docs/uxr/team-walkthrough.html
+docs/uxr/kiosk-walkthrough.html
 
 # UXR renders — regenerable from the prototypes with `uxr/shoot.ts`, and a round
 # is a few megabytes of PNG. The critiques themselves are the record and are

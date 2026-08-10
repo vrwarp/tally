@@ -155,7 +155,9 @@ export async function pairKiosk(kiosk: Page, staff: Page): Promise<string> {
   await staff.goto('/pair-kiosk');
   await staff.getByLabel(/pairing code/i).fill(code);
   await staff.getByRole('button', { name: /approve this kiosk/i }).click();
-  await expect(staff.getByText(/the kiosk will sign itself in/i)).toBeVisible();
+  // The verdict replaces the standing hint under the button rather than
+  // arriving beneath it, so this is the same element either way.
+  await expect(staff.getByText(/the kiosk signs itself in/i)).toBeVisible();
 
   // The kiosk polls every couple of seconds, then signs in with the minted
   // token before the chooser appears.
