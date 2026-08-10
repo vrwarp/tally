@@ -1,0 +1,21 @@
+<!doctype html>
+<!--
+  The identity-decision walkthrough.
+
+  `data-theme="dark"` is what a signed-in laptop resolves to, and what the
+  screenshots of this screen were all shot in; the app's `ThemeProvider` writes
+  the same attribute onto `<html>` once it has read the local choice, and
+  nothing here reads that choice.
+-->
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="robots" content="noindex" />
+    <title>Review — every identity decision on one card</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

@@ -56,6 +56,7 @@
     "walkthrough:corrections:capture": "tsx uxr/review-live/shoot.ts",
     "walkthrough:corrections:build": "tsx scripts/build-corrections-walkthrough.ts",
     "walkthrough:corrections": "npm run walkthrough:corrections:capture && npm run walkthrough:corrections:build",
+    "walkthrough:identity": "tsx uxr/identity-live/build.ts && tsx uxr/identity-live/verify.mts",
     "uxr:capture": "playwright test -c uxr/playwright.config.ts",
     "uxr:shoot": "tsx uxr/shoot.ts",
     "uxr:kiosk": "tsx uxr/kiosk-live/shoot.ts",
