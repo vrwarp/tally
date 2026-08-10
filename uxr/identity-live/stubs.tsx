@@ -58,11 +58,13 @@ export function currentJourneyId(): string {
   return journeyId;
 }
 
-export function useDemoState(): {
+interface DemoState {
   journeyId: string;
   toast: { message: string; tone: string } | null;
   lastApprove: Record<string, unknown> | null;
-} {
+}
+
+export function useDemoState(): DemoState {
   return useSyncExternalStore(
     subscribe,
     () => snapshot,
@@ -74,7 +76,12 @@ export function useDemoState(): {
  * A cached object identity, because `useSyncExternalStore` compares snapshots
  * with `Object.is` and a fresh literal every call is an infinite render.
  */
-let snapshot = { journeyId, toast, lastApprove };
+/*
+ * Annotated, not inferred. Every field is `null` at this line, so inference
+ * gives the snapshot three `null` types and `commit` below cannot then put a
+ * toast in it.
+ */
+let snapshot: DemoState = { journeyId, toast, lastApprove };
 function commit(): void {
   snapshot = { journeyId, toast, lastApprove };
   announce();
