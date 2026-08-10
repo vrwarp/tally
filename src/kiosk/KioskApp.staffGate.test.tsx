@@ -194,9 +194,16 @@ describe('the staff gate', () => {
     // The doors, not the one door. A volunteer who came to print a name tag
     // never has to touch the one that shuts the kiosk.
     expect(screen.getByText('Staff')).toBeTruthy();
-    expect(screen.getByText(/Reprint a name tag/i)).toBeTruthy();
     expect(screen.getByText(/Label printer/i)).toBeTruthy();
     expect(screen.getByText(/Change event/i)).toBeTruthy();
+    /*
+     * This kiosk has no printer configured, so there is no reprint door — a
+     * statement stands in its place. A disabled slab at the top of the stack
+     * answers a press with nothing at all, which on a lobby tablet reads as a
+     * device that has frozen rather than as a kiosk with no printer.
+     */
+    expect(screen.getByText(/No printer on this kiosk/i)).toBeTruthy();
+    expect(screen.queryByText(/Reprint a name tag/i)).toBeNull();
     // Named, because a volunteer holding a lobby tablet needs to know which
     // gathering they are standing on.
     expect(screen.getByText('Sunday Nursery')).toBeTruthy();
@@ -269,29 +276,33 @@ describe('the staff gate', () => {
     expect(screen.queryByText(/Change event\?/i)).toBeNull();
   });
 
-  it('returns to the search screen when the question is declined', async () => {
+  it('returns to the staff menu when the question is declined', async () => {
     await mount();
     await type('ada');
     await holdClear();
     await tap(/Change event/i);
     expect(screen.getByText(/Change event\?/i)).toBeTruthy();
 
+    /*
+     * Declining lands back on the menu it was opened from, not out at the front
+     * door. Two people meet this prompt: one who mis-tapped the row under the
+     * one they wanted, and one who opened it to check which gathering the kiosk
+     * is on. Both want to be where they were, and dropping them at the search
+     * screen costs another two-second hold with a parent standing there.
+     *
+     * Either way the kiosk is still pointed at the gathering, and the queue has
+     * lost nothing but the seconds.
+     */
     await tap(/Keep checking in/i);
 
-    /*
-     * Declining lands on the search screen, not on the event chooser. The kiosk
-     * is still pointed at the gathering, and the queue standing at it has lost
-     * nothing but the seconds.
-     *
-     * The typed buffer is gone, and correctly so — holding Clear *is* pressing
-     * Clear, and every key on this glass acts on contact. What matters is that
-     * the screen is the one the finger was on, not that a half-typed name
-     * survived a deliberate wipe.
-     */
     expect(screen.queryByText(/Change event\?/i)).toBeNull();
+    expect(screen.getByText('Staff')).toBeTruthy();
+    expect(localStorage.getItem(KIOSK_KEYS.binding)).not.toBeNull();
+
+    // And the way out of the menu is still one tap, onto a cleared screen.
+    await tap(/Keep checking in/i);
     expect(screen.getByText(PLACEHOLDER)).toBeTruthy();
     expect(screen.getByText(/Sunday Nursery/)).toBeTruthy();
-    expect(localStorage.getItem(KIOSK_KEYS.binding)).not.toBeNull();
   });
 
   it('leaves the gathering when the question is answered', async () => {

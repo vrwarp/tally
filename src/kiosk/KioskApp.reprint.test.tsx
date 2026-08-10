@@ -281,12 +281,18 @@ describe('the staff reprint flow', () => {
     expect(screen.getByText(/Printer needs attention/i)).toBeTruthy();
   });
 
-  /* The other direction: nothing to print to, so nothing to press. */
-  it('offers no reprint door on a gathering that prints nothing', async () => {
+  /*
+   * The other direction: nothing to print to, so no door — and a sentence
+   * rather than a dead one. A disabled slab at the top of the stack answers a
+   * press with nothing at all, which on a lobby tablet is indistinguishable
+   * from a device that has frozen.
+   */
+  it('puts a statement where the reprint door goes when nothing would print', async () => {
     await mount(binding({ labelTemplate: undefined }));
     await holdClear();
 
-    expect(screen.getByText(/Reprint a name tag/i).closest('button')).toBeDisabled();
+    expect(screen.queryByText(/Reprint a name tag/i)).toBeNull();
+    expect(screen.getByText(/No printer on this kiosk/i)).toBeTruthy();
   });
 
   it('hands the kiosk back on its own when the volunteer walks away', async () => {

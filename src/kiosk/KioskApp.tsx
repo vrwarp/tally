@@ -1456,10 +1456,43 @@ export function KioskApp() {
       overlay?.kind === 'staff' ||
       overlay?.kind === 'reprint' ||
       overlay?.kind === 'reprint-confirm' ||
-      overlay?.kind === 'printer'
+      overlay?.kind === 'printer' ||
+      overlay?.kind === 'unbind'
     ) {
       const staffScreen =
-        overlay.kind === 'staff' ? (
+        overlay.kind === 'unbind' ? (
+          <ChangeEventScreen
+            title={binding.title}
+            /*
+             * Back to the menu it was opened from, not out to the search screen.
+             *
+             * This prompt is only ever reached from the staff screen now, and a
+             * volunteer lands on it two ways: they mis-tapped the row under the
+             * one they wanted, or they opened it to check which gathering the
+             * kiosk is on. Both of them want to be where they were. Dropping
+             * them at the front door instead costs another two-second hold on
+             * Clear, with the parent still standing there — and the gate is the
+             * gate, so there is no cheaper way back in.
+             */
+            onStay={() => setOverlay({ kind: 'staff' })}
+            onLeave={() => {
+              // A kiosk that has left a gathering has no business still holding
+              // notes about the children who were at it — nor the evening's list
+              // of who had a name tag printed, which is the same argument about
+              // the same names.
+              printing?.forgetGathering();
+              clearBinding();
+              setBinding(null);
+              setBuffer('');
+              setOverlay(null);
+              setPresentIds(new Set());
+              setCheckedInAtMs(new Map());
+              setReprintedIds(new Set());
+              setSentId(null);
+              setPhase('choosing');
+            }}
+          />
+        ) : overlay.kind === 'staff' ? (
           <StaffScreen
             title={binding.title}
             window={eventWindow(binding)}
@@ -1682,31 +1715,6 @@ export function KioskApp() {
         />
       );
     }
-    if (overlay?.kind === 'unbind') {
-      return (
-        <ChangeEventScreen
-          title={binding.title}
-          onStay={() => setOverlay(null)}
-          onLeave={() => {
-            // A kiosk that has left a gathering has no business still holding
-            // notes about the children who were at it — nor the evening's list
-            // of who had a name tag printed, which is the same argument about
-            // the same names.
-            printing?.forgetGathering();
-            clearBinding();
-            setBinding(null);
-            setBuffer('');
-            setOverlay(null);
-            setPresentIds(new Set());
-            setCheckedInAtMs(new Map());
-            setReprintedIds(new Set());
-            setSentId(null);
-            setPhase('choosing');
-          }}
-        />
-      );
-    }
-
     return (
       <SearchScreen
         binding={binding}
