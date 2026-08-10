@@ -35,7 +35,11 @@
  */
 import { Timestamp } from 'firebase-admin/firestore';
 import type { BackendRegistry } from '../backends/registry.js';
-import type { AdultCandidate, CreateFamilyResult } from '../backends/types.js';
+import type {
+  AdultCandidate,
+  CreateFamilyResult,
+  StudentCandidate,
+} from '../backends/types.js';
 import { PATHS, SILENT_LOGGER, type FirestoreLike, type FunctionLogger } from '../firestore.js';
 import { parseStudentId, type BackendId } from '../generated/backendIds.js';
 import { PHONE_INDEX_DOC } from './phoneIndex.js';
@@ -84,6 +88,15 @@ export interface PendingRegistrationChild extends RegistrationChild {
   studentId: string | null;
   /** Whether the student document is still held. */
   pendingReview: boolean;
+  /**
+   * The backend person this child is already linked to, if the push ran.
+   *
+   * What closes the identity question for a counselor's card, where the child
+   * reached the backend before anybody opened this screen. Carried so both the
+   * upstream-candidate pass and the card can tell "not decided yet" from
+   * "decided, by a rule, minutes after the door".
+   */
+  upstreamPersonId: string | null;
   /** Set once a reviewer folded this child into a row that was already there. */
   mergedIntoStudentId: string | null;
   /**
@@ -102,6 +115,34 @@ export interface PendingRegistrationChild extends RegistrationChild {
   allergies: string | null;
   /** Active students who already have this name. Suspicion, not a verdict. */
   possibleDuplicates: ReviewStudentSummary[];
+  /**
+   * People the *church* already has under this name and grade, who are not on
+   * Tally's roster at all.
+   *
+   * The other half of the same question `possibleDuplicates` asks, against the
+   * other corpus. `findRosterDuplicates` reads Tally's students; a child the
+   * church holds and Tally does not — anybody outside the configured grade band,
+   * for one — is invisible to it. `pushStudent` finds them anyway on approve,
+   * and links to one, and says nothing.
+   *
+   * Disjoint from `possibleDuplicates` by construction: anyone already carrying
+   * a roster row is dropped here, so the reviewer is never asked about the same
+   * person twice under two different framings.
+   *
+   * Empty is not "the church has nobody" — it is equally "write-back is off"
+   * and "the backend did not answer" — the same read as `guardianCandidates`.
+   */
+  upstreamCandidates: StudentCandidate[];
+  /**
+   * Who this child was already linked to, when it happened before anybody
+   * looked.
+   *
+   * A counselor's quick-add is pushed by the ordinary trigger minutes after the
+   * door, so by review time the link exists and the question above is closed.
+   * Naming it is the difference between a card that looks like it never asked
+   * and one that says what it did.
+   */
+  linkedTo: { personId: string; name: string } | null;
   /**
    * How the family typed this child, when a reviewer has since corrected them.
    *
@@ -380,6 +421,11 @@ export async function listPendingRegistrations(
           typedAs: corrected ? typed : null,
           studentId: student?.exists ? student.studentId : null,
           pendingReview: student?.data.pendingReview === true,
+          upstreamPersonId:
+            typeof student?.data.upstreamPersonId === 'string' &&
+            student.data.upstreamPersonId.length > 0
+              ? student.data.upstreamPersonId
+              : null,
           mergedIntoStudentId:
             typeof student?.data.mergedIntoStudentId === 'string'
               ? student.data.mergedIntoStudentId
@@ -392,6 +438,10 @@ export async function listPendingRegistrations(
           possibleDuplicates: await Promise.all(
             (record.possibleDuplicateOf[String(index)] ?? []).map((id) => summarise(db, id)),
           ),
+          // Filled in by the passes below, which hold the backend and the
+          // roster's own set of upstream ids.
+          upstreamCandidates: [],
+          linkedTo: null,
         };
       }),
     );
@@ -467,8 +517,124 @@ export async function listPendingRegistrations(
 
   linkSameFamily(rows);
   await namesFromUpstream(options.registry, rows, upstreamByRegistration, logger);
+  await childrenFromUpstream(db, options.registry, rows, logger);
 
   return rows.sort((a, b) => (b.registeredAt ?? 0) - (a.registeredAt ?? 0));
+}
+
+/**
+ * Everyone the backend already holds who could be one of these children.
+ *
+ * The child-side twin of `namesFromUpstream`, with the same posture: one search
+ * per *distinct* name and grade rather than per child, every failure silent, and
+ * nothing written. What differs is the gate and the filter.
+ *
+ * The gate is `writeBack !== 'off'` rather than `'full'`, because pushing a
+ * student is a create and `create` mode does it — the adult half needs `full`
+ * only because building a household does.
+ *
+ * The filter is what keeps this cheap and honest. A child who is already linked
+ * upstream had this question answered before anybody looked (a counselor's
+ * quick-add, pushed by the ordinary trigger), a child folded into a roster row
+ * had it answered by the merge, and a child nobody is holding is not being
+ * decided. None of them are asked about; the first is *named* instead.
+ */
+async function childrenFromUpstream(
+  db: FirestoreLike,
+  registry: BackendRegistry | undefined,
+  rows: PendingRegistration[],
+  logger: FunctionLogger,
+): Promise<void> {
+  if (!registry) return;
+  const target = registry.defaultPush();
+  if ('error' in target) return;
+  const backend = target.backend;
+  if (backend.capabilities.writeBack === 'off') return;
+  const search = backend.findStudentCandidates;
+
+  /*
+   * Every upstream person Tally's roster already accounts for.
+   *
+   * Both spellings, because a roster row carries its linkage two ways: a
+   * `pco_123` document *is* the person, and a Tally-born visitor points at one
+   * through `upstreamPersonId` once pushed. Anyone in here is already offered —
+   * or deliberately not offered — by `possibleDuplicates`, and showing them
+   * again under "in the church's database" would ask one question twice.
+   */
+  const onRoster = new Set<string>();
+  try {
+    const students = await db.collection(PATHS.students).get();
+    for (const doc of students.docs) {
+      const parsed = parseStudentId(doc.id);
+      if (parsed) onRoster.add(parsed.personId);
+      const linked = (doc.data() ?? {}).upstreamPersonId;
+      if (typeof linked === 'string' && linked.length > 0) onRoster.add(linked);
+    }
+  } catch (error) {
+    // No suppression rather than no candidates: a reviewer shown one duplicate
+    // twice is a worse screen, not a wrong write.
+    logger.warn('Could not read the roster while listing upstream child candidates', {
+      error: String(error),
+    });
+  }
+
+  /* ---- Naming what already happened, for the counselor's card ------------- */
+
+  const linked = rows.flatMap((row) =>
+    row.children.filter((child) => child.upstreamPersonId !== null),
+  );
+  if (linked.length > 0) {
+    try {
+      const result = await backend.fetchRoster({
+        personIds: [...new Set(linked.map((child) => child.upstreamPersonId!))],
+      });
+      const byId = new Map(result.people.map((person) => [person.pcoPersonId, person]));
+      for (const child of linked) {
+        const person = byId.get(child.upstreamPersonId!);
+        if (!person) continue;
+        child.linkedTo = {
+          personId: child.upstreamPersonId!,
+          name: `${person.firstName} ${person.lastName}`.trim(),
+        };
+      }
+    } catch (error) {
+      logger.warn('Could not name who a child was already linked to', { error: String(error) });
+    }
+  }
+
+  /* ---- Asking about the ones still open ----------------------------------- */
+
+  if (search === undefined) return;
+
+  const asked = new Map<string, PendingRegistrationChild[]>();
+  for (const row of rows) {
+    for (const child of row.children) {
+      if (!child.pendingReview) continue;
+      if (child.mergedIntoStudentId !== null) continue;
+      if (child.upstreamPersonId !== null) continue;
+      // Stringified rather than concatenated, for the reason `namesFromUpstream`
+      // gives: joining name parts on nothing makes two families into one.
+      const key = JSON.stringify([child.firstName, child.lastName, child.grade]);
+      asked.set(key, [...(asked.get(key) ?? []), child]);
+    }
+  }
+
+  for (const group of asked.values()) {
+    const first = group[0]!;
+    let candidates: StudentCandidate[] = [];
+    try {
+      candidates = await search.call(backend, {
+        firstName: first.firstName,
+        lastName: first.lastName,
+        grade: first.grade,
+        logger,
+      });
+    } catch (error) {
+      logger.warn('Could not read upstream candidates for a child', { error: String(error) });
+    }
+    const offered = candidates.filter((candidate) => !onRoster.has(candidate.personId));
+    for (const child of group) child.upstreamCandidates = offered;
+  }
 }
 
 /**
@@ -707,6 +873,20 @@ export async function approveRegistration(options: {
   guardianPersonId?: string | null;
   /** The reviewer saw the candidates and said none of them is the parent. */
   createNewGuardian?: boolean;
+  /**
+   * Who each child already is, where a reviewer answered.
+   *
+   * Keyed by the child's *own* student id, and applied only when that document
+   * is still the one being pushed — see the note at the loop below. Children
+   * left out are pushed exactly as they always were.
+   */
+  childDecisions?: readonly { studentId: string; personId?: string; createNew?: boolean }[];
+  /** Which family the lot joins, when a reviewer picked one of the adult's. */
+  guardianHouseholdId?: string | null;
+  /** The reviewer saw the households and said none of them is this family. */
+  createNewHousehold?: boolean;
+  /** A name for a household the reviewer asked to create. */
+  newHouseholdName?: string | null;
   now?: Date;
   logger?: FunctionLogger;
 }): Promise<ApproveRegistrationResult> {
@@ -818,12 +998,36 @@ export async function approveRegistration(options: {
 
   /* ---- Every child, then one household ------------------------------------ */
 
+  /*
+   * A reviewer's answer about a child, keyed by the document it was made about.
+   *
+   * `live` holds *survivors* — a child folded into a roster row is pushed as
+   * that row, not as the document the card asked about. So a decision is looked
+   * up by the id being pushed, and one made about a since-merged child simply
+   * does not match: the merge already answered "who is this child", and it
+   * answered with somebody the reviewer picked off the same control.
+   */
+  const decisions = new Map<string, { personId?: string; createNew?: boolean }>();
+  for (const decision of options.childDecisions ?? []) {
+    if (!live.includes(decision.studentId)) continue;
+    decisions.set(decision.studentId, {
+      personId: decision.personId,
+      createNew: decision.createNew,
+    });
+  }
+
   let pushed = 0;
   let failed = 0;
   let changed = false;
   for (const studentId of live) {
     try {
-      const result = await backend.pushStudent({ studentId, logger });
+      const decision = decisions.get(studentId);
+      const result = await backend.pushStudent({
+        studentId,
+        personId: decision?.personId ?? null,
+        createNew: decision?.createNew === true,
+        logger,
+      });
       /*
        * A child the backend already holds is not a refusal.
        *
@@ -919,6 +1123,16 @@ export async function approveRegistration(options: {
         lastName: record.guardian.lastName,
         parentPersonId: options.guardianPersonId ?? null,
         createNewParent: options.createNewGuardian === true,
+        /*
+         * Only when somebody actually answered. Unset leaves the precedence
+         * exactly as it was, which is the right behaviour for every card where
+         * the adult heads one household and there was nothing to ask.
+         */
+        householdChoice: options.createNewHousehold
+          ? { kind: 'new', name: options.newHouseholdName ?? null }
+          : options.guardianHouseholdId
+            ? { kind: 'existing', id: options.guardianHouseholdId }
+            : undefined,
         phone: record.guardian.phone,
         logger,
       });

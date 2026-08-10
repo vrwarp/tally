@@ -40,11 +40,43 @@ export interface PushStudentResult {
   message: string;
 }
 
+/**
+ * Somebody the backend already has who could be this child, offered rather than
+ * acted on.
+ *
+ * The child-side twin of `AdultCandidate`, and deliberately the same shape of
+ * thing: `wouldMatch` is a fact about what an unattended push would do with
+ * this list, not advice about what a reviewer should do with it. Backend-
+ * independent — Attendees answers with these too — so the id is named for what
+ * it is rather than for Planning Center.
+ *
+ * Mirrors `StudentCandidate` in src/services/functions.ts.
+ */
+export interface StudentCandidate {
+  personId: string;
+  name: string;
+  grade: number | null;
+  /** The one `pickExistingPerson` would link to if nobody were asked. */
+  wouldMatch: boolean;
+}
+
 export interface PushStudentOptions {
   db: FirestoreLike;
   client: PcoClient;
   config: PcoConfig;
   studentId: string;
+  /**
+   * The person a reviewer said this child already is.
+   *
+   * Set, it *is* the answer: no search runs, and a person the backend no longer
+   * has is reported rather than quietly replaced with a fresh create. The
+   * reviewer named *that* record, and inventing a different one is not a
+   * smaller version of doing what they asked. Same contract as `createFamily`'s
+   * `parentPersonId`.
+   */
+  personId?: string | null;
+  /** A reviewer who saw the candidates and said this child is new. */
+  createNew?: boolean;
   now?: Date;
   logger?: FunctionLogger;
 }
@@ -78,19 +110,25 @@ function readGrade(data: Record<string, unknown>): number | null {
 /* -------------------------------------------------------------------------- */
 
 /**
- * Looks for the person this student obviously already is.
+ * Everyone this student could obviously already be, oldest id first.
  *
  * "Obviously" is deliberately strict: first name, last name *and* grade must all
  * match. `where[search_name]` is fuzzy on the server, so the result is filtered
  * again locally through the same normalisation the visitor-collapse uses.
+ *
+ * The *list*, rather than the winner, because two callers want different things
+ * from it. A push with nobody watching takes the first and gets on with it —
+ * see `pickExistingPerson`, which is the whole of the old behaviour. A reviewer
+ * looking at a card wants to know there were two, which is the fact this
+ * function used to compute and discard on its last line.
  */
-async function findExistingPerson(
+export async function findExistingPeople(
   client: PcoClient,
   config: PcoConfig,
   firstName: string,
   lastName: string,
   grade: number | null,
-): Promise<PcoPerson | null> {
+): Promise<PcoPerson[]> {
   // The server's fuzzy `search_name` has never seen `Benson “蔡秉洲” Tsai` — it
   // indexes the halves — so it is asked for the plain name and the composite is
   // matched locally below.
@@ -139,10 +177,76 @@ async function findExistingPerson(
     return candidates.has(wanted);
   });
 
-  if (matches.length === 0) return null;
-  // Several exact matches means the church database already has duplicates.
-  // Adding a third is strictly worse than picking the oldest deterministically.
-  return matches.sort((a, b) => compareIds(a.id, b.id))[0] ?? null;
+  return matches.sort((a, b) => compareIds(a.id, b.id));
+}
+
+/**
+ * The one an unattended push links to, and a line in the log when it guessed.
+ *
+ * Several exact matches means the church database already has duplicates, and
+ * adding a third is strictly worse than picking the oldest deterministically.
+ * That reasoning holds precisely while nobody is there to ask — so the pick is
+ * kept, and the fact that a pick was *made* stops being invisible. A reviewer
+ * on the Review screen is asked instead; see `findStudentCandidates`.
+ */
+async function pickExistingPerson(
+  client: PcoClient,
+  config: PcoConfig,
+  firstName: string,
+  lastName: string,
+  grade: number | null,
+  logger: FunctionLogger,
+): Promise<PcoPerson | null> {
+  const matches = await findExistingPeople(client, config, firstName, lastName, grade);
+  if (matches.length > 1) {
+    logger.info('Several people in Planning Center match this student; linked the oldest', {
+      matches: matches.length,
+      chosen: matches[0]!.id,
+    });
+  }
+  return matches[0] ?? null;
+}
+
+/**
+ * The same search, answering with everyone it found instead of choosing.
+ *
+ * `pickExistingPerson` above is for a push with nobody watching, and its rule —
+ * take the oldest, a duplicate is better than a third — is the right rule for
+ * exactly that. This one is for the Review screen, where somebody is looking at
+ * the card and can answer the question the rule is standing in for.
+ *
+ * The list is a list to show somebody, never a match to act on: `wouldMatch`
+ * marks what would have happened unasked, so the card can pre-select it and say
+ * so, and the reviewer can disagree.
+ */
+export async function findStudentCandidates(options: {
+  client: PcoClient;
+  config: PcoConfig;
+  firstName: string;
+  lastName: string;
+  grade: number | null;
+}): Promise<StudentCandidate[]> {
+  const { client, config, grade } = options;
+  const firstName = (options.firstName ?? '').trim();
+  const lastName = (options.lastName ?? '').trim();
+  if (!firstName && !lastName) return [];
+
+  const matches = await findExistingPeople(client, config, firstName, lastName, grade);
+  return matches.map((person, index) => {
+    const mapped = mapPersonToStudent(person, {
+      minGrade: config.minGrade,
+      maxGrade: config.maxGrade,
+    });
+    const held = person.attributes?.grade;
+    return {
+      personId: person.id,
+      name: `${mapped.firstName} ${mapped.lastName}`.trim(),
+      // The *raw* grade, like the matcher compares on — the clamped one is
+      // where the band landed, not a fact about the child.
+      grade: typeof held === 'number' && Number.isFinite(held) ? held : null,
+      wouldMatch: index === 0,
+    };
+  });
 }
 
 /* -------------------------------------------------------------------------- */
@@ -370,7 +474,41 @@ export async function pushStudent(options: PushStudentOptions): Promise<PushStud
    * failure. `createAttributes` omits the field rather than sending a zero, and
    * the duplicate check above leans on `child` instead.
    */
-  const existing = await findExistingPerson(client, config, firstName, lastName, grade);
+  /*
+   * A reviewer's answer, where there is one.
+   *
+   * Read back live rather than trusted, and refused rather than substituted —
+   * the same posture as `createFamily`'s `loadChosenParent`, for the same
+   * reason. The id came off a screen that may have been open while somebody
+   * merged or deleted that person upstream, and quietly creating a fresh child
+   * of the same name instead is not a smaller version of what was asked: it is
+   * the duplicate the reviewer was answering the question to prevent.
+   *
+   * `createNew` is the other half — somebody saw the candidates and said none
+   * of them is this child — and it means the search is not run at all.
+   */
+  const chosenId = (options.personId ?? '').trim();
+  let existing: PcoPerson | null = null;
+  if (chosenId) {
+    try {
+      const chosen = await client.get<PcoPerson>(`/people/${encodeURIComponent(chosenId)}`);
+      existing = Array.isArray(chosen.data) ? (chosen.data[0] ?? null) : (chosen.data ?? null);
+    } catch (error) {
+      if (!isPersonGoneError(error)) throw error;
+      existing = null;
+    }
+    if (!existing) {
+      return {
+        status: 'skipped',
+        pcoPersonId: null,
+        message:
+          'Planning Center no longer has the person that was chosen for this child — they may have been merged or deleted. Review the family again.',
+      };
+    }
+  } else if (options.createNew !== true) {
+    existing = await pickExistingPerson(client, config, firstName, lastName, grade, logger);
+  }
+
   if (existing) {
     await ref.update({
       pcoPersonId: existing.id,

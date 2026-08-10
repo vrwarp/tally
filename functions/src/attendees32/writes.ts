@@ -27,8 +27,10 @@ import type {
   AdultCandidate,
   CreateFamilyResult,
   ExistingPerson,
+  HouseholdChoice,
+  HouseholdSummary,
 } from '../pco/household.js';
-import type { PushStudentResult } from '../pco/pushStudents.js';
+import type { PushStudentResult, StudentCandidate } from '../pco/pushStudents.js';
 import type { RecreateStudentResult } from '../pco/recreate.js';
 import { migrateStudentMemberships } from '../backends/studentMigration.js';
 import { HELD_FOR_REVIEW_MESSAGE, isHeldForReview } from '../backends/pendingReview.js';
@@ -57,6 +59,15 @@ import {
   type A32Relation,
 } from './types.js';
 import { cacheKey } from '../pco/cache.js';
+
+/**
+ * How many family members one adult's folks may be named from.
+ *
+ * The names exist to tell two identically-titled families apart, and two or
+ * three do that as well as ten. The cap is what stops a large household turning
+ * a single review card into a page of requests.
+ */
+const MAX_FOLK_MEMBER_LOOKUPS = 8;
 
 export interface A32WriteOptions {
   db: FirestoreLike;
@@ -165,7 +176,13 @@ export async function checkPerson(
  * `full` — carries drifted managed fields onto an already-linked record.
  */
 export async function pushStudent(
-  options: A32WriteOptions & { studentId: string },
+  options: A32WriteOptions & {
+    studentId: string;
+    /** The attendee a reviewer said this child already is — see ../pco/pushStudents.ts. */
+    personId?: string | null;
+    /** A reviewer who saw the candidates and said this child is new. */
+    createNew?: boolean;
+  },
 ): Promise<PushStudentResult> {
   const { db, client, config, studentId } = options;
   const logger = options.logger ?? SILENT_LOGGER;
@@ -267,13 +284,35 @@ export async function pushStudent(
    * the second time now lands on the record the first visit made instead of
    * beside it.
    */
-  const existing = await findExistingAttendee(
-    client,
-    firstName,
-    lastName,
-    grade,
-    grade === null ? await allRelations(options) : new Map(),
-  );
+  /*
+   * A reviewer's answer, where there is one — read back live and refused rather
+   * than substituted. See the same block in ../pco/pushStudents.ts; the reason
+   * bites harder here, because Attendees has no merges at all and a person
+   * created in error is created for ever.
+   */
+  const chosenId = trimmed(options.personId ?? null);
+  let existing: A32Attendee | null = null;
+  if (chosenId) {
+    existing = await loadChosenPerson(client, chosenId);
+    if (!existing) {
+      return {
+        status: 'skipped',
+        pcoPersonId: null,
+        message:
+          'Attendees no longer has the person that was chosen for this child. Review the family again.',
+      };
+    }
+  } else if (options.createNew !== true) {
+    existing = await pickExistingAttendee(
+      client,
+      firstName,
+      lastName,
+      grade,
+      grade === null ? await allRelations(options) : new Map(),
+      logger,
+    );
+  }
+
   if (existing) {
     await ref.update({
       upstreamBackend: 'a32',
@@ -339,16 +378,20 @@ export async function pushStudent(
 /**
  * The duplicate check, same normalisation as the visitor-collapse: exact
  * name-grade key, matched locally over a server-side name search. Lowest id
- * wins so repeated pushes pick the same record every time.
+ * first so repeated pushes pick the same record every time.
+ *
+ * Answers with the whole list rather than the winner — see the same split in
+ * ../pco/pushStudents.ts. The choosing is `pickExistingAttendee`'s, and it is
+ * only the right thing to do when nobody is there to be asked.
  */
-async function findExistingAttendee(
+export async function findExistingAttendees(
   client: A32Client,
   firstName: string,
   lastName: string,
   grade: number | null,
   /** Only consulted for a grade-less student, to tell a child from an adult. */
   relations: ReadonlyMap<number, A32Relation>,
-): Promise<A32Attendee | null> {
+): Promise<A32Attendee[]> {
   const plainFirstName = splitFirstName(firstName).firstName;
   const wanted = nameGradeKey(firstName, lastName, grade);
 
@@ -378,7 +421,57 @@ async function findExistingAttendee(
     }
   }
   matches.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  return matches;
+}
+
+/** The one an unattended push links to, with a line in the log when it guessed. */
+async function pickExistingAttendee(
+  client: A32Client,
+  firstName: string,
+  lastName: string,
+  grade: number | null,
+  relations: ReadonlyMap<number, A32Relation>,
+  logger: FunctionLogger,
+): Promise<A32Attendee | null> {
+  const matches = await findExistingAttendees(client, firstName, lastName, grade, relations);
+  if (matches.length > 1) {
+    logger.info('Several attendees match this student; linked the oldest', {
+      matches: matches.length,
+      chosen: matches[0]!.id,
+    });
+  }
   return matches[0] ?? null;
+}
+
+/**
+ * The Attendees half of `findStudentCandidates` — same contract as
+ * ../pco/pushStudents.ts, same refusal to act on what it finds.
+ *
+ * `relations` is loaded unconditionally here rather than only for a grade-less
+ * student: this runs on the Review screen where the answer is being shown to
+ * somebody, and a candidate wrongly kept because we skipped the child check is
+ * a stranger offered to a reviewer as their child.
+ */
+export async function findStudentCandidates(
+  options: A32WriteOptions & {
+    firstName: string;
+    lastName: string;
+    grade: number | null;
+  },
+): Promise<StudentCandidate[]> {
+  const { client, grade } = options;
+  const firstName = trimmed(options.firstName) ?? '';
+  const lastName = trimmed(options.lastName) ?? '';
+  if (!firstName && !lastName) return [];
+
+  const relations = await allRelations(options);
+  const matches = await findExistingAttendees(client, firstName, lastName, grade, relations);
+  return matches.map((attendee, index) => ({
+    personId: attendee.id,
+    name: `${displayFirstNameOf(attendee)} ${attendee.last_name ?? ''}`.trim(),
+    grade: a32Grade(attendee),
+    wouldMatch: index === 0,
+  }));
 }
 
 /* -------------------------------------------------------------------------- */
@@ -903,8 +996,94 @@ function isChildAttendee(
   return false;
 }
 
-/** The attendee a reviewer named, or null once Attendees no longer has them. */
-async function loadChosenParent(
+/**
+ * The families an attendee heads — but only when which one matters.
+ *
+ * The Attendees half of `withHouseholds` in ../pco/household.ts, and the same
+ * threshold for the same reason: one folk, or none, is not a question. Past
+ * one, the members are worth a request each, because `${lastName} family` is
+ * what every one of them is called and a reviewer choosing between two
+ * identical labels is choosing at random.
+ */
+async function withFolks(
+  options: A32WriteOptions,
+  attendee: A32Attendee,
+): Promise<HouseholdSummary[] | undefined> {
+  const edges = attendee.folkattendee_set ?? [];
+  const folks = edges.filter(
+    (edge) =>
+      edge.attendee === attendee.id &&
+      edge.folk.category === A32_FAMILY_CATEGORY &&
+      edge.is_removed !== true,
+  );
+  if (folks.length < 2) return undefined;
+
+  /*
+   * One read for every folk this attendee is in, then names resolved by id.
+   *
+   * `loadFamilyEdges` answers for the *person*, not for one folk, so calling it
+   * inside the loop below would re-fetch the same list once per folk. The edges
+   * carry attendee ids and no names, so the names cost a lookup each — capped,
+   * because a commune-sized family must not turn one card into forty requests,
+   * and a partial list still tells two households apart.
+   */
+  let edgesForPerson: A32FolkAttendee[] = [];
+  try {
+    edgesForPerson = await loadFamilyEdges(options.client, attendee.id);
+  } catch {
+    // Named by the folks alone — still real options, thinly labelled.
+  }
+
+  const names = new Map<string, string>();
+  let looked = 0;
+  const nameOf = async (personId: string): Promise<string | null> => {
+    if (names.has(personId)) return names.get(personId)!;
+    if (looked >= MAX_FOLK_MEMBER_LOOKUPS) return null;
+    looked += 1;
+    try {
+      const member = await options.client.get<A32Attendee>(API.attendeeById(personId));
+      const name = `${displayFirstNameOf(member)} ${member.last_name ?? ''}`.trim();
+      if (name) names.set(personId, name);
+      return name || null;
+    } catch {
+      return null;
+    }
+  };
+
+  const summaries: HouseholdSummary[] = [];
+  for (const edge of [...folks].sort((a, b) => compareIds(a.folk.id, b.folk.id))) {
+    const memberIds = edgesForPerson
+      .filter(
+        (other) =>
+          other.folk.id === edge.folk.id &&
+          other.attendee !== attendee.id &&
+          other.is_removed !== true,
+      )
+      .map((other) => other.attendee);
+
+    const memberNames: string[] = [];
+    for (const memberId of memberIds) {
+      const name = await nameOf(memberId);
+      if (name) memberNames.push(name);
+    }
+
+    summaries.push({
+      id: edge.folk.id,
+      name: trimmed(edge.folk.display_name) ?? 'Family',
+      memberNames,
+    });
+  }
+  return summaries;
+}
+
+/**
+ * The attendee a reviewer named, or null once Attendees no longer has them.
+ *
+ * Used for both halves of the card's identity question — the parent and, since
+ * children got a chooser of their own, the child. Attendees has one endpoint
+ * for people and no `child` flag, so there is one function.
+ */
+async function loadChosenPerson(
   client: A32Client,
   personId: string,
 ): Promise<A32Attendee | null> {
@@ -961,6 +1140,14 @@ export async function findAdultCandidates(
         corroborated: phone
           ? allPhonesOf(attendee).some((held) => phoneDigits(held) === phoneDigits(phone))
           : false,
+        /*
+         * Free here, unlike Planning Center. `folkattendee_set` rides on every
+         * search row — `isChildAttendee` above already depends on it — so the
+         * folks this adult heads, and their display names, cost no request at
+         * all. Only the *membership* of each one does, and that is fetched
+         * past the same threshold for the same reason: see `withFolks`.
+         */
+        households: await withFolks(options, attendee),
       });
     }
   }
@@ -985,6 +1172,8 @@ export async function createFamily(
     parentPersonId?: string | null;
     /** A reviewer who saw the candidates and said none of them is the parent. */
     createNewParent?: boolean;
+    /** Which folk this lot joins, when a reviewer said — see ../pco/household.ts. */
+    householdChoice?: HouseholdChoice;
     phone?: string | null;
     email?: string | null;
   },
@@ -1139,7 +1328,7 @@ export async function createFamily(
    */
   const chosenId = trimmed(options.parentPersonId ?? null);
   if (chosenId) {
-    const chosen = await loadChosenParent(client, chosenId);
+    const chosen = await loadChosenPerson(client, chosenId);
     if (!chosen || isChildAttendee(chosen, relations)) {
       return refuse(
         'parent-not-found',
@@ -1211,8 +1400,19 @@ export async function createFamily(
     : familyFolkIdsOf(parentId, await loadFamilyEdges(client, parentId));
   const linkedFolkIds = linked.flatMap((child) => familyFolkIdsOf(child.personId, child.edges));
 
+  /*
+   * A reviewer's answer wins outright — see the same block in
+   * ../pco/household.ts. `'new'` resolves to no folk, which is how it reaches
+   * the create below rather than only falling into it.
+   */
+  const chosenFolk = options.householdChoice;
   let folkId =
-    [anchorFolkIds, parentFolkIds, linkedFolkIds].find((group) => group.length > 0)?.[0] ?? null;
+    chosenFolk?.kind === 'existing'
+      ? chosenFolk.id
+      : chosenFolk?.kind === 'new'
+        ? null
+        : ([anchorFolkIds, parentFolkIds, linkedFolkIds].find((group) => group.length > 0)?.[0] ??
+          null);
   let createdHousehold = false;
   if (!folkId) {
     const folk = await client.post<A32Folk>(
@@ -1220,7 +1420,12 @@ export async function createFamily(
       {
         division: Number.parseInt(config.divisionId, 10),
         category: A32_FAMILY_CATEGORY,
-        display_name: `${lastName} family`.trim(),
+        // A name somebody typed, when they did — every folk is otherwise
+        // `${lastName} family`, and a deliberate second one would be
+        // indistinguishable from the first.
+        display_name:
+          (chosenFolk?.kind === 'new' ? trimmed(chosenFolk.name ?? null) : null) ??
+          `${lastName} family`.trim(),
       },
       { 'X-Target-Attendee-Id': anchor.personId },
     );

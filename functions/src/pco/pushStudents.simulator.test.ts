@@ -19,7 +19,7 @@ import {
 import type { PcoConfig, PcoWriteBackMode } from '../config.js';
 import { createPcoClient, type PcoClient } from '../pco/client.js';
 import { FakeFirestore } from '../testing/fakeFirestore.js';
-import { pushPendingStudents, pushStudent } from './pushStudents.js';
+import { findStudentCandidates, pushPendingStudents, pushStudent } from './pushStudents.js';
 
 const NOW = new Date('2026-07-02T09:00:00Z');
 const OLD = Timestamp.fromDate(new Date('2026-01-01T00:00:00Z'));
@@ -562,5 +562,142 @@ describe('pushStudent against the simulator', () => {
       expect(result.errors + result.pushed).toBe(2);
       expect(result.pushed).toBeGreaterThanOrEqual(1);
     });
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* The read a reviewer decides from                                            */
+/* -------------------------------------------------------------------------- */
+
+describe('findStudentCandidates against the simulator', () => {
+  let h: Harness;
+
+  beforeEach(() => {
+    h = harness();
+  });
+
+  it('offers everyone who matches, and marks the one a push would take', async () => {
+    /*
+     * Two children of the same name in the same grade is what the unattended
+     * matcher resolves by taking the oldest — a defensible rule with nobody to
+     * ask, and a coin toss when somebody is looking at the card. Both come back
+     * so the reviewer can be the one to answer.
+     */
+    const older = h.store.createPerson({
+      first_name: 'Nia',
+      last_name: 'Fontaine',
+      grade: 9,
+      child: true,
+    });
+    const younger = h.store.createPerson({
+      first_name: 'Nia',
+      last_name: 'Fontaine',
+      grade: 9,
+      child: true,
+    });
+
+    const candidates = await findStudentCandidates({
+      client: h.client,
+      config: config('full'),
+      firstName: 'Nia',
+      lastName: 'Fontaine',
+      grade: 9,
+    });
+
+    expect(candidates.map((candidate) => candidate.personId)).toEqual([older.id, younger.id]);
+    expect(candidates.filter((candidate) => candidate.wouldMatch)).toHaveLength(1);
+    expect(candidates[0]!.wouldMatch).toBe(true);
+    expect(candidates[0]!.grade).toBe(9);
+  });
+
+  it('does not offer somebody in another grade', async () => {
+    h.store.createPerson({ first_name: 'Nia', last_name: 'Fontaine', grade: 7, child: true });
+
+    const candidates = await findStudentCandidates({
+      client: h.client,
+      config: config('full'),
+      firstName: 'Nia',
+      lastName: 'Fontaine',
+      grade: 9,
+    });
+
+    expect(candidates).toEqual([]);
+  });
+});
+
+describe('pushStudent with a reviewer’s answer', () => {
+  let h: Harness;
+
+  beforeEach(() => {
+    h = harness();
+  });
+
+  it('links the person a reviewer named, without searching for one', async () => {
+    const chosen = h.store.createPerson({
+      first_name: 'Nia',
+      last_name: 'Fontaine',
+      grade: 9,
+      child: true,
+    });
+    // The one an unaided push would have taken, precisely so that landing on
+    // the *other* proves the answer was used rather than re-derived.
+    h.store.createPerson({ first_name: 'Nia', last_name: 'Fontaine', grade: 9, child: true });
+    h.db.seed('students/s1', tallyOnlyStudent());
+
+    const result = await pushStudent({
+      db: h.db,
+      client: h.client,
+      config: config('create'),
+      studentId: 's1',
+      personId: chosen.id,
+      now: NOW,
+    });
+
+    expect(result.pcoPersonId).toBe(chosen.id);
+    expect(h.db.get('students/s1')?.upstreamPersonId).toBe(chosen.id);
+  });
+
+  it('creates rather than matching when a reviewer said the child is new', async () => {
+    const namesake = h.store.createPerson({
+      first_name: 'Nia',
+      last_name: 'Fontaine',
+      grade: 9,
+      child: true,
+    });
+    h.db.seed('students/s1', tallyOnlyStudent());
+
+    const result = await pushStudent({
+      db: h.db,
+      client: h.client,
+      config: config('create'),
+      studentId: 's1',
+      createNew: true,
+      now: NOW,
+    });
+
+    expect(result.status).toBe('created');
+    expect(result.pcoPersonId).not.toBe(namesake.id);
+  });
+
+  it('refuses rather than inventing a replacement for somebody who has gone', async () => {
+    h.db.seed('students/s1', tallyOnlyStudent());
+
+    const result = await pushStudent({
+      db: h.db,
+      client: h.client,
+      config: config('create'),
+      studentId: 's1',
+      personId: '999999',
+      now: NOW,
+    });
+
+    /*
+     * The reviewer named *that* person. Quietly creating a fresh child of the
+     * same name instead is not a smaller version of what they asked for — it is
+     * the duplicate they answered the question to prevent.
+     */
+    expect(result.status).toBe('skipped');
+    expect(result.message).toMatch(/no longer has the person/i);
+    expect(h.db.get('students/s1')?.upstreamPersonId).toBeUndefined();
   });
 });

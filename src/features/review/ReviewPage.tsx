@@ -65,6 +65,7 @@ import {
   type PendingRegistration,
   type PendingRegistrationChild,
   type ReviewStudentSummary,
+  type StudentCandidate,
 } from '@/services/functions';
 import { GRADES } from '@/types';
 
@@ -275,6 +276,13 @@ export function ReviewPage() {
                         ? { guardianPersonId: decision.guardianPersonId }
                         : {}),
                       ...(decision?.createNewGuardian ? { createNewGuardian: true } : {}),
+                      ...(decision?.childDecisions?.length
+                        ? { childDecisions: decision.childDecisions }
+                        : {}),
+                      ...(decision?.guardianHouseholdId
+                        ? { guardianHouseholdId: decision.guardianHouseholdId }
+                        : {}),
+                      ...(decision?.createNewHousehold ? { createNewHousehold: true } : {}),
                     });
                     return data.message;
                   })
@@ -327,7 +335,29 @@ export interface ApproveDecision {
   guardianPersonId?: string;
   /** They saw the candidates and said none of them is the parent. */
   createNewGuardian?: boolean;
+  /** Who each child already is, for the children a reviewer answered about. */
+  childDecisions?: { studentId: string; personId?: string; createNew?: boolean }[];
+  /** Which of the adult's families the lot joins. */
+  guardianHouseholdId?: string;
+  /** They saw the families and said none of them is this one. */
+  createNewHousehold?: boolean;
 }
+
+/**
+ * One child's answer to "who is this?", in the three shapes it can take.
+ *
+ * Discriminated rather than a bare id, because the three answers are acted on
+ * at different moments and by different code. A roster row is a *merge*, which
+ * goes to the server the instant it is chosen and can be undone; an upstream
+ * person is a link that happens on approve and cannot; and `new` is an
+ * assertion that stays on this screen and only releases the button. Collapsing
+ * them into one string is how the previous version of this control let a
+ * reviewer hold two contradictory answers at once.
+ */
+export type ChildAnswer =
+  | { kind: 'roster'; studentId: string }
+  | { kind: 'upstream'; personId: string }
+  | { kind: 'new' };
 
 interface RegistrationCardProps {
   row: PendingRegistration;
@@ -737,8 +767,13 @@ function stillHeld(row: PendingRegistration): PendingRegistrationChild[] {
 
 /** "Ade, Chidi and Ngozi" — names, because a count is not a person. */
 function listNames(children: PendingRegistrationChild[]): string {
-  const names = children.map((child) => child.firstName).filter(Boolean);
-  if (names.length === 0) return 'these children';
+  return joinNames(children.map((child) => child.firstName)) ?? 'these children';
+}
+
+/** "Ada", "Ada and Bo", "Ada, Bo and Cy" — null when there is nobody to name. */
+function joinNames(values: readonly string[]): string | null {
+  const names = values.map((name) => name.trim()).filter(Boolean);
+  if (names.length === 0) return null;
   if (names.length === 1) return names[0]!;
   return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 }
@@ -773,12 +808,14 @@ function RegistrationCard({
   /**
    * What a reviewer has said about each flagged child, this session.
    *
-   * A candidate id means "this is that child" and has already been sent; the
-   * literal `'new'` means "none of these is them", which is an assertion by a
-   * person and not a fact about the world — so it stays local and reversible
-   * until they approve, and never round-trips to the server.
+   * Keyed by the child's own student id, and holding a `ChildAnswer` rather
+   * than a bare string because the three answers are not the same kind of
+   * thing. `roster` has already been sent — a merge goes to the server the
+   * instant it is chosen, and can be undone. `upstream` and `new` are
+   * assertions by a person that stay here until they approve: the first becomes
+   * a link the push honours, the second suppresses the push's own guess.
    */
-  const [resolution, setResolution] = useState<Record<string, string | 'new'>>({});
+  const [resolution, setResolution] = useState<Record<string, ChildAnswer>>({});
   /**
    * The other cards this reviewer has said are the same household.
    *
@@ -796,6 +833,15 @@ function RegistrationCard({
    * was never visible in the church's database anyway.
    */
   const [guardianChoice, setGuardianChoice] = useState<string | 'new' | null>(null);
+  /**
+   * Which of that adult's families this lot joins.
+   *
+   * Only ever asked when the selected adult heads more than one, which is the
+   * only time there is a question — see `householdOptions`. `null` means the
+   * backend's own precedence stands, and the picker pre-selects what that
+   * precedence would pick, so `null` and "the first option" agree.
+   */
+  const [householdChoice, setHouseholdChoice] = useState<string | 'new' | null>(null);
   const when = row.registeredAt === null ? null : new Date(row.registeredAt);
   const expiringSoon = row.expiresInMs !== null && row.expiresInMs < EXPIRING_SOON_MS;
   // Rounded up, and floored at one: a record with six hours left has "1 day",
@@ -873,8 +919,32 @@ function RegistrationCard({
    * nobody is stuck on a card they cannot decide.
    */
   const unsettled = held.filter(
-    (child) => child.studentId && candidatesFor(child).length > 0 && !resolution[child.studentId],
+    (child) => child.studentId && needsAnswer(child) && !resolution[child.studentId],
   );
+
+  /**
+   * What the card sends about each child, answered or not.
+   *
+   * A reviewer's own answer wins. Where they said nothing, a *single* upstream
+   * candidate is sent anyway — the same posture as the guardian chooser, and
+   * for the same reason: that candidate is already what the push will link to,
+   * so naming them turns a rule re-run at press time into an instruction the
+   * backend verifies and refuses if it has gone stale. Where there are two, the
+   * button is held above and nothing is sent until somebody chooses.
+   *
+   * A roster answer sends nothing: the merge already happened, the document
+   * being pushed is the row that survived, and it carries its own linkage.
+   */
+  const childDecisions = held.flatMap((child) => {
+    if (!child.studentId) return [];
+    const answer = resolution[child.studentId] ?? defaultAnswerFor(child);
+    if (!answer || answer.kind === 'roster') return [];
+    return [
+      answer.kind === 'new'
+        ? { studentId: child.studentId, createNew: true }
+        : { studentId: child.studentId, personId: answer.personId },
+    ];
+  });
 
   const kin = row.sameFamily ?? [];
   const adults = row.guardianCandidates ?? [];
@@ -952,10 +1022,54 @@ function RegistrationCard({
       ? `${nameOf(row.guardian)} ${guardianClause}, attached to ${named}.`
       : `Adds ${nameOf(row.guardian)} to the church’s database, attached to ${named}.`;
 
+  /**
+   * The families the selected adult already heads, when there is a choice.
+   *
+   * Only for an adult the church already has — a new person has no household to
+   * pick from — and only when the backend sent more than one, which it does only
+   * past the threshold where the question is real. Anchors suppress it outright:
+   * when the family named a sibling the church already has, `createFamily`
+   * returns before the household is ever chosen, so a picker here would offer a
+   * decision that is not taken.
+   */
+  const householdOptions =
+    chosenAdult && row.anchors.length === 0 ? (chosenAdult.households ?? []) : [];
+  /*
+   * The first is the one the backend's own precedence would land on.
+   *
+   * Both backends build this list lowest-id-first — `householdIdsOf` and
+   * `familyFolkIdsOf` each sort on the way out — and lowest id is oldest, which
+   * is exactly the tie-break `createFamily` applies. So the picker opens on what
+   * would have happened anyway, and is not re-sorted here: a second ordering
+   * that drifted from the server's would be a picker that lies about the
+   * default.
+   */
+  const effectiveHousehold =
+    householdOptions.length > 1 ? (householdChoice ?? householdOptions[0]?.id ?? null) : null;
+
+  /**
+   * Whether the child answers are about to make the adult answer moot.
+   *
+   * `createFamily` refuses outright — before the parent is resolved at all — if
+   * any child it is about to place already has an adult in their family. Linking
+   * a child to somebody the church already has is exactly how that becomes true,
+   * so a reviewer can pick an adult, pick a household, press the button and get
+   * neither. The card cannot know whether the linked person *has* such a family,
+   * so it says the weaker true thing rather than the stronger false one.
+   */
+  const childLinkMayOverrideFamily =
+    row.guardian !== null &&
+    childDecisions.some((decision) => typeof decision.personId === 'string');
+
   const approveDecision = (): ApproveDecision => ({
     ...(sameFamily.length > 0 ? { withRegistrationIds: sameFamily } : {}),
     ...(effectiveChoice && effectiveChoice !== 'new' ? { guardianPersonId: effectiveChoice } : {}),
     ...(effectiveChoice === 'new' ? { createNewGuardian: true } : {}),
+    ...(childDecisions.length > 0 ? { childDecisions } : {}),
+    ...(effectiveHousehold && effectiveHousehold !== 'new'
+      ? { guardianHouseholdId: effectiveHousehold }
+      : {}),
+    ...(effectiveHousehold === 'new' ? { createNewHousehold: true } : {}),
   });
 
   return (
@@ -1111,6 +1225,10 @@ function RegistrationCard({
                   still the right answer to forget, and no longer a blank.
                 */
                 setGuardianChoice(null);
+                // The household hangs off whichever adult is selected, and the
+                // adult answer has just been dropped — so the options this was
+                // chosen from no longer exist.
+                setHouseholdChoice(null);
                 if (result.last4Changed) setSameFamily([]);
               }
               return result;
@@ -1349,6 +1467,90 @@ function RegistrationCard({
           </div>
         ) : null}
 
+        {/*
+          Which of that adult's families this lot joins.
+
+          Only drawn when the answer is genuinely open — an adult the church
+          already has, heading more than one household, on a card whose family
+          named no existing sibling. Every other card has one answer and gets no
+          control, which is the same rule the backend applies and the reason the
+          households are not even fetched below the threshold.
+
+          The names alone do not discriminate: both backends call every family
+          after its surname, so `Person Household` appears twice and the members
+          are what tell them apart.
+        */}
+        {householdOptions.length > 1 ? (
+          <div className={STRIP}>
+            <p>
+              {chosenAdult?.name} is in {householdOptions.length} families in the church&rsquo;s
+              database. {listNames(held)} {held.length === 1 ? 'joins' : 'join'} this one:
+            </p>
+            <ul className="mt-2 flex flex-col gap-2">
+              {householdOptions.map((household, index) => {
+                const picked = effectiveHousehold === household.id;
+                return (
+                  <li
+                    key={household.id}
+                    className="flex flex-wrap items-center justify-between gap-2"
+                  >
+                    <span className="min-w-0 text-ink-200">
+                      {household.name}
+                      <span className="text-ink-400">
+                        {' — '}
+                        {joinNames(household.memberNames)
+                          ? `with ${joinNames(household.memberNames)}`
+                          : 'nobody else on file'}
+                        {index === 0 ? ', the one we would pick' : ''}
+                      </span>
+                    </span>
+                    <Button
+                      variant={picked ? 'primary' : 'secondary'}
+                      className="min-h-9 px-3 text-sm"
+                      disabled={locked}
+                      aria-pressed={picked}
+                      onClick={() => setHouseholdChoice(household.id)}
+                    >
+                      {picked ? 'This one' : 'This family'}
+                    </Button>
+                  </li>
+                );
+              })}
+              <li className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-ink-400">Neither — start a new family</span>
+                <Button
+                  variant={effectiveHousehold === 'new' ? 'primary' : 'secondary'}
+                  className="min-h-9 px-3 text-sm"
+                  disabled={locked}
+                  aria-pressed={effectiveHousehold === 'new'}
+                  onClick={() => setHouseholdChoice('new')}
+                >
+                  {effectiveHousehold === 'new' ? 'Starting a new one' : 'New family'}
+                </Button>
+              </li>
+            </ul>
+          </div>
+        ) : null}
+
+        {/*
+          The one interaction between the two halves of this card that a
+          reviewer cannot see coming.
+
+          `createFamily` refuses before it resolves the parent at all if any
+          child it is placing already has an adult in their family — so linking
+          a child to somebody the church already has can quietly discard the
+          adult, and the household, that were just chosen above. Said plainly,
+          because the alternative is a reviewer who picks an adult, presses, and
+          reads "this family already has an adult on file" with no idea which of
+          their answers caused it.
+        */}
+        {childLinkMayOverrideFamily ? (
+          <p className={cn(STRIP, 'text-ink-400')}>
+            If the child already belongs to a family in the church&rsquo;s database, that family
+            stands and {row.guardian?.firstName} is not added to it.
+          </p>
+        ) : null}
+
         <ul className="flex flex-col gap-2">
           {row.children.map((child, index) => (
             <ChildRow
@@ -1380,6 +1582,14 @@ function RegistrationCard({
                   if (child.studentId) {
                     setResolution(({ [child.studentId!]: _dropped, ...rest }) => rest);
                   }
+                  /*
+                    And the household with it. Which family this lot joins hangs
+                    off the adult *and* off who the children turn out to be — a
+                    child linked upstream brings their own household into the
+                    precedence — so a corrected name can change the options
+                    under an answer that is still sitting there selected.
+                  */
+                  setHouseholdChoice(null);
                 }
                 return result;
               }}
@@ -1387,9 +1597,14 @@ function RegistrationCard({
               onResolve={(choice) => {
                 if (!child.studentId) return;
                 setResolution((held) => ({ ...held, [child.studentId!]: choice }));
-                // A candidate is a real decision about the roster and goes to
-                // the server; "new" is a reviewer's assertion and stays here.
-                if (choice !== 'new') onMerge(choice, child.studentId);
+                /*
+                  A roster row is a real decision about Tally's own roster and
+                  goes to the server now, where it can be undone. The other two
+                  are assertions that only mean anything at the press: an
+                  upstream link is made by the push, and "new" only suppresses
+                  the push's own guess.
+                */
+                if (choice.kind === 'roster') onMerge(choice.studentId, child.studentId);
               }}
             />
           ))}
@@ -1642,9 +1857,9 @@ function ChildRow({
 }: {
   child: PendingRegistrationChild;
   disabled: boolean;
-  /** A candidate id, `'new'`, or nothing decided yet. */
-  resolution: string | 'new' | undefined;
-  onResolve: (choice: string | 'new') => void;
+  /** What this reviewer said, or nothing yet — see `ChildAnswer`. */
+  resolution: ChildAnswer | undefined;
+  onResolve: (choice: ChildAnswer) => void;
   onUnmerge: (foldId: string) => void;
   /** Whether this child is still Tally's alone to correct. */
   correctable: boolean;
@@ -1654,6 +1869,7 @@ function ChildRow({
   onSaveChild: (fields: ChildFields) => Promise<AmendRegistrationResult>;
 }) {
   const candidates = candidatesFor(child);
+  const upstream = upstreamFor(child);
 
   /*
     The editor takes the whole row rather than opening beside it.
@@ -1782,7 +1998,22 @@ function ChildRow({
         </div>
       ) : null}
 
-      {candidates.length > 0 && child.studentId ? (
+      {/*
+        What the push already did, on a card that never got to ask.
+
+        A counselor's quick-add reaches the backend minutes after the door, so
+        by the time anybody opens this screen the identity question is closed —
+        answered by a name-and-grade rule, correctly or not. Saying so is the
+        difference between a card that looks like it never asked and one that
+        reports what happened while nobody was looking.
+      */}
+      {child.linkedTo ? (
+        <p className={cn('mt-2 ml-12', CAPTION)}>
+          Linked automatically to {child.linkedTo.name} in the church&rsquo;s database.
+        </p>
+      ) : null}
+
+      {(candidates.length > 0 || upstream.length > 0) && child.studentId ? (
         /*
           `ml-12` is the avatar plus the gap after it — where this child's own
           name starts. The candidates are being compared *to that name*, so they
@@ -1790,14 +2021,32 @@ function ChildRow({
         */
         <div className="mt-3 ml-12 border-t border-ink-800 pt-3">
           <p className="text-sm font-semibold text-ink-200 lg:text-xs">
-            {candidates.length === 1
-              ? 'One student on the roster shares this name.'
-              : `${candidates.length} students on the roster share this name.`}
+            Who is {child.firstName}?
           </p>
           <p className={cn('mt-0.5', CAPTION)}>
-            Merging can be undone. A duplicate in the church&rsquo;s database cannot.
+            {candidates.length > 0 && upstream.length > 0
+              ? 'Merging a roster row can be undone. Adding to the church’s database cannot.'
+              : candidates.length > 0
+                ? 'Merging can be undone. A duplicate in the church’s database cannot.'
+                : 'Nothing added to the church’s database can be taken back.'}
           </p>
 
+          {/*
+            Two groups, one selection.
+
+            They are different populations — the roster's own rows, and people
+            the church has who are not on the roster at all — and the callable
+            keeps them disjoint, so nobody is offered twice. What they are not
+            is two questions: a child is one person, and letting a reviewer
+            answer "the roster's Michael" *and* "the church's Michael" at once
+            would be two contradictory instructions with no way to reconcile
+            them at the press.
+          */}
+          {candidates.length > 0 ? (
+            <p className="mt-3 text-xs font-semibold tracking-wide text-ink-500 uppercase">
+              On Tally&rsquo;s roster
+            </p>
+          ) : null}
           <ul
             /*
               `gap-3` rather than `gap-1.5`: these are adjacent targets with
@@ -1816,16 +2065,77 @@ function ChildRow({
                 <CandidateButton
                   candidate={candidate}
                   child={child}
-                  chosen={resolution === candidate.studentId}
+                  chosen={
+                    resolution?.kind === 'roster' && resolution.studentId === candidate.studentId
+                  }
                   disabled={disabled}
-                  onChoose={() => onResolve(candidate.studentId)}
+                  onChoose={() => onResolve({ kind: 'roster', studentId: candidate.studentId })}
                 />
               </li>
             ))}
           </ul>
 
+          {upstream.length > 0 ? (
+            <>
+              <p className="mt-3 text-xs font-semibold tracking-wide text-ink-500 uppercase">
+                In the church&rsquo;s database
+              </p>
+              <ul
+                className={cn(
+                  'mt-2 flex flex-col gap-3',
+                  upstream.length > 1 && 'lg:grid lg:grid-cols-2 lg:gap-x-6',
+                )}
+              >
+                {upstream.map((candidate) => {
+                  const chosen =
+                    resolution?.kind === 'upstream' && resolution.personId === candidate.personId;
+                  /*
+                    The default, marked — and only when it *is* the default.
+                    One candidate is what the push would link to anyway, so the
+                    control opens on it. Two is ambiguity the backend resolves
+                    by taking the oldest, which is a coin toss it should not be
+                    making with somebody sitting here, so neither is marked and
+                    the approve button waits.
+                  */
+                  const isDefault = upstream.length === 1 && candidate.wouldMatch;
+                  const selected = chosen || (resolution === undefined && isDefault);
+                  return (
+                    <li key={candidate.personId}>
+                      <button
+                        type="button"
+                        disabled={disabled}
+                        aria-pressed={selected}
+                        onClick={() => onResolve({ kind: 'upstream', personId: candidate.personId })}
+                        className={cn(
+                          'flex min-h-12 w-full flex-col justify-center rounded-lg px-3 py-2 text-left ring-1 transition-colors disabled:opacity-60 pointer-fine:min-h-9',
+                          selected
+                            ? 'bg-brand-500/15 text-brand-300 ring-brand-500/40'
+                            : 'bg-ink-800 text-ink-100 ring-ink-600 hover:bg-ink-700 active:bg-ink-700',
+                        )}
+                      >
+                        <span className="truncate text-sm">
+                          {selected ? '✓ ' : ''}
+                          {candidate.name}
+                          {' · '}
+                          <span className="text-ink-400">
+                            {gradeSentence(candidate) ?? 'no grade on file'}
+                          </span>
+                        </span>
+                        <span className="mt-0.5 text-sm text-ink-500 lg:text-xs">
+                          {isDefault
+                            ? 'The one we would link by default.'
+                            : 'Not on Tally’s roster.'}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          ) : null}
+
           {/*
-            Outside the list, because it is not a candidate — it was pixel-
+            Outside the lists, because it is not a candidate — it was pixel-
             identical to one, in a set the reader is meant to compare. And it is
             a real answer now rather than a way to close a panel: saying the
             child is new is what releases the card's approve button.
@@ -1833,8 +2143,8 @@ function ChildRow({
           <button
             type="button"
             disabled={disabled}
-            aria-pressed={resolution === 'new'}
-            onClick={() => onResolve('new')}
+            aria-pressed={resolution?.kind === 'new'}
+            onClick={() => onResolve({ kind: 'new' })}
             /*
               Further from the candidates than they are from each other, and
               narrower than the group: it is a different kind of answer, not a
@@ -1844,12 +2154,12 @@ function ChildRow({
             */
             className={cn(
               'mt-4 flex min-h-12 items-center rounded-lg px-3 py-2 text-left text-sm ring-1 transition-colors disabled:opacity-60 pointer-fine:min-h-9',
-              resolution === 'new'
+              resolution?.kind === 'new'
                 ? 'bg-brand-500/15 text-brand-300 ring-brand-500/40'
                 : 'text-ink-400 ring-ink-800 hover:bg-ink-900 active:bg-ink-900',
             )}
           >
-            {resolution === 'new' ? '✓ ' : ''}
+            {resolution?.kind === 'new' ? '✓ ' : ''}
             None of them — {child.firstName} is new
           </button>
         </div>
@@ -1951,4 +2261,48 @@ function candidatesFor(child: PendingRegistrationChild): ReviewStudentSummary[] 
   return child.possibleDuplicates.filter(
     (candidate) => candidate.status === 'active' && candidate.studentId !== child.studentId,
   );
+}
+
+/**
+ * The people the *church* has who this child might be, still worth offering.
+ *
+ * Nothing once a merge has settled the question, and nothing once the push has
+ * already run — a counselor's child reached the backend before this screen was
+ * opened, and `linkedTo` says who to instead of asking again.
+ */
+function upstreamFor(child: PendingRegistrationChild): StudentCandidate[] {
+  if (child.mergedIntoStudentId) return [];
+  if (child.upstreamPersonId) return [];
+  return child.upstreamCandidates ?? [];
+}
+
+/**
+ * Whether this child's identity is a question a person still has to answer.
+ *
+ * Roster candidates always ask: a name already on the roster is a merge nobody
+ * but a reviewer can judge, and it has held the approve button since it
+ * shipped. Upstream candidates ask only when there is more than one, because a
+ * single one is not ambiguity — it is exactly what the push was going to do
+ * anyway, pre-selected and stated in the caption, with the reviewer free to
+ * disagree. Holding the button on it would stop every ordinary card for a
+ * decision that has already been made correctly.
+ */
+function needsAnswer(child: PendingRegistrationChild): boolean {
+  return candidatesFor(child).length > 0 || upstreamFor(child).length > 1;
+}
+
+/**
+ * What the card shows selected for a child nobody has answered about.
+ *
+ * Null where there is genuinely nothing to say — no candidates of either kind,
+ * so the push does what it has always done and the card claims nothing. A lone
+ * upstream candidate is the backend's own answer, shown rather than hidden.
+ * Roster candidates never pre-select: a merge is not what happens by default,
+ * and pre-selecting one would propose an irreversible fold nobody asked for.
+ */
+function defaultAnswerFor(child: PendingRegistrationChild): ChildAnswer | null {
+  if (candidatesFor(child).length > 0) return null;
+  const upstream = upstreamFor(child);
+  if (upstream.length !== 1) return null;
+  return { kind: 'upstream', personId: upstream[0]!.personId };
 }

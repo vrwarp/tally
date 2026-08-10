@@ -30,6 +30,7 @@ import {
   checkPerson,
   createFamily,
   findAdultCandidates,
+  findStudentCandidates,
   pushStudent,
   recreateStudent,
   setParentContact,
@@ -73,8 +74,8 @@ export function createA32Backend(args: BackendContext & { config: A32Config }): 
       collectPhoneLast4({ client, config, cache, personIds, force }),
     checkPerson: ({ personId }) => checkPerson(client, personId),
 
-    pushStudent: ({ studentId, logger }) =>
-      pushStudent({ db, client, config, cache, studentId, logger }),
+    pushStudent: ({ studentId, personId, createNew, logger }) =>
+      pushStudent({ db, client, config, cache, studentId, personId, createNew, logger }),
     pushPendingStudents: async ({ logger, limit }) => {
       // The same sweep the Planning Center flow does, against this backend's
       // own push: every active, unlinked, queued student.
@@ -136,6 +137,7 @@ export function createA32Backend(args: BackendContext & { config: A32Config }): 
       lastName,
       parentPersonId,
       createNewParent,
+      householdChoice,
       phone,
       email,
       logger,
@@ -151,6 +153,7 @@ export function createA32Backend(args: BackendContext & { config: A32Config }): 
         lastName,
         parentPersonId,
         createNewParent,
+        householdChoice,
         phone,
         email,
         logger,
@@ -167,6 +170,8 @@ export function createA32Backend(args: BackendContext & { config: A32Config }): 
         excludePersonIds,
         logger,
       }),
+    findStudentCandidates: ({ firstName, lastName, grade, logger }) =>
+      findStudentCandidates({ db, client, config, cache, firstName, lastName, grade, logger }),
     recreateStudent: ({ studentId, firstName, lastName, grade, logger }) =>
       recreateStudent({ db, client, config, cache, studentId, firstName, lastName, grade, logger }),
 

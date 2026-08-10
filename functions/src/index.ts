@@ -2728,6 +2728,10 @@ export const approveRegistration = onCall<
     withRegistrationIds?: string[];
     guardianPersonId?: string | null;
     createNewGuardian?: boolean;
+    childDecisions?: { studentId?: unknown; personId?: unknown; createNew?: unknown }[];
+    guardianHouseholdId?: string | null;
+    createNewHousehold?: boolean;
+    newHouseholdName?: string | null;
   },
   Promise<ApproveRegistrationResult>
 >({ secrets: BACKEND_SECRETS, timeoutSeconds: 300, memory: '256MiB' }, async (request) => {
@@ -2749,6 +2753,40 @@ export const approveRegistration = onCall<
   ) {
     throw new HttpsError('invalid-argument', 'guardianPersonId must be a person id.');
   }
+  const guardianHouseholdId = request.data?.guardianHouseholdId;
+  if (
+    guardianHouseholdId !== undefined &&
+    guardianHouseholdId !== null &&
+    typeof guardianHouseholdId !== 'string'
+  ) {
+    throw new HttpsError('invalid-argument', 'guardianHouseholdId must be a household id.');
+  }
+  const rawChildDecisions = request.data?.childDecisions;
+  if (rawChildDecisions !== undefined && !Array.isArray(rawChildDecisions)) {
+    throw new HttpsError('invalid-argument', 'childDecisions must be a list.');
+  }
+  /*
+   * Read field by field rather than trusted as a shape. This is the payload
+   * that names which upstream person a child becomes, and a malformed entry
+   * must degrade to "nobody answered for this child" — the behaviour every
+   * caller had before the control existed — rather than to a link nobody made.
+   */
+  const childDecisions = (rawChildDecisions ?? [])
+    .map((entry) => {
+      const row = (entry ?? {}) as Record<string, unknown>;
+      const studentId = typeof row.studentId === 'string' ? row.studentId.trim() : '';
+      if (!studentId) return null;
+      return {
+        studentId,
+        ...(typeof row.personId === 'string' && row.personId.trim().length > 0
+          ? { personId: row.personId.trim() }
+          : {}),
+        ...(row.createNew === true ? { createNew: true } : {}),
+      };
+    })
+    .filter((entry): entry is { studentId: string; personId?: string; createNew?: boolean } =>
+      entry !== null,
+    );
 
   const database = db();
   return runApproveRegistration({
@@ -2765,6 +2803,14 @@ export const approveRegistration = onCall<
       .filter((id) => id.length > 0),
     guardianPersonId: typeof guardianPersonId === 'string' ? guardianPersonId.trim() : null,
     createNewGuardian: request.data?.createNewGuardian === true,
+    childDecisions,
+    guardianHouseholdId:
+      typeof guardianHouseholdId === 'string' ? guardianHouseholdId.trim() : null,
+    createNewHousehold: request.data?.createNewHousehold === true,
+    newHouseholdName:
+      typeof request.data?.newHouseholdName === 'string'
+        ? request.data.newHouseholdName.trim()
+        : null,
     uid: request.auth!.uid,
     logger,
   });

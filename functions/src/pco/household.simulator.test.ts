@@ -648,4 +648,60 @@ describe('findAdultCandidates against the simulator', () => {
     });
     expect(candidates).toEqual([]);
   });
+
+  it('says nothing about households for an adult who heads one', async () => {
+    const parent = h.store.createPerson({ first_name: 'Solo', last_name: 'Parent', child: false });
+    const child = h.store.createPerson({ first_name: 'Kid', last_name: 'Parent', child: true });
+    h.store.createHousehold({
+      attributes: { name: 'Parent Household', primary_contact_id: parent.id },
+      memberIds: [parent.id, child.id],
+    });
+
+    const [candidate] = await findAdultCandidates({
+      client: h.client,
+      firstName: 'Solo',
+      lastName: 'Parent',
+    });
+
+    /*
+     * Undefined rather than a one-entry list, and the distinction is the whole
+     * cost model: below the threshold the members are never fetched, because a
+     * picker with one option is not a question anybody needs asked.
+     */
+    expect(candidate?.households).toBeUndefined();
+  });
+
+  it('names both families, and their members, for an adult who heads two', async () => {
+    const parent = h.store.createPerson({ first_name: 'Twice', last_name: 'Over', child: false });
+    const first = h.store.createPerson({ first_name: 'Ada', last_name: 'Over', child: true });
+    const second = h.store.createPerson({ first_name: 'Bo', last_name: 'Over', child: true });
+    h.store.createHousehold({
+      attributes: { name: 'Over Household', primary_contact_id: parent.id },
+      memberIds: [parent.id, first.id],
+    });
+    h.store.createHousehold({
+      attributes: { name: 'Over Household', primary_contact_id: parent.id },
+      memberIds: [parent.id, second.id],
+    });
+
+    const [candidate] = await findAdultCandidates({
+      client: h.client,
+      firstName: 'Twice',
+      lastName: 'Over',
+    });
+
+    expect(candidate?.households).toHaveLength(2);
+    /*
+     * Planning Center calls both of them `Over Household`, which is exactly why
+     * the members are fetched: the name alone leaves a reviewer choosing at
+     * random between two identical labels.
+     */
+    expect(candidate?.households?.map((household) => household.name)).toEqual([
+      'Over Household',
+      'Over Household',
+    ]);
+    expect(candidate?.households?.flatMap((household) => household.memberNames)).toEqual(
+      expect.arrayContaining(['Ada Over', 'Bo Over']),
+    );
+  });
 });

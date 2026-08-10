@@ -12,7 +12,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { ReviewPage } from '@/features/review/ReviewPage';
-import type { PendingRegistration } from '@/services/functions';
+import type { PendingRegistration, PendingRegistrationChild } from '@/services/functions';
 
 const listPendingRegistrations = vi.hoisted(() => vi.fn());
 const approveRegistration = vi.hoisted(() => vi.fn());
@@ -193,7 +193,12 @@ describe('a name that already exists', () => {
     expect(
       await screen.findByRole('button', { name: /Robin Fields · 9th grade/ }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/One student on the roster shares this name/i)).toBeInTheDocument();
+    // One question, asked once, with the roster's answer under its own heading
+    // — the church's database gets a second heading in the same block when it
+    // has anybody to offer.
+    expect(screen.getByText(/Who is Robin\?/i)).toBeInTheDocument();
+    expect(screen.getByText(/On Tally’s roster/i)).toBeInTheDocument();
+    expect(screen.getByText(/Merging can be undone/i)).toBeInTheDocument();
   });
 
   it('will not approve while the collision is unresolved', async () => {
@@ -778,6 +783,297 @@ describe('choosing the adult', () => {
     // Empty is "we did not find out", not "the guardian is new" — so the card
     // says nothing about it either way.
     expect(screen.queryByText(/The church already has/)).not.toBeInTheDocument();
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Who each child already is                                                   */
+/* -------------------------------------------------------------------------- */
+
+describe('choosing who a child is', () => {
+  /** A held child with nothing on Tally's roster sharing the name. */
+  const withUpstream = (upstreamCandidates: PendingRegistrationChild['upstreamCandidates']) =>
+    registration({
+      children: [
+        {
+          firstName: 'Robin',
+          lastName: 'Fields',
+          grade: 4,
+          studentId: 'held-1',
+          pendingReview: true,
+          mergedIntoStudentId: null,
+          allergies: null,
+          possibleDuplicates: [],
+          upstreamCandidates,
+        },
+      ],
+    });
+
+  it('sends the only upstream match without anybody pressing the chooser', async () => {
+    const user = userEvent.setup();
+    listPendingRegistrations.mockResolvedValue({
+      data: [
+        withUpstream([{ personId: '55', name: 'Robin Fields', grade: 4, wouldMatch: true }]),
+      ],
+    });
+    mount();
+
+    /*
+     * One candidate is not ambiguity — it is exactly what the push was going to
+     * link to anyway. So the card shows it selected and the button is not held;
+     * naming the id is what turns a rule re-run at press time into an
+     * instruction the backend verifies and refuses if it has gone stale.
+     */
+    expect(await screen.findByText(/The one we would link by default/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Approve and add/i }));
+    await user.click(screen.getByRole('button', { name: /^Yes — add/i }));
+
+    await waitFor(() =>
+      expect(approveRegistration).toHaveBeenCalledWith(
+        expect.objectContaining({
+          registrationId: 'reg-1',
+          childDecisions: [{ studentId: 'held-1', personId: '55' }],
+        }),
+      ),
+    );
+  });
+
+  it('holds the approve button when the church has two of them', async () => {
+    listPendingRegistrations.mockResolvedValue({
+      data: [
+        withUpstream([
+          { personId: '55', name: 'Robin Fields', grade: 4, wouldMatch: true },
+          { personId: '56', name: 'Robin Fields', grade: 4, wouldMatch: false },
+        ]),
+      ],
+    });
+    mount();
+
+    // The backend resolves this by taking the oldest, which is a coin toss it
+    // should not make with somebody sitting here. Neither is pre-selected.
+    expect(await screen.findByRole('button', { name: /Approve and add/i })).toBeDisabled();
+    expect(screen.queryByText(/The one we would link by default/i)).not.toBeInTheDocument();
+  });
+
+  it('sends "none of them" as a decision that suppresses the backend’s own guess', async () => {
+    const user = userEvent.setup();
+    listPendingRegistrations.mockResolvedValue({
+      data: [
+        withUpstream([
+          { personId: '55', name: 'Robin Fields', grade: 4, wouldMatch: true },
+          { personId: '56', name: 'Robin Fields', grade: 4, wouldMatch: false },
+        ]),
+      ],
+    });
+    mount();
+
+    await user.click(await screen.findByRole('button', { name: /None of them/i }));
+    await user.click(screen.getByRole('button', { name: /Approve and add/i }));
+    await user.click(screen.getByRole('button', { name: /^Yes — add/i }));
+
+    await waitFor(() =>
+      expect(approveRegistration).toHaveBeenCalledWith(
+        expect.objectContaining({
+          childDecisions: [{ studentId: 'held-1', createNew: true }],
+        }),
+      ),
+    );
+  });
+
+  it('merges into a roster row there and then, and sends nothing about it', async () => {
+    const user = userEvent.setup();
+    listPendingRegistrations.mockResolvedValue({
+      data: [
+        registration({
+          children: [
+            {
+              firstName: 'Robin',
+              lastName: 'Fields',
+              grade: 4,
+              studentId: 'held-1',
+              pendingReview: true,
+              mergedIntoStudentId: null,
+              allergies: null,
+              possibleDuplicates: [
+                {
+                  studentId: 'pco_7',
+                  firstName: 'Robin',
+                  lastName: 'Fields',
+                  grade: 9,
+                  known: true,
+                  status: 'active',
+                },
+              ],
+              upstreamCandidates: [],
+            },
+          ],
+        }),
+      ],
+    });
+    mount();
+
+    await user.click(await screen.findByRole('button', { name: /Robin Fields · 9th grade/ }));
+    // The merge is a Tally write that happens now and can be undone; the push
+    // then carries the row that survived, which already knows what it is linked
+    // to. Nothing about this child rides on the approve payload.
+    await waitFor(() => expect(mergeStudents).toHaveBeenCalledWith({ keeperId: 'pco_7', foldId: 'held-1' }));
+  });
+
+  it('says what the push already did when nobody was asked', async () => {
+    listPendingRegistrations.mockResolvedValue({
+      data: [
+        registration({
+          source: 'counselor',
+          children: [
+            {
+              firstName: 'Robin',
+              lastName: 'Fields',
+              grade: 4,
+              studentId: 'held-1',
+              pendingReview: false,
+              mergedIntoStudentId: null,
+              allergies: null,
+              possibleDuplicates: [],
+              upstreamCandidates: [],
+              upstreamPersonId: '55',
+              linkedTo: { personId: '55', name: 'Robin Fields' },
+            },
+          ],
+        }),
+      ],
+    });
+    mount();
+
+    expect(
+      await screen.findByText(/Linked automatically to Robin Fields/i),
+    ).toBeInTheDocument();
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Which family they join                                                      */
+/* -------------------------------------------------------------------------- */
+
+describe('choosing the household', () => {
+  const twoHouseholds = [
+    { id: '10', name: 'Fields Household', memberNames: ['Ada Fields'] },
+    { id: '11', name: 'Fields Household', memberNames: ['Bo Fields'] },
+  ];
+
+  it('asks nothing when the adult heads one family', async () => {
+    listPendingRegistrations.mockResolvedValue({
+      data: [
+        registration({
+          guardianCandidates: [
+            { personId: '900', name: 'Dana Fields', reachable: true, corroborated: true },
+          ],
+        }),
+      ],
+    });
+    mount();
+
+    await screen.findByText(/already has somebody called Dana Fields/);
+    // Below the threshold the backend does not even fetch the households, and
+    // a picker with one option is not a question.
+    expect(screen.queryByText(/families in the church’s database/i)).not.toBeInTheDocument();
+  });
+
+  it('opens on the family the backend would have picked, and sends it', async () => {
+    const user = userEvent.setup();
+    listPendingRegistrations.mockResolvedValue({
+      data: [
+        registration({
+          guardianCandidates: [
+            {
+              personId: '900',
+              name: 'Dana Fields',
+              reachable: true,
+              corroborated: true,
+              households: twoHouseholds,
+            },
+          ],
+        }),
+      ],
+    });
+    mount();
+
+    // First in the list is lowest id is oldest, which is the tie-break
+    // `createFamily` applies — so the picker opens on what would have happened.
+    expect(await screen.findByText(/, the one we would pick/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Approve and add/i }));
+    await user.click(screen.getByRole('button', { name: /^Yes — add/i }));
+
+    await waitFor(() =>
+      expect(approveRegistration).toHaveBeenCalledWith(
+        expect.objectContaining({ guardianHouseholdId: '10' }),
+      ),
+    );
+  });
+
+  it('sends the other family when a reviewer picks it', async () => {
+    const user = userEvent.setup();
+    listPendingRegistrations.mockResolvedValue({
+      data: [
+        registration({
+          guardianCandidates: [
+            {
+              personId: '900',
+              name: 'Dana Fields',
+              reachable: true,
+              corroborated: true,
+              households: twoHouseholds,
+            },
+          ],
+        }),
+      ],
+    });
+    mount();
+
+    // Named by their members, because both are called "Fields Household".
+    await user.click(await screen.findByRole('button', { name: /^This family$/i }));
+    await user.click(screen.getByRole('button', { name: /Approve and add/i }));
+    await user.click(screen.getByRole('button', { name: /^Yes — add/i }));
+
+    await waitFor(() =>
+      expect(approveRegistration).toHaveBeenCalledWith(
+        expect.objectContaining({ guardianHouseholdId: '11' }),
+      ),
+    );
+  });
+
+  it('holds its peace when the family named a sibling the church already has', async () => {
+    listPendingRegistrations.mockResolvedValue({
+      data: [
+        registration({
+          anchors: [
+            {
+              studentId: 'pco_9',
+              firstName: 'Ada',
+              lastName: 'Fields',
+              grade: 8,
+              known: true,
+              status: 'active',
+            },
+          ],
+          guardianCandidates: [
+            {
+              personId: '900',
+              name: 'Dana Fields',
+              reachable: true,
+              corroborated: true,
+              households: twoHouseholds,
+            },
+          ],
+        }),
+      ],
+    });
+    mount();
+
+    // `createFamily` files the child into the anchor's household and returns
+    // before the household is ever chosen, so a picker here would offer a
+    // decision that is not taken.
+    await screen.findByText(/already has somebody called Dana Fields/);
+    expect(screen.queryByText(/families in the church’s database/i)).not.toBeInTheDocument();
   });
 });
 

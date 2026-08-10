@@ -772,6 +772,19 @@ export interface PendingRegistrationChild {
   allergies: string | null;
   possibleDuplicates: ReviewStudentSummary[];
   /**
+   * People the church already has under this name and grade who are *not* on
+   * Tally's roster.
+   *
+   * The other half of the same question `possibleDuplicates` asks. Absent from
+   * an older callable, which reads the same as "we did not find out" — the card
+   * shows no group for it and claims nothing.
+   */
+  upstreamCandidates?: StudentCandidate[];
+  /** The backend person this child is already linked to, if the push ran. */
+  upstreamPersonId?: string | null;
+  /** Who they were linked to before anybody looked — a counselor's quick-add. */
+  linkedTo?: { personId: string; name: string } | null;
+  /**
    * How the family typed this child, when a reviewer has since corrected them.
    *
    * Null when nobody has — and absent entirely from an older callable, which is
@@ -779,6 +792,23 @@ export interface PendingRegistrationChild {
    * filled it in" the moment this is set, and shows what was typed instead.
    */
   typedAs?: { firstName: string; lastName: string; grade: number | null } | null;
+}
+
+/** Mirrors `StudentCandidate` in functions/src/pco/pushStudents.ts. */
+export interface StudentCandidate {
+  personId: string;
+  name: string;
+  grade: number | null;
+  /** The one an unattended push would have linked to. A fact, not advice. */
+  wouldMatch: boolean;
+}
+
+/** Mirrors `HouseholdSummary` in functions/src/pco/household.ts. */
+export interface HouseholdSummary {
+  id: string;
+  name: string;
+  /** Everyone else in it — two families are often given the same name. */
+  memberNames: string[];
 }
 
 /** Mirrors `AdultCandidate` in functions/src/pco/household.ts. */
@@ -789,6 +819,13 @@ export interface AdultCandidate {
   reachable: boolean;
   /** Whether one of their numbers is the one the family typed at the kiosk. */
   corroborated: boolean;
+  /**
+   * The families this adult heads, present only when there is more than one.
+   *
+   * Absent is the ordinary case and means there is nothing to choose between —
+   * the backend hydrates this past the threshold that makes the question real.
+   */
+  households?: HouseholdSummary[];
 }
 
 /** Mirrors `SameFamilyHint` in functions/src/kiosk/review.ts. */
@@ -959,6 +996,20 @@ export const approveRegistration = httpsCallable<
      * even where a name and a number would have matched.
      */
     createNewGuardian?: boolean;
+    /**
+     * Who each child already is, where a reviewer answered.
+     *
+     * Keyed by the child's own student id. A child left out is pushed exactly
+     * as they always were — the backend's own name-and-grade match — so an old
+     * bundle, or a card where nothing was ambiguous, behaves unchanged.
+     */
+    childDecisions?: { studentId: string; personId?: string; createNew?: boolean }[];
+    /** Which of the adult's families the lot joins, when a reviewer picked. */
+    guardianHouseholdId?: string | null;
+    /** The reviewer saw the families and said none of them is this one. */
+    createNewHousehold?: boolean;
+    /** What to call a family the reviewer asked to create. */
+    newHouseholdName?: string | null;
   },
   ApproveRegistrationResult
 >(functions, 'approveRegistration');
