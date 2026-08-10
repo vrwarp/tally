@@ -252,6 +252,43 @@ describe('the bands', () => {
     expect(screen.getByText('Nothing scheduled yet')).toBeInTheDocument();
     await settle();
   });
+
+  /*
+   * The empty state has to point at something that is on the screen.
+   *
+   * Quick actions are built from `eventSeries` documents, which only a seeded
+   * database has — so on a fresh install the section above this one does not
+   * render at all, and "use a quick action above" named a shortcut that was not
+   * there. The header's "New event" always is.
+   */
+  it('sends a reader with no quick actions to the button that is there', async () => {
+    show([]);
+
+    expect(screen.getByText(/use “new event” above/i)).toBeInTheDocument();
+    expect(screen.queryByText(/use a quick action above/i)).not.toBeInTheDocument();
+    await settle();
+  });
+
+  it('names the quick actions once there are some', async () => {
+    show([], {
+      series: [
+        {
+          id: 'friday-fellowship',
+          title: 'Friday Fellowship',
+          dayOfWeek: 5,
+          startTime: '19:00',
+          endTime: '21:00',
+          checkInOpensMinutesBefore: 60,
+          checkInClosesMinutesAfter: 60,
+          active: true,
+          order: 0,
+        },
+      ],
+    });
+
+    expect(screen.getByText(/use a quick action above/i)).toBeInTheDocument();
+    await settle();
+  });
 });
 
 /* -------------------------------------------------------------------------- */

@@ -1,10 +1,11 @@
 /**
- * The two roster questions the editor asks, and which mode each belongs to.
+ * The roster question the editor asks, and the chain facts it must not lose.
  *
- * A recurring gathering predicts from its own past nights — the series picker
- * says which chain it is *in*, and leaving it empty costs it nothing. A one-off
- * has no past at all, so the prediction is a thing a leader hands it: the
- * gathering whose regulars are the people on the coach.
+ * A recurring gathering predicts from its own past nights and is never asked
+ * anything about it. A one-off has no past at all, so the prediction is a thing
+ * a leader hands it: the gathering whose regulars are the people on the coach.
+ * There used to be a second question — a "Series" picker on the recurring half —
+ * and the first block below is what remains of it.
  *
  * Firestore is mocked at the service boundary; what these assert is the shape of
  * the draft the form builds, which is the only thing the writes see.
@@ -17,6 +18,8 @@ import { AuthContext, type AuthContextValue } from '@/context/authContext';
 import { DataContext, type DataContextValue } from '@/context/dataContext';
 import { ToastContext, type ToastContextValue } from '@/context/toastContext';
 import { EventEditorModal } from '@/features/events/EventEditorModal';
+// Type-only, so it survives the module mock below untouched.
+import type { EventDraft } from '@/services/events';
 import type { EventSeries, TallyEvent } from '@/types';
 import { makeEvent, makeSettings } from '../../../tests/factories';
 
@@ -62,7 +65,7 @@ const calendar: TallyEvent[] = [
   }),
 ];
 
-function show(event: TallyEvent | null = null) {
+function show(event: TallyEvent | null = null, defaults?: Partial<EventDraft>) {
   const data: DataContextValue = {
     students: [],
     events: calendar,
@@ -106,30 +109,73 @@ function show(event: TallyEvent | null = null) {
     </AuthContext.Provider>
   );
 
-  return render(wrap(<EventEditorModal open onClose={() => {}} event={event} />));
+  return render(
+    wrap(<EventEditorModal open onClose={() => {}} event={event} defaults={defaults} />),
+  );
 }
 
 const typeSelect = (label: string) => screen.getByLabelText(label) as HTMLSelectElement;
 
-describe('EventEditorModal: the series picker on a recurring gathering', () => {
-  /*
-   * The lie this replaced. Prediction has grouped history by the repeat chain
-   * for as long as the app has scheduled its own weekly events, so a blank
-   * series has never meant a blank roster — it only ever meant "this gathering
-   * is not one of the seeded ones".
-   */
-  it('does not claim that leaving it empty costs the roster its prediction', () => {
+/*
+ * The picker that used to be here, and why its absence is worth a test.
+ *
+ * It listed `eventSeries` documents, and nothing in the app creates one — the
+ * seed script is the only writer — so outside a seeded database it offered a
+ * single choice, "Not part of one", and no way to reach any other. Asserting it
+ * is gone is really asserting that a leader is not handed an empty control on
+ * the form they fill in most often.
+ *
+ * `series` stays in the context above deliberately: a seeded deployment still
+ * has the documents, and dropping the picker must not drop them from the
+ * borrowing list on a one-off, which is titled from them.
+ */
+describe('EventEditorModal: the series picker that is gone', () => {
+  it('does not offer a series to a recurring gathering', () => {
     show();
 
-    expect(screen.getByRole('option', { name: /not part of one/i })).toBeInTheDocument();
-    expect(screen.queryByText(/no predicted roster/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Series')).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /not part of one/i })).not.toBeInTheDocument();
   });
 
-  it('offers the series documents, and nothing about borrowing', () => {
-    show();
+  /*
+   * The one that would be missed. Prediction groups history by the repeat chain
+   * and `chainKey` reads `seriesId` first, so a Friday that already carries one
+   * is held in its chain by that field alone — and `buildEventPayload` writes
+   * every field on every save. A form that forgot to carry it would cut the
+   * night out of its own history, and out of the `eventAccess` document naming
+   * it, without anything on screen having changed.
+   */
+  it('still carries a series an event already has through an edit', async () => {
+    const user = userEvent.setup();
+    show(calendar[0]!);
 
-    expect(screen.getByRole('option', { name: 'Friday Fellowship' })).toBeInTheDocument();
-    expect(screen.queryByLabelText('Predicted roster')).not.toBeInTheDocument();
+    await user.clear(screen.getByLabelText(/^Title/));
+    await user.type(screen.getByLabelText(/^Title/), 'Friday Fellowship — Winter');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => expect(updateEvent).toHaveBeenCalled());
+    expect(updateEvent.mock.calls.at(-1)![1]).toMatchObject({
+      mode: 'recurring',
+      seriesId: FRIDAY,
+    });
+  });
+
+  /*
+   * The other way one still arrives: `EventsPage`'s quick actions open this form
+   * with a series in `defaults`, which is the path a seeded deployment schedules
+   * its Fridays by. Removing the control must not remove that.
+   */
+  it('saves a series handed to it in defaults', async () => {
+    const user = userEvent.setup();
+    show(null, { mode: 'recurring', seriesId: FRIDAY, title: 'Friday Fellowship' });
+
+    await user.click(screen.getByRole('button', { name: 'Schedule event' }));
+
+    await waitFor(() => expect(createEvent).toHaveBeenCalled());
+    expect(createEvent.mock.calls.at(-1)![0]).toMatchObject({
+      mode: 'recurring',
+      seriesId: FRIDAY,
+    });
   });
 });
 

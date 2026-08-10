@@ -21,6 +21,14 @@
  * and hands it straight to the editor, which makes scheduling two taps instead
  * of a form.
  *
+ * Those actions come from `eventSeries` documents, and nothing in the app
+ * creates one — `scripts/seed.ts` is the only writer — so an install that was
+ * never seeded has none of them. That is survivable here in a way it was not in
+ * the event editor, where the same collection fed a picker that was removed for
+ * it: this list renders only when it has entries, so an install without series
+ * sees no shortcut rather than an empty one. Anything added below that refers to
+ * the shortcuts has to hold when there are none — see the empty state.
+ *
  * RSVP counts deliberately do not appear on a row. They live in a subcollection
  * this screen does not subscribe to, and a plausible-looking wrong number is
  * worse than no number when it is what a leader is chasing.
@@ -619,7 +627,16 @@ export function EventsPage() {
             <EmptyState
               icon="🗓"
               title="Nothing scheduled yet"
-              description="Use a quick action above, or create a one-off for a retreat or outing."
+              // The empty state has to point somewhere real, and the quick
+              // actions above it are not always there: they come from
+              // `eventSeries` documents, which only a seeded database has. An
+              // install with none was being told to use a shortcut that was not
+              // on the screen, on the one screen where nothing else was either.
+              description={
+                quickActions.length > 0
+                  ? 'Use a quick action above, or create a one-off for a retreat or outing.'
+                  : 'Use “New event” above to schedule a gathering, or a one-off for a retreat or outing.'
+              }
             />
           ) : null}
 
