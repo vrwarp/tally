@@ -9,14 +9,14 @@
  *
  * One gathering at a time, deliberately. Friday and Sunday are different crowds
  * — the whole app is built on that — and a matrix spanning both would have a
- * column per night of each, most of them blank for most rows. It is also what
- * makes the date headers unique: an occurrence id is a chain plus a calendar
- * day, so within one chain no two nights share a date.
+ * column per occurrence of each, most of them blank for most rows. It is also
+ * what makes the date headers unique: an occurrence id is a chain plus a
+ * calendar day, so within one chain no two of them share a date.
  *
  * The window caps at twelve months because that is what the calendar holds:
  * `DataProvider` streams a year of event documents, so anything longer would
  * need paging the past and a wait nobody asked for. Past roughly two hundred
- * nights this should become a callable — see the plan — but nothing here is
+ * occurrences this should become a callable — see the plan — but nothing here is
  * anywhere near that.
  */
 import { useMemo, useState } from 'react';
@@ -36,7 +36,7 @@ import type { TallyEvent } from '@/types';
 
 /** Presets rather than a date picker: these are the three questions asked. */
 const WINDOWS = [
-  { value: '8', label: 'Last 8 nights', nights: 8 },
+  { value: '8', label: 'Last 8 gatherings', count: 8 },
   { value: '90', label: 'Last 3 months', days: 90 },
   { value: '365', label: 'Last 12 months', days: 365 },
 ] as const;
@@ -67,7 +67,10 @@ export function AttendanceGridModal({ open, onClose }: AttendanceGridModalProps)
   const gathering = gatherings.find((option) => option.key === selected) ?? null;
   const preset = WINDOWS.find((entry) => entry.value === window) ?? WINDOWS[1];
 
-  const nights = useMemo(() => {
+  // The chosen chain's own past occurrences — what the columns are built from.
+  // Named apart from `gatherings` above, which is the list of chains to choose
+  // between; these are instances of one of them.
+  const occurrences = useMemo(() => {
     if (!selected) return [];
     const now = new Date();
     const chainEvents = events
@@ -82,14 +85,14 @@ export function AttendanceGridModal({ open, onClose }: AttendanceGridModalProps)
       )
       .sort((a, b) => b.startAt.getTime() - a.startAt.getTime());
 
-    if ('nights' in preset) return chainEvents.slice(0, preset.nights);
+    if ('count' in preset) return chainEvents.slice(0, preset.count);
     const cutoff = new Date(now.getTime() - preset.days * 86_400_000);
     return chainEvents.filter((event) => event.startAt >= cutoff);
   }, [events, selected, preset]);
 
   // Only read while the modal is up: an unopened dialog must not spend a
   // session's worth of register reads on a question nobody asked.
-  const { snapshots, denied, loading } = useEventSnapshots(open ? nights : EMPTY);
+  const { snapshots, denied, loading } = useEventSnapshots(open ? occurrences : EMPTY);
 
   const grid = useMemo(() => {
     if (!gathering) return null;
@@ -115,7 +118,7 @@ export function AttendanceGridModal({ open, onClose }: AttendanceGridModalProps)
       open={open}
       onClose={onClose}
       title="Attendance grid"
-      description="One gathering, students down and nights across — for a spreadsheet."
+      description="One gathering, students down and dates across — for a spreadsheet."
       footer={
         <ExportCsvButton
           // The exception to the ghost default: in a modal footer this is the
@@ -130,7 +133,7 @@ export function AttendanceGridModal({ open, onClose }: AttendanceGridModalProps)
             }),
             contents: buildAttendanceGridCsv(grid!, { backends: rosterBackends }),
           })}
-          count={grid && grid.nights.length > 0 ? rowCount : 0}
+          count={grid && grid.gatherings.length > 0 ? rowCount : 0}
           noun="students"
           label="Download CSV"
           blockedReason={loading ? 'Still reading the registers.' : null}
@@ -170,13 +173,16 @@ export function AttendanceGridModal({ open, onClose }: AttendanceGridModalProps)
 
             {loading ? (
               <p className="flex items-center gap-2 text-sm text-ink-500">
-                <Spinner /> Reading {nights.length} {nights.length === 1 ? 'night' : 'nights'}…
+                <Spinner /> Reading {occurrences.length}{' '}
+                {occurrences.length === 1 ? 'gathering' : 'gatherings'}…
               </p>
             ) : (
               <div className="flex flex-col gap-1 text-sm text-ink-400">
                 <p>
-                  <span className="tabular-nums text-ink-100">{grid?.nights.length ?? 0}</span>{' '}
-                  {grid?.nights.length === 1 ? 'night' : 'nights'} ×{' '}
+                  <span className="tabular-nums text-ink-100">
+                    {grid?.gatherings.length ?? 0}
+                  </span>{' '}
+                  {grid?.gatherings.length === 1 ? 'gathering' : 'gatherings'} ×{' '}
                   <span className="tabular-nums text-ink-100">{rowCount}</span>{' '}
                   {rowCount === 1 ? 'student' : 'students'}.
                 </p>
@@ -188,16 +194,16 @@ export function AttendanceGridModal({ open, onClose }: AttendanceGridModalProps)
                 {grid && grid.presumedCancelled > 0 ? (
                   <p className="text-ink-500">
                     {grid.presumedCancelled}{' '}
-                    {grid.presumedCancelled === 1 ? 'night had' : 'nights had'} nobody checked in
-                    and {grid.presumedCancelled === 1 ? 'is' : 'are'} left out, the way every other
-                    screen treats them.
+                    {grid.presumedCancelled === 1 ? 'gathering had' : 'gatherings had'} nobody
+                    checked in and {grid.presumedCancelled === 1 ? 'is' : 'are'} left out, the way
+                    every other screen treats them.
                   </p>
                 ) : null}
                 {grid && grid.denied > 0 ? (
                   <p className="text-warn-400">
-                    {grid.denied} {grid.denied === 1 ? 'night is' : 'nights are'} not yours to read,
-                    so {grid.denied === 1 ? 'it has' : 'they have'} no column here — rather than a
-                    column of zeros saying nobody came.
+                    {grid.denied} {grid.denied === 1 ? 'gathering is' : 'gatherings are'} not yours
+                    to read, so {grid.denied === 1 ? 'it has' : 'they have'} no column here — rather
+                    than a column of zeros saying nobody came.
                   </p>
                 ) : null}
               </div>

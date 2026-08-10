@@ -34,7 +34,7 @@ export function OneOffRecapList({ items, className }: OneOffRecapListProps & { c
       <CardHeader
         title="One-off events"
         count={items.length}
-        description="Retreats and trips. Head count on the night — there is nothing to compare it against."
+        description="Retreats and trips. Head count on the day — there is nothing to compare it against."
       />
 
       {items.length === 0 ? (

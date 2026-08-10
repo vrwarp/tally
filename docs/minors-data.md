@@ -47,7 +47,7 @@ gathering in the last year — the same year the check-in screen uses to decide 
 — rather than to every active student in the ministry, because a parent at Friday Fellowship is not
 standing in front of the Sunday nursery's roster and should not be able to type four digits into
 one. The scope only ever fails open: a gathering with no history behind it searches everything, so
-there is nothing to configure and no way to switch it off by accident, anyone on tonight's register
+there is nothing to configure and no way to switch it off by accident, anyone on today's register
 is findable whatever last night's aggregate said, and **"Search everyone"** widens that one search to
 all of Tally on the spot, with no read behind it. It stands on the no-match panel and, in a quieter
 weight, in the row beneath a list of results — because the state that most needs it is the one where
@@ -63,8 +63,8 @@ history and could not download the code that reads it.
 
 ## What the CSV exports contain
 
-The core team can download four files — the roster, one night's register, the follow-up lists, and
-an attendance grid. Every export is a statement about what leaves the app, so it belongs here.
+The core team can download four files — the roster, one gathering's register, the follow-up lists,
+and an attendance grid. Every export is a statement about what leaves the app, so it belongs here.
 
 They carry names, grades, attendance and the Tally-owned annotations a screen already shows: the
 allergy **flag**, the notes a counselor typed, which backend holds each student and when it was last
@@ -86,8 +86,8 @@ beside it.
 
 An export cannot widen anybody's reach. It is assembled in the browser out of data the reader
 already has, so `firestore.rules` and the per-gathering access lists bound it exactly as they bound
-the screen — a night whose register the reader may not see has no column in the grid, rather than a
-column of zeros.
+the screen — a gathering whose register the reader may not see has no column in the grid, rather
+than a column of zeros.
 
 ## Leaving, and being removed
 

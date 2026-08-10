@@ -46,7 +46,7 @@ export function EarlierAttendance({ studentId, alsoStudentIds }: EarlierAttendan
   return (
     <Card>
       <CardHeader
-        title="Every night they came"
+        title="Every gathering they came to"
         {...(started && entries.length > 0 ? { count: entries.length } : {})}
       />
 
@@ -89,7 +89,7 @@ export function EarlierAttendance({ studentId, alsoStudentIds }: EarlierAttendan
 
         {!loading && hasMore ? (
           <Button variant="secondary" fullWidth onClick={loadMore}>
-            {started ? 'Show more' : 'Show every night they came'}
+            {started ? 'Show more' : 'Show every gathering they came to'}
           </Button>
         ) : null}
 

@@ -211,7 +211,7 @@ function MiaRow({
         <span className="shrink-0 rounded-xl bg-danger-500/10 px-2.5 py-1 text-center ring-1 ring-danger-500/25">
           <span className="sr-only">
             {item.gatheringTitle
-              ? `Missed ${consecutiveMisses} ${item.gatheringTitle} nights in a row.`
+              ? `Missed ${consecutiveMisses} ${item.gatheringTitle} gatherings in a row.`
               : `Not seen at any of the last ${consecutiveMisses} gatherings.`}
           </span>
           <span
