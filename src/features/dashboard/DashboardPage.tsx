@@ -356,7 +356,10 @@ export function DashboardPage() {
 
   const scopeLabel = activeGathering
     ? `of ${activeGathering.title}`
-    : 'across every gathering';
+    // The noun lives here rather than before it: scoped, the gathering's own
+    // name is the noun ("last 8 of Sunday School"), and repeating it would read
+    // as "last 8 gatherings of Sunday School".
+    : `${held.length === 1 ? 'gathering' : 'gatherings'}, across every one`;
 
   return (
     <PageFrame width="lg">
@@ -366,7 +369,7 @@ export function DashboardPage() {
           {awaitingHistory
             ? 'Reading the recent attendance…'
             : lastGathering
-              ? `Through ${lastGathering.title}, ${formatShortDate(lastGathering.startAt)} · last ${held.length} ${held.length === 1 ? 'night' : 'nights'} ${scopeLabel}`
+              ? `Through ${lastGathering.title}, ${formatShortDate(lastGathering.startAt)} · last ${held.length} ${scopeLabel}`
               : recentEvents.length > 0
                 ? 'Nobody has been checked into any of the recent gatherings.'
                 : 'No gatherings on record yet.'}
@@ -408,7 +411,7 @@ export function DashboardPage() {
           shares the body's seam and its gutter instead of running its own. */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-[repeat(3,minmax(0,1fr))_28rem] lg:gap-6">
         <StatTile
-          label={activeGathering ? 'Last night' : 'Last gathering'}
+          label="Last gathering"
           value={summary.lastEventCount}
           hint={deltaHint}
         />

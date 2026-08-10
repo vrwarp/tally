@@ -1,5 +1,5 @@
 /**
- * Students down, nights across — the grid a Sunday School teacher has kept on
+ * Students down, dates across — the grid a Sunday School teacher has kept on
  * paper since before the app existed.
  *
  * No Tally screen shows this and none should: it is a wall of ticks, useless on
@@ -11,21 +11,26 @@
  *
  * A `0` in this file is a claim that a named child did not turn up to a
  * gathering that happened. There are three ways to write one by accident, and
- * all three end in somebody phoning a family about a night that was never held
- * or was never theirs:
+ * all three end in somebody phoning a family about a gathering that was never
+ * held or was never theirs:
  *
  *   - **A register the reader was refused.** `useEventSnapshots` keeps these in
  *     `denied` and *out* of `snapshots` precisely so nothing downstream reads
  *     the absence as an empty room. A column of zeros here would assert every
- *     student missed a night nobody was allowed to look at. So a denied night
+ *     student missed a gathering nobody was allowed to look at. So a denied one
  *     gets **no column at all**.
- *   - **A night nobody came to.** `sessionOutcome` already calls that
+ *   - **A gathering nobody came to.** `sessionOutcome` already calls that
  *     `presumed-cancelled` and every other derivation drops it. So does this:
  *     no column.
- *   - **A night before the student was on the roster.** Their cell is **blank**,
- *     not `0`, and the night does not count against them in `nights`. Without
- *     that denominator a student added in May reads as 20% attendance over a
- *     year, which is the kind of number somebody acts on.
+ *   - **A gathering held before the student was on the roster.** Their cell is
+ *     **blank**, not `0`, and it does not count toward `eligible`. Without that
+ *     denominator a student added in May reads as 20% attendance over a year,
+ *     which is the kind of number somebody acts on.
+ *
+ * The word is "gathering" rather than "night" throughout, here and in the
+ * column names, because half of them are not at night: Sunday School is a
+ * morning and so is the nursery. A column header leaves the app and is read by
+ * somebody with none of this context.
  *
  * Both exclusions are counted and handed back so the screen can say what it left
  * out, the way Insights already names the gatherings it could not see. A file
@@ -50,17 +55,17 @@ export interface AttendanceGridRow {
   /** `true` present, `false` absent, `undefined` not yet on the roster. */
   cells: (boolean | undefined)[];
   attended: number;
-  /** Nights this student was eligible for — the honest denominator. */
-  nights: number;
+  /** Gatherings this student was eligible for — the honest denominator. */
+  eligible: number;
 }
 
 export interface AttendanceGrid {
   /** Oldest first, so the columns read left to right like a calendar. */
-  nights: EventAttendanceSnapshot[];
+  gatherings: EventAttendanceSnapshot[];
   rows: AttendanceGridRow[];
-  /** Scheduled nights nobody was checked in at. Excluded, and counted. */
+  /** Scheduled gatherings nobody was checked in at. Excluded, and counted. */
   presumedCancelled: number;
-  /** Nights whose register this reader may not see. Excluded, and counted. */
+  /** Gatherings whose register this reader may not see. Excluded, and counted. */
   denied: number;
 }
 
@@ -85,7 +90,7 @@ export function buildAttendanceGrid({
   denied,
 }: AttendanceGridInput): AttendanceGrid {
   const usable = snapshots.filter((snapshot) => sessionOutcome(snapshot) === 'held');
-  const nights = [...usable].sort(
+  const gatherings = [...usable].sort(
     (a, b) => a.event.startAt.getTime() - b.event.startAt.getTime(),
   );
 
@@ -95,26 +100,26 @@ export function buildAttendanceGrid({
     let attended = 0;
     let eligible = 0;
 
-    for (const night of nights) {
+    for (const gathering of gatherings) {
       // A row cannot have missed a gathering held before they existed here.
       // `createdAt` rather than `firstAttendedAt`: somebody added in March who
       // has never come has missed every Friday since, and that is the point of
       // the list.
-      if (night.event.startAt < student.createdAt) {
+      if (gathering.event.startAt < student.createdAt) {
         cells.push(undefined);
         continue;
       }
       eligible += 1;
-      const present = ids.some((id) => night.presentStudentIds.has(id));
+      const present = ids.some((id) => gathering.presentStudentIds.has(id));
       if (present) attended += 1;
       cells.push(present);
     }
 
-    return { student, cells, attended, nights: eligible };
+    return { student, cells, attended, eligible };
   });
 
   return {
-    nights,
+    gatherings,
     rows,
     presumedCancelled: snapshots.filter(
       (snapshot) => sessionOutcome(snapshot) === 'presumed-cancelled',
@@ -144,12 +149,12 @@ export function buildAttendanceGridCsv(
     },
   ];
 
-  grid.nights.forEach((night, index) => {
+  grid.gatherings.forEach((gathering, index) => {
     columns.push({
       // A date, and unique within a chain by construction: an occurrence id is
       // the chain plus a calendar day. One chain at a time is what makes that
       // hold.
-      header: isoDate(night.event.startAt),
+      header: isoDate(gathering.event.startAt),
       // Numbers, so a column sums and a row averages. `undefined` stays an
       // empty cell — see the module docstring.
       value: (row) => {
@@ -160,11 +165,14 @@ export function buildAttendanceGridCsv(
   });
 
   columns.push(
-    { header: 'attended', value: (row) => row.attended },
-    { header: 'nights', value: (row) => row.nights },
+    { header: 'gatherings_attended', value: (row) => row.attended },
+    // Per student, not per file: the gatherings held since they joined. Named
+    // as a pair with the column above so a reader can see at a glance that one
+    // divides the other, and that neither counts the file's whole width.
+    { header: 'gatherings_eligible', value: (row) => row.eligible },
     {
       header: 'rate',
-      value: (row) => (row.nights === 0 ? '' : Math.round((row.attended / row.nights) * 100)),
+      value: (row) => (row.eligible === 0 ? '' : Math.round((row.attended / row.eligible) * 100)),
     },
   );
 

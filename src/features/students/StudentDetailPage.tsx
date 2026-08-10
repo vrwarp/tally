@@ -470,8 +470,8 @@ export function StudentDetailPage() {
         </Button>
         <span className="text-xs text-ink-500">
           {backend !== null
-            ? `Removing them here leaves their ${backendName} record alone, and keeps every night they attended.`
-            : 'Keeps every night they attended; they just stop appearing at the door.'}
+            ? `Removing them here leaves their ${backendName} record alone, and keeps every gathering they attended.`
+            : 'Keeps every gathering they attended; they just stop appearing at the door.'}
         </span>
       </div>
 
@@ -711,7 +711,7 @@ export function StudentDetailPage() {
         <CardHeader
           title="Attendance"
           description={`The last year, by gathering — ${recentEvents.length} finished ${
-            recentEvents.length === 1 ? 'night' : 'nights'
+            recentEvents.length === 1 ? 'gathering' : 'gatherings'
           }.`}
         />
 
@@ -749,7 +749,7 @@ export function StudentDetailPage() {
               seen.lastSeenAt
                 ? formatShortDate(seen.lastSeenAt)
                 : seen.unseenInWindow
-                  ? 'not at any night in the last year'
+                  ? 'not at any gathering in the last year'
                   : 'no check-ins yet'
             }
           />
@@ -781,7 +781,7 @@ export function StudentDetailPage() {
                       // anything, and a streak over trips would mean nothing.
                       'Trips and retreats — no streak applies'
                     : group.standing === null
-                      ? 'None of these nights happened'
+                      ? 'None of these gatherings happened'
                       : !group.standing.wasRegular
                         ? // Nobody was expecting them here, so nothing was
                           // missed. A bare "8 missed in a row" beside a student
@@ -875,7 +875,7 @@ function NightChip({ entry, theirs }: { entry: HistoryEntry; theirs: boolean }) 
   const spoken = present
     ? 'present'
     : !held
-      ? 'this night did not happen, so it counts as neither'
+      ? 'this gathering did not happen, so it counts as neither'
       : !theirs
         ? 'not a gathering they come to'
         : event.mode === 'oneoff'

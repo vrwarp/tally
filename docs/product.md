@@ -251,8 +251,8 @@ empty. The clipboard copy beside it stays exactly as it was: that one is plain t
 going into a group chat, and the two have different destinations rather than one being better.
 
 The same seam serves three other jobs Tally deliberately has no screen for — the roster as a list to
-mail-merge from, one night's register handed to somebody who was not there, and the students × nights
-grid a Sunday School teacher has kept on paper since before the app existed. None of them becomes a
+mail-merge from, one gathering's register handed to somebody who was not there, and the
+students × dates grid a Sunday School teacher has kept on paper since before the app existed. None of them becomes a
 report inside Tally. The dashboard is a call list, and a file that opens in Numbers is how the app
 stops rather than how it grows.
 
@@ -260,9 +260,9 @@ Every export is the rows that are on screen, under the filters that are applied,
 control lives on the list rather than in a Reports tab. Two things it will not do quietly: a roster
 read that landed with one backend down is confirmed before it is exported and then annotated — a
 `-partial` filename and a `source_read_at` on every row, because a stale file looks exactly like a
-complete one once it has been emailed — and a night whose register the reader may not see is left out
-of the grid as an absent column with a count saying so, never a column of zeros claiming forty
-children missed a gathering nobody was allowed to look at. What the files hold, and the four things
+complete one once it has been emailed — and a gathering whose register the reader may not see is left
+out of the grid as an absent column with a count saying so, never a column of zeros claiming forty
+children missed something nobody was allowed to look at. What the files hold, and the four things
 they refuse to, is [the minors' data note](minors-data.md#what-the-csv-exports-contain).
 
 **Journey 6 — the calendar.** The Events tab is read from where the leader is standing. Today is the

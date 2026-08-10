@@ -27,7 +27,7 @@ function snapshot(
   };
 }
 
-function night(day: number, id = `evt-${day}`): TallyEvent {
+function gathering(day: number, id = `evt-${day}`): TallyEvent {
   return makeEvent({ id, startAt: new Date(2026, 4, day, 19, 0), endAt: new Date(2026, 4, day, 21, 0) });
 }
 
@@ -44,39 +44,39 @@ function csvRows(csv: string): string[][] {
 }
 
 describe('buildAttendanceGrid — columns', () => {
-  it('orders nights oldest first, so the columns read like a calendar', () => {
-    const result = grid([snapshot(night(15), ['pco_1']), snapshot(night(1), ['pco_1'])], [AMARA]);
-    expect(result.nights.map((entry) => entry.event.id)).toEqual(['evt-1', 'evt-15']);
+  it('orders gatherings oldest first, so the columns read like a calendar', () => {
+    const result = grid([snapshot(gathering(15), ['pco_1']), snapshot(gathering(1), ['pco_1'])], [AMARA]);
+    expect(result.gatherings.map((entry) => entry.event.id)).toEqual(['evt-1', 'evt-15']);
   });
 
-  it('leaves out a night nobody was checked in at, and counts it', () => {
+  it('leaves out a gathering nobody was checked in at, and counts it', () => {
     // `presumed-cancelled` everywhere else in the app. A column of zeros here
     // would say every student missed a gathering that did not happen.
     const result = grid(
-      [snapshot(night(1), ['pco_1']), snapshot(night(8), [], false)],
+      [snapshot(gathering(1), ['pco_1']), snapshot(gathering(8), [], false)],
       [AMARA],
     );
-    expect(result.nights).toHaveLength(1);
+    expect(result.gatherings).toHaveLength(1);
     expect(result.presumedCancelled).toBe(1);
   });
 
-  it('leaves out a cancelled night', () => {
+  it('leaves out a cancelled gathering', () => {
     const cancelled = makeEvent({ id: 'evt-8', status: 'cancelled', startAt: new Date(2026, 4, 8) });
-    const result = grid([snapshot(night(1), ['pco_1']), snapshot(cancelled, [])], [AMARA]);
-    expect(result.nights).toHaveLength(1);
+    const result = grid([snapshot(gathering(1), ['pco_1']), snapshot(cancelled, [])], [AMARA]);
+    expect(result.gatherings).toHaveLength(1);
   });
 
-  it('counts the nights this reader was refused, which have no column at all', () => {
+  it('counts the gatherings this reader was refused, which have no column at all', () => {
     // The worst available failure: a spreadsheet asserting a child missed
     // gatherings nobody was allowed to look at.
-    const result = grid([snapshot(night(1), ['pco_1'])], [AMARA], new Set(['evt-8', 'evt-15']));
-    expect(result.nights).toHaveLength(1);
+    const result = grid([snapshot(gathering(1), ['pco_1'])], [AMARA], new Set(['evt-8', 'evt-15']));
+    expect(result.gatherings).toHaveLength(1);
     expect(result.denied).toBe(2);
   });
 });
 
 describe('buildAttendanceGrid — eligibility', () => {
-  it('blanks the nights held before a student joined, and excludes them from the rate', () => {
+  it('blanks the gatherings held before a student joined, and excludes them from the rate', () => {
     const late = makeStudent({
       id: 'pco_3',
       firstName: 'Chidi',
@@ -84,24 +84,24 @@ describe('buildAttendanceGrid — eligibility', () => {
       createdAt: new Date(2026, 4, 10),
     });
     const result = grid(
-      [snapshot(night(1), ['pco_1']), snapshot(night(15), ['pco_1', 'pco_3'])],
+      [snapshot(gathering(1), ['pco_1']), snapshot(gathering(15), ['pco_1', 'pco_3'])],
       [late],
     );
 
     const row = result.rows[0]!;
     expect(row.cells).toEqual([undefined, true]);
-    // One eligible night, attended — 100%, not the 50% a zero would produce.
-    expect(row.nights).toBe(1);
+    // One eligible gathering, attended — 100%, not the 50% a zero would produce.
+    expect(row.eligible).toBe(1);
     expect(row.attended).toBe(1);
   });
 
-  it('counts a night somebody was eligible for and missed', () => {
+  it('counts a gathering somebody was eligible for and missed', () => {
     const result = grid(
-      [snapshot(night(1), ['pco_1']), snapshot(night(15), ['pco_1'])],
+      [snapshot(gathering(1), ['pco_1']), snapshot(gathering(15), ['pco_1'])],
       [BEN],
     );
     expect(result.rows[0]!.cells).toEqual([false, false]);
-    expect(result.rows[0]!.nights).toBe(2);
+    expect(result.rows[0]!.eligible).toBe(2);
     expect(result.rows[0]!.attended).toBe(0);
   });
 });
@@ -115,7 +115,7 @@ describe('buildAttendanceGrid — merged students', () => {
       mergedFromStudentIds: ['pco_9'],
     };
     const result = grid(
-      [snapshot(night(1), ['pco_9']), snapshot(night(15), ['pco_1'])],
+      [snapshot(gathering(1), ['pco_9']), snapshot(gathering(15), ['pco_1'])],
       [keeper],
     );
     expect(result.rows[0]!.cells).toEqual([true, true]);
@@ -125,13 +125,13 @@ describe('buildAttendanceGrid — merged students', () => {
 
 describe('buildAttendanceGridCsv', () => {
   const result = grid(
-    [snapshot(night(1), ['pco_1']), snapshot(night(15), ['pco_1', 'pco_2'])],
+    [snapshot(gathering(1), ['pco_1']), snapshot(gathering(15), ['pco_1', 'pco_2'])],
     [AMARA, BEN],
   );
   const csv = buildAttendanceGridCsv(result, { backends: [] });
   const rows = csvRows(csv);
 
-  it('heads each night column with its date, sortable and locale-free', () => {
+  it('heads each gathering column with its date, sortable and locale-free', () => {
     expect(rows[0]).toContain('2026-05-01');
     expect(rows[0]).toContain('2026-05-15');
   });
@@ -146,17 +146,21 @@ describe('buildAttendanceGridCsv', () => {
     expect(rows[2]![dateIndex]).toBe('0');
   });
 
-  it('carries attended, nights and rate at the end', () => {
+  it('carries the two counts and the rate at the end, named as a pair', () => {
     const headers = rows[0]!;
-    expect(headers.slice(-3)).toEqual(['attended', 'nights', 'rate']);
+    expect(headers.slice(-3)).toEqual([
+      'gatherings_attended',
+      'gatherings_eligible',
+      'rate',
+    ]);
     expect(rows[1]![headers.indexOf('rate')]).toBe('100');
     expect(rows[2]![headers.indexOf('rate')]).toBe('50');
   });
 
-  it('writes an empty cell, never a zero, for a night before the student joined', () => {
+  it('writes an empty cell, never a zero, for a gathering before the student joined', () => {
     const late = makeStudent({ id: 'pco_3', createdAt: new Date(2026, 4, 10) });
     const lateGrid = grid(
-      [snapshot(night(1), ['pco_1']), snapshot(night(15), ['pco_3'])],
+      [snapshot(gathering(1), ['pco_1']), snapshot(gathering(15), ['pco_3'])],
       [late],
     );
     const lateRows = csvRows(buildAttendanceGridCsv(lateGrid, { backends: [] }));
@@ -166,7 +170,7 @@ describe('buildAttendanceGridCsv', () => {
 
   it('leaves the rate blank rather than dividing by zero', () => {
     const brandNew = makeStudent({ id: 'pco_4', createdAt: new Date(2026, 6, 1) });
-    const emptyGrid = grid([snapshot(night(1), ['pco_1'])], [brandNew]);
+    const emptyGrid = grid([snapshot(gathering(1), ['pco_1'])], [brandNew]);
     const emptyRows = csvRows(buildAttendanceGridCsv(emptyGrid, { backends: [] }));
     expect(emptyRows[1]![emptyRows[0]!.indexOf('rate')]).toBe('');
   });

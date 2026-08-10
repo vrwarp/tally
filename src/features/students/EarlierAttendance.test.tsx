@@ -1,5 +1,5 @@
 /**
- * The record under the analysis: every night a student came, however long ago.
+ * The record under the analysis: every gathering a student came to, however long ago.
  *
  * What matters here is the contract with the person reading it — that it costs
  * nothing until asked for, that pressing again reaches further back, and that
@@ -46,10 +46,10 @@ describe('EarlierAttendance', () => {
     // A page of reads on every profile open, for a question most opens do not
     // ask, is the trade this laziness exists to refuse.
     expect(fetchStudentHistory).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: /show every night/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /show every gathering/i })).toBeInTheDocument();
   });
 
-  it('lists the nights they came, oldest history and all', async () => {
+  it('lists the gatherings they came to, oldest history and all', async () => {
     fetchStudentHistory.mockResolvedValue({
       entries: [
         entry('pco-checkins-698430-2026-03-20', 'Footprints', '2026-03-21T02:30:00Z'),
@@ -60,7 +60,7 @@ describe('EarlierAttendance', () => {
     });
 
     render(<EarlierAttendance studentId="pco_140203716" />);
-    await userEvent.click(screen.getByRole('button', { name: /show every night/i }));
+    await userEvent.click(screen.getByRole('button', { name: /show every gathering/i }));
 
     await waitFor(() => expect(screen.getAllByText('Footprints')).toHaveLength(2));
     // Reaching two years back is the entire point — this is history the
@@ -83,7 +83,7 @@ describe('EarlierAttendance', () => {
       });
 
     render(<EarlierAttendance studentId="pco_140203716" />);
-    await userEvent.click(screen.getByRole('button', { name: /show every night/i }));
+    await userEvent.click(screen.getByRole('button', { name: /show every gathering/i }));
     await screen.findByRole('button', { name: /show more/i });
     await userEvent.click(screen.getByRole('button', { name: /show more/i }));
 
@@ -93,7 +93,7 @@ describe('EarlierAttendance', () => {
     expect(fetchStudentHistory).toHaveBeenLastCalledWith('pco_140203716', { id: 'cursor' });
   });
 
-  it('says it only shows nights they were present', () => {
+  it('says it only shows gatherings they were present at', () => {
     render(<EarlierAttendance studentId="pco_140203716" />);
 
     // A sparse list must not read as a patchy attender. An absence is a fact
@@ -103,7 +103,7 @@ describe('EarlierAttendance', () => {
 
   /*
    * A merged student is one child under two document ids, and merging does not
-   * re-key the attendance — that would be a write per night against records
+   * re-key the attendance — that would be a write per gathering against records
    * already reported on. So the read is what puts the two halves back
    * together; without it, merging a family's duplicate makes half a child's
    * history disappear from the only screen that shows all of it.
@@ -119,7 +119,7 @@ describe('EarlierAttendance', () => {
     }));
 
     render(<EarlierAttendance studentId="pco_140203716" alsoStudentIds={['tally-dupe']} />);
-    await userEvent.click(screen.getByRole('button', { name: /show every night/i }));
+    await userEvent.click(screen.getByRole('button', { name: /show every gathering/i }));
 
     expect(await screen.findByText('Footprints')).toBeInTheDocument();
     expect(screen.getByText('Anchor')).toBeInTheDocument();
@@ -137,7 +137,7 @@ describe('EarlierAttendance', () => {
     });
 
     render(<EarlierAttendance studentId="pco_140203716" />);
-    await userEvent.click(screen.getByRole('button', { name: /show every night/i }));
+    await userEvent.click(screen.getByRole('button', { name: /show every gathering/i }));
 
     expect(await screen.findByText(/no longer on record/i)).toBeInTheDocument();
   });

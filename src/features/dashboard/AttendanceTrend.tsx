@@ -56,7 +56,7 @@ export function AttendanceTrend({
         title="Attendance trend"
         description={
           gatheringTitle
-            ? `${gatheringTitle} — head count per night, oldest to newest.`
+            ? `${gatheringTitle} — head count per gathering, oldest to newest.`
             : 'Head count per day, oldest to newest. Every gathering that met, added up.'
         }
       />
@@ -64,7 +64,7 @@ export function AttendanceTrend({
       {points.length === 0 ? (
         <EmptyState
           title="No gatherings to chart yet."
-          description="Once a couple of nights have been checked in, the trend fills in here."
+          description="Once a couple of gatherings have been checked in, the trend fills in here."
         />
       ) : (
         <div className="px-3 pb-3 pt-3">

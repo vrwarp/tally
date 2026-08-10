@@ -212,7 +212,7 @@ test.describe('dashboard', () => {
     await expect(
       page.getByText(/came to friday fellowship regularly, then missed \d+ or more in a row/i),
     ).toBeVisible();
-    await expect(page.getByText(/friday fellowship — head count per night/i)).toBeVisible();
+    await expect(page.getByText(/friday fellowship — head count per gathering/i)).toBeVisible();
     // Nobody else's gathering leaks into a scoped list.
     await expect(page.getByText(/missing from sunday school/i)).toHaveCount(0);
 
