@@ -1,44 +1,50 @@
 /**
- * The reprint proposal, mounted so the critique loop can look at states.
+ * The reprint flow, mounted from `src/` so the critique loop and the
+ * walkthrough look at states rather than at a prototype of them.
  *
- * Same argument as `uxr/kiosk-live/main.tsx`: the kiosk's screens are pure
- * functions of their props, so a dev server renders the real thing in
- * milliseconds and nothing has to be hand-drawn. The difference is that these
- * screens do not exist in `src/` yet — this is the proposal, written against
- * the real stylesheet, the real keyboard, the real tap guard and the real row
- * geometry, so what the critics judge is what the implementation would be.
+ * It began as the prototype — five screens written against the real stylesheet
+ * while the design was argued out over four rounds — and the moment those
+ * screens landed in `src/kiosk/` the copies became the thing `uxr/README.md`
+ * warns about: a hand-written double that drifts, and a critique worth only what
+ * the frame is worth. So the harness now imports the shipped components. It
+ * cannot drift, because it is the app.
+ *
+ * What is faked is the printing module's handle — a `KioskPrinting` is a WebUSB
+ * transport and a rasteriser, and the printer screen only asks it about models
+ * and media — and the fixture roster, which is `kiosk-live`'s.
  *
  * Every knob is a query parameter, because the shooter addresses states by URL:
  *
- *   ?screen=staff|reprint|confirm|printer|done   which screen    (default reprint)
+ *   ?screen=search|staff|reprint|confirm|printer|done  which screen (default reprint)
  *   ?buffer=Alva                            what has been typed      (default "")
- *   ?sentId=1                               the line after a print lands
+ *   ?sentId=1                               whose tag just went to the printer
  *   ?present=1,2                            ids already checked in tonight
  *   ?printer=trouble|none                   what the staff screen says about it
  *   ?recent=0                               a printer screen with nothing on it
  *   ?checkedInAgo=3                         minutes since this kiosk checked them in
- *   ?reprinted=1                            children a label has already gone again for
+ *   ?reprinted=1                            a label has already gone again for them
  *
- * The last two are deliberately *not* an `?offer=offer|spent|none` switch, which
- * is what they were. A cap a reader cannot watch hold is a cap they have to take
- * on trust, and the first version of this offer was blocked precisely because
- * the thing asserted — one per child — was not the thing that mattered. So the
- * window and the counter are modelled, the three states are derived from them by
- * `reprintOffer`, and a scene is a clock reading and a print log rather than a
- * label.
+ * The parent-facing offer is addressed by the *facts* that produce it rather
+ * than by name, and `reprintOffer` — the shipped policy — decides. A critique
+ * cannot judge a cap it cannot see hold, and a frame that took `offer=spent`
+ * from a query string was a claim rather than evidence.
  */
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@/index.css';
 import type { KioskKey } from '@/kiosk/components/Keyboard';
+import type { KioskPrinting } from '@/kiosk/KioskApp';
+import type { PrintedLabel } from '@/kiosk/printing';
 import type { KioskStudent } from '@/kiosk/search';
-import { StaffScreen } from './screens/StaffScreen';
-import { StaffSession } from './screens/StaffSession';
-import { ReprintScreen } from './screens/ReprintScreen';
-import { ReprintConfirmScreen } from './screens/ReprintConfirmScreen';
-import { PrinterScreenProto, type PrintedLabel } from './screens/PrinterScreenProto';
-import { AlreadyCheckedInScreen } from './screens/AlreadyCheckedInScreen';
-import { reprintOffer } from './screens/reprintOffer';
+import { reprintOffer } from '@/kiosk/reprintOffer';
+import { ConfirmScreen } from '@/kiosk/screens/ConfirmScreen';
+import { PrinterScreen } from '@/kiosk/screens/PrinterScreen';
+import { ReprintConfirmScreen } from '@/kiosk/screens/ReprintConfirmScreen';
+import { MAX_REPRINT_RESULTS, ReprintScreen } from '@/kiosk/screens/ReprintScreen';
+import { StaffScreen } from '@/kiosk/screens/StaffScreen';
+import { SearchScreen } from '@/kiosk/screens/SearchScreen';
+import type { KioskBinding } from '@/kiosk/binding';
+import type { KioskSearchOutcome } from '@/kiosk/search';
 
 const params = new URLSearchParams(location.search);
 
@@ -57,20 +63,6 @@ const STUDENTS: KioskStudent[] = [
   { id: '11', firstName: 'Alonzo', lastName: 'Allred', grade: 9 },
 ] as KioskStudent[];
 
-/**
- * Fewer than the parent screen's eight, and that is the reprint screen's own
- * number rather than a shared one.
- *
- * The landscape kiosk leaves this list a 250px track, which is three rows at
- * kiosk row height. Eight matches balance four-and-four across two columns, so
- * the fourth row of both columns was under the ramp with a 23px scroll nobody
- * would guess at; six balance three-and-three and the region shows all of them.
- * The cost is that "more names than fit" fires two letters earlier — which on
- * this screen is not a cost, because a volunteer standing here already knows
- * the child's name and typing is the cheapest thing they can do.
- */
-const MAX_RESULTS = 6;
-
 function outcomeFor(buffer: string) {
   const needle = buffer.toLowerCase();
   const matched = buffer
@@ -81,45 +73,73 @@ function outcomeFor(buffer: string) {
           .some((word) => word.startsWith(needle)),
       )
     : [];
-  return { results: matched.slice(0, MAX_RESULTS), total: matched.length };
+  return { results: matched.slice(0, MAX_REPRINT_RESULTS), total: matched.length };
 }
 
+const NOW = Date.now();
+
+/**
+ * Half past six this evening, whatever time the shutter actually opens.
+ *
+ * The kiosk-live fixture anchors its gathering to the real clock on purpose —
+ * the header asks `windowHasClosed` what to say, and a hard-coded evening goes
+ * stale. That is right for a critique frame and wrong for a walkthrough, which
+ * is read months later: a build that happened to run at ten past midnight
+ * produced a page whose first frame said the gathering ran from 11:55 PM to
+ * 1:25 AM. The evening is fixed and the *date* is today's, so the window reads
+ * like a Wednesday and nothing in it is stale.
+ */
+function evening(hour: number, minute: number): number {
+  const when = new Date(NOW);
+  when.setHours(hour, minute, 0, 0);
+  return when.getTime();
+}
+
+/**
+ * The gathering the kiosk is on, so the walkthrough can open where a parent
+ * finds this device: a check-in screen, mid-service, with a queue behind it.
+ */
+const BINDING: KioskBinding = {
+  eventId: 'uxr-event',
+  seriesId: null,
+  title: 'Wednesday Night',
+  startAtMs: evening(18, 30),
+  endAtMs: evening(20, 0),
+  checkInClosesAtMs: evening(20, 30),
+  boundAtMs: evening(17, 45),
+};
+
+/** An evening: two just now, one that jammed, two earlier. */
 const RECENT: PrintedLabel[] = [
-  { id: 'a', name: 'Ramona Alvarez', at: '6:41 PM' },
-  { id: 'b', name: 'Noah Alvarez', at: '6:41 PM' },
-  { id: 'c', name: 'Alethea Alford', at: '6:38 PM', failed: true },
-  { id: 'd', name: 'Sam Alvarado', at: '6:35 PM' },
-  { id: 'e', name: 'Alonzo Allred', at: '6:32 PM' },
+  { id: 'a', studentId: '1', name: 'Ramona Alvarez', atMs: evening(18, 41), failed: false },
+  { id: 'b', studentId: '2', name: 'Noah Alvarez', atMs: evening(18, 41), failed: false },
+  { id: 'c', studentId: '10', name: 'Alethea Alford', atMs: evening(18, 38), failed: true },
+  { id: 'd', studentId: '4', name: 'Sam Alvarado', atMs: evening(18, 35), failed: false },
+  { id: 'e', studentId: '11', name: 'Alonzo Allred', atMs: evening(18, 32), failed: false },
 ];
 
 /**
- * What the kiosk knows about tonight, for the parent-facing offer.
+ * What the printer screen asks the printing module, and nothing else.
  *
- * Two facts, held here rather than passed as a state name, because they are the
- * two facts the exception is made of and a reader has to be able to see them
- * bound it:
- *
- * `checkedInAtMs` is *this kiosk's own* arrival log — the children it printed a
- * name tag for as they walked in. A child checked in at the other kiosk, or in
- * the app by a leader, is not in it and never gets the control.
- *
- * `reprintedIds` is the shared counter. Every path that sends a label for a
- * child beyond the one their check-in printed writes to it: this parent's hold,
- * the by-name confirm behind the staff gate, and a row on the printer screen.
- * That is what makes "once per child" a cap rather than a suggestion — a parent
- * cannot get a second label by finding a volunteer first, or the other way
- * round.
+ * The real handle is a rasteriser, a worker and a WebUSB device; this screen
+ * wants a list of models, a list of media and a state to render.
  */
-const NOW = Date.now();
-const CHECKED_IN_AT_MS = new Map<string, number>(
-  STUDENTS.map((student, index) => [
-    student.id,
-    // Everybody but the tapped child arrived well before the window; the child
-    // this scene is about arrived `checkedInAgo` minutes ago.
-    NOW - (index === 0 ? Number(params.get('checkedInAgo') ?? '3') : 40) * 60_000,
-  ]),
-);
-const REPRINTED_IDS = new Set(params.get('reprinted')?.split(',').filter(Boolean) ?? []);
+const printing = {
+  modelIdentifiers: () => ['QL-810W', 'QL-800', 'QL-820NWB'],
+  labelsForModel: () => [{ identifier: '62' }, { identifier: '62x29' }],
+  labelName: (entry?: { identifier: string }) =>
+    entry?.identifier === '62x29' ? '62 × 29mm name badge' : '62mm continuous',
+  subscribe: () => () => {},
+  currentState: () =>
+    params.get('printer') === 'trouble'
+      ? { kind: 'trouble' as const, message: 'The cover is open.', advice: 'Close it and try again.' }
+      : { kind: 'ready' as const, config: { model: 'QL-810W', label: '62' } },
+  configure: async () => {},
+  pairPrinter: async () => {},
+  readStatus: async () => null,
+  suggestLabels: () => [],
+  testPrint: () => {},
+} as unknown as KioskPrinting;
 
 export function Prototype() {
   const [buffer, setBuffer] = useState(params.get('buffer') ?? '');
@@ -130,92 +150,110 @@ export function Prototype() {
   };
 
   const screen = params.get('screen') ?? 'reprint';
-  const printer = (params.get('printer') as 'ready' | 'trouble' | 'none') ?? 'ready';
+  const trouble = params.get('printer') === 'trouble';
 
-  /*
-   * The parent's screen is the one thing here that is *not* behind the staff
-   * gate, so it is the one screen with no session clock around it: it is a
-   * check-in screen, and the kiosk is already where it should be.
-   */
-  if (screen === 'done') {
-    const student = STUDENTS[0]!;
+  if (screen === 'search') {
+    const matched = outcomeFor(buffer);
     return (
-      <AlreadyCheckedInScreen
-        student={student}
-        offer={reprintOffer({
-          studentId: student.id,
-          now: Date.now(),
-          checkedInAtMs: CHECKED_IN_AT_MS,
-          reprintedIds: REPRINTED_IDS,
-          // A gathering with a template and a printer that is not in trouble.
-          // The parent is never told which of those it was.
-          labelWouldPrint: printer === 'ready',
-        })}
+      <SearchScreen
+        binding={BINDING}
+        buffer={buffer}
+        onKey={onKey}
+        outcome={
+          {
+            mode: buffer ? 'name' : 'idle',
+            results: matched.results,
+            total: matched.total,
+          } as KioskSearchOutcome
+        }
+        presentIds={new Set(params.get('present')?.split(',').filter(Boolean) ?? [])}
+        checkedOutIds={new Set()}
+        tracksCheckOut={false}
+        printerNeedsAttention={trouble}
+        refresh="idle"
+        widening={false}
+        onWiden={() => {}}
+        onPick={() => {}}
+        onRegister={() => {}}
+        onStaffGate={() => {}}
+      />
+    );
+  }
+
+  if (screen === 'staff') {
+    return (
+      <StaffScreen
+        title="Wednesday Night"
+        window="6:30 – 8:00 PM"
+        printer={(params.get('printer') as 'ready' | 'trouble' | 'none') ?? 'ready'}
         onReprint={() => {}}
+        onPrinter={() => {}}
+        onChangeEvent={() => {}}
+        onStay={() => {}}
+      />
+    );
+  }
+
+  if (screen === 'confirm') {
+    return (
+      <ReprintConfirmScreen
+        student={STUDENTS[0]!}
+        lines={['Ramona A', '7th grade', 'Wednesday Night', '6:30 PM']}
+        printedAt={params.get('printedAt') ?? '6:41 PM'}
+        printerNeedsAttention={trouble}
+        onPrint={() => {}}
         onBack={() => {}}
       />
     );
   }
 
-  /*
-   * Everything else is behind the two-second hold on Clear, and the clock that
-   * hands the kiosk back to the parents belongs to the gate rather than to any
-   * of them — see `StaffSession`. Wrapping here is what makes that true of a
-   * screen added tomorrow as well.
-   */
-  const staff = (() => {
-    if (screen === 'staff') {
-      return (
-        <StaffScreen
-          title="Wednesday Night"
-          window="6:30 – 8:00 PM"
-          printer={printer}
-          onReprint={() => {}}
-          onPrinter={() => {}}
-          onChangeEvent={() => {}}
-          onStay={() => {}}
-        />
-      );
-    }
-
-    if (screen === 'confirm') {
-      return (
-        <ReprintConfirmScreen
-          student={STUDENTS[0]!}
-          lines={['Ramona Alvarez', '7th grade', 'Wednesday Night', '6:30 PM']}
-          printedAt={params.get('printedAt') ?? '6:41 PM'}
-          printerNeedsAttention={printer === 'trouble'}
-          onPrint={() => {}}
-          onBack={() => {}}
-        />
-      );
-    }
-
-    if (screen === 'printer') {
-      return (
-        <PrinterScreenProto
-          recent={params.get('recent') === '0' ? [] : RECENT}
-          onPick={() => {}}
-          onDone={() => {}}
-        />
-      );
-    }
-
+  if (screen === 'done') {
     return (
-      <ReprintScreen
-        buffer={buffer}
-        outcome={outcomeFor(buffer)}
-        presentIds={new Set(params.get('present')?.split(',').filter(Boolean) ?? [])}
-        sentId={params.get('sentId')}
-        printerNeedsAttention={printer === 'trouble'}
-        onKey={onKey}
-        onPick={() => {}}
+      <ConfirmScreen
+        student={STUDENTS[0]!}
+        intent="done"
+        family={[]}
+        skipped={new Set()}
+        reprintOffer={reprintOffer({
+          studentId: '1',
+          now: NOW,
+          checkedInAtMs: new Map([['1', NOW - Number(params.get('checkedInAgo') ?? 3) * 60_000]]),
+          reprintedIds: new Set(params.get('reprinted') === '1' ? ['1'] : []),
+          labelWouldPrint: params.get('printer') !== 'none' && !trouble,
+        })}
+        onReprint={() => {}}
+        onToggle={() => {}}
+        onConfirm={() => {}}
+        onBack={() => {}}
+      />
+    );
+  }
+
+  if (screen === 'printer') {
+    return (
+      <PrinterScreen
+        printing={printing}
+        config={{ model: 'QL-810W', label: '62' }}
+        printedTonight={params.get('recent') === '0' ? [] : RECENT}
+        onReprint={() => {}}
+        onReprintByName={() => {}}
         onDone={() => {}}
       />
     );
-  })();
+  }
 
-  return <StaffSession onReturn={() => {}}>{staff}</StaffSession>;
+  return (
+    <ReprintScreen
+      buffer={buffer}
+      outcome={outcomeFor(buffer)}
+      presentIds={new Set(params.get('present')?.split(',').filter(Boolean) ?? [])}
+      sentId={params.get('sentId')}
+      printerNeedsAttention={trouble}
+      onKey={onKey}
+      onPick={() => {}}
+      onDone={() => {}}
+    />
+  );
 }
 
 createRoot(document.getElementById('root')!).render(<Prototype />);

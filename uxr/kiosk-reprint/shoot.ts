@@ -92,7 +92,7 @@ const SCENES: {
   },
   /* Eleven minutes later: the common case, and the one that has to be today's
      screen and one line. */
-  { id: 'done-none', query: 'screen=done&checkedInAgo=25', views: ['phone', 'kiosktall'] },
+  { id: 'done-ask', query: 'screen=done&checkedInAgo=25', views: ['phone', 'kiosktall'] },
   { id: 'printer-recent', query: 'screen=printer', views: ['phone', 'kiosktall', 'kioskwide'] },
 ];
 

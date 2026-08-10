@@ -1,18 +1,20 @@
 # Reprinting a name tag
 
-What to build, why it is shaped this way, and what the critique loop threw out
+What was built, why it is shaped this way, and what the critique loop threw out
 on the way. The design was refined in `uxr/kiosk-reprint/` — four rounds, three
 critics a round, thirty frames a round at the shapes a lobby tablet actually
 takes. The rounds are in [`uxr/rounds/reprint-r01`](../uxr/rounds/reprint-r01)
 through `r04`; the brief they were judged against is
-[`uxr/BRIEF-reprint.md`](../uxr/BRIEF-reprint.md).
+[`uxr/BRIEF-reprint.md`](../uxr/BRIEF-reprint.md); and the journey it produced,
+frame by frame, is the
+[walkthrough](walkthrough/reprint/README.md).
 
 ---
 
-## The hole
+## The hole this filled
 
-The kiosk prints a name tag when a child is checked in. That is the only label
-it prints on purpose, and there is exactly one way to get a second copy:
+The kiosk prints a name tag when a child is checked in. That was the only label
+it printed on purpose, and there was exactly one way to get a second copy:
 
 1. Hold **Clear** for two seconds — the staff gate.
 2. That opens **Change event?**, whose quiet answer is *Leave Wednesday Night*.
@@ -24,9 +26,9 @@ it prints on purpose, and there is exactly one way to get a second copy:
 6. **Done**, back to the chooser, hold a row for two seconds to re-point the
    kiosk at the gathering it was already on.
 
-So the only reprint in the product costs the queue at the door, cannot be aimed
-at a named child, and is a guess that goes wrong the moment somebody else checks
-in behind you. A family of three who need their labels again is three passes
+So the only reprint in the product cost the queue at the door, could not be aimed
+at a named child, and was a guess that went wrong the moment somebody else
+checked in behind you. A family of three who need their labels again is three passes
 through that, and the second and third are impossible — *the last label* is only
 ever one child.
 
@@ -45,7 +47,7 @@ two are a volunteer. That split is the whole design.
 
 ---
 
-## What to build
+## What is there now
 
 ### 1. The staff gate opens onto doors, not one door
 
@@ -91,8 +93,8 @@ on the shape with the least vertical track.
 
 ### 5. The parent's ten minutes
 
-The already-checked-in screen is today a statement with nothing to press, and it
-is exactly where a parent stands when they notice the tag is missing. It gains a
+The already-checked-in screen was a statement with nothing to press, and it is
+exactly where a parent stands when they notice the tag is missing. It has a
 hold-to-print control **only** for a child this kiosk checked in within the last
 ten minutes, once per child, and only where a label would actually come out.
 
@@ -117,9 +119,11 @@ before it found them fixed:
   its green button, and the first version drew the reprint across 57–70% of it —
   the pixels a parent's thumb aims at all evening.
 
-Outside the window the screen is today's screen plus one line: *Name tags come
-from the check-in desk.* That line is the whole discoverability fix, and it is
-free.
+Outside the window the screen is what it always was plus one line: *Name tags
+come from the check-in desk.* That line is the whole discoverability fix, and it
+is free. Where no label would come out at all — no template, no printer, or one
+in trouble — even the line is absent: a parent is never told about a printer, and
+pointing them at a desk that cannot help is a second queue for the same answer.
 
 ### 6. The gate owns the clock
 
@@ -131,16 +135,22 @@ sit unattended with five children's names and arrival times on it.
 
 ---
 
-## Implementation
+## How it is put together
 
 ### `src/kiosk/KioskApp.tsx`
 
 - `onStaffGate` opens `{ kind: 'staff' }` instead of `{ kind: 'unbind' }`.
-- New overlays: `staff`, `reprint`, `reprint-confirm`. `unbind` is unchanged and
-  reached from the staff screen.
-- The printer screen keeps its `phase`, plus where **Done** returns to — the
-  chooser when it was reached during setup, the search screen when it was
-  reached from the staff gate mid-service.
+- Four new overlays — `staff`, `reprint`, `reprint-confirm`, `printer` — rather
+  than phases, which is what keeps the kiosk bound while a volunteer works. It
+  also keeps `idleRef` honest for free: a kiosk with somebody on it is not idle,
+  so the binding cannot expire and the 4am reload cannot fire underneath them.
+  `unbind` is unchanged and is now reached from the staff screen.
+- The printer screen is still a `phase` when it is reached from the chooser
+  during setup — the one time it is opened with the kiosk on no gathering, so it
+  is drawn there without the by-name door and with no evening to list.
+- `StaffSession` wraps the flow with one 45-second inactivity return, restarted
+  by any pointer event. On the gate rather than on the screens, so a fifth screen
+  added behind it cannot reopen the hole the printer screen fell into.
 - New state: `checkedInAtMs: Map<studentId, number>`, written in `onConfirm`
   beside `arrivals`. The kiosk records which arrivals *it* took; that is what
   condition 1 of the offer is.
@@ -151,29 +161,36 @@ sit unattended with five children's names and arrival times on it.
 
 ### `src/kiosk/printing/`
 
-- `queue.ts` grows a bounded history — student id, display name, time, and
-  whether the send threw — behind `printedTonight()`. `lastPrinted` and
-  `reprintLast` go: the whole point is that *the last label* was the wrong
-  question.
-- `index.ts` gains `reprintFor(student, binding)`. It is `printLabel` with the
-  history marked, and it re-rasterises rather than reusing bytes, so a child
-  whose allergy note arrived late gets the label they should have had.
-- Unbinding clears the history with the allergy notes it already clears.
+- `queue.ts` grows a bounded log of *attempts* — student id, display name, time,
+  and whether it reached the tape — behind `printedTonight()`. Attempts, because
+  the row a volunteer wants is the one that failed. A job with no `name` is not
+  logged at all, which is what a test print is. `lastPrinted` and `reprintLast`
+  are gone: the whole point is that *the last label* was the wrong question.
+- `index.ts` gains `reprintLabel(student, binding)`, which re-rasterises rather
+  than re-sending bytes, so a child whose allergy note arrived late gets the
+  label they should have had. And `labelPreview`, which is the same token fill
+  the rasteriser does with the drawing left off.
+- `forgetGathering()` clears the log with the allergy notes unbinding already
+  cleared. Both are lists of children's names in memory on a device that sits in
+  a lobby for weeks.
 
 ### Screens
 
 New: `StaffScreen`, `ReprintScreen`, `ReprintConfirmScreen`, `StaffMark`,
 `StaffSession`, `reprintOffer.ts`, `useOverflowFade.ts`. Changed:
-`PrinterScreen` (the list, the two-column shape, the collapsed setup),
-`ConfirmScreen` (the `done` branch's offer block), `SearchScreen` (see below).
+`PrinterScreen` (the log, the two-column shape, the collapsed setup),
+`ConfirmScreen` (the `done` branch's offer block).
 
-Prototypes for all of them are in `uxr/kiosk-reprint/screens/`, written against
-the real stylesheet and the real components — they are the implementation, less
-the wiring.
+`eventWindow` moved from `SearchScreen` to `binding.ts`, because the staff screen
+wants the same sentence and a screen is the wrong place to keep a fact about a
+gathering.
 
-### Already landed on this branch
+`uxr/kiosk-reprint/` was the prototype while the design was argued out; it now
+mounts the shipped components instead, which is what `uxr/README.md` argues a
+kiosk harness has to do — a hand-written double drifts, and a critique is worth
+only what the frame is worth.
 
-Two shipping fixes the loop turned up, both outside the reprint itself:
+### Fixes the loop turned up, outside the reprint itself
 
 - **`src/index.css`** — `@custom-variant kiosk (@media A, B)` compiled to `A`
   alone, so `kiosk:` was byte-for-byte `tall:` and every `kiosk:` utility under
@@ -184,30 +201,40 @@ Two shipping fixes the loop turned up, both outside the reprint itself:
   pixels was answering with an eighty-eight pixel dissolve over rows that fit.
 - **`src/kiosk/components/HoldButton.tsx`** — opt-in `cancelOnStray` and
   `strayHint`. Default off, so the check-out hold and the chooser's bind are
-  untouched.
+  untouched and their tests are the regression.
 
-`SearchScreen` has the same padding-manufactured fade the prototype had, and the
-same `n of m` question in its readout. Neither is this change's job, but both are
-one-line adoptions of what is now in `index.css`.
+`SearchScreen` still has the padding-manufactured fade the reprint screen had,
+and the same `n of m` question in its readout. Neither is this change's job, but
+both are one-line adoptions of what is now in `index.css` and
+`useOverflowFade.ts`.
 
 ### Tests
 
-- `reprintOffer` — the window's edges, the shared counter, and the
-  no-printer case. Pure function, so this is a table.
-- `queue` — history bounded, ordered, marked on failure, cleared on unbind.
-- `KioskApp` — the staff gate opens the staff screen and not the unbind prompt;
-  a reprint writes no attendance; the kiosk stays bound throughout; the offer is
-  absent eleven minutes on and after somebody else has spent it.
-- `HoldButton` — `cancelOnStray` cancels on drift and shows the hint; without
-  the prop, behaviour is byte-identical (the existing callers' tests are the
-  regression).
-- e2e — `recordedLabels` already exists: reprint from the staff flow produces
-  exactly one label and leaves the register untouched.
+`src/kiosk/reprintOffer.test.ts` — the window's edges to the millisecond, the
+shared counter, and the difference between *ask at the desk* and *say nothing*.
+
+`src/kiosk/printing/queue.test.ts` — the log is bounded, newest first, records a
+send that threw and one dropped as stale, ignores a job with no name, and is
+emptied when the kiosk leaves the gathering.
+
+`src/kiosk/KioskApp.reprint.test.tsx` — a named child's tag prints once and
+writes no attendance; the binding survives the whole errand; the gate hands the
+kiosk back on its own; a staff reprint spends the parent's copy; the offer
+appears inside ten minutes, vanishes after eleven, never appears for a child this
+kiosk did not check in, and is absent entirely on a gathering that prints
+nothing.
+
+`src/kiosk/components/HoldButton.test.tsx` — drift cancels only where a caller
+asked for it, the wobble of a thumb still completes, and the hint survives the
+lift and clears on the next press.
+
+`src/kiosk/KioskApp.staffGate.test.tsx` — the hold opens the staff screen and
+changes nothing; *Change event* still asks; the wizard's Clear is still a Clear.
 
 ### Budget
 
-First paint is 94.8 KB gz against 127, printing 15.0 against 24.4. Two screens
-of markup fit. The transport stays behind its dynamic import — nothing here
+First paint went 94.8 → 97.7 KB gz against a budget of 127; printing 15.0 → 15.1
+against 24.4. The transport stays behind its dynamic import — nothing here
 reaches the printing module on a kiosk that has no printer.
 
 ---
