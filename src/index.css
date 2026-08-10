@@ -124,9 +124,29 @@
  *    raised surface catches more light; on paper it is the page that is grey
  *    and the card that is white. Inverting the numbers without inverting that
  *    relationship would leave every card looking like a hole.
- *  - `ink-500` is the app's most-used muted text — 74 occurrences — so it holds
- *    at #64748b, which clears 4.5:1 on white. A mechanical flip would have put
- *    a pale grey there and quietly failed contrast across half the app.
+ *  - `ink-500` is the app's most-used muted text — 74 occurrences — so it is
+ *    held wherever it needs to be to clear 4.5:1 on a card. A mechanical flip
+ *    would have put a pale grey there and quietly failed contrast across half
+ *    the app.
+ *
+ * ## Why the pale end is tinted rather than white
+ *
+ * It used to run to #ffffff at the card and #f1f5f9 at the page, and that was
+ * two problems wearing one face. On its own it read as glare — a slab of paper
+ * white with no relation to the slate the rest of the app is built from. And it
+ * left the lobby kiosk's "room" unable to do its job: a gathering picks a hue
+ * for the page and the cards, that hue is applied by turning `h` while holding
+ * `L` and `C`, and **pure white has no hue to turn**. Every light kiosk came out
+ * the same white no matter what anybody chose.
+ *
+ * So the pale steps carry a little chroma, on the slate hue the ramp already
+ * sits at. That is what a themed room turns. The ceiling is not a taste
+ * judgement: near white the sRGB gamut narrows unevenly by hue — at L .967
+ * indigo tops out at C .017 while forest reaches C .054 — so a chroma the
+ * weakest hue cannot reach would be silently clipped there and not elsewhere,
+ * and the hues would stop being equals. Every value below is inside the ceiling
+ * of the *worst* hue on the wheel, which is what keeps `kioskTheme.ts`'s promise
+ * that contrast belongs to the slot rather than to the colour.
  */
 :root[data-theme='light'] {
   --color-ink-50: #0f172a;
@@ -134,12 +154,12 @@
   --color-ink-200: #334155;
   --color-ink-300: #475569;
   --color-ink-400: #576375;
-  --color-ink-500: #64748b;
+  --color-ink-500: #5c6b82;
   --color-ink-600: #8b97a8;
-  --color-ink-700: #cbd5e1;
-  --color-ink-800: #e2e8f0;
-  --color-ink-900: #ffffff;
-  --color-ink-950: #f1f5f9;
+  --color-ink-700: #c7d5e6;
+  --color-ink-800: #dde9f8;
+  --color-ink-900: #f4f9ff;
+  --color-ink-950: #e4f1fe;
 
   /* Accents re-picked for a white ground, not lightened versions of the dark ones. */
   --color-brand-200: #075985;
@@ -149,7 +169,11 @@
   --color-brand-600: #0369a1;
   --color-brand-700: #075985;
 
-  --color-present-400: #15803d;
+  /* 400 and 600 were the same green until the page stopped being near-white.
+     They answer different questions: 400 is the "✓ Checked in" line and has to
+     clear 4.5:1 as text on the page, while 600 is a fill under white text and
+     needs 3:1 the other way. Darkening the one that carries the harder job. */
+  --color-present-400: #007634;
   --color-present-500: #16a34a;
   --color-present-600: #15803d;
 

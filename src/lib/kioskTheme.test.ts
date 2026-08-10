@@ -21,6 +21,7 @@ import {
   DEFAULT_KIOSK_THEME,
   KIOSK_HUES,
   KIOSK_SOURCE_RAMPS,
+  hexToOklch,
   kioskPalette,
   sanitizeKioskTheme,
   type KioskGround,
@@ -194,11 +195,22 @@ describe('kioskPalette', () => {
     }
   });
 
-  it('tints the page but leaves a light card white', () => {
-    // Pure white has no hue to turn, and a tinted card on paper reads as a stain.
+  it('tints the page, and the card along with it', () => {
+    // The card used to be exempt, for a reason that was really a constraint: it
+    // was #ffffff, and pure white has no hue to turn, so it could only ever come
+    // out white. Now the pale end of the light ramp carries a little chroma, the
+    // card turns with everything else — much less of it than the page, which is
+    // what keeps a warm room from reading as a stain on the paper.
     const palette = kioskPalette(theme({ ground: 'light', backdrop: 'ember' })) ?? {};
-    expect(palette['--color-ink-900']).toBeUndefined();
     expect(palette['--color-ink-950']).not.toBe(KIOSK_SOURCE_RAMPS.light.ink[950]);
+    expect(palette['--color-ink-900']).not.toBe(KIOSK_SOURCE_RAMPS.light.ink[900]);
+
+    // The card stays the lightest thing on the screen, and the palest.
+    const chroma = (hex: string) => hexToOklch(hex).C;
+    expect(hexToOklch(palette['--color-ink-900']).L).toBeGreaterThan(
+      hexToOklch(palette['--color-ink-950']).L,
+    );
+    expect(chroma(palette['--color-ink-900'])).toBeLessThan(chroma(palette['--color-ink-950']));
   });
 
   it('gives indigo and the untinted backdrop the same answer', () => {

@@ -86,7 +86,7 @@ export function applyTheme(theme: Theme): void {
   root.dataset.theme = theme;
 
   const meta = document.querySelector('meta[name="theme-color"]');
-  meta?.setAttribute('content', theme === 'light' ? '#f1f5f9' : '#0f172a');
+  meta?.setAttribute('content', theme === 'light' ? '#e4f1fe' : '#0f172a');
 }
 
 /**

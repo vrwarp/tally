@@ -152,7 +152,7 @@ describe('applyTheme', () => {
     // `theme-color` looks like it has a black bar wedged above it.
     applyTheme('light');
     expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe(
-      '#f1f5f9',
+      '#e4f1fe',
     );
 
     applyTheme('dark');
