@@ -277,7 +277,7 @@ One dated gathering.
 | `description` | string \| null | A sentence for the people turning up — "Games, a talk and pizza". Distinct from `notes`, which is logistics for the other leaders; the description is what the check-in screen leads with when this is today's gathering. |
 | `icon` | string \| null | A Material Symbols name from the bundled catalogue in `src/lib/eventIcons.ts`. Stored as the name, not as a glyph, and validated against the catalogue on read: an event carrying a name Tally no longer ships renders as one with no icon rather than as an empty tile. |
 | `mode` | `'recurring' \| 'oneoff'` | Recurring is speed-first with a predictive roster. One-off does not repeat and never informs prediction — though it may borrow one, see `predictFromChain` — and its roster can be closed to the students who RSVP'd. |
-| `seriesId` | string \| null | Optional link to an `eventSeries` template, on recurring events only. What it does is join this gathering to that template's chain; it is not what turns prediction on, which groups by `chainKey`. Nothing in the app creates a series document — they come from the seed — so most recurring events leave this null. |
+| `seriesId` | string \| null | Optional link to an `eventSeries` template, on recurring events only. What it does is join this gathering to that template's chain; it is not what turns prediction on, which groups by `chainKey`. Nothing in the app creates a series document — they come from the seed — so an install that was never seeded leaves this null on every event. The editor has no control for it: the picker that offered one was removed once it became clear it could never have anything in it. The one path that still sets it is the Events screen's quick actions, which are built from the seeded series themselves; an edit then carries it forward untouched, because `chainKey` reads it before `recurrenceRootId` and dropping it would cut the night out of its own chain. |
 | `predictFromChain` | string \| null | On one-off events only: the `chainKey` of the gathering whose regulars this trip borrows. A retreat has no history of its own, but the students on the coach are the ones who come on Friday nights, so a leader names that gathering and the trip's Recent filter reads its last few instances. A chain rather than a `seriesId`, so a weekly gathering created in the app can be borrowed too. Null means no prediction — the whole roster. |
 | `recurrence` | object \| null | How the event repeats (RFC 5545 subset, anchored on `startAt`). Occurrences are projected at read time, not written ahead: a document exists only for a gathering somebody acted on — see `lib/materialize.ts` and `lib/eventProjection.ts`. |
 | `recurrenceRootId` | string \| null | The hand-made event a chain of repeats grew from, or null when this event *is* that root. Copied onto every occurrence, so the chain has an identity that outlives any one instance. |
@@ -364,6 +364,15 @@ Reference data. Series carry `title`, `dayOfWeek`, `startTime` / `endTime` as lo
 `checkInOpensMinutesBefore` / `checkInClosesMinutesAfter`, `active` and `order`.
 
 **Who writes:** core and up. Readable by anyone active.
+
+Nothing in the app writes one, though — `scripts/seed.ts` is the only writer in the repository, so a
+deployment that was never seeded has none of these documents at all, permanently. That is worth
+knowing before building on them. What still reads them degrades to nothing rather than to something
+broken: the Events screen's quick actions render only when there are entries, the borrow-a-gathering
+list on a one-off titles chains from them but is built from events, and the Settings threshold
+sentence names a weekday from the first active one and says "gatherings" when there is none. A
+"Series" picker in the event editor did not degrade — it showed an empty control on the most-used
+form in the app — and was removed for it.
 
 ### `skippedNights/{chainKey}`
 
