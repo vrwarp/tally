@@ -183,7 +183,7 @@ describe('the signing status', () => {
     // The exact text, newlines and all — a command retyped from a screenshot
     // is a command with a typo in it.
     expect(writeText).toHaveBeenCalledWith(DENIED.command);
-    expect(await screen.findByText('Copied.')).toBeInTheDocument();
+    expect(await screen.findByText('Command copied.')).toBeInTheDocument();
   });
 
   it('says so when the clipboard is unavailable, rather than doing nothing', async () => {
@@ -191,8 +191,10 @@ describe('the signing status', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Copy command' }));
     // http origins and some in-app browsers. The command is on screen either
-    // way, so the reader is told to select it.
-    expect(await screen.findByText(/select the command above/)).toBeInTheDocument();
+    // way, so the reader is told to select it — below the buttons, which is
+    // where it now sits: what passes under a phone's tab bar should be the
+    // thing you read and copy, not the button you have to press twice.
+    expect(await screen.findByText(/select the command below/)).toBeInTheDocument();
   });
 
   it('does not claim a fault it could not confirm', async () => {

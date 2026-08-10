@@ -27,6 +27,8 @@ result portable back into `src/`.
 | `kiosk-live/` | The kiosk's screens mounted from `src/` and shot straight, state by state. See below. |
 | `team-live/` | The Team screen mounted from `src/` against a fixture, and frozen from there. Same argument as the kiosk: two subscriptions and a profile is not worth an emulator suite. |
 | `measure.ts` | Re-runs the walkthrough's measurements against the frozen scenes: how far each page scrolls, and whether it scrolls sideways. |
+| `kiosk-setup-live/` | The team's side of the kiosk — the pairing screen — mounted from `src/` inside the real app shell, with the account menu opened on the way past. See below. |
+| `JOURNEY-kiosk.md` | The brief for that scene: the Friday-evening moment, the person, and what the app used to do with it. |
 | `baseline/` | The frozen app as it was. Never edited. |
 | `prototype/` | The working copy the ideation agent edits. |
 | `rounds/` | One directory per round: what the critics found, what the ideator did about it. |
@@ -94,6 +96,32 @@ prototypes: `uxr/shoot.ts` reads them, the ideation agent edits them.
 
 Re-run it after porting a round back into `src/` and it re-freezes what actually
 shipped, which is the only honest input to the before/after page.
+
+## The kiosk screen is mounted inside the real shell
+
+```bash
+npm run uxr:kiosk-setup -- --out uxr/prototype-kiosk-setup   # freeze it from a live mount
+npm run uxr:shoot -- uxr/prototype-kiosk-setup --out uxr/renders/ks-r01
+```
+
+`kiosk-setup-live/` is `team-live/` with one difference, and the difference is
+the point. Team re-draws the app frame by hand, because that screen is reached
+the way every other core screen is and the frame only has to be the right size.
+The kiosk screen's problem *was the route to it*: it lived behind a text link in
+a paragraph on the third card of Settings, and Settings is core-team only, so
+the counselor the kiosk's own screen sends there could not get there at all. So
+this harness mounts the real `AppShell`, aliases the four modules it reads from
+Firebase, and opens the account menu with a click before freezing — because the
+menu is the finding.
+
+Five scenes: the menu (admin and counselor), and the screen as an admin, as a
+counselor and on a deployment that cannot sign kiosk tokens. `scene.tsx` is one
+line naming the component being photographed, and it is its own file so that
+the before-frames of a refinement and the after-frames come out of the same
+harness, the same browser and the same two viewports.
+
+The brief for the scene is `JOURNEY-kiosk.md`; the rounds are
+`rounds/kiosk-setup-r0*`.
 
 ## The before/after page
 

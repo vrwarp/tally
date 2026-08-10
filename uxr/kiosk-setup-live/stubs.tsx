@@ -75,15 +75,27 @@ const WHERE = {
 
 const STATUSES: Record<KioskStatus['state'], KioskStatus> = {
   ok: { state: 'ok', ...WHERE, problem: null, remedy: null, command: null },
+  /*
+   * Worded as `functions/src/kiosk/signing.ts` words it, continuations and all.
+   * A frame is worth what its content is worth: a hand-written approximation of
+   * this state would have the critics judging a sentence and a line-break the
+   * app never produces.
+   */
   denied: {
     state: 'denied',
     ...WHERE,
     problem:
-      'This deployment cannot sign kiosk tokens: the functions service account is missing the Service Account Token Creator role.',
+      'This project cannot sign kiosk tokens, so pairing a kiosk will hang at the last step — ' +
+      'the code stays on screen after it is approved.',
     remedy:
-      'Grant the role to the service account below, then reload this page. A kiosk already showing a code will pair on its next poll.',
+      'These functions run as tally-76406@appspot.gserviceaccount.com. Grant that account ' +
+      'roles/iam.serviceAccountTokenCreator on itself — on the account, not on the project — ' +
+      'then pair the kiosk again.',
     command:
-      'gcloud projects add-iam-policy-binding tally-76406 --member=serviceAccount:tally-76406@appspot.gserviceaccount.com --role=roles/iam.serviceAccountTokenCreator',
+      'gcloud iam service-accounts add-iam-policy-binding tally-76406@appspot.gserviceaccount.com \\\n' +
+      '  --project tally-76406 \\\n' +
+      '  --member="serviceAccount:tally-76406@appspot.gserviceaccount.com" \\\n' +
+      '  --role=roles/iam.serviceAccountTokenCreator',
   },
   unknown: {
     state: 'unknown',
