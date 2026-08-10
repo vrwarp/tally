@@ -28,8 +28,13 @@ export const NAME_MAX_LENGTH = 40;
 /** Held for the reviewer on the registration record, then sent upstream. */
 export const ALLERGIES_MAX_LENGTH = 200;
 
-/** Kindergarten through 12th grade, with `0` meaning kindergarten. */
-export const MIN_GRADE = 0;
+/**
+ * Pre-K through 12th grade: `-1` is Pre-K, `0` is kindergarten.
+ *
+ * Mirrors `Grade` in src/types/index.ts, which cannot be imported here — this
+ * module imports nothing, so that the functions package can take it verbatim.
+ */
+export const MIN_GRADE = -1;
 export const MAX_GRADE = 12;
 
 export type FieldCheck<T> = { ok: true; value: T } | { ok: false; error: string };
@@ -65,7 +70,9 @@ export function checkName(raw: unknown, field: string): FieldCheck<string> {
  *
  * Null is an answer rather than a blank — a child too young for a grade has
  * none — which is why this takes it happily and why nothing downstream
- * substitutes a zero for it.
+ * substitutes a zero for it. The floor is `-1` and not zero: that is Pre-K,
+ * and a door that refused it would refuse the children a nursery registers
+ * most.
  */
 export function checkGrade(raw: unknown): FieldCheck<number | null> {
   if (raw === null || raw === undefined) return { ok: true, value: null };
@@ -75,7 +82,7 @@ export function checkGrade(raw: unknown): FieldCheck<number | null> {
     raw < MIN_GRADE ||
     raw > MAX_GRADE
   ) {
-    return bad('grade must be a whole number from 0 to 12, or null.');
+    return bad('grade must be a whole number from -1 (Pre-K) to 12, or null.');
   }
   return { ok: true, value: raw };
 }

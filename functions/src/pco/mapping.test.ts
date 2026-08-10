@@ -168,19 +168,28 @@ describe('mapPersonToStudent', () => {
   });
 
   it('will not extrapolate a graduation year past either end of school', () => {
-    // A toddler in the class of 2040 is not in "-1th grade" — they are not in
-    // school. The kiosk printed exactly that beside a child's name, because the
-    // derivation is a straight line and school is not.
-    const toddler = person('1', { first_name: 'Rue', last_name: 'Lin', graduation_year: 2040 });
-    expect(mapPersonToStudent(toddler, { ...RANGE, now: NOW }).grade).toBeNull();
+    // The derivation is a straight line and school is not, so it keeps counting
+    // past both ends. An infant in the class of 2043 is in no grade at all.
+    const infant = person('1', { first_name: 'Rue', last_name: 'Lin', graduation_year: 2043 });
+    expect(mapPersonToStudent(infant, { ...RANGE, now: NOW }).grade).toBeNull();
 
-    // Kindergarten still derives, being a real grade — the bound is K, not 1st.
-    const kindergartener = person('2', { first_name: 'Ada', last_name: 'Lin', graduation_year: 2038 });
+    // Pre-K and kindergarten are real grades, and the bound is Pre-K.
+    const preK = person('2', { first_name: 'Shay', last_name: 'Lin', graduation_year: 2039 });
+    expect(mapPersonToStudent(preK, { ...RANGE, now: NOW }).grade).toBe(-1);
+    const kindergartener = person('3', { first_name: 'Ada', last_name: 'Lin', graduation_year: 2038 });
     expect(mapPersonToStudent(kindergartener, { ...RANGE, now: NOW }).grade).toBe(0);
 
     // And the other end: somebody who graduated years ago is not in 18th grade.
-    const alum = person('3', { first_name: 'Nia', last_name: 'Lin', graduation_year: 2020 });
+    const alum = person('4', { first_name: 'Nia', last_name: 'Lin', graduation_year: 2020 });
     expect(mapPersonToStudent(alum, { ...RANGE, now: NOW }).grade).toBeNull();
+  });
+
+  it('carries the Pre-K grade Planning Center holds outright', () => {
+    // The case that started this: Planning Center's own profile screen renders
+    // `grade: -1` as "Pre-K", and it arrives with no graduation year at all.
+    const preK = person('1', { first_name: 'Shayla', last_name: 'Bo', grade: -1, child: true });
+
+    expect(mapPersonToStudent(preK, { ...RANGE, now: NOW }).grade).toBe(-1);
   });
 
   it('answers null when nothing is known, rather than the bottom of the band', () => {
@@ -349,9 +358,10 @@ describe('pcoGrade', () => {
     expect(pcoGrade(person('1', { graduation_year: 2030 }), NOW)).toBe(8);
   });
 
-  it('derives a grade only inside K-12, and says nothing outside it', () => {
+  it('derives a grade only inside Pre-K..12, and says nothing outside it', () => {
+    expect(pcoGrade(person('1', { graduation_year: 2039 }), NOW)).toBe(-1);
     expect(pcoGrade(person('1', { graduation_year: 2038 }), NOW)).toBe(0);
-    expect(pcoGrade(person('1', { graduation_year: 2039 }), NOW)).toBeNull();
+    expect(pcoGrade(person('1', { graduation_year: 2040 }), NOW)).toBeNull();
     expect(pcoGrade(person('1', { graduation_year: 2026 }), NOW)).toBe(12);
     expect(pcoGrade(person('1', { graduation_year: 2025 }), NOW)).toBeNull();
     // Garbage upstream is absent, not a number nobody typed. See the fuzz suite.
@@ -359,6 +369,7 @@ describe('pcoGrade', () => {
 
     // A grade Planning Center holds outright is still reported as it stands:
     // the band is the roster's business to filter, not this function's.
+    expect(pcoGrade(person('1', { grade: -1 }))).toBe(-1);
     expect(pcoGrade(person('1', { grade: 14 }))).toBe(14);
   });
 });

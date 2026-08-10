@@ -117,6 +117,32 @@ describe('pushStudent', () => {
     expect(db.get('students/nursery-1')!.upstreamPushPending).toBe(false);
   });
 
+  /**
+   * Pre-K, on the backend that is not Planning Center.
+   *
+   * `-1` is a grade rather than a sentinel for "none", and the two guards that
+   * decide whether a grade goes upstream are `!== null` on this side and a
+   * range check on the other. Both used to be a truthiness test dressed up as a
+   * bound, which dropped Pre-K exactly the way an older one dropped
+   * kindergarten — so the number reaches Attendees, and does not become the
+   * empty `fixed` blob a grade-less child gets.
+   */
+  it('sends a Pre-K grade to Attendees rather than treating it as no grade', async () => {
+    db.seed('students/prek-1', {
+      firstName: 'Shayla',
+      lastName: 'Bo',
+      grade: -1,
+      status: 'active',
+      upstreamPushPending: true,
+    });
+
+    const result = await pushStudent({ db, client, config, cache, studentId: 'prek-1' });
+
+    expect(result.status).toBe('created');
+    const created = store.attendees.get(result.pcoPersonId!)!;
+    expect((created.infos.fixed as Record<string, unknown>).grade).toBe(-1);
+  });
+
   /*
    * The grade-less duplicate check, which used to be skipped entirely.
    *

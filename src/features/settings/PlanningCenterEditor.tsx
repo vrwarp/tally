@@ -20,8 +20,9 @@ import {
   TextField,
 } from '@/components/ui';
 import { useAuth } from '@/context/authContext';
+import { gradeDescription } from '@/lib/utils';
 import { savePlanningCenterConfig, type PcoConfigDraft } from '@/services/planningCenter';
-import type { PcoEffectiveSettings, PcoWriteBackMode } from '@/types';
+import { GRADES, type PcoEffectiveSettings, type PcoWriteBackMode } from '@/types';
 
 const WRITE_BACK_HINT: Record<PcoWriteBackMode, string> = {
   off: 'Tally never writes to Planning Center. Visitors added at the door stay queued until this is turned on.',
@@ -145,21 +146,36 @@ export function PlanningCenterEditor({
 
         <div>
           <div className="grid grid-cols-2 gap-3">
-            <NumberStepperField
+            {/*
+              Named, not numbered. The two grades at the bottom of the scale are
+              `0` and `-1`, and a stepper showing "-1" for Pre-K is the same
+              thing the kiosk was doing wrong — a number standing where a name
+              belongs. A select also refuses a value off the scale by
+              construction, which the stepper's free-typed box did not.
+            */}
+            <SelectField
               label="Lowest grade"
-              min={0}
-              max={12}
-              value={draft.minGrade}
-              onValueChange={(value) => set('minGrade', value)}
-            />
-            <NumberStepperField
+              value={String(draft.minGrade)}
+              onChange={(event) => set('minGrade', Number(event.target.value))}
+            >
+              {GRADES.map((value) => (
+                <option key={value} value={value}>
+                  {gradeDescription(value)}
+                </option>
+              ))}
+            </SelectField>
+            <SelectField
               label="Highest grade"
-              min={0}
-              max={12}
-              value={draft.maxGrade}
-              onValueChange={(value) => set('maxGrade', value)}
+              value={String(draft.maxGrade)}
+              onChange={(event) => set('maxGrade', Number(event.target.value))}
               error={draft.maxGrade < draft.minGrade ? 'Cannot end below where it starts.' : null}
-            />
+            >
+              {GRADES.map((value) => (
+                <option key={value} value={value}>
+                  {gradeDescription(value)}
+                </option>
+              ))}
+            </SelectField>
           </div>
           <p className="mt-1.5 text-xs text-ink-500">
             Who is on the roster is decided on the Students screen, one student at a time. This band

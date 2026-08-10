@@ -365,8 +365,11 @@ export async function updateStudentProfile(
       grade < ABSOLUTE_MIN_GRADE ||
       grade > ABSOLUTE_MAX_GRADE
     ) {
-      // 0 is kindergarten, and "between 0 and 12" reads like a bug report.
-      const floor = ABSOLUTE_MIN_GRADE === 0 ? 'K' : String(ABSOLUTE_MIN_GRADE);
+      // The bottom two grades have names rather than numbers — `-1` is Pre-K
+      // and `0` is kindergarten — and "between -1 and 12" reads like a bug
+      // report rather than a sentence about a child.
+      const NAMED_GRADES: Record<number, string> = { [-1]: 'Pre-K', 0: 'K' };
+      const floor = NAMED_GRADES[ABSOLUTE_MIN_GRADE] ?? String(ABSOLUTE_MIN_GRADE);
       return result('invalid', `Grade has to be between ${floor} and ${ABSOLUTE_MAX_GRADE}.`);
     }
   }

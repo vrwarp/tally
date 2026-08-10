@@ -234,13 +234,16 @@ export function gradeFromGraduationYear(graduationYear: number, now: Date): numb
 }
 
 /**
- * The two ends of school. Kindergarten is zero; a senior graduates from 12th.
+ * The two ends of school. Pre-K is `-1`, kindergarten is `0`, and a senior
+ * graduates from 12th.
  *
  * These bound the *derivation* below, not the roster: `minGrade`/`maxGrade` are
  * the band a church runs on and are somebody's configuration, while this is the
- * range a grade can be at all.
+ * range a grade can be at all — `Grade` in src/types/index.ts, and
+ * `ABSOLUTE_MIN_GRADE`/`ABSOLUTE_MAX_GRADE` in ../config.ts, which is the same
+ * range said twice more because neither file can import this one.
  */
-const FIRST_GRADE = 0;
+const FIRST_GRADE = -1;
 const LAST_GRADE = 12;
 
 /**
@@ -255,14 +258,12 @@ const LAST_GRADE = 12;
  * filter rather than this one's to rewrite.
  *
  * A grade *derived* from a graduation year is different: the arithmetic is a
- * straight line and school is not, so it keeps counting past both ends. The
- * class of 2040 is a toddler, and extrapolating gave them grade `-1`, which the
- * kiosk then printed beside their name as "-1th grade". Their class year is a
- * real fact about a real child; the grade it implies is not one, because they
- * are not in school yet. Same at the other end, where a senior who graduated
- * six years ago derived to 18th. Outside K–12 the honest answer is that they
- * have no grade — which is what `Grade` in src/types/index.ts says too, and how
- * every screen already renders somebody too young for one.
+ * straight line and school is not, so it keeps counting past both ends. A
+ * class year far enough out belongs to a child who is not in school yet — an
+ * infant in the nursery derives to `-4` — and a senior who graduated six years
+ * ago derives to 18th. Neither is a grade. Outside Pre-K–12 the honest answer
+ * is that they have none, which is what `Grade` in src/types/index.ts says and
+ * what every screen already renders for a child too young for one.
  *
  * The bounds also swallow the non-finite cases the fuzz suite found: an
  * `Infinity` graduation year derives to `-Infinity`, which no comparison here

@@ -285,6 +285,34 @@ describe('pushStudent against the simulator', () => {
       expect(h.store.personById(FIXTURE_IDS.amara)?.grade).toBe(9);
     });
 
+    /**
+     * Pre-K, on the way upstream.
+     *
+     * The guard here has been wrong twice in the same way: `> 0` dropped every
+     * kindergartener's grade, and `>= 0` did the same to every Pre-K child.
+     * `-1` is what Planning Center itself holds for a pre-schooler, so this is
+     * repairing its own field with its own number.
+     */
+    it('writes a Pre-K grade to a person Planning Center holds none for', async () => {
+      const person = h.store.createPerson({ first_name: 'Shayla', last_name: 'Bo' });
+      h.db.seed(
+        'students/s1',
+        tallyOnlyStudent({
+          firstName: 'Shayla',
+          lastName: 'Bo',
+          searchName: 'shayla bo',
+          grade: -1,
+          pcoPersonId: person.id,
+          upstreamPushPending: false,
+        }),
+      );
+
+      const result = await push('s1', 'full');
+
+      expect(result.status).toBe('updated');
+      expect(h.store.personById(person.id)).toMatchObject({ grade: -1, child: true });
+    });
+
     it('restores the grade and child flag a thinned create left behind', async () => {
       // The shape an unrepaired create leaves in the church's database: a
       // grade-less adult. The reconcile push heals both fields together.

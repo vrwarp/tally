@@ -161,15 +161,15 @@ export const A32_SECRETS = A32_TOKEN ? [A32_TOKEN] : [];
 export const BACKEND_SECRETS = [...PCO_SECRETS, ...A32_SECRETS];
 
 /**
- * Grades Tally understands at all — `Grade` in src/types is 0..12, where 0 is
- * kindergarten. The configured band is clamped into this, so a typo cannot
- * produce a student the client-side converter would answer null for.
+ * Grades Tally understands at all — `Grade` in src/types is -1..12, where -1 is
+ * Pre-K and 0 is kindergarten. The configured band is clamped into this, so a
+ * typo cannot produce a student the client-side converter would answer null for.
  *
  * Wider than any one ministry's band on purpose: which grades a church
  * actually reads is `minGrade`/`maxGrade` in Settings, and those still default
  * to 6 and 12. Widening here does not widen anybody's roster.
  */
-export const ABSOLUTE_MIN_GRADE = 0;
+export const ABSOLUTE_MIN_GRADE = -1;
 export const ABSOLUTE_MAX_GRADE = 12;
 
 /**

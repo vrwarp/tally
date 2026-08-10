@@ -20,7 +20,7 @@ import type { LabelTemplate } from '@/lib/labelTemplate';
 /* -------------------------------------------------------------------------- */
 
 /**
- * Kindergarten through 12th grade, with `0` meaning kindergarten.
+ * Pre-K through 12th grade: `-1` is Pre-K, `0` is kindergarten.
  *
  * Wider than the 6–12 the youth ministry runs on, because a nursery or a
  * children's ministry is the same app with a different band — and which band a
@@ -28,14 +28,31 @@ import type { LabelTemplate } from '@/lib/labelTemplate';
  * type. Widening here only decides what Tally can *represent*; an existing
  * deployment's band stays 6–12 until somebody changes it in Settings.
  *
- * Below kindergarten there is no grade at all, and that is `null` rather than a
- * negative sentinel: `grade` is pushed into Planning Center's own attribute and
- * an Attendees `infos.fixed.grade`, where a `-2` would be a lie in somebody
- * else's system.
+ * **`-1` is not Tally's invention.** It is what Planning Center itself holds
+ * for a pre-schooler — its own profile screen renders `grade: -1` as "Pre-K",
+ * beside their name and in their household — so the number pushed back into
+ * `grade` upstream, and into an Attendees `infos.fixed.grade`, is the number
+ * those systems already use. This type used to stop at kindergarten and call
+ * anything below it null, on the reasoning that a negative would be a lie in
+ * somebody else's database. It was the opposite: a real Pre-K child arrived as
+ * `-1`, Tally could not hold it, and the kiosk printed "-1th grade" beside a
+ * four-year-old's name — then had their check-in refused outright, because the
+ * database's own rule stopped at zero.
+ *
+ * Below Pre-K there is still no grade: an infant in the nursery has none, and
+ * neither does an adult on a hand-picked roster. That is `null`, and every slot
+ * that shows a grade knows how to say so.
  */
-export type Grade = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+export type Grade = -1 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
 
-export const GRADES: readonly Grade[] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
+/**
+ * Pre-K, by name. The number is Planning Center's, and it is negative, which is
+ * exactly the shape of thing that should not be spelled out at a comparison
+ * three files away from the reason.
+ */
+export const PRE_K = -1 satisfies Grade;
+
+export const GRADES: readonly Grade[] = [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
 
 export function isGrade(value: unknown): value is Grade {
   return typeof value === 'number' && GRADES.includes(value as Grade);
@@ -49,8 +66,8 @@ export function isGrade(value: unknown): value is Grade {
  * a backend's own field, a cached row written by an older build, a document
  * some earlier sync wrote. Out of range is *no grade* rather than the nearest
  * one, for the reason `Grade` gives: the alternative is printing a number
- * nobody claims beside a child's name, which is how a toddler in the class of
- * 2040 came to be shown as "-1th grade" on the kiosk.
+ * nobody claims beside a child's name, which is how "-1th grade" reached a
+ * lobby screen before Pre-K was something Tally could hold.
  */
 export function asGrade(value: unknown): Grade | null {
   return isGrade(value) ? value : null;

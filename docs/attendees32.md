@@ -56,7 +56,7 @@ deploys cleanly.
 | `characterSlug` | `A32_CHARACTER_SLUG` | The character (role) new students join the meet as. |
 | `assemblySlug` | `A32_ASSEMBLY_SLUG` | The assembly history import lists meets for. |
 | `writeBack` | `A32_WRITE_BACK` | `off` / `create` / `full` — the same ladder as Planning Center. |
-| `minGrade`, `maxGrade` | `A32_MIN_GRADE` / `A32_MAX_GRADE` | The grade band a deployment reads. It decides membership and warns on a profile edit; it no longer rewrites anybody's grade — a student Attendees holds no grade for arrives with none, and screens say "No grade". Defaults stay 6–12 even though `Grade` now admits K–12. |
+| `minGrade`, `maxGrade` | `A32_MIN_GRADE` / `A32_MAX_GRADE` | The grade band a deployment reads. It decides membership and warns on a profile edit; it no longer rewrites anybody's grade — a student Attendees holds no grade for arrives with none, and screens say "No grade". Defaults stay 6–12 even though `Grade` now admits Pre-K–12 (`-1` is Pre-K, `0` is kindergarten). |
 | `cacheTtlSeconds` | `A32_CACHE_TTL_SECONDS` | Read-reuse window, 0–300 seconds. |
 | `enabled` | — | The document's off switch. Absent counts as on; being *configured* is the real gate. |
 
@@ -73,7 +73,7 @@ paths:
 | person id | `Attendee.id` (UUID) | Student doc id `a32_{uuid}`; linkage via `upstreamBackend`/`upstreamPersonId` only — never `pcoPersonId`. |
 | first name | `first_name` (+ `last_name2``first_name2`) | The CJK second name composes into Tally's `First “last2first2”` convention, round-tripping with `splitFirstName`. |
 | last name | `last_name` | |
-| grade | `infos.fixed.grade` | Clamped into the configured band on read. |
+| grade | `infos.fixed.grade` | Read and written as the number Attendees holds, `-1` (Pre-K) through `12`. Not clamped into the configured band — the band decides who is on the roster, not what grade a child is in. |
 | birthday | `actual_birthday`, else `estimated_birthday` | Attendees documents year **1800** as "day known, year unknown"; Tally reads either into its year-free `MM-DD` and writes a full date to `actual_birthday` or a day-only as `estimated_birthday: 1800-MM-DD`. (Planning Center's equivalent sentinel is 1885 — each backend keeps its own.) |
 | allergies | `infos.fixed.allergies` | Attendees has no native field; this follows its own `infos.fixed.*` precedent and rides the same PATCH as profile edits. |
 | parent contact | family `Folk` co-members' `infos.contacts.phone1/email1` | A parent is an adult co-member of a category-0 (family) folk whose `Relation` is an emergency contact and not `child`. Fill-only-when-empty, like Planning Center. |

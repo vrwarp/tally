@@ -56,8 +56,8 @@ function columns(context: RosterCsvContext): CsvColumn<Student>[] {
     { header: 'last_name', value: (student) => student.lastName },
     // Numeric, so a column of grades sorts and averages.
     { header: 'grade', value: (student) => student.grade },
-    // …and the label beside it, because `gradeName(0)` is `K` and a spreadsheet
-    // cannot sort that back into place.
+    // …and the label beside it, because `gradeName` answers `K` for 0 and
+    // `Pre-K` for -1, and a spreadsheet cannot sort those back into place.
     { header: 'grade_label', value: (student) => gradeLabel(student) },
     { header: 'status', value: (student) => student.status },
     { header: 'is_visitor', value: (student) => student.isVisitor },

@@ -94,7 +94,7 @@ describe('loadConfig', () => {
   });
 
   describe('grade band', () => {
-    it('clamps a band wider than Tally can represent into 0-12', () => {
+    it('clamps a band wider than Tally can represent into Pre-K..12', () => {
       // Kindergarten is grade zero, so 1 is a band a children's ministry might
       // genuinely want and is kept. 99 is not a grade in any school.
       env({ ...CREDENTIALS, PCO_MIN_GRADE: '1', PCO_MAX_GRADE: '99' });
@@ -104,11 +104,15 @@ describe('loadConfig', () => {
       expect(config.maxGrade).toBe(12);
     });
 
-    it('refuses a band below kindergarten', () => {
-      // Nothing under 0 is representable: a child too young for kindergarten
-      // has no grade at all, which is null rather than a negative number.
+    it('keeps a band that starts at Pre-K, and refuses one below it', () => {
+      // -1 is Pre-K, which Planning Center holds and Tally represents. Nothing
+      // under it is a grade: a child too young for Pre-K has none at all,
+      // which is null rather than a smaller negative number.
+      env({ ...CREDENTIALS, PCO_MIN_GRADE: '-1', PCO_MAX_GRADE: '12' });
+      expect(loadConfig().minGrade).toBe(-1);
+
       env({ ...CREDENTIALS, PCO_MIN_GRADE: '-3', PCO_MAX_GRADE: '12' });
-      expect(loadConfig().minGrade).toBe(0);
+      expect(loadConfig().minGrade).toBe(-1);
     });
 
     it('never lets the maximum fall below the minimum', () => {
@@ -254,7 +258,7 @@ describe('resolveConfig', () => {
       withDocument({ minGrade: -3, maxGrade: 99, cacheTtlSeconds: 86_400, writeBack: 'everything' }),
     );
 
-    expect(config.minGrade).toBe(0);
+    expect(config.minGrade).toBe(-1);
     expect(config.maxGrade).toBe(12);
     expect(config.cacheTtlSeconds).toBe(300);
     // Never silently escalate: an unrecognised mode must not become `full`.
