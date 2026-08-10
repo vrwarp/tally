@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { PRE_K } from '@/types';
 
 /** Tailwind-aware class name join. */
 export function cn(...inputs: ClassValue[]): string {
@@ -366,13 +367,19 @@ export function ordinalGrade(grade: number): string {
 }
 
 /**
- * The short token for a grade: `K`, `1st`, `9th`.
+ * The short token for a grade: `Pre-K`, `K`, `1st`, `9th`.
  *
- * Kindergarten is the one grade with a name rather than a number, and
- * `ordinalGrade` would print "0th". Everything below kindergarten has no grade
+ * The two grades below 1st have names rather than numbers, and `ordinalGrade`
+ * would print "0th" and "-1th" for them — the second of which is not a
+ * hypothetical: it reached a lobby screen. Everything below Pre-K has no grade
  * at all and never reaches here — see `Grade`.
+ *
+ * "Pre-K" rather than "PK", because that is what Planning Center calls it on
+ * the profile these children arrive from — so it is the name already on the
+ * screen the office is looking at while a volunteer reads the label.
  */
 export function gradeName(grade: number): string {
+  if (grade === PRE_K) return 'Pre-K';
   return grade === 0 ? 'K' : ordinalGrade(grade);
 }
 
@@ -380,9 +387,11 @@ export function gradeName(grade: number): string {
  * The same thing with its noun, for the places that read "9th grade".
  *
  * Kindergarten needs the whole word: "K grade" is not English, and a screen
- * reader saying it beside a child's name is worse.
+ * reader saying it beside a child's name is worse. Pre-K is the same — it is
+ * already the name of the year, so "Pre-K grade" only adds a stumble.
  */
 export function gradeDescription(grade: number): string {
+  if (grade === PRE_K) return 'Pre-K';
   return grade === 0 ? 'Kindergarten' : `${ordinalGrade(grade)} grade`;
 }
 

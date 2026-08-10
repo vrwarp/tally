@@ -14,7 +14,7 @@
  *   - `full` mode only ever patches the fields Planning Center already manages.
  */
 import { Timestamp } from 'firebase-admin/firestore';
-import type { PcoConfig } from '../config.js';
+import { ABSOLUTE_MIN_GRADE, type PcoConfig } from '../config.js';
 import { PcoApiError, type PcoClient } from '../pco/client.js';
 import { followPersonLink, isPersonGoneError } from './personLink.js';
 import {
@@ -320,9 +320,16 @@ function driftedAttributes(
    * Center holds no grade for.
    */
   const heldGrade = (person.attributes ?? {}).grade;
-  // `>= 0`, not `> 0`: kindergarten is grade zero, and the old guard dropped
-  // every kindergartener's grade on the way upstream.
-  if (grade !== null && grade >= 0) {
+  /*
+   * `>= ABSOLUTE_MIN_GRADE`, which is `-1`. It was `> 0` once and dropped every
+   * kindergartener's grade on the way upstream; then `>= 0`, which did the same
+   * to every Pre-K child. Both were the same mistake — a truthiness guard
+   * standing in for "is there a grade here", on a scale whose bottom two values
+   * are `0` and `-1`. "Is there one" is `grade !== null`, and it is the only
+   * question this needs to ask; the bound is here to refuse a number the
+   * upstream field cannot mean at all.
+   */
+  if (grade !== null && grade >= ABSOLUTE_MIN_GRADE) {
     if (heldGrade === null || heldGrade === undefined) {
       attributes.grade = grade;
       /*

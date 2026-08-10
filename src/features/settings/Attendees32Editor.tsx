@@ -18,12 +18,13 @@ import {
   TextField,
 } from '@/components/ui';
 import { useAuth } from '@/context/authContext';
+import { gradeDescription } from '@/lib/utils';
 import {
   saveAttendees32Config,
   type A32ConfigDraft,
   type A32EffectiveSettings,
 } from '@/services/backends';
-import type { PcoWriteBackMode } from '@/types';
+import { GRADES, type PcoWriteBackMode } from '@/types';
 
 const WRITE_BACK_HINT: Record<PcoWriteBackMode, string> = {
   off: 'Tally never writes to Attendees. Visitors added at the door stay queued until this is turned on.',
@@ -188,21 +189,31 @@ export function Attendees32Editor({
 
         <div>
           <div className="grid grid-cols-2 gap-3">
-            <NumberStepperField
+            {/* Named rather than numbered, for the reason the same pair of
+                fields gives in PlanningCenterEditor: Pre-K is `-1`. */}
+            <SelectField
               label="Lowest grade"
-              min={0}
-              max={12}
-              value={draft.minGrade}
-              onValueChange={(value) => set('minGrade', value)}
-            />
-            <NumberStepperField
+              value={String(draft.minGrade)}
+              onChange={(event) => set('minGrade', Number(event.target.value))}
+            >
+              {GRADES.map((value) => (
+                <option key={value} value={value}>
+                  {gradeDescription(value)}
+                </option>
+              ))}
+            </SelectField>
+            <SelectField
               label="Highest grade"
-              min={0}
-              max={12}
-              value={draft.maxGrade}
-              onValueChange={(value) => set('maxGrade', value)}
+              value={String(draft.maxGrade)}
+              onChange={(event) => set('maxGrade', Number(event.target.value))}
               error={draft.maxGrade < draft.minGrade ? 'Cannot end below where it starts.' : null}
-            />
+            >
+              {GRADES.map((value) => (
+                <option key={value} value={value}>
+                  {gradeDescription(value)}
+                </option>
+              ))}
+            </SelectField>
           </div>
           <p className="mt-1.5 text-xs text-ink-500">
             The band a student with no grade in Attendees lands in, and the range the app

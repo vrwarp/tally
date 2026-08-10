@@ -234,17 +234,42 @@ export function gradeFromGraduationYear(graduationYear: number, now: Date): numb
 }
 
 /**
+ * The two ends of school. Pre-K is `-1`, kindergarten is `0`, and a senior
+ * graduates from 12th.
+ *
+ * These bound the *derivation* below, not the roster: `minGrade`/`maxGrade` are
+ * the band a church runs on and are somebody's configuration, while this is the
+ * range a grade can be at all — `Grade` in src/types/index.ts, and
+ * `ABSOLUTE_MIN_GRADE`/`ABSOLUTE_MAX_GRADE` in ../config.ts, which is the same
+ * range said twice more because neither file can import this one.
+ */
+const FIRST_GRADE = -1;
+const LAST_GRADE = 12;
+
+/**
  * The grade Planning Center actually holds, or null when it says nothing.
  *
  * Kept separate from `mapPersonToStudent` because the two callers want opposite
  * things from a blank: a screen showing "what Planning Center thinks" must be
  * able to say that Planning Center thinks nothing.
  *
- * Both branches check `Number.isFinite`, and the second one has to. An
- * `Infinity` graduation year derives to `-Infinity`, which used to be swallowed
- * by the clamp that no longer runs — `Math.max(minGrade, -Infinity)` quietly
- * answered `minGrade`, so a garbage value upstream arrived looking like a 6th
- * grader. Found by the fuzz suite the moment the clamp came out.
+ * A `grade` Planning Center holds outright is reported as it stands — that is
+ * the whole point of this function, and the band is the roster's business to
+ * filter rather than this one's to rewrite.
+ *
+ * A grade *derived* from a graduation year is different: the arithmetic is a
+ * straight line and school is not, so it keeps counting past both ends. A
+ * class year far enough out belongs to a child who is not in school yet — an
+ * infant in the nursery derives to `-4` — and a senior who graduated six years
+ * ago derives to 18th. Neither is a grade. Outside Pre-K–12 the honest answer
+ * is that they have none, which is what `Grade` in src/types/index.ts says and
+ * what every screen already renders for a child too young for one.
+ *
+ * The bounds also swallow the non-finite cases the fuzz suite found: an
+ * `Infinity` graduation year derives to `-Infinity`, which no comparison here
+ * admits. It used to be absorbed by the clamp that no longer runs —
+ * `Math.max(minGrade, -Infinity)` quietly answered `minGrade`, so garbage
+ * upstream arrived looking like a confident 6th grader.
  */
 export function pcoGrade(person: PcoPerson, now?: Date): number | null {
   const attributes: PcoPersonAttributes = person.attributes ?? {};
@@ -253,7 +278,7 @@ export function pcoGrade(person: PcoPerson, now?: Date): number | null {
   }
   if (now && typeof attributes.graduation_year === 'number') {
     const derived = gradeFromGraduationYear(attributes.graduation_year, now);
-    return Number.isFinite(derived) ? derived : null;
+    return derived >= FIRST_GRADE && derived <= LAST_GRADE ? derived : null;
   }
   return null;
 }

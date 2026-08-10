@@ -121,7 +121,7 @@ closed set of keys, so credentials cannot be stashed in it even by an admin.
 | `PCO_APP_ID` | *(secret, required)* | Personal Access Token application id. Sent as the HTTP Basic username. Secret Manager only. |
 | `PCO_SECRET` | *(secret, required)* | Personal Access Token secret. Sent as the HTTP Basic password. Secret Manager only. |
 | `TALLY_ADMIN_EMAILS` | *(empty)* | Google addresses that are admins on every sign-in, whatever the database says. The bootstrap for a fresh install and the break-glass for a lockout. Comma- or whitespace-separated. Not a Planning Center setting at all — see §6. |
-| `PCO_MIN_GRADE` | `6` | Bottom of the grade band. Clamped into 6–12, because those are the only grades the app's `Grade` type admits. Selects nobody; see §3. |
+| `PCO_MIN_GRADE` | `6` | Bottom of the grade band. Clamped into Pre-K–12 (`-1`–`12`), because those are the only grades the app's `Grade` type admits. Selects nobody; see §3. |
 | `PCO_MAX_GRADE` | `12` | Top of the grade band. Clamped into `PCO_MIN_GRADE`–12. |
 | `PCO_WRITE_BACK` | `create` | How much Tally may change in Planning Center: `off`, `create` or `full`. See §4. Any other value falls back to `create`. |
 | `PCO_CACHE_TTL_SECONDS` | `30` | How long a Planning Center read may be reused. `0` turns retention off; the ceiling is 300, past which a cache becomes a mirror. |
@@ -206,11 +206,39 @@ either: not the check-in batch, not an annotation document, not a push.
 This replaced a `gradeOnFile` boolean carried alongside the number. The flag tracked whether the
 upstream value was *blank*, not whether it had been clamped, so a real 3rd grader was reported as
 `{ grade: 6, gradeOnFile: true }` — Tally asserting as a fact that a child in 3rd grade was in 6th.
-`Grade` now spans K–12 (`0` is kindergarten), so most of those children are simply representable;
-anything still outside it is null, which loses information but says something true.
+`Grade` now spans Pre-K–12 (`-1` is Pre-K, `0` is kindergarten), so most of those children are
+simply representable; anything still outside it is null, which loses information but says something
+true.
+
+**`-1` is Pre-K, and it is Planning Center's number, not Tally's.** Planning Center's own profile
+screen renders `grade: -1` as "Pre-K" — in the personal-information panel and in the household
+sidebar — for a pre-schooler with no graduation year at all. Tally used to stop at kindergarten and
+call anything below it "no grade", on the reasoning that a negative would be a lie in somebody
+else's database. It was the reverse. A real Pre-K child arrived as `-1`, nothing could hold it, and
+two things went wrong at once:
+
+- the kiosk printed **"-1th grade"** beside a four-year-old's name, because `ordinalGrade` renders
+  whatever it is handed and the kiosk's row carried a bare number;
+- their **check-in failed outright**. A check-in writes the child's grade onto their student
+  document in the same batch as the attendance record, and `validStudent` in `firestore.rules`
+  required `grade >= 0`. The batch was refused, so the tap did nothing.
+
+Pre-K is now a grade everywhere it needs to be: the `Grade` type, `GRADES` and every picker built
+from it, the security rules, the registration validator at the door, the configurable band, and the
+push back to Planning Center — which writes `-1` into the same attribute it was read from. The
+Attendees backend carries it identically in `infos.fixed.grade`; see
+[attendees32.md](./attendees32.md). Below Pre-K there is still no grade at all, and that is null.
 
 A graduation year still counts as a grade: the mapper derives one, and deriving is not inventing.
 Only a person with neither is grade-less.
+
+**Deriving stops at both ends of school.** The arithmetic is a straight line and school is not, so
+it keeps counting past Pre-K and past 12: a class year far enough out belongs to an infant, and a
+senior who graduated six years ago derives to 18th. Neither is a grade. Their class year is a fact
+about them, but the grade it implies outside Pre-K–12 is not, so `pcoGrade` answers null there — the
+same answer it gives for a child too young to have one, which every screen already knows how to
+render. A grade Planning Center *holds* outright is still reported as it stands, in or out of the
+band; the bound applies only to what Tally derives.
 
 **A grade-less student is still pushed.** Creating one used to be refused — on the reasoning that
 every student queued for a create had a grade typed at quick-add — which left a nursery child sitting

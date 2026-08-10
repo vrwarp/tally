@@ -98,6 +98,24 @@ describe('a visitor Tally created', () => {
     expect(rows[0]!.grade).toBe(7);
   });
 
+  /*
+   * A number is not a grade. The kiosk drew "-1th grade" on the lobby glass for
+   * a Pre-K child, because the row carried whatever number a backend offered
+   * and `ordinalGrade` renders whatever it is handed. Pre-K is a real grade now
+   * and comes through as one; what must not come through is a number no grade
+   * answers to, and this is the guard that covers a document some older sync
+   * already wrote one into.
+   */
+  it('takes a real grade and refuses a number that is not one', () => {
+    // Pre-K and kindergarten are grades, and neither is "no grade".
+    expect(joinKioskRoster([], [person({ grade: -1 })])[0]!.grade).toBe(-1);
+    expect(joinKioskRoster([], [person({ grade: 0 })])[0]!.grade).toBe(0);
+
+    // Below Pre-K, and past 12th, nobody is in a grade at all.
+    expect(joinKioskRoster([], [person({ grade: -2 })])[0]!.grade).toBeNull();
+    expect(joinKioskRoster([document('student-bree-sandoval', { grade: 14 })], [])[0]!.grade).toBeNull();
+  });
+
   it('follows the generic linkage, not only the Planning Center one', () => {
     const rows = joinKioskRoster(
       [

@@ -262,6 +262,14 @@ describe('gradeName and gradeDescription', () => {
     expect(gradeDescription(0)).toBe('Kindergarten');
   });
 
+  it('names Pre-K rather than printing a minus-first grade', () => {
+    // Not hypothetical: Planning Center holds `-1` for a pre-schooler, and
+    // before Pre-K had a name here the lobby screen read "-1th grade" beside a
+    // four-year-old. "Pre-K grade" is not English either, same as "K grade".
+    expect(gradeName(-1)).toBe('Pre-K');
+    expect(gradeDescription(-1)).toBe('Pre-K');
+  });
+
   it('keeps the ordinal for every grade that has one', () => {
     expect(gradeName(1)).toBe('1st');
     expect(gradeName(9)).toBe('9th');
@@ -285,6 +293,10 @@ describe('gradeLabel', () => {
     // on `minGrade` and every screen printed "6th grade" under their name.
     // There is no clamp to consult now — the grade is simply absent.
     expect(gradeLabel({ grade: null })).toBeNull();
+  });
+
+  it('reads Pre-K on a chip the same as anywhere else', () => {
+    expect(gradeLabel({ grade: -1 })).toBe('Pre-K');
   });
 
   it('trusts a grade with no flag beside it', () => {

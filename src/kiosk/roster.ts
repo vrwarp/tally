@@ -32,7 +32,7 @@
  * itself; the bug this file exists to fix did neither.
  */
 import { isBackendId, studentIdFor } from '@/lib/backendIds';
-import type { PcoRosterPerson } from '@/types';
+import { asGrade, type PcoRosterPerson } from '@/types';
 import type { KioskStudent } from './search';
 
 /** A student document as the kiosk reads it — id and raw fields. */
@@ -64,7 +64,9 @@ function fromPerson(person: PcoRosterPerson): KioskStudent {
     id: person.id,
     firstName: person.firstName,
     lastName: person.lastName,
-    grade: person.grade,
+    // `asGrade`, because a roster row carries whatever the backend holds — and
+    // what it holds is sometimes not a grade. See `KioskStudent.grade`.
+    grade: asGrade(person.grade),
     searchName: person.searchName,
     // The flag, never the note — the roster read carries one and not the other
     // on purpose, and the kiosk is the last place to blur that. What it buys is
@@ -82,7 +84,7 @@ function fromDocument(document: KioskRosterDocument): KioskStudent | null {
     id: document.id,
     firstName,
     lastName,
-    grade: typeof document.data.grade === 'number' ? document.data.grade : null,
+    grade: asGrade(document.data.grade),
     searchName: text(document.data.searchName) || `${firstName} ${lastName}`.trim().toLowerCase(),
     // Always false, and not for want of looking: `noMirroredPersonalData` in
     // firestore.rules refuses an `allergies` key on a student document, so a
@@ -160,7 +162,7 @@ export function joinKioskRoster(
       byId.set(document.id, {
         ...target,
         id: document.id,
-        grade: target.grade ?? (typeof document.data.grade === 'number' ? document.data.grade : null),
+        grade: target.grade ?? asGrade(document.data.grade),
       });
       continue;
     }

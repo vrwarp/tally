@@ -7,6 +7,7 @@
  * throws on a corrupt cache entry is a kiosk somebody has to drive out and
  * reboot.
  */
+import { asGrade } from '@/types';
 import type { KioskStudent } from './search';
 
 export const KIOSK_KEYS = {
@@ -117,7 +118,16 @@ export function readCachedRoster(): CachedRoster | null {
 export function readCachedRosterOfAnyVersion(): CachedRoster | null {
   const stored = readJson<CachedRoster>(KIOSK_KEYS.roster);
   if (!stored || !Array.isArray(stored.students) || stored.students.length === 0) return null;
-  return stored;
+  /*
+   * The grade is re-checked on the way out, because a cache is the one input
+   * that can be older than the code reading it. A build before `asGrade` wrote
+   * whatever the backend offered, including the `-1` a graduation year derives
+   * for a child not yet in school — and this is the copy the screen paints from
+   * at boot, before any network read lands, and the only copy it has at all
+   * when the hallway switch is unplugged.
+   */
+  const students = stored.students.map((student) => ({ ...student, grade: asGrade(student.grade) }));
+  return { ...stored, students };
 }
 
 export function writeCachedRoster(students: KioskStudent[]): void {

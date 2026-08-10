@@ -391,13 +391,13 @@ describe('students', () => {
     );
   });
 
-  it('rejects grades outside K..12', async () => {
+  it('rejects grades outside Pre-K..12', async () => {
     const db = asUser(env, UID.counselor);
     // Off-model on purpose: `Grade` makes these unrepresentable in TypeScript,
-    // which is exactly why the rule has to say it too. Below kindergarten
-    // there is no grade at all — that is an absent field, not a negative one.
+    // which is exactly why the rule has to say it too. Below Pre-K there is no
+    // grade at all — that is an absent field, not a smaller negative one.
     await assertFails(
-      setDoc(doc(db, paths.student('student-gneg')), { ...studentDoc(), grade: -1 }),
+      setDoc(doc(db, paths.student('student-gneg')), { ...studentDoc(), grade: -2 }),
     );
     await assertFails(
       setDoc(doc(db, paths.student('student-g13')), { ...studentDoc(), grade: 13 }),
@@ -406,7 +406,9 @@ describe('students', () => {
 
   it('accepts the boundary grades', async () => {
     const db = asUser(env, UID.counselor);
-    // 0 is kindergarten — a children's ministry roster, on the same rules.
+    // -1 is Pre-K and 0 is kindergarten — a children's ministry roster, on the
+    // same rules.
+    await assertSucceeds(setDoc(doc(db, paths.student('student-gpk')), studentDoc({ grade: -1 })));
     await assertSucceeds(setDoc(doc(db, paths.student('student-gk')), studentDoc({ grade: 0 })));
     await assertSucceeds(setDoc(doc(db, paths.student('student-g12')), studentDoc({ grade: 12 })));
   });
@@ -1194,8 +1196,10 @@ describe('config/planningCenter', () => {
 
   it('rejects a grade band outside the grades the app understands', async () => {
     const db = asUser(env, UID.core);
-    await assertFails(setDoc(doc(db, paths.planningCenter()), pcoConfigDoc({ minGrade: -1 })));
+    // -1 is Pre-K, the bottom of the range; -2 is nothing.
+    await assertFails(setDoc(doc(db, paths.planningCenter()), pcoConfigDoc({ minGrade: -2 })));
     await assertFails(setDoc(doc(db, paths.planningCenter()), pcoConfigDoc({ maxGrade: 13 })));
+    await assertSucceeds(setDoc(doc(db, paths.planningCenter()), pcoConfigDoc({ minGrade: -1 })));
   });
 
   it('rejects a band whose top is below its bottom', async () => {
@@ -1298,8 +1302,10 @@ describe('config/attendees32', () => {
 
   it('rejects a grade band outside the grades the app understands', async () => {
     const db = asUser(env, UID.core);
-    await assertFails(setDoc(doc(db, paths.attendees32()), a32ConfigDoc({ minGrade: -1 })));
+    // Parity with the Planning Center band above, on the same range.
+    await assertFails(setDoc(doc(db, paths.attendees32()), a32ConfigDoc({ minGrade: -2 })));
     await assertFails(setDoc(doc(db, paths.attendees32()), a32ConfigDoc({ maxGrade: 13 })));
+    await assertSucceeds(setDoc(doc(db, paths.attendees32()), a32ConfigDoc({ minGrade: -1 })));
   });
 
   it('refuses to let a cache become a mirror', async () => {
@@ -2171,6 +2177,24 @@ describe('kiosk', () => {
     it('may create the document the patch usually creates', async () => {
       await assertSucceeds(
         setDoc(doc(asKiosk(env, UID.counselor), paths.student('kiosk-new-student')), datePatch()),
+      );
+    });
+
+    /**
+     * The check-in the database itself used to refuse.
+     *
+     * A Pre-K child's grade rides on this patch, and the patch shares a batch
+     * with their attendance record — so while this rule's floor was `0`, a
+     * `grade: -1` failed validation, the batch failed with it, and a
+     * four-year-old could not be checked in at all. The "-1th grade" on the
+     * lobby screen was the visible half of that bug; this was the other half.
+     */
+    it('may check in a Pre-K child, whose grade rides on the patch', async () => {
+      await assertSucceeds(
+        setDoc(doc(asKiosk(env, UID.counselor), paths.student('kiosk-prek-student')), {
+          ...datePatch(),
+          grade: -1,
+        }),
       );
     });
 
