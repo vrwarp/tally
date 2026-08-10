@@ -72,7 +72,7 @@ export function sanitizeKioskPalette(value: unknown): KioskPalette | null {
  * the ramp it already had.
  *
  * `applyTheme()` from `@/lib/theme` is deliberately not reused. It stamps the
- * same attribute, but its `theme-color` is a hardcoded `#0f172a` / `#f1f5f9` —
+ * same attribute, but its `theme-color` is a hardcoded `#0f172a` / `#e4f1fe` —
  * right for the main app and wrong the moment a backdrop is tinted, since that
  * meta is the colour iOS and Android paint the status bar with and a themed
  * kiosk would get a slate bar wedged above a warm screen.
@@ -107,6 +107,6 @@ export function applyKioskTheme(
   // The colour behind the status bar: the page, whatever the backdrop turned it
   // into, and the shipped value when nothing turned it into anything.
   const page =
-    safe?.['--color-ink-950'] ?? (ground === 'light' ? '#f1f5f9' : SHIPPED_THEME_COLOR);
+    safe?.['--color-ink-950'] ?? (ground === 'light' ? '#e4f1fe' : SHIPPED_THEME_COLOR);
   if (page) document.querySelector('meta[name="theme-color"]')?.setAttribute('content', page);
 }
