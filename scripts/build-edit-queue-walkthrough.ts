@@ -27,24 +27,36 @@ interface Shot {
 const OUT = 'docs/walkthrough/edit-queue';
 
 /*
- * Two manifests, because the two layouts are captured by two Playwright
- * projects and a project cannot see what another wrote. The phone pass is
- * optional: a desktop-only capture still builds, and says so by simply not
- * having a phone section.
+ * One manifest per pass, because a pass cannot see what another wrote.
+ *
+ * Four of them, in reading order: the Planning Center laptop, its phone, and
+ * then the two other deployment shapes a church can be in. Each exists on its
+ * own for a reason — the phone is a second Playwright project, and "Attendees
+ * and not Planning Center" is a second *emulator*, started with no Planning
+ * Center credentials, because which backends exist is decided by the
+ * credentials a deployment holds rather than by a setting.
+ *
+ * Every one is optional, so a capture of any subset still builds; the page
+ * simply has fewer sections.
  */
-async function manifest(viewport: 'desktop' | 'phone'): Promise<Shot[]> {
+async function manifest(pass: string): Promise<Shot[]> {
   try {
-    return JSON.parse(await readFile(join(OUT, `shots-${viewport}.json`), 'utf8')) as Shot[];
+    return JSON.parse(await readFile(join(OUT, `shots-${pass}.json`), 'utf8')) as Shot[];
   } catch {
     return [];
   }
 }
 
-const shots = [...(await manifest('desktop')), ...(await manifest('phone'))];
+const shots = [
+  ...(await manifest('desktop')),
+  ...(await manifest('phone')),
+  ...(await manifest('both')),
+  ...(await manifest('a32')),
+];
 
 if (shots.length === 0) {
   throw new Error(
-    'No frames in the manifest. Capture them first:\n' +
+    'No frames in any manifest. Capture them first:\n' +
       '  npm run walkthrough:edit-queue:capture',
   );
 }
@@ -497,8 +509,8 @@ const artifact = `<title>A profile edit, on its way to the church database</titl
       Correcting a child's surname in Tally used to mean waiting on Planning Center with the form
       open. It does not wait any more: the edit becomes a durable job, a server carries it the rest
       of the way, and every screen showing that student shows the job. <strong>These are the states
-      that produces</strong> — twenty frames, six journeys, both layouts, photographed from the
-      running app.
+      that produces</strong> — ${shots.length} frames photographed from the running app, across
+      every journey, both layouts, and each of the three deployment shapes a church can be in.
     </p>
     <p class="note">
       <strong>Every frame is the real thing.</strong> A production build against the Firebase

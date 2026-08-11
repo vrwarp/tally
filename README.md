@@ -157,7 +157,7 @@ happens when a family asks to be removed — is **[docs/minors-data.md](docs/min
 | [docs/minors-data.md](docs/minors-data.md) | What Tally stores about children, and what it refuses to |
 | [docs/profile-edits.md](docs/profile-edits.md) | Why a profile edit is a queued job, what every state means, and what is deliberately not blocked |
 | [docs/queue-ownership.md](docs/queue-ownership.md) | Who decides when a queued edit runs — the browser, a trigger or a schedule — and what each choice costs |
-| [docs/walkthrough/edit-queue](docs/walkthrough/edit-queue/README.md) | Every one of those states, photographed from the running app with the far end held open |
+| [docs/walkthrough/edit-queue.md](docs/walkthrough/edit-queue.md) | Every one of those states, photographed from the running app with the far end held open |
 | [docs/planning-center.md](docs/planning-center.md) | Tokens, configuration, roster modes, write-back, troubleshooting |
 | [docs/backends.md](docs/backends.md) | The people-backend abstraction: ids, capabilities, partial failure, adding one |
 | [docs/attendees32.md](docs/attendees32.md) | The Attendees backend: setup command, field mapping, caveats |

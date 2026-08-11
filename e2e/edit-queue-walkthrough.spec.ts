@@ -31,6 +31,7 @@ import { gotoReady, signIn, TEAM } from './support/auth';
 import { test } from './support/fixtures';
 import {
   burySimulatorPerson,
+  a32PersonIdOf,
   clearSimulatorFaults,
   drainQueue,
   drainStudentNow,
@@ -73,9 +74,34 @@ function viewportOf(): 'desktop' | 'phone' {
   return test.info().project.name.includes('mobile') ? 'phone' : 'desktop';
 }
 
+/**
+ * Which deployment this pass is photographing.
+ *
+ * Three shapes a church can actually be in, and they are not settings — which
+ * people-backends exist is decided by the credentials a deployment holds.
+ * Attendees can be switched on and off from Settings, so `pco` and `both` are
+ * two passes against one emulator; Planning Center cannot, because there is
+ * deliberately no in-app switch for the original backend. So the third pass
+ * runs against an emulator started with no `PCO_APP_ID`/`PCO_SECRET` at all,
+ * which is what a church that never connected Planning Center has.
+ *
+ * `scripts/capture-edit-queue-walkthrough.mjs` runs all three in order.
+ */
+type Shape = 'pco' | 'both' | 'a32';
+const SHAPE = (process.env.WALKTHROUGH_BACKENDS ?? 'pco') as Shape;
+
 async function capture(page: Page, shot: Omit<Shot, 'file' | 'viewport'>): Promise<void> {
   const viewport = viewportOf();
-  const file = `${viewport}-${shots.length.toString().padStart(2, '0')}-${shot.state
+  /*
+   * The pass is part of the name, not just the viewport.
+   *
+   * Each pass numbers its own frames from zero and names them after the state,
+   * so two passes that photograph the same state at the same position collide
+   * — and the second one silently overwrites the first's picture while leaving
+   * its manifest entry pointing at the new file. The Planning Center section
+   * spent one build showing an Attendees strip because of exactly that.
+   */
+  const file = `${SHAPE}-${viewport}-${shots.length.toString().padStart(2, '0')}-${shot.state
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')}.png`;
@@ -178,6 +204,7 @@ test.describe('the edit queue, photographed', () => {
   }) => {
     test.setTimeout(600_000);
     test.skip(test.info().project.name.includes('mobile'), 'The laptop layout only.');
+    test.skip(SHAPE !== 'pco', 'The Planning Center pass.');
     /*
      * Dana Ruiz, who is the seeded ministry's admin and the person the design
      * brief was written around. Admin rather than core because asking the queue
@@ -656,6 +683,166 @@ test.describe('the edit queue, photographed', () => {
   });
 
   /**
+   * Which people-database is behind the queue, and how the screens say so.
+   *
+   * Tally's queue is one machine over two backends, and almost everything
+   * about it is the same either way — the states, the lease, the fold, the
+   * compare-and-set. What differs is what a leader is *told*: every sentence
+   * names the database that actually holds that child, and a roster serving
+   * two of them has to stop speaking as though there were one.
+   *
+   * Three shapes, because a church is in exactly one of them.
+   */
+  test('the deployment shapes a church can be in', async ({
+    page,
+    signedInAs,
+    attendees,
+    browserName,
+  }) => {
+    test.setTimeout(600_000);
+    test.skip(SHAPE === 'pco', 'Runs in the both/attendees passes.');
+    void browserName;
+
+    await signedInAs('admin');
+    await writeDocument('config/planningCenter', { writeBack: 'full' });
+    if (SHAPE === 'both' || SHAPE === 'a32') await attendees.enable('full');
+
+    /* ---- what is connected ------------------------------------------------ */
+    await gotoReady(page, '/settings');
+    /*
+     * The two connection cards, not the top of the page.
+     *
+     * Anchored on the Planning Center card and asserted *visible* rather than
+     * scrolled-if-possible: a `scrollIntoViewIfNeeded` that quietly failed put
+     * the thresholds panel under a caption about which databases are
+     * connected, and nothing objected because "Attendees" is also a word
+     * further down the page.
+     */
+    const planningCentre = page.getByRole('heading', { name: 'Planning Center', exact: true });
+    await planningCentre.waitFor({ timeout: 20_000 });
+    await planningCentre.scrollIntoViewIfNeeded();
+    await expect(page.getByRole('heading', { name: 'Attendees', exact: true })).toBeVisible({
+      timeout: 20_000,
+    });
+    // Let both cards finish probing, so neither is photographed mid-skeleton.
+    await expect(page.getByText(/Connected|Not set up|not configured/i).first()).toBeVisible({
+      timeout: 30_000,
+    });
+    await capture(page, {
+      journey:
+        SHAPE === 'both'
+          ? 'When a church runs both databases'
+          : 'When a church runs Attendees and not Planning Center',
+      state: 'Connected',
+      title:
+        SHAPE === 'both'
+          ? 'Two directories, and Tally says which is which'
+          : 'Planning Center was never connected, and nothing pretends otherwise',
+      caption:
+        SHAPE === 'both'
+          ? 'Both are connected, so neither gets to be "the" database. Every button that used to ' +
+            'name Planning Center stops naming anybody, and every row that could belong to either ' +
+            'says which one holds it — because a leader correcting a child needs to know which ' +
+            'office to ring when it will not save.'
+          : 'Which people-backends exist is decided by the credentials a deployment holds, not by ' +
+            'a switch — so this frame is a different emulator, started with no Planning Center ' +
+            'credentials at all. The screen says so plainly rather than showing a connection that ' +
+            'is not there.',
+    });
+
+    /* ---- an edit, against whichever database holds the child -------------- */
+    const a32Id = await a32PersonIdOf('Priya Raghunathan');
+    const a32Student = `a32_${a32Id}`;
+    await writeDocument(`students/${a32Student}`, {
+      upstreamBackend: 'a32',
+      upstreamPersonId: a32Id,
+      status: 'active',
+      firstName: 'Priya',
+      lastName: 'Raghunathan',
+      searchName: 'priya raghunathan',
+    });
+
+    await takeEditLease(a32Student);
+    await openProfile(page, a32Student);
+    await renameTo(page, 'Raghunathan-Iyer');
+    await expect(strip(page)).toContainText('Queued for Attendees');
+    await capture(page, {
+      journey:
+        SHAPE === 'both'
+          ? 'When a church runs both databases'
+          : 'When a church runs Attendees and not Planning Center',
+      state: 'Queued',
+      title: 'The same strip, naming the database that actually holds her',
+      caption:
+        'One queue, one state machine, one set of words — and not one sentence that says ' +
+        '"Planning Center" out of habit. The backend a child belongs to is a property of the ' +
+        'child, not of the installation, so the strip reads it from her rather than from a ' +
+        'setting.',
+    });
+    await releaseEditLease(a32Student);
+    await drainUntil(a32Student, ['landed'], 90_000);
+
+    /* ---- the field this backend cannot take ------------------------------- */
+    await openProfile(page, a32Student);
+    await page.getByRole('button', { name: 'Edit profile' }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByLabel(/^Nickname/)).toBeEnabled();
+    await dialog.getByLabel(/^Nickname/).fill('Pri');
+    await dialog.getByRole('button', { name: 'Save changes' }).click();
+    await expect(dialog).toBeHidden();
+    await drainUntil(a32Student, ['failed'], 90_000);
+    await expect(strip(page)).toContainText('refused');
+    await capture(page, {
+      journey:
+        SHAPE === 'both'
+          ? 'When a church runs both databases'
+          : 'When a church runs Attendees and not Planning Center',
+      state: 'Refused',
+      title: 'A field this database will not take from Tally',
+      caption:
+        'Attendees keeps the bracketed name in its own fields, and Tally cannot tell which half ' +
+        'of a CJK string is the family name — so it refuses rather than guessing. It used to ' +
+        'accept the edit, write nothing, and report "Saved in Attendees": the same screen, the ' +
+        'same green mark, and a correction that had gone nowhere. Two backends means two sets of ' +
+        'what a field can do, and the refusal is how that becomes visible instead of silent.',
+    });
+
+    if (SHAPE === 'both') {
+      /* ---- one roster, two databases ------------------------------------- */
+      const mayaId = await personIdOf('Maya', 'Adebayo');
+      const maya = `pco_${mayaId}`;
+      await takeEditLease(maya);
+      await takeEditLease(a32Student);
+      await openProfile(page, maya);
+      await renameTo(page, 'Adebayo-Cole');
+      await openProfile(page, a32Student);
+      await renameTo(page, 'Raghunathan-Bell');
+
+      await gotoReady(page, '/students');
+      await page.getByRole('button', { name: /In flight/ }).click();
+      await expect(page.getByRole('link', { name: /Adebayo-Cole/ })).toBeVisible();
+      await capture(page, {
+        journey: 'When a church runs both databases',
+        state: 'Queued',
+        title: 'Two edits in flight, in two different directories',
+        caption:
+          'The count does not care which database a job is going to, and neither does the queue: ' +
+          'one lease per child, one drain, one set of states. What a leader sees is a single list ' +
+          'of what is happening to their roster — which is the point of putting the backend ' +
+          'behind a seam rather than in front of one.',
+      });
+      await releaseEditLease(maya);
+      await releaseEditLease(a32Student);
+    }
+
+    await writeFile(
+      join(OUT_DIR, `shots-${SHAPE}.json`),
+      `${JSON.stringify(shots, null, 2)}\n`,
+      'utf8',
+    );
+  });
+
+  /**
    * The same feature on the device most of it happens on.
    *
    * A phone is not a narrow laptop here. The roster row is a 64px card whose
@@ -670,6 +857,7 @@ test.describe('the edit queue, photographed', () => {
   test('the same queue in a hand', async ({ page, signedInAs, context }) => {
     test.setTimeout(300_000);
     test.skip(!test.info().project.name.includes('mobile'), 'The phone layout only.');
+    test.skip(SHAPE !== 'pco', 'The Planning Center pass.');
 
     await signedInAs('admin');
     await writeDocument('config/planningCenter', { writeBack: 'full' });
