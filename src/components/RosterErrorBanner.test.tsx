@@ -70,6 +70,7 @@ function harness(overrides: Partial<DataContextValue> = {}) {
     canWork: () => true,
     refreshRoster,
     applyRosterPerson: () => {},
+    upstreamEdits: [],
     ...overrides,
   };
 

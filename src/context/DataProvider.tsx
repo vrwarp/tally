@@ -3,6 +3,8 @@ import { subscribeEventSeries, subscribeEvents, subscribeSettings } from '@/serv
 import { subscribeEventAccess } from '@/services/eventAccess';
 import { subscribeStudents } from '@/services/students';
 import { cachedRoster, fetchRoster, mergeRoster, rememberRosterPerson } from '@/services/roster';
+import { applyPendingEdits } from '@/features/roster/pendingEdits';
+import { subscribeUpstreamEdits } from '@/services/upstreamEdits';
 import type { RosterBackendStatus } from '@/services/functions';
 import { fromRosterPerson } from '@/services/converters';
 import { useNow } from '@/hooks/useNow';
@@ -20,6 +22,7 @@ import {
   type PcoRosterPerson,
   type Student,
   type TallyEvent,
+  type UpstreamEdit,
 } from '@/types';
 import { DataContext, type DataContextValue } from '@/context/dataContext';
 
@@ -141,6 +144,13 @@ function backendReportSignature(entries: readonly RosterBackendStatus[]): string
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const { profile, can } = useAuth();
+  /*
+   * The rules refuse `upstreamEdits` to a counselor, so the listener is not
+   * opened for one. Not a permission check standing in for the rules — those
+   * are the fence — but the difference between a screen that never asks and one
+   * that asks, is refused, and has to decide what to do about it.
+   */
+  const canReadEdits = can('core');
   const [documents, setDocuments] = useState<Student[]>([]);
   const [storedEvents, setStoredEvents] = useState<TallyEvent[]>([]);
   const [series, setSeries] = useState<EventSeries[]>([]);
@@ -343,7 +353,44 @@ export function DataProvider({ children }: { children: ReactNode }) {
     };
   }, [refreshRoster]);
 
-  const students = useMemo(() => mergeRoster(roster, documents), [roster, documents]);
+  /* ---- Profile edits on their way upstream ------------------------------- */
+
+  /*
+   * A live stream, unlike the roster beside it, because this is the one thing
+   * on these screens that changes without anybody on this device doing
+   * anything: a job queued on a phone in a corridor lands from a server, and
+   * the laptop watching the same student has to stop saying "sending".
+   *
+   * Small by construction — everything in flight, plus failures nobody has
+   * resolved, plus a couple of minutes of freshly-landed ones. A ministry that
+   * has never had a failure holds a handful of documents. It is also core-team
+   * only at the rules, so a counselor's listener is never opened at all.
+   */
+  const [upstreamEdits, setUpstreamEdits] = useState<UpstreamEdit[]>([]);
+
+  useEffect(() => {
+    if (!canReadEdits) {
+      setUpstreamEdits([]);
+      return;
+    }
+    return subscribeUpstreamEdits(setUpstreamEdits, () => {
+      // Deliberately quiet. The queue is an aid to somebody already editing;
+      // a listener the rules refuse must not put an error banner in front of a
+      // leader who was doing something else entirely.
+      setUpstreamEdits([]);
+    });
+  }, [canReadEdits]);
+
+  /*
+   * The overlay is applied *after* the merge, so identity is settled before
+   * anything is painted over it: `mergeRoster` decides which document and which
+   * backend row are the same person, and only then does a job get to say what
+   * somebody is in the middle of changing about them.
+   */
+  const students = useMemo(
+    () => applyPendingEdits(mergeRoster(roster, documents), upstreamEdits),
+    [roster, documents, upstreamEdits],
+  );
 
   /* ---- The calendar ------------------------------------------------------ */
 
@@ -414,6 +461,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       rosterBackends,
       refreshRoster,
       applyRosterPerson,
+      upstreamEdits,
     }),
     [
       students,
@@ -432,6 +480,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       rosterBackends,
       refreshRoster,
       applyRosterPerson,
+      upstreamEdits,
     ],
   );
 

@@ -8,6 +8,7 @@ import type {
   PcoRosterPerson,
   Student,
   TallyEvent,
+  UpstreamEdit,
 } from '@/types';
 
 /**
@@ -96,6 +97,24 @@ export interface DataContextValue {
    * is nothing here to match it to.
    */
   applyRosterPerson: (person?: PcoRosterPerson | null) => void;
+
+  /* ---- Profile edits on their way upstream ------------------------------- */
+  /**
+   * Every edit anybody has in flight, plus the ones nobody has resolved.
+   *
+   * Live, unlike the roster it annotates, because it is the one thing on these
+   * screens that changes without anybody on this device acting: a job queued on
+   * a phone in a corridor is drained by a server, and a laptop watching the same
+   * student has to stop saying "sending".
+   *
+   * Not scoped to the reader. Two leaders working one roster have to see each
+   * other's queued work — that is the whole of the collision journey, and the
+   * answer to it is saying who and when rather than locking anybody out.
+   *
+   * Empty for a counselor: the rules refuse the collection, and the listener is
+   * never opened.
+   */
+  upstreamEdits: UpstreamEdit[];
 
   /* ---- Access ------------------------------------------------------------ */
   /**

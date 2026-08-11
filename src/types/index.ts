@@ -316,6 +316,189 @@ export const PCO_MANAGED_STUDENT_FIELDS = [
 
 export type PcoManagedStudentField = (typeof PCO_MANAGED_STUDENT_FIELDS)[number];
 
+/* -------------------------------------------------------------------------- */
+/* Profile edits on their way upstream                                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The fields one queued edit may carry.
+ *
+ * Deliberately the managed set minus `status`: who is on the roster is Tally's
+ * own list and is never written upstream in any mode, so it has no business in
+ * a queue whose whole purpose is reaching somebody else's database.
+ */
+export interface UpstreamEditPatch {
+  firstName?: string;
+  nickname?: string | null;
+  lastName?: string;
+  grade?: Grade | null;
+  allergies?: string | null;
+  /** `MM-DD` keeps the year upstream; `YYYY-MM-DD` replaces it. See §4 of planning-center.md. */
+  birthday?: string;
+}
+
+export const UPSTREAM_EDIT_FIELDS = [
+  'firstName',
+  'nickname',
+  'lastName',
+  'grade',
+  'allergies',
+  'birthday',
+] as const satisfies readonly (keyof UpstreamEditPatch)[];
+
+export type UpstreamEditField = (typeof UPSTREAM_EDIT_FIELDS)[number];
+
+/**
+ * Where one edit has got to.
+ *
+ * Nine of them, and the distinctions are not decoration — each pair that looks
+ * alike behaves differently and a screen that collapsed them would lie:
+ *
+ *   - `queued` may still be cancelled; `sending` may not.
+ *   - `waiting` resumes on its own; `failed` never will.
+ *   - `stalled` is derived rather than stored (see `isStalled`) and may still
+ *     land, so it must not read as a failure.
+ *   - `differs` and `merged` both mean "it landed and what came back is not
+ *     what was sent" — but one is about a *value* somebody changed and the
+ *     other is about the *person* moving, which are different errands.
+ */
+export type UpstreamEditState =
+  | 'queued'
+  | 'sending'
+  | 'waiting'
+  | 'landed'
+  | 'differs'
+  | 'merged'
+  | 'failed'
+  | 'orphaned'
+  | 'cancelled';
+
+/**
+ * Why an edit will not land, in the few classes a screen actually branches on.
+ *
+ * `auth` and `writeBackOff` are the aggregate ones: they fail every queued job
+ * at once for one reason, which is why the students list can say it once above
+ * the list instead of printing the same banner on nine records.
+ */
+export type UpstreamEditFailure =
+  | 'auth'
+  | 'writeBackOff'
+  | 'validation'
+  | 'personGone'
+  | 'exhausted'
+  | 'unknown';
+
+/** True while a job has been in `sending` long enough to be worth mentioning. */
+export const UPSTREAM_EDIT_STALLED_MS = 120_000;
+
+export interface UpstreamEditDoc {
+  studentId: string;
+  /**
+   * Only the fields whose value differed from what the form opened on.
+   *
+   * An untouched box is never an instruction. `updateStudentProfile` sends every
+   * managed field on every save, which is correct for a request somebody waits
+   * on — the server diffs against a fresh read — and wrong for a queued one: a
+   * second leader restating a stale value patches the first leader's in-flight
+   * correction back out, and both are told they succeeded.
+   */
+  patch: UpstreamEditPatch;
+  /**
+   * What the form was showing for each patched field when Save was pressed.
+   *
+   * This is what makes `differs` answerable. The drain reads the person fresh;
+   * a field whose upstream value is neither this nor the patch is a field
+   * somebody else changed in between.
+   */
+  baseline: UpstreamEditPatch;
+  state: UpstreamEditState;
+  attempts: number;
+  /** When a backed-off job may be picked up again. */
+  nextAttemptAt: Timestamp | null;
+  /** How long the claiming worker holds it; past this, a sweeper may reclaim. */
+  leaseUntil: Timestamp | null;
+  failure: UpstreamEditFailure | null;
+  /** Plain language, already written for a leader rather than for a log. */
+  message: string | null;
+  /** Which field a validation refusal was about, where the backend said. */
+  field: UpstreamEditField | null;
+  /**
+   * What the backend held for a field the edit did not expect, on `differs`.
+   * Only the fields that disagreed, and only for as long as the job lives.
+   */
+  observed: UpstreamEditPatch | null;
+  /** On `merged`: the person the edit ended up on, which is not the one it named. */
+  survivorPersonId: string | null;
+  survivorName: string | null;
+  createdAt: Timestamp;
+  createdBy: string;
+  /** The display name of whoever queued it, for the collision sentence. */
+  createdByName: string;
+  updatedAt: Timestamp;
+  /** When a worker first picked it up — what `stalled` is measured from. */
+  startedAt: Timestamp | null;
+  settledAt: Timestamp | null;
+}
+
+export interface UpstreamEdit
+  extends Omit<
+    UpstreamEditDoc,
+    'createdAt' | 'updatedAt' | 'startedAt' | 'settledAt' | 'nextAttemptAt' | 'leaseUntil'
+  > {
+  id: string;
+  createdAt: Date;
+  updatedAt: Date;
+  startedAt: Date | null;
+  settledAt: Date | null;
+  nextAttemptAt: Date | null;
+  leaseUntil: Date | null;
+  /**
+   * True while this write has not been acknowledged by the server.
+   *
+   * The tenth state, hiding inside `queued`. A counselor in a basement corridor
+   * is the ordinary case rather than the edge one, and the difference matters in
+   * the exact moment the reassurance is least likely to be true: "it goes on its
+   * own even if you lock your phone" is a promise about a job Firestore is
+   * holding, and the job is on the handset.
+   *
+   * Not a stored field — it is `snapshot.metadata.hasPendingWrites`, which is a
+   * fact about this device rather than about the edit.
+   */
+  pendingOnDevice: boolean;
+}
+
+/** States a worker may still act on. Anything else is settled. */
+export const UPSTREAM_EDIT_OPEN_STATES = ['queued', 'sending', 'waiting'] as const;
+
+/** States that will not resolve without a person. */
+export const UPSTREAM_EDIT_NEEDS_HUMAN = ['differs', 'merged', 'failed', 'orphaned'] as const;
+
+export function needsAHuman(edit: Pick<UpstreamEdit, 'state'>): boolean {
+  return (UPSTREAM_EDIT_NEEDS_HUMAN as readonly string[]).includes(edit.state);
+}
+
+export function isInFlight(edit: Pick<UpstreamEdit, 'state'>): boolean {
+  return (UPSTREAM_EDIT_OPEN_STATES as readonly string[]).includes(edit.state);
+}
+
+/**
+ * A job that has been sending for too long.
+ *
+ * Derived rather than stored, because nothing changes about the job when the
+ * clock passes the threshold — only what is honest to say about it. It may
+ * still land, so it stays in the in-flight count and never wears the failure
+ * colour.
+ */
+export function isStalled(edit: Pick<UpstreamEdit, 'state' | 'startedAt'>, now: Date): boolean {
+  if (edit.state !== 'sending' || !edit.startedAt) return false;
+  return now.getTime() - edit.startedAt.getTime() > UPSTREAM_EDIT_STALLED_MS;
+}
+
+/** Which fields one edit names, in the order the form shows them. */
+export function editedFields(edit: Pick<UpstreamEdit, 'patch'>): UpstreamEditField[] {
+  return UPSTREAM_EDIT_FIELDS.filter((field) => edit.patch[field] !== undefined);
+}
+
 /**
  * A profile counts as complete once the core team can reach a parent.
  * Phone or email is enough — Journey 3 only asks for "emergency contact number".

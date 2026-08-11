@@ -109,6 +109,7 @@ function show(events: readonly TallyEvent[], options: ShowOptions = {}) {
     canWork: options.canWork ?? (() => true),
     refreshRoster: async () => {},
     applyRosterPerson: () => {},
+    upstreamEdits: [],
   };
 
   const auth = {
