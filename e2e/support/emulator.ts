@@ -307,6 +307,222 @@ export async function simulatorPeople(): Promise<Array<Record<string, unknown>>>
  * dashboard and check-in specs assert on. The Attendees specs run first
  * alphabetically and sweep themselves out on the way.
  */
+/* ---- the gate, and the states that only exist behind it ------------------ */
+
+/**
+ * Arms the simulator to hold the next matching request open.
+ *
+ * This is how the suite sees a state that exists only while a call to Planning
+ * Center is in flight. Holding a socket open is what a slow API does, so nothing
+ * in the Cloud Function, the trigger or the browser has to know it is being
+ * tested — and the hold is applied before the handler runs, so the world on
+ * screen while it waits is genuinely the world before the write.
+ */
+export async function holdSimulator(match: { method?: string; path?: string } = {}): Promise<void> {
+  const response = await fetch(`${E2E.simulatorUrl}/_sim/hold`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(match),
+  });
+  if (!response.ok) throw new Error(`Could not arm the simulator hold: HTTP ${response.status}.`);
+}
+
+/** What the gate has caught. Waiting on this is how a spec avoids sleeping. */
+export async function heldRequests(): Promise<Array<{ method: string; path: string }>> {
+  const response = await fetch(`${E2E.simulatorUrl}/_sim/held`);
+  if (!response.ok) throw new Error(`Could not read held requests: HTTP ${response.status}.`);
+  return ((await response.json()) as { held: Array<{ method: string; path: string }> }).held;
+}
+
+/** Blocks until the drain has actually reached Planning Center. */
+export async function waitForHeldRequest(label: string, timeoutMs = 30_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if ((await heldRequests()).length > 0) return;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`Planning Center was never asked for ${label} within ${timeoutMs}ms.`);
+}
+
+export async function releaseSimulator(): Promise<void> {
+  const response = await fetch(`${E2E.simulatorUrl}/_sim/release`, { method: 'POST' });
+  if (!response.ok) throw new Error(`Could not release the simulator: HTTP ${response.status}.`);
+}
+
+/**
+ * Deletes a person upstream, or merges them into another.
+ *
+ * With no survivor it is the deletion an office admin makes; with one, the
+ * tombstone names them and Planning Center answers `410` with `meta.merged_into`
+ * — which is what `readThroughMerges` follows, and therefore the only way to
+ * produce the state where an edit lands on somebody other than the person it
+ * named.
+ */
+export async function burySimulatorPerson(id: string, mergedInto?: string): Promise<void> {
+  const response = await fetch(`${E2E.simulatorUrl}/_sim/bury`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ id, ...(mergedInto ? { mergedInto } : {}) }),
+  });
+  if (!response.ok) throw new Error(`Could not bury ${id}: HTTP ${response.status}.`);
+}
+
+/**
+ * Rate-limits the next `count` requests, exactly as a busy lobby kiosk does.
+ *
+ * `retryAfterSeconds` is what the drain believes over its own schedule, so this
+ * is also the control over how long `waiting` lasts.
+ */
+export async function rateLimitSimulator(count = 1, retryAfterSeconds = 1): Promise<void> {
+  const response = await fetch(`${E2E.simulatorUrl}/_sim/rate-limit`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ count, retryAfterSeconds }),
+  });
+  if (!response.ok) throw new Error(`Could not arm a rate limit: HTTP ${response.status}.`);
+}
+
+/* ---- calling a callable as somebody -------------------------------------- */
+
+/**
+ * An ID token the Functions emulator will accept.
+ *
+ * The emulator decodes the bearer token and skips signature verification, which
+ * is the same affordance the sign-in fallback already leans on — see
+ * `e2e/support/auth.ts`. It is only ever reachable at `127.0.0.1:5001`, and the
+ * production verifier does not have this behaviour, so nothing about it can
+ * escape the suite.
+ *
+ * Worth the twenty lines rather than reaching past the guard: it means a spec
+ * that drains the queue is going through `requireAdmin` → `readCaller` →
+ * `users/{uid}` for real, and would notice the day that guard stopped working.
+ */
+function emulatorIdToken(uid: string, email: string): string {
+  const segment = (value: unknown) =>
+    Buffer.from(JSON.stringify(value)).toString('base64url');
+  const now = Math.floor(Date.now() / 1000);
+  const header = segment({ alg: 'none', typ: 'JWT' });
+  const payload = segment({
+    iss: `https://securetoken.google.com/${E2E.projectId}`,
+    aud: E2E.projectId,
+    auth_time: now,
+    user_id: uid,
+    sub: uid,
+    iat: now,
+    exp: now + 3600,
+    email,
+    email_verified: true,
+    firebase: { identities: { email: [email] }, sign_in_provider: 'google.com' },
+  });
+  return `${header}.${payload}.`;
+}
+
+/** The uid the seeded ministry gave a signed-in member, by their address. */
+export async function uidOf(email: string): Promise<string> {
+  const users = await readCollection('users');
+  const match = users.find((row) => row.data.email === email);
+  if (!match) {
+    throw new Error(
+      `No users document for ${email}. Sign that member in before asking for their uid.`,
+    );
+  }
+  return match.id;
+}
+
+export async function callFunction(
+  name: string,
+  data: unknown,
+  as: { uid: string; email: string },
+): Promise<unknown> {
+  const response = await fetch(
+    `http://127.0.0.1:${E2E.functions}/${E2E.projectId}/us-central1/${name}`,
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        Authorization: `Bearer ${emulatorIdToken(as.uid, as.email)}`,
+      },
+      body: JSON.stringify({ data }),
+    },
+  );
+  const text = await response.text();
+  if (!response.ok) throw new Error(`${name} failed: HTTP ${response.status} ${text}`);
+  return (JSON.parse(text) as { result?: unknown }).result;
+}
+
+/* ---- the edit queue ------------------------------------------------------- */
+
+/**
+ * Takes a student's lease before the drain can.
+ *
+ * This is how a spec sees `queued` — the state between a leader pressing Save
+ * and a worker claiming the job, which against these emulators is a few hundred
+ * milliseconds. Rather than a switch that stops the drain, the spec holds the
+ * lease the drain itself competes for, so what is being exercised is the real
+ * mutual exclusion: the same refusal a second worker would meet, and the same
+ * one that keeps two edits of one child in the order they were queued.
+ */
+export async function takeEditLease(studentId: string, forMs = 120_000): Promise<void> {
+  await writeDocument(`upstreamEditLeases/${studentId}`, {
+    editId: 'held-by-the-suite',
+    untilMs: Date.now() + forMs,
+  });
+}
+
+export async function releaseEditLease(studentId: string): Promise<void> {
+  await deleteDocument(`upstreamEditLeases/${studentId}`);
+}
+
+/**
+ * Drains the queue now, as an admin, rather than waiting out the schedule.
+ *
+ * Scheduled functions do not run on their own in the emulator, so without this
+ * every retry in the design would be unreachable from a test — a `waiting` job
+ * would sit at its backoff for ever. The callable is the schedule's twin, on
+ * the same pattern as `pushPendingVisitors` beside `pushPendingStudents`, so
+ * this is the product's own path and not a way around it.
+ */
+export async function drainQueue(): Promise<{ ran: number; swept: number }> {
+  const { TEAM } = await import('./auth');
+  const uid = await uidOf(TEAM.admin);
+  return (await callFunction('drainUpstreamEditsNow', {}, {
+    uid,
+    email: TEAM.admin,
+  })) as { ran: number; swept: number };
+}
+
+/** Every queued edit, newest first, straight out of Firestore. */
+export async function readUpstreamEdits(): Promise<FirestoreDoc[]> {
+  return readCollection('upstreamEdits');
+}
+
+/**
+ * Waits for one student's edit to reach a state, and answers with it.
+ *
+ * Polls Firestore rather than the screen on purpose: a spec that only ever
+ * asserted the rendering could not tell a drain that worked from one whose
+ * result the browser happened to be drawing from a stale subscription.
+ */
+export async function waitForEditState(
+  studentId: string,
+  states: readonly string[],
+  timeoutMs = 30_000,
+): Promise<FirestoreDoc> {
+  const deadline = Date.now() + timeoutMs;
+  let seen = '';
+  while (Date.now() < deadline) {
+    const edits = await readUpstreamEdits();
+    const mine = edits.filter((row) => row.data.studentId === studentId);
+    const match = mine.find((row) => states.includes(String(row.data.state)));
+    if (match) return match;
+    seen = mine.map((row) => String(row.data.state)).join(', ') || 'none';
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  throw new Error(
+    `Edit for ${studentId} never reached ${states.join(' or ')} within ${timeoutMs}ms (saw: ${seen}).`,
+  );
+}
+
 export async function removeA32Residue(): Promise<void> {
   for (const student of await readCollection('students')) {
     if (student.id.startsWith('a32_') || student.data.upstreamBackend === 'a32') {

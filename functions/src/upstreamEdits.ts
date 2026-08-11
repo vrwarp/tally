@@ -47,7 +47,33 @@ export const LEASE_MS = 4 * 60_000;
  * failure and does not want to be retried into the same wall six times in a
  * minute; the backend's own `Retry-After` wins over this whenever it sends one.
  */
-export const BACKOFF_MS = [15_000, 30_000, 60_000, 120_000, 240_000, 480_000, 900_000, 900_000];
+const DEFAULT_BACKOFF_MS = [15_000, 30_000, 60_000, 120_000, 240_000, 480_000, 900_000, 900_000];
+
+/**
+ * The schedule, and why it is settable.
+ *
+ * `TALLY_EDIT_BACKOFF_MS` takes a comma-separated list of milliseconds. It is a
+ * real operational knob rather than a test seam: a church whose Planning Center
+ * is heavily throttled has a genuine reason to want longer steps, and one
+ * running against a private mirror has a reason to want shorter. The end-to-end
+ * suite sets it small for the same reason it sets a five-second cache TTL —
+ * so a run exercises the retry rather than routing around it.
+ *
+ * A malformed value falls back rather than throwing. This is read at module
+ * load in a background worker, and a typo in an environment variable must not
+ * be the thing that stops a queue draining.
+ */
+function backoffFromEnv(): number[] {
+  const raw = process.env.TALLY_EDIT_BACKOFF_MS;
+  if (!raw) return DEFAULT_BACKOFF_MS;
+  const parsed = raw
+    .split(',')
+    .map((step) => Number(step.trim()))
+    .filter((step) => Number.isFinite(step) && step >= 0);
+  return parsed.length > 0 ? parsed : DEFAULT_BACKOFF_MS;
+}
+
+export const BACKOFF_MS = backoffFromEnv();
 
 /** After this many attempts a job stops being a machine's problem. */
 export const MAX_ATTEMPTS = BACKOFF_MS.length;

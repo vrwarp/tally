@@ -91,6 +91,16 @@ const planningCenterEnv = {
   // being in sync with the params the code declares.
   PCO_CACHE_TTL_SECONDS: '5',
   /*
+   * A retry the suite can actually watch.
+   *
+   * The shipped schedule starts at fifteen seconds, which is right for an API
+   * that rate-limits and impossible for a test: a spec proving that a
+   * rate-limited edit resumes on its own would either sleep through it or skip
+   * the only interesting part. Small here for the same reason the cache TTL is
+   * — so a run exercises the backoff rather than routing around it.
+   */
+  TALLY_EDIT_BACKOFF_MS: '250,250,250,250,250,250,250,250',
+  /*
    * Only the credential. Everything else about Attendees arrives through the
    * `config/attendees32` document, which the Attendees specs write and remove
    * around themselves — so every other spec runs with the second backend

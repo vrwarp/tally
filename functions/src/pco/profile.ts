@@ -76,6 +76,21 @@ export interface UpdateStudentProfileResult {
    * corrects it.
    */
   person: RosterPerson | null;
+  /**
+   * The row as the backend held it *before* this call wrote anything.
+   *
+   * Null wherever there was no read to take one from — every refusal above the
+   * upstream read.
+   *
+   * Here for one caller and one question: the edit queue, asking whether
+   * somebody changed the same field between a leader opening the form and the
+   * job draining. That cannot be answered from `person`, which is the row as it
+   * stands *after* the write and therefore always agrees with what was sent —
+   * the first version of this compared against it and could never report a
+   * disagreement at all. The value has to be the one that was on file when the
+   * drain looked, and this function is the only place that ever holds it.
+   */
+  before: RosterPerson | null;
 }
 
 /**
@@ -130,8 +145,9 @@ function result(
   message: string,
   wrote: string[] = [],
   person: RosterPerson | null = null,
+  before: RosterPerson | null = null,
 ): UpdateStudentProfileResult {
-  return { status, wrote, message, person };
+  return { status, wrote, message, person, before };
 }
 
 function trimmed(value: string | null | undefined): string | null {
@@ -444,6 +460,10 @@ export async function updateStudentProfile(
    * round trip on the path somebody is watching a spinner on. Anything the
    * PATCH goes on to refuse never gets this far; the throw is the answer.
    */
+  /** The row exactly as Planning Center held it a moment ago. */
+  const rowBefore = (): RosterPerson =>
+    rosterPersonFrom(person.data, config, options.now ?? new Date());
+
   const rowAfter = (): RosterPerson =>
     rosterPersonFrom(
       {
@@ -464,6 +484,7 @@ export async function updateStudentProfile(
       'Planning Center already matches. Nothing was changed there.',
       [],
       rowAfter(),
+      rowBefore(),
     );
   }
 
@@ -498,5 +519,6 @@ export async function updateStudentProfile(
       : `Saved ${describe(wrote)} in Planning Center.`,
     wrote,
     rowAfter(),
+    rowBefore(),
   );
 }

@@ -600,6 +600,20 @@ export const updateStudentProfile = httpsCallable<
   UpdateStudentProfileResult
 >(functions, 'updateStudentProfile');
 
+/**
+ * Drains the profile-edit queue now, rather than within the minute.
+ *
+ * The callable twin of the schedule that owns it, on the same pattern as
+ * `pushPendingVisitors` beside `pushPendingStudents`. Admin only: what it can
+ * do, the schedule does anyway — but it decides *when* the church's people
+ * database is talked to, and pacing is the reason the sweep takes small
+ * batches at all.
+ */
+export const drainUpstreamEditsNow = httpsCallable<
+  { limit?: number } | void,
+  { ran: number; swept: number }
+>(functions, 'drainUpstreamEditsNow');
+
 export interface PushPendingResult {
   pushed: number;
   skipped: number;

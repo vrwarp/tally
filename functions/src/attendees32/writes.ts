@@ -490,14 +490,15 @@ export async function updateStudentProfile(
       message:
         'Editing an Attendees profile from Tally is switched off. A leader can turn on full write-back in Settings, or make the change in Attendees.',
       person: null,
+      before: null,
     };
   }
 
   if (options.firstName !== undefined && !options.firstName.trim()) {
-    return { status: 'invalid', wrote: [], message: 'A first name is required.', person: null };
+    return { status: 'invalid', wrote: [], message: 'A first name is required.', person: null, before: null };
   }
   if (options.lastName !== undefined && !options.lastName.trim()) {
-    return { status: 'invalid', wrote: [], message: 'A last name is required.', person: null };
+    return { status: 'invalid', wrote: [], message: 'A last name is required.', person: null, before: null };
   }
   if (
     options.grade !== undefined &&
@@ -508,12 +509,13 @@ export async function updateStudentProfile(
       wrote: [],
       message: `Grade must be between ${config.minGrade} and ${config.maxGrade}.`,
       person: null,
+      before: null,
     };
   }
 
   const resolved = await resolveA32Person(db, studentId);
   if (!resolved.exists || !resolved.active) {
-    return { status: 'no-student', wrote: [], message: 'That student is not on the roster.', person: null };
+    return { status: 'no-student', wrote: [], message: 'That student is not on the roster.', person: null, before: null };
   }
   if (!resolved.personId) {
     return {
@@ -521,6 +523,7 @@ export async function updateStudentProfile(
       wrote: [],
       message: 'This student has no Attendees record yet; push them first.',
       person: null,
+      before: null,
     };
   }
 
@@ -534,6 +537,7 @@ export async function updateStudentProfile(
       wrote: [],
       message: 'Attendees no longer has this person.',
       person: null,
+      before: null,
     };
   }
 
@@ -575,7 +579,7 @@ export async function updateStudentProfile(
   if (options.birthday !== undefined) {
     const dated = birthdayPatch(options.birthday, attendee);
     if (dated === null) {
-      return { status: 'invalid', wrote: [], message: 'That is not a birthday Tally can write.', person: null };
+      return { status: 'invalid', wrote: [], message: 'That is not a birthday Tally can write.', person: null, before: null };
     }
     const [field, value] = Object.entries(dated)[0]!;
     if (trimmed((attendee as unknown as Record<string, string | null>)[field]) !== value) {
@@ -591,6 +595,8 @@ export async function updateStudentProfile(
       wrote: [],
       message: 'Attendees already matches.',
       person: mapAttendeeToRosterPerson(attendee),
+      // The same row: nothing was written, so before and after are one thing.
+      before: mapAttendeeToRosterPerson(attendee),
     };
   }
 
@@ -602,6 +608,9 @@ export async function updateStudentProfile(
     wrote,
     message: `Saved ${wrote.join(', ')} to Attendees.`,
     person: mapAttendeeToRosterPerson(updated),
+    // What was on file when this call looked, which is what lets the edit queue
+    // tell "your edit landed" from "somebody had already changed this".
+    before: mapAttendeeToRosterPerson(attendee),
   };
 }
 

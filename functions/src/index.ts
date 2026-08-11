@@ -27,6 +27,7 @@ import {
   type DrainDeps,
   type EditRecord,
   type RunOutcome,
+  type SweepResult,
 } from './upstreamEdits.js';
 import { isHeldForReview } from './backends/pendingReview.js';
 import {
@@ -374,6 +375,21 @@ async function requireCoreTeam(uid: string | undefined): Promise<void> {
   const caller = await readCaller(uid);
   if (!caller.active || (caller.role !== 'core' && caller.role !== 'admin')) {
     throw new HttpsError('permission-denied', 'Only the core team can do that.');
+  }
+}
+
+/**
+ * Admin, for the handful of things that are not a leader's to decide.
+ *
+ * The core team may edit the church's people database; deciding *when* Tally
+ * talks to it is a different question, and the queue's pacing exists because an
+ * API that rate-limits does not want a stampede.
+ */
+async function requireAdmin(uid: string | undefined): Promise<void> {
+  if (!uid) throw new HttpsError('unauthenticated', 'Sign in first.');
+  const caller = await readCaller(uid);
+  if (!caller.active || caller.role !== 'admin') {
+    throw new HttpsError('permission-denied', 'Only an admin can do that.');
   }
 }
 
@@ -2211,8 +2227,13 @@ async function runUpstreamEdit(edit: EditRecord): Promise<RunOutcome> {
     };
   }
 
-  const observed = disagreementsWith(edit, person);
-  if (observed) return { kind: 'differs', observed, message: result.message };
+  const observed = disagreementsWith(edit, result.before);
+  if (observed) {
+    // Nothing to undo: the patch only ever named fields the leader changed, and
+    // the office's value for a field they did not touch is untouched. What this
+    // reports is that the two disagree and a human has to say which is right.
+    return { kind: 'differs', observed, message: result.message };
+  }
 
   if (result.status === 'updated') {
     backend.resetCache();
@@ -2226,28 +2247,56 @@ async function runUpstreamEdit(edit: EditRecord): Promise<RunOutcome> {
 }
 
 /**
- * Fields the backend holds as neither what was typed nor what the form showed.
+ * Fields somebody else changed between the form opening and the drain running.
  *
- * Only the two the roster row can actually answer for. A roster row carries no
- * allergy note and no birth year by design, so an edit to those cannot be
- * checked this way and is reported as landed — which is honest: the write was
- * accepted, and Tally has not been given anything to disagree with.
+ * The comparison is against the row as the backend held it **before** this call
+ * wrote anything, and that is the whole of it. The first version of this
+ * compared against the row returned *after* the write, which always agrees with
+ * what was sent — so it could never report a disagreement, and the state the
+ * journey brief calls the one most likely to be dropped would have been dropped
+ * silently. The e2e spec for it is what surfaced that.
+ *
+ * Three readings of one field, and only the third is a conflict:
+ *
+ *  - upstream still holds the baseline — nobody touched it, this edit is the
+ *    only change;
+ *  - upstream already holds what was typed — somebody made the same correction
+ *    first, which is agreement rather than conflict;
+ *  - upstream holds a third thing — somebody changed it to something else, and
+ *    a human has to decide.
+ *
+ * Only the two fields a roster row can answer for. An allergy note and a birth
+ * year are deliberately not on a roster row, so there is nothing here to
+ * disagree with, and inventing a disagreement would be worse than saying
+ * nothing.
  */
 function disagreementsWith(
   edit: EditRecord,
-  person: { firstName: string; lastName: string; grade: number | null } | null,
+  before: { lastName: string; grade: number | null } | null,
 ): Record<string, unknown> | null {
-  if (!person) return null;
+  if (!before) return null;
   const out: Record<string, unknown> = {};
 
   const wantedLast = edit.patch.lastName;
-  if (typeof wantedLast === 'string' && person.lastName !== wantedLast) {
-    out.lastName = person.lastName;
+  const baseLast = edit.baseline.lastName;
+  if (
+    typeof wantedLast === 'string' &&
+    before.lastName !== wantedLast &&
+    before.lastName !== baseLast
+  ) {
+    out.lastName = before.lastName;
   }
+
   const wantedGrade = edit.patch.grade;
-  if (wantedGrade !== undefined && person.grade !== wantedGrade) {
-    out.grade = person.grade;
+  const baseGrade = edit.baseline.grade;
+  if (
+    wantedGrade !== undefined &&
+    before.grade !== wantedGrade &&
+    before.grade !== (baseGrade ?? null)
+  ) {
+    out.grade = before.grade;
   }
+
   return Object.keys(out).length > 0 ? out : null;
 }
 
@@ -2280,6 +2329,32 @@ export const onUpstreamEditCreated = onDocumentCreated(
     const data = event.data?.data();
     if (!data) return;
     await drainEdit(toEditRecord(event.params.editId, data), drainDeps());
+  },
+);
+
+/**
+ * Drains the queue now, rather than within the minute.
+ *
+ * The callable twin of the schedule below, and every scheduled job in this
+ * codebase has one — `pushPendingVisitors` beside `pushPendingStudents`,
+ * `refreshKioskPhoneIndex` beside `rebuildKioskPhoneIndex`. The reason is the
+ * same each time: a job that only ever runs on a timer is one nobody can do
+ * anything about at the moment they are looking at it. An admin who has just
+ * reconnected a credential should not have to wait out a minute to find out
+ * whether it worked, and a queue that looks stuck should be pokeable.
+ *
+ * Admin only. It is not a write of its own — everything it can do, the schedule
+ * does anyway — but it decides *when* the church's people database is talked
+ * to, and pacing is the whole reason the sweep takes small batches.
+ */
+export const drainUpstreamEditsNow = onCall<{ limit?: number } | void, Promise<SweepResult>>(
+  { secrets: BACKEND_SECRETS, timeoutSeconds: 300, memory: '256MiB' },
+  async (request): Promise<SweepResult> => {
+    await requireAdmin(request.auth?.uid);
+    const limit = typeof request.data?.limit === 'number' ? request.data.limit : undefined;
+    const result = await sweepEdits(drainDeps(), limit);
+    logger.info('Drained the upstream edit queue on request', result);
+    return result;
   },
 );
 

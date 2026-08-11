@@ -53,6 +53,48 @@ function send(response: ServerResponse, status: number, body: unknown): void {
   response.end(payload);
 }
 
+/**
+ * A request the simulator is holding open, and the promise that lets it go.
+ *
+ * The end-to-end suite needs to see a state that exists only while a call to
+ * Planning Center is in flight — the moment a leader's edit has been claimed by
+ * a worker and is on its way. Against a simulator that answers in about two
+ * milliseconds that state is unobservable, so the suite arms a gate and the
+ * matching request simply does not get answered until it says so.
+ *
+ * Holding a socket open is what a slow API *does*, which is the point: nothing
+ * in the Cloud Function, the trigger or the browser has to know it is being
+ * tested. It is the far end being slow, which is the one thing this whole
+ * simulator exists to be able to vary.
+ */
+interface Hold {
+  method: string | null;
+  /** Matched as a substring, so `/people/` catches every person write. */
+  path: string | null;
+  /** Resolved by `POST /_sim/release`. */
+  release: () => void;
+  released: Promise<void>;
+}
+
+interface HeldRequest {
+  method: string;
+  path: string;
+}
+
+function makeHold(method: string | null, path: string | null): Hold {
+  let release = () => {};
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return { method, path, release, released };
+}
+
+function holdMatches(hold: Hold, request: { method: string; path: string }): boolean {
+  if (hold.method && hold.method.toUpperCase() !== request.method.toUpperCase()) return false;
+  if (hold.path && !request.path.includes(hold.path)) return false;
+  return true;
+}
+
 export async function startSimulator(
   options: SimulatorServerOptions = {},
 ): Promise<RunningSimulator> {
@@ -69,6 +111,12 @@ export async function startSimulator(
   });
   const verbose = options.verbose ?? true;
 
+  /** Armed by `/_sim/hold`, and at most one at a time — a test that needs two
+      overlapping holds is a test that has stopped describing one journey. */
+  let hold: Hold | null = null;
+  /** What the gate has caught, so a test can wait for arrival rather than sleep. */
+  const held: HeldRequest[] = [];
+
   const server = createServer((req, res) => {
     void (async () => {
       const url = new URL(req.url ?? '/', 'http://localhost');
@@ -79,6 +127,9 @@ export async function startSimulator(
 
         if (action === 'reset' && req.method === 'POST') {
           store.reset();
+          hold?.release();
+          hold = null;
+          held.length = 0;
           return send(res, 200, { ok: true });
         }
         if (action === 'requests' && req.method === 'GET') {
@@ -107,6 +158,36 @@ export async function startSimulator(
           for (const member of body?.team ?? []) store.seedTeamMember(member);
 
           return send(res, 200, { ok: true, people: store.people.length });
+        }
+        if (action === 'hold' && req.method === 'POST') {
+          const body = (await readBody(req)) as { method?: string; path?: string } | null;
+          // Anything already waiting is let go first: an armed gate left over
+          // from a failed test would otherwise hang the next one.
+          hold?.release();
+          held.length = 0;
+          hold = makeHold(body?.method ?? null, body?.path ?? null);
+          return send(res, 200, { ok: true });
+        }
+        if (action === 'held' && req.method === 'GET') {
+          return send(res, 200, { held });
+        }
+        if (action === 'release' && req.method === 'POST') {
+          hold?.release();
+          hold = null;
+          return send(res, 200, { ok: true, released: held.length });
+        }
+        /**
+         * Buries a person, the way an office admin deleting or merging one does.
+         *
+         * With no survivor it is a plain deletion and the person is simply gone;
+         * with one, the tombstone names them and the handler answers `410` with
+         * `meta.merged_into`, which is the shape Tally actually faces.
+         */
+        if (action === 'bury' && req.method === 'POST') {
+          const body = (await readBody(req)) as { id?: string; mergedInto?: string } | null;
+          if (!body?.id) return send(res, 400, { error: 'bury needs an id.' });
+          store.buryPerson(body.id, body.mergedInto ?? null);
+          return send(res, 200, { ok: true });
         }
         if (action === 'clear-faults' && req.method === 'POST') {
           store.clearFaults();
@@ -147,6 +228,17 @@ export async function startSimulator(
         body: await readBody(req),
         authorization: (req.headers.authorization as string | undefined) ?? null,
       };
+
+      /*
+       * The gate sits *before* the handler, so a held request has not yet
+       * changed anything: the state on screen while it waits is the state
+       * before the write, which is what makes the assertion honest.
+       */
+      if (hold && holdMatches(hold, request)) {
+        held.push({ method: request.method, path: request.path });
+        if (verbose) console.log(`[pco-sim] holding ${request.method} ${request.path}`);
+        await hold.released;
+      }
 
       const result = handleRequest(request, store);
       if (verbose) {
