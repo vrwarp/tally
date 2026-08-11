@@ -73,6 +73,39 @@ async function openProfile(page: Page, studentId: string) {
 }
 
 /** Types a new surname into the editor and presses Save. */
+/**
+ * Waits until a student's queued jobs are on a server, not just on the device.
+ *
+ * `renameTo` returns when the editor closes, and the editor closes on the
+ * *local* Firestore write — deliberately, because waiting for a server before
+ * letting go of a leader is the thing the queue exists to avoid; see the
+ * corridor journey at the bottom of this file. The consequence is that a save
+ * having visibly happened does not mean the job is drainable yet, and a test
+ * that goes on to drain has to say which it means.
+ *
+ * This cost an intermittent failure in the folding journey below: under load
+ * the second job was still in flight when the test released the lease, so the
+ * drain folded one edit instead of two, the first surname landed alone, and
+ * the second arrived to find Planning Center holding a value its baseline did
+ * not expect — a real conflict, correctly reported, over a race in the test.
+ *
+ * Counted by existence rather than by state, which is not fussiness. Folding
+ * happens *before* the lease is claimed (`drainStudent`), so a poke that
+ * arrives while the suite is holding a student still cancels the superseded
+ * job and rewrites the survivor — it is only the upstream write that is
+ * blocked. Waiting for two *queued* jobs therefore waits for something that
+ * has often already stopped being true.
+ */
+async function onServer(studentId: string, count: number): Promise<void> {
+  await expect
+    .poll(
+      async () =>
+        (await readUpstreamEdits()).filter((row) => row.data.studentId === studentId).length,
+      { timeout: 15_000 },
+    )
+    .toBe(count);
+}
+
 async function renameTo(page: Page, surname: string) {
   await page.getByRole('button', { name: 'Edit profile' }).click();
   const dialog = page.getByRole('dialog');
@@ -478,6 +511,10 @@ test.describe('an edit on its way to Planning Center', () => {
     await renameTo(page, 'Delgadoo');
     await expect(strip(page)).toContainText('Queued');
     await renameTo(page, 'Delgado-Hale');
+
+    // Both jobs on the server before anything is allowed to run: folding is
+    // what this journey is about, and a drain cannot fold a job it cannot see.
+    await onServer(studentId, 2);
 
     await releaseEditLease(studentId);
     await drainQueue();

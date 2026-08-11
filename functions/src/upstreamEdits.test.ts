@@ -378,6 +378,64 @@ describe('draining a student rather than a document', () => {
     expect(db.get(`${UPSTREAM_EDITS}/a`)?.state).toBe('landed');
   });
 
+  /**
+   * A held student is not touched at all — not even folded.
+   *
+   * Folding is two writes, retiring the superseded jobs and then moving their
+   * patch onto the survivor, and it used to happen before anything was
+   * claimed. Two drains arriving together could interleave between those
+   * writes: the second found a lone survivor still carrying the *older*
+   * patch and sent it, so a leader who corrected their own typo watched the
+   * typo reach Planning Center with the correction marked "folded into a
+   * later edit" that never went.
+   *
+   * The invariant that forbids it is this one, and it is worth stating as
+   * "nothing moved" rather than as "no upstream write happened": the damage
+   * was done by the bookkeeping, not by the send. Its absence cost an
+   * intermittent end-to-end failure at about one run in eight, whose shape —
+   * the right jobs in the right states, the wrong name upstream — is what a
+   * torn fold looks like from outside.
+   */
+  it('folds nothing while somebody else holds the student', async () => {
+    const db = new FakeFirestore();
+    db.seed(`${UPSTREAM_EDITS}/a`, {
+      studentId: 'pco_101',
+      state: 'queued',
+      patch: { lastName: 'Chen' },
+      baseline: { lastName: 'Chen-Ito' },
+      createdAt: new Date(nowMs - 2000),
+    });
+    db.seed(`${UPSTREAM_EDITS}/b`, {
+      studentId: 'pco_101',
+      state: 'queued',
+      patch: { grade: 10 },
+      baseline: { grade: 9 },
+      createdAt: new Date(nowMs - 1000),
+    });
+    db.seed(`${UPSTREAM_EDIT_LEASES}/pco_101`, {
+      editId: 'somebody-else',
+      untilMs: nowMs + LEASE_MS,
+    });
+
+    const sent: EditRecord[] = [];
+    const states = await drainStudent('pco_101', deps(db, async (job) => {
+      sent.push(job);
+      return { kind: 'landed' };
+    }));
+
+    expect(states).toEqual([]);
+    expect(sent).toEqual([]);
+    // Both jobs exactly as they were: no cancellation, no patch moved onto a
+    // survivor that a second drain could then send on its own.
+    expect(db.get(`${UPSTREAM_EDITS}/a`)?.state).toBe('queued');
+    expect(db.get(`${UPSTREAM_EDITS}/a`)?.patch).toEqual({ lastName: 'Chen' });
+    expect(db.get(`${UPSTREAM_EDITS}/b`)?.state).toBe('queued');
+    expect(db.get(`${UPSTREAM_EDITS}/b`)?.patch).toEqual({ grade: 10 });
+    // And the holder's claim is intact — a drain that took nothing must not
+    // release a lease it never had.
+    expect(db.get(`${UPSTREAM_EDIT_LEASES}/pco_101`)?.editId).toBe('somebody-else');
+  });
+
   it('stops at the lease rather than spinning', async () => {
     const db = new FakeFirestore();
     db.seed(`${UPSTREAM_EDITS}/a`, { studentId: 'pco_101', state: 'queued', patch: { lastName: 'X' } });

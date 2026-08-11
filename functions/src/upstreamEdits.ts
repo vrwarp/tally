@@ -232,6 +232,26 @@ export async function claimStudent(
   }
 }
 
+/** What a whole-student drain writes in the lease's `editId`, for a log to read. */
+const STUDENT_CLAIM = 'student-drain';
+
+/**
+ * Pushes a held claim's expiry out, without going through `create`.
+ *
+ * A blind write: the caller has already claimed the student, and a lease that
+ * has since been taken from them under an expiry is a case `claimStudent`
+ * already decided — losing that race means the round's next write fails on its
+ * own terms rather than here.
+ */
+async function extendClaim(db: FirestoreLike, studentId: string, nowMs: number): Promise<void> {
+  await db
+    .doc(`${UPSTREAM_EDIT_LEASES}/${studentId}`)
+    .update({ untilMs: nowMs + LEASE_MS })
+    .catch(() => {
+      /* Nothing to extend is not an error; the next write decides. */
+    });
+}
+
 export async function releaseStudent(db: FirestoreLike, studentId: string): Promise<void> {
   await db.doc(`${UPSTREAM_EDIT_LEASES}/${studentId}`).delete();
 }
@@ -301,12 +321,39 @@ export function messageFor(outcome: RunOutcome, state: EditState): string | null
 
 /** Runs one edit, if it is still runnable and nobody else holds the student. */
 export async function drainEdit(edit: EditRecord, deps: DrainDeps): Promise<EditState | null> {
-  const logger = deps.logger ?? SILENT_LOGGER;
   const nowMs = deps.now().getTime();
   if (!isRunnable(edit, nowMs)) return null;
   if (!edit.studentId) return null;
-
   if (!(await claimStudent(deps.db, edit.studentId, edit.id, nowMs))) return null;
+
+  try {
+    return await runClaimedEdit(edit, deps);
+  } finally {
+    await releaseStudent(deps.db, edit.studentId);
+  }
+}
+
+/**
+ * The body of a drain, for a caller that is already holding the student.
+ *
+ * Split out so that folding and running happen under *one* claim. Folding is
+ * two writes — retire the superseded jobs, then move their patch onto the
+ * survivor — and it used to run before anything was claimed. A second drain
+ * reading between those two writes sees a survivor still carrying its
+ * pre-fold patch and sends it: a leader who fixed their own typo three
+ * seconds later watched the typo land in Planning Center, with the correction
+ * cancelled as "folded into a later edit" that never went. It cost an
+ * intermittent failure in the folding journey, at about one run in eight, and
+ * the shape of that failure — the right number of jobs in the right states,
+ * the wrong surname upstream — is what a torn fold looks like from outside.
+ */
+export async function runClaimedEdit(
+  edit: EditRecord,
+  deps: DrainDeps,
+): Promise<EditState | null> {
+  const logger = deps.logger ?? SILENT_LOGGER;
+  const nowMs = deps.now().getTime();
+  if (!isRunnable(edit, nowMs)) return null;
 
   const ref = deps.db.doc(`${UPSTREAM_EDITS}/${edit.id}`);
   const attempts = edit.attempts + 1;
@@ -362,8 +409,6 @@ export async function drainEdit(edit: EditRecord, deps: DrainDeps): Promise<Edit
       error: String(error),
     });
     return settled.state;
-  } finally {
-    await releaseStudent(deps.db, edit.studentId);
   }
 }
 
@@ -416,7 +461,41 @@ export async function drainStudent(
   maxJobs = 5,
 ): Promise<EditState[]> {
   const states: EditState[] = [];
+  if (!studentId) return states;
 
+  /*
+   * Claimed once, around the folding as well as the running.
+   *
+   * Folding is two writes — retire the superseded jobs, then move their patch
+   * onto the survivor — and it used to happen before anything was claimed,
+   * with only the upstream write itself serialised. Two drains arriving
+   * together (a browser's poke and the sweep, which is now the ordinary case
+   * rather than a rare one) could interleave: the second reads after the
+   * first has cancelled the newer job but before it has moved the patch, so
+   * it finds a lone survivor still carrying the *older* patch and sends that.
+   * The leader's correction is cancelled and their typo is what reaches
+   * Planning Center.
+   *
+   * `STUDENT_CLAIM` rather than an edit id because the claim now covers the
+   * round rather than one job; the field is diagnostic.
+   */
+  const startMs = deps.now().getTime();
+  if (!(await claimStudent(deps.db, studentId, STUDENT_CLAIM, startMs))) return states;
+
+  try {
+    return await drainClaimedStudent(studentId, deps, maxJobs, states);
+  } finally {
+    await releaseStudent(deps.db, studentId);
+  }
+}
+
+/** The rounds themselves, with the student already held. */
+async function drainClaimedStudent(
+  studentId: string,
+  deps: DrainDeps,
+  maxJobs: number,
+  states: EditState[],
+): Promise<EditState[]> {
   for (let round = 0; round < maxJobs; round += 1) {
     const snapshot = await deps.db.collection(UPSTREAM_EDITS).get();
     const mine = snapshot.docs
@@ -424,6 +503,13 @@ export async function drainStudent(
       .filter((job) => job.studentId === studentId);
 
     const nowMs = deps.now().getTime();
+    /*
+     * Pushed out every round. One claim now spans up to `maxJobs` upstream
+     * writes, and a backend that sleeps inside a rate-limited request can
+     * take a while over each — long enough that a lease sized for one job
+     * would lapse mid-round and let a second worker in behind it.
+     */
+    await extendClaim(deps.db, studentId, nowMs);
     const folded = foldQueued(mine);
 
     if (folded) {
@@ -444,7 +530,7 @@ export async function drainStudent(
           updatedAt: deps.now(),
         });
       }
-      const state = await drainEdit(folded.run, deps);
+      const state = await runClaimedEdit(folded.run, deps);
       if (state === null) return states;
       states.push(state);
       continue;
@@ -455,7 +541,7 @@ export async function drainStudent(
       .sort((a, b) => a.createdAtMs - b.createdAtMs)[0];
     if (!retry) return states;
 
-    const state = await drainEdit(retry, deps);
+    const state = await runClaimedEdit(retry, deps);
     if (state === null) return states;
     states.push(state);
   }

@@ -132,6 +132,17 @@ surface is needed, so `FirestoreLike` stays the forty lines it advertises.
 request leaves a job no worker will ever pick up, under a screen that has already
 told a leader their correction is on its way.
 
+**It is claimed around the folding, not just around the send.** Folding is two
+writes — retire the superseded jobs, then move their patch onto the survivor —
+and it used to happen before anything was claimed, on the reasoning that only
+the upstream write needed serialising. It does not hold. Two drains arriving
+together read between those writes: the second finds a lone survivor still
+carrying the *older* patch, claims the student, and sends that. The leader's
+correction ends up cancelled as "folded into a later edit" and the typo is what
+reaches Planning Center — the right jobs in the right states, the wrong name
+upstream. One claim spans the whole round now, pushed out each time round so a
+rate-limited job cannot let the lease lapse mid-round.
+
 **Superseding happens in the drain, not in the browser**, and the reason is the
 corridor. The first version folded a second save into an unclaimed first inside a
 Firestore transaction — which is a nicety that cost the property the whole design
