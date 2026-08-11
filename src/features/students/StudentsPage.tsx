@@ -141,16 +141,20 @@ export function StudentsPage() {
    */
   const editsByStudent = useMemo(() => latestByStudent(upstreamEdits), [upstreamEdits]);
 
-  const inFlightCount = useMemo(
-    () => [...editsByStudent.values()].filter(isInFlight).length,
-    [editsByStudent],
-  );
-  const needsYouCount = useMemo(
-    () => [...editsByStudent.values()].filter(needsAHuman).length,
-    [editsByStudent],
-  );
-
-  const visible = useMemo(() => {
+  /*
+   * Everybody the other three controls allow through, before any chip is
+   * pressed. Both the counts and the list are read from this, and that is the
+   * whole point of it existing.
+   *
+   * The counts used to be taken from the queue and the roster directly, which
+   * made them answer a different question from the filter they sit on: a
+   * student the status filter was hiding still counted. It showed up the first
+   * time a walkthrough photographed the screen — "Needs you 6" over a list of
+   * five, because a child who had been merged upstream was now inactive and so
+   * counted but not shown. A count on a filter has to be a promise about what
+   * pressing it produces, or it is worse than no count at all.
+   */
+  const matching = useMemo(() => {
     const matcher = createSearchMatcher(query);
     return students.filter((student) => {
       if (status !== 'all' && student.status !== status) return false;
@@ -158,6 +162,29 @@ export function StudentsPage() {
       // getting the ministry's adult volunteers back is the same bug as
       // printing "6th grade" under their name.
       if (grade !== null && student.grade !== grade) return false;
+      return matcher.matches(student.searchName);
+    });
+  }, [students, status, grade, query]);
+
+  const inFlightCount = useMemo(
+    () =>
+      matching.filter((student) => {
+        const edit = editsByStudent.get(student.id);
+        return edit ? isInFlight(edit) : false;
+      }).length,
+    [matching, editsByStudent],
+  );
+  const needsYouCount = useMemo(
+    () =>
+      matching.filter((student) => {
+        const edit = editsByStudent.get(student.id);
+        return edit ? needsAHuman(edit) : false;
+      }).length,
+    [matching, editsByStudent],
+  );
+
+  const visible = useMemo(() => {
+    return matching.filter((student) => {
       if (quick === 'incomplete' && !isUnreachable(student, reachable)) return false;
       if (quick === 'visitors' && !student.isVisitor) return false;
       if (quick === 'inFlight') {
@@ -168,18 +195,22 @@ export function StudentsPage() {
         const edit = editsByStudent.get(student.id);
         if (!edit || !needsAHuman(edit)) return false;
       }
-      if (!matcher.matches(student.searchName)) return false;
       return true;
     });
-  }, [students, status, grade, quick, query, reachable, editsByStudent]);
+  }, [matching, quick, reachable, editsByStudent]);
 
   const incompleteCount = useMemo(
-    () => students.filter((student) => isUnreachable(student, reachable)).length,
-    [students, reachable],
+    () => matching.filter((student) => isUnreachable(student, reachable)).length,
+    [matching, reachable],
   );
+  /*
+   * No `status === 'active'` of its own any more: it follows the status
+   * control like everything else here, so asking for inactive students and
+   * being told how many *active* visitors there are cannot happen.
+   */
   const visitorCount = useMemo(
-    () => students.filter((student) => student.status === 'active' && student.isVisitor).length,
-    [students],
+    () => matching.filter((student) => student.isVisitor).length,
+    [matching],
   );
 
   const isFiltered =

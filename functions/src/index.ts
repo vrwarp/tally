@@ -2209,7 +2209,7 @@ async function runUpstreamEdit(edit: EditRecord): Promise<RunOutcome> {
       return {
         kind: 'refused',
         failure: 'auth',
-        message: `${backend.displayName} refused Tally's credentials. An admin has to reconnect it; retrying will not help.`,
+        message: `${backend.displayName} refused Tally's credentials. An admin has to reconnect it in Settings; sending this again will only help once they have.`,
       };
     }
     if (status === 404 || status === 410) return { kind: 'orphaned' };

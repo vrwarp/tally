@@ -33,6 +33,7 @@ import { gotoReady, signIn, TEAM } from './support/auth';
 import {
   burySimulatorPerson,
   drainQueue,
+  drainStudentNow,
   holdSimulator,
   rateLimitSimulator,
   readUpstreamEdits,
@@ -101,7 +102,10 @@ async function onServer(studentId: string, count: number): Promise<void> {
     .poll(
       async () =>
         (await readUpstreamEdits()).filter((row) => row.data.studentId === studentId).length,
-      { timeout: 15_000 },
+      // Thirty rather than fifteen: this is waiting on a server acknowledgement
+      // under whatever load the rest of the file is putting on the emulator,
+      // and fifteen was occasionally not enough when the whole suite ran.
+      { timeout: 30_000 },
     )
     .toBe(count);
 }
@@ -174,7 +178,10 @@ async function pump(
     } catch (cause) {
       if (Date.now() >= deadline) throw cause;
     }
-    await drainQueue();
+    // The student, not the world: the wide sweep shares one 300-second
+    // ceiling across five students and can spend it on somebody else's
+    // backed-off job while this loop waits.
+    await drainStudentNow(studentId);
   }
 }
 
@@ -342,7 +349,8 @@ test.describe('an edit on its way to Planning Center', () => {
 
     const failed = await pump(studentId, ['failed'], 90_000);
     await expect(strip(page)).toContainText('refused this edit');
-    // One obvious move, and an escape hatch that is visibly not it.
+    // One obvious move, and an escape hatch that is visibly not it. The editor
+    // is the move for *this* class only: the values are what was objected to.
     await expect(page.getByRole('button', { name: 'Fix and send again' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Discard the edit' })).toBeVisible();
 
@@ -371,6 +379,14 @@ test.describe('an edit on its way to Planning Center', () => {
      */
     expect(failed.data.failure).toBe('auth');
     await expect(strip(page)).toContainText('reconnect');
+    /*
+     * And the move offered is to send the same patch again, not to open the
+     * editor. Nothing a leader typed is wrong here, so a form is a wrong turn
+     * — the strip printed "an admin has to reconnect it" beside a button
+     * offering exactly that turn until a walkthrough photographed the pair.
+     */
+    await expect(page.getByRole('button', { name: 'Send it again' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Fix and send again' })).toHaveCount(0);
   });
 
   test('has nowhere to land when the person was deleted upstream', async ({

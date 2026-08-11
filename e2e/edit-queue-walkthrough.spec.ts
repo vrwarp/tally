@@ -27,14 +27,14 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
-import { gotoReady } from './support/auth';
+import { gotoReady, signIn, TEAM } from './support/auth';
 import { test } from './support/fixtures';
 import {
   burySimulatorPerson,
   clearSimulatorFaults,
   drainQueue,
+  drainStudentNow,
   holdSimulator,
-  rateLimitSimulator,
   releaseEditLease,
   releaseSimulator,
   simulatorPeople,
@@ -54,18 +54,34 @@ interface Shot {
   state: string;
   title: string;
   caption: string;
+  /** Which of the two layouts this was taken on. */
+  viewport: 'desktop' | 'phone';
 }
 
 const shots: Shot[] = [];
 
-async function capture(page: Page, shot: Omit<Shot, 'file'>): Promise<void> {
-  const file = `${shots.length.toString().padStart(2, '0')}-${shot.state
+/**
+ * Phone or laptop, decided by the project rather than by a flag.
+ *
+ * The two are different designs rather than one design at two widths — the
+ * roster row is a 64px card on a phone and a 44px line on a laptop, and the
+ * job mark is the word alone on one and a word, an age and a caption on the
+ * other. A walkthrough that only ever showed the laptop would be describing
+ * half of what was built, and the half a leader at a door does not use.
+ */
+function viewportOf(): 'desktop' | 'phone' {
+  return test.info().project.name.includes('mobile') ? 'phone' : 'desktop';
+}
+
+async function capture(page: Page, shot: Omit<Shot, 'file' | 'viewport'>): Promise<void> {
+  const viewport = viewportOf();
+  const file = `${viewport}-${shots.length.toString().padStart(2, '0')}-${shot.state
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')}.png`;
   await mkdir(OUT_DIR, { recursive: true });
   await page.screenshot({ path: join(OUT_DIR, file) });
-  shots.push({ file, ...shot });
+  shots.push({ file, viewport, ...shot });
 }
 
 async function personIdOf(firstName: string, lastName: string): Promise<string> {
@@ -76,6 +92,15 @@ async function personIdOf(firstName: string, lastName: string): Promise<string> 
   if (!match) throw new Error(`Planning Center has no ${firstName} ${lastName}.`);
   return String(match.id);
 }
+
+/**
+ * The record's own sync strip, scoped to `main`.
+ *
+ * The toast region is also a live region, so an unscoped `role=status` matches
+ * both — a strict-mode violation the first time a save raises a toast, which
+ * is every time.
+ */
+const strip = (page: Page) => page.getByRole('main').getByRole('status');
 
 async function openProfile(page: Page, studentId: string) {
   await gotoReady(page, `/students/${studentId}`);
@@ -137,7 +162,10 @@ async function drainUntil(
     } catch (cause) {
       if (Date.now() >= deadline) throw cause;
     }
-    await drainQueue();
+    // The student, not the world: the wide sweep shares one 300-second
+    // ceiling across five students and can spend it on somebody else's
+    // backed-off job while this loop waits.
+    await drainStudentNow(studentId);
   }
 }
 
@@ -146,8 +174,10 @@ test.describe('the edit queue, photographed', () => {
     page,
     signedInAs,
     planningCenter,
+    browser,
   }) => {
-    test.setTimeout(300_000);
+    test.setTimeout(600_000);
+    test.skip(test.info().project.name.includes('mobile'), 'The laptop layout only.');
     /*
      * Dana Ruiz, who is the seeded ministry's admin and the person the design
      * brief was written around. Admin rather than core because asking the queue
@@ -262,23 +292,187 @@ test.describe('the edit queue, photographed', () => {
         'nothing new about a child.',
     });
 
+    /* ---- J1b. changing your mind ----------------------------------------- */
+    /*
+     * The one state that offers to cancel is the only one where cancelling can
+     * keep its promise, so the frame that shows it working belongs beside the
+     * frame that offers it.
+     */
+    const sofiaId = await personIdOf('Sofia', 'Ramirez');
+    const sofia = `pco_${sofiaId}`;
+    await takeEditLease(sofia);
+    await openProfile(page, sofia);
+    await renameTo(page, 'Ramirez-Bell');
+    await expect(strip(page)).toContainText('Queued');
+    await page.getByRole('button', { name: 'Cancel this edit' }).click();
+    await expect(strip(page)).toBeHidden();
+    await capture(page, {
+      journey: 'Changing your mind',
+      state: 'Cancelled',
+      title: 'Taken back, and the record says so by saying nothing',
+      caption:
+        'The strip is gone and the name is what Planning Center actually holds again — not the ' +
+        'typed one with a mark on it. Cancelling has to undo the optimism as well as the job, or ' +
+        'a leader is left reading their own withdrawn correction as though it were the record.',
+    });
+    await releaseEditLease(sofia);
+
+    /* ---- J5. two leaders on one child ------------------------------------ */
+    const noahId = await personIdOf('Noah', 'Fitzgerald');
+    const noah = `pco_${noahId}`;
+    await takeEditLease(noah);
+    await openProfile(page, noah);
+    await renameTo(page, 'Fitzgerald-Ruiz');
+    await expect(strip(page)).toContainText('Queued');
+
+    const second = await browser.newContext();
+    try {
+      const other = await second.newPage();
+      // A genuinely different leader in a genuinely different browser context,
+      // which is the whole point of the frame: nothing here is this tab's
+      // memory of what this tab did.
+      await signIn(other, TEAM.core);
+      await openProfile(other, noah);
+      await expect(other.getByRole('main').getByRole('status')).toContainText('Queued for');
+      await capture(other, {
+        journey: 'When two leaders share a roster',
+        state: 'Queued',
+        title: 'Somebody else is already on this record',
+        caption:
+          'Marcus opens a child Dana is halfway through correcting. He sees her typed value, ' +
+          'marked as not upstream yet, and her name against it — which is why nothing has to be ' +
+          'locked. The answer to two people at one record is telling, not locking: a locked form ' +
+          'at a door is a leader who cannot do their job.',
+      });
+    } finally {
+      await second.close();
+      await releaseEditLease(noah);
+    }
+
+    /* ---- J5b. the half that is Tally's own -------------------------------- */
+    const leilaId = await personIdOf('Leila', 'Haddad');
+    const leila = `pco_${leilaId}`;
+    await takeEditLease(leila);
+    await openProfile(page, leila);
+    await page.getByRole('button', { name: 'Edit profile' }).click();
+    const leilaDialog = page.getByRole('dialog');
+    await expect(leilaDialog.getByLabel(/^Last name/)).toBeEnabled();
+    await leilaDialog.getByLabel(/^Last name/).fill('Haddad-Sharma');
+    await leilaDialog.getByLabel(/^Notes/).fill('Leads the Sunday worship team.');
+    await leilaDialog.getByRole('button', { name: 'Save changes' }).click();
+    await expect(leilaDialog).toBeHidden();
+    await expect(strip(page)).toContainText('Queued');
+    // By role: the editor keeps the typed note in its textarea after closing,
+    // so a bare text match finds the record *and* the hidden form.
+    await expect(
+      page.getByRole('paragraph').filter({ hasText: 'Leads the Sunday worship team.' }),
+    ).toBeVisible();
+    await capture(page, {
+      journey: 'When two leaders share a roster',
+      state: 'Queued',
+      title: 'The note is already saved; the surname is still on its way',
+      caption:
+        'One Save, two destinations. Notes and roster status are Tally’s own and land instantly; ' +
+        'name, grade, birthday and allergies belong to Planning Center and go through the queue. ' +
+        'Holding the note back until the queue drained would make a leader wait on a database ' +
+        'that has no opinion about it.',
+    });
+
     /* ---- 6. waiting ------------------------------------------------------ */
+    /*
+     * Seeded rather than provoked, and for a better reason than convenience.
+     *
+     * A 429 carries `Retry-After`, and the Planning Center client honours it
+     * *inside* the request — so arming a rate limit produces a long `sending`,
+     * not a `waiting`. `waiting` is what is left after the client has spent
+     * its own patience: the job handed back with a time to come again. And it
+     * is now short by design, because the tab sets a timer against
+     * `nextAttemptAt` and asks the moment it expires. This is that document,
+     * with the wait still ahead of it and the student held so nothing runs it.
+     */
     const ethanId = await personIdOf('Ethan', 'Nguyen');
     const ethan = `pco_${ethanId}`;
+    const askedAt = new Date(Date.now() - 40_000);
+    await writeDocument('upstreamEdits/waiting-walkthrough', {
+      studentId: ethan,
+      patch: { lastName: 'Nguyen-Hart' },
+      baseline: { lastName: 'Nguyen' },
+      state: 'waiting',
+      attempts: 1,
+      nextAttemptAt: new Date(Date.now() + 25_000),
+      leaseUntil: null,
+      failure: null,
+      message: null,
+      field: null,
+      observed: null,
+      survivorPersonId: null,
+      survivorName: null,
+      createdAt: askedAt,
+      createdBy: 'dana',
+      createdByName: 'Dana Ruiz',
+      updatedAt: askedAt,
+      startedAt: askedAt,
+      settledAt: null,
+    });
+    await takeEditLease(ethan);
     await openProfile(page, ethan);
-    await renameThen(page, 'Nguyen-Hart', () => rateLimitSimulator(99, 1));
-    await drainUntil(ethan, ['waiting']);
+    await expect(strip(page)).toContainText('Waiting on Planning Center');
     await capture(page, {
       journey: 'When the far end is busy',
       state: 'Waiting',
       title: 'Rate-limited, and not stuck',
       caption:
-        'A busy lobby kiosk can push one leader’s correction past thirty seconds with nothing ' +
-        'wrong. This must never read as broken: a leader who thinks it is stuck retries something ' +
-        'that was already on its way.',
+        'A busy lobby kiosk shares one rate limit with the roster, and a correction can be told ' +
+        'to come back in half a minute with nothing wrong. This must never read as broken: a ' +
+        'leader who thinks it is stuck retries something that was already on its way. The tab is ' +
+        'what asks again when the wait expires, so in practice this state is usually over before ' +
+        'anybody finishes reading it.',
     });
-    await clearSimulatorFaults();
-    await drainUntil(ethan, ['landed']);
+    await releaseEditLease(ethan);
+
+    /* ---- J4a. taking too long -------------------------------------------- */
+    /*
+     * The one state derived from the clock rather than stored, so producing it
+     * honestly would mean holding a request open for two minutes. The job is
+     * seeded with its `startedAt` already in the past instead — a real document
+     * the real screen reads, with the clock moved rather than the meaning.
+     */
+    const aishaId = await personIdOf('Aisha', 'Rahman');
+    const aisha = `pco_${aishaId}`;
+    const longAgo = new Date(Date.now() - 5 * 60_000);
+    await writeDocument('upstreamEdits/stalled-walkthrough', {
+      studentId: aisha,
+      patch: { lastName: 'Rahman-Laurent' },
+      baseline: { lastName: 'Rahman' },
+      state: 'sending',
+      attempts: 1,
+      nextAttemptAt: null,
+      leaseUntil: new Date(Date.now() + 10 * 60_000),
+      failure: null,
+      message: null,
+      field: null,
+      observed: null,
+      survivorPersonId: null,
+      survivorName: null,
+      createdAt: longAgo,
+      createdBy: 'marcus',
+      createdByName: 'Marcus Webb',
+      updatedAt: longAgo,
+      startedAt: longAgo,
+      settledAt: null,
+    });
+    await takeEditLease(aisha);
+    await openProfile(page, aisha);
+    await expect(strip(page)).toContainText('Taking longer than it should');
+    await capture(page, {
+      journey: 'When the far end is busy',
+      state: 'Still sending',
+      title: 'Longer than it should, and still not a failure',
+      caption:
+        'Five minutes in a state that usually lasts one second. It has to say so — silence here ' +
+        'reads as a hang — without saying the one thing that is not true: nothing has failed, and ' +
+        'it may still land. A leader who reads "stuck" retries something that was already on its way.',
+    });
 
     /* ---- 7. refused ------------------------------------------------------ */
     const priyaId = await personIdOf('Priya', 'Patel');
@@ -288,6 +482,11 @@ test.describe('the edit queue, photographed', () => {
       planningCenter.fail(422, 'That name is not one Planning Center will take.', 99),
     );
     await drainUntil(priya, ['failed'], 90_000);
+    // The screen, not just the database: `drainUntil` polls Firestore and the
+    // page has its own listener, so a shutter fired on the drain alone can
+    // catch the state before it — which it did, once, photographing
+    // "Sending" under a caption about a refusal.
+    await expect(strip(page)).toContainText('refused this edit');
     await capture(page, {
       journey: 'When it will not land',
       state: 'Refused',
@@ -315,7 +514,19 @@ test.describe('the edit queue, photographed', () => {
     await renameThen(page, 'Brooks-Nakamura', () =>
       planningCenter.fail(503, 'Planning Center is having a moment.', 99),
     );
-    await drainUntil(isaiah, ['failed'], 90_000);
+    /*
+     * Generous, and it has to be. Exhaustion is eight attempts against a
+     * backend that answers 503, each of which the Planning Center client
+     * retries internally with its own backoff before giving the job back —
+     * and the drain now holds the student across the round rather than
+     * releasing between attempts, so the whole sequence is one call.
+     */
+    await drainUntil(isaiah, ['failed'], 180_000);
+    // The screen, not just the database: `drainUntil` polls Firestore and the
+    // page has its own listener, so a shutter fired on the drain alone can
+    // catch the state before it — which it did, once, photographing
+    // "Sending" under a caption about a refusal.
+    await expect(strip(page)).toContainText('Could not reach');
     await capture(page, {
       journey: 'When it will not land',
       state: 'Unreachable',
@@ -324,6 +535,32 @@ test.describe('the edit queue, photographed', () => {
         'Tally tried and gave up, so there is nothing in the form to fix and the button says so: ' +
         'it sends the same patch again. Calling this "refused" over a "Fix and send again" sent a ' +
         'leader hunting for a mistake in a correction that never had one.',
+    });
+    await clearSimulatorFaults();
+
+    /* ---- J4b. the one a leader cannot fix -------------------------------- */
+    const calebId = await personIdOf('Caleb', 'Okafor');
+    const caleb = `pco_${calebId}`;
+    await openProfile(page, caleb);
+    await renameThen(page, 'Okafor-Bright', () =>
+      planningCenter.fail(401, 'Unauthorized', 99),
+    );
+    await drainUntil(caleb, ['failed'], 90_000);
+    // The screen, not just the database: `drainUntil` polls Firestore and the
+    // page has its own listener, so a shutter fired on the drain alone can
+    // catch the state before it — which it did, once, photographing
+    // "Sending" under a caption about a refusal.
+    await expect(strip(page)).toContainText('refused this edit');
+    await capture(page, {
+      journey: 'When it will not land',
+      state: 'Refused',
+      title: 'Not this leader’s to fix, and it says whose',
+      caption:
+        'A rotated credential fails every queued job at once, and nothing a leader typed is ' +
+        'wrong — so the errand is named (an admin, in Settings) and the move is to send the same ' +
+        'patch again once they have done it. Not to open the editor: this frame is the reason ' +
+        'the editor is now offered for one class of refusal only, because it was photographed ' +
+        'here beside a sentence ruling it out.',
     });
     await clearSimulatorFaults();
 
@@ -337,6 +574,7 @@ test.describe('the edit queue, photographed', () => {
     await planningCenter.patchPerson(amaraId, { last_name: 'Osei-Boateng' });
     await releaseEditLease(amara);
     await drainUntil(amara, ['differs']);
+    // This frame re-opens the record below, so its own load is the wait.
     await openProfile(page, amara);
     await capture(page, {
       journey: 'When two people disagree',
@@ -390,6 +628,113 @@ test.describe('the edit queue, photographed', () => {
         'which the linked path did not do until this work.',
     });
 
-    await writeFile(join(OUT_DIR, 'shots.json'), `${JSON.stringify(shots, null, 2)}\n`, 'utf8');
+    /* ---- J2/J3. the glance down the list ---------------------------------- */
+    /*
+     * Last, because it needs everything above it to have happened: by now this
+     * roster holds jobs in six different states, put there by six different
+     * things going right and wrong.
+     */
+    await gotoReady(page, '/students');
+    await page.getByRole('button', { name: /Needs you/ }).click();
+    await expect(page.getByRole('listitem').first()).toBeVisible();
+    await capture(page, {
+      journey: 'Down a list of forty-nine',
+      state: 'Needs you',
+      title: 'Which of them are waiting on a human',
+      caption:
+        'The second count, and the one that answers the Sunday-morning question. A leader who ' +
+        'made nine corrections in four minutes cannot re-open nine records to find the two that ' +
+        'did not land, and the marks are unfilled and dashed against the filled badges the ' +
+        'standing flags keep — so an amber badge on a row still means exactly one thing.',
+    });
+
+    await writeFile(
+      join(OUT_DIR, `shots-${viewportOf()}.json`),
+      `${JSON.stringify(shots, null, 2)}\n`,
+      'utf8',
+    );
+  });
+
+  /**
+   * The same feature on the device most of it happens on.
+   *
+   * A phone is not a narrow laptop here. The roster row is a 64px card whose
+   * second line is already spoken for, so the job mark is the word alone —
+   * no age, no caption naming the field and the author, because there is no
+   * room for either and a thumb did not come to that screen for them. The
+   * strip stacks, and its buttons become full-width targets rather than a
+   * row. And the corridor — no signal, mid-corridor, phone in hand — is the
+   * case the whole queue was built for and cannot be photographed anywhere
+   * else.
+   */
+  test('the same queue in a hand', async ({ page, signedInAs, context }) => {
+    test.setTimeout(300_000);
+    test.skip(!test.info().project.name.includes('mobile'), 'The phone layout only.');
+
+    await signedInAs('admin');
+    await writeDocument('config/planningCenter', { writeBack: 'full' });
+
+    /* ---- the record, mid-flight ------------------------------------------ */
+    const mayaId = await personIdOf('Maya', 'Adebayo');
+    const maya = `pco_${mayaId}`;
+    await takeEditLease(maya);
+    await openProfile(page, maya);
+    await renameTo(page, 'Adebayo-Cole');
+    await expect(strip(page)).toContainText('Queued for Planning Center');
+    await capture(page, {
+      journey: 'On a phone, which is where this happens',
+      state: 'Queued',
+      title: 'The whole state, stacked',
+      caption:
+        'Everything the laptop says, in a column: what is changing, who asked for it, that ' +
+        'nothing has reached Planning Center yet, and the one move that can still keep its ' +
+        'promise. The action is a full-width target rather than a button in a row, because the ' +
+        'thing pressing it is a thumb.',
+    });
+
+    /* ---- the row ---------------------------------------------------------- */
+    await gotoReady(page, '/students');
+    await page.getByRole('button', { name: /In flight/ }).click();
+    await expect(page.getByRole('link', { name: /Adebayo-Cole/ })).toBeVisible();
+    await capture(page, {
+      journey: 'On a phone, which is where this happens',
+      state: 'Queued',
+      title: 'The word alone, on a 64px card',
+      caption:
+        'The mark rides in the row’s second line beside the grade, and it is the word without ' +
+        'the age — a phone row has no room for a clock, and the caption that names the field and ' +
+        'the author is laptop-only. The counts above are still filters, which is how a leader ' +
+        'gets from "something is happening" to "these two" without opening anything.',
+    });
+    await releaseEditLease(maya);
+
+    /* ---- the corridor ----------------------------------------------------- */
+    const hannahId = await personIdOf('Hannah', 'Schmidt');
+    const hannah = `pco_${hannahId}`;
+    await openProfile(page, hannah);
+    await context.setOffline(true);
+    try {
+      await renameTo(page, 'Schmidt-Marek');
+      await expect(strip(page)).toContainText('Held on this phone');
+      await capture(page, {
+        journey: 'On a phone, which is where this happens',
+        state: 'Held on this phone',
+        title: 'No signal, and Save still returns',
+        caption:
+          'The case the queue exists for. Save writes locally and lets go — waiting for a server ' +
+          'here is what left a leader watching a spinner in a corridor — and the promise is about ' +
+          'the device rather than about a tab: it says the write has not left yet, that it goes ' +
+          'when there is signal, and that closing Tally before then loses it, which with an ' +
+          'in-memory cache is true.',
+      });
+    } finally {
+      await context.setOffline(false);
+    }
+
+    await writeFile(
+      join(OUT_DIR, `shots-${viewportOf()}.json`),
+      `${JSON.stringify(shots, null, 2)}\n`,
+      'utf8',
+    );
   });
 });

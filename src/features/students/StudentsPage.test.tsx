@@ -170,6 +170,68 @@ function job(over: Partial<UpstreamEdit> = {}): UpstreamEdit {
  * nothing at all. A test that only asserts the mark exists passes in that
  * state, so these assert the two facts the mark cannot carry.
  */
+/**
+ * A count on a filter is a promise about what pressing it produces.
+ *
+ * These were taken from the queue and the roster directly, which made them
+ * answer a different question from the control they sit on. The first
+ * walkthrough of the finished feature caught it in a photograph: "Needs you 6"
+ * above a list of five, because a child merged upstream had gone inactive and
+ * the status filter was hiding her from the list but not from the count.
+ */
+describe('the counts and the rows they filter to', () => {
+  it('does not count a student the status filter is hiding', async () => {
+    const user = userEvent.setup();
+    renderRoster(
+      [
+        makeStudent({ id: 's1', firstName: 'Aiden', lastName: 'Shin' }),
+        makeStudent({ id: 's2', firstName: 'Bea', lastName: 'Cruz', status: 'inactive' }),
+      ],
+      {},
+      { upstreamEdits: [job({ state: 'failed' }), job({ id: 'edit-2', studentId: 's2', state: 'failed' })] },
+    );
+
+    // Active is the default view, so one of the two failures is out of sight.
+    expect(screen.getByRole('button', { name: /Needs you/ })).toHaveTextContent('1');
+
+    await user.click(screen.getByRole('button', { name: /Needs you/ }));
+    expect(screen.getAllByRole('listitem')).toHaveLength(1);
+  });
+
+  it('counts them again when the roster is showing everybody', async () => {
+    const user = userEvent.setup();
+    renderRoster(
+      [
+        makeStudent({ id: 's1', firstName: 'Aiden', lastName: 'Shin' }),
+        makeStudent({ id: 's2', firstName: 'Bea', lastName: 'Cruz', status: 'inactive' }),
+      ],
+      {},
+      { upstreamEdits: [job({ state: 'failed' }), job({ id: 'edit-2', studentId: 's2', state: 'failed' })] },
+    );
+
+    // By role: the always-mounted editor modal has a Status field too, so a
+    // label match finds two.
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Status' }), 'all');
+    expect(screen.getByRole('button', { name: /Needs you/ })).toHaveTextContent('2');
+  });
+
+  it('narrows the counts with the search box, like the list', async () => {
+    const user = userEvent.setup();
+    renderRoster(
+      [
+        makeStudent({ id: 's1', firstName: 'Aiden', lastName: 'Shin' }),
+        makeStudent({ id: 's2', firstName: 'Bea', lastName: 'Cruz' }),
+      ],
+      {},
+      { upstreamEdits: [job({ state: 'queued' }), job({ id: 'edit-2', studentId: 's2', state: 'queued' })] },
+    );
+
+    expect(screen.getByRole('button', { name: /In flight/ })).toHaveTextContent('2');
+    await user.type(screen.getByRole('searchbox', { name: 'Search' }), 'Aiden');
+    expect(screen.getByRole('button', { name: /In flight/ })).toHaveTextContent('1');
+  });
+});
+
 describe('the band a row wears while an edit of it is on its way', () => {
   it('names the fields changing and who asked for it', () => {
     renderRoster([makeStudent({ id: 's1', firstName: 'Aiden', lastName: 'Shin' })], {}, { upstreamEdits: [job()] });

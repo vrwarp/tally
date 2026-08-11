@@ -1,0 +1,26 @@
+[
+  {
+    "file": "phone-00-queued.png",
+    "viewport": "phone",
+    "journey": "On a phone, which is where this happens",
+    "state": "Queued",
+    "title": "The whole state, stacked",
+    "caption": "Everything the laptop says, in a column: what is changing, who asked for it, that nothing has reached Planning Center yet, and the one move that can still keep its promise. The action is a full-width target rather than a button in a row, because the thing pressing it is a thumb."
+  },
+  {
+    "file": "phone-01-queued.png",
+    "viewport": "phone",
+    "journey": "On a phone, which is where this happens",
+    "state": "Queued",
+    "title": "The word alone, on a 64px card",
+    "caption": "The mark rides in the row’s second line beside the grade, and it is the word without the age — a phone row has no room for a clock, and the caption that names the field and the author is laptop-only. The counts above are still filters, which is how a leader gets from \"something is happening\" to \"these two\" without opening anything."
+  },
+  {
+    "file": "phone-02-held-on-this-phone.png",
+    "viewport": "phone",
+    "journey": "On a phone, which is where this happens",
+    "state": "Held on this phone",
+    "title": "No signal, and Save still returns",
+    "caption": "The case the queue exists for. Save writes locally and lets go — waiting for a server here is what left a leader watching a spinner in a corridor — and the promise is about the device rather than about a tab: it says the write has not left yet, that it goes when there is signal, and that closing Tally before then loses it, which with an in-memory cache is true."
+  }
+]

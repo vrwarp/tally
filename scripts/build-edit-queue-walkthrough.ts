@@ -21,17 +21,31 @@ interface Shot {
   state: string;
   title: string;
   caption: string;
+  viewport: 'desktop' | 'phone';
 }
 
 const OUT = 'docs/walkthrough/edit-queue';
 
-const shots = JSON.parse(await readFile(join(OUT, 'shots.json'), 'utf8')) as Shot[];
+/*
+ * Two manifests, because the two layouts are captured by two Playwright
+ * projects and a project cannot see what another wrote. The phone pass is
+ * optional: a desktop-only capture still builds, and says so by simply not
+ * having a phone section.
+ */
+async function manifest(viewport: 'desktop' | 'phone'): Promise<Shot[]> {
+  try {
+    return JSON.parse(await readFile(join(OUT, `shots-${viewport}.json`), 'utf8')) as Shot[];
+  } catch {
+    return [];
+  }
+}
+
+const shots = [...(await manifest('desktop')), ...(await manifest('phone'))];
 
 if (shots.length === 0) {
   throw new Error(
     'No frames in the manifest. Capture them first:\n' +
-      '  WALKTHROUGH=1 npx playwright test --project=chromium-desktop ' +
-      'e2e/edit-queue-walkthrough.spec.ts',
+      '  npm run walkthrough:edit-queue:capture',
   );
 }
 
@@ -82,7 +96,12 @@ for (const group of groups) {
           <span class="chip chip--${toneOf(shot.state)}">${escapeHtml(shot.state)}</span>
           <h3 class="frame__title">${escapeHtml(shot.title)}</h3>
         </div>
-        <img src="${await dataUri(shot.file)}" alt="${escapeHtml(shot.title)}" loading="lazy" />
+        <img
+          class="shot shot--${shot.viewport}"
+          src="${await dataUri(shot.file)}"
+          alt="${escapeHtml(shot.title)}"
+          loading="lazy"
+        />
         <figcaption>${escapeHtml(shot.caption)}</figcaption>
       </figure>`);
   }
@@ -150,6 +169,17 @@ const html = `<!doctype html>
   .frame img {
     display: block; width: 100%; height: auto; border-radius: .75rem;
     border: 1px solid var(--line); background: var(--card);
+  }
+  /*
+   * A phone frame is 390 CSS pixels wide. Stretched to the column it would be
+   * a 62rem picture of a phone layout, which reads as a laptop screen with
+   * enormous type — the exact misreading these frames exist to prevent, since
+   * the whole point of the pair is that the two layouts are different designs.
+   * Held at its own width, against a tinted bed so it is obviously a device.
+   */
+  .shot--phone {
+    width: min(390px, 100%); margin: 0 auto; border-radius: 1.25rem;
+    box-shadow: 0 1px 3px rgb(15 23 42 / .12), 0 12px 32px rgb(15 23 42 / .10);
   }
   figcaption { margin: .7rem 0 0; font-size: .93rem; color: var(--ink-400); max-width: 46rem; }
   footer { margin-top: 4rem; padding-top: 1.25rem; border-top: 1px solid var(--rule); font-size: .85rem; color: var(--ink-400); }

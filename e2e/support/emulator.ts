@@ -515,6 +515,25 @@ export async function drainQueue(): Promise<{ ran: number; swept: number }> {
   })) as { ran: number; swept: number };
 }
 
+/**
+ * Asks for one student's jobs to be drained, the way the app itself does.
+ *
+ * Narrower than `drainQueue` and usually what a test actually means. The wide
+ * sweep walks the whole collection, takes up to five students and up to five
+ * jobs each under one 300-second ceiling — so a spec that loops on it while a
+ * fault is armed can spend minutes of that ceiling on students it is not
+ * waiting for, and eventually kill the call outright. This is the callable the
+ * browser fires after a save, scoped to the one child in question.
+ */
+export async function drainStudentNow(studentId: string): Promise<{ states: string[] }> {
+  const { TEAM } = await import('./auth');
+  const uid = await uidOf(TEAM.admin);
+  return (await callFunction('drainStudentEdits', { studentId }, {
+    uid,
+    email: TEAM.admin,
+  })) as { states: string[] };
+}
+
 /** Every queued edit, newest first, straight out of Firestore. */
 export async function readUpstreamEdits(): Promise<FirestoreDoc[]> {
   return readCollection('upstreamEdits');

@@ -74,6 +74,22 @@ describe('a job that could not be delivered', () => {
     expect(words.body).toContain('Planning Center rejected the grade.');
   });
 
+  /**
+   * The sentence and the button beside it have to agree.
+   *
+   * A rotated credential said "an admin has to reconnect it; retrying will
+   * not help" over a button offering to open the editor — two wrong things at
+   * once, in the same strip: nothing in the form is broken, and the one move
+   * offered was the one the text had just ruled out. Only a validation
+   * refusal is about what somebody typed.
+   */
+  it('sends a leader to the form only when the values are what was refused', () => {
+    expect(copy(job({ failure: 'validation', message: 'No.' })).body).toContain('No.');
+    // The auth message must not tell somebody that sending again is pointless,
+    // because after an admin reconnects it is exactly the move.
+    expect(copy(job({ failure: 'auth' })).body).not.toMatch(/will not help\b/);
+  });
+
   /*
    * Both of them promise the same thing, and it is the promise that lets
    * somebody walk away from the screen: whatever went wrong upstream, the

@@ -172,22 +172,30 @@ export function StudentSyncStrip({
             </Button>
           ) : null}
           {/*
-            An unreachable backend and a rejected value need different buttons,
-            because the work in front of the leader is different. "Fix" opens
-            the editor with the refused values still in it, which is right when
-            the backend read them and said no. When it never answered, there is
-            nothing in the form to fix — the edit is exactly as good as it was
-            — and a button that opens an editor makes a leader hunt for a
-            mistake they did not make. That one sends the same patch again.
+            Only a validation refusal is about what somebody typed.
+            
+            "Fix and send again" opens the editor with the refused values still
+            in it, and that is the right move for exactly one class: the
+            backend read the values and objected to them. For every other
+            failure the patch is fine and the world was not — a backend that
+            never answered, a rotated credential, write-back switched off — so
+            the move is to send the same thing again once the world is fixed,
+            and an editor is a wrong turn that makes a leader hunt for a
+            mistake they did not make.
+
+            This was the wrong way round for two of the three. A rotated
+            credential printed "an admin has to reconnect it" directly beside a
+            button offering to open the form, in the same strip, and a
+            walkthrough photographed the pair before anybody noticed.
           */}
           {edit.state === 'failed' ? (
-            edit.failure === 'exhausted' ? (
-              <Button variant={loud ? 'primary' : 'secondary'} className="w-full lg:w-auto" onClick={onRetry}>
-                Send it again
-              </Button>
-            ) : (
+            edit.failure === 'validation' ? (
               <Button variant={loud ? 'primary' : 'secondary'} className="w-full lg:w-auto" onClick={onFix}>
                 Fix and send again
+              </Button>
+            ) : (
+              <Button variant={loud ? 'primary' : 'secondary'} className="w-full lg:w-auto" onClick={onRetry}>
+                Send it again
               </Button>
             )
           ) : null}

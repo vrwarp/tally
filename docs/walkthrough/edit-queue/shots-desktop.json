@@ -1,0 +1,138 @@
+[
+  {
+    "file": "desktop-00-typed.png",
+    "viewport": "desktop",
+    "journey": "The ordinary edit",
+    "state": "Typed",
+    "title": "A surname corrected",
+    "caption": "The managed boxes stay disabled until Tally has read what Planning Center holds, so a leader can never type over a value the form has not seen. Notes and roster status are Tally’s own and are editable either way."
+  },
+  {
+    "file": "desktop-01-queued.png",
+    "viewport": "desktop",
+    "journey": "The ordinary edit",
+    "state": "Queued",
+    "title": "Save returns; the wait is somebody else’s",
+    "caption": "The record already shows what was typed, marked as not upstream yet. Nothing has reached Planning Center, so this is the one state where cancelling can keep its promise — and the only one that offers it."
+  },
+  {
+    "file": "desktop-02-queued.png",
+    "viewport": "desktop",
+    "journey": "The ordinary edit",
+    "state": "Queued",
+    "title": "Three edits in flight, from one glance",
+    "caption": "The counts are filters. Job marks are unfilled and dashed against the filled badges the standing flags keep, so an amber badge on a row still means exactly one thing — and the band beside the name carries what is changing and who asked for it, which is what stops a leader opening three records to find out."
+  },
+  {
+    "file": "desktop-03-sending.png",
+    "viewport": "desktop",
+    "journey": "The ordinary edit",
+    "state": "Sending",
+    "title": "A worker has it, and the cancel is gone",
+    "caption": "The patch may already be on the wire. A cancel here could not stop it, and a button that cannot keep its promise leaves a leader believing the old surname survived while the new one lands. This frame exists because the simulator is holding the request open."
+  },
+  {
+    "file": "desktop-04-saved.png",
+    "viewport": "desktop",
+    "journey": "The ordinary edit",
+    "state": "Saved",
+    "title": "Done, and briefly said so",
+    "caption": "A finished row and a row nobody touched used to be the same pixels. The green mark is short-lived on purpose — it reports the job’s outcome, never the value, so it shows nothing new about a child."
+  },
+  {
+    "file": "desktop-05-cancelled.png",
+    "viewport": "desktop",
+    "journey": "Changing your mind",
+    "state": "Cancelled",
+    "title": "Taken back, and the record says so by saying nothing",
+    "caption": "The strip is gone and the name is what Planning Center actually holds again — not the typed one with a mark on it. Cancelling has to undo the optimism as well as the job, or a leader is left reading their own withdrawn correction as though it were the record."
+  },
+  {
+    "file": "desktop-06-queued.png",
+    "viewport": "desktop",
+    "journey": "When two leaders share a roster",
+    "state": "Queued",
+    "title": "Somebody else is already on this record",
+    "caption": "Marcus opens a child Dana is halfway through correcting. He sees her typed value, marked as not upstream yet, and her name against it — which is why nothing has to be locked. The answer to two people at one record is telling, not locking: a locked form at a door is a leader who cannot do their job."
+  },
+  {
+    "file": "desktop-07-queued.png",
+    "viewport": "desktop",
+    "journey": "When two leaders share a roster",
+    "state": "Queued",
+    "title": "The note is already saved; the surname is still on its way",
+    "caption": "One Save, two destinations. Notes and roster status are Tally’s own and land instantly; name, grade, birthday and allergies belong to Planning Center and go through the queue. Holding the note back until the queue drained would make a leader wait on a database that has no opinion about it."
+  },
+  {
+    "file": "desktop-08-waiting.png",
+    "viewport": "desktop",
+    "journey": "When the far end is busy",
+    "state": "Waiting",
+    "title": "Rate-limited, and not stuck",
+    "caption": "A busy lobby kiosk shares one rate limit with the roster, and a correction can be told to come back in half a minute with nothing wrong. This must never read as broken: a leader who thinks it is stuck retries something that was already on its way. The tab is what asks again when the wait expires, so in practice this state is usually over before anybody finishes reading it."
+  },
+  {
+    "file": "desktop-09-still-sending.png",
+    "viewport": "desktop",
+    "journey": "When the far end is busy",
+    "state": "Still sending",
+    "title": "Longer than it should, and still not a failure",
+    "caption": "Five minutes in a state that usually lasts one second. It has to say so — silence here reads as a hang — without saying the one thing that is not true: nothing has failed, and it may still land. A leader who reads \"stuck\" retries something that was already on its way."
+  },
+  {
+    "file": "desktop-10-refused.png",
+    "viewport": "desktop",
+    "journey": "When it will not land",
+    "state": "Refused",
+    "title": "Nothing was saved, and nothing typed is lost",
+    "caption": "Planning Center read this and said no, so the button opens the editor with the refused values still in it. The refusal outlives the tab that made it — one obvious move, and an escape hatch that is visibly not it, where the two used to be the same object eight pixels apart."
+  },
+  {
+    "file": "desktop-11-unreachable.png",
+    "viewport": "desktop",
+    "journey": "When it will not land",
+    "state": "Unreachable",
+    "title": "Nobody answered, and that is not a refusal",
+    "caption": "Tally tried and gave up, so there is nothing in the form to fix and the button says so: it sends the same patch again. Calling this \"refused\" over a \"Fix and send again\" sent a leader hunting for a mistake in a correction that never had one."
+  },
+  {
+    "file": "desktop-12-refused.png",
+    "viewport": "desktop",
+    "journey": "When it will not land",
+    "state": "Refused",
+    "title": "Not this leader’s to fix, and it says whose",
+    "caption": "A rotated credential fails every queued job at once, and nothing a leader typed is wrong — so the errand is named (an admin, in Settings) and the move is to send the same patch again once they have done it. Not to open the editor: this frame is the reason the editor is now offered for one class of refusal only, because it was photographed here beside a sentence ruling it out."
+  },
+  {
+    "file": "desktop-13-changed-upstream.png",
+    "viewport": "desktop",
+    "journey": "When two people disagree",
+    "state": "Changed upstream",
+    "title": "Somebody changed the same field first",
+    "caption": "Nothing was written. The profile write is a compare-and-set, so an edit that arrives second does not get to decide what a child’s record says. Neither move is the default — one of them writes over a change a named human made on purpose."
+  },
+  {
+    "file": "desktop-14-merged-upstream.png",
+    "viewport": "desktop",
+    "journey": "When the person moves",
+    "state": "Merged upstream",
+    "title": "The edit landed on somebody else",
+    "caption": "Both cells hold the same surname, because this is the quiet case: the survivor already had it, so no field disagrees. What moved is the person, and the two ids are the only thing that says so. Deciding this on the id rather than the values is what catches it."
+  },
+  {
+    "file": "desktop-15-no-upstream-record.png",
+    "viewport": "desktop",
+    "journey": "When the person moves",
+    "state": "No upstream record",
+    "title": "Deleted, and not merged into anybody",
+    "caption": "Different from a refusal: there is nothing to try again against. Re-creating sends the correction with them so nobody types it twice — and searches for a matching person first, which the linked path did not do until this work."
+  },
+  {
+    "file": "desktop-16-needs-you.png",
+    "viewport": "desktop",
+    "journey": "Down a list of forty-nine",
+    "state": "Needs you",
+    "title": "Which of them are waiting on a human",
+    "caption": "The second count, and the one that answers the Sunday-morning question. A leader who made nine corrections in four minutes cannot re-open nine records to find the two that did not land, and the marks are unfilled and dashed against the filled badges the standing flags keep — so an amber badge on a row still means exactly one thing."
+  }
+]
