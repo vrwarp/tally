@@ -59,6 +59,17 @@ const setParentContact = vi.hoisted(() => vi.fn());
 const addParent = vi.hoisted(() => vi.fn());
 vi.mock('@/services/functions', () => ({ updateStudentProfile, setParentContact, addParent }));
 
+/*
+ * Save no longer waits on the backend — it queues a job — so this is the seam
+ * these tests now assert against. Mocked rather than imported for the same
+ * reason every Firestore-touching module here is: the real one reaches
+ * `@/lib/firebase`, which throws at import time with no project configured.
+ */
+const enqueueUpstreamEdit = vi.hoisted(() =>
+  vi.fn<(...args: unknown[]) => Promise<string>>(async () => 'edit-1'),
+);
+vi.mock('@/services/upstreamEdits', () => ({ enqueueUpstreamEdit }));
+
 const updateStudent = vi.hoisted(() => vi.fn<(...args: unknown[]) => Promise<void>>(async () => {}));
 const createStudent = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<string>>(async () => 'new-student'),
@@ -156,6 +167,7 @@ const save = async () => {
 
 beforeEach(() => {
   updateStudentProfile.mockClear();
+  enqueueUpstreamEdit.mockClear();
   updateStudent.mockClear();
   createStudent.mockClear();
   refreshRoster.mockClear();
@@ -193,7 +205,7 @@ describe('when write-back is not full', () => {
     await save();
 
     await waitFor(() => expect(updateStudent).toHaveBeenCalled());
-    expect(updateStudentProfile).not.toHaveBeenCalled();
+    expect(enqueueUpstreamEdit).not.toHaveBeenCalled();
     expect(updateStudent.mock.calls[0]?.[1]).toEqual({ notes: 'Rides with the Kims' });
   });
 });
@@ -211,7 +223,7 @@ describe('when write-back is full', () => {
     expect(screen.getByRole('link', { name: /Open in Planning Center/ })).toBeInTheDocument();
   });
 
-  it('sends the edit straight upstream, and keeps no copy in Tally', async () => {
+  it('queues only the field that changed, and keeps no copy in Tally', async () => {
     open(linked());
 
     const first = screen.getByLabelText(/First name/);
@@ -219,26 +231,32 @@ describe('when write-back is full', () => {
     await userEvent.type(first, 'Sofía');
     await save();
 
-    await waitFor(() => expect(updateStudentProfile).toHaveBeenCalled());
-    expect(updateStudentProfile.mock.calls[0]?.[0]).toMatchObject({
-      studentId: 'pco_4200003',
-      firstName: 'Sofía',
-      lastName: 'Delgado',
-      grade: 11,
-    });
+    await waitFor(() => expect(enqueueUpstreamEdit).toHaveBeenCalled());
+    const queued = enqueueUpstreamEdit.mock.calls[0]?.[0] as {
+      studentId: string;
+      patch: Record<string, unknown>;
+      baseline: Record<string, unknown>;
+    };
+    expect(queued.studentId).toBe('pco_4200003');
+    expect(queued.patch).toEqual({ firstName: 'Sofía' });
+    /*
+     * The last name and the grade are *absent*, and that is the assertion that
+     * matters. `updateStudentProfile` sent every managed field on every save,
+     * which is right for a request somebody waits on — the server diffs against
+     * a fresh read. It is wrong for a queued one: a second leader restating a
+     * value they never touched patches the first leader's in-flight correction
+     * back out, and both are told they succeeded.
+     */
+    expect(queued.patch).not.toHaveProperty('lastName');
+    expect(queued.patch).not.toHaveProperty('grade');
+    // What the form was showing, so the drain can tell a value somebody else
+    // changed in between from the one this edit is replacing.
+    expect(queued.baseline).toMatchObject({ firstName: 'Sofia' });
+
     // Notes and nothing else: the name went where the name lives.
     expect(updateStudent.mock.calls[0]?.[1]).toEqual({ notes: '' });
-    /*
-     * And the roster takes the row the write handed back rather than being read
-     * again. A forced refresh here was a paged sweep of every child in the
-     * church, waited on with the modal still open, to be told the name that had
-     * just been sent.
-     */
-    await waitFor(() =>
-      expect(applyRosterPerson).toHaveBeenCalledWith(
-        expect.objectContaining({ pcoPersonId: '4200003', firstName: 'Sofía' }),
-      ),
-    );
+    // And nothing waits on the roster, because nothing has landed yet to read.
+    expect(applyRosterPerson).not.toHaveBeenCalled();
     expect(refreshRoster).not.toHaveBeenCalled();
   });
 
@@ -252,10 +270,10 @@ describe('when write-back is full', () => {
     await userEvent.type(allergies, 'Peanuts. EpiPen in her bag.');
     await save();
 
-    await waitFor(() => expect(updateStudentProfile).toHaveBeenCalled());
-    expect(updateStudentProfile.mock.calls[0]?.[0]).toMatchObject({
-      allergies: 'Peanuts. EpiPen in her bag.',
-    });
+    await waitFor(() => expect(enqueueUpstreamEdit).toHaveBeenCalled());
+    expect(
+      (enqueueUpstreamEdit.mock.calls[0]?.[0] as { patch: Record<string, unknown> }).patch,
+    ).toMatchObject({ allergies: 'Peanuts. EpiPen in her bag.' });
   });
 
   /**
@@ -274,19 +292,32 @@ describe('when write-back is full', () => {
 
     await save();
     await waitFor(() => expect(updateStudent).toHaveBeenCalled());
-    expect(updateStudentProfile).not.toHaveBeenCalled();
+    expect(enqueueUpstreamEdit).not.toHaveBeenCalled();
   });
 
-  it('keeps the form open and shows why when Planning Center refuses', async () => {
-    updateStudentProfile.mockResolvedValueOnce({
-      data: { status: 'invalid', wrote: [], message: 'A last name is required.' },
-    });
+  /**
+   * The refusal moved, and that is the point of this whole change.
+   *
+   * A backend can still say no — a birthday it will not take, credentials that
+   * have been rotated — but nobody finds out while a modal is open, because the
+   * modal is not waiting any more. The job carries the refusal, the record's
+   * strip says what happened and offers the one move, and it survives the tab
+   * being closed. What this asserts is the half that used to be a spinner:
+   * pressing Save returns.
+   */
+  it('closes on Save instead of waiting for the backend to answer', async () => {
     open(linked());
 
+    const first = screen.getByLabelText(/First name/);
+    await userEvent.clear(first);
+    await userEvent.type(first, 'Sofía');
     await save();
 
-    expect(await screen.findByText('A last name is required.')).toBeInTheDocument();
-    expect(updateStudent).not.toHaveBeenCalled();
+    await waitFor(() => expect(enqueueUpstreamEdit).toHaveBeenCalled());
+    // Nothing on this path talks to the backend at all any more: the callable
+    // that used to hold the modal open while Planning Center thought about it
+    // is not reached, so Save has nothing left to wait for.
+    expect(updateStudentProfile).not.toHaveBeenCalled();
   });
 
   it('still refuses to write the status, which is a roster decision', () => {
@@ -332,8 +363,15 @@ describe('when write-back is full', () => {
       );
       await save();
 
-      await waitFor(() => expect(updateStudentProfile).toHaveBeenCalled());
-      expect(updateStudentProfile.mock.calls[0]?.[0]).not.toHaveProperty('birthday');
+      /*
+       * Nothing is queued at all. The form opened on the date already on file
+       * and nobody typed, so there is no instruction in it — and under a queue
+       * that is the stronger statement, because a job carrying an empty patch
+       * would put a mark on every screen showing this student for a save that
+       * asked for nothing.
+       */
+      await waitFor(() => expect(updateStudent).toHaveBeenCalled());
+      expect(enqueueUpstreamEdit).not.toHaveBeenCalled();
     });
 
     /** And the correction that was impossible before: the year itself. */
@@ -347,8 +385,8 @@ describe('when write-back is full', () => {
       await userEvent.type(box, '6/28/2009');
       await save();
 
-      await waitFor(() => expect(updateStudentProfile).toHaveBeenCalled());
-      expect(updateStudentProfile.mock.calls[0]?.[0]).toMatchObject({ birthday: '2009-06-28' });
+      await waitFor(() => expect(enqueueUpstreamEdit).toHaveBeenCalled());
+      expect((enqueueUpstreamEdit.mock.calls[0]?.[0] as { patch: Record<string, unknown> }).patch).toMatchObject({ birthday: '2009-06-28' });
     });
 
     it('sends the corrected day on its own, so the year upstream is kept', async () => {
@@ -359,8 +397,8 @@ describe('when write-back is full', () => {
       await userEvent.type(box, '6/26');
       await save();
 
-      await waitFor(() => expect(updateStudentProfile).toHaveBeenCalled());
-      expect(updateStudentProfile.mock.calls[0]?.[0]).toMatchObject({ birthday: '06-26' });
+      await waitFor(() => expect(enqueueUpstreamEdit).toHaveBeenCalled());
+      expect((enqueueUpstreamEdit.mock.calls[0]?.[0] as { patch: Record<string, unknown> }).patch).toMatchObject({ birthday: '06-26' });
     });
 
     it('sends the whole date when a leader types the year too', async () => {
@@ -369,8 +407,8 @@ describe('when write-back is full', () => {
       await userEvent.type(screen.getByLabelText('Birthday'), '4/2/2013');
       await save();
 
-      await waitFor(() => expect(updateStudentProfile).toHaveBeenCalled());
-      expect(updateStudentProfile.mock.calls[0]?.[0]).toMatchObject({ birthday: '2013-04-02' });
+      await waitFor(() => expect(enqueueUpstreamEdit).toHaveBeenCalled());
+      expect((enqueueUpstreamEdit.mock.calls[0]?.[0] as { patch: Record<string, unknown> }).patch).toMatchObject({ birthday: '2013-04-02' });
     });
 
     /**
@@ -387,8 +425,10 @@ describe('when write-back is full', () => {
       await userEvent.type(first, 'Sofía');
       await save();
 
-      await waitFor(() => expect(updateStudentProfile).toHaveBeenCalled());
-      expect(updateStudentProfile.mock.calls[0]?.[0]).not.toHaveProperty('birthday');
+      await waitFor(() => expect(enqueueUpstreamEdit).toHaveBeenCalled());
+      expect(
+        (enqueueUpstreamEdit.mock.calls[0]?.[0] as { patch: Record<string, unknown> }).patch,
+      ).not.toHaveProperty('birthday');
     });
 
     /**
@@ -402,8 +442,8 @@ describe('when write-back is full', () => {
       await userEvent.type(screen.getByLabelText('Birthday'), '4/2');
       await save();
 
-      await waitFor(() => expect(updateStudentProfile).toHaveBeenCalled());
-      expect(updateStudentProfile.mock.calls[0]?.[0]).toMatchObject({ birthday: '04-02' });
+      await waitFor(() => expect(enqueueUpstreamEdit).toHaveBeenCalled());
+      expect((enqueueUpstreamEdit.mock.calls[0]?.[0] as { patch: Record<string, unknown> }).patch).toMatchObject({ birthday: '04-02' });
     });
 
     it('refuses a day that month does not have', async () => {
@@ -415,7 +455,7 @@ describe('when write-back is full', () => {
       await save();
 
       expect(await screen.findByText(/does not exist/)).toBeInTheDocument();
-      expect(updateStudentProfile).not.toHaveBeenCalled();
+      expect(enqueueUpstreamEdit).not.toHaveBeenCalled();
     });
 
     it('offers no birthday box at all when Tally may not write it', () => {
@@ -456,8 +496,8 @@ describe('a student with no grade on file', () => {
     await userEvent.type(first, 'Alan');
     await save();
 
-    await waitFor(() => expect(updateStudentProfile).toHaveBeenCalled());
-    expect(updateStudentProfile.mock.calls[0]?.[0]).not.toHaveProperty('grade');
+    await waitFor(() => expect(enqueueUpstreamEdit).toHaveBeenCalled());
+    expect((enqueueUpstreamEdit.mock.calls[0]?.[0] as { patch: Record<string, unknown> }).patch).not.toHaveProperty('grade');
   });
 
   it('writes no grade onto the annotation document either', async () => {
@@ -481,8 +521,8 @@ describe('a student with no grade on file', () => {
     await userEvent.selectOptions(screen.getByLabelText(/Grade/), '8');
     await save();
 
-    await waitFor(() => expect(updateStudentProfile).toHaveBeenCalled());
-    expect(updateStudentProfile.mock.calls[0]?.[0]).toMatchObject({ grade: 8 });
+    await waitFor(() => expect(enqueueUpstreamEdit).toHaveBeenCalled());
+    expect((enqueueUpstreamEdit.mock.calls[0]?.[0] as { patch: Record<string, unknown> }).patch).toMatchObject({ grade: 8 });
   });
 
   it('offers no blank option to a student whose grade is genuinely on file', () => {
@@ -527,7 +567,7 @@ describe('a visitor Tally created', () => {
     await save();
 
     await waitFor(() => expect(updateStudent).toHaveBeenCalled());
-    expect(updateStudentProfile).not.toHaveBeenCalled();
+    expect(enqueueUpstreamEdit).not.toHaveBeenCalled();
     expect(updateStudent.mock.calls[0]?.[1]).toMatchObject({
       firstName: 'Nia',
       lastName: 'Fontaine',

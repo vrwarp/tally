@@ -40,6 +40,16 @@ const updateStudentProfile = vi.hoisted(() =>
     }),
   ),
 );
+vi.mock('@/services/upstreamEdits', () => ({
+  // The record's sync strip reads the queue through `useData`; nothing in this
+  // file drives it, and the real module reaches `@/lib/firebase`.
+  enqueueUpstreamEdit: async () => 'edit-1',
+  cancelUpstreamEdit: async () => {},
+  retryUpstreamEdit: async () => {},
+  dismissUpstreamEdit: async () => {},
+  subscribeUpstreamEdits: () => () => {},
+}));
+
 vi.mock('@/services/functions', () => ({
   updateStudentProfile,
   addRosterMember: vi.fn(),
