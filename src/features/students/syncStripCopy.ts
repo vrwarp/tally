@@ -89,7 +89,19 @@ export function syncStripCopy(input: SyncStripInput): SyncStripCopy {
             tone: 'run',
             glyph: '▪',
             heading: 'Held on this phone — no signal',
-            body: `${fields}, ${by} ${ago}. It has not left the device yet. It goes as soon as you have signal, even if you lock the screen.`,
+            /*
+             * "Even if you lock the screen" was here, and Tally cannot keep it.
+             * The Firestore client is built with a memory cache on purpose
+             * (see `lib/firebase.ts`: the persistent one can wedge a whole
+             * client behind a Web Lock that is never granted, with a queue at
+             * the door). An unsent write therefore lives as long as the page
+             * does, and a phone that discards a backgrounded tab takes the
+             * correction with it. Saying so is not a nice sentence to write,
+             * and it is the difference between a leader who leaves Tally open
+             * for the walk back to the office and one who is told a fortnight
+             * later that the surname never changed.
+             */
+            body: `${fields}, ${by} ${ago}. It has not left the device yet, and it goes as soon as you have signal — as long as Tally is still open. Closing this tab before then loses it.`,
           }
         : {
             tone: 'run',
@@ -160,14 +172,38 @@ export function syncStripCopy(input: SyncStripInput): SyncStripCopy {
 
     case 'failed':
     default:
-      return {
-        tone: 'bad',
-        glyph: '!',
-        heading: `${backend} refused this edit`,
-        body: edit.message
-          ? `${edit.message} ${fields.toLowerCase()}, ${by} ${ago}. Nothing was saved.`
-          : `${fields}, ${by} ${ago}. Nothing was saved.`,
-      };
+      /*
+       * Two failures wearing one word, and a leader has to be able to tell
+       * them apart before pressing anything. `exhausted` is a backend Tally
+       * could not reach and has stopped ringing — pressing again is the whole
+       * answer, and often works. Every other class is the backend answering
+       * and saying no, where pressing again unchanged will be told no again;
+       * a heading that called both of them "refused" sent people to retry the
+       * one retrying cannot fix, and made the outage look like a rejection of
+       * something they had typed.
+       */
+      return edit.failure === 'exhausted'
+        ? {
+            tone: 'bad',
+            glyph: '!',
+            heading: `Could not reach ${backend}`,
+            body: `${fields}, ${by} ${ago}. Tally tried and gave up, and has stopped trying on its own — sending it again is usually all it takes. Nothing was saved, and nothing you typed is lost.`,
+          }
+        : {
+            tone: 'bad',
+            glyph: '!',
+            heading: `${backend} refused this edit`,
+            /*
+             * The field sentence first, the backend's own words after, in that
+             * order on every state in this file. Inverted here once, and the
+             * backend's message ends in a full stop — so the sentence a leader
+             * read was a lowercase fragment starting mid-thought, on the one
+             * screen in the queue where the words are all there is.
+             */
+            body: edit.message
+              ? `${fields}, ${by} ${ago}. ${edit.message} Nothing was saved.`
+              : `${fields}, ${by} ${ago}. Nothing was saved.`,
+          };
   }
 }
 

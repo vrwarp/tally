@@ -66,7 +66,15 @@ vi.mock('@/services/functions', () => ({ updateStudentProfile, setParentContact,
  * `@/lib/firebase`, which throws at import time with no project configured.
  */
 const enqueueUpstreamEdit = vi.hoisted(() =>
-  vi.fn<(...args: unknown[]) => Promise<string>>(async () => 'edit-1'),
+  /*
+   * Returns synchronously, like the real one: the job exists on the device the
+   * moment it is called, and the promise it hands back is the *server's*
+   * answer, which the screens deliberately do not wait for.
+   */
+  vi.fn<(...args: unknown[]) => { editId: string; written: Promise<void> }>(() => ({
+    editId: 'edit-1',
+    written: Promise.resolve(),
+  })),
 );
 vi.mock('@/services/upstreamEdits', () => ({ enqueueUpstreamEdit }));
 
@@ -128,7 +136,7 @@ function details(overrides: Partial<PcoPersonDetails> = {}): PcoPersonDetails {
   };
 }
 
-function open(student: Student | null, onSaved = vi.fn()) {
+function open(student: Student | null, onSaved = vi.fn(), onClose = vi.fn()) {
   const data = {
     students: student ? [student] : [],
     events: [],
@@ -157,7 +165,7 @@ function open(student: Student | null, onSaved = vi.fn()) {
     </AuthContext.Provider>
   );
 
-  render(wrap(<StudentEditorModal open onClose={() => {}} student={student} onSaved={onSaved} />));
+  render(wrap(<StudentEditorModal open onClose={onClose} student={student} onSaved={onSaved} />));
   return onSaved;
 }
 
@@ -213,6 +221,57 @@ describe('when write-back is not full', () => {
 describe('when write-back is full', () => {
   beforeEach(() => {
     personDetails.current = details();
+  });
+
+  /**
+   * The corridor case, which is the one the whole queue was built for.
+   *
+   * Offline, a Firestore write is applied on the device at once and its promise
+   * stays pending until a server acknowledges it — which may be minutes. This
+   * used to be awaited before closing, so a leader with no signal pressed Save
+   * and sat looking at an open dialog with a spinner in it. Nothing here mocks
+   * the network: a job whose server acknowledgement never comes is exactly what
+   * a `written` promise that never settles is.
+   */
+  it('closes on the write reaching the device, not on a server answering', async () => {
+    const onClose = vi.fn();
+    enqueueUpstreamEdit.mockReturnValueOnce({
+      editId: 'edit-1',
+      written: new Promise<void>(() => {}),
+    });
+    open(linked(), vi.fn(), onClose);
+
+    await userEvent.clear(screen.getByLabelText(/Last name/));
+    await userEvent.type(screen.getByLabelText(/Last name/), 'Chen-Ito');
+    await save();
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(enqueueUpstreamEdit).toHaveBeenCalled();
+  });
+
+  /**
+   * The other half of not waiting: a job the rules refused never existed, so no
+   * strip will ever appear on the record to report it. If this screen says
+   * nothing either, the correction is gone and nobody is told.
+   */
+  it('says so when the job could not be written at all', async () => {
+    // Built inside the implementation rather than ahead of it: a rejected
+    // promise created before the call is unhandled for a turn, and Node counts
+    // that as an unhandled rejection even though the screen attaches a handler
+    // the instant it is given one.
+    enqueueUpstreamEdit.mockImplementationOnce(() => ({
+      editId: 'edit-1',
+      written: Promise.reject(new Error('permission-denied')),
+    }));
+    open(linked());
+
+    await userEvent.clear(screen.getByLabelText(/Last name/));
+    await userEvent.type(screen.getByLabelText(/Last name/), 'Chen-Ito');
+    await save();
+
+    await waitFor(() =>
+      expect(show).toHaveBeenCalledWith(expect.stringMatching(/could not be saved/i)),
+    );
   });
 
   it('lets a leader correct the name that Planning Center holds', () => {

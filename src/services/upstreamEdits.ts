@@ -172,7 +172,27 @@ export interface EnqueueOptions {
  * edit becomes its own job and runs after, which is also correct, because the
  * drain diffs against a read taken after the first one landed.
  */
-export async function enqueueUpstreamEdit(options: EnqueueOptions): Promise<string> {
+export interface EnqueuedEdit {
+  /** The job's id, which exists the moment the local write is applied. */
+  editId: string;
+  /**
+   * Resolves when the server has the job, and rejects if it never will.
+   *
+   * Deliberately not awaited by the screens that enqueue: offline, this does
+   * not settle at all — the Firestore SDK holds the write and keeps this
+   * promise pending until a server acknowledges it, which on a phone in a
+   * corridor may be several minutes. Awaiting it is what left a leader looking
+   * at an open dialog and a spinner after pressing Save with no signal, which
+   * is the exact case the queue was built for.
+   *
+   * It still has to be watched: the one thing that must not happen quietly is
+   * a rejection, because a job the rules refused never existed and no strip
+   * will ever appear to say so.
+   */
+  written: Promise<void>;
+}
+
+export function enqueueUpstreamEdit(options: EnqueueOptions): EnqueuedEdit {
   const { studentId, uid, authorName } = options;
 
   /*
@@ -197,7 +217,7 @@ export async function enqueueUpstreamEdit(options: EnqueueOptions): Promise<stri
    */
   const ref = doc(collection(db, paths.upstreamEdits()));
 
-  await setDoc(ref, {
+  const written = setDoc(ref, {
     studentId,
     patch: options.patch,
     baseline: options.baseline,
@@ -219,7 +239,7 @@ export async function enqueueUpstreamEdit(options: EnqueueOptions): Promise<stri
     settledAt: null,
   });
 
-  return ref.id;
+  return { editId: ref.id, written };
 }
 
 /**

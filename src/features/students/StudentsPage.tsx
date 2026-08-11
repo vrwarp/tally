@@ -42,6 +42,7 @@ import { buildRosterCsv } from '@/features/students/rosterCsv';
 import { RowBadgeModal, type RowBadgeAction } from '@/features/students/RowBadgeModal';
 import { StudentEditorModal } from '@/features/students/StudentEditorModal';
 import { JobChip } from '@/features/students/JobChip';
+import { describeFields } from '@/features/students/syncStripCopy';
 import { latestByStudent } from '@/features/roster/pendingEdits';
 import {
   birthdayState,
@@ -470,6 +471,7 @@ export function StudentsPage() {
                 unreachable={isUnreachable(student, reachable)}
                 now={now}
                 edit={editsByStudent.get(student.id) ?? null}
+                uid={user?.uid ?? null}
                 onBadge={openBadge}
               />
             ))}
@@ -557,6 +559,7 @@ const StudentListRow = memo(function StudentListRow({
   unreachable,
   now,
   edit,
+  uid,
   onBadge,
 }: {
   student: Student;
@@ -570,6 +573,8 @@ const StudentListRow = memo(function StudentListRow({
    * disagree about which pile it is in.
    */
   edit: UpstreamEdit | null;
+  /** Whoever is reading, so the band can say "you" rather than their own name. */
+  uid: string | null;
   onBadge: (student: Student, action: RowBadgeAction) => void;
 }) {
   const name = `${student.firstName} ${student.lastName}`;
@@ -643,7 +648,22 @@ const StudentListRow = memo(function StudentListRow({
           <span className="font-semibold">{student.firstName}</span>{' '}
           <span className="font-normal text-ink-300">{student.lastName}</span>
         </span>
-        <NoteSnippet notes={student.notes} />
+        {/*
+          The band, or the note — never both, and never neither.
+
+          Both want the one elastic slot this row has, and a row can only
+          give it to one of them. The job wins it for as long as it is a
+          job: a note is a standing fact that will read the same tomorrow,
+          and an edit on its way to the church's database is the only thing
+          on this row that has a clock on it. It hands the slot straight
+          back when the job settles, so a list at rest is the list that was
+          always here.
+        */}
+        {edit ? (
+          <JobBand edit={edit} now={now} uid={uid} />
+        ) : (
+          <NoteSnippet notes={student.notes} />
+        )}
         <LastSeen at={student.lastAttendedAt} />
         {/*
           Badges annotate the row; they do not restructure it.
@@ -655,10 +675,18 @@ const StudentListRow = memo(function StudentListRow({
           the no-contact flag at five different x positions, so the thing a
           leader came to find was a ragged mid-row scan rather than a column.
 
-          `min-w-80` rather than a fixed width: the lane holds its column for
+          `min-w-72` rather than a fixed width: the lane holds its column for
           the rows everybody has, and grows into the note's space on the rare
           row carrying four flags at once, instead of overflowing them back
           across the columns to its left.
+
+          It was `min-w-80`, and gave 32px back to the slot on its left when
+          that slot stopped being only a note. A row carrying a job spends
+          that slot on the two facts a mark cannot hold — what is changing
+          and who asked for it — and at 1280 with the sidebar open there was
+          not room for a sixth word of it. The lane still holds every badge
+          the common rows wear; it reaches for the extra width only on the
+          rare four-flag row, exactly as before.
 
           The grade sits at the lane's leading edge and the badges are pushed to
           its trailing edge by a spacer that takes the slack. Packed together
@@ -666,7 +694,7 @@ const StudentListRow = memo(function StudentListRow({
           one fact every row shares, at a different x on every row, which is the
           precise thing this lane was given a fixed width to stop.
         */}
-        <span className="relative z-10 mt-0.5 flex flex-wrap items-center gap-2 text-xs text-ink-500 lg:mt-0 lg:min-w-80 lg:shrink-0 lg:flex-nowrap">
+        <span className="relative z-10 mt-0.5 flex flex-wrap items-center gap-2 text-xs text-ink-500 lg:mt-0 lg:min-w-72 lg:shrink-0 lg:flex-nowrap">
           {/*
             Never the thing that gives way.
 
@@ -682,10 +710,10 @@ const StudentListRow = memo(function StudentListRow({
             {spokenGrade ?? NO_GRADE}
           </span>
           {/*
-            The job mark rides in the row's meta line below `lg` and in the
-            band beside the name at pointer widths — one component, two slots.
-            Below `lg` it is the word alone: a phone row has no room for an age
-            and the caption that carries the field and the author is `lg:` only.
+            The job mark rides in the row's meta line below `lg`, and beside
+            the name at pointer widths — one component, two slots. Below `lg`
+            it is the word alone: a phone row has no room for an age, and the
+            caption carrying the field and the author is `lg:` only.
           */}
           {edit ? <JobChip edit={edit} now={now} short className="lg:hidden" /> : null}
           <span className="hidden lg:block lg:flex-1" />
@@ -775,6 +803,53 @@ const StudentListRow = memo(function StudentListRow({
  * of context, so this is set to read as annotation rather than as content —
  * the row's own facts stay the brighter thing.
  */
+/**
+ * What is changing on this row, and who asked for it.
+ *
+ * The wide layout's answer to the question a mark alone raises. "Queued" on a
+ * row tells a leader something is happening to a child's record and not what,
+ * which on a shared roster is the moment they open it to find out — so the two
+ * facts that stop them are the ones the mark cannot carry: the fields, and the
+ * name of whoever typed them.
+ *
+ * The chip's lane is fixed rather than shrink-to-fit. Its word is the widest
+ * thing about it and its age ticks, so a lane sized to its contents would move
+ * the caption beside it as the seconds passed and put a different left edge on
+ * every row of a filtered list — the whole reason this screen has columns.
+ */
+function JobBand({
+  edit,
+  now,
+  uid,
+}: {
+  edit: UpstreamEdit;
+  now: Date;
+  uid: string | null;
+}) {
+  const mine = edit.createdBy === uid;
+  const author = mine ? 'you' : (edit.createdByName.split(/\s+/)[0] ?? 'somebody');
+  const caption = `${describeFields(edit)} · ${author}`;
+
+  return (
+    <span className="hidden min-w-0 flex-1 items-center gap-2 text-xs text-ink-500 lg:flex">
+      <span className="flex min-w-36 shrink-0">
+        <JobChip edit={edit} now={now} />
+      </span>
+      {/*
+        The first thing to truncate on a narrow laptop, and deliberately so:
+        it is the only part of the row whose full text a pointer can get back
+        by hovering, and the record itself says the same thing in prose one
+        press away. Everything either side of it is a column, and a column
+        that truncates on some rows and not others is worse than a phrase
+        that ends in an ellipsis.
+      */}
+      <span title={caption} className="min-w-0 truncate">
+        {caption}
+      </span>
+    </span>
+  );
+}
+
 function NoteSnippet({ notes }: { notes: string | null }) {
   // Rendered even when empty. It is the only elastic thing left in the row now
   // that the name is pinned, so a row without a note that skipped it would pull

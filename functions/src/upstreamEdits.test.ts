@@ -12,6 +12,7 @@ import {
   BACKOFF_MS,
   LEASE_MS,
   MAX_ATTEMPTS,
+  messageFor,
   UPSTREAM_EDITS,
   UPSTREAM_EDIT_LEASES,
   claimStudent,
@@ -191,6 +192,35 @@ describe('retrying', () => {
       state: 'failed',
       failure: 'exhausted',
     });
+  });
+
+  /**
+   * The sentence that goes with a retry is written in the future tense — it
+   * says the job will try again on its own — and on the last attempt that
+   * stops being true. It has to be dropped there, because `failed` is a state
+   * a leader is expected to act on: "it will try again" above a button that
+   * says "send it again" tells somebody their correction is in hand when it is
+   * sitting still, which is the one thing this queue is not allowed to do.
+   */
+  it('drops a retry\u2019s promise once there are no retries left', () => {
+    const promise = {
+      kind: 'retry' as const,
+      message: 'Could not reach Planning Center to save this. It will try again on its own.',
+    };
+
+    expect(messageFor(promise, 'waiting')).toBe(promise.message);
+    expect(messageFor(promise, 'failed')).toBeNull();
+  });
+
+  it('keeps what a backend actually said when it refused', () => {
+    // Not the tense problem: a refusal's words are true whenever they are read,
+    // and they are the only account of *why* the screen has anything to give.
+    expect(
+      messageFor(
+        { kind: 'refused', failure: 'validation', message: 'Planning Center rejected the grade.' },
+        'failed',
+      ),
+    ).toBe('Planning Center rejected the grade.');
   });
 
   /**

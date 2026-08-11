@@ -41,7 +41,15 @@ const updateStudentProfile = vi.hoisted(() =>
   ),
 );
 const enqueueUpstreamEdit = vi.hoisted(() =>
-  vi.fn<(...args: unknown[]) => Promise<string>>(async () => 'edit-1'),
+  /*
+   * Returns synchronously, like the real one: the job exists on the device the
+   * moment it is called, and the promise it hands back is the *server's*
+   * answer, which the screens deliberately do not wait for.
+   */
+  vi.fn<(...args: unknown[]) => { editId: string; written: Promise<void> }>(() => ({
+    editId: 'edit-1',
+    written: Promise.resolve(),
+  })),
 );
 vi.mock('@/services/upstreamEdits', () => ({
   enqueueUpstreamEdit,

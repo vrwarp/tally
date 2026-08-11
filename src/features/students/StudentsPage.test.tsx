@@ -27,7 +27,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ToastProvider } from '@/context/ToastProvider';
 import { StudentsPage } from '@/features/students/StudentsPage';
 import { makeSettings, makeStudent } from '../../../tests/factories';
-import type { Student } from '@/types';
+import type { Student, UpstreamEdit } from '@/types';
 
 const useData = vi.hoisted(() => vi.fn());
 const useAuth = vi.hoisted(() => vi.fn());
@@ -132,6 +132,96 @@ function renderRoster(
 function row(name: RegExp) {
   return screen.getByRole('link', { name }).closest('li') as HTMLElement;
 }
+
+function job(over: Partial<UpstreamEdit> = {}): UpstreamEdit {
+  return {
+    id: 'edit-1',
+    studentId: 's1',
+    patch: { lastName: 'Shin-Park', grade: 8 },
+    baseline: { lastName: 'Shin', grade: 7 },
+    state: 'queued',
+    attempts: 0,
+    nextAttemptAt: null,
+    leaseUntil: null,
+    failure: null,
+    message: null,
+    field: null,
+    observed: null,
+    survivorPersonId: null,
+    survivorName: null,
+    createdAt: TODAY,
+    createdBy: 'counselor-1',
+    createdByName: 'Dana Ruiz',
+    updatedAt: TODAY,
+    startedAt: null,
+    settledAt: null,
+    pendingOnDevice: false,
+    ...over,
+  };
+}
+
+/**
+ * The band beside the name, which is the wide layout's whole answer to "so
+ * what is being changed, and by whom".
+ *
+ * Worth pinning because it was missing for a while and nothing failed: the
+ * phone chip was built, the desktop half was described in a comment and never
+ * written, and a laptop showed a filtered in-flight list of rows saying
+ * nothing at all. A test that only asserts the mark exists passes in that
+ * state, so these assert the two facts the mark cannot carry.
+ */
+describe('the band a row wears while an edit of it is on its way', () => {
+  it('names the fields changing and who asked for it', () => {
+    renderRoster([makeStudent({ id: 's1', firstName: 'Aiden', lastName: 'Shin' })], {}, { upstreamEdits: [job()] });
+
+    expect(within(row(/Aiden/)).getByText(/Last name and grade · you/)).toBeInTheDocument();
+  });
+
+  it('uses the author\u2019s first name when it is somebody else\u2019s edit', () => {
+    renderRoster([makeStudent({ id: 's1', firstName: 'Aiden', lastName: 'Shin' })], {}, { upstreamEdits: [job({ createdBy: 'pastor-2' })] });
+
+    expect(within(row(/Aiden/)).getByText(/Last name and grade · Dana/)).toBeInTheDocument();
+  });
+
+  it('keeps the band through the moment it says "Saved"', () => {
+    renderRoster(
+      [makeStudent({ id: 's1', firstName: 'Aiden', lastName: 'Shin', notes: 'Rides with Bea' })],
+      {},
+      { upstreamEdits: [job({ state: 'landed' })] },
+    );
+
+    // The green mark and the caption that says what it was arrive and leave
+    // together. Splitting them would leave "Saved" on a row for a minute or
+    // two without saying saved *what* — which is the state a leader is most
+    // likely to be scanning, because it is the one they were waiting for.
+    expect(within(row(/Aiden/)).getByText(/Last name and grade · you/)).toBeInTheDocument();
+    expect(within(row(/Aiden/)).queryByText('Rides with Bea')).not.toBeInTheDocument();
+  });
+
+  it('gives the slot back to the note once the job is gone', () => {
+    renderRoster(
+      [makeStudent({ id: 's1', firstName: 'Aiden', lastName: 'Shin', notes: 'Rides with Bea' })],
+      {},
+      { upstreamEdits: [] },
+    );
+
+    // The sweeper deletes a landed job shortly after, and the row is at rest
+    // again: the note is back, and nothing about the edit remains.
+    expect(within(row(/Aiden/)).getByText('Rides with Bea')).toBeInTheDocument();
+    expect(within(row(/Aiden/)).queryByText(/· you/)).not.toBeInTheDocument();
+  });
+
+  it('keeps the band while the job needs a human, when the note matters least', () => {
+    renderRoster(
+      [makeStudent({ id: 's1', firstName: 'Aiden', lastName: 'Shin', notes: 'Rides with Bea' })],
+      {},
+      { upstreamEdits: [job({ state: 'failed' })] },
+    );
+
+    expect(within(row(/Aiden/)).queryByText('Rides with Bea')).not.toBeInTheDocument();
+    expect(within(row(/Aiden/)).getByText(/Last name and grade · you/)).toBeInTheDocument();
+  });
+});
 
 describe('StudentsPage roster rows', () => {
   it('gives the allergy an amber badge, on a page that used to omit it entirely', () => {

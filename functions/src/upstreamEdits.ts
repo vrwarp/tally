@@ -281,6 +281,24 @@ export function settleFor(outcome: RunOutcome, attempts: number, nowMs: number) 
   }
 }
 
+/**
+ * The sentence that survives the outcome, which is not always the one it came
+ * with.
+ *
+ * A retryable failure's message is written in the future tense — it says the
+ * job will try again on its own, because when it is written that is true. On
+ * the last attempt it stops being true, and the state it lands in is one a
+ * leader is expected to act on: a strip that says "it will try again" above a
+ * button that says "send it again" is telling somebody their correction is in
+ * hand when it is sitting still. The tense is the whole difference between
+ * waiting and doing something, so the promise is dropped at the point it
+ * expires rather than papered over in the copy that reads it.
+ */
+export function messageFor(outcome: RunOutcome, state: EditState): string | null {
+  if (outcome.kind === 'retry' && state !== 'waiting') return null;
+  return outcome.message ?? null;
+}
+
 /** Runs one edit, if it is still runnable and nobody else holds the student. */
 export async function drainEdit(edit: EditRecord, deps: DrainDeps): Promise<EditState | null> {
   const logger = deps.logger ?? SILENT_LOGGER;
@@ -312,7 +330,7 @@ export async function drainEdit(edit: EditRecord, deps: DrainDeps): Promise<Edit
         'nextAttemptAtMs' in settled && settled.nextAttemptAtMs
           ? new Date(settled.nextAttemptAtMs)
           : null,
-      message: outcome.message ?? null,
+      message: messageFor(outcome, settled.state),
       leaseUntil: null,
       updatedAt: deps.now(),
       settledAt: done ? deps.now() : null,

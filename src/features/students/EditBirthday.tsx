@@ -158,12 +158,18 @@ export function EditBirthday({ student, onFile, onSaved, onDone }: EditBirthdayP
        * answer: `applyPendingEdits` draws the typed day, marked as not upstream
        * yet, until the drain lands it.
        */
-      await enqueueUpstreamEdit({
+      // Not awaited: see the note on `EnqueuedEdit.written`. The job is on the
+      // device when this returns, and waiting for a server to say so is what
+      // pins a leader to this panel in the one place they cannot afford it.
+      const { written } = enqueueUpstreamEdit({
         studentId: student.id,
         patch: { birthday: read.value },
         ...(held ? { baseline: { birthday: held } } : { baseline: {} }),
         uid: user?.uid ?? '',
         authorName: profile?.displayName ?? user?.email ?? 'Somebody',
+      });
+      void written.catch(() => {
+        setProblem(`${backendLabelOf(student)} could not be reached. Nothing was changed.`);
       });
       invalidatePersonDetails(student.id);
       onSaved?.();

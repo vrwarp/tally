@@ -118,6 +118,21 @@ never resolves, and a leader with no signal would have pressed Save and had
 nothing happen. Enqueueing is now one plain `setDoc` on a fresh id, which
 Firestore holds on the device and sends when the signal returns.
 
+**And the screen does not wait for that `setDoc` either.** A Firestore write is
+applied locally the moment it is issued — the record redraws from it and the
+strip says so — but the promise it returns stays pending until a *server*
+acknowledges it. Awaiting that is the same bug in a smaller place: the editor
+stayed open with a spinner in it for exactly as long as the leader had no
+signal. `enqueueUpstreamEdit` returns `{ editId, written }`; the screens close
+on the return and watch `written` only for a rejection, which is the one failure
+no strip can ever report, because a job the rules refused never existed.
+
+The honest limit of this: Tally builds its Firestore client with a **memory**
+cache, on purpose (`lib/firebase.ts` — the persistent one can wedge a whole
+client behind a Web Lock that is never granted, with a queue at the door). An
+unsent write therefore lives as long as the page does. The offline strip says
+so in as many words rather than promising the write will survive the tab.
+
 The drain folds instead, and it is the better home: it holds the student's lease,
 so it sees every queued job for that child at once — including the burst a phone
 sends after an hour with no signal, which no client-side transaction could ever
@@ -131,10 +146,21 @@ it would sit queued until the next sweep noticed it a minute later.
 
 ### What happens when it does not work
 
+Two of these arrive at the same state and must not read the same way. A backend
+that never answered is `exhausted`: nothing is wrong with the patch, pressing
+again is usually the whole answer, and the strip says **"Could not reach
+Planning Center"** over a **Send it again**. A backend that answered and said no
+is a refusal: the same patch will be refused again, so the strip names the
+backend's own objection over a **Fix and send again**, which opens the editor
+with the values still in it. Calling both of them "refused" sent leaders hunting
+for a mistake in a form that never had one — and a 4xx that was quietly treated
+as an outage burned four retries first, then blamed the network.
+
 | what happened | state | next |
 | --- | --- | --- |
 | rate limited, or a 5xx | `waiting` | the backend's own `Retry-After`, else 15s → 15m |
 | out of attempts | `failed` (`exhausted`) | a leader, and pressing again is reasonable |
+| any other 4xx | `failed` (`validation`) | a leader, in the backend's own words |
 | validation refused | `failed` (`validation`) | a leader, with the field named |
 | credentials rotated | `failed` (`auth`) | an admin — and every queued job fails the same way at once, so the list says it once above the list rather than nine times |
 | write-back no longer `full` | `failed` (`writeBackOff`) | Settings |

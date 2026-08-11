@@ -379,12 +379,27 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
         if (writable && student) {
           const { patch: upstream, baseline } = buildPatch(student, firstName, lastName, birthday);
           if (Object.keys(upstream).length > 0) {
-            await enqueueUpstreamEdit({
+            /*
+             * Not awaited, and that is the offline case working rather than a
+             * missing `await`. The write is applied on the device the moment
+             * this returns — the record redraws from it and the strip says so
+             * — while the promise it hands back stays pending until a server
+             * acknowledges it. Waiting on that held the dialog open with a
+             * spinner in it for as long as a leader had no signal, which is
+             * precisely the moment the queue exists to get them out of.
+             */
+            const { written } = enqueueUpstreamEdit({
               studentId: student.id,
               patch: upstream,
               baseline,
               uid: user.uid,
               authorName: profile?.displayName ?? user.email ?? 'Somebody',
+            });
+            // A rejection means the job never existed, so no strip will ever
+            // appear to report it. It is the one failure here nobody would
+            // otherwise be told about.
+            void written.catch(() => {
+              show(`${student.firstName}\u2019s correction could not be saved. Try again.`);
             });
             queued = true;
           }
@@ -412,7 +427,17 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
          * pre-edit name would leave `students/pco_…` asserting a spelling the
          * backend is about to stop holding.
          */
-        await updateStudent(
+        /*
+         * Not awaited, for the reason the queue write is not.
+         *
+         * This is the annotation document — notes, and the identity the rules
+         * read — and it is a plain Firestore write, so it is applied on the
+         * device at once and acknowledged by a server whenever there is one.
+         * Waiting for the acknowledgement made the whole editor as offline as
+         * its slowest write: the queue write was fixed and Save still hung
+         * here, one line later, on a phone with no signal.
+         */
+        const stored = updateStudent(
           student.id,
           patch,
           user.uid,
@@ -420,6 +445,9 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
             ? { firstName, lastName, grade: form.grade ?? student.grade }
             : student,
         );
+        void stored.catch(() => {
+          show(`${student.firstName}\u2019s notes could not be saved. Try again.`);
+        });
 
         const saved = {
           message: queued

@@ -27,6 +27,7 @@
  * Nothing here sleeps. Every wait is on a fact: a request arriving at the
  * simulator, or a document reaching a state in Firestore.
  */
+import type { Page } from '@playwright/test';
 import { expect, test } from './support/fixtures';
 import { gotoReady, signIn, TEAM } from './support/auth';
 import {
@@ -66,13 +67,13 @@ async function upstreamLastName(personId: string): Promise<string> {
 }
 
 /** Opens one student's record, the way a leader reaches it. */
-async function openProfile(page: import('@playwright/test').Page, studentId: string) {
+async function openProfile(page: Page, studentId: string) {
   await gotoReady(page, `/students/${studentId}`);
   await expect(page.getByRole('button', { name: 'Edit profile' })).toBeVisible();
 }
 
 /** Types a new surname into the editor and presses Save. */
-async function renameTo(page: import('@playwright/test').Page, surname: string) {
+async function renameTo(page: Page, surname: string) {
   await page.getByRole('button', { name: 'Edit profile' }).click();
   const dialog = page.getByRole('dialog');
   const lastName = dialog.getByLabel(/^Last name/);
@@ -85,7 +86,65 @@ async function renameTo(page: import('@playwright/test').Page, surname: string) 
   await expect(dialog).toBeHidden();
 }
 
-const strip = (page: import('@playwright/test').Page) => page.getByRole('status');
+/**
+ * Types a new surname, arms the far end to misbehave, *then* saves.
+ *
+ * The order matters and is not obvious. A fault armed before the form opens
+ * also breaks the details read that decides whether the managed boxes are
+ * editable at all, so the leader would meet a disabled form rather than a
+ * queued edit. Arming it after the fields are filled is also the truthful
+ * arrangement: the backend was fine when they typed and went wrong on the way.
+ */
+async function renameThen(
+  page: Page,
+  surname: string,
+  arm: () => Promise<void>,
+) {
+  await page.getByRole('button', { name: 'Edit profile' }).click();
+  const dialog = page.getByRole('dialog');
+  const lastName = dialog.getByLabel(/^Last name/);
+  await expect(lastName).toBeEnabled();
+  await lastName.fill(surname);
+  await arm();
+  await dialog.getByRole('button', { name: 'Save changes' }).click();
+  await expect(dialog).toBeHidden();
+}
+
+
+const strip = (page: Page) =>
+  page.getByRole('main').getByRole('status');
+
+/**
+ * Drives the queue until an edit reaches one of these states.
+ *
+ * In the app a save starts a drain on its own — `onUpstreamEditCreated` fires
+ * the moment the job lands, and one journey below is about exactly that and
+ * asks for nothing. Everywhere else, waiting on the ambient trigger makes a
+ * test of the *waiting state* into a test of the trigger as well, so a single
+ * environment that cannot register the trigger reports five broken journeys
+ * instead of one missing feature. These ask for the drain out loud, through
+ * `drainUpstreamEditsNow` — the callable twin of the schedule that a stuck
+ * queue is meant to be recoverable with anyway.
+ *
+ * A backed-off job is not runnable until its next attempt is due, so this is a
+ * sequence of drains rather than one: a single sweep would find nothing to do
+ * and honestly say so.
+ */
+async function pump(
+  studentId: string,
+  states: readonly string[],
+  timeoutMs = 60_000,
+): Promise<Awaited<ReturnType<typeof waitForEditState>>> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    try {
+      return await waitForEditState(studentId, states, 1_500);
+    } catch (cause) {
+      if (Date.now() >= deadline) throw cause;
+    }
+    await drainQueue();
+  }
+}
 
 test.describe('an edit on its way to Planning Center', () => {
   test.beforeEach(async () => {
@@ -96,7 +155,7 @@ test.describe('an edit on its way to Planning Center', () => {
     page,
     signedInAs,
   }) => {
-    await signedInAs('core');
+    await signedInAs('admin');
     const personId = await personIdOf('Maya', 'Adebayo');
     const studentId = `pco_${personId}`;
 
@@ -120,11 +179,34 @@ test.describe('an edit on its way to Planning Center', () => {
     expect(await upstreamLastName(personId)).toBe('Adebayo');
   });
 
+  /**
+   * The one journey that asks for nothing and waits.
+   *
+   * Every other test here drives the queue through `drainUpstreamEditsNow`,
+   * so that a test of the *waiting* state is a test of the waiting state. This
+   * one is the exception on purpose: it presses Save and then does nothing at
+   * all, which is the only way to show that `onUpstreamEditCreated` starts a
+   * drain — the difference between a leader's correction going upstream in a
+   * second or two and sitting until the next minute's sweep.
+   */
+  test('goes upstream on its own, with nobody asking it to', async ({ page, signedInAs }) => {
+    await signedInAs('admin');
+    const personId = await personIdOf('Isaiah', 'Brooks');
+    const studentId = `pco_${personId}`;
+
+    await openProfile(page, studentId);
+    await renameTo(page, 'Brooks-Nakamura');
+
+    // No drain, no sweep, no nudge of any kind.
+    await waitForEditState(studentId, ['landed'], 30_000);
+    expect(await upstreamLastName(personId)).toBe('Brooks-Nakamura');
+  });
+
   test('survives the worker that was holding the student, and lands', async ({
     page,
     signedInAs,
   }) => {
-    await signedInAs('core');
+    await signedInAs('admin');
     const personId = await personIdOf('Ethan', 'Nguyen');
     const studentId = `pco_${personId}`;
 
@@ -145,7 +227,7 @@ test.describe('an edit on its way to Planning Center', () => {
     page,
     signedInAs,
   }) => {
-    await signedInAs('core');
+    await signedInAs('admin');
     const personId = await personIdOf('Grace', 'Kim');
     const studentId = `pco_${personId}`;
 
@@ -155,6 +237,9 @@ test.describe('an edit on its way to Planning Center', () => {
     await openProfile(page, studentId);
     await renameTo(page, 'Kim-Alvarez');
 
+    // Not awaited: this drain does not return until the write it starts comes
+    // back, and the write is the thing being held open.
+    void drainQueue();
     await waitForHeldRequest('the profile write');
     await expect(strip(page)).toContainText('Sending to Planning Center');
     /*
@@ -166,21 +251,21 @@ test.describe('an edit on its way to Planning Center', () => {
     await expect(page.getByRole('button', { name: 'Cancel this edit' })).toHaveCount(0);
 
     await releaseSimulator();
-    await waitForEditState(studentId, ['landed']);
+    await pump(studentId, ['landed']);
     await expect(strip(page)).toContainText('Saved in Planning Center');
   });
 
   test('waits out a rate limit and resumes on its own', async ({ page, signedInAs }) => {
-    await signedInAs('core');
+    await signedInAs('admin');
     const personId = await personIdOf('Malik', 'Johnson');
     const studentId = `pco_${personId}`;
 
-    // What a busy lobby kiosk does to a leader's save.
-    await rateLimitSimulator(99, 1);
     await openProfile(page, studentId);
-    await renameTo(page, 'Johnson-Reyes');
+    // What a busy lobby kiosk does to a leader's save — armed after the form is
+    // filled, or it would break the read that unlocks the boxes instead.
+    await renameThen(page, 'Johnson-Reyes', () => rateLimitSimulator(99, 1));
 
-    await waitForEditState(studentId, ['waiting']);
+    await pump(studentId, ['waiting']);
     await expect(strip(page)).toContainText('Waiting on Planning Center');
     // The sentence that stops somebody retrying a thing that was never stuck.
     await expect(strip(page)).toContainText('resumes on its own');
@@ -191,7 +276,7 @@ test.describe('an edit on its way to Planning Center', () => {
       .poll(async () => (await drainQueue()).ran, { timeout: 20_000 })
       .toBeGreaterThan(0);
 
-    await waitForEditState(studentId, ['landed'], 20_000);
+    await pump(studentId, ['landed'], 30_000);
     expect(await upstreamLastName(personId)).toBe('Johnson-Reyes');
   });
 
@@ -200,15 +285,16 @@ test.describe('an edit on its way to Planning Center', () => {
     signedInAs,
     planningCenter,
   }) => {
-    await signedInAs('core');
+    await signedInAs('admin');
     const personId = await personIdOf('Priya', 'Patel');
     const studentId = `pco_${personId}`;
 
-    await planningCenter.fail(422, 'That name is not acceptable.', 99);
     await openProfile(page, studentId);
-    await renameTo(page, 'Patel-Rao');
+    await renameThen(page, 'Patel-Rao', () =>
+      planningCenter.fail(422, 'That name is not acceptable.', 99),
+    );
 
-    const failed = await waitForEditState(studentId, ['failed'], 40_000);
+    const failed = await pump(studentId, ['failed'], 90_000);
     await expect(strip(page)).toContainText('refused this edit');
     // One obvious move, and an escape hatch that is visibly not it.
     await expect(page.getByRole('button', { name: 'Fix and send again' })).toBeVisible();
@@ -224,15 +310,14 @@ test.describe('an edit on its way to Planning Center', () => {
     signedInAs,
     planningCenter,
   }) => {
-    await signedInAs('core');
+    await signedInAs('admin');
     const personId = await personIdOf('Caleb', 'Okafor');
     const studentId = `pco_${personId}`;
 
-    await planningCenter.fail(401, 'Unauthorized', 99);
     await openProfile(page, studentId);
-    await renameTo(page, 'Okafor-Bright');
+    await renameThen(page, 'Okafor-Bright', () => planningCenter.fail(401, 'Unauthorized', 99));
 
-    const failed = await waitForEditState(studentId, ['failed'], 40_000);
+    const failed = await pump(studentId, ['failed'], 90_000);
     /*
      * The class matters more than the message. `auth` fails every queued job at
      * once for one reason, which is what lets the list say it once above the
@@ -246,7 +331,7 @@ test.describe('an edit on its way to Planning Center', () => {
     page,
     signedInAs,
   }) => {
-    await signedInAs('core');
+    await signedInAs('admin');
     const personId = await personIdOf('Jonah', 'Weiss');
     const studentId = `pco_${personId}`;
 
@@ -259,7 +344,7 @@ test.describe('an edit on its way to Planning Center', () => {
     await releaseEditLease(studentId);
     await drainQueue();
 
-    await waitForEditState(studentId, ['orphaned'], 30_000);
+    await pump(studentId, ['orphaned'], 60_000);
     await expect(strip(page)).toContainText('No longer in Planning Center');
     await expect(
       page.getByRole('button', { name: /Re-create them in Planning Center/ }),
@@ -276,7 +361,7 @@ test.describe('an edit on its way to Planning Center', () => {
    * it on the id rather than the values is the only thing that catches it.
    */
   test('reports a merge even when no value changed', async ({ page, signedInAs }) => {
-    await signedInAs('core');
+    await signedInAs('admin');
     const personId = await personIdOf('Camila', 'Torres');
     const survivorId = await personIdOf('Tyler', 'McAllister');
     const studentId = `pco_${personId}`;
@@ -290,7 +375,7 @@ test.describe('an edit on its way to Planning Center', () => {
     await releaseEditLease(studentId);
     await drainQueue();
 
-    const merged = await waitForEditState(studentId, ['merged'], 30_000);
+    const merged = await pump(studentId, ['merged'], 60_000);
     expect(merged.data.survivorPersonId).toBe(survivorId);
     await expect(strip(page)).toContainText('merged into another person');
   });
@@ -308,7 +393,7 @@ test.describe('an edit on its way to Planning Center', () => {
     signedInAs,
     planningCenter,
   }) => {
-    await signedInAs('core');
+    await signedInAs('admin');
     const personId = await personIdOf('Amara', 'Osei');
     const studentId = `pco_${personId}`;
 
@@ -321,7 +406,7 @@ test.describe('an edit on its way to Planning Center', () => {
     await releaseEditLease(studentId);
     await drainQueue();
 
-    const differs = await waitForEditState(studentId, ['differs'], 30_000);
+    const differs = await pump(studentId, ['differs'], 60_000);
     expect((differs.data.observed as Record<string, unknown>).lastName).toBe('Osei-Boateng');
     await expect(strip(page)).toContainText('holds a different value');
     // Neither move is the default: one of them writes over a change a named
@@ -339,7 +424,7 @@ test.describe('an edit on its way to Planning Center', () => {
    * succeeded.
    */
   test('queues only the field that was actually changed', async ({ page, signedInAs }) => {
-    await signedInAs('core');
+    await signedInAs('admin');
     const personId = await personIdOf('Sofia', 'Ramirez');
     const studentId = `pco_${personId}`;
 
@@ -362,7 +447,7 @@ test.describe('an edit on its way to Planning Center', () => {
 
     await releaseEditLease(studentId);
     await drainQueue();
-    await waitForEditState(studentId, ['landed'], 30_000);
+    await pump(studentId, ['landed'], 60_000);
     // The surname nobody touched is the surname it was.
     expect(await upstreamLastName(personId)).toBe('Ramirez');
   });
@@ -371,7 +456,7 @@ test.describe('an edit on its way to Planning Center', () => {
     page,
     signedInAs,
   }) => {
-    await signedInAs('core');
+    await signedInAs('admin');
     const personId = await personIdOf('Marcus', 'Delgado');
     const studentId = `pco_${personId}`;
 
@@ -383,7 +468,7 @@ test.describe('an edit on its way to Planning Center', () => {
 
     await releaseEditLease(studentId);
     await drainQueue();
-    await waitForEditState(studentId, ['landed'], 30_000);
+    await pump(studentId, ['landed'], 60_000);
 
     expect(await upstreamLastName(personId)).toBe('Delgado-Hale');
     const mine = (await readUpstreamEdits()).filter((row) => row.data.studentId === studentId);
@@ -403,7 +488,7 @@ test.describe('an edit on its way to Planning Center', () => {
     signedInAs,
     browser,
   }) => {
-    await signedInAs('core');
+    await signedInAs('admin');
     const personId = await personIdOf('Noah', 'Fitzgerald');
     const studentId = `pco_${personId}`;
 
@@ -415,12 +500,13 @@ test.describe('an edit on its way to Planning Center', () => {
     const second = await browser.newContext();
     try {
       const other = await second.newPage();
-      await signIn(other, TEAM.admin);
+      // A different leader, which is the whole point of this frame.
+      await signIn(other, TEAM.core);
       await openProfile(other, studentId);
 
       // The other leader's device shows the pending value, marked, and says
       // whose it is — which is why nothing has to be locked.
-      await expect(other.getByRole('status')).toContainText('Queued for Planning Center');
+      await expect(other.getByRole('main').getByRole('status')).toContainText('Queued for Planning Center');
       await expect(other.getByRole('heading', { level: 1 })).toContainText('Fitzgerald-Ruiz');
     } finally {
       await second.close();
@@ -433,7 +519,7 @@ test.describe('an edit on its way to Planning Center', () => {
     signedInAs,
     firestore,
   }) => {
-    await signedInAs('core');
+    await signedInAs('admin');
     const personId = await personIdOf('Leila', 'Haddad');
     const studentId = `pco_${personId}`;
 
@@ -475,7 +561,7 @@ test.describe('an edit on its way to Planning Center', () => {
     signedInAs,
     context,
   }) => {
-    await signedInAs('core');
+    await signedInAs('admin');
     const personId = await personIdOf('Hannah', 'Schmidt');
     const studentId = `pco_${personId}`;
 
@@ -495,7 +581,7 @@ test.describe('an edit on its way to Planning Center', () => {
       await context.setOffline(false);
     }
 
-    await waitForEditState(studentId, ['landed'], 30_000);
+    await pump(studentId, ['landed'], 60_000);
     expect(await upstreamLastName(personId)).toBe('Schmidt-Marek');
   });
 
@@ -505,7 +591,7 @@ test.describe('an edit on its way to Planning Center', () => {
    * here, and the spec says so rather than pretending otherwise.
    */
   test('says a long-running send may still land', async ({ page, signedInAs }) => {
-    await signedInAs('core');
+    await signedInAs('admin');
     const personId = await personIdOf('Aisha', 'Rahman');
     const studentId = `pco_${personId}`;
     const started = new Date(Date.now() - 5 * 60_000);

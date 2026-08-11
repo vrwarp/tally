@@ -33,6 +33,7 @@ import { cn } from '@/lib/utils';
 import {
   backendLabelOf,
   needsAHuman,
+  personIdFromStudentId,
   type Student,
   type UpstreamEdit,
   type UpstreamEditPatch,
@@ -109,7 +110,18 @@ export function StudentSyncStrip({
           {
             label: 'You edited',
             value: `${student.firstName} ${student.lastName}`.trim(),
-            meta: `merged ${formatRelative(edit.settledAt ?? edit.updatedAt)}`,
+            /*
+             * The id the edit named, beside the one it landed on. Both, because
+             * after a merge the two names can be identical — that is the case
+             * this state exists for — and the ids are then the only thing that
+             * says a person moved.
+             */
+            meta: [
+              personIdFromStudentId(student.id) ? `#${personIdFromStudentId(student.id)}` : null,
+              `merged ${formatRelative(edit.settledAt ?? edit.updatedAt)}`,
+            ]
+              .filter(Boolean)
+              .join(' · '),
           },
         ]
       : edit.state === 'differs' && edit.observed
@@ -159,10 +171,25 @@ export function StudentSyncStrip({
               Cancel this edit
             </Button>
           ) : null}
+          {/*
+            An unreachable backend and a rejected value need different buttons,
+            because the work in front of the leader is different. "Fix" opens
+            the editor with the refused values still in it, which is right when
+            the backend read them and said no. When it never answered, there is
+            nothing in the form to fix — the edit is exactly as good as it was
+            — and a button that opens an editor makes a leader hunt for a
+            mistake they did not make. That one sends the same patch again.
+          */}
           {edit.state === 'failed' ? (
-            <Button variant={loud ? 'primary' : 'secondary'} className="w-full lg:w-auto" onClick={onFix}>
-              Fix and send again
-            </Button>
+            edit.failure === 'exhausted' ? (
+              <Button variant={loud ? 'primary' : 'secondary'} className="w-full lg:w-auto" onClick={onRetry}>
+                Send it again
+              </Button>
+            ) : (
+              <Button variant={loud ? 'primary' : 'secondary'} className="w-full lg:w-auto" onClick={onFix}>
+                Fix and send again
+              </Button>
+            )
           ) : null}
           {edit.state === 'orphaned' ? (
             <>

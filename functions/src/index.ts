@@ -138,7 +138,7 @@ import { materializeOccurrence as materializeOne, MINISTRY_TIME_ZONE } from './o
 // registry, and the entry point is the one place that decides what ships.
 import './attendees32/backend.js';
 import { createPcoBackend } from './pco/backend.js';
-import { createPcoClient } from './pco/client.js';
+import { createPcoClient, PcoApiError } from './pco/client.js';
 import { fetchLists } from './pco/lists.js';
 import { graftMergedStudent } from './pco/studentPerson.js';
 
@@ -2213,9 +2213,27 @@ async function runUpstreamEdit(edit: EditRecord): Promise<RunOutcome> {
       };
     }
     if (status === 404 || status === 410) return { kind: 'orphaned' };
-    // 429s and 5xx have already been retried inside the client, with
-    // `Retry-After` honoured; reaching here means that ran out, not that the
-    // backend said no.
+    /*
+     * Anything else in the 4xx range is the backend having read the request and
+     * said no — a name it will not take, a grade outside its own range. The
+     * same patch sent again gets the same answer, so retrying it is four more
+     * round trips ending in "could not reach Planning Center", which is both
+     * untrue and points a leader at the network instead of at the value they
+     * typed. It goes to the screen at once, in the backend's own words.
+     *
+     * The exceptions are the ones where the request was fine and the moment
+     * was not: 408 and 409 are worth repeating as-is, and a 429 has already
+     * been retried inside the client with `Retry-After` honoured — reaching
+     * here means that ran out, not that the backend said no.
+     */
+    if (status !== null && status >= 400 && status < 500 && ![408, 409, 429].includes(status)) {
+      return {
+        kind: 'refused',
+        failure: 'validation',
+        message: describeBackendRefusal(error, backend.displayName),
+      };
+    }
+    // 429s, 5xx and anything that never got an answer at all.
     return {
       kind: 'retry',
       retryAfterMs: retryAfterOf(error),
@@ -2305,6 +2323,27 @@ function disagreementsWith(
   }
 
   return Object.keys(out).length > 0 ? out : null;
+}
+
+/**
+ * What a backend said when it refused, in words a leader can act on.
+ *
+ * The error carries the backend's own `detail` lines, and they are the only
+ * account of *which* value was wrong — "Grade must be between 1 and 12" is a
+ * sentence somebody can go and fix, and a generic "Planning Center would not
+ * accept this" sends them back to the form to guess. They are written for
+ * developers, so they get a sentence of Tally's around them rather than being
+ * dropped on the screen alone, and a status-only fallback covers the backends
+ * that refuse without saying anything.
+ */
+function describeBackendRefusal(error: unknown, displayName: string): string {
+  const details = error instanceof PcoApiError
+    ? error.errors.map((detail) => detail.detail ?? detail.title).filter(Boolean)
+    : [];
+  const said = details.join('; ').trim();
+  return said
+    ? `${displayName} would not accept this: ${said}`
+    : `${displayName} would not accept this, and sending it again unchanged will not help.`;
 }
 
 /** What the backend asked us to wait, where it said. */
