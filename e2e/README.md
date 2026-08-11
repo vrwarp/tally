@@ -28,6 +28,26 @@ resets the simulator, so every run starts from the same data.
 The app is built, not dev-served, on purpose: the service worker, the code
 splitting and the minified bundle are all things that can only break once built.
 
+## A note on running these in a sandbox
+
+The suite needs the **Eventarc emulator** to be running, because that is how a
+v2 Firestore trigger is registered: the Functions emulator asks the Firestore
+emulator to install the trigger, and the Firestore emulator proxies it on to
+Eventarc. Where Eventarc cannot bind — some containers have no IPv6, and the
+Cloud Tasks emulator reports `EAFNOSUPPORT ... ::1` in the same run — the
+Firestore emulator answers `upstream request failed`, firebase-tools reports
+
+```
+⚠  Error adding firestore function: FirebaseError: Unable to parse JSON:
+   SyntaxError: Unexpected token 'u', "upstream r"... is not valid JSON
+```
+
+and then shuts the whole stack down. The trigger it names first is
+`onStudentCreated`, so this is not about any one spec: **no** spec can run, and
+the failure looks like the app rather than the environment. If you see it, check
+whether an Eventarc emulator line ever appeared in the log — if the only mention
+is "Stopping Eventarc Emulator", it never started.
+
 ## Arranging the far end
 
 Most specs only need the simulator to *hold* a ministry. A few need it to
