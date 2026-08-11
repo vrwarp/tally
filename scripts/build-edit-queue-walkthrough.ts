@@ -66,6 +66,17 @@ async function dataUri(file: string): Promise<string> {
   return `data:image/png;base64,${bytes.toString('base64')}`;
 }
 
+/*
+ * A PNG's pixel size, straight out of its IHDR — the first chunk, always, at a
+ * fixed offset. Read so the artifact can declare `width`/`height` on every
+ * frame: inside an artifact the page is measured to size its host, and an
+ * undeclared image contributes nothing to that measurement until it decodes.
+ */
+async function pixelSize(file: string): Promise<{ width: number; height: number }> {
+  const bytes = await readFile(join(OUT, file));
+  return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
+}
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -137,11 +148,21 @@ for (const group of groups) {
   const figures: string[] = [];
   for (const shot of group.shots) {
     artifactIndex += 1;
+    const size = await pixelSize(shot.file);
+    /*
+     * Eager, and sized. Every frame is already inside the document as a data
+     * URI, so `loading="lazy"` saves no bytes — and it costs the whole page:
+     * the artifact host sizes itself from the document height, an unsized lazy
+     * image adds no height, so nothing below the first journey ever scrolls
+     * into view to be loaded.
+     */
     const image = `<img
           class="shot shot--${shot.viewport}"
           src="${await dataUri(shot.file)}"
           alt="${escapeHtml(shot.title)}"
-          loading="lazy"
+          width="${size.width}"
+          height="${size.height}"
+          decoding="async"
         />`;
     figures.push(`      <figure class="frame">
         <div class="frame__head">
