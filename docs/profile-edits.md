@@ -93,11 +93,33 @@ upstream in any mode. The rules refuse a patch that names it.
 
 ## Draining
 
-`onUpstreamEditCreated` for the ordinary case — the edit is usually upstream a
-second or two after Save — plus `drainUpstreamEdits`, a one-minute schedule, for
-everything the trigger cannot cover: a backed-off retry whose time has come, a
-job abandoned by a worker that died mid-request, a job written while the trigger
-itself was failing, and the sweeping of settled ones.
+**The browser asks**, for the ordinary case — the edit is usually upstream a
+second or two after Save — plus `drainUpstreamEdits`, a five-minute schedule,
+for everything a browser cannot be trusted with: a job whose tab was closed
+between writing it and asking, one abandoned by a worker that died mid-request,
+a backed-off retry nobody is watching any more, and the sweeping of settled
+ones.
+
+This used to be `onUpstreamEditCreated`, a Firestore trigger. The trigger's
+whole job was latency, and the device that just pressed Save can do that itself
+— sooner, with no Eventarc registration and no second function cold-starting
+behind the first. `enqueueUpstreamEdit` chains `drainStudentEdits` onto the
+write's *server acknowledgement* rather than firing it beside the write, which
+is the one way to get this wrong: a poke that overtakes its own job finds
+nothing to do and fails silently, and the edit then waits for the sweep. Offline
+that acknowledgement never comes, so nothing is asked, which is also right —
+there is no server to ask, and the job is already held on the device.
+
+**None of it is load-bearing.** The poke may fail, be skipped, or never be sent;
+the job document was written first and the sweep takes it regardless. That is
+what lets the schedule run every five minutes instead of every one — a ministry
+editing nine profiles a week was paying for 1,440 sweeps a day to find nothing.
+
+**A retry is the exception**, and the tab owns that too. A rate limit answered
+with "come back in fifteen seconds" must not be served five minutes later under
+a sentence promising it resumes on its own, so a tab showing a `waiting` job
+sets a timer against `nextAttemptAt` and asks then (`useDrainPokes`). Close the
+tab and the sweep still gets it; it just gets it later.
 
 **Serial per student** is a lease document, `upstreamEditLeases/{studentId}`,
 claimed with `create()` — which the admin SDK rejects rather than overwrites. Two

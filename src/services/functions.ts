@@ -601,13 +601,31 @@ export const updateStudentProfile = httpsCallable<
 >(functions, 'updateStudentProfile');
 
 /**
- * Drains the profile-edit queue now, rather than within the minute.
+ * Asks for one student's queued edits to be sent, now.
+ *
+ * The device that made the edit doing what a Firestore trigger used to: the
+ * job document is already written and the sweep would take it eventually, and
+ * this is how it goes in a second instead. It is an optimisation and nothing
+ * else — a failure here costs latency, never an edit, because the durable
+ * record was written before this was called.
+ *
+ * By student rather than by job, which is what folds a leader correcting their
+ * own typo into one upstream write.
+ */
+export const drainStudentEdits = httpsCallable<{ studentId: string }, { states: string[] }>(
+  functions,
+  'drainStudentEdits',
+);
+
+/**
+ * Drains the profile-edit queue now, rather than waiting for the sweep.
  *
  * The callable twin of the schedule that owns it, on the same pattern as
- * `pushPendingVisitors` beside `pushPendingStudents`. Admin only: what it can
- * do, the schedule does anyway — but it decides *when* the church's people
- * database is talked to, and pacing is the reason the sweep takes small
- * batches at all.
+ * `pushPendingVisitors` beside `pushPendingStudents`. Admin only, and the wide
+ * one: `drainStudentEdits` above is what an ordinary save calls, for one
+ * child. What this can do, the schedule does anyway — but it decides *when*
+ * the whole church database is talked to at once, and pacing is the reason
+ * the sweep takes small batches at all.
  */
 export const drainUpstreamEditsNow = httpsCallable<
   { limit?: number } | void,

@@ -533,7 +533,7 @@ export function StudentDetailPage() {
           now={now}
           uid={user?.uid ?? ''}
           onCancel={() => void cancelUpstreamEdit(edit.id)}
-          onRetry={() => void retryUpstreamEdit(edit.id)}
+          onRetry={() => void retryUpstreamEdit(edit.id, edit.studentId)}
           onDismiss={() => void dismissUpstreamEdit(edit.id)}
           onFix={() => setEditorOpen(true)}
           onRecreate={() => void recreate()}

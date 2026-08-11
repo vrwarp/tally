@@ -4,6 +4,7 @@ import { subscribeEventAccess } from '@/services/eventAccess';
 import { subscribeStudents } from '@/services/students';
 import { cachedRoster, fetchRoster, mergeRoster, rememberRosterPerson } from '@/services/roster';
 import { applyPendingEdits } from '@/features/roster/pendingEdits';
+import { useDrainPokes } from '@/features/roster/useDrainPokes';
 import { subscribeUpstreamEdits } from '@/services/upstreamEdits';
 import type { RosterBackendStatus } from '@/services/functions';
 import { fromRosterPerson } from '@/services/converters';
@@ -380,6 +381,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setUpstreamEdits([]);
     });
   }, [canReadEdits]);
+
+  /*
+   * A tab that is showing a backed-off retry owns asking for it when it comes
+   * due. See `useDrainPokes` — it is what lets the sweep run every five
+   * minutes without a rate-limited edit sitting for five.
+   */
+  useDrainPokes(upstreamEdits);
 
   /*
    * The overlay is applied *after* the merge, so identity is settled before

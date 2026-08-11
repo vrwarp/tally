@@ -117,14 +117,13 @@ const strip = (page: Page) =>
 /**
  * Drives the queue until an edit reaches one of these states.
  *
- * In the app a save starts a drain on its own — `onUpstreamEditCreated` fires
- * the moment the job lands, and one journey below is about exactly that and
- * asks for nothing. Everywhere else, waiting on the ambient trigger makes a
- * test of the *waiting state* into a test of the trigger as well, so a single
- * environment that cannot register the trigger reports five broken journeys
- * instead of one missing feature. These ask for the drain out loud, through
- * `drainUpstreamEditsNow` — the callable twin of the schedule that a stuck
- * queue is meant to be recoverable with anyway.
+ * In the app a save starts a drain on its own — the browser asks for one as
+ * soon as the job reaches a server, and one journey below is about exactly
+ * that and asks for nothing. Everywhere else, leaning on that makes a test of
+ * the *waiting state* into a test of the poke as well, and one broken thing
+ * should report as one broken thing. These ask out loud instead, through
+ * `drainUpstreamEditsNow` — the admin twin of the schedule that a stuck queue
+ * is meant to be recoverable with anyway.
  *
  * A backed-off job is not runnable until its next attempt is due, so this is a
  * sequence of drains rather than one: a single sweep would find nothing to do
@@ -182,12 +181,15 @@ test.describe('an edit on its way to Planning Center', () => {
   /**
    * The one journey that asks for nothing and waits.
    *
-   * Every other test here drives the queue through `drainUpstreamEditsNow`,
-   * so that a test of the *waiting* state is a test of the waiting state. This
-   * one is the exception on purpose: it presses Save and then does nothing at
-   * all, which is the only way to show that `onUpstreamEditCreated` starts a
-   * drain — the difference between a leader's correction going upstream in a
-   * second or two and sitting until the next minute's sweep.
+   * Every other test here drives the queue through `drainUpstreamEditsNow`, so
+   * that a test of the *waiting* state is a test of the waiting state. This one
+   * is the exception on purpose: it presses Save and then does nothing at all.
+   *
+   * What it pins is the whole of the fast path — that the browser, having
+   * written a durable job, asks a server to run it, and does so *after* the
+   * write has landed rather than beside it. A poke that overtakes its own job
+   * finds nothing to do and fails silently, leaving the edit to the sweep; the
+   * only way to catch that is to have nobody else drive.
    */
   test('goes upstream on its own, with nobody asking it to', async ({ page, signedInAs }) => {
     await signedInAs('admin');
@@ -272,11 +274,22 @@ test.describe('an edit on its way to Planning Center', () => {
 
     const { clearSimulatorFaults } = await import('./support/emulator');
     await clearSimulatorFaults();
-    await expect
-      .poll(async () => (await drainQueue()).ran, { timeout: 20_000 })
-      .toBeGreaterThan(0);
 
-    await pump(studentId, ['landed'], 30_000);
+    /*
+     * Nothing drives this one, and that is the assertion.
+     *
+     * A backed-off retry is the one part of the queue the five-minute sweep
+     * would make a leader feel: told "come back in fifteen seconds" and
+     * answered five minutes later, under a sentence promising it resumes on
+     * its own. So the tab that is showing the job owns its retry and asks when
+     * the backoff expires — `useDrainPokes`, against `nextAttemptAt`, which
+     * `TALLY_EDIT_BACKOFF_MS` makes 250ms here.
+     *
+     * This used to poll `drainQueue().ran` for a sweep that had something to
+     * do. That asserted *who* did the work rather than that it got done, and
+     * it started failing the moment the browser began doing it first.
+     */
+    await waitForEditState(studentId, ['landed'], 30_000);
     expect(await upstreamLastName(personId)).toBe('Johnson-Reyes');
   });
 
@@ -468,7 +481,10 @@ test.describe('an edit on its way to Planning Center', () => {
 
     await releaseEditLease(studentId);
     await drainQueue();
-    await pump(studentId, ['landed'], 60_000);
+    // Bounded well inside the test's own budget: `pump` given the whole 60s
+    // leaves nothing for the assertions after it, so a slow run reports as a
+    // bare timeout with no idea which step was slow.
+    await pump(studentId, ['landed'], 30_000);
 
     expect(await upstreamLastName(personId)).toBe('Delgado-Hale');
     const mine = (await readUpstreamEdits()).filter((row) => row.data.studentId === studentId);

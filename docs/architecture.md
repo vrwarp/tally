@@ -79,8 +79,9 @@ still exists, which is untidy and fixable, rather than the reverse — and clear
 `preview` counts without writing, which is where the confirmation dialog's numbers come from.
 
 **A profile edit is a job, not a request.** Editing a linked student's name, grade, birthday or
-allergies writes `upstreamEdits/{editId}` and returns; `onUpstreamEditCreated` and a one-minute
-sweep drain it against the people backend. The reason is arithmetic rather than taste — one save is
+allergies writes `upstreamEdits/{editId}` and returns; the browser then asks for that student to be
+drained (`drainStudentEdits`), and a five-minute sweep covers everything it cannot — a tab that was
+closed, a worker that died, a retry nobody is watching. The reason is arithmetic rather than taste — one save is
 three to six round trips to an API that rate-limits by sleeping inside the request, under a callable
 ceiling of two minutes — and the consequences are everywhere: the enqueue is a document write rather
 than a callable so it survives a phone with no signal, the patch carries only the fields somebody

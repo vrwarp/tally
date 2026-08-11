@@ -2357,32 +2357,42 @@ function drainDeps(): DrainDeps {
 }
 
 /**
- * The ordinary path: an edit is usually upstream a second or two after Save.
+ * The ordinary path: the device that made the edit asks for it to be sent.
  *
- * `retry: false` because the queue has its own retry, with a backoff chosen for
- * an API that rate-limits — and a trigger retried by the platform on top of
- * that is two schedulers disagreeing about the same job.
+ * This used to be `onUpstreamEditCreated`, a Firestore trigger. The trigger's
+ * entire job was latency — start the drain in a second or two rather than
+ * waiting for the sweep — and the browser that just pressed Save can do that
+ * itself, sooner and with one less moving part: no Eventarc registration, no
+ * second function cold-starting behind the first.
+ *
+ * What it is *not* is the thing that makes an edit durable. That is the job
+ * document, which is written before this is called and is picked up by the
+ * sweep below whatever happens to the tab. So this may fail, be skipped, or
+ * never be called at all, and the only consequence is that the edit goes
+ * within the sweep's period instead of within a second. Nothing here is
+ * allowed to become load-bearing.
+ *
+ * Scoped to one student rather than the queue, and core team rather than
+ * admin: the caller has just created a job for that child and is asking for
+ * their own work to be done. `drainUpstreamEditsNow` remains the wide,
+ * admin-only poke, because deciding to talk to the whole church database at
+ * once is a different decision.
+ *
+ * Draining the *student* rather than the edit is what folds two saves in a
+ * row into one upstream write — the same reason the trigger did it.
  */
-export const onUpstreamEditCreated = onDocumentCreated(
-  {
-    document: 'upstreamEdits/{editId}',
-    secrets: BACKEND_SECRETS,
-    timeoutSeconds: 300,
-    memory: '256MiB',
-    retry: false,
-  },
-  async (event) => {
-    const data = event.data?.data();
-    if (!data) return;
-    const studentId = typeof data.studentId === 'string' ? data.studentId : '';
-    if (!studentId) return;
-    /*
-     * By student rather than by this one document: two saves in a row fire two
-     * triggers, the second loses the race for the lease, and without this it
-     * would sit queued until the next sweep noticed it a minute later. Draining
-     * the student folds the pair and sends them together.
-     */
-    await drainStudent(studentId, drainDeps());
+export const drainStudentEdits = onCall<{ studentId: string }, Promise<{ states: string[] }>>(
+  { secrets: BACKEND_SECRETS, timeoutSeconds: 300, memory: '256MiB' },
+  async (request): Promise<{ states: string[] }> => {
+    await requireCoreTeam(request.auth?.uid);
+
+    const studentId = request.data?.studentId;
+    if (typeof studentId !== 'string' || studentId.trim().length === 0) {
+      throw new HttpsError('invalid-argument', 'studentId is required.');
+    }
+
+    const states = await drainStudent(studentId, drainDeps());
+    return { states };
   },
 );
 
@@ -2413,17 +2423,25 @@ export const drainUpstreamEditsNow = onCall<{ limit?: number } | void, Promise<S
 );
 
 /**
- * Everything the trigger cannot cover.
+ * Everything a browser cannot be trusted to cover.
  *
- * A backed-off retry whose time has come, a job abandoned by a worker that died
- * mid-request, a job written while the trigger itself was failing, and the
- * sweeping of settled ones. Every minute, in small batches: a queue that built
- * up through an outage drains into an API that rate-limits, and stampeding it
- * is how a recovery turns back into an outage.
+ * A job whose tab was closed between writing it and asking for it, one
+ * abandoned by a worker that died mid-request, a backed-off retry nobody is
+ * watching any more, and the sweeping of settled ones. In small batches: a
+ * queue that built up through an outage drains into an API that rate-limits,
+ * and stampeding it is how a recovery turns back into an outage.
+ *
+ * Every five minutes rather than every one. It stopped being the thing that
+ * decides how long an ordinary edit takes the moment the client began asking
+ * for its own drain — including for a retry, which the tab schedules against
+ * `nextAttemptAt` while it is open. What is left here is the case where there
+ * is no tab, and five minutes is a fair answer to "nobody is watching this".
+ * A ministry that edits nine profiles a week was paying for 1,440 sweeps a day
+ * to find nothing.
  */
 export const drainUpstreamEdits = onSchedule(
   {
-    schedule: 'every 1 minutes',
+    schedule: 'every 5 minutes',
     secrets: BACKEND_SECRETS,
     timeoutSeconds: 300,
     memory: '256MiB',

@@ -49,6 +49,7 @@ import {
   where,
   type Unsubscribe,
 } from 'firebase/firestore';
+import { drainStudentEdits } from '@/services/functions';
 import { db } from '@/lib/firebase';
 import { paths } from '@/lib/paths';
 import { toDate, toDateOrNull } from '@/services/converters';
@@ -172,6 +173,30 @@ export interface EnqueueOptions {
  * edit becomes its own job and runs after, which is also correct, because the
  * drain diffs against a read taken after the first one landed.
  */
+/**
+ * Asks a server to send this student's queued edits, now.
+ *
+ * Fire-and-forget on purpose, and quiet on purpose. This is the browser doing
+ * what `onUpstreamEditCreated` used to do — starting the drain in a second
+ * rather than leaving it to the sweep — and it is an optimisation over a job
+ * that is *already durable*. The document was written before this was called
+ * and the sweep will take it whatever happens here, so a rejection means the
+ * edit is slower, never lost, and there is nothing to tell a leader who has
+ * already been shown a queued job on the record.
+ *
+ * The one thing that matters is the ordering, which is why every caller chains
+ * this onto the write's server acknowledgement rather than calling it beside
+ * the write. A poke that overtakes its own job finds nothing to do, and the
+ * edit then waits for the sweep — the exact latency this exists to avoid.
+ * Offline that acknowledgement never comes, so no poke is sent, which is also
+ * correct: there is no server to ask.
+ */
+export function pokeUpstreamDrain(studentId: string): void {
+  void drainStudentEdits({ studentId }).catch(() => {
+    /* The sweep is the answer to every failure here. */
+  });
+}
+
 export interface EnqueuedEdit {
   /** The job's id, which exists the moment the local write is applied. */
   editId: string;
@@ -239,6 +264,15 @@ export function enqueueUpstreamEdit(options: EnqueueOptions): EnqueuedEdit {
     settledAt: null,
   });
 
+  /*
+   * Chained onto the acknowledgement rather than fired beside the write, so
+   * the drain cannot arrive before the job it is being asked to run. See
+   * `pokeUpstreamDrain`.
+   */
+  void written.then(() => pokeUpstreamDrain(studentId)).catch(() => {
+    /* A write that never landed has nothing to drain. */
+  });
+
   return { editId: ref.id, written };
 }
 
@@ -267,7 +301,7 @@ export async function cancelUpstreamEdit(editId: string): Promise<void> {
  * write-back back on — and starting from the old backoff would make the retry
  * look broken for the first minute of a connection that is fine.
  */
-export async function retryUpstreamEdit(editId: string): Promise<void> {
+export async function retryUpstreamEdit(editId: string, studentId: string): Promise<void> {
   await updateDoc(doc(db, paths.upstreamEdit(editId)), {
     state: 'queued',
     attempts: 0,
@@ -279,6 +313,12 @@ export async function retryUpstreamEdit(editId: string): Promise<void> {
     updatedAt: serverTimestamp(),
     settledAt: null,
   });
+  /*
+   * Awaited above rather than chained, because unlike the first write this one
+   * is a leader pressing a button while looking at the screen: they are online
+   * by definition, and the poke is what makes "Send it again" mean now.
+   */
+  pokeUpstreamDrain(studentId);
 }
 
 /**
