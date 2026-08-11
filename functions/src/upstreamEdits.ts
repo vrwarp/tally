@@ -125,13 +125,35 @@ function millis(value: unknown): number | null {
   return null;
 }
 
+/**
+ * The states this drain knows. Anything else reads as `queued`.
+ *
+ * Defensive on purpose: a document written by a newer client — or corrupted —
+ * must not be able to stop the sweep, because the sweep is what everything
+ * else in the queue depends on to make progress.
+ */
+const STATES = new Set<EditState>([
+  'queued',
+  'sending',
+  'waiting',
+  'landed',
+  'differs',
+  'merged',
+  'failed',
+  'orphaned',
+  'cancelled',
+]);
+
 export function toEditRecord(id: string, data: Record<string, unknown>): EditRecord {
   return {
     id,
     studentId: typeof data.studentId === 'string' ? data.studentId : '',
     patch: (data.patch as Record<string, unknown>) ?? {},
     baseline: (data.baseline as Record<string, unknown>) ?? {},
-    state: (typeof data.state === 'string' ? data.state : 'queued') as EditState,
+    state:
+      typeof data.state === 'string' && STATES.has(data.state as EditState)
+        ? (data.state as EditState)
+        : 'queued',
     attempts: typeof data.attempts === 'number' ? data.attempts : 0,
     nextAttemptAtMs: millis(data.nextAttemptAt),
     leaseUntilMs: millis(data.leaseUntil),
