@@ -177,27 +177,44 @@ export async function enqueueUpstreamEdit(options: EnqueueOptions): Promise<stri
 
   return runTransaction(db, async (transaction) => {
     /*
-     * Read the candidate by a deterministic id rather than by a query.
+     * The unclaimed job for a student is findable by name.
      *
-     * Firestore transactions in a browser cannot read a query, so the
-     * supersedable job has to be findable by name. `queued:{studentId}` is that
-     * name: there is at most one unclaimed edit per student by construction,
-     * and the worker renames nothing — it moves the document out of this id
-     * space by writing `state`, and a superseding write checks the state it
-     * reads rather than the id it used to find it.
+     * A browser transaction cannot read a query, so the one job that may be
+     * superseded has to have a deterministic id — `queued_{studentId}` is it,
+     * and there is at most one by construction. A job a worker has taken is a
+     * *different* document: the drain moves it out of this id space by state
+     * rather than by renaming it, so the check below is on the state it reads,
+     * never on the id it used to find it.
      */
     const openRef = doc(editsRef, `queued_${studentId}`);
     const open = await transaction.get(openRef);
+    const supersedable = open.exists() && open.data().state === 'queued';
+
+    /*
+     * If a worker already holds the earlier edit, this one becomes its own
+     * document and runs after it. Writing over the in-flight job instead would
+     * reset a patch that may already be on its way to the backend, and the
+     * lease would then be held for a job whose contents had changed underneath
+     * the worker holding it.
+     *
+     * The residual is benign and worth naming: while one job is in flight, a
+     * third and fourth edit each become their own document rather than folding
+     * into the second. They still run in order behind the lease, each against a
+     * fresh read, so the record ends where the last one asked — it simply costs
+     * the backend one write per save instead of one per burst, for the few
+     * seconds a job is actually in flight.
+     */
+    const ref = supersedable || !open.exists() ? openRef : doc(editsRef);
 
     const merged: UpstreamEditPatch = { ...options.patch };
     const baseline: UpstreamEditPatch = { ...options.baseline };
     let createdAt: unknown = serverTimestamp();
 
-    if (open.exists() && open.data().state === 'queued') {
+    if (supersedable) {
       const previous = toUpstreamEdit(open.id, open.data());
-      // The earlier patch first, so this save's fields win where they overlap,
-      // and the earlier *baseline* wins everywhere — what the drain compares
-      // against is what the record looked like before anybody started editing.
+      // The earlier patch fills the gaps, so this save's fields win where the
+      // two overlap; the earlier *baseline* wins everywhere, because what the
+      // drain compares against is the record as it was before anybody started.
       for (const field of UPSTREAM_EDIT_FIELDS) {
         if (merged[field] === undefined && previous.patch[field] !== undefined) {
           (merged as Record<string, unknown>)[field] = previous.patch[field];
@@ -209,7 +226,7 @@ export async function enqueueUpstreamEdit(options: EnqueueOptions): Promise<stri
       createdAt = open.data().createdAt ?? serverTimestamp();
     }
 
-    transaction.set(openRef, {
+    transaction.set(ref, {
       studentId,
       patch: merged,
       baseline,
@@ -231,7 +248,7 @@ export async function enqueueUpstreamEdit(options: EnqueueOptions): Promise<stri
       settledAt: null,
     });
 
-    return openRef.id;
+    return ref.id;
   });
 }
 
