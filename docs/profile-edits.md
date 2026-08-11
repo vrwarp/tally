@@ -110,9 +110,24 @@ surface is needed, so `FirestoreLike` stays the forty lines it advertises.
 request leaves a job no worker will ever pick up, under a screen that has already
 told a leader their correction is on its way.
 
-**Superseding** happens at enqueue: an existing unclaimed job for the same
-student absorbs the new patch rather than a second job being written. A leader
-correcting their own typo three seconds later costs the backend one write.
+**Superseding happens in the drain, not in the browser**, and the reason is the
+corridor. The first version folded a second save into an unclaimed first inside a
+Firestore transaction — which is a nicety that cost the property the whole design
+rests on: a transaction needs the server, so offline it does not queue, it simply
+never resolves, and a leader with no signal would have pressed Save and had
+nothing happen. Enqueueing is now one plain `setDoc` on a fresh id, which
+Firestore holds on the device and sends when the signal returns.
+
+The drain folds instead, and it is the better home: it holds the student's lease,
+so it sees every queued job for that child at once — including the burst a phone
+sends after an hour with no signal, which no client-side transaction could ever
+have folded. The newest patch wins field by field; the *oldest* baseline wins,
+because what the drain compares against is the record as it stood before anybody
+started editing.
+
+The trigger drains the **student**, not the document it fired for. Two saves in a
+row fire two triggers, the second loses the race for the lease, and without this
+it would sit queued until the next sweep noticed it a minute later.
 
 ### What happens when it does not work
 
@@ -125,6 +140,14 @@ correcting their own typo three seconds later costs the backend one write.
 | write-back no longer `full` | `failed` (`writeBackOff`) | Settings |
 | the person was deleted upstream | `orphaned` | re-create, with the edit riding along |
 | the person was merged upstream | `merged` | see below |
+
+`differs` is judged against the row the backend held **before** the write, which
+`updateStudentProfile` now returns as `before`. It has to be: the row it returns
+*after* a write always agrees with what was sent, so a comparison against that
+could never report a disagreement at all. Three readings of one field and only
+the third is a conflict — upstream still holds the baseline (nobody touched it),
+upstream already holds what was typed (somebody made the same correction first,
+which is agreement), or upstream holds a third thing.
 
 ### Merged is decided on the id, never on the values
 

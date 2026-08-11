@@ -21,9 +21,8 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { backendFailureStatus, describeBackendFailure } from './backends/errors.js';
 import {
-  drainEdit,
+  drainStudent,
   sweepEdits,
-  toEditRecord,
   type DrainDeps,
   type EditRecord,
   type RunOutcome,
@@ -2328,7 +2327,15 @@ export const onUpstreamEditCreated = onDocumentCreated(
   async (event) => {
     const data = event.data?.data();
     if (!data) return;
-    await drainEdit(toEditRecord(event.params.editId, data), drainDeps());
+    const studentId = typeof data.studentId === 'string' ? data.studentId : '';
+    if (!studentId) return;
+    /*
+     * By student rather than by this one document: two saves in a row fire two
+     * triggers, the second loses the race for the lease, and without this it
+     * would sit queued until the next sweep noticed it a minute later. Draining
+     * the student folds the pair and sends them together.
+     */
+    await drainStudent(studentId, drainDeps());
   },
 );
 

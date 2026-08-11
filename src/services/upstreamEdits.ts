@@ -43,8 +43,9 @@ import {
   doc,
   onSnapshot,
   query,
-  runTransaction,
   serverTimestamp,
+  setDoc,
+  updateDoc,
   where,
   type Unsubscribe,
 } from 'firebase/firestore';
@@ -173,96 +174,68 @@ export interface EnqueueOptions {
  */
 export async function enqueueUpstreamEdit(options: EnqueueOptions): Promise<string> {
   const { studentId, uid, authorName } = options;
-  const editsRef = collection(db, paths.upstreamEdits());
 
-  return runTransaction(db, async (transaction) => {
-    /*
-     * The unclaimed job for a student is findable by name.
-     *
-     * A browser transaction cannot read a query, so the one job that may be
-     * superseded has to have a deterministic id — `queued_{studentId}` is it,
-     * and there is at most one by construction. A job a worker has taken is a
-     * *different* document: the drain moves it out of this id space by state
-     * rather than by renaming it, so the check below is on the state it reads,
-     * never on the id it used to find it.
-     */
-    const openRef = doc(editsRef, `queued_${studentId}`);
-    const open = await transaction.get(openRef);
-    const supersedable = open.exists() && open.data().state === 'queued';
+  /*
+   * One plain write, and deliberately not a transaction.
+   *
+   * The first version of this ran a transaction so that a second save could
+   * fold into an unclaimed first — which was a nicety, and it cost the one
+   * property this whole design is built on. A Firestore transaction needs the
+   * server: it reads, compares and writes in one round trip, so offline it does
+   * not queue, it simply never resolves. The counselor in a corridor that the
+   * journey calls the ordinary case would have pressed Save and had nothing
+   * happen at all.
+   *
+   * A `setDoc` on a fresh id is held on the device and sent when the signal
+   * comes back, which is the behaviour that was being claimed all along.
+   *
+   * Folding two saves together moved to the drain, which is a better home for
+   * it anyway: it is the thing that holds the student's lease, so it sees every
+   * queued job for that child at once — including a burst that left a phone in
+   * one batch after an hour with no signal, which no client-side transaction
+   * could ever have folded.
+   */
+  const ref = doc(collection(db, paths.upstreamEdits()));
 
-    /*
-     * If a worker already holds the earlier edit, this one becomes its own
-     * document and runs after it. Writing over the in-flight job instead would
-     * reset a patch that may already be on its way to the backend, and the
-     * lease would then be held for a job whose contents had changed underneath
-     * the worker holding it.
-     *
-     * The residual is benign and worth naming: while one job is in flight, a
-     * third and fourth edit each become their own document rather than folding
-     * into the second. They still run in order behind the lease, each against a
-     * fresh read, so the record ends where the last one asked — it simply costs
-     * the backend one write per save instead of one per burst, for the few
-     * seconds a job is actually in flight.
-     */
-    const ref = supersedable || !open.exists() ? openRef : doc(editsRef);
-
-    const merged: UpstreamEditPatch = { ...options.patch };
-    const baseline: UpstreamEditPatch = { ...options.baseline };
-    let createdAt: unknown = serverTimestamp();
-
-    if (supersedable) {
-      const previous = toUpstreamEdit(open.id, open.data());
-      // The earlier patch fills the gaps, so this save's fields win where the
-      // two overlap; the earlier *baseline* wins everywhere, because what the
-      // drain compares against is the record as it was before anybody started.
-      for (const field of UPSTREAM_EDIT_FIELDS) {
-        if (merged[field] === undefined && previous.patch[field] !== undefined) {
-          (merged as Record<string, unknown>)[field] = previous.patch[field];
-        }
-        if (previous.baseline[field] !== undefined) {
-          (baseline as Record<string, unknown>)[field] = previous.baseline[field];
-        }
-      }
-      createdAt = open.data().createdAt ?? serverTimestamp();
-    }
-
-    transaction.set(ref, {
-      studentId,
-      patch: merged,
-      baseline,
-      state: 'queued',
-      attempts: 0,
-      nextAttemptAt: null,
-      leaseUntil: null,
-      failure: null,
-      message: null,
-      field: null,
-      observed: null,
-      survivorPersonId: null,
-      survivorName: null,
-      createdAt,
-      createdBy: uid,
-      createdByName: authorName,
-      updatedAt: serverTimestamp(),
-      startedAt: null,
-      settledAt: null,
-    });
-
-    return ref.id;
+  await setDoc(ref, {
+    studentId,
+    patch: options.patch,
+    baseline: options.baseline,
+    state: 'queued',
+    attempts: 0,
+    nextAttemptAt: null,
+    leaseUntil: null,
+    failure: null,
+    message: null,
+    field: null,
+    observed: null,
+    survivorPersonId: null,
+    survivorName: null,
+    createdAt: serverTimestamp(),
+    createdBy: uid,
+    createdByName: authorName,
+    updatedAt: serverTimestamp(),
+    startedAt: null,
+    settledAt: null,
   });
+
+  return ref.id;
 }
 
-/** Stops a job nothing has claimed. Refused by the rules once one has. */
+/**
+ * Stops a job nothing has claimed.
+ *
+ * A blind update rather than a read-then-write, because the guard belongs in
+ * the rules and is already there: `queued → cancelled` is the only transition
+ * they allow from here, so a job a worker claimed in the meantime is refused by
+ * the database rather than by a check this code could get wrong. That also
+ * keeps the operation offline-tolerant, which a transaction is not.
+ */
 export async function cancelUpstreamEdit(editId: string): Promise<void> {
-  await runTransaction(db, async (transaction) => {
-    const ref = doc(db, paths.upstreamEdit(editId));
-    const snapshot = await transaction.get(ref);
-    if (!snapshot.exists() || snapshot.data().state !== 'queued') return;
-    transaction.update(ref, {
-      state: 'cancelled',
-      updatedAt: serverTimestamp(),
-      settledAt: serverTimestamp(),
-    });
+  await updateDoc(doc(db, paths.upstreamEdit(editId)), {
+    state: 'cancelled',
+    updatedAt: serverTimestamp(),
+    settledAt: serverTimestamp(),
   });
 }
 
@@ -275,21 +248,16 @@ export async function cancelUpstreamEdit(editId: string): Promise<void> {
  * look broken for the first minute of a connection that is fine.
  */
 export async function retryUpstreamEdit(editId: string): Promise<void> {
-  await runTransaction(db, async (transaction) => {
-    const ref = doc(db, paths.upstreamEdit(editId));
-    const snapshot = await transaction.get(ref);
-    if (!snapshot.exists() || snapshot.data().state !== 'failed') return;
-    transaction.update(ref, {
-      state: 'queued',
-      attempts: 0,
-      failure: null,
-      message: null,
-      field: null,
-      nextAttemptAt: null,
-      leaseUntil: null,
-      updatedAt: serverTimestamp(),
-      settledAt: null,
-    });
+  await updateDoc(doc(db, paths.upstreamEdit(editId)), {
+    state: 'queued',
+    attempts: 0,
+    failure: null,
+    message: null,
+    field: null,
+    nextAttemptAt: null,
+    leaseUntil: null,
+    updatedAt: serverTimestamp(),
+    settledAt: null,
   });
 }
 
@@ -300,16 +268,9 @@ export async function retryUpstreamEdit(editId: string): Promise<void> {
  * could delete is a job whose failure a client could hide.
  */
 export async function dismissUpstreamEdit(editId: string): Promise<void> {
-  await runTransaction(db, async (transaction) => {
-    const ref = doc(db, paths.upstreamEdit(editId));
-    const snapshot = await transaction.get(ref);
-    if (!snapshot.exists()) return;
-    const current = snapshot.data().state;
-    if (current === 'queued' || current === 'sending' || current === 'waiting') return;
-    transaction.update(ref, {
-      state: 'cancelled',
-      updatedAt: serverTimestamp(),
-      settledAt: serverTimestamp(),
-    });
+  await updateDoc(doc(db, paths.upstreamEdit(editId)), {
+    state: 'cancelled',
+    updatedAt: serverTimestamp(),
+    settledAt: serverTimestamp(),
   });
 }

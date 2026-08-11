@@ -349,6 +349,102 @@ export async function drainEdit(edit: EditRecord, deps: DrainDeps): Promise<Edit
   }
 }
 
+/**
+ * Every queued job for one student, folded into the oldest of them.
+ *
+ * This is where superseding lives, and it belongs here rather than in the
+ * browser for two reasons. The client cannot do it without a transaction, and a
+ * transaction cannot be written offline — which is the case the whole queue
+ * exists to survive. And a phone that spent an hour with no signal sends its
+ * whole burst at once, which is precisely the pile a client-side fold would
+ * never have seen.
+ *
+ * The newest patch wins field by field, because it is the leader's latest word.
+ * The *oldest* baseline wins, because what the drain compares against is the
+ * record as it stood before anybody started editing it — that is what makes a
+ * disagreement with the church office answerable.
+ */
+export function foldQueued(jobs: readonly EditRecord[]): {
+  run: EditRecord;
+  superseded: EditRecord[];
+} | null {
+  const queued = jobs
+    .filter((job) => job.state === 'queued')
+    .sort((a, b) => a.createdAtMs - b.createdAtMs);
+  if (queued.length === 0) return null;
+
+  const run = { ...queued[0]!, patch: { ...queued[0]!.patch }, baseline: { ...queued[0]!.baseline } };
+  for (const later of queued.slice(1)) {
+    Object.assign(run.patch, later.patch);
+    for (const [field, value] of Object.entries(later.baseline)) {
+      if (run.baseline[field] === undefined) run.baseline[field] = value;
+    }
+  }
+  return { run, superseded: queued.slice(1) };
+}
+
+/**
+ * Works one student until nothing of theirs is left to do.
+ *
+ * The trigger fires per document, so two saves in a row would otherwise leave
+ * the second sitting `queued` behind a lease it lost the race for, until the
+ * next sweep noticed it a minute later. Draining the *student* rather than the
+ * document means the follow-up goes out with the first one, which is what a
+ * leader correcting their own typo three seconds later expects.
+ */
+export async function drainStudent(
+  studentId: string,
+  deps: DrainDeps,
+  maxJobs = 5,
+): Promise<EditState[]> {
+  const states: EditState[] = [];
+
+  for (let round = 0; round < maxJobs; round += 1) {
+    const snapshot = await deps.db.collection(UPSTREAM_EDITS).get();
+    const mine = snapshot.docs
+      .map((row) => toEditRecord(row.id, row.data() ?? {}))
+      .filter((job) => job.studentId === studentId);
+
+    const nowMs = deps.now().getTime();
+    const folded = foldQueued(mine);
+
+    if (folded) {
+      // Retire the ones folded in before running, so a worker that dies partway
+      // cannot run them again as separate edits.
+      for (const spent of folded.superseded) {
+        await deps.db.doc(`${UPSTREAM_EDITS}/${spent.id}`).update({
+          state: 'cancelled',
+          message: 'Folded into a later edit of the same student.',
+          updatedAt: deps.now(),
+          settledAt: deps.now(),
+        });
+      }
+      if (folded.superseded.length > 0) {
+        await deps.db.doc(`${UPSTREAM_EDITS}/${folded.run.id}`).update({
+          patch: folded.run.patch,
+          baseline: folded.run.baseline,
+          updatedAt: deps.now(),
+        });
+      }
+      const state = await drainEdit(folded.run, deps);
+      if (state === null) return states;
+      states.push(state);
+      continue;
+    }
+
+    const retry = mine
+      .filter((job) => isRunnable(job, nowMs))
+      .sort((a, b) => a.createdAtMs - b.createdAtMs)[0];
+    if (!retry) return states;
+
+    const state = await drainEdit(retry, deps);
+    if (state === null) return states;
+    states.push(state);
+  }
+
+  return states;
+}
+
 export interface SweepResult {
   ran: number;
   swept: number;
@@ -385,17 +481,25 @@ export async function sweepEdits(deps: DrainDeps, limit = 5): Promise<SweepResul
     }
   }
 
-  const runnable = edits
-    .filter((edit) => isRunnable(edit, nowMs))
-    // Oldest first: a queue drained newest-first reorders two edits of one
-    // child, which is the one thing the lease exists to prevent.
-    .sort((a, b) => a.createdAtMs - b.createdAtMs)
-    .slice(0, limit);
+  /*
+   * By student, not by job: the lease is per student, so two jobs for one child
+   * would otherwise have the second refused and left for the next sweep. Oldest
+   * first, so a queue that built up through an outage comes out in the order it
+   * went in.
+   */
+  const students = [
+    ...new Map(
+      edits
+        .filter((edit) => isRunnable(edit, nowMs))
+        .sort((a, b) => a.createdAtMs - b.createdAtMs)
+        .map((edit) => [edit.studentId, edit] as const),
+    ).keys(),
+  ].slice(0, limit);
 
   let ran = 0;
-  for (const edit of runnable) {
-    const state = await drainEdit(edit, deps);
-    if (state !== null) ran += 1;
+  for (const studentId of students) {
+    const states = await drainStudent(studentId, deps);
+    ran += states.length;
   }
 
   return { ran, swept };

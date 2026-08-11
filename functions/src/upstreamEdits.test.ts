@@ -16,6 +16,8 @@ import {
   UPSTREAM_EDIT_LEASES,
   claimStudent,
   drainEdit,
+  drainStudent,
+  foldQueued,
   isRunnable,
   settleFor,
   sweepEdits,
@@ -272,5 +274,87 @@ describe('reading a stored job', () => {
     // An unknown state reads as queued rather than throwing: a drain that
     // crashed on an unfamiliar document would stop draining everything else.
     expect(record.state).toBe('queued');
+  });
+});
+
+describe('folding two saves of one student', () => {
+  /**
+   * Superseding moved here from the browser when the enqueue stopped using a
+   * transaction — a transaction cannot be written offline, and the corridor is
+   * the case the whole queue exists to survive. The drain is a better home for
+   * it anyway: it holds the student's lease, so it sees the whole pile at once,
+   * including a burst that left a phone in one batch.
+   */
+  it('takes the newest word on each field', () => {
+    const first = edit({ id: 'a', createdAtMs: 1, patch: { lastName: 'Chen' }, baseline: { lastName: 'Ramirez' } });
+    const second = edit({ id: 'b', createdAtMs: 2, patch: { lastName: 'Chen-Ito', grade: 10 }, baseline: { lastName: 'Chen', grade: 9 } });
+
+    const folded = foldQueued([second, first])!;
+    expect(folded.run.id).toBe('a');
+    expect(folded.run.patch).toEqual({ lastName: 'Chen-Ito', grade: 10 });
+    expect(folded.superseded.map((job) => job.id)).toEqual(['b']);
+  });
+
+  /**
+   * And the *oldest* baseline, because what the drain compares against is the
+   * record as it stood before anybody started — that is what makes a
+   * disagreement with the church office answerable rather than a comparison
+   * against a value this leader typed a moment ago.
+   */
+  it('keeps the baseline from before anybody started', () => {
+    const first = edit({ id: 'a', createdAtMs: 1, patch: { lastName: 'Chen' }, baseline: { lastName: 'Ramirez' } });
+    const second = edit({ id: 'b', createdAtMs: 2, patch: { lastName: 'Chen-Ito' }, baseline: { lastName: 'Chen' } });
+    expect(foldQueued([first, second])!.run.baseline).toEqual({ lastName: 'Ramirez' });
+  });
+
+  it('has nothing to say about jobs a worker already holds', () => {
+    expect(foldQueued([edit({ state: 'sending' })])).toBeNull();
+  });
+});
+
+describe('draining a student rather than a document', () => {
+  /**
+   * Two saves in a row fire two triggers; the second loses the race for the
+   * lease. Without draining the *student*, it would sit queued until the next
+   * sweep noticed it a minute later.
+   */
+  it('sends a follow-up with the first rather than leaving it for the sweep', async () => {
+    const db = new FakeFirestore();
+    db.seed(`${UPSTREAM_EDITS}/a`, {
+      studentId: 'pco_101',
+      state: 'queued',
+      patch: { lastName: 'Chen' },
+      baseline: { lastName: 'Ramirez' },
+      createdAt: new Date(nowMs - 2000),
+    });
+    db.seed(`${UPSTREAM_EDITS}/b`, {
+      studentId: 'pco_101',
+      state: 'queued',
+      patch: { grade: 10 },
+      baseline: { grade: 9 },
+      createdAt: new Date(nowMs - 1000),
+    });
+
+    const sent: EditRecord[] = [];
+    await drainStudent('pco_101', deps(db, async (job) => {
+      sent.push(job);
+      return { kind: 'landed' };
+    }));
+
+    // One upstream write carrying both fields, not two.
+    expect(sent).toHaveLength(1);
+    expect(sent[0]!.patch).toEqual({ lastName: 'Chen', grade: 10 });
+    expect(db.get(`${UPSTREAM_EDITS}/b`)?.state).toBe('cancelled');
+    expect(db.get(`${UPSTREAM_EDITS}/a`)?.state).toBe('landed');
+  });
+
+  it('stops at the lease rather than spinning', async () => {
+    const db = new FakeFirestore();
+    db.seed(`${UPSTREAM_EDITS}/a`, { studentId: 'pco_101', state: 'queued', patch: { lastName: 'X' } });
+    db.seed(`${UPSTREAM_EDIT_LEASES}/pco_101`, { editId: 'other', untilMs: nowMs + LEASE_MS });
+
+    const states = await drainStudent('pco_101', deps(db, async () => ({ kind: 'landed' })));
+    expect(states).toEqual([]);
+    expect(db.get(`${UPSTREAM_EDITS}/a`)?.state).toBe('queued');
   });
 });
