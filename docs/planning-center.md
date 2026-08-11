@@ -299,9 +299,20 @@ Tally keeps no copy of a linked student's name, grade, birthday or allergies, so
 them would be gone on the next read. Under `full` the same boxes are editable and Save calls
 `updateStudentProfile`, which patches the person upstream.
 
-The edit goes **straight** to Planning Center — nothing is written to Firestore on the way, and this
-is the reason the callable exists rather than the form writing a student document and letting the
-reconcile sweep notice the drift:
+**Save no longer waits for Planning Center.** The edit becomes a durable job —
+`upstreamEdits/{editId}` — and a server drains it, retrying the things worth retrying, while every
+screen showing that student shows the job. A save used to hold a spinner through three to six round
+trips to somebody else's API, with `Retry-After` slept inside the request, against a 120-second
+ceiling past which the browser was told nothing useful about a write that may well have landed. The
+whole of it is [profile-edits.md](profile-edits.md); the two things worth knowing here are that a
+queued patch carries **only the fields whose value differs from what the form opened on** — an
+untouched box is not an instruction, and restating one patches another leader's in-flight correction
+back out — and that the queue never carries a *create*, because a create run twice is a duplicate
+child in the church's permanent database.
+
+The edit still goes **straight** to Planning Center — nothing is written to Firestore as a copy on
+the way, and this is the reason it does not become a student document for the reconcile sweep to
+notice:
 
 - `mergeRoster` reads name and grade off the roster, so a copy in Firestore would not even show.
 - A copy left behind is a copy that gets pushed again later, over a correction somebody makes in

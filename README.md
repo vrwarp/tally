@@ -155,6 +155,7 @@ happens when a family asks to be removed — is **[docs/minors-data.md](docs/min
 | [docs/review-corrections.md](docs/review-corrections.md) | Correcting a self-registered family before approving them: the journeys, and the rules the screen follows |
 | [docs/walkthrough/corrections](docs/walkthrough/corrections/README.md) | The same five journeys, frame by frame, captured from the running screen |
 | [docs/minors-data.md](docs/minors-data.md) | What Tally stores about children, and what it refuses to |
+| [docs/profile-edits.md](docs/profile-edits.md) | Why a profile edit is a queued job, what every state means, and what is deliberately not blocked |
 | [docs/planning-center.md](docs/planning-center.md) | Tokens, configuration, roster modes, write-back, troubleshooting |
 | [docs/backends.md](docs/backends.md) | The people-backend abstraction: ids, capabilities, partial failure, adding one |
 | [docs/attendees32.md](docs/attendees32.md) | The Attendees backend: setup command, field mapping, caveats |

@@ -78,6 +78,17 @@ still exists, which is untidy and fixable, rather than the reverse — and clear
 `predictFromChain` pointer on any trip that was borrowing the chain's regulars. The same call with
 `preview` counts without writing, which is where the confirmation dialog's numbers come from.
 
+**A profile edit is a job, not a request.** Editing a linked student's name, grade, birthday or
+allergies writes `upstreamEdits/{editId}` and returns; `onUpstreamEditCreated` and a one-minute
+sweep drain it against the people backend. The reason is arithmetic rather than taste — one save is
+three to six round trips to an API that rate-limits by sleeping inside the request, under a callable
+ceiling of two minutes — and the consequences are everywhere: the enqueue is a document write rather
+than a callable so it survives a phone with no signal, the patch carries only the fields somebody
+actually changed so two leaders cannot overwrite each other, and every screen showing the student
+draws the job. Serialisation per student is a lease document claimed with `create()`, which is why
+`FirestoreLike` still needs no transaction and no query surface. See
+[profile-edits.md](profile-edits.md).
+
 **Nothing picks the event but the person holding the phone.** `/` is a question — `ChooseEvent` —
 and `/event/:eventId` is the only URL that renders a roster. `pickActiveEvent` survives the change
 because "what is on right now" is still worth knowing: it sorts the live gathering to the top of the

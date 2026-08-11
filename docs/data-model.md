@@ -417,6 +417,55 @@ one of which the same gate refuses in turn. `fetchSkippedNights` returns the ref
 alongside the ones it read, and a student's profile drops those nights — it does not fail the whole
 year's read over them, and it does not call them cancelled.
 
+### `upstreamEdits/{editId}`
+
+One profile edit on its way to a people backend, and its whole life.
+
+Top level rather than under `students` because the question it exists to answer —
+which edits need somebody — is asked by a leader who does not know which of four
+hundred students it was. That is one small live query here against a collection
+group over four hundred parents anywhere else. The set stays small by
+construction: everything in flight, plus failures nobody has resolved, plus a few
+minutes of freshly-landed ones, which a sweep then deletes.
+
+| Field | Notes |
+| --- | --- |
+| `studentId` | Who the edit is about. |
+| `patch` | **Only the fields whose value differs from what the form opened on.** An untouched box is not an instruction: a second leader restating a value they never touched would patch the first leader's in-flight correction back out, and both would be told they succeeded. `status` may never appear here — who is on the roster is Tally's own list and is never written upstream. |
+| `baseline` | What the form was showing for each patched field. This is what makes "somebody else changed this in between" answerable. |
+| `state` | `queued`, `sending`, `waiting`, `landed`, `differs`, `merged`, `failed`, `orphaned`, `cancelled`. |
+| `attempts`, `nextAttemptAt`, `leaseUntil` | The retry schedule, and the lease that lets a sweep reclaim a job whose worker died mid-request. |
+| `failure`, `message`, `field` | Why it will not land, in the few classes a screen branches on — `auth` and `writeBackOff` fail every queued job at once, which is why the list can say it once rather than nine times. |
+| `observed` | On `differs`: what the backend held instead. Dies with the job. |
+| `survivorPersonId`, `survivorName` | On `merged`: who it actually landed on. |
+| `createdBy`, `createdByName` | So a second leader is told *who* is editing, rather than being locked out. |
+
+**Written by a browser, drained by a server.** The rules pin every field the
+drain owns to its empty value on create, so a browser can ask for work and can
+never claim work was done; the only two client transitions afterwards are
+cancelling a job nothing has claimed and re-queueing one that failed. Deletion is
+the sweeper's alone — a job a client could delete is a job whose failure a client
+could hide.
+
+**This is an instruction with a lifetime, not a mirror.** The values live here
+only while the job does. That is what keeps it on the right side of
+[what is not stored](#what-is-not-stored): a copy that outlived its job would be
+re-pushed over somebody's later correction, which is the exact bug §4 of
+[planning-center.md](planning-center.md) exists to prevent.
+
+The reasoning, the states and what is deliberately *not* blocked are in
+[profile-edits.md](profile-edits.md).
+
+### `upstreamEditLeases/{studentId}`
+
+Server-only, and one field wide: which edit holds this student, and until when.
+
+It is how two edits of one child are kept in the order they were queued —
+`create()` is atomic and rejects rather than overwriting, so two workers racing
+for one student produce exactly one winner without a transaction. The expiry is
+what makes a worker that died mid-request recoverable rather than a job nothing
+will ever pick up.
+
 ### `eventAccess/{chainKey}`
 
 Who may *work* one gathering. Absent for every gathering nobody has restricted, which is the whole

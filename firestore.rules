@@ -1260,6 +1260,19 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    /**
+     * Which worker holds a student, and until when.
+     *
+     * Server-only in every direction, and stated rather than left to the
+     * default: this is the lock that keeps two edits of one child in the order
+     * they were queued, and a browser that could write it could make one leader's
+     * correction overtake another's — or take a student and never give them
+     * back.
+     */
+    match /upstreamEditLeases/{studentId} {
+      allow read, write: if false;
+    }
+
     /* ---------------------------------------------------------------- */
     /* Default deny                                                      */
     /* ---------------------------------------------------------------- */
