@@ -601,6 +601,26 @@ export async function resetA32Simulator(): Promise<void> {
  * API — the ids are minted at boot, so a spec that links a Planning Center
  * person to one has to ask.
  */
+/**
+ * Merges one simulated attendee into another, the way a coworker would in
+ * Attendees itself.
+ *
+ * On the control plane rather than the API, because this is not something
+ * Tally can ask for — it is a fact about the far end that a test arranges,
+ * like `down`. Afterwards the loser's id answers `410` with the survivor,
+ * which is the contract attendees32 states.
+ */
+export async function mergeA32Attendee(loser: string, survivor: string): Promise<void> {
+  const response = await fetch(`${E2E.a32SimulatorUrl}/_sim/merge`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ loser, survivor }),
+  });
+  if (!response.ok) {
+    throw new Error(`Could not merge ${loser} into ${survivor}: HTTP ${response.status}.`);
+  }
+}
+
 export async function a32PersonIdOf(name: string): Promise<string> {
   const url = `${E2E.a32SimulatorUrl}/persons/api/datagrid_data_attendee/?searchValue=${encodeURIComponent(name)}&take=5&skip=0`;
   const response = await fetch(url, { headers: { Authorization: 'Token a32-sim-token' } });

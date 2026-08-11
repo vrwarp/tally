@@ -55,8 +55,12 @@ export function createA32Backend(args: BackendContext & { config: A32Config }): 
     capabilities: {
       writeBack: config.writeBack,
       parentCreatable: true,
-      // No merges upstream: a dead id has no forwarding address, ever.
-      mergeAware: false,
+      /*
+       * True since attendees32 grew merges of its own: a merged-away attendee
+       * answers `410` with `merged_into`, which is the same question Planning
+       * Center's mirror answers and the only thing this flag is asking.
+       */
+      mergeAware: true,
       listsSupported: false,
       historyImportSupported: true,
       attendancePushSupported: false,

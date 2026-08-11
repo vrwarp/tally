@@ -46,6 +46,16 @@ export class A32ApiError extends Error {
   readonly path: string;
   /** DRF's `detail` (or the raw body), flattened to lines for a debug panel. */
   readonly errors: string[];
+  /**
+   * The survivor named on a `410`, when the burial was a merge.
+   *
+   * Attendees answers a merged-away attendee with `410` and `merged_into` in
+   * the body, which is its half of the same contract Planning Center states
+   * with `410` and `meta.merged_into`. Kept as a field rather than re-parsed
+   * by a caller because the body is read once, here, and `errors` has already
+   * flattened it to prose by the time anybody else sees it.
+   */
+  readonly mergedInto: string | null;
   readonly retryAfterMs: number | null;
   readonly request: PcoRequestTrace | null;
   readonly response: PcoResponseTrace | null;
@@ -56,12 +66,14 @@ export class A32ApiError extends Error {
     errors: string[],
     retryAfterMs: number | null = null,
     trace?: { request?: PcoRequestTrace; response?: PcoResponseTrace },
+    mergedInto: string | null = null,
   ) {
     super(`Attendees ${status} for ${path}${errors.length > 0 ? `: ${errors.join('; ')}` : ''}`);
     this.name = 'A32ApiError';
     this.status = status;
     this.path = path;
     this.errors = errors;
+    this.mergedInto = mergedInto;
     this.retryAfterMs = retryAfterMs;
     this.request = trace?.request ?? null;
     this.response = trace?.response ?? null;
@@ -81,9 +93,22 @@ export class A32NetworkError extends Error {
   }
 }
 
-/** `404`: the record is not there — Attendees has no merges, so that is the whole story. */
+/**
+ * `404`/`410`: the person is not there, whatever else is true.
+ *
+ * `410` was missing, and it is the interesting one: Attendees answers a
+ * merged-away attendee with it. Without this the read that finds a merged
+ * person threw an unclassified error, and the queue reported an outage for a
+ * record that had simply moved.
+ */
 export function isA32GoneError(error: unknown): error is A32ApiError {
-  return error instanceof A32ApiError && error.status === 404;
+  return error instanceof A32ApiError && (error.status === 404 || error.status === 410);
+}
+
+/** The forwarding address on a tombstone, if the burial was a merge. */
+export function a32MergedForwardOf(error: unknown): string | null {
+  if (!(error instanceof A32ApiError) || error.status !== 410) return null;
+  return error.mergedInto;
 }
 
 export interface A32ClientOptions {
@@ -159,6 +184,26 @@ function readResponseHeaders(response: Response): Record<string, string> {
     headers[key] = value;
   });
   return headers;
+}
+
+/**
+ * The survivor id on a `410` body, or null.
+ *
+ * Deliberately tolerant about the type: a uuid arrives as a string here, but a
+ * backend that numbered its people would send a number, and a forwarding
+ * address that failed to parse for that reason would look exactly like a
+ * person who was deleted.
+ */
+function mergedIntoOf(text: string): string | null {
+  try {
+    const body = JSON.parse(text) as Record<string, unknown>;
+    const forwarded = body?.merged_into;
+    if (typeof forwarded === 'string' && forwarded) return forwarded;
+    if (typeof forwarded === 'number') return String(forwarded);
+  } catch {
+    // Not JSON; there is no forwarding address to find.
+  }
+  return null;
 }
 
 function errorLines(text: string): string[] {
@@ -247,17 +292,24 @@ export function createA32Client(options: A32ClientOptions): A32Client {
 
       const apiError = async (): Promise<A32ApiError> => {
         const text = await response.text().catch(() => '');
-        return new A32ApiError(response.status, url, errorLines(text), retryAfterMs, {
-          request: traceRequest(attempt),
-          response: {
-            status: response.status,
-            statusText: response.statusText,
-            headers: readResponseHeaders(response),
-            body: text.slice(0, MAX_TRACE_BODY_CHARS),
-            bodyTruncated: text.length > MAX_TRACE_BODY_CHARS,
-            durationMs: Math.max(0, now().getTime() - startedAt),
+        return new A32ApiError(
+          response.status,
+          url,
+          errorLines(text),
+          retryAfterMs,
+          {
+            request: traceRequest(attempt),
+            response: {
+              status: response.status,
+              statusText: response.statusText,
+              headers: readResponseHeaders(response),
+              body: text.slice(0, MAX_TRACE_BODY_CHARS),
+              bodyTruncated: text.length > MAX_TRACE_BODY_CHARS,
+              durationMs: Math.max(0, now().getTime() - startedAt),
+            },
           },
-        });
+          mergedIntoOf(text),
+        );
       };
 
       if (!isRetryableStatus(response.status, replayable)) throw await apiError();

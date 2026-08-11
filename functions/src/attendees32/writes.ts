@@ -40,6 +40,7 @@ import { migrateStudentMemberships } from '../backends/studentMigration.js';
 import { HELD_FOR_REVIEW_MESSAGE, isHeldForReview } from '../backends/pendingReview.js';
 import type { PersonCheck } from '../backends/types.js';
 import { isA32GoneError, type A32Client } from './client.js';
+import { followA32PersonLink } from './personLink.js';
 import {
   a32Grade,
   allPhonesOf,
@@ -165,8 +166,17 @@ export async function checkPerson(
     await client.get<A32Attendee>(API.attendeeById(personId));
     return { outcome: 'exists', personId };
   } catch (error) {
-    if (isA32GoneError(error)) return { outcome: 'gone' };
-    throw error;
+    if (!isA32GoneError(error)) throw error;
+    /*
+     * Gone is not the end of the question. A merged-away attendee answers
+     * `410` with the survivor, and adding somebody to a roster by an id that
+     * has since been merged should land on the person, not report them
+     * missing and offer to create a second duplicate of the record somebody
+     * has just finished de-duplicating.
+     */
+    const link = await followA32PersonLink(client, personId, error);
+    if (link.outcome === 'live') return { outcome: 'relinked', personId: link.personId };
+    return { outcome: 'gone' };
   }
 }
 
@@ -499,6 +509,35 @@ export async function updateStudentProfile(
     };
   }
 
+  /*
+   * Refused rather than ignored, and refused rather than written.
+   *
+   * The nickname half of the composite is Attendees' CJK name, held in
+   * `first_name2`/`last_name2`, and `mapping.ts` deliberately never writes
+   * those: Tally cannot tell which half of a CJK string is the family name,
+   * and a wrong split written upstream is worse than a stale nickname. That
+   * decision was sound and its consequence was not — the field simply fell
+   * through this function, nothing was written, and the job reported `landed`
+   * under a strip that said "Saved in Attendees". A leader was told their
+   * correction had gone to the church's database when it had gone nowhere.
+   *
+   * So it is `invalid`: nothing is written, the whole patch is refused, and
+   * the record says which field and where to change it. Silent loss of a
+   * typed value is the failure this queue exists to make impossible.
+   */
+  if (options.nickname !== undefined) {
+    return {
+      status: 'invalid',
+      wrote: [],
+      message:
+        'Tally cannot change the bracketed name here — Attendees keeps it in its own ' +
+        'fields, and Tally cannot tell which half is the family name. Change it in ' +
+        'Attendees; everything else on this form can be saved from Tally.',
+      person: null,
+      before: null,
+    };
+  }
+
   if (options.firstName !== undefined && !options.firstName.trim()) {
     return { status: 'invalid', wrote: [], message: 'A first name is required.', person: null, before: null };
   }
@@ -532,18 +571,38 @@ export async function updateStudentProfile(
     };
   }
 
+  /*
+   * Read through merges, not a bare get.
+   *
+   * A merged attendee answers `410` with the survivor, and an edit that names
+   * the id somebody merged away is still an edit of that person — they have
+   * moved, not vanished. Following it here is what lets the queue report
+   * `merged` (the row that comes back carries a different id from the one the
+   * job named) instead of `orphaned`, which would offer a leader a re-create
+   * for a child who already exists under the survivor's id.
+   *
+   * `personId` rather than `resolved.personId` from here down: everything
+   * after this — the compare-and-set, the PATCH, the row handed back — has to
+   * be about whoever holds the record now.
+   */
+  let personId = resolved.personId;
   let attendee: A32Attendee;
   try {
-    attendee = await client.get<A32Attendee>(API.attendeeById(resolved.personId));
+    attendee = await client.get<A32Attendee>(API.attendeeById(personId));
   } catch (error) {
     if (!isA32GoneError(error)) throw error;
-    return {
-      status: 'no-student',
-      wrote: [],
-      message: 'Attendees no longer has this person.',
-      person: null,
-      before: null,
-    };
+    const link = await followA32PersonLink(client, personId, error);
+    if (link.outcome !== 'live') {
+      return {
+        status: 'no-student',
+        wrote: [],
+        message: 'Attendees no longer has this person.',
+        person: null,
+        before: null,
+      };
+    }
+    personId = link.personId;
+    attendee = link.attendee;
   }
 
   const patch: Record<string, unknown> = {};
@@ -634,8 +693,8 @@ export async function updateStudentProfile(
     };
   }
 
-  const updated = await client.patch<A32Attendee>(API.attendeeById(resolved.personId), patch, {
-    'X-Target-Attendee-Id': resolved.personId,
+  const updated = await client.patch<A32Attendee>(API.attendeeById(personId), patch, {
+    'X-Target-Attendee-Id': personId,
   });
   return {
     status: 'updated',

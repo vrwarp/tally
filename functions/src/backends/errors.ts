@@ -12,6 +12,7 @@
  * are about HTTP, not about Planning Center. Renaming it would touch every
  * screen that renders a Details panel for no behavioral gain.
  */
+import { A32ApiError } from '../attendees32/client.js';
 import { PcoApiError } from '../pco/client.js';
 import { describePcoFailure, type PcoErrorDebug } from '../pco/debug.js';
 
@@ -22,9 +23,18 @@ export type { PcoErrorDebug };
  * an answer — network failures, programming errors. What the entry points
  * branch on to tell "they are rate-limiting us" from "our credentials are bad"
  * from "something else".
+ *
+ * Both clients, and the second one was missing. `A32ApiError` returned null
+ * here, so every Attendees failure that threw looked like "no answer at all":
+ * a rotated token, a person deleted between a read and a write, and a value
+ * Attendees rejected all fell past the auth, orphaned and validation branches
+ * in `runUpstreamEdit`, burned eight retries, and were reported to a leader as
+ * "could not reach Attendees". The two error classes have carried the same
+ * three fields all along.
  */
 export function backendFailureStatus(error: unknown): number | null {
   if (error instanceof PcoApiError) return error.status;
+  if (error instanceof A32ApiError) return error.status;
   return null;
 }
 

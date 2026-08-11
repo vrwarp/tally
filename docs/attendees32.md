@@ -86,10 +86,19 @@ costs no extra requests.
 
 ## 3. What is different from Planning Center
 
-- **No merges.** Attendees soft-deletes (`is_removed`) and never merges records, so there is no
-  forwarding address to follow: `mergeAware: false`, `relinks` is always empty, and a dead record
-  freezes check-ins exactly like a deleted Planning Center person until a leader removes or
-  re-creates the student.
+- **Merges, since attendees32 grew them.** A merged-away attendee answers `410` with
+  `merged_into` naming the survivor, which is the same question Planning Center's mirror answers —
+  so `mergeAware: true`, `checkPerson` relinks, and an edit whose person has moved lands on the
+  survivor and is reported as `merged` rather than as a person who is gone. A chain reports its
+  end, so Tally never walks one itself. A `410` *without* a forwarding address is a third answer
+  again: merged, and the survivor deleted afterwards — gone, with nowhere to point. A plain
+  soft-delete is still a `404` and still freezes check-ins until a leader removes or re-creates
+  the student.
+- **The bracketed name cannot be written from Tally.** The nickname half of the composite is
+  Attendees' CJK name, held in `first_name2`/`last_name2`, and Tally cannot tell which half of a
+  CJK string is the family name — so a nickname edit is *refused* (`invalid`), with a sentence
+  saying where to make it. It used to fall through and report success, which meant a leader was
+  told their correction had reached the church's database when it had gone nowhere.
 - **Re-create means a new UUID.** Planning Center lets Tally re-create a person and keep the old
   membership document; an Attendees re-create mints a new id, so the roster membership migrates to
   a new `a32_{uuid}` document and attendance moves with it (`backends/studentMigration.ts`).

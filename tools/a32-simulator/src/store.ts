@@ -26,6 +26,15 @@ export interface SimAttendee {
   deathday: string | null;
   infos: Record<string, unknown>;
   isRemoved: boolean;
+  /**
+   * The survivor this attendee was merged into, if any.
+   *
+   * A tombstone rather than a deletion, exactly as attendees32 keeps one: an
+   * id that has been handed out stays followable. Null for the ordinary case
+   * and for a plain soft-delete, which is a different answer — gone with
+   * nowhere to point.
+   */
+  mergedInto: string | null;
 }
 
 export interface SimFolk {
@@ -207,6 +216,7 @@ export class A32SimulatorStore {
       deathday: fields.deathday ?? null,
       infos: { fixed: {}, contacts: {}, emergency_contacts: {}, schedulers: {}, ...(fields.infos ?? {}) },
       isRemoved: false,
+      mergedInto: null,
     };
     this.composeNames(attendee);
     this.attendees.set(attendee.id, attendee);
@@ -221,6 +231,42 @@ export class A32SimulatorStore {
     });
     this.attendings.push({ id: intId(), attendeeId: attendee.id, category: 'auto-created' });
     return attendee;
+  }
+
+  /**
+   * Merges one attendee into another, the way attendees32 does.
+   *
+   * The loser keeps its row, is soft-deleted, and points at the survivor. The
+   * simulator does not move attendance — that is attendees32's business and
+   * has its own tests over there; what a test against *this* needs is the
+   * observable half, which is what an id answers afterwards.
+   */
+  mergeAttendee(loserId: string, survivorId: string): SimAttendee | null {
+    const loser = this.attendees.get(loserId);
+    const survivor = this.attendees.get(survivorId);
+    if (!loser || !survivor || loser.id === survivor.id) return null;
+    loser.mergedInto = survivor.id;
+    loser.isRemoved = true;
+    return survivor;
+  }
+
+  /**
+   * Follows a chain of merges to whoever holds the record now, or null.
+   *
+   * Bounded for the same reason the real one is: a cycle is reachable by hand
+   * and the answer to it is "gone", not a hang.
+   */
+  survivorOf(id: string): SimAttendee | null {
+    const seen = new Set<string>([id]);
+    let current = this.attendees.get(id) ?? null;
+
+    for (let hop = 0; hop < 5 && current; hop += 1) {
+      if (!current.mergedInto) return current.isRemoved ? null : current;
+      if (seen.has(current.mergedInto)) return null;
+      seen.add(current.mergedInto);
+      current = this.attendees.get(current.mergedInto) ?? null;
+    }
+    return null;
   }
 
   updateAttendee(id: string, fields: Record<string, unknown>): SimAttendee | null {

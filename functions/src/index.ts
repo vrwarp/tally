@@ -138,6 +138,7 @@ import { materializeOccurrence as materializeOne, MINISTRY_TIME_ZONE } from './o
 // registry, and the entry point is the one place that decides what ships.
 import './attendees32/backend.js';
 import { createPcoBackend } from './pco/backend.js';
+import { A32ApiError } from './attendees32/client.js';
 import { createPcoClient, PcoApiError } from './pco/client.js';
 import { fetchLists } from './pco/lists.js';
 import { graftMergedStudent } from './pco/studentPerson.js';
@@ -2337,9 +2338,18 @@ function disagreementsWith(
  * that refuse without saying anything.
  */
 function describeBackendRefusal(error: unknown, displayName: string): string {
+  /*
+   * Two shapes, because the two backends speak different dialects: Planning
+   * Center's JSON:API carries `{detail, title}` objects, and Attendees is a
+   * DRF app whose `detail` and field errors have already been flattened to
+   * lines by its client. Both are the backend's own words about what it
+   * refused, which is the only part a leader can act on.
+   */
   const details = error instanceof PcoApiError
     ? error.errors.map((detail) => detail.detail ?? detail.title).filter(Boolean)
-    : [];
+    : error instanceof A32ApiError
+      ? error.errors.filter(Boolean)
+      : [];
   const said = details.join('; ').trim();
   return said
     ? `${displayName} would not accept this: ${said}`

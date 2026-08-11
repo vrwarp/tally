@@ -38,7 +38,7 @@ Each backend declares `capabilities`:
 | --- | --- | --- | --- |
 | `writeBack` | per config | per config | `off` / `create` / `full`, same ladder both sides |
 | `parentCreatable` | yes | yes | `addParent` and `createFamily` can create a person and a household/family |
-| `mergeAware` | yes | no | Upstream merges leave a forwarding address Tally can follow |
+| `mergeAware` | yes | yes | Upstream merges leave a forwarding address Tally can follow |
 | `listsSupported` | yes | no | Saved lists exist upstream and can seed the roster |
 | `historyImportSupported` | yes | yes | A whole event's attendance history can be imported |
 | `attendancePushSupported` | no | no | Declared for a future backend; nothing implements it |

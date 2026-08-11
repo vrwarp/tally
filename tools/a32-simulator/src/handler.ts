@@ -260,8 +260,25 @@ function personsApi(
   if (resource === 'datagrid_data_attendee') {
     if (method === 'GET' && id) {
       const attendee = store.attendees.get(id);
-      if (!attendee || attendee.isRemoved) return json(404, { detail: 'Not found.' });
-      return json(200, attendeeRow(store, attendee));
+      if (attendee && !attendee.isRemoved) return json(200, attendeeRow(store, attendee));
+      /*
+       * A merged-away id answers 410 with the survivor, which is the contract
+       * attendees32 states and the only way a caller can tell "this person
+       * moved" from "this person is gone". A chain reports its end, so a
+       * caller never has to walk one itself — and a trail that ends nowhere
+       * is a 410 with no forwarding address, which is a third answer again.
+       */
+      if (attendee?.mergedInto) {
+        const survivor = store.survivorOf(attendee.id);
+        if (!survivor) {
+          return json(410, { detail: 'That attendee is gone, and no record holds them now.' });
+        }
+        return json(410, {
+          detail: 'That attendee was merged into another record.',
+          merged_into: survivor.id,
+        });
+      }
+      return json(404, { detail: 'Not found.' });
     }
     if (method === 'GET') {
       const term = first(query.searchValue)?.toLowerCase();

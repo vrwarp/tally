@@ -347,6 +347,129 @@ describe('updateStudentProfile', () => {
   });
 });
 
+describe('a merged attendee', () => {
+  /**
+   * The behaviour this backend declared it did not have.
+   *
+   * `capabilities.mergeAware` was false and honestly so: a merged-away person
+   * read as a person who was gone, so a queued edit for them was reported as
+   * `orphaned` and a leader was offered a re-create for somebody who already
+   * existed under another id. attendees32 answers `410` with `merged_into`
+   * now, which is the same question Planning Center's mirror answers.
+   */
+  it('follows the edit onto the survivor and says whose record it landed on', async () => {
+    const wei = idOf('Wei');
+    const salote = idOf('Salote');
+    db.seed(`students/a32_${wei}`, { status: 'active' });
+    // Read before the merge: asserting against a literal would pass by
+    // accident whenever the fixture happened to hold the same grade.
+    const tombstoneGradeBefore = (store.attendees.get(wei)!.infos.fixed as Record<string, unknown>)
+      .grade;
+    store.mergeAttendee(wei, salote);
+
+    const result = await updateStudentProfile({
+      db,
+      client,
+      config,
+      cache,
+      studentId: `a32_${wei}`,
+      grade: 11,
+    });
+
+    expect(result.status).toBe('updated');
+    // The id that came back is not the id the edit named, which is exactly
+    // what the queue reads to report `merged` rather than `landed`.
+    expect(result.person?.pcoPersonId).toBe(salote);
+    expect((store.attendees.get(salote)!.infos.fixed as Record<string, unknown>).grade).toBe(11);
+    // And nothing was written to the tombstone.
+    expect((store.attendees.get(wei)!.infos.fixed as Record<string, unknown>).grade).toBe(
+      tombstoneGradeBefore,
+    );
+  });
+
+  it('follows a chain to its end', async () => {
+    const wei = idOf('Wei');
+    const salote = idOf('Salote');
+    const third = store.createAttendee({ firstName: 'Mele', lastName: 'Tui' });
+    db.seed(`students/a32_${wei}`, { status: 'active' });
+    store.mergeAttendee(wei, salote);
+    store.mergeAttendee(salote, third.id);
+
+    const result = await updateStudentProfile({
+      db,
+      client,
+      config,
+      cache,
+      studentId: `a32_${wei}`,
+      grade: 9,
+    });
+
+    expect(result.person?.pcoPersonId).toBe(third.id);
+  });
+
+  it('is gone, not merged, when the trail ends nowhere', async () => {
+    const wei = idOf('Wei');
+    const salote = idOf('Salote');
+    db.seed(`students/a32_${wei}`, { status: 'active' });
+    store.mergeAttendee(wei, salote);
+    // The survivor is deleted afterwards, which a tidy-up does.
+    store.attendees.get(salote)!.isRemoved = true;
+
+    const result = await updateStudentProfile({
+      db,
+      client,
+      config,
+      cache,
+      studentId: `a32_${wei}`,
+      grade: 9,
+    });
+
+    expect(result.status).toBe('no-student');
+  });
+
+  it('relinks rather than reporting a person missing', async () => {
+    const wei = idOf('Wei');
+    const salote = idOf('Salote');
+    store.mergeAttendee(wei, salote);
+
+    // Adding somebody by an id that has since been merged should land on the
+    // person, not offer to create a second copy of the record a coworker has
+    // just finished de-duplicating.
+    expect(await checkPerson(client, wei)).toEqual({ outcome: 'relinked', personId: salote });
+  });
+});
+
+describe('a nickname on Attendees', () => {
+  /**
+   * The field that used to report success and write nothing.
+   *
+   * The bracketed half of the composite is Attendees' CJK name, and
+   * `mapping.ts` deliberately never writes those fields — Tally cannot tell
+   * which half is the family name. The decision was right; the consequence
+   * was that the field fell through, nothing was written, and the job landed
+   * under a strip reading "Saved in Attendees".
+   */
+  it('is refused rather than silently dropped', async () => {
+    const wei = idOf('Wei');
+    db.seed(`students/a32_${wei}`, { status: 'active' });
+    const before = store.attendees.get(wei)!.firstName2;
+
+    const result = await updateStudentProfile({
+      db,
+      client,
+      config,
+      cache,
+      studentId: `a32_${wei}`,
+      nickname: 'Ah Wei',
+    });
+
+    expect(result.status).toBe('invalid');
+    expect(result.wrote).toEqual([]);
+    expect(result.message).toMatch(/Attendees/);
+    expect(store.attendees.get(wei)!.firstName2).toBe(before);
+  });
+});
+
 describe('setParentContact', () => {
   it('fills only the empty slot and never overwrites what is on file', async () => {
     const wei = idOf('Wei');
