@@ -18,8 +18,23 @@
  */
 import type { Page } from '@playwright/test';
 
+/**
+ * The top layer, written down. See the note beside `data-uxr-modal` below.
+ *
+ * The attribute selector out-specifies the `bg-transparent` on the dialog's own
+ * class list, which is correct: transparent was right when a `::backdrop`
+ * pseudo-element was painting behind it, and there is no pseudo-element in a
+ * static file.
+ */
+const MODAL_RULE = [
+  'dialog[open][data-uxr-modal]{position:fixed;inset:0;z-index:60;',
+  'background:rgb(0 0 0 / 0.7);max-height:100dvh;max-width:100vw;}',
+].join('');
+
 export async function freeze(page: Page): Promise<string> {
-  return page.evaluate(() => {
+  // Passed in rather than closed over: the body of `evaluate` is serialised and
+  // run in the page, where nothing in this module's scope exists.
+  return page.evaluate((modalRule: string) => {
     /* Inline every rule the page is actually painting with. Same-origin, so
        `cssRules` is readable; the try/catch is for anything that is not. */
     const sheets = Array.from(document.styleSheets)
@@ -56,9 +71,29 @@ export async function freeze(page: Page): Promise<string> {
     const root = document.documentElement.cloneNode(true) as HTMLElement;
     root.querySelectorAll('script, link[rel="stylesheet"], style').forEach((node) => node.remove());
 
+    /*
+     * An open <dialog> is the one thing on a page that a clone cannot carry.
+     *
+     * `showModal()` puts the element in the *top layer* — above everything,
+     * centred against the viewport, with `::backdrop` painted behind it — and
+     * none of that is expressed in the DOM or in a stylesheet. The `open`
+     * attribute survives the clone and means something much weaker: a non-modal
+     * dialog, absolutely positioned in the flow, no backdrop. So a frozen
+     * scene whose whole subject is a form in a modal came out as the page
+     * behind it, with the form sitting a screen and a half further down.
+     *
+     * Re-expressing it is a translation rather than a decoration: fixed to the
+     * viewport, above the page, with the backdrop's own colour moved onto the
+     * element — which is what the browser was painting a moment ago. Anything
+     * that reads the frame afterwards is looking at the same pixels.
+     */
+    root.querySelectorAll('dialog[open]').forEach((dialog) => {
+      dialog.setAttribute('data-uxr-modal', '');
+    });
+
     const style = document.createElement('style');
     style.setAttribute('data-uxr', 'frozen');
-    style.textContent = sheets;
+    style.textContent = `${sheets}\n\n${modalRule}`;
     root.querySelector('head')?.appendChild(style);
 
     /* A hook for the ideation agent: every prototype carries an empty override
@@ -70,5 +105,5 @@ export async function freeze(page: Page): Promise<string> {
     root.querySelector('head')?.appendChild(overrides);
 
     return `<!doctype html>\n${root.outerHTML}`;
-  });
+  }, MODAL_RULE);
 }

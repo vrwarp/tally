@@ -1,0 +1,65 @@
+[
+  {
+    "scene": "sync-students",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "the status chips on the list rows — \"Saving\" and \"Allergy\" on Ava Chen, \"Waiting\" on Marcus Delacroix-Oyelaran, \"Queued\" and \"No contact\" on Amara Whitfield",
+    "finding": "The new sync chip has no signature of its own. It borrows two existing costumes wholesale: \"Saving\" and \"Waiting\" are pixel-for-pixel the allergy badge (same amber fill, same amber ring, same amber bold 11px, differing only by a 10px glyph), and \"Queued\" is pixel-for-pixel the \"No contact\" badge. So one family of states speaks in three unrelated treatments — amber, red, neutral — while two of those three are indistinguishable from chips that are not about sync at all. On Ava's row a transient thirty-second condition and a standing life-safety fact sit shoulder to shoulder as twins.",
+    "evidence": "Ava's row carries two amber chips side by side, 8px apart, at identical size, weight and hue; the only difference is ◷ against ⚠. Amara's row carries \"No contact\" and \"Queued\" adjacent in the same grey chip. Down the list the reader has to read every chip's word to know its class, which is exactly the counting the run of nine edits is supposed to avoid.",
+    "direction": "Give the sync family one signature that is not already spoken for, and let hue inside that signature carry only severity. The standing badges are filled; the sync states could be the unfilled/outlined member of the same chip, or carry a common leading mark, so that one glance separates \"a fact about this child\" from \"a thing happening right now\" before any word is read. Whatever it is, the amber allergy badge must stay the only filled amber object on a row, and no sync state may wear the \"No contact\" grey."
+  },
+  {
+    "scene": "sync-students",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "the \"Needs you 1\" quick-filter chip in the filter row",
+    "finding": "In this filter row, a tinted fill with a coloured ring is the selected state — that is how \"Incomplete profiles\" and \"Visitors\" say they are on. The new chip wears that exact recipe in red while it is off, and it is the only chip in the row carrying any colour at all. The row therefore reads as \"a filter is applied\", and the list beneath it contradicts that by showing all forty-five.",
+    "evidence": "\"Incomplete profiles\" and \"Visitors\" are flat ink with an invisible ring; \"Needs you\" is filled and ringed in danger. Its count pill, meanwhile, is still in the unselected grey — so the object is half dressed as pressed and half as not, within itself.",
+    "direction": "Keep the alarm out of the chip's chrome and put it in the count, or mark severity with something that cannot be confused with selection (the numeral in danger, the label in ink). Selection must remain the only thing a filled, ringed chip means in this row."
+  },
+  {
+    "scene": "sync-profile",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "the \"Undo this edit\" button inside the amber status strip, and the \"Edit profile\" button 16px below it",
+    "finding": "The single highest-contrast object on this record is a bright filled brand pill labelled \"Undo this edit\" — an escape hatch from something that is going fine — and directly under the strip sits a second, identical filled brand pill that is the record's actual primary action. Two pills of equal weight, adjacent, doing unrelated jobs, means neither is primary. Squint at the fold and the answer to \"what is this screen about\" is a blue rectangle, not the child's name and not the sentence saying her edit is on its way.",
+    "evidence": "\"Undo this edit\" and \"Edit profile\" carry the same fill, radius, weight and height and are separated only by the strip's border. The name \"Ava Chen-Ito\", the strip's own heading and the allergy badge are all lower contrast than either pill. sync-failed repeats the pattern: \"Fix and send again\" is the same pill, 12px above the same \"Edit profile\".",
+    "direction": "The loudest thing inside a status strip should be the status. Demote the strip's action to the weight the app already uses for secondary work — \"Remove from roster\", \"Change\" — so the record keeps exactly one filled brand pill, and the strip reads as a sentence with an offer attached rather than as a call to action wrapped in a caution."
+  },
+  {
+    "scene": "sync-editor",
+    "viewport": "phone",
+    "severity": "major",
+    "where": "the First name, Last name and Status fields, and the \"Saved in Planning Center\" hints beneath them",
+    "finding": "Two of the managed fields render at half opacity while Grade, Birthday and Allergies — managed by the same system, described by the same hint — render live. The form's disabled state is therefore uncorrelated with anything visible: the same sentence, \"Saved in Planning Center\", sits under a greyed box and under an editable one, and nothing else in the frame separates the two. A reader concludes the greying is arbitrary or broken rather than meaningful.",
+    "evidence": "First name (\"Ava\") and Last name (\"Chen\") are grey enough to read as placeholder text; the Grade select immediately below shows \"9th grade\" at full ink and carries the identical hint. Status is greyed too, with a hint about a different control entirely.",
+    "direction": "A field that is not the reader's to type into needs a cause visible in the same frame and a hint that differs from the hint under a field that is. Either the whole managed block dims together with one explanation at its head, or the individual locked fields say what is holding them — but the lock and its label have to move as one."
+  },
+  {
+    "scene": "sync-blocked",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the modal title \"Edit Amara Whitfield\" against the dimmed record behind it",
+    "finding": "The backdrop is legible enough to read \"AC / Ava Chen / 9th grade / Allergies\", and the sheet on top of it is titled for a different student. The frame asserts two identities at once, on the one scene whose whole subject is which person an in-flight instruction names.",
+    "evidence": "Header behind the sheet reads Ava Chen; the sheet header and both name fields read Amara Whitfield. sync-editor, by contrast, agrees with its own backdrop.",
+    "direction": "The sheet and the record under it must name the same child."
+  },
+  {
+    "scene": "sync-profile",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the dotted underline under \"Chen-Ito\" and under \"10th grade\"",
+    "finding": "The marker is louder than the value it marks. Under \"10th grade\" — muted grey secondary text — the amber dots are the brighter of the two, so the eye lands on the annotation rather than the fact. It also renders at two visibly different weights on the two lines, because the decoration scales with the type, so the same semantic mark reads as two different marks stacked 8px apart. And a dotted underline in amber under one word of a name is the browser's own spelling-error idiom, which says \"this is wrong\" rather than \"this is not landed yet\".",
+    "evidence": "At 1x the name's underline is a thick amber dash and the grade's is a thin one; against ink-500 text the grade's underline out-contrasts its own word.",
+    "direction": "Hold the mark at one weight regardless of the type it sits under, and keep it quieter than the value — the value is the thing being read. If the amber underline stays, it should be dimmer than the text above it, not brighter, and it should not be the same figure a browser uses for a misspelling."
+  },
+  {
+    "scene": "sync-failed",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the \"Fix and send again\" / \"Discard the edit\" pair inside the red strip",
+    "finding": "The two actions have wrapped onto separate lines at two different widths, left-aligned, with the wider one on top. It reads as a flex row that ran out of room rather than as a decision laid out on purpose, and the ragged right edge is the only ragged edge in an otherwise squared-off column of cards.",
+    "evidence": "\"Fix and send again\" is roughly a third wider than \"Discard the edit\" and sits directly above it with the strip's remaining width empty to the right of both.",
+    "direction": "If they are going to stack at this width, make the stack deliberate — matched widths, or full-bleed to the strip's inner edge — so the pair reads as two choices rather than as an accident of wrapping."
+  }
+]
