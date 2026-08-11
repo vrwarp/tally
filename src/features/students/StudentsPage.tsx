@@ -312,12 +312,29 @@ export function StudentsPage() {
         }}
       />
 
-      {/* One toolbar row where there is a pointer. Stacked, the search field,
-          the two selects and the two chips terminated at three different right
-          edges — three controls dropped in at their natural widths rather than
-          a set — and cost a row and a half of students. */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:gap-4">
-        <div className="lg:flex-1">
+      {/*
+        One toolbar row where there is a pointer — and one that wraps rather
+        than pushing the page sideways.
+
+        Stacked, the search field, the two selects and the chips terminated at
+        three different right edges — three controls dropped in at their
+        natural widths rather than a set — and cost a row and a half of
+        students. So they are one row.
+
+        `lg:flex-wrap` is what keeps that from becoming a lie. The quick
+        filters grew from two chips to four when the queue arrived, and four
+        chips plus a 448px pair of selects plus a search field do not fit
+        beside a 224px sidebar at 1280: the group ran 51px off the right edge,
+        taking the last chip with it. A chip nobody can reach is worse than a
+        chip on its own line, and this is the one screen where the widths are
+        genuinely content-dependent — a count going from 3 to 13 moves them.
+        Above 1440 they still ride up onto the first row.
+      */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end lg:gap-4">
+        {/* `min-w-0`: a flex item defaults to `min-width: auto` and refuses to
+            shrink below its content, which is the usual way this page learns
+            it can scroll sideways. */}
+        <div className="lg:min-w-56 lg:flex-1">
           <TextField
             label="Search"
             type="search"
