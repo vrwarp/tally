@@ -1,0 +1,92 @@
+[
+  {
+    "scene": "sync-students",
+    "viewport": "desktop",
+    "severity": "major",
+    "where": "the quick-filter pill row, x 843–1409 at y 128 — 'Incomplete profiles 10 · In flight 4 · Saves failed 1 · Visitors 1'",
+    "finding": "The fixed spot Dana surveys from counts the jobs that need nothing from her and omits both states that need a decision. 'In flight 4' is queued + waiting + sending + Amara's pending link; 'Saves failed 1' is Benson. Priya Raman's row carries '≠ Changed upstream · 2m' — a job that landed on a value nobody typed — and it is in neither count, and no list frame in the round shows an orphaned row at all, so orphaned has no count either. At the end of her four minutes Dana reads 'In flight 0 · Saves failed 0' and concludes all nine landed, while one record is asserting the church office's value over her correction and she never learned. That is the exact outcome the brief's paragraph on `differs` exists to prevent, one level up from the record where it was fixed.",
+    "evidence": "sync-students--desktop-fold.png: four pills, counts 10/4/1/1. Seven job marks exist on the list (Queued 14s, Waiting 1m, Save failed 1wk, Sending 40s, Changed upstream 2m, Saved just now, Not in Planning Center yet); only five of the seven are reachable from a pill. The frame also flatters itself: all seven marked rows sit in the top ten, but the list is alphabetical by surname from row 13 (Brooks, Coleman, Dutta, Esposito, Fitzgerald…), so under real sorting Dana's nine scatter across a 2199px page of which 17 rows fit above the 900px fold. 'Saved · just now' decays after ~2 min by design, so a completed run leaves nothing behind but the pills.",
+    "direction": "Give the states that require a human one door of their own next to 'Saves failed' — a 'Needs a decision' count that adds `differs` and `orphaned` — or fold them into the failure pill and let the row mark distinguish them. The point is that no state that waits on Dana should be discoverable only by scrolling 2199px."
+  },
+  {
+    "scene": "sync-outage",
+    "viewport": "desktop",
+    "severity": "major",
+    "where": "the danger strip's filled primary, 'Open Planning Center settings', x 1118–1391 at y 100–132, against the sidebar identity 'Dana Ruiz' at the bottom left",
+    "finding": "The aggregate-failure screen delivers cause and scale well, but the one move it makes loudest is not the move of the person standing in front of it. The sentence says the edits 'go out as soon as an admin reconnects it', and the frame is rendered as Dana Ruiz, who is core team, not admin — and then the largest, brightest object on the page sends her to a settings card where the address is admin-gated and the credential class is not editable from the app at all. She is told the fix belongs to a role and handed a door into it anyway. Tally already knows the eleven people on the team and which of them is the admin, and this screen names none of them, so the nine held edits wait on a hand-off the design does not make.",
+    "evidence": "The strip's action column is `bg-brand-500` 'Open Planning Center settings' with 'Show the 9 held edits' as the underlined second. `src/features/settings/PlanningCenterEditor.tsx` gates the address on `profile?.role === 'admin'` ('Only an admin may introduce one'), and `PlanningCenterCard.tsx` tells an admin 'The credentials themselves live in Secret Manager and are not editable from the app.' The brief's own wording for this class is 'It names an admin' — this one names the noun, not a person.",
+    "direction": "Let the strip name whoever holds the role — 'Priya Raman is your admin' with the one-tap way to reach her — and if the reader is not that person, demote the settings button to the quiet slot and promote 'Show the 9 held edits', which is the move a core-team member can actually make. When the reader is the admin, the current weighting is right."
+  },
+  {
+    "scene": "sync-outage",
+    "viewport": "desktop",
+    "severity": "major",
+    "where": "the middle-band caption on all nine held rows, x ≈ 776–890, between the job mark and the last-seen column",
+    "finding": "The band the middle of the row gained this round carries the field, the leader and the minute — and on the one screen where those facts are the whole point, all nine of them truncate, and what is cut is always the tail: the author's surname and the time. Priya arrives at this screen knowing only that something failed; the strip tells her why and how many, and then the list refuses to tell her whose. 'Grade · Marcus Webb · Mon 09:55' renders as 'Grade · Marcus Web…', 'Last name, grade · you · Mon 09:41' as 'Last name, grade · y…'. She cannot tell her own held edits from Marcus's, or a 09:41 edit from a 09:55 one, without opening nine records — which is what the aggregate was built to spare her.",
+    "evidence": "sync-outage--desktop-fold.png: every held row's caption ends in an ellipsis. The row grid at lg is name `lg:w-72` (288px) + middle `flex-1` + date `lg:w-28` (112px) + a right cluster at `lg:min-w-80` (320px). The mark 'Held · since Monday' takes ~150px of the middle band, leaving roughly 110–150px for a ~190px string. Two columns to the right, that 320px cluster holds only '11th grade' in an 80px right-aligned slot on rows like Marcus Delacroix-Oyelaran — ~240px of reserved, empty row on the same line as the truncation. sync-students shows the milder version: one caption truncated ('Birthday · Marcus …' on Benson Tsai).",
+    "direction": "The width exists on the same row — take it from the fixed 320px flag cluster, which is empty on most rows, or drop the redundant 'since Monday' from every mark (the strip above already says Monday once) and spend those ~90px on the caption. A leader should never have to open a record to learn who queued the thing the list is already describing."
+  },
+  {
+    "scene": "sync-differs",
+    "viewport": "desktop",
+    "severity": "major",
+    "where": "the warn strip's body sentence, x 553–955 at y 188–265, above the two comparison cells",
+    "finding": "The screen asks a leader to choose between two values and describes two incompatible histories in one sentence. 'Your correction landed at 9:12, but the church office had changed the same field four minutes earlier. What is on this record is theirs, not what you typed.' If hers landed at 9:12 and theirs went in at 9:08, the record would hold hers; if the record holds theirs, hers did not land. 'Landed' is also the brief's own state word for 'the backend confirmed it', used here for a job that demonstrably did not take. Dana cannot work out from this whether her value ever touched Planning Center, and that is precisely the fact that decides what 'Send mine again' is about to do — reinstate a value that was already there once, or overwrite a correction that was never contested. Choosing between two values on a description of the past that cannot be true is not an informed choice.",
+    "evidence": "The strip is `role=\"status\"` warn with '≠ Planning Center holds a different last name'; the cells read YOU TYPED / Chen-Ito and PLANNING CENTER HOLDS / Ito. The cells carry no time and no author, so the contradictory sentence is the only account of the sequence on the frame. The list row for the same job reads '≠ Changed upstream · 2m'.",
+    "direction": "One history, in order, with the clock on both sides: 'The office changed this to Ito at 9:08. Your correction was written at 9:05 and went out at 9:12 — Tally did not overwrite them.' The two cells are the right shape; give each one its time and its author so the comparison carries the provenance instead of the paragraph."
+  },
+  {
+    "scene": "sync-differs",
+    "viewport": "desktop",
+    "severity": "major",
+    "where": "the strip's action column, 'Send mine again' (filled brand, x 972–1135, y 179–211) over 'Keep theirs' (underlined text, y 231–247)",
+    "finding": "The default is the destructive one. 'Keep theirs' retires a job and writes nothing; 'Send mine again' queues a write into the church's permanent database that overwrites a change a named human made deliberately four minutes ago. The consequences are asymmetric and the weighting is inverted: the overwrite gets the only filled brand pill on the page, the top of the column and the pointer's resting target, and the non-destructive choice is a 13px underlined link 20px below it. Dana, mid-run on her ninth record, clicks the blue one because the blue one is what a strip like this has meant on every other frame in this set — and the office's correction is gone with no confirmation and no second look. The rule that produced this ('a strip that requires a human gets the filled primary') is sound for `failed` and `orphaned`, where the loud action is the recovery; on `differs` the loud action is the one that damages somebody else's work.",
+    "evidence": "Markup: `bg-brand-500 text-white` on 'Send mine again', `text-ink-400 underline` on 'Keep theirs'. Compare sync-failed and sync-orphaned, where the same slot holds 'Fix and send again' and 'Re-create her in Planning Center' — actions that restore something the leader already asked for. Nothing on this frame tells Dana who upstream made the change or why, so she is choosing louder-versus-quieter, not right-versus-wrong.",
+    "direction": "When neither value is knowably right, neither should be the default: two matched secondary actions at equal weight, or make 'Keep theirs' the primary since it is the one that writes nothing. Keep the filled pill for the states where the loud move is a recovery."
+  },
+  {
+    "scene": "sync-blocked",
+    "viewport": "desktop",
+    "severity": "major",
+    "where": "the editor sheet, x 448–992: the notice at y 92–320, six held fields down to Allergies at y 763, footer 'Save notes' at y 828–860",
+    "finding": "The frame promises the leader two live fields and shows her none of them. The notice says 'Notes and roster status are Tally's own — those are live now'; the footer's primary is labelled 'Save notes'; and in the 900px fold there is not a single typeable box on screen — six greyed controls, each repeating 'Held until her record exists.', and then the button. Notes sits at y 900 and Status at y 1035, both behind the dialog's internal scroll, which has no visible scrollbar. Dana opens Amara's record to add the thing she was told at the door, reads that notes are hers to type, sees six locked boxes and a Save notes button, and has no evidence a notes box exists. This is the r01 blocker's second half: the greying now has a cause, but the one thing she can actually do is off-screen.",
+    "evidence": "sync-blocked--desktop-fold.png ends at the Allergies textarea; sync-blocked--desktop-full.png puts Notes at y ≈ 900–990 and Status at y ≈ 1035–1090, i.e. ~190px below the 900 fold and below the dialog's own `max-h-[92dvh]` clip. Six identical 'Held until her record exists.' hints occupy y 454–867. Widening the dialog was scope-declined in r01, so the fix here cannot be geometry.",
+    "direction": "Order the form by what is true right now: when every managed field is held, put Notes and Status at the top, directly under the notice that says they are live, and let the six held boxes fall below the scroll where their state is already fully explained by one sentence. Say the held reason once above the group rather than six times inside it."
+  },
+  {
+    "scene": "sync-profile / sync-orphaned / sync-differs / sync-failed",
+    "viewport": "desktop",
+    "severity": "major",
+    "where": "the status strip's message column, x 556–829 on sync-orphaned and 556–965 on sync-profile, inside a 672px `max-w-2xl` card in a 1216px working area",
+    "finding": "The strip got shorter, not cheaper: the `lg:flex-row` shape reserves a right-hand action column out of a column that was already narrow, so the wider the button, the narrower the message. On sync-orphaned the 288px 'Re-create her in Planning Center' button squeezes the message to 273 CSS px — narrower than the same sentence gets on a 390px phone (303px) — and it sets to seven lines, 258px tall, 29% of a 900px fold, on a 1440px screen with 544px of empty page beside it. Worse, the sentence that guards this product's most feared operation ('It writes one new person and never a second copy') is now 12px ink-500 at the bottom-left of that trench, ~190px below and ~290px left of the button it describes; on the phone it sits directly above the button, where a person reads it before pressing. The desktop frame is the one where the leader is least likely to read the guarantee before firing a create into the church's permanent database.",
+    "evidence": "Strip heights measured off the folds: sync-profile 118px (y 165–283, 4 wrapped lines at 409px), sync-differs 165px, sync-failed 137px, sync-orphaned 258px (y 165–423). Markup: `flex flex-col gap-3 … lg:flex-row lg:items-start lg:gap-4 lg:py-2` with `min-w-0 flex-1` on the message and `lg:shrink-0` on the actions; the guard sentence is `text-xs text-ink-500` inside the message column, after the body. The page container is `max-w-2xl` (672px) centred in the 1216px right of the 224px rail. Re-laying the record into two columns was scope-declined in r01, so this has to be solved inside the strip.",
+    "direction": "At lg let the strip take the working width rather than the record column, or drop the reserved action column when the button is wide and put the actions on their own line at the strip's right edge — either way the message reads at 600px+ instead of 273. Move the one-new-person guarantee adjacent to the button that fires it, as the phone already does."
+  },
+  {
+    "scene": "sync-editor",
+    "viewport": "desktop",
+    "severity": "major",
+    "where": "the Last name field (x 725–973, y 331–367) and the Grade select (x 468–973, y 531–565), and their warn hints",
+    "finding": "J5's requirement is that whoever is second must not type over a value that is about to be replaced by one they cannot see — and this frame still does not show the value. It names the person, the fields, the device and the time, and then leaves 'Chen' and '9th grade' in the boxes with '◷ Marcus's change to this is still going out.' underneath. Dana came here to fix a grade. She cannot tell whether Marcus already fixed it, whether he fixed it to what she was going to type, or whether he mistyped it — so her choices are to type blind, to abandon the record and come back, or to leave it and lose track of which of her nine it was. The job document holds the requested value with a lifetime, and sync-differs already renders exactly this pair on the same product, so the fact exists and is allowed on the glass.",
+    "evidence": "sync-editor--desktop-fold.png: notice reads 'He queued a change to Last name and Grade from his phone 40 seconds ago, and it goes out before anything you save. Nothing here is locked — but those two boxes are about to change under you.' Last name shows 'Chen'; Grade shows '9th grade'. The two hints name the field and the person only. sync-differs--desktop-fold.png renders a queued-versus-held value pair in the same codebase.",
+    "direction": "Put the incoming value in the hint that already exists: 'Marcus's change to this is still going out — he typed 10th grade.' No new object, no new width, and the sentence stops being a warning about an unknown."
+  },
+  {
+    "scene": "sync-outage",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "Amara Whitfield's row (row 10), the muted '◌ Not in Planning Center yet' mark at x 618–768",
+    "finding": "The strip asserts a scale — 'All nine queued edits failed for the same reason' — and a tenth job on the same broken connection sits in the list dressed as normal progress. Amara's create is held by the same outage (the mark's `title` says so), but the visible layer is neutral ink and the words 'not in Planning Center yet', which read as a create that is on its way. Anyone who follows that row into the editor is offered 'Create her in Planning Center' as a filled action against a backend that is refusing everything.",
+    "evidence": "sync-outage--desktop.html, Amara's chip: class `uxr-job-mute`, `title=\"Quick-added at the door. Her create is held by the same outage…\"`; the nine edit rows use `uxr-job-held` in damped danger with 'Held · since Monday' on the glass. The reason is in the tooltip on the one row where it is not visible.",
+    "direction": "Put her in the same held costume with her own wording ('Create held · since Monday') and count her — 'nine edits and one new record' — or say why she is exempt. And while an outage notice is standing, the create action in sync-blocked should be visibly held rather than inviting."
+  },
+  {
+    "scene": "sync-students / sync-profile",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the job marks in the middle band, and the record strip's headings",
+    "finding": "`stalled` still has no wording, but the age added to the mark this round has taken most of the harm out of it: a job that has run long now reads 'Sending · 4m' rather than a timeless 'Saving', so a leader can at least see the clock. What is left is that nothing anywhere says the thing the brief insists on — that a long job may still land — so the inference from '4m' is left to the reader, and on the record the strip would still say 'Sending to Planning Center' in the same voice at four minutes as at forty seconds.",
+    "evidence": "Marks across sync-students--desktop-full.png: Queued · 14s, Waiting on a rate limit · 1m, Sending · 40s, Saved · just now, Changed upstream · 2m, Save failed · 1 wk ago. No frame renders a job past ~2 minutes. The r01 ideation declined the frame and wrote the copy for it.",
+    "direction": "The declined plan is right and cheap — a threshold on the claim time, 'Taking longer than it should. It may still land — nothing has failed', warn, no cancel. It needs the sentence more than it needs the frame."
+  }
+]

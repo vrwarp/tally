@@ -1,0 +1,65 @@
+[
+  {
+    "scene": "sync-students",
+    "viewport": "desktop",
+    "severity": "major",
+    "where": "the job marks in the middle band — \"‖ Waiting on a rate limit · 1m\" against \"⚠ Save failed · 1 wk ago\"",
+    "finding": "Inside the new dashed family, the states that require nothing are the loudest objects and the one state that requires a human is the quietest. Warn amber sits at a much higher luminance than danger red on this dark ramp, so four identical-weight amber marks out-shout the single red one; and the routine states have been given the longest words, so the physically widest mark in the whole table is the one the journey brief insists must read as \"nothing is wrong\". Down 45 rows, J2's question is \"which of my nine need me\", and the composition answers \"the waiting one\". The dashed outline correctly separates sync from the standing flags — that part landed — but inside the family there is no rank at all: queued, sending, waiting and changed-upstream are one undifferentiated amber block.",
+    "evidence": "Sampled text colour: the four amber marks are #facc15 (rel. luminance 200) and \"Save failed\" is #f87171 (142) — the failure is 30% dimmer than a fourteen-second queue. Chip widths: \"Waiting on a rate limit · 1m\" 197px, \"Changed upstream · 2m\" 179px, \"Save failed · 1 wk ago\" 167px, \"Queued · 14s\" 112px. Blurred to a squint, rows 2 and 6 arrive first and row 3 does not arrive at all.",
+    "direction": "Hue is fixed by the journey brief, so the rank has to come from size and word count. Let the self-resolving states be the smallest marks on the row — glyph plus one word plus the age, with the reason moved to the caption or the title — and let the two that persist and need a decision (failed, changed upstream) keep the width and carry the extra weight the amber ramp is denying them. The rule to aim at: a mark that will clear itself in a minute should never be larger than a mark that has been sitting there a week."
+  },
+  {
+    "scene": "sync-students",
+    "viewport": "desktop",
+    "severity": "major",
+    "where": "the six-glyph family across all eight scenes — ◌ ‖ ◷ ✓ ⚠ ≠ ⊘ at 11px",
+    "finding": "The family's stated premise is that the glyph sorts the states, and at 11px it does not, in two ways. First, it is six glyphs for nine states, and two of them are doubled onto pairs that must never be read as each other: ‖ is \"waiting on a rate limit — resumes on its own\" on sync-students and \"held by the outage — an admin must reconnect\" on sync-outage, so nine jobs that cannot resolve themselves wear the mark of the one state that can; ◌ is both \"queued edit, cancellable\" and \"this child has no upstream person at all\", which are not the same kind of fact about a minor. The editor compounds it by using ◷ (sending) for a job its own sentence calls queued. Second, at 11px the two glyphs that carry the ordinary in-flight pair, ◌ and ◷, are both simply small rings — the quarter-fill that separates them is roughly two pixels — while ‖ renders as a solid filled block among six outline forms, so the one glyph that is optically distinct is distinct in the wrong direction. What survives a squint is the hue and the word, which is exactly what the glyph was introduced to spare the reader.",
+    "evidence": "Markup: `uxr-job-run` ◌ \"Written down and not sent yet\" and `uxr-job-mute` ◌ \"Her Planning Center record has not been created yet\"; `uxr-job-run` ‖ \"Planning Center asked Tally to slow down… nothing is stuck\" and `uxr-job-held` ‖ \"Held by the same outage as the other eight\"; sync-editor renders ◷ against \"He queued a change… 40 seconds ago\". At 8× magnification of the students fold, the ◌ on row 1 and the ◷ on row 4 are the same ring.",
+    "direction": "One glyph, one state, and the set has to be legible as six different silhouettes at 11px, not six different characters in a font table. Test them at size before choosing: a ring, a filled disc, a bar, a tick, a triangle and a slash are separable; two rings are not. Where two states genuinely share a family (waiting and held), let the shared thing be the hue or the word, never the mark — and give the state that cannot resolve itself the mark that does not say \"paused\"."
+  },
+  {
+    "scene": "sync-students",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the middle band — the job mark and the \"field · author\" caption beside it",
+    "finding": "The band has one set edge and one accidental one. The marks all start at a fixed x, which reads as a column; the caption is simply flexed in after whatever width the mark happened to need, so its left edge lands in seven different places down seven rows, and the point at which it truncates moves with the length of the state word rather than with the length of the caption. So the band reads as a mark column with text spilling out of it, not as two columns. sync-outage proves the point by accident: there every mark is the same string and the same width, and the caption edge is dead straight all the way down.",
+    "evidence": "sync-students fold, caption left edges: 738, 822, 793, 741, 804, 759, 821 — an 84px spread. Benson's caption truncates to \"Birthday · Marcus …\" purely because his mark is 55px wider than Ava's, whose caption fits. On sync-outage all nine captions start at 772 and all nine truncate identically — \"Last name, grade · y…\", a caption clipped one character into the word \"you\".",
+    "direction": "Set the band as two columns rather than one flex row: a mark slot of fixed width — sized to the family's longest short label once the words are trimmed — and a caption column with a stable left edge. And trim the caption's content so the median row does not truncate; if the mark already says \"since Monday\", the caption does not need the minute as well."
+  },
+  {
+    "scene": "sync-orphaned",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the status strip's text column and the action column beside it, on orphaned, differs and outage",
+    "finding": "The strip's measure is decided by whichever button happens to sit beside it, and across the scenes it swings from unreadably narrow to unreadably wide. On sync-orphaned a 290px action pill squeezes the prose into a 280px column — about 38 characters, seven lines, on a 1440px laptop — while a 290×200px rectangle of empty red sits beside it under the actions; on sync-outage the same component runs to about 105 characters a line. Neither is a set measure. The narrow one also breaks the inline heading: \"Ava is no longer in Planning / Center · Marcus Webb corrected her\" puts the seam between bold red heading and grey body in the middle of line two, so the reader cannot see where the state's name ends and the explanation begins.",
+    "evidence": "sync-orphaned fold: paragraph runs x 552–832, seven lines, then a three-line 12px ink-500 caption butted straight onto it with no separation; the actions occupy y 179–250 of a strip that is 265px tall. sync-outage fold: the same component's paragraph runs x 300–1071.",
+    "direction": "Give the strip a measure of its own — a body column that holds roughly 60–75 characters at every width — and let the action column size to that rather than the reverse; a long action label should wrap or shorten rather than dictate the paragraph. When the text runs past two or three lines, the heading should stop running inline and sit on its own line so the state's name is a fixed object, and the strip should not be left as an L with a filled left half and an empty right one."
+  },
+  {
+    "scene": "sync-differs",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the YOU TYPED / PLANNING CENTER HOLDS pair inside the strip",
+    "finding": "The comparison is the whole point of this screen and it is the quietest thing in the strip. \"Chen-Ito\" and \"Ito\" are set at the same size and weight as the paragraph that explains them, so the explanation and the answer arrive together; and because the labels are uppercase and letter-spaced, the labels are actually more conspicuous than the two values they label. The pair is also confined to the prose column, stopping short of the strip's right edge and leaving the bottom-right quadrant empty, so the one object that would have justified the strip's full width is the one object not using it.",
+    "evidence": "Both values render at 14px regular ink-100 — identical to the body text three lines above; the 10px tracked labels read at similar contrast. The two cells end at x=956 while the strip runs to x=1152, and the region below \"Keep theirs\" (x 972–1136, y 250–330) is empty.",
+    "direction": "Make the two values the figure and their labels the ground — step the values up in size or weight and drop the labels back — so the difference between them is what the eye lands on. Let the pair span the strip's full width beneath the sentence rather than sitting inside the prose column; that fills the void and gives each value room to be read as a value rather than as more prose."
+  },
+  {
+    "scene": "sync-failed",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the \"Edit profile\" / \"Remove from roster\" pair, on failed, differs and orphaned",
+    "finding": "Stepping the page's own primary down when the strip needs a human was the right move, but it has landed the record's routine action and its destructive one on exactly the same object: two ink pills of identical fill, height, radius and type, side by side, distinguishable only by reading them. The pair had an order before — one was brand, one was not — and now it has none, on the three scenes where a leader is already being asked to act quickly. The 12px caption underneath compounds it: it explains only \"Remove from roster\" but is left-aligned to \"Edit profile\", so it reads as a note on the pair.",
+    "evidence": "sync-failed fold: both buttons sample #1e293b; on sync-profile \"Edit profile\" is #0ea5e9 and the two are clearly ranked. \"Removing them here leaves their Planning Center record alone…\" begins at x=512, under the first button.",
+    "direction": "When the page's primary steps down it should step to a rank the destructive action does not already occupy — let Remove step down with it, to a text action or a plainer treatment, so the pair keeps an order in every state. And hang the caption off the button it describes rather than off the row."
+  },
+  {
+    "scene": "sync-blocked",
+    "viewport": "desktop",
+    "severity": "minor",
+    "where": "the six repeated \"◌ Held until her record exists.\" hints down the form",
+    "finding": "The same amber sentence is printed six times in a 544px column, once under every managed field. Repeated at that interval it stops being a label and becomes the form's dominant rhythm — six evenly spaced amber lines are the most conspicuous pattern in the modal, louder than the notice that explains them and louder than the one move the scene exists for, which is a grey full-width button above them. It also spends the hint slot: because every held field says the same thing, the hint no longer tells the reader anything a glance at the field's contrast had not already said, and Notes and Status — the two fields that are live — lose their distinctiveness in the noise.",
+    "evidence": "sync-blocked fold: identical warn hints at y=454 (×2), 544, 637, 731 and one more below the fold, against a notice at the top that already says \"a name, grade, birthday or allergy note has nothing to be written to\". \"Create her in Planning Center\" is an ink-800 pill; the footer's brand pill is \"Save notes\".",
+    "direction": "Say it once, at the boundary. Group the held fields visually as one region with a single label rather than annotating each of them, so the form reads as two zones — held above, yours below — and the reader learns the rule instead of reading it six times. That also returns the top of the modal to the create action, which is what the scene is for."
+  }
+]
