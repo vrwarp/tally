@@ -21,6 +21,7 @@
  * still needs a human — and sorting by the other question is what put the one
  * row on the list that never resolves itself in with the three that do.
  */
+import { shortAge } from '@/features/students/syncStripCopy';
 import { cn } from '@/lib/utils';
 import {
   isStalled,
@@ -133,25 +134,6 @@ const STALLED: Words = {
   tone: 'run',
   title: 'Taking longer than it should. It may still land — nothing has failed.',
 };
-
-/**
- * How long ago, in the two or three characters a row can spare.
- *
- * Deliberately coarse. The number is there to separate a job queued fourteen
- * seconds ago from one that has been sitting for a week, not to be read as a
- * clock — and a mark that will clear itself in a minute should never be the
- * widest thing in the column.
- */
-export function shortAge(from: Date, now: Date): string {
-  const seconds = Math.max(0, Math.round((now.getTime() - from.getTime()) / 1000));
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours}h`;
-  const days = Math.round(hours / 24);
-  return days < 7 ? `${days}d` : `${Math.round(days / 7)}wk`;
-}
 
 export interface JobChipProps {
   edit: UpstreamEdit;

@@ -105,6 +105,7 @@ function renderRoster(
     rosterFetchedAt: TODAY,
     rosterBackends: [],
     refreshRoster: vi.fn(async () => {}),
+    upstreamEdits: [],
     ...dataOverrides,
   });
   // `useAuth().user` is the Firebase Auth user, not the profile document —

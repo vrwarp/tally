@@ -170,3 +170,22 @@ export function syncStripCopy(input: SyncStripInput): SyncStripCopy {
       };
   }
 }
+
+/**
+ * How long ago, in the two or three characters a row can spare.
+ *
+ * Deliberately coarse. The number is there to separate a job queued fourteen
+ * seconds ago from one that has been sitting for a week, not to be read as a
+ * clock — and a mark that will clear itself in a minute should never be the
+ * widest thing in the column.
+ */
+export function shortAge(from: Date, now: Date): string {
+  const seconds = Math.max(0, Math.round((now.getTime() - from.getTime()) / 1000));
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.round(hours / 24);
+  return days < 7 ? `${days}d` : `${Math.round(days / 7)}wk`;
+}

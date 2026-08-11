@@ -147,6 +147,7 @@ function openProfile(student: Student, over: Partial<DataContextValue> = {}) {
     rosterFetchedAt: null,
     refreshRoster,
     applyRosterPerson,
+    upstreamEdits: [],
     ...over,
   } as unknown as DataContextValue;
 

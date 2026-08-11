@@ -41,6 +41,8 @@ import { PartialRosterDialog } from '@/features/students/PartialRosterDialog';
 import { buildRosterCsv } from '@/features/students/rosterCsv';
 import { RowBadgeModal, type RowBadgeAction } from '@/features/students/RowBadgeModal';
 import { StudentEditorModal } from '@/features/students/StudentEditorModal';
+import { JobChip } from '@/features/students/JobChip';
+import { latestByStudent } from '@/features/roster/pendingEdits';
 import {
   birthdayState,
   formatBirthdayLong,
@@ -57,10 +59,19 @@ import {
   initials,
   NO_GRADE,
 } from '@/lib/utils';
-import { GRADES, backendLabelOf, backendOfStudent, type Grade, type Student } from '@/types';
+import {
+  GRADES,
+  backendLabelOf,
+  backendOfStudent,
+  isInFlight,
+  needsAHuman,
+  type Grade,
+  type Student,
+  type UpstreamEdit,
+} from '@/types';
 
 type StatusFilter = 'active' | 'inactive' | 'all';
-type QuickFilter = 'none' | 'incomplete' | 'visitors';
+type QuickFilter = 'none' | 'incomplete' | 'visitors' | 'inFlight' | 'needsYou';
 
 export function StudentsPage() {
   const {
@@ -71,6 +82,7 @@ export function StudentsPage() {
     rosterBackends,
     rosterLoading,
     rosterSettled,
+    upstreamEdits,
   } = useData();
   // With a second backend connected, "Planning Center" stops being the name
   // for where students come from — the buttons say the neutral thing instead.
@@ -118,6 +130,25 @@ export function StudentsPage() {
    */
   const { reachable } = useParentContact();
 
+  /*
+   * The queue, keyed by student, so a row does not scan a list to draw a mark.
+   *
+   * `latestByStudent` keeps the newest job per student, which is the one a row
+   * has room for. The counts below cut the same three ways the marks do —
+   * running, needs-a-human, done — because a screen whose pills and whose marks
+   * disagreed about which pile a row was in would be worse than either alone.
+   */
+  const editsByStudent = useMemo(() => latestByStudent(upstreamEdits), [upstreamEdits]);
+
+  const inFlightCount = useMemo(
+    () => [...editsByStudent.values()].filter(isInFlight).length,
+    [editsByStudent],
+  );
+  const needsYouCount = useMemo(
+    () => [...editsByStudent.values()].filter(needsAHuman).length,
+    [editsByStudent],
+  );
+
   const visible = useMemo(() => {
     const matcher = createSearchMatcher(query);
     return students.filter((student) => {
@@ -128,10 +159,18 @@ export function StudentsPage() {
       if (grade !== null && student.grade !== grade) return false;
       if (quick === 'incomplete' && !isUnreachable(student, reachable)) return false;
       if (quick === 'visitors' && !student.isVisitor) return false;
+      if (quick === 'inFlight') {
+        const edit = editsByStudent.get(student.id);
+        if (!edit || !isInFlight(edit)) return false;
+      }
+      if (quick === 'needsYou') {
+        const edit = editsByStudent.get(student.id);
+        if (!edit || !needsAHuman(edit)) return false;
+      }
       if (!matcher.matches(student.searchName)) return false;
       return true;
     });
-  }, [students, status, grade, quick, query, reachable]);
+  }, [students, status, grade, quick, query, reachable, editsByStudent]);
 
   const incompleteCount = useMemo(
     () => students.filter((student) => isUnreachable(student, reachable)).length,
@@ -319,7 +358,39 @@ export function StudentsPage() {
           </SelectField>
         </div>
 
-        <div role="group" aria-label="Quick filters" className="flex flex-wrap gap-2 lg:shrink-0">
+        {/*
+          Two groups, not four loose chips.
+
+          The pair that answers this journey's question — what is running, what
+          needs me — has to stay on one line, and flex-wrap fills greedily, so
+          ordering alone would not hold it: at 390px the widest standing count
+          packs onto line one and splits the pair. Making the grouping
+          structural means the break is a fact about the content rather than a
+          coincidence of two chip widths, and it survives a count going from 3
+          to 13.
+        */}
+        <div
+          role="group"
+          aria-label="Quick filters"
+          className="flex flex-wrap items-center gap-x-4 gap-y-2 lg:shrink-0"
+        >
+          <span className="flex shrink-0 flex-wrap gap-2">
+            <FilterChip
+              active={quick === 'inFlight'}
+              onPress={() => setQuick((current) => (current === 'inFlight' ? 'none' : 'inFlight'))}
+            >
+              In flight
+              <ChipCount active={quick === 'inFlight'}>{inFlightCount}</ChipCount>
+            </FilterChip>
+            <FilterChip
+              active={quick === 'needsYou'}
+              onPress={() => setQuick((current) => (current === 'needsYou' ? 'none' : 'needsYou'))}
+            >
+              Needs you
+              <ChipCount active={quick === 'needsYou'}>{needsYouCount}</ChipCount>
+            </FilterChip>
+          </span>
+          <span className="flex shrink-0 flex-wrap gap-2">
           <FilterChip
             active={quick === 'incomplete'}
             onPress={() => setQuick((current) => (current === 'incomplete' ? 'none' : 'incomplete'))}
@@ -334,6 +405,7 @@ export function StudentsPage() {
             Visitors
             <ChipCount active={quick === 'visitors'}>{visitorCount}</ChipCount>
           </FilterChip>
+          </span>
           {isFiltered ? (
             <button
               type="button"
@@ -397,6 +469,7 @@ export function StudentsPage() {
                 student={student}
                 unreachable={isUnreachable(student, reachable)}
                 now={now}
+                edit={editsByStudent.get(student.id) ?? null}
                 onBadge={openBadge}
               />
             ))}
@@ -483,6 +556,7 @@ const StudentListRow = memo(function StudentListRow({
   student,
   unreachable,
   now,
+  edit,
   onBadge,
 }: {
   student: Student;
@@ -490,6 +564,12 @@ const StudentListRow = memo(function StudentListRow({
   unreachable: boolean;
   /** Today, decided once by the page. See the note where it is built. */
   now: Date;
+  /**
+   * The one job this student has, or null. Passed in for the same reason
+   * `unreachable` is: the row and the counts above it must not be able to
+   * disagree about which pile it is in.
+   */
+  edit: UpstreamEdit | null;
   onBadge: (student: Student, action: RowBadgeAction) => void;
 }) {
   const name = `${student.firstName} ${student.lastName}`;
@@ -601,6 +681,13 @@ const StudentListRow = memo(function StudentListRow({
           <span className="shrink-0 lg:w-20 lg:text-right">
             {spokenGrade ?? NO_GRADE}
           </span>
+          {/*
+            The job mark rides in the row's meta line below `lg` and in the
+            band beside the name at pointer widths — one component, two slots.
+            Below `lg` it is the word alone: a phone row has no room for an age
+            and the caption that carries the field and the author is `lg:` only.
+          */}
+          {edit ? <JobChip edit={edit} now={now} short className="lg:hidden" /> : null}
           <span className="hidden lg:block lg:flex-1" />
 
           {student.isVisitor ? (
