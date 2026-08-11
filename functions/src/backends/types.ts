@@ -31,7 +31,11 @@ import type {
 } from '../pco/household.js';
 import type { PcoListSummary } from '../pco/lists.js';
 import type { SetParentContactResult } from '../pco/parentContact.js';
-import type { StudentProfilePatch, UpdateStudentProfileResult } from '../pco/profile.js';
+import type {
+  ProfileExpectations,
+  StudentProfilePatch,
+  UpdateStudentProfileResult,
+} from '../pco/profile.js';
 import type {
   ParentContactStatus,
   PersonDetails,
@@ -170,8 +174,15 @@ export interface PeopleBackend {
     logger?: FunctionLogger;
     limit?: number;
   }): Promise<PushPendingResult>;
+  /**
+   * `expect` turns this into a compare-and-set — see `ProfileExpectations`.
+   * Every backend has to honour it or the safety property differs by backend,
+   * which is worse than not having one: a church would not know which kind of
+   * record it had.
+   */
   updateStudentProfile(
-    args: { studentId: string; logger?: FunctionLogger } & StudentProfilePatch,
+    args: { studentId: string; logger?: FunctionLogger; expect?: ProfileExpectations } &
+      StudentProfilePatch,
   ): Promise<UpdateStudentProfileResult>;
   setParentContact(args: {
     studentId: string;

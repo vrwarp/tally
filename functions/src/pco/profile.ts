@@ -46,6 +46,16 @@ export type UpdateStudentProfileStatus =
   | 'disabled'
   /** No such student, or one who is not on the roster. */
   | 'no-student'
+  /**
+   * Somebody changed one of these fields between the caller reading it and this
+   * call running, so **nothing was written**.
+   *
+   * Only ever returned when the caller supplied `expect`, which is a
+   * compare-and-set: a queued edit knows what the form was showing, and a
+   * church's permanent record is not a place to resolve a disagreement by
+   * arriving second. The row on `before` is what was found instead.
+   */
+  | 'conflict'
   /** A Tally-only visitor: there is no upstream person to edit. */
   | 'not-in-planning-center'
   /** The edit itself is not writable — a blank name, a grade outside K-12. */
@@ -129,7 +139,22 @@ export interface StudentProfilePatch {
   birthday?: string;
 }
 
+/**
+ * What the caller believed these fields held when it decided to write.
+ *
+ * Absent for a save somebody is waiting on — they are looking at the form, and
+ * the value they read a second ago is the value they meant. Present for a queued
+ * edit, which may have been written minutes ago on a phone with no signal, and
+ * where arriving second must not mean winning.
+ */
+export interface ProfileExpectations {
+  lastName?: string;
+  grade?: number | null;
+}
+
 export interface UpdateStudentProfileOptions extends StudentProfilePatch {
+  /** See `ProfileExpectations`. Makes this call a compare-and-set. */
+  expect?: ProfileExpectations;
   db: FirestoreLike;
   client: PcoClient;
   config: PcoConfig;
@@ -435,6 +460,43 @@ export async function updateStudentProfile(
   const person = read.value;
   const personId = read.personId;
 
+  /** The row exactly as Planning Center held it a moment ago. */
+  const rowBefore = (): RosterPerson =>
+    rosterPersonFrom(person.data, config, options.now ?? new Date());
+
+  /*
+   * Compare-and-set, when the caller said what it expected.
+   *
+   * Three readings of one field and only the third stops the write: it still
+   * holds what the caller saw (nobody touched it), it already holds what the
+   * caller wants (somebody made the same correction first, which is agreement),
+   * or it holds a third thing — which means two people disagree about a child's
+   * record, and the one who happens to arrive second does not get to decide.
+   */
+  if (options.expect) {
+    const held = rowBefore();
+    const wanted = options.expect;
+    const changedUnderneath =
+      (wanted.lastName !== undefined &&
+        options.lastName !== undefined &&
+        held.lastName !== wanted.lastName &&
+        held.lastName !== options.lastName) ||
+      (wanted.grade !== undefined &&
+        options.grade !== undefined &&
+        held.grade !== (wanted.grade ?? null) &&
+        held.grade !== options.grade);
+
+    if (changedUnderneath) {
+      return result(
+        'conflict',
+        'Somebody changed this in Planning Center first, so nothing was written.',
+        [],
+        null,
+        held,
+      );
+    }
+  }
+
   const attributes = changedAttributes(options, person.data);
 
   if (wantedBirthday) {
@@ -460,10 +522,6 @@ export async function updateStudentProfile(
    * round trip on the path somebody is watching a spinner on. Anything the
    * PATCH goes on to refuse never gets this far; the throw is the answer.
    */
-  /** The row exactly as Planning Center held it a moment ago. */
-  const rowBefore = (): RosterPerson =>
-    rosterPersonFrom(person.data, config, options.now ?? new Date());
-
   const rowAfter = (): RosterPerson =>
     rosterPersonFrom(
       {

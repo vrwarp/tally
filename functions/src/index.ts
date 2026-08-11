@@ -2183,7 +2183,26 @@ async function runUpstreamEdit(edit: EditRecord): Promise<RunOutcome> {
 
   let result;
   try {
-    result = await backend.updateStudentProfile({ studentId: edit.studentId, ...patch, logger });
+    result = await backend.updateStudentProfile({
+      studentId: edit.studentId,
+      ...patch,
+      /*
+       * What the form was showing, which turns this into a compare-and-set.
+       *
+       * A queued edit may have been written minutes ago on a phone with no
+       * signal. Arriving second must not mean winning: if somebody in the
+       * church office changed the same field in between, nothing is written and
+       * a human is asked which is right.
+       */
+      expect: {
+        lastName: typeof edit.baseline.lastName === 'string' ? edit.baseline.lastName : undefined,
+        grade:
+          edit.baseline.grade === null || typeof edit.baseline.grade === 'number'
+            ? (edit.baseline.grade as number | null)
+            : undefined,
+      },
+      logger,
+    });
   } catch (error) {
     const status = backendFailureStatus(error);
     if (status === 401 || status === 403) {
@@ -2226,12 +2245,12 @@ async function runUpstreamEdit(edit: EditRecord): Promise<RunOutcome> {
     };
   }
 
-  const observed = disagreementsWith(edit, result.before);
-  if (observed) {
-    // Nothing to undo: the patch only ever named fields the leader changed, and
-    // the office's value for a field they did not touch is untouched. What this
-    // reports is that the two disagree and a human has to say which is right.
-    return { kind: 'differs', observed, message: result.message };
+  if (result.status === 'conflict') {
+    return {
+      kind: 'differs',
+      observed: disagreementsWith(edit, result.before) ?? {},
+      message: result.message,
+    };
   }
 
   if (result.status === 'updated') {
@@ -2246,23 +2265,12 @@ async function runUpstreamEdit(edit: EditRecord): Promise<RunOutcome> {
 }
 
 /**
- * Fields somebody else changed between the form opening and the drain running.
+ * What the backend was holding instead, for the strip to show beside what was
+ * typed.
  *
- * The comparison is against the row as the backend held it **before** this call
- * wrote anything, and that is the whole of it. The first version of this
- * compared against the row returned *after* the write, which always agrees with
- * what was sent — so it could never report a disagreement, and the state the
- * journey brief calls the one most likely to be dropped would have been dropped
- * silently. The e2e spec for it is what surfaced that.
- *
- * Three readings of one field, and only the third is a conflict:
- *
- *  - upstream still holds the baseline — nobody touched it, this edit is the
- *    only change;
- *  - upstream already holds what was typed — somebody made the same correction
- *    first, which is agreement rather than conflict;
- *  - upstream holds a third thing — somebody changed it to something else, and
- *    a human has to decide.
+ * The refusal itself is the adapter's — it compares and declines to set, so
+ * nothing of the office's is overwritten by an edit that arrived second. This
+ * only reads the row that came back with that refusal.
  *
  * Only the two fields a roster row can answer for. An allergy note and a birth
  * year are deliberately not on a roster row, so there is nothing here to

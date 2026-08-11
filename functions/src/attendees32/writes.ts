@@ -21,7 +21,11 @@ import { PATHS, SILENT_LOGGER, type FirestoreLike, type FunctionLogger } from '.
 import { parseStudentId } from '../generated/backendIds.js';
 import type { TtlCache } from '../pco/cache.js';
 import { normalizeEmail, normalizePhone, type SetParentContactResult } from '../pco/parentContact.js';
-import type { StudentProfilePatch, UpdateStudentProfileResult } from '../pco/profile.js';
+import type {
+  ProfileExpectations,
+  StudentProfilePatch,
+  UpdateStudentProfileResult,
+} from '../pco/profile.js';
 import type {
   AddParentResult,
   AdultCandidate,
@@ -479,7 +483,8 @@ export async function findStudentCandidates(
 /* -------------------------------------------------------------------------- */
 
 export async function updateStudentProfile(
-  options: A32WriteOptions & { studentId: string } & StudentProfilePatch,
+  options: A32WriteOptions & { studentId: string; expect?: ProfileExpectations } &
+    StudentProfilePatch,
 ): Promise<UpdateStudentProfileResult> {
   const { db, client, config, studentId } = options;
 
@@ -588,6 +593,35 @@ export async function updateStudentProfile(
     }
   }
   if (infosChanged) patch.infos = infos;
+
+  /*
+   * The same compare-and-set Planning Center's adapter makes, because a safety
+   * property that held for one backend and not the other would be worse than
+   * not having it: the church would not know which kind of record it had.
+   */
+  if (options.expect) {
+    const held = mapAttendeeToRosterPerson(attendee);
+    const wanted = options.expect;
+    const changedUnderneath =
+      (wanted.lastName !== undefined &&
+        options.lastName !== undefined &&
+        held.lastName !== wanted.lastName &&
+        held.lastName !== options.lastName) ||
+      (wanted.grade !== undefined &&
+        options.grade !== undefined &&
+        held.grade !== (wanted.grade ?? null) &&
+        held.grade !== options.grade);
+
+    if (changedUnderneath) {
+      return {
+        status: 'conflict',
+        wrote: [],
+        message: 'Somebody changed this in Attendees first, so nothing was written.',
+        person: null,
+        before: held,
+      };
+    }
+  }
 
   if (Object.keys(patch).length === 0) {
     return {

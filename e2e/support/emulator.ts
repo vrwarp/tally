@@ -450,6 +450,30 @@ export async function callFunction(
   return (JSON.parse(text) as { result?: unknown }).result;
 }
 
+/**
+ * Changes somebody upstream, the way the church office does.
+ *
+ * A real `PATCH /people/{id}` with the simulator's credentials rather than a
+ * control-plane shortcut, because what a spec needs to arrange here is not a
+ * fixture — it is another human editing the same record in Planning Center
+ * while a leader's correction is queued. Going through the API is the only
+ * version of that which the drain cannot tell apart from the real thing.
+ */
+export async function patchSimulatorPerson(
+  personId: string,
+  attributes: Record<string, unknown>,
+): Promise<void> {
+  const auth = Buffer.from('sim-app-id:sim-secret').toString('base64');
+  const response = await fetch(`${E2E.simulatorUrl}/people/v2/people/${personId}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', Authorization: `Basic ${auth}` },
+    body: JSON.stringify({ data: { type: 'Person', id: personId, attributes } }),
+  });
+  if (!response.ok) {
+    throw new Error(`Could not edit ${personId} upstream: HTTP ${response.status}.`);
+  }
+}
+
 /* ---- the edit queue ------------------------------------------------------- */
 
 /**
