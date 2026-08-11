@@ -111,6 +111,42 @@ ${figures.join('\n')}
     </section>`);
 }
 
+/*
+ * The artifact's own figures.
+ *
+ * Assembled from the same groups so the two files cannot drift, with two
+ * differences that matter: a phone frame sits in a tinted bed at its true
+ * width, and the journey heading is an eyebrow rather than an `h2` — this
+ * version is read as one continuous page rather than navigated.
+ */
+const artifactSections: string[] = [];
+let artifactIndex = 0;
+for (const group of groups) {
+  const figures: string[] = [];
+  for (const shot of group.shots) {
+    artifactIndex += 1;
+    const image = `<img
+          class="shot shot--${shot.viewport}"
+          src="${await dataUri(shot.file)}"
+          alt="${escapeHtml(shot.title)}"
+          loading="lazy"
+        />`;
+    figures.push(`      <figure class="frame">
+        <div class="frame__head">
+          <span class="frame__no">${String(artifactIndex).padStart(2, '0')}</span>
+          <span class="chip chip--${toneOf(shot.state)}">${escapeHtml(shot.state)}</span>
+          <h3 class="frame__title">${escapeHtml(shot.title)}</h3>
+        </div>
+        ${shot.viewport === 'phone' ? `<div class="bed--phone">${image}</div>` : image}
+        <figcaption>${escapeHtml(shot.caption)}</figcaption>
+      </figure>`);
+  }
+  artifactSections.push(`  <section class="journey">
+    <p class="eyebrow">${escapeHtml(group.journey)}</p>
+${figures.join('\n')}
+  </section>`);
+}
+
 const html = `<!doctype html>
 <html lang="en">
 <head>
@@ -225,3 +261,266 @@ ${sections.join('\n')}
 
 await writeFile('docs/walkthrough/edit-queue.html', html, 'utf8');
 console.log(`[edit-queue] ${shots.length} frames → docs/walkthrough/edit-queue.html`);
+
+/* -------------------------------------------------------------------------- */
+/* The same frames, shaped for publishing                                      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A second file, for the Artifact surface.
+ *
+ * Same manifests, same frames, same words — a different envelope. Artifacts
+ * are wrapped in their own `<!doctype>`/`<head>`/`<body>` at publish time, so
+ * a whole document would be nested inside another one; and they render in the
+ * *viewer's* theme, which the page above deliberately does not have — it is
+ * light because the screenshots are, and it is only ever read as a file.
+ *
+ * So this one is token-based and answers to both themes. The frames stay on a
+ * light bed in either: the screenshots are light-theme captures of the app,
+ * and a dark card behind a light screenshot reads as a hole in the page.
+ */
+const artifact = `<title>A profile edit, on its way to the church database</title>
+<style>
+  /*
+   * Neutrals biased toward the app's own blue rather than a pure grey, and
+   * four accents that are not decoration: they are the product's own state
+   * semantics — amber for running, green for done, red for needs-a-human —
+   * and this document is about those states, so it borrows their colours
+   * rather than inventing a palette that would disagree with the pictures.
+   */
+  :root {
+    color-scheme: light;
+    --page: #f5f8fb;
+    --card: #ffffff;
+    --bed: #eef3f9;
+    --rule: #dce4ee;
+    --hair: #e8eef6;
+    --ink: #0f172a;
+    --ink-2: #43526b;
+    --ink-3: #68788f;
+    --run: #a16207;
+    --run-line: #e5c07b;
+    --ok: #15803d;
+    --ok-line: #9bd6b0;
+    --bad: #b91c1c;
+    --bad-line: #f0b1b1;
+    --calm: #0369a1;
+    --calm-line: #a8d3ec;
+    --note: #eaf3fa;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --page: #0d1420;
+      --card: #141c2b;
+      --bed: #1b2434;
+      --rule: #263449;
+      --hair: #1e293b;
+      --ink: #eef4fb;
+      --ink-2: #b3c1d4;
+      --ink-3: #8496ad;
+      --run: #e0ac4c;
+      --run-line: #6b5320;
+      --ok: #5cc98a;
+      --ok-line: #24583c;
+      --bad: #f18a8a;
+      --bad-line: #6d2b2b;
+      --calm: #56b7e8;
+      --calm-line: #1d4a66;
+      --note: #16273a;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d1420;
+    --card: #141c2b;
+    --bed: #1b2434;
+    --rule: #263449;
+    --hair: #1e293b;
+    --ink: #eef4fb;
+    --ink-2: #b3c1d4;
+    --ink-3: #8496ad;
+    --run: #e0ac4c;
+    --run-line: #6b5320;
+    --ok: #5cc98a;
+    --ok-line: #24583c;
+    --bad: #f18a8a;
+    --bad-line: #6d2b2b;
+    --calm: #56b7e8;
+    --calm-line: #1d4a66;
+    --note: #16273a;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: clamp(2rem, 5vw, 4.5rem) 1.25rem 6rem;
+    /* Explicit, always: the viewer paints its own ground behind this, and a
+       transparent body borrows whichever theme the host happens to be in. */
+    background: var(--page);
+    color: var(--ink-2);
+    font: 16px/1.65 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  main { max-width: 60rem; margin: 0 auto; display: flex; flex-direction: column; gap: 3.5rem; }
+
+  .head { display: flex; flex-direction: column; gap: 1rem; }
+  h1 {
+    margin: 0;
+    color: var(--ink);
+    font-size: clamp(1.75rem, 4.2vw, 2.6rem);
+    line-height: 1.12;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+    max-width: 22ch;
+  }
+  .lede { margin: 0; max-width: 62ch; font-size: 1.06rem; }
+  .lede strong { color: var(--ink); font-weight: 600; }
+
+  /* The utility face. Mono is doing real work here rather than decorating:
+     it marks the machine's vocabulary — state names, file paths, the frame
+     index — apart from the prose about it. */
+  .mono, .eyebrow, .chip, .frame__no, code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, "Cascadia Mono", monospace;
+  }
+
+  .note {
+    padding: 1.1rem 1.25rem;
+    border: 1px solid var(--calm-line);
+    border-radius: .85rem;
+    background: var(--note);
+    color: var(--ink-2);
+    font-size: .95rem;
+    max-width: 62ch;
+  }
+  .note strong { color: var(--ink); }
+  code {
+    font-size: .88em;
+    background: var(--card);
+    border: 1px solid var(--hair);
+    border-radius: .3rem;
+    padding: .05rem .35rem;
+  }
+
+  .journey { display: flex; flex-direction: column; gap: 2rem; }
+  .eyebrow {
+    margin: 0;
+    color: var(--ink-3);
+    font-size: .78rem;
+    font-weight: 600;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    padding-bottom: .7rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .frame { margin: 0; display: flex; flex-direction: column; gap: .85rem; }
+  .frame__head { display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; }
+  .frame__no {
+    color: var(--ink-3);
+    font-size: .78rem;
+    font-variant-numeric: tabular-nums;
+    min-width: 1.6em;
+  }
+  .frame__title {
+    margin: 0;
+    flex: 1 1 18rem;
+    color: var(--ink);
+    font-size: 1.12rem;
+    font-weight: 600;
+    line-height: 1.3;
+    text-wrap: balance;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid;
+    border-radius: 999px;
+    padding: .1rem .55rem;
+    font-size: .74rem;
+    font-weight: 600;
+    letter-spacing: .01em;
+    white-space: nowrap;
+  }
+  .chip--run { color: var(--run); border-color: var(--run-line); }
+  .chip--ok { color: var(--ok); border-color: var(--ok-line); }
+  .chip--bad { color: var(--bad); border-color: var(--bad-line); }
+  .chip--calm { color: var(--calm); border-color: var(--calm-line); }
+
+  .shot {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: 1px solid var(--rule);
+    border-radius: .75rem;
+    /* White in both themes, because the screenshot is: a dark card behind a
+       light capture reads as a hole rather than as a frame. */
+    background: #ffffff;
+  }
+  /* A phone frame is 390 CSS pixels wide. Stretched to the column it would be
+     a picture of a phone layout at laptop size, which is the exact misreading
+     these pairs exist to prevent. */
+  .shot--phone {
+    width: min(390px, 100%);
+    margin: 0 auto;
+    border-radius: 1.25rem;
+    box-shadow: 0 1px 3px rgb(9 15 25 / .18), 0 14px 34px rgb(9 15 25 / .16);
+  }
+  .bed--phone {
+    background: var(--bed);
+    border-radius: 1rem;
+    padding: 1.5rem 1rem;
+  }
+
+  figcaption { margin: 0; max-width: 62ch; font-size: .95rem; color: var(--ink-2); }
+
+  footer {
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--rule);
+    font-size: .88rem;
+    color: var(--ink-3);
+    max-width: 62ch;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    html { scroll-behavior: smooth; }
+  }
+</style>
+
+<main>
+  <header class="head">
+    <h1>A profile edit, on its way to the church database</h1>
+    <p class="lede">
+      Correcting a child's surname in Tally used to mean waiting on Planning Center with the form
+      open. It does not wait any more: the edit becomes a durable job, a server carries it the rest
+      of the way, and every screen showing that student shows the job. <strong>These are the states
+      that produces</strong> — twenty frames, six journeys, both layouts, photographed from the
+      running app.
+    </p>
+    <p class="note">
+      <strong>Every frame is the real thing.</strong> A production build against the Firebase
+      emulators and the Planning Center simulator: the edits below are really queued, the drain
+      really runs, and the church's database really changes. Only the far end's timing is
+      choreographed — a gate holds one request open so <code>Sending</code> can be photographed
+      rather than raced, and the per-student lease is taken by hand so a job stays
+      <code>Queued</code> long enough to see. Two states are seeded instead, because they are
+      defined by a clock rather than by an answer, and their captions say so.
+    </p>
+  </header>
+
+${artifactSections.join('\n')}
+
+  <footer>
+    Captured by <code>e2e/edit-queue-walkthrough.spec.ts</code>, assembled by
+    <code>scripts/build-edit-queue-walkthrough.ts</code>. The reasoning is in
+    <code>docs/profile-edits.md</code>, and who drives the queue is in
+    <code>docs/queue-ownership.md</code>.
+  </footer>
+</main>
+`;
+
+await writeFile('docs/walkthrough/edit-queue.artifact.html', artifact, 'utf8');
+console.log(`[edit-queue] ${shots.length} frames → docs/walkthrough/edit-queue.artifact.html`);
