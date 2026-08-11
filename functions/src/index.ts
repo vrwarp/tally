@@ -20,6 +20,14 @@ import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { backendFailureStatus, describeBackendFailure } from './backends/errors.js';
+import {
+  drainEdit,
+  sweepEdits,
+  toEditRecord,
+  type DrainDeps,
+  type EditRecord,
+  type RunOutcome,
+} from './upstreamEdits.js';
 import { isHeldForReview } from './backends/pendingReview.js';
 import {
   a32AliasPairs,
@@ -2110,6 +2118,191 @@ export const onStudentCreated = onDocumentCreated(
         studentId: event.params.studentId,
         error: String(error),
       });
+    }
+  },
+);
+
+/* -------------------------------------------------------------------------- */
+/* The profile-edit queue                                                      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Runs one queued edit against whichever backend holds the student.
+ *
+ * Everything this function decides is a *classification*: it turns one
+ * backend's answer into one of the six outcomes `upstreamEdits.ts` knows how to
+ * write down, so the drain itself never has to know what Planning Center is.
+ * The two interesting judgements:
+ *
+ * **Merged is decided on the id, never on the values.** `readThroughMerges`
+ * follows a person through however many merges their record has been part of,
+ * so an edit against somebody merged mid-flight lands — on the survivor, under
+ * a different id than the job named. If the fields also differed, `differs`
+ * could describe it; if they did not, nothing would, and the job would report
+ * success while the student now resolves to a different human. So the id is
+ * compared first and wins outright.
+ *
+ * **`differs` is judged against the baseline the form was showing.** A field
+ * whose upstream value is neither what was typed nor what the form opened on is
+ * a field somebody else changed in between, and saying so is the difference
+ * between reporting a save and asserting a value nobody holds.
+ */
+async function runUpstreamEdit(edit: EditRecord): Promise<RunOutcome> {
+  const registry = await createRegistry(db());
+  const resolution = await backendForStudent(registry, db(), edit.studentId);
+  if ('error' in resolution) {
+    return { kind: 'refused', failure: 'writeBackOff', message: resolution.error };
+  }
+  const backend = resolution.backend;
+
+  if (backend.capabilities.writeBack !== 'full') {
+    return {
+      kind: 'refused',
+      failure: 'writeBackOff',
+      message: `Write-back to ${backend.displayName} is not switched on, so this edit was not saved. An admin can turn it on in Settings.`,
+    };
+  }
+
+  const patch = edit.patch as StudentProfilePatch;
+  const namedPersonId = personIdFromStudentId(edit.studentId);
+
+  let result;
+  try {
+    result = await backend.updateStudentProfile({ studentId: edit.studentId, ...patch, logger });
+  } catch (error) {
+    const status = backendFailureStatus(error);
+    if (status === 401 || status === 403) {
+      return {
+        kind: 'refused',
+        failure: 'auth',
+        message: `${backend.displayName} refused Tally's credentials. An admin has to reconnect it; retrying will not help.`,
+      };
+    }
+    if (status === 404 || status === 410) return { kind: 'orphaned' };
+    // 429s and 5xx have already been retried inside the client, with
+    // `Retry-After` honoured; reaching here means that ran out, not that the
+    // backend said no.
+    return {
+      kind: 'retry',
+      retryAfterMs: retryAfterOf(error),
+      message: `Could not reach ${backend.displayName} to save this. It will try again on its own.`,
+    };
+  }
+
+  if (result.status === 'no-student' || result.status === 'not-in-planning-center') {
+    return { kind: 'orphaned', message: result.message };
+  }
+  if (result.status === 'invalid') {
+    return { kind: 'refused', failure: 'validation', message: result.message };
+  }
+  if (result.status === 'disabled') {
+    return { kind: 'refused', failure: 'writeBackOff', message: result.message };
+  }
+
+  const person = result.person;
+
+  // Identity first, and outright. See the note above.
+  if (person && namedPersonId && person.pcoPersonId !== namedPersonId) {
+    return {
+      kind: 'merged',
+      survivorPersonId: person.pcoPersonId,
+      survivorName: `${person.firstName} ${person.lastName}`.trim(),
+      message: result.message,
+    };
+  }
+
+  const observed = disagreementsWith(edit, person);
+  if (observed) return { kind: 'differs', observed, message: result.message };
+
+  if (result.status === 'updated') {
+    backend.resetCache();
+  } else {
+    // `unchanged` is often this browser discovering it was the stale one, and
+    // the roster row it hands back is the correction. Nothing was written, so
+    // the whole cache does not have to pay for it.
+    backend.invalidateReachability();
+  }
+  return { kind: 'landed', message: result.message };
+}
+
+/**
+ * Fields the backend holds as neither what was typed nor what the form showed.
+ *
+ * Only the two the roster row can actually answer for. A roster row carries no
+ * allergy note and no birth year by design, so an edit to those cannot be
+ * checked this way and is reported as landed — which is honest: the write was
+ * accepted, and Tally has not been given anything to disagree with.
+ */
+function disagreementsWith(
+  edit: EditRecord,
+  person: { firstName: string; lastName: string; grade: number | null } | null,
+): Record<string, unknown> | null {
+  if (!person) return null;
+  const out: Record<string, unknown> = {};
+
+  const wantedLast = edit.patch.lastName;
+  if (typeof wantedLast === 'string' && person.lastName !== wantedLast) {
+    out.lastName = person.lastName;
+  }
+  const wantedGrade = edit.patch.grade;
+  if (wantedGrade !== undefined && person.grade !== wantedGrade) {
+    out.grade = person.grade;
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
+/** What the backend asked us to wait, where it said. */
+function retryAfterOf(error: unknown): number | null {
+  const value = (error as { retryAfterMs?: unknown } | null)?.retryAfterMs;
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function drainDeps(): DrainDeps {
+  return { db: db(), now: () => new Date(), run: runUpstreamEdit, logger };
+}
+
+/**
+ * The ordinary path: an edit is usually upstream a second or two after Save.
+ *
+ * `retry: false` because the queue has its own retry, with a backoff chosen for
+ * an API that rate-limits — and a trigger retried by the platform on top of
+ * that is two schedulers disagreeing about the same job.
+ */
+export const onUpstreamEditCreated = onDocumentCreated(
+  {
+    document: 'upstreamEdits/{editId}',
+    secrets: BACKEND_SECRETS,
+    timeoutSeconds: 300,
+    memory: '256MiB',
+    retry: false,
+  },
+  async (event) => {
+    const data = event.data?.data();
+    if (!data) return;
+    await drainEdit(toEditRecord(event.params.editId, data), drainDeps());
+  },
+);
+
+/**
+ * Everything the trigger cannot cover.
+ *
+ * A backed-off retry whose time has come, a job abandoned by a worker that died
+ * mid-request, a job written while the trigger itself was failing, and the
+ * sweeping of settled ones. Every minute, in small batches: a queue that built
+ * up through an outage drains into an API that rate-limits, and stampeding it
+ * is how a recovery turns back into an outage.
+ */
+export const drainUpstreamEdits = onSchedule(
+  {
+    schedule: 'every 1 minutes',
+    secrets: BACKEND_SECRETS,
+    timeoutSeconds: 300,
+    memory: '256MiB',
+  },
+  async () => {
+    const result = await sweepEdits(drainDeps());
+    if (result.ran > 0 || result.swept > 0) {
+      logger.info('Swept the upstream edit queue', result);
     }
   },
 );

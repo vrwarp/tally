@@ -15,10 +15,14 @@
  *    the student is grafted onto the survivor, the same move every read path
  *    makes. Creating a fresh record here would manufacture the duplicate the
  *    admin just cleaned up.
- *  - Only a genuinely dead trail creates, and for a visitor document it goes
- *    through `pushStudent` on purpose: that path already matches against
- *    existing people before creating, verifies what Planning Center kept, and
- *    links the document — re-creation is a push with the dead link cleared.
+ *  - Only a genuinely dead trail creates, and **both branches search before
+ *    they create**. A visitor document goes through `pushStudent`, which
+ *    already matched, verified and linked; a `pco_…` document does the same
+ *    search here. It used to not, and the gap was the dangerous one: the
+ *    commonest reason a person is *deleted* rather than merged is an office
+ *    admin clearing a duplicate by hand, which is exactly the case where
+ *    another record of that child is sitting upstream — and the screen offering
+ *    this button promises that a second copy will not be made.
  *  - A `pco_…` document holds no name (names are Planning Center's), so the
  *    caller must supply one; the membership then moves to a document named
  *    after the new person, pointered both ways, exactly like a merge graft —
@@ -29,7 +33,7 @@ import type { PcoConfig } from '../config.js';
 import { PATHS, SILENT_LOGGER, type FirestoreLike, type FunctionLogger } from '../firestore.js';
 import type { PcoClient } from './client.js';
 import { followPersonLink, isPersonGoneError } from './personLink.js';
-import { pushStudent } from './pushStudents.js';
+import { findExistingPeople, pushStudent } from './pushStudents.js';
 import { pcoStudentId, personIdFromStudentId } from './roster.js';
 import { graftMergedStudent } from './studentPerson.js';
 import { PCO_TYPES, type PcoPerson } from './types.js';
@@ -177,18 +181,48 @@ export async function recreateStudent(
     );
   }
 
-  const created = await client.post<PcoPerson>('/people', {
-    data: {
-      type: PCO_TYPES.person,
-      attributes: {
-        first_name: firstName,
-        last_name: lastName,
-        child: true,
-        ...(typeof options.grade === 'number' ? { grade: options.grade } : {}),
+  /*
+   * Search before creating, on the same terms the visitor push uses.
+   *
+   * The match is the strict one — first name, last name and grade, re-filtered
+   * locally through the same accent- and punctuation-insensitive normalisation
+   * that collapses duplicate visitors, with `child: true` required when there
+   * is no grade to match on — so this cannot graft a child onto a same-named
+   * adult volunteer. Several exact matches means the church database already
+   * has duplicates, and linking to the oldest is strictly better than adding a
+   * third.
+   */
+  const existing = await findExistingPeople(
+    client,
+    config,
+    firstName,
+    lastName,
+    typeof options.grade === 'number' ? options.grade : null,
+  );
+  const match = existing[0] ?? null;
+  if (match) {
+    logger.info('Found an existing Planning Center person while re-creating; linked instead', {
+      studentId,
+      pcoPersonId: match.id,
+      matches: existing.length,
+    });
+  }
+
+  let createdId = match?.id ?? null;
+  if (!createdId) {
+    const created = await client.post<PcoPerson>('/people', {
+      data: {
+        type: PCO_TYPES.person,
+        attributes: {
+          first_name: firstName,
+          last_name: lastName,
+          child: true,
+          ...(typeof options.grade === 'number' ? { grade: options.grade } : {}),
+        },
       },
-    },
-  });
-  const createdId = created.data?.id;
+    });
+    createdId = created.data?.id ?? null;
+  }
   if (!createdId) {
     return result('no-student', 'Planning Center returned no person id for the new record.');
   }
@@ -210,14 +244,17 @@ export async function recreateStudent(
   );
   await ref.set({ status: 'inactive', recreatedAsStudentId: newStudentId }, { merge: true });
 
-  logger.info('Re-created a Planning Center person for a roster student', {
-    studentId,
-    newStudentId,
-    pcoPersonId: createdId,
-  });
+  logger.info(
+    match
+      ? 'Linked a roster student to a matching Planning Center person instead of creating one'
+      : 'Re-created a Planning Center person for a roster student',
+    { studentId, newStudentId, pcoPersonId: createdId, matched: match !== null },
+  );
   return result(
-    'recreated',
-    'Planning Center has a record for them again. Check-ins are unfrozen.',
+    match ? 'relinked' : 'recreated',
+    match
+      ? 'Planning Center already had a record matching them, so Tally linked to it rather than adding a second. Check-ins are unfrozen.'
+      : 'Planning Center has a record for them again. Check-ins are unfrozen.',
     { pcoPersonId: createdId, studentId: newStudentId },
   );
 }
