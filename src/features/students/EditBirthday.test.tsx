@@ -19,26 +19,10 @@ import { AuthContext, type AuthContextValue } from '@/context/authContext';
 import { DataContext, type DataContextValue } from '@/context/dataContext';
 import { ToastContext, type ToastContextValue } from '@/context/toastContext';
 import { RowBadgeModal } from '@/features/students/RowBadgeModal';
-import type { PcoPersonDetails, PcoRosterPerson, Student } from '@/types';
+import type { PcoPersonDetails, Student } from '@/types';
 import { makeSettings, makeStudent } from '../../../tests/factories';
 
 /** The row Planning Center holds once the write has landed. */
-function savedRow(overrides: Partial<PcoRosterPerson> = {}): PcoRosterPerson {
-  return {
-    id: 'pco_4200003',
-    pcoPersonId: '4200003',
-    firstName: 'Sofia',
-    lastName: 'Delgado',
-    grade: 9,
-    status: 'active',
-    searchName: 'sofia delgado',
-    profileComplete: null,
-    hasAllergies: false,
-    birthday: '03-16',
-    
-    ...overrides,
-  };
-}
 
 const updateStudentProfile = vi.hoisted(() =>
   vi.fn<
@@ -78,6 +62,25 @@ vi.mock('@/services/functions', () => ({
   pushStudentToPlanningCenter: vi.fn(),
 }));
 vi.mock('@/services/students', () => ({ updateStudent: vi.fn(), setStudentStatus: vi.fn() }));
+
+/*
+ * The badge queues its edit now, exactly as the editor's Save does. It used to
+ * block on the backend confirming the write — defensible while it was the only
+ * such path, and indefensible the moment the editor stopped, because the same
+ * field would then behave two ways depending on which control reached it.
+ */
+const enqueueUpstreamEdit = vi.hoisted(() =>
+  /*
+   * Returns synchronously, like the real one: the job exists on the device the
+   * moment it is called, and the promise it hands back is the *server's*
+   * answer, which the screens deliberately do not wait for.
+   */
+  vi.fn<(...args: unknown[]) => { editId: string; written: Promise<void> }>(() => ({
+    editId: 'edit-1',
+    written: Promise.resolve(),
+  })),
+);
+vi.mock('@/services/upstreamEdits', () => ({ enqueueUpstreamEdit }));
 
 const personDetails = vi.hoisted(() => ({
   current: null as PcoPersonDetails | null,
@@ -165,6 +168,7 @@ function linked(overrides: Partial<Student> = {}): Student {
 
 beforeEach(() => {
   updateStudentProfile.mockClear();
+  enqueueUpstreamEdit.mockClear();
   refreshRoster.mockClear();
   applyRosterPerson.mockClear();
   show.mockClear();
@@ -218,9 +222,8 @@ describe('the birthday badge', () => {
     await userEvent.type(screen.getByRole('textbox', { name: 'Birthday' }), '4/2');
     await userEvent.click(screen.getByRole('button', { name: /Save to Planning Center/ }));
 
-    await waitFor(() => expect(updateStudentProfile).toHaveBeenCalled());
-    expect(updateStudentProfile.mock.calls[0]?.[0]).toEqual({
-      studentId: 'pco_4200003',
+    await waitFor(() => expect(enqueueUpstreamEdit).toHaveBeenCalled());
+    expect((enqueueUpstreamEdit.mock.calls[0]?.[0] as { patch: Record<string, unknown> }).patch).toEqual({
       birthday: '04-02',
     });
   });
@@ -231,7 +234,7 @@ describe('the birthday badge', () => {
    * church, paged out of Planning Center — to learn back the date somebody had
    * just typed, with the leader watching a spinner through it.
    */
-  it('writes the day upstream and takes the corrected row from the answer', async () => {
+  it('queues the day, and leaves the row to the job', async () => {
     openBadge(linked({ birthday: '03-14' }));
 
     expect(screen.getByText('14 March')).toBeInTheDocument();
@@ -241,14 +244,20 @@ describe('the birthday badge', () => {
     await userEvent.type(box, '3/16');
     await userEvent.click(screen.getByRole('button', { name: /Save to Planning Center/ }));
 
-    await waitFor(() => expect(updateStudentProfile).toHaveBeenCalled());
-    expect(updateStudentProfile.mock.calls[0]?.[0]).toEqual({
-      studentId: 'pco_4200003',
+    await waitFor(() => expect(enqueueUpstreamEdit).toHaveBeenCalled());
+    expect((enqueueUpstreamEdit.mock.calls[0]?.[0] as { patch: Record<string, unknown> }).patch).toEqual({
       birthday: '03-16',
     });
-    await waitFor(() => expect(applyRosterPerson).toHaveBeenCalledWith(savedRow()));
+    /*
+     * The roster is corrected from the *job*, not from a write's answer, because
+     * there is no answer yet. `applyPendingEdits` draws the typed day over the
+     * row and marks it as not upstream, and the drain replaces it when it lands.
+     */
+    expect(applyRosterPerson).not.toHaveBeenCalled();
     expect(refreshRoster).not.toHaveBeenCalled();
-    expect(show).toHaveBeenCalledWith('Saved birthday in Planning Center.');
+    // Says what is true — it is on its way — rather than what used to be true
+    // only after a leader had waited for it.
+    expect(show).toHaveBeenCalledWith(expect.stringContaining('Saving'));
   });
 
   /**
@@ -256,10 +265,14 @@ describe('the birthday badge', () => {
    * the screen agreeing with Planning Center. `applyRosterPerson` is what falls
    * back to a read, so the assertion is that it is called at all.
    */
-  it('still hands the write on when the answer carries no row', async () => {
-    updateStudentProfile.mockResolvedValueOnce({
-      data: { status: 'updated', wrote: ['birthdate'], message: 'Saved birthday in Planning Center.' },
-    });
+  /**
+   * There is no answer to carry a row any more, and that is the point.
+   *
+   * The case this used to guard — a write that landed while Planning Center
+   * returned nothing to redraw the row with — cannot arise: nothing here waits
+   * for a write, and what redraws the row is the queued job itself.
+   */
+  it('redraws the row from the queued job rather than from a reply', async () => {
     openBadge(linked({ birthday: '03-14' }));
 
     const box = screen.getByRole('textbox', { name: 'Birthday' });
@@ -267,7 +280,8 @@ describe('the birthday badge', () => {
     await userEvent.type(box, '3/16');
     await userEvent.click(screen.getByRole('button', { name: /Save to Planning Center/ }));
 
-    await waitFor(() => expect(applyRosterPerson).toHaveBeenCalledWith(undefined));
+    await waitFor(() => expect(enqueueUpstreamEdit).toHaveBeenCalled());
+    expect(applyRosterPerson).not.toHaveBeenCalled();
   });
 
   /**
@@ -297,18 +311,25 @@ describe('the birthday badge', () => {
     expect(screen.getByText(/Planning Center holds no year for Sofia/)).toBeInTheDocument();
   });
 
-  it('keeps the form open and says why when Planning Center refuses', async () => {
-    updateStudentProfile.mockResolvedValueOnce({
-      data: { status: 'invalid', wrote: [], message: 'Give the year too.' },
-    });
-    openBadge(linked({ birthday: '03-14' }));
+  /**
+   * A refusal from the backend no longer reaches this panel, and that is the
+   * trade this change makes deliberately: nobody waits, so nobody is standing
+   * here when the answer comes. The record's own strip carries the refusal
+   * afterwards, with the typed value intact and one move — and it survives the
+   * leader locking their phone, which a panel never could.
+   *
+   * What still refuses *here* is everything that can be judged at the keyboard,
+   * which is the case a leader can actually fix while they are looking at it.
+   */
+  it('still refuses at the keyboard what it can judge without asking', async () => {
+    openBadge(linked({ birthday: null }));
 
     const box = screen.getByRole('textbox', { name: 'Birthday' });
     await userEvent.clear(box);
-    await userEvent.type(box, '3/16');
+    await userEvent.type(box, '2/29');
     await userEvent.click(screen.getByRole('button', { name: /Save to Planning Center/ }));
 
-    expect(await screen.findByText('Give the year too.')).toBeInTheDocument();
+    expect(enqueueUpstreamEdit).not.toHaveBeenCalled();
     expect(screen.getByRole('textbox', { name: 'Birthday' })).toBeInTheDocument();
   });
 

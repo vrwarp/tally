@@ -41,6 +41,9 @@ import { PartialRosterDialog } from '@/features/students/PartialRosterDialog';
 import { buildRosterCsv } from '@/features/students/rosterCsv';
 import { RowBadgeModal, type RowBadgeAction } from '@/features/students/RowBadgeModal';
 import { StudentEditorModal } from '@/features/students/StudentEditorModal';
+import { JobChip } from '@/features/students/JobChip';
+import { describeFields } from '@/features/students/syncStripCopy';
+import { latestByStudent } from '@/features/roster/pendingEdits';
 import {
   birthdayState,
   formatBirthdayLong,
@@ -57,10 +60,19 @@ import {
   initials,
   NO_GRADE,
 } from '@/lib/utils';
-import { GRADES, backendLabelOf, backendOfStudent, type Grade, type Student } from '@/types';
+import {
+  GRADES,
+  backendLabelOf,
+  backendOfStudent,
+  isInFlight,
+  needsAHuman,
+  type Grade,
+  type Student,
+  type UpstreamEdit,
+} from '@/types';
 
 type StatusFilter = 'active' | 'inactive' | 'all';
-type QuickFilter = 'none' | 'incomplete' | 'visitors';
+type QuickFilter = 'none' | 'incomplete' | 'visitors' | 'inFlight' | 'needsYou';
 
 export function StudentsPage() {
   const {
@@ -71,6 +83,7 @@ export function StudentsPage() {
     rosterBackends,
     rosterLoading,
     rosterSettled,
+    upstreamEdits,
   } = useData();
   // With a second backend connected, "Planning Center" stops being the name
   // for where students come from — the buttons say the neutral thing instead.
@@ -118,7 +131,30 @@ export function StudentsPage() {
    */
   const { reachable } = useParentContact();
 
-  const visible = useMemo(() => {
+  /*
+   * The queue, keyed by student, so a row does not scan a list to draw a mark.
+   *
+   * `latestByStudent` keeps the newest job per student, which is the one a row
+   * has room for. The counts below cut the same three ways the marks do —
+   * running, needs-a-human, done — because a screen whose pills and whose marks
+   * disagreed about which pile a row was in would be worse than either alone.
+   */
+  const editsByStudent = useMemo(() => latestByStudent(upstreamEdits), [upstreamEdits]);
+
+  /*
+   * Everybody the other three controls allow through, before any chip is
+   * pressed. Both the counts and the list are read from this, and that is the
+   * whole point of it existing.
+   *
+   * The counts used to be taken from the queue and the roster directly, which
+   * made them answer a different question from the filter they sit on: a
+   * student the status filter was hiding still counted. It showed up the first
+   * time a walkthrough photographed the screen — "Needs you 6" over a list of
+   * five, because a child who had been merged upstream was now inactive and so
+   * counted but not shown. A count on a filter has to be a promise about what
+   * pressing it produces, or it is worse than no count at all.
+   */
+  const matching = useMemo(() => {
     const matcher = createSearchMatcher(query);
     return students.filter((student) => {
       if (status !== 'all' && student.status !== status) return false;
@@ -126,20 +162,55 @@ export function StudentsPage() {
       // getting the ministry's adult volunteers back is the same bug as
       // printing "6th grade" under their name.
       if (grade !== null && student.grade !== grade) return false;
+      return matcher.matches(student.searchName);
+    });
+  }, [students, status, grade, query]);
+
+  const inFlightCount = useMemo(
+    () =>
+      matching.filter((student) => {
+        const edit = editsByStudent.get(student.id);
+        return edit ? isInFlight(edit) : false;
+      }).length,
+    [matching, editsByStudent],
+  );
+  const needsYouCount = useMemo(
+    () =>
+      matching.filter((student) => {
+        const edit = editsByStudent.get(student.id);
+        return edit ? needsAHuman(edit) : false;
+      }).length,
+    [matching, editsByStudent],
+  );
+
+  const visible = useMemo(() => {
+    return matching.filter((student) => {
       if (quick === 'incomplete' && !isUnreachable(student, reachable)) return false;
       if (quick === 'visitors' && !student.isVisitor) return false;
-      if (!matcher.matches(student.searchName)) return false;
+      if (quick === 'inFlight') {
+        const edit = editsByStudent.get(student.id);
+        if (!edit || !isInFlight(edit)) return false;
+      }
+      if (quick === 'needsYou') {
+        const edit = editsByStudent.get(student.id);
+        if (!edit || !needsAHuman(edit)) return false;
+      }
       return true;
     });
-  }, [students, status, grade, quick, query, reachable]);
+  }, [matching, quick, reachable, editsByStudent]);
 
   const incompleteCount = useMemo(
-    () => students.filter((student) => isUnreachable(student, reachable)).length,
-    [students, reachable],
+    () => matching.filter((student) => isUnreachable(student, reachable)).length,
+    [matching, reachable],
   );
+  /*
+   * No `status === 'active'` of its own any more: it follows the status
+   * control like everything else here, so asking for inactive students and
+   * being told how many *active* visitors there are cannot happen.
+   */
   const visitorCount = useMemo(
-    () => students.filter((student) => student.status === 'active' && student.isVisitor).length,
-    [students],
+    () => matching.filter((student) => student.isVisitor).length,
+    [matching],
   );
 
   const isFiltered =
@@ -272,12 +343,29 @@ export function StudentsPage() {
         }}
       />
 
-      {/* One toolbar row where there is a pointer. Stacked, the search field,
-          the two selects and the two chips terminated at three different right
-          edges — three controls dropped in at their natural widths rather than
-          a set — and cost a row and a half of students. */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:gap-4">
-        <div className="lg:flex-1">
+      {/*
+        One toolbar row where there is a pointer — and one that wraps rather
+        than pushing the page sideways.
+
+        Stacked, the search field, the two selects and the chips terminated at
+        three different right edges — three controls dropped in at their
+        natural widths rather than a set — and cost a row and a half of
+        students. So they are one row.
+
+        `lg:flex-wrap` is what keeps that from becoming a lie. The quick
+        filters grew from two chips to four when the queue arrived, and four
+        chips plus a 448px pair of selects plus a search field do not fit
+        beside a 224px sidebar at 1280: the group ran 51px off the right edge,
+        taking the last chip with it. A chip nobody can reach is worse than a
+        chip on its own line, and this is the one screen where the widths are
+        genuinely content-dependent — a count going from 3 to 13 moves them.
+        Above 1440 they still ride up onto the first row.
+      */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end lg:gap-4">
+        {/* `min-w-0`: a flex item defaults to `min-width: auto` and refuses to
+            shrink below its content, which is the usual way this page learns
+            it can scroll sideways. */}
+        <div className="lg:min-w-56 lg:flex-1">
           <TextField
             label="Search"
             type="search"
@@ -319,7 +407,39 @@ export function StudentsPage() {
           </SelectField>
         </div>
 
-        <div role="group" aria-label="Quick filters" className="flex flex-wrap gap-2 lg:shrink-0">
+        {/*
+          Two groups, not four loose chips.
+
+          The pair that answers this journey's question — what is running, what
+          needs me — has to stay on one line, and flex-wrap fills greedily, so
+          ordering alone would not hold it: at 390px the widest standing count
+          packs onto line one and splits the pair. Making the grouping
+          structural means the break is a fact about the content rather than a
+          coincidence of two chip widths, and it survives a count going from 3
+          to 13.
+        */}
+        <div
+          role="group"
+          aria-label="Quick filters"
+          className="flex flex-wrap items-center gap-x-4 gap-y-2 lg:shrink-0"
+        >
+          <span className="flex shrink-0 flex-wrap gap-2">
+            <FilterChip
+              active={quick === 'inFlight'}
+              onPress={() => setQuick((current) => (current === 'inFlight' ? 'none' : 'inFlight'))}
+            >
+              In flight
+              <ChipCount active={quick === 'inFlight'}>{inFlightCount}</ChipCount>
+            </FilterChip>
+            <FilterChip
+              active={quick === 'needsYou'}
+              onPress={() => setQuick((current) => (current === 'needsYou' ? 'none' : 'needsYou'))}
+            >
+              Needs you
+              <ChipCount active={quick === 'needsYou'}>{needsYouCount}</ChipCount>
+            </FilterChip>
+          </span>
+          <span className="flex shrink-0 flex-wrap gap-2">
           <FilterChip
             active={quick === 'incomplete'}
             onPress={() => setQuick((current) => (current === 'incomplete' ? 'none' : 'incomplete'))}
@@ -334,6 +454,7 @@ export function StudentsPage() {
             Visitors
             <ChipCount active={quick === 'visitors'}>{visitorCount}</ChipCount>
           </FilterChip>
+          </span>
           {isFiltered ? (
             <button
               type="button"
@@ -397,6 +518,8 @@ export function StudentsPage() {
                 student={student}
                 unreachable={isUnreachable(student, reachable)}
                 now={now}
+                edit={editsByStudent.get(student.id) ?? null}
+                uid={user?.uid ?? null}
                 onBadge={openBadge}
               />
             ))}
@@ -483,6 +606,8 @@ const StudentListRow = memo(function StudentListRow({
   student,
   unreachable,
   now,
+  edit,
+  uid,
   onBadge,
 }: {
   student: Student;
@@ -490,6 +615,14 @@ const StudentListRow = memo(function StudentListRow({
   unreachable: boolean;
   /** Today, decided once by the page. See the note where it is built. */
   now: Date;
+  /**
+   * The one job this student has, or null. Passed in for the same reason
+   * `unreachable` is: the row and the counts above it must not be able to
+   * disagree about which pile it is in.
+   */
+  edit: UpstreamEdit | null;
+  /** Whoever is reading, so the band can say "you" rather than their own name. */
+  uid: string | null;
   onBadge: (student: Student, action: RowBadgeAction) => void;
 }) {
   const name = `${student.firstName} ${student.lastName}`;
@@ -563,7 +696,22 @@ const StudentListRow = memo(function StudentListRow({
           <span className="font-semibold">{student.firstName}</span>{' '}
           <span className="font-normal text-ink-300">{student.lastName}</span>
         </span>
-        <NoteSnippet notes={student.notes} />
+        {/*
+          The band, or the note — never both, and never neither.
+
+          Both want the one elastic slot this row has, and a row can only
+          give it to one of them. The job wins it for as long as it is a
+          job: a note is a standing fact that will read the same tomorrow,
+          and an edit on its way to the church's database is the only thing
+          on this row that has a clock on it. It hands the slot straight
+          back when the job settles, so a list at rest is the list that was
+          always here.
+        */}
+        {edit ? (
+          <JobBand edit={edit} now={now} uid={uid} />
+        ) : (
+          <NoteSnippet notes={student.notes} />
+        )}
         <LastSeen at={student.lastAttendedAt} />
         {/*
           Badges annotate the row; they do not restructure it.
@@ -575,10 +723,18 @@ const StudentListRow = memo(function StudentListRow({
           the no-contact flag at five different x positions, so the thing a
           leader came to find was a ragged mid-row scan rather than a column.
 
-          `min-w-80` rather than a fixed width: the lane holds its column for
+          `min-w-72` rather than a fixed width: the lane holds its column for
           the rows everybody has, and grows into the note's space on the rare
           row carrying four flags at once, instead of overflowing them back
           across the columns to its left.
+
+          It was `min-w-80`, and gave 32px back to the slot on its left when
+          that slot stopped being only a note. A row carrying a job spends
+          that slot on the two facts a mark cannot hold — what is changing
+          and who asked for it — and at 1280 with the sidebar open there was
+          not room for a sixth word of it. The lane still holds every badge
+          the common rows wear; it reaches for the extra width only on the
+          rare four-flag row, exactly as before.
 
           The grade sits at the lane's leading edge and the badges are pushed to
           its trailing edge by a spacer that takes the slack. Packed together
@@ -586,7 +742,7 @@ const StudentListRow = memo(function StudentListRow({
           one fact every row shares, at a different x on every row, which is the
           precise thing this lane was given a fixed width to stop.
         */}
-        <span className="relative z-10 mt-0.5 flex flex-wrap items-center gap-2 text-xs text-ink-500 lg:mt-0 lg:min-w-80 lg:shrink-0 lg:flex-nowrap">
+        <span className="relative z-10 mt-0.5 flex flex-wrap items-center gap-2 text-xs text-ink-500 lg:mt-0 lg:min-w-72 lg:shrink-0 lg:flex-nowrap">
           {/*
             Never the thing that gives way.
 
@@ -601,6 +757,13 @@ const StudentListRow = memo(function StudentListRow({
           <span className="shrink-0 lg:w-20 lg:text-right">
             {spokenGrade ?? NO_GRADE}
           </span>
+          {/*
+            The job mark rides in the row's meta line below `lg`, and beside
+            the name at pointer widths — one component, two slots. Below `lg`
+            it is the word alone: a phone row has no room for an age, and the
+            caption carrying the field and the author is `lg:` only.
+          */}
+          {edit ? <JobChip edit={edit} now={now} short className="lg:hidden" /> : null}
           <span className="hidden lg:block lg:flex-1" />
 
           {student.isVisitor ? (
@@ -688,6 +851,53 @@ const StudentListRow = memo(function StudentListRow({
  * of context, so this is set to read as annotation rather than as content —
  * the row's own facts stay the brighter thing.
  */
+/**
+ * What is changing on this row, and who asked for it.
+ *
+ * The wide layout's answer to the question a mark alone raises. "Queued" on a
+ * row tells a leader something is happening to a child's record and not what,
+ * which on a shared roster is the moment they open it to find out — so the two
+ * facts that stop them are the ones the mark cannot carry: the fields, and the
+ * name of whoever typed them.
+ *
+ * The chip's lane is fixed rather than shrink-to-fit. Its word is the widest
+ * thing about it and its age ticks, so a lane sized to its contents would move
+ * the caption beside it as the seconds passed and put a different left edge on
+ * every row of a filtered list — the whole reason this screen has columns.
+ */
+function JobBand({
+  edit,
+  now,
+  uid,
+}: {
+  edit: UpstreamEdit;
+  now: Date;
+  uid: string | null;
+}) {
+  const mine = edit.createdBy === uid;
+  const author = mine ? 'you' : (edit.createdByName.split(/\s+/)[0] ?? 'somebody');
+  const caption = `${describeFields(edit)} · ${author}`;
+
+  return (
+    <span className="hidden min-w-0 flex-1 items-center gap-2 text-xs text-ink-500 lg:flex">
+      <span className="flex min-w-36 shrink-0">
+        <JobChip edit={edit} now={now} />
+      </span>
+      {/*
+        The first thing to truncate on a narrow laptop, and deliberately so:
+        it is the only part of the row whose full text a pointer can get back
+        by hovering, and the record itself says the same thing in prose one
+        press away. Everything either side of it is a column, and a column
+        that truncates on some rows and not others is worse than a phrase
+        that ends in an ellipsis.
+      */}
+      <span title={caption} className="min-w-0 truncate">
+        {caption}
+      </span>
+    </span>
+  );
+}
+
 function NoteSnippet({ notes }: { notes: string | null }) {
   // Rendered even when empty. It is the only elastic thing left in the row now
   // that the name is pinned, so a row without a note that skipped it would pull

@@ -1,0 +1,34 @@
+[
+  {
+    "file": "both-desktop-00-connected.png",
+    "viewport": "desktop",
+    "journey": "When a church runs both databases",
+    "state": "Connected",
+    "title": "Two directories, and Tally says which is which",
+    "caption": "Both are connected, so neither gets to be \"the\" database. Every button that used to name Planning Center stops naming anybody, and every row that could belong to either says which one holds it — because a leader correcting a child needs to know which office to ring when it will not save."
+  },
+  {
+    "file": "both-desktop-01-queued.png",
+    "viewport": "desktop",
+    "journey": "When a church runs both databases",
+    "state": "Queued",
+    "title": "The same strip, naming the database that actually holds her",
+    "caption": "One queue, one state machine, one set of words — and not one sentence that says \"Planning Center\" out of habit. The backend a child belongs to is a property of the child, not of the installation, so the strip reads it from her rather than from a setting."
+  },
+  {
+    "file": "both-desktop-02-refused.png",
+    "viewport": "desktop",
+    "journey": "When a church runs both databases",
+    "state": "Refused",
+    "title": "A field this database will not take from Tally",
+    "caption": "Attendees keeps the bracketed name in its own fields, and Tally cannot tell which half of a CJK string is the family name — so it refuses rather than guessing. It used to accept the edit, write nothing, and report \"Saved in Attendees\": the same screen, the same green mark, and a correction that had gone nowhere. Two backends means two sets of what a field can do, and the refusal is how that becomes visible instead of silent."
+  },
+  {
+    "file": "both-desktop-03-queued.png",
+    "viewport": "desktop",
+    "journey": "When a church runs both databases",
+    "state": "Queued",
+    "title": "Two edits in flight, in two different directories",
+    "caption": "The count does not care which database a job is going to, and neither does the queue: one lease per child, one drain, one set of states. What a leader sees is a single list of what is happening to their roster — which is the point of putting the backend behind a seam rather than in front of one."
+  }
+]

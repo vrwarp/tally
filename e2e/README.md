@@ -28,6 +28,65 @@ resets the simulator, so every run starts from the same data.
 The app is built, not dev-served, on purpose: the service worker, the code
 splitting and the minified bundle are all things that can only break once built.
 
+## A note on running these in a sandbox
+
+The suite needs the **Eventarc emulator** to be running, because that is how a
+v2 Firestore trigger is registered: the Functions emulator asks the Firestore
+emulator to install the trigger, and the Firestore emulator proxies it on to
+Eventarc. Where Eventarc cannot bind — some containers have no IPv6, and the
+Cloud Tasks emulator reports `EAFNOSUPPORT ... ::1` in the same run — the
+Firestore emulator answers `upstream request failed`, firebase-tools reports
+
+```
+⚠  Error adding firestore function: FirebaseError: Unable to parse JSON:
+   SyntaxError: Unexpected token 'u', "upstream r"... is not valid JSON
+```
+
+and then shuts the whole stack down. The trigger it names first is
+`onStudentCreated`, so this is not about any one spec: **no** spec can run, and
+the failure looks like the app rather than the environment. If you see it, check
+whether an Eventarc emulator line ever appeared in the log — if the only mention
+is "Stopping Eventarc Emulator", it never started.
+
+## Arranging the far end
+
+Most specs only need the simulator to *hold* a ministry. A few need it to
+misbehave on purpose, and one feature — the profile-edit queue — needs it to
+misbehave *at a particular moment*, because the states worth asserting on exist
+only while a call to Planning Center is in flight.
+
+`e2e/support/emulator.ts` has the controls:
+
+| Helper | What it arranges |
+| --- | --- |
+| `planningCenter.fail(status, …)` | The next N requests answer with a status you choose. |
+| `rateLimitSimulator(count, retryAfterSeconds)` | …answer `429`, as a busy lobby kiosk makes them. |
+| `holdSimulator({ method, path })` | The next matching request **blocks before it is handled**. |
+| `waitForHeldRequest()` | Waits for it to arrive, so nothing sleeps. |
+| `releaseSimulator()` | Lets it through. |
+| `burySimulatorPerson(id, mergedInto?)` | Deletes somebody upstream, or merges them into somebody else. |
+| `planningCenter.patchPerson(id, attrs)` | Edits somebody upstream through the real API — the church office, mid-flight. |
+
+**Why a gate rather than a stub.** The suite's contract is that only the far end
+is simulated, and a gate keeps it: the browser write, the security rules, the
+Firestore trigger, the per-student lease, the claim, the state transitions and
+the `onSnapshot` all still run. Holding a socket open is what a slow API does
+anyway, so nothing under test knows it is being tested — and because the hold is
+applied *before* the handler runs, the world on screen while it waits is
+genuinely the world before the write.
+
+**Two things the queue's specs use instead of a shim.** To see a job that no
+worker has claimed, a spec takes `upstreamEditLeases/{studentId}` — the document
+the drain itself competes for — so what is exercised is the real mutual
+exclusion rather than a switch. And to make a retry happen, it calls
+`drainUpstreamEditsNow`, the callable twin of the drain schedule, because
+scheduled functions do not run on their own in the emulator. Both are the
+product's own machinery; neither exists for the tests.
+
+`TALLY_EDIT_BACKOFF_MS` in `playwright.config.ts` shortens the retry schedule for
+the same reason `PCO_CACHE_TTL_SECONDS` is five seconds: so a run exercises the
+backoff rather than sleeping through fifteen seconds of it.
+
 ## Sign-in
 
 `signIn()` drives the real Google flow: it clicks the button, waits for the

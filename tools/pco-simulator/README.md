@@ -26,6 +26,33 @@ PCO_SIM_PAGE_SIZE=10 \
 Credentials default to `sim-app-id` / `sim-secret` (HTTP Basic, as a Personal
 Access Token) and can be overridden with `PCO_APP_ID` / `PCO_SECRET`.
 
+## The control plane
+
+`/_sim/*`, outside the API, for the suite to arrange the far end with.
+
+| Action | What it does |
+| --- | --- |
+| `POST /_sim/reset` | Back to the built-in fixtures. Also clears any armed gate. |
+| `POST /_sim/seed` | A whole ministry in one request. |
+| `GET /_sim/people` | Everyone the simulator holds. |
+| `GET /_sim/requests` | What Tally actually asked for. |
+| `POST /_sim/fail` | The next N requests answer with a status you choose. |
+| `POST /_sim/rate-limit` | The next N answer `429` with `Retry-After`. |
+| `POST /_sim/clear-faults` | Disarm both of the above. |
+| `POST /_sim/hold` | Arm a gate: the next matching request blocks before it is handled. `{ method?, path? }`, path matched as a substring. |
+| `GET /_sim/held` | What the gate has caught — so a test waits for arrival rather than sleeping. |
+| `POST /_sim/release` | Let the held request through. |
+| `POST /_sim/bury` | Delete a person (`{ id }`), or merge them into another (`{ id, mergedInto }`), which answers `410` with `meta.merged_into`. |
+
+**Why a gate exists at all.** Some of what Tally does is only observable while a
+call to Planning Center is *in flight* — a queued profile edit that a worker has
+claimed and not yet finished. Against a simulator answering in two milliseconds
+that state cannot be asserted on without a race. Holding the socket open is what
+a slow API does anyway, so the gate lets the suite see it without anything in the
+Cloud Function, the trigger or the browser knowing it is being tested. The hold
+is applied *before* the handler runs, so a held write has not changed anything
+yet and the state on screen is genuinely the state before it.
+
 ## What it implements
 
 - `GET /people` — `where[child]`, `where[grade]`, `where[status]`, `where[id]`,
@@ -40,6 +67,8 @@ Access Token) and can be overridden with `PCO_APP_ID` / `PCO_SECRET`.
   `households.people`, `field_data`, `field_data.field_definition`
 - HTTP Basic auth, returning 401 on a bad token
 - 429 with `Retry-After`, and arbitrary injected failures
+- Holding a request open until told to let it go, and burying a person as a
+  deletion or a merge — see the control plane below
 
 Four pagination shapes are selectable, because the client supports all four and
 one that silently handled a single shape would look fine right up until

@@ -16,12 +16,12 @@
  */
 import { useState } from 'react';
 import { Button, MaskedField } from '@/components/ui';
-import { useData } from '@/context/dataContext';
+import { useAuth } from '@/context/authContext';
 import { useToast } from '@/context/toastContext';
 import { invalidatePersonDetails } from '@/hooks/usePersonDetails';
 import { birthdayFieldFrom, describeBirthdayField, readBirthdayField } from '@/lib/birthdayField';
 import { birthdayMaskGhost, formatBirthdayInput } from '@/lib/birthdayInput';
-import { updateStudentProfile } from '@/services/functions';
+import { enqueueUpstreamEdit } from '@/services/upstreamEdits';
 import { backendLabelOf, type Student } from '@/types';
 
 export interface BirthdayFieldProps {
@@ -120,7 +120,7 @@ export interface EditBirthdayProps {
  */
 export function EditBirthday({ student, onFile, onSaved, onDone }: EditBirthdayProps) {
   const { show } = useToast();
-  const { applyRosterPerson } = useData();
+  const { user, profile } = useAuth();
   // `undefined` is "the host has no details", not "no birthdate": a host that
   // has read Planning Center and found none passes null, and both open blank.
   const held = onFile === undefined ? student.birthday : onFile;
@@ -144,33 +144,36 @@ export function EditBirthday({ student, onFile, onSaved, onDone }: EditBirthdayP
     setBusy(true);
     setProblem(null);
     try {
-      const response = await updateStudentProfile({ studentId: student.id, birthday: read.value });
-      if (response.data.status !== 'updated' && response.data.status !== 'unchanged') {
-        setProblem(response.data.message);
-        return;
-      }
       /*
-       * Two copies of what just changed, and they are corrected differently.
+       * Queued, exactly as the editor's Save is, and for the same reason.
        *
-       * The roster is where every screen's day comes from — including the row
-       * behind this panel — and the row comes back from the write, so putting
-       * it straight in costs nothing and waits for nothing. It used to be
-       * `refreshRoster(true)`, awaited before the toast and the close, which is
-       * what put a leader standing at a door in front of a spinner while a
-       * Cloud Function paged through every child in the church to fetch back
-       * the date they had just typed. The Save still blocks on Planning Center
-       * confirming the write — that is the part somebody is entitled to wait
-       * for — and nothing beyond it.
+       * This panel used to block on the backend confirming the write, on the
+       * grounds that it is the part somebody is entitled to wait for. That was
+       * true when it was the only such path; it stopped being true the moment
+       * the editor stopped waiting, because a leader would then meet two
+       * behaviours for the same field depending on which control they reached
+       * it through — and this is the control they reach it through at a door.
        *
-       * The memoised person details are where the *year* comes from, and they
-       * hold no fresher answer than the one just replaced; dropping them is
-       * what stops this box re-opening on the year it has overwritten. The host
-       * re-reads if it is still on screen showing one.
+       * The roster corrects itself from the job rather than from a write's
+       * answer: `applyPendingEdits` draws the typed day, marked as not upstream
+       * yet, until the drain lands it.
        */
-      applyRosterPerson(response.data.person);
+      // Not awaited: see the note on `EnqueuedEdit.written`. The job is on the
+      // device when this returns, and waiting for a server to say so is what
+      // pins a leader to this panel in the one place they cannot afford it.
+      const { written } = enqueueUpstreamEdit({
+        studentId: student.id,
+        patch: { birthday: read.value },
+        ...(held ? { baseline: { birthday: held } } : { baseline: {} }),
+        uid: user?.uid ?? '',
+        authorName: profile?.displayName ?? user?.email ?? 'Somebody',
+      });
+      void written.catch(() => {
+        setProblem(`${backendLabelOf(student)} could not be reached. Nothing was changed.`);
+      });
       invalidatePersonDetails(student.id);
       onSaved?.();
-      show(response.data.status === 'updated' ? response.data.message : 'Already up to date.');
+      show(`Saving ${student.firstName}\u2019s birthday to ${backendLabelOf(student)}.`);
       onDone();
     } catch {
       setProblem(`${backendLabelOf(student)} could not be reached. Nothing was changed.`);

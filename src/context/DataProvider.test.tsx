@@ -32,6 +32,21 @@ vi.mock('@/services/roster', () => ({
   mergeRoster: (roster: unknown) => roster,
 }));
 
+/*
+ * The queue's own listener, stubbed to empty.
+ *
+ * Not because these tests are about it — they are not — but because importing
+ * the real module reaches `@/lib/firebase`, which throws at import time on a
+ * machine with no project configured. Every other Firestore-touching module
+ * this file uses is mocked for exactly the same reason.
+ */
+vi.mock('@/services/upstreamEdits', () => ({
+  subscribeUpstreamEdits: (next: (value: never[]) => void) => {
+    next([]);
+    return () => {};
+  },
+}));
+
 vi.mock('@/services/students', () => ({
   subscribeStudents: (next: (value: never[]) => void) => {
     next([]);

@@ -1399,6 +1399,169 @@ describe('config/backends', () => {
  * that only holds while the document stays derived, so the shape is checked and
  * wholesale deletion is refused.
  */
+describe('upstreamEdits', () => {
+  /**
+   * A browser may ask for work and may never claim work was done.
+   *
+   * Everything below is that one sentence, tested from both sides: the shape a
+   * fresh job has to have, and every field a client would have to lie about to
+   * pretend a job had run.
+   */
+  const editPath = (id = 'edit-1') => `${COLLECTIONS.upstreamEdits}/${id}`;
+
+  const job = (over: Record<string, unknown> = {}) => ({
+    studentId: ID.student,
+    patch: { lastName: 'Chen-Ito' },
+    baseline: { lastName: 'Chen' },
+    state: 'queued',
+    attempts: 0,
+    nextAttemptAt: null,
+    leaseUntil: null,
+    failure: null,
+    message: null,
+    field: null,
+    observed: null,
+    survivorPersonId: null,
+    survivorName: null,
+    createdAt: serverTimestamp(),
+    createdBy: UID.core,
+    createdByName: 'Dana Ruiz',
+    updatedAt: serverTimestamp(),
+    startedAt: null,
+    settledAt: null,
+    ...over,
+  });
+
+  it('lets the core team queue an edit', async () => {
+    const db = asUser(env, UID.core);
+    await assertSucceeds(setDoc(doc(db, editPath()), job()));
+  });
+
+  /**
+   * A counselor's one screen is check-in, and nothing on it reaches the
+   * church's people database. The listener is never even opened for them.
+   */
+  it('refuses a counselor, on read and on write', async () => {
+    const db = asUser(env, UID.counselor);
+    await assertFails(setDoc(doc(db, editPath()), job()));
+    await assertFails(getDoc(doc(db, editPath())));
+  });
+
+  it('refuses a job somebody else claims to have queued', async () => {
+    const db = asUser(env, UID.core);
+    await assertFails(setDoc(doc(db, editPath()), job({ createdBy: UID.admin })));
+  });
+
+  /** Every one of these is a client pretending the drain has already run. */
+  it('refuses a job that arrives already done', async () => {
+    const db = asUser(env, UID.core);
+    await assertFails(setDoc(doc(db, editPath()), job({ state: 'landed' })));
+    await assertFails(setDoc(doc(db, editPath()), job({ attempts: 3 })));
+    await assertFails(setDoc(doc(db, editPath()), job({ failure: 'auth' })));
+    await assertFails(setDoc(doc(db, editPath()), job({ message: 'Saved.' })));
+    await assertFails(setDoc(doc(db, editPath()), job({ survivorPersonId: '377' })));
+    await assertFails(setDoc(doc(db, editPath()), job({ settledAt: serverTimestamp() })));
+  });
+
+  it('refuses a job with nothing in it to do', async () => {
+    const db = asUser(env, UID.core);
+    await assertFails(setDoc(doc(db, editPath()), job({ patch: {} })));
+  });
+
+  /**
+   * The queue may not carry `status`. Who is on the roster is Tally's own list
+   * and is never written upstream in any mode, so a job that could name it
+   * would be a way to reach the church's database with a decision that was
+   * never theirs.
+   */
+  it('refuses a field the queue does not carry', async () => {
+    const db = asUser(env, UID.core);
+    await assertFails(setDoc(doc(db, editPath()), job({ patch: { status: 'inactive' } })));
+    await assertFails(setDoc(doc(db, editPath()), job({ patch: { notes: 'anything' } })));
+  });
+
+  it('refuses a grade outside Pre-K to 12', async () => {
+    const db = asUser(env, UID.core);
+    await assertFails(setDoc(doc(db, editPath()), job({ patch: { grade: 13 } })));
+    await assertFails(setDoc(doc(db, editPath()), job({ patch: { grade: -2 } })));
+    await assertSucceeds(setDoc(doc(db, editPath('pre-k')), job({ patch: { grade: -1 } })));
+  });
+
+  it('lets a leader cancel a job nothing has claimed', async () => {
+    const db = asUser(env, UID.core);
+    await assertSucceeds(setDoc(doc(db, editPath()), job()));
+    await assertSucceeds(
+      updateDoc(doc(db, editPath()), {
+        state: 'cancelled',
+        updatedAt: serverTimestamp(),
+        settledAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  /**
+   * The patch may already be on its way, so a cancel here cannot keep its
+   * promise — and the screen does not offer one.
+   */
+  it('refuses a cancel once a worker holds it', async () => {
+    await env.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), editPath()), job({ state: 'sending' }));
+    });
+    const db = asUser(env, UID.core);
+    await assertFails(
+      updateDoc(doc(db, editPath()), { state: 'cancelled', updatedAt: serverTimestamp() }),
+    );
+  });
+
+  it('lets a leader send a refused edit again', async () => {
+    await env.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), editPath()),
+        job({ state: 'failed', attempts: 8, failure: 'validation', message: 'No.' }),
+      );
+    });
+    const db = asUser(env, UID.core);
+    await assertSucceeds(
+      updateDoc(doc(db, editPath()), {
+        state: 'queued',
+        attempts: 0,
+        failure: null,
+        message: null,
+        field: null,
+        nextAttemptAt: null,
+        leaseUntil: null,
+        settledAt: null,
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it('refuses a retry that also rewrites what the edit says', async () => {
+    await env.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), editPath()), job({ state: 'failed', attempts: 8 }));
+    });
+    const db = asUser(env, UID.core);
+    await assertFails(
+      updateDoc(doc(db, editPath()), {
+        state: 'queued',
+        attempts: 0,
+        patch: { lastName: 'Somebody Else' },
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  /** The sweeper owns removal: a job a client could delete is one whose
+      failure a client could hide. */
+  it('refuses a delete from anybody', async () => {
+    await env.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), editPath()), job());
+    });
+    await assertFails(deleteDoc(doc(asUser(env, UID.core), editPath())));
+    await assertFails(deleteDoc(doc(asUser(env, UID.admin), editPath())));
+  });
+});
+
 describe('skippedNights', () => {
   const chain = ID.series;
   const registry = (over: Record<string, unknown> = {}) => ({

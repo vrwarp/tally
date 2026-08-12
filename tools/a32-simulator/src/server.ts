@@ -85,6 +85,25 @@ export async function startSimulator(options: A32ServerOptions = {}): Promise<Ru
       if (path === '/_sim/requests' && method === 'GET') {
         return send(outgoing, 200, { requests: store.requests.slice(-100) });
       }
+      /*
+       * Merging two people is something a coworker does in Attendees, not
+       * something Tally can ask for — so it belongs on the control plane
+       * beside "the server is down", as a way of arranging the world a test
+       * needs rather than an API Tally is given.
+       */
+      if (path === '/_sim/merge' && method === 'POST') {
+        const body = (await readBody(incoming)) as
+          | { loser?: string; survivor?: string }
+          | null;
+        const survivor =
+          body?.loser && body?.survivor
+            ? store.mergeAttendee(body.loser, body.survivor)
+            : null;
+        if (!survivor) {
+          return send(outgoing, 400, { error: 'Name a loser and a survivor that both exist.' });
+        }
+        return send(outgoing, 200, { status: 'ok', merged_into: survivor.id });
+      }
 
       const query: SimRequest['query'] = {};
       for (const [key, value] of url.searchParams.entries()) {
@@ -119,7 +138,9 @@ export async function startSimulator(options: A32ServerOptions = {}): Promise<Ru
   if (verbose) {
     console.log(`[a32-sim] Attendees simulator listening on http://${host}:${port}`);
     console.log(`[a32-sim]   ${store.attendees.size} attendees seeded, token "${store.token}"`);
-    console.log('[a32-sim]   control plane: POST /_sim/reset, POST /_sim/down, GET /_sim/requests');
+    console.log(
+      '[a32-sim]   control plane: POST /_sim/reset, POST /_sim/down, POST /_sim/merge, GET /_sim/requests',
+    );
   }
 
   return {

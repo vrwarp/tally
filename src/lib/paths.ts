@@ -7,6 +7,7 @@
  *   invitations/{emailKey}                   who an admin has said may sign in
  *   eventSeries/{seriesId}                   recurring templates (friday, sunday)
  *   students/{studentId}                     what Tally owns about a person
+ *   upstreamEdits/{editId}                   a profile edit on its way upstream
  *   events/{eventId}                         a single dated gathering
  *   events/{eventId}/attendance/{studentId}  who showed up
  *   events/{eventId}/rsvps/{studentId}       who said they were coming (one-offs)
@@ -48,6 +49,19 @@ export const COLLECTIONS = {
    * instead of one per night.
    */
   skippedNights: 'skippedNights',
+  /**
+   * Profile edits on their way to a people backend.
+   *
+   * Top level rather than under `students` because the question it exists to
+   * answer is "which edits need somebody", asked by a leader who does not know
+   * which of four hundred students it was. That is one small live query here and
+   * a collection group over four hundred parents anywhere else.
+   *
+   * The set is genuinely small: everything in flight, plus unresolved failures,
+   * plus a few minutes of freshly-landed ones. A ministry that has never had a
+   * failure subscribes to a handful of documents.
+   */
+  upstreamEdits: 'upstreamEdits',
   /**
    * One document per repeat chain, recording who may work it.
    *
@@ -96,6 +110,9 @@ export const paths = {
   event: (eventId: string) => `${COLLECTIONS.events}/${eventId}`,
 
   skippedNights: (chainKey: string) => `${COLLECTIONS.skippedNights}/${chainKey}`,
+
+  upstreamEdits: () => COLLECTIONS.upstreamEdits,
+  upstreamEdit: (editId: string) => `${COLLECTIONS.upstreamEdits}/${editId}`,
 
   eventAccessCollection: () => COLLECTIONS.eventAccess,
   eventAccess: (chainKey: string) => `${COLLECTIONS.eventAccess}/${chainKey}`,

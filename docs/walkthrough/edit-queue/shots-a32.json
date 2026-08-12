@@ -1,0 +1,26 @@
+[
+  {
+    "file": "a32-desktop-00-connected.png",
+    "viewport": "desktop",
+    "journey": "When a church runs Attendees and not Planning Center",
+    "state": "Connected",
+    "title": "Planning Center was never connected, and nothing pretends otherwise",
+    "caption": "Which people-backends exist is decided by the credentials a deployment holds, not by a switch — so this frame is a different emulator, started with no Planning Center credentials at all. The screen says so plainly rather than showing a connection that is not there."
+  },
+  {
+    "file": "a32-desktop-01-queued.png",
+    "viewport": "desktop",
+    "journey": "When a church runs Attendees and not Planning Center",
+    "state": "Queued",
+    "title": "The same strip, naming the database that actually holds her",
+    "caption": "One queue, one state machine, one set of words — and not one sentence that says \"Planning Center\" out of habit. The backend a child belongs to is a property of the child, not of the installation, so the strip reads it from her rather than from a setting."
+  },
+  {
+    "file": "a32-desktop-02-refused.png",
+    "viewport": "desktop",
+    "journey": "When a church runs Attendees and not Planning Center",
+    "state": "Refused",
+    "title": "A field this database will not take from Tally",
+    "caption": "Attendees keeps the bracketed name in its own fields, and Tally cannot tell which half of a CJK string is the family name — so it refuses rather than guessing. It used to accept the edit, write nothing, and report \"Saved in Attendees\": the same screen, the same green mark, and a correction that had gone nowhere. Two backends means two sets of what a field can do, and the refusal is how that becomes visible instead of silent."
+  }
+]

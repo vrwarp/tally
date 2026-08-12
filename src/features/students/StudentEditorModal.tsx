@@ -31,7 +31,6 @@ import {
   TextField,
 } from '@/components/ui';
 import { useAuth } from '@/context/authContext';
-import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { AddParentContact } from '@/features/students/AddParentContact';
 import { BirthdayField } from '@/features/students/EditBirthday';
@@ -44,7 +43,7 @@ import {
 } from '@/lib/birthdayField';
 import { pcoPersonUrl } from '@/lib/planningCenter';
 import { formatPhone, gradeDescription } from '@/lib/utils';
-import { updateStudentProfile } from '@/services/functions';
+import { enqueueUpstreamEdit } from '@/services/upstreamEdits';
 import { createStudent, updateStudent, type StudentDraft } from '@/services/students';
 import {
   GRADES,
@@ -58,6 +57,7 @@ import {
   type PcoPersonDetails,
   type Student,
   type StudentStatus,
+  type UpstreamEditPatch,
 } from '@/types';
 
 function isPcoManaged(field: keyof Student): boolean {
@@ -142,8 +142,7 @@ export interface StudentEditorModalProps {
 }
 
 export function StudentEditorModal({ open, onClose, student, onSaved }: StudentEditorModalProps) {
-  const { user } = useAuth();
-  const { applyRosterPerson } = useData();
+  const { user, profile } = useAuth();
   const { show } = useToast();
   const formId = useId();
 
@@ -244,54 +243,82 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
    * the difference, which is the only comparison worth making: the value this
    * form opened with may have been corrected in Planning Center since.
    */
-  const saveUpstream = async (
+  /**
+   * Works out what this leader actually changed, and queues only that.
+   *
+   * `updateStudentProfile` sends every managed field on every save, and the
+   * reasoning above it is sound for a request somebody waits on: the server
+   * diffs against a fresh read, so restating a field costs nothing and the value
+   * the form opened with may be stale anyway.
+   *
+   * It is false of a queued one, and the failure is silent. Marcus queues a
+   * surname correction from a corridor. Dana opens the same record on her
+   * laptop, sees the surname the roster still holds, changes only the allergy
+   * note and presses Save. Her patch restates the old surname; her job drains
+   * after his, diffs against a read that by then holds his correction, finds a
+   * difference, and patches it back out. Both are told they succeeded and the
+   * church's permanent record quietly loses the fix.
+   *
+   * So an untouched box is not an instruction. The birthday field already works
+   * this way for its own reason — `MM-DD` against a person with no birthdate is
+   * a refusal, so it must not ride along on a save that never touched it — and
+   * the rule simply generalises.
+   */
+  const buildPatch = (
     current: Student,
     firstName: string,
     lastName: string,
     birthday: string | undefined,
-  ) => {
-    const response = await updateStudentProfile({
-      studentId: current.id,
-      firstName: form.firstName.trim(),
-      nickname: form.nickname.trim() || null,
-      lastName,
-      /*
-       * Omitted when the form showed no grade, on the same terms as the
-       * birthday below: `undefined` is how this patch says "not part of the
-       * edit", and a student Planning Center holds no grade for opened on
-       * nothing selected. Sending the clamp instead would write a 6th grade
-       * nobody chose onto a person upstream.
-       */
-      ...(form.grade === null ? {} : { grade: form.grade }),
-      /*
-       * Omitted unless it changed, unlike every other managed field here.
-       *
-       * The rest are sent on every save so the server can compare them against a
-       * fresh read. This one cannot be: `MM-DD` on a student with no birthdate
-       * upstream is a refusal — there is no year to keep it against — and that
-       * refusal would fail a save whose author never touched the birthday.
-       */
-      ...(birthday === undefined ? {} : { birthday }),
-      /*
-       * Safe to send as a value — including an empty one — only because
-       * `writable` is false until the details read lands, so this box has
-       * genuinely shown what Planning Center holds. An empty box on a form that
-       * never saw the current value would clear a child's medical note without
-       * anybody deciding to.
-       */
-      allergies: form.allergies.trim() || null,
-    });
+  ): { patch: UpstreamEditPatch; baseline: UpstreamEditPatch } => {
+    const opened = splitFirstName(current.firstName);
+    const patch: UpstreamEditPatch = {};
+    const baseline: UpstreamEditPatch = {};
 
-    if (response.data.status === 'updated' || response.data.status === 'unchanged') {
-      return {
-        message:
-          response.data.status === 'updated'
-            ? response.data.message
-            : `${studentFullName({ firstName, lastName })} saved`,
-        person: response.data.person,
-      };
+    const typedFirst = form.firstName.trim();
+    if (typedFirst !== opened.firstName) {
+      patch.firstName = typedFirst;
+      baseline.firstName = opened.firstName;
     }
-    throw new Error(response.data.message);
+    const typedNickname = form.nickname.trim() || null;
+    if (typedNickname !== (opened.nickname ?? null)) {
+      patch.nickname = typedNickname;
+      baseline.nickname = opened.nickname ?? null;
+    }
+    if (lastName !== current.lastName) {
+      patch.lastName = lastName;
+      baseline.lastName = current.lastName;
+    }
+    if (form.grade !== null && form.grade !== current.grade) {
+      patch.grade = form.grade;
+      baseline.grade = current.grade;
+    }
+    /*
+     * Safe to compare as a value — including an empty one — only because
+     * `writable` stays false until the details read lands, so this box has
+     * genuinely shown what the backend holds. An empty box on a form that never
+     * saw the current value would clear a child's medical note without anybody
+     * deciding to.
+     */
+    const heldAllergies = details?.allergies ?? null;
+    const typedAllergies = form.allergies.trim() || null;
+    if (typedAllergies !== heldAllergies) {
+      patch.allergies = typedAllergies;
+      baseline.allergies = heldAllergies;
+    }
+    if (birthday !== undefined) {
+      patch.birthday = birthday;
+      const onFile = details?.birthdate ?? current.birthday;
+      if (onFile) baseline.birthday = onFile;
+    }
+
+    // `firstName` composes with `nickname` upstream, so a nickname edit has to
+    // carry the first name with it or the two halves are written apart.
+    if (patch.nickname !== undefined && patch.firstName === undefined) {
+      patch.firstName = typedFirst;
+      baseline.firstName = opened.firstName;
+    }
+    void firstName;
+    return { patch, baseline };
   };
 
   const handleSubmit = async (submitted: FormEvent<HTMLFormElement>) => {
@@ -336,17 +363,52 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
 
     try {
       if (student) {
-        // The upstream half first: it is the half that can be refused, and a
-        // note saved against a name Planning Center rejected is a half-done
-        // save nobody asked for.
-        const saved = writable
-          ? await saveUpstream(student, firstName, lastName, birthday)
-          : { message: `${studentFullName(student)} saved`, person: null };
+        /*
+         * The upstream half is queued, not waited on — that is the whole of
+         * this change. What used to happen here was a callable that resolved
+         * the person, read them through their merges, patched, dropped the
+         * roster cache and answered, with the leader watching a spinner
+         * through however long the backend took. It now writes a job and
+         * returns, and `upstreamEdits` carries it the rest of the way.
+         *
+         * The Firestore half still goes first-and-only for a student Tally
+         * owns, and notes still land instantly for everybody: they are Tally's
+         * own field and were never in anybody's queue.
+         */
+        let queued = false;
+        if (writable && student) {
+          const { patch: upstream, baseline } = buildPatch(student, firstName, lastName, birthday);
+          if (Object.keys(upstream).length > 0) {
+            /*
+             * Not awaited, and that is the offline case working rather than a
+             * missing `await`. The write is applied on the device the moment
+             * this returns — the record redraws from it and the strip says so
+             * — while the promise it hands back stays pending until a server
+             * acknowledges it. Waiting on that held the dialog open with a
+             * spinner in it for as long as a leader had no signal, which is
+             * precisely the moment the queue exists to get them out of.
+             */
+            const { written } = enqueueUpstreamEdit({
+              studentId: student.id,
+              patch: upstream,
+              baseline,
+              uid: user.uid,
+              authorName: profile?.displayName ?? user.email ?? 'Somebody',
+            });
+            // A rejection means the job never existed, so no strip will ever
+            // appear to report it. It is the one failure here nobody would
+            // otherwise be told about.
+            void written.catch(() => {
+              show(`${student.firstName}\u2019s correction could not be saved. Try again.`);
+            });
+            queued = true;
+          }
+        }
 
         const patch: Partial<StudentDraft> = { notes: form.notes };
         // Managed fields are left out of the Firestore patch in both modes, and
         // for the same reason in each: under `create` Tally does not own them,
-        // and under `full` they have just gone to the place that does.
+        // and under `full` they are on their way to the place that does.
         if (!linked) {
           patch.firstName = firstName;
           patch.lastName = lastName;
@@ -357,51 +419,53 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
           patch.status = form.status;
         }
         /*
-         * The name passed as `current` is the one that just went upstream, not
-         * the one the form opened with.
+         * The name handed down as `current` is the one on its way upstream.
          *
          * An annotation document carries a name it does not own — enough
          * identity for the security rules and for anybody reading Firestore
          * directly — and `updateStudent` refreshes it from here. Handing it the
-         * pre-edit name would leave `students/pco_…` asserting a spelling
-         * Planning Center no longer holds.
-         *
-         * The grade is flagged rather than just passed, because `updateStudent`
-         * backfills it onto that document: a blank one must not be written down
-         * as the clamp's 6, which would put the invented number somewhere the
-         * roster no longer governs.
+         * pre-edit name would leave `students/pco_…` asserting a spelling the
+         * backend is about to stop holding.
          */
-        await updateStudent(
+        /*
+         * Not awaited, for the reason the queue write is not.
+         *
+         * This is the annotation document — notes, and the identity the rules
+         * read — and it is a plain Firestore write, so it is applied on the
+         * device at once and acknowledged by a server whenever there is one.
+         * Waiting for the acknowledgement made the whole editor as offline as
+         * its slowest write: the queue write was fixed and Save still hung
+         * here, one line later, on a phone with no signal.
+         */
+        const stored = updateStudent(
           student.id,
           patch,
           user.uid,
           writable
-            ? {
-                firstName,
-                lastName,
-                grade: form.grade ?? student.grade,
-              }
+            ? { firstName, lastName, grade: form.grade ?? student.grade }
             : student,
         );
+        void stored.catch(() => {
+          show(`${student.firstName}\u2019s notes could not be saved. Try again.`);
+        });
 
-        if (writable) {
+        const saved = {
+          message: queued
+            ? `${studentFullName({ firstName, lastName })} — saving to ${label}`
+            : `${studentFullName(student)} saved`,
+        };
+
+        if (queued) {
           /*
-           * The roster is where the name and grade on every other screen come
-           * from; the memoised details are where the allergies are. Dropping
-           * the memo rather than re-reading it here, because this modal is
-           * about to close — whoever opened it asks again.
-           *
-           * The roster row is corrected from the write's own answer rather than
-           * by asking for the whole roster again with `force`, which is a sweep
-           * of every child in the church for a name somebody just typed. Save
-           * still blocks on Planning Center accepting the edit; it no longer
-           * blocks on being told back what it wrote.
+           * The memoised details are dropped rather than re-read: this modal is
+           * closing, and whoever opens it next asks again. The roster is *not*
+           * corrected from a write's answer any more, because there is no answer
+           * yet — the queued job is what every screen reads until it lands, and
+           * `applyPendingEdits` is what draws it.
            */
-          applyRosterPerson(saved.person);
           invalidatePersonDetails(student.id);
           // And the notes the check-in badges print, which are held separately
-          // and would otherwise go on showing the allergy as it was typed
-          // before this edit — on the screen that acts on it.
+          // and would otherwise go on showing the allergy as it was before.
           invalidateAllergyNotes();
           onSaved?.();
         }

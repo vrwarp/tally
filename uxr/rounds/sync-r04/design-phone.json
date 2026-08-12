@@ -1,0 +1,29 @@
+[
+  {
+    "scene": "sync-merged",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the danger strip on Ava Chen-Ito's record — the body paragraph and the NOW POINTS AT / YOU EDITED two-up beneath it",
+    "finding": "The new scene borrows differs' strip exactly — same ring, same ≠, same matched cells, same order — and then breaks the one rule that was written for that strip this round: a value that appears in a cell does not appear in the paragraph. Both people and the date are stated in prose first and then again as the comparison, so the two-up arrives as a recap of a sentence the reader has just finished, which is precisely the shape that came off sync-differs in this round. It also inverts the cell's own hierarchy: the cell's figure is the name the paragraph already gave, and the fact that actually distinguishes the two rows — #AC377 against #AC101, the ideator's own account of what carries this state — is the smallest, greyest text in the strip. Read side by side, differs now reads composed and merged reads like the draft it was cut from.",
+    "evidence": "The paragraph reads \"Planning Center merged Ava Chen into Ava Chen-Ito on Tuesday…\"; the cells then read Ava Chen-Ito / #AC377 · the survivor and Ava Chen / #AC101 · merged Tue, and the identity chip above already says ≠ Merged upstream · Tue. The survivor's name appears four times inside the fold — H1, bold in the paragraph, cell figure, button label — and a fifth time in the Profile card's provenance line. The two names sit at 18px semibold; the two ids at 12px ink-500. Differs' paragraph, one frame over, holds exactly one fact its cells do not (9:12) and is a line shorter.",
+    "direction": "Apply the rule the family adopted for differs to the frame built from it: let the cells own the two people and the merge date, and let the paragraph say only what the cells cannot — that the correction followed the merge, landed on the survivor, changed nothing because she already held that surname, and that this page now reads from her. If the ids are what carry the distinction, they should not be the quietest thing in the cell that holds them."
+  },
+  {
+    "scene": "sync-merged",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the strip's action column — \"Open Ava Chen-Ito\", the caption \"Opens her in Planning Center.\", and \"Got it\" beneath it",
+    "finding": "The action column is spaced as three equal steps, so the caption that qualifies the primary sits exactly as far from the button it explains as from the retreat it does not, and on a glance it is unclear which of the two it belongs to. The retreat also gets no more clearance than a caption does, so the group has no internal ranking: primary, aside and escape read as one evenly-spaced list of three. sync-orphaned, the frame this one otherwise mirrors move for move, does it the other way — its guard prose sits above the primary, tight to it, and the retreat is pushed off by an extra step. Two frames with the same anatomy resolve the same three parts differently, which is the sort of thing that makes a family read as two attempts.",
+    "evidence": "The column is `flex flex-col gap-4` with the caption as a plain sibling, so button→caption and caption→retreat are both 16px. sync-orphaned's is `gap-3` with `mt-1` on the retreat: caption→primary 12px, primary→retreat 16px, and the caption precedes the button.",
+    "direction": "Pick one order and one spacing for the guard sentence across the strip family and hold it — either the caption leads the primary as orphaned has it, or it trails it — and in both cases bind it to the primary with a smaller gap than the one that separates the retreat, so the column reads as one action with a note plus a way out, rather than three peers."
+  },
+  {
+    "scene": "sync-students",
+    "viewport": "phone",
+    "severity": "minor",
+    "where": "the page header's action group — New visitor / Add from Planning Center / Export CSV — above Search, and the same group on sync-outage",
+    "finding": "Three buttons of the same rank, same fill and three different widths wrap into a right-aligned staircase with a ragged left edge, and the middle step reaches back under the page title. Nothing in the shape says these are one group; it reads as three unrelated slabs stepping down the screen. They are also the first substantial thing in the frame on the scene whose whole job is scanning rows for job marks, and they take a sixth of the fold before Search to say nothing about any student. This one predates the sync work — the baseline wrapped two of them — but a third button turned a two-step wrap into a staircase, and it is on this round's glass.",
+    "evidence": "In the fold frame the three buttons occupy y=64→212 of an 844px fold: left edges at x=252, 136 and 253 against a shared right edge at x=374. \"Add from Planning Center\" starts 116px left of its neighbours and sits directly beneath \"45 students\".",
+    "direction": "On the phone these three are a menu, not a toolbar. Either give them one common edge and one width so the stack reads as a group, or collapse the two rarer ones behind the primary so the header costs one row instead of three, and the list starts higher."
+  }
+]

@@ -1,0 +1,448 @@
+/**
+ * The drain, exercised in-process.
+ *
+ * Everything here runs against `FakeFirestore` and a `run` stub, because the
+ * whole point of splitting the classification (`runUpstreamEdit`, in index.ts)
+ * from the machinery (this module) is that the machinery can be argued with
+ * without a network, an emulator or a Planning Center simulator.
+ */
+import { describe, expect, it } from 'vitest';
+import { FakeFirestore } from './testing/fakeFirestore.js';
+import {
+  BACKOFF_MS,
+  LEASE_MS,
+  MAX_ATTEMPTS,
+  messageFor,
+  UPSTREAM_EDITS,
+  UPSTREAM_EDIT_LEASES,
+  claimStudent,
+  drainEdit,
+  drainStudent,
+  foldQueued,
+  isRunnable,
+  settleFor,
+  sweepEdits,
+  toEditRecord,
+  type EditRecord,
+  type RunOutcome,
+} from './upstreamEdits.js';
+
+const NOW = new Date('2025-03-14T09:00:00Z');
+const nowMs = NOW.getTime();
+
+function edit(over: Partial<EditRecord> = {}): EditRecord {
+  return {
+    id: 'edit-1',
+    studentId: 'pco_101',
+    patch: { lastName: 'Chen-Ito' },
+    baseline: { lastName: 'Chen' },
+    state: 'queued',
+    attempts: 0,
+    nextAttemptAtMs: null,
+    leaseUntilMs: null,
+    createdAtMs: nowMs - 10_000,
+    ...over,
+  };
+}
+
+function seeded(over: Partial<EditRecord> = {}): { db: FakeFirestore; record: EditRecord } {
+  const db = new FakeFirestore();
+  const record = edit(over);
+  db.seed(`${UPSTREAM_EDITS}/${record.id}`, {
+    studentId: record.studentId,
+    patch: record.patch,
+    baseline: record.baseline,
+    state: record.state,
+    attempts: record.attempts,
+  });
+  return { db, record };
+}
+
+function deps(db: FakeFirestore, run: (job: EditRecord) => Promise<RunOutcome>) {
+  return { db, now: () => NOW, run };
+}
+
+describe('what a worker may pick up', () => {
+  it('takes a queued job', () => {
+    expect(isRunnable(edit(), nowMs)).toBe(true);
+  });
+
+  it('leaves a backed-off job alone until its time', () => {
+    expect(isRunnable(edit({ state: 'waiting', nextAttemptAtMs: nowMs + 5_000 }), nowMs)).toBe(false);
+    expect(isRunnable(edit({ state: 'waiting', nextAttemptAtMs: nowMs - 1 }), nowMs)).toBe(true);
+  });
+
+  /**
+   * The case that makes a dead worker recoverable.
+   *
+   * Without it, an instance reclaimed mid-request leaves a job in `sending`
+   * that nothing will ever pick up, under a screen that has already told a
+   * leader their correction is on its way.
+   */
+  it('reclaims a job whose worker died holding it', () => {
+    expect(isRunnable(edit({ state: 'sending', leaseUntilMs: nowMs + LEASE_MS }), nowMs)).toBe(false);
+    expect(isRunnable(edit({ state: 'sending', leaseUntilMs: nowMs - 1 }), nowMs)).toBe(true);
+  });
+
+  it('never touches a settled job', () => {
+    for (const state of ['landed', 'differs', 'merged', 'failed', 'orphaned', 'cancelled'] as const) {
+      expect(isRunnable(edit({ state }), nowMs)).toBe(false);
+    }
+  });
+});
+
+describe('the per-student lease', () => {
+  it('lets exactly one worker hold a student', async () => {
+    const db = new FakeFirestore();
+    expect(await claimStudent(db, 'pco_101', 'edit-1', nowMs)).toBe(true);
+    expect(await claimStudent(db, 'pco_101', 'edit-2', nowMs)).toBe(false);
+  });
+
+  it('breaks a lease whose holder is gone', async () => {
+    const db = new FakeFirestore();
+    db.seed(`${UPSTREAM_EDIT_LEASES}/pco_101`, { editId: 'dead', untilMs: nowMs - 1 });
+    expect(await claimStudent(db, 'pco_101', 'edit-2', nowMs)).toBe(true);
+  });
+
+  /**
+   * Two edits of one child must reach the backend in the order they were
+   * queued, because the second one's diff is only correct against a read taken
+   * after the first has landed.
+   */
+  it('holds a second edit of the same student behind the first', async () => {
+    const { db } = seeded();
+    db.seed(`${UPSTREAM_EDIT_LEASES}/pco_101`, { editId: 'other', untilMs: nowMs + LEASE_MS });
+
+    const state = await drainEdit(edit(), deps(db, async () => ({ kind: 'landed' })));
+    expect(state).toBeNull();
+    expect(db.get(`${UPSTREAM_EDITS}/edit-1`)?.state).toBe('queued');
+  });
+
+  it('gives the student back when it is done', async () => {
+    const { db } = seeded();
+    await drainEdit(edit(), deps(db, async () => ({ kind: 'landed' })));
+    expect(db.get(`${UPSTREAM_EDIT_LEASES}/pco_101`)).toBeUndefined();
+  });
+});
+
+describe('how an outcome is written down', () => {
+  it('records a landing', async () => {
+    const { db } = seeded();
+    const state = await drainEdit(edit(), deps(db, async () => ({ kind: 'landed' })));
+    expect(state).toBe('landed');
+    const stored = db.get(`${UPSTREAM_EDITS}/edit-1`)!;
+    expect(stored.state).toBe('landed');
+    expect(stored.attempts).toBe(1);
+    expect(stored.leaseUntil).toBeNull();
+  });
+
+  /**
+   * The rule this whole state exists for.
+   *
+   * `merged` is decided on the id, never on the values, and it outranks
+   * `landed`. The dangerous case is the quiet one: the survivor already holds
+   * what was typed, nothing differs, and without this the job reports success
+   * while the student resolves to a different human than it did an hour ago.
+   */
+  it('reports a merge even when nothing about the fields changed', () => {
+    const settled = settleFor(
+      { kind: 'merged', survivorPersonId: '377', survivorName: 'Ava Chen-Ito' },
+      1,
+      nowMs,
+    );
+    expect(settled.state).toBe('merged');
+    expect(settled).toMatchObject({ survivorPersonId: '377', survivorName: 'Ava Chen-Ito' });
+  });
+
+  it('keeps what the backend held when somebody else changed the same field', () => {
+    const settled = settleFor({ kind: 'differs', observed: { lastName: 'Ito' } }, 1, nowMs);
+    expect(settled).toMatchObject({ state: 'differs', observed: { lastName: 'Ito' } });
+  });
+
+  it('names the failure class so the list can say it once instead of nine times', () => {
+    expect(settleFor({ kind: 'refused', failure: 'auth' }, 1, nowMs)).toMatchObject({
+      state: 'failed',
+      failure: 'auth',
+    });
+  });
+});
+
+describe('retrying', () => {
+  it('backs off further each time', () => {
+    expect(settleFor({ kind: 'retry' }, 1, nowMs)).toMatchObject({
+      state: 'waiting',
+      nextAttemptAtMs: nowMs + BACKOFF_MS[1]!,
+    });
+  });
+
+  /** A backend that says how long to wait is believed over the schedule. */
+  it('honours what the backend asked for', () => {
+    expect(settleFor({ kind: 'retry', retryAfterMs: 90_000 }, 1, nowMs)).toMatchObject({
+      nextAttemptAtMs: nowMs + 90_000,
+    });
+  });
+
+  /**
+   * Out of patience is not the same as refused, and the screen branches on the
+   * difference: this one is worth a leader pressing again, and a rotated
+   * credential is not.
+   */
+  it('gives up as `exhausted` rather than as a refusal', () => {
+    expect(settleFor({ kind: 'retry' }, MAX_ATTEMPTS, nowMs)).toMatchObject({
+      state: 'failed',
+      failure: 'exhausted',
+    });
+  });
+
+  /**
+   * The sentence that goes with a retry is written in the future tense — it
+   * says the job will try again on its own — and on the last attempt that
+   * stops being true. It has to be dropped there, because `failed` is a state
+   * a leader is expected to act on: "it will try again" above a button that
+   * says "send it again" tells somebody their correction is in hand when it is
+   * sitting still, which is the one thing this queue is not allowed to do.
+   */
+  it('drops a retry\u2019s promise once there are no retries left', () => {
+    const promise = {
+      kind: 'retry' as const,
+      message: 'Could not reach Planning Center to save this. It will try again on its own.',
+    };
+
+    expect(messageFor(promise, 'waiting')).toBe(promise.message);
+    expect(messageFor(promise, 'failed')).toBeNull();
+  });
+
+  it('keeps what a backend actually said when it refused', () => {
+    // Not the tense problem: a refusal's words are true whenever they are read,
+    // and they are the only account of *why* the screen has anything to give.
+    expect(
+      messageFor(
+        { kind: 'refused', failure: 'validation', message: 'Planning Center rejected the grade.' },
+        'failed',
+      ),
+    ).toBe('Planning Center rejected the grade.');
+  });
+
+  /**
+   * A throw is this code failing, not the backend refusing. Discarding a
+   * leader's typed correction because a server had a bad minute is the one
+   * outcome that must not happen.
+   */
+  it('retries rather than losing an edit when the runner throws', async () => {
+    const { db } = seeded();
+    const state = await drainEdit(
+      edit(),
+      deps(db, async () => {
+        throw new Error('socket hang up');
+      }),
+    );
+    expect(state).toBe('waiting');
+    expect(db.get(`${UPSTREAM_EDITS}/edit-1`)?.state).toBe('waiting');
+    expect(db.get(`${UPSTREAM_EDIT_LEASES}/pco_101`)).toBeUndefined();
+  });
+});
+
+describe('the sweep', () => {
+  it('runs the oldest first, so two edits of one child keep their order', async () => {
+    const db = new FakeFirestore();
+    db.seed(`${UPSTREAM_EDITS}/newer`, {
+      studentId: 'a',
+      state: 'queued',
+      createdAt: new Date(nowMs - 1_000),
+    });
+    db.seed(`${UPSTREAM_EDITS}/older`, {
+      studentId: 'b',
+      state: 'queued',
+      createdAt: new Date(nowMs - 60_000),
+    });
+
+    const seen: string[] = [];
+    await sweepEdits(deps(db, async (job) => {
+      seen.push(job.id);
+      return { kind: 'landed' };
+    }));
+    expect(seen).toEqual(['older', 'newer']);
+  });
+
+  /**
+   * A queue that built up through an outage drains into an API that
+   * rate-limits, and stampeding it is how a recovery turns back into one.
+   */
+  it('takes a small batch rather than everything at once', async () => {
+    const db = new FakeFirestore();
+    for (let index = 0; index < 12; index += 1) {
+      db.seed(`${UPSTREAM_EDITS}/job-${index}`, {
+        studentId: `student-${index}`,
+        state: 'queued',
+        createdAt: new Date(nowMs - index * 1000),
+      });
+    }
+    const result = await sweepEdits(deps(db, async () => ({ kind: 'landed' })), 3);
+    expect(result.ran).toBe(3);
+  });
+
+  it('does not pick up a job that is settled or still backing off', async () => {
+    const db = new FakeFirestore();
+    db.seed(`${UPSTREAM_EDITS}/done`, { studentId: 'a', state: 'landed' });
+    db.seed(`${UPSTREAM_EDITS}/soon`, {
+      studentId: 'b',
+      state: 'waiting',
+      nextAttemptAt: new Date(nowMs + 60_000),
+    });
+    const result = await sweepEdits(deps(db, async () => ({ kind: 'landed' })));
+    expect(result.ran).toBe(0);
+  });
+});
+
+describe('reading a stored job', () => {
+  it('survives a document written by something newer', () => {
+    const record = toEditRecord('edit-9', {
+      studentId: 'pco_1',
+      state: 'somethingElse',
+      patch: { lastName: 'X' },
+    });
+    // An unknown state reads as queued rather than throwing: a drain that
+    // crashed on an unfamiliar document would stop draining everything else.
+    expect(record.state).toBe('queued');
+  });
+});
+
+describe('folding two saves of one student', () => {
+  /**
+   * Superseding moved here from the browser when the enqueue stopped using a
+   * transaction — a transaction cannot be written offline, and the corridor is
+   * the case the whole queue exists to survive. The drain is a better home for
+   * it anyway: it holds the student's lease, so it sees the whole pile at once,
+   * including a burst that left a phone in one batch.
+   */
+  it('takes the newest word on each field', () => {
+    const first = edit({ id: 'a', createdAtMs: 1, patch: { lastName: 'Chen' }, baseline: { lastName: 'Ramirez' } });
+    const second = edit({ id: 'b', createdAtMs: 2, patch: { lastName: 'Chen-Ito', grade: 10 }, baseline: { lastName: 'Chen', grade: 9 } });
+
+    const folded = foldQueued([second, first])!;
+    expect(folded.run.id).toBe('a');
+    expect(folded.run.patch).toEqual({ lastName: 'Chen-Ito', grade: 10 });
+    expect(folded.superseded.map((job) => job.id)).toEqual(['b']);
+  });
+
+  /**
+   * And the *oldest* baseline, because what the drain compares against is the
+   * record as it stood before anybody started — that is what makes a
+   * disagreement with the church office answerable rather than a comparison
+   * against a value this leader typed a moment ago.
+   */
+  it('keeps the baseline from before anybody started', () => {
+    const first = edit({ id: 'a', createdAtMs: 1, patch: { lastName: 'Chen' }, baseline: { lastName: 'Ramirez' } });
+    const second = edit({ id: 'b', createdAtMs: 2, patch: { lastName: 'Chen-Ito' }, baseline: { lastName: 'Chen' } });
+    expect(foldQueued([first, second])!.run.baseline).toEqual({ lastName: 'Ramirez' });
+  });
+
+  it('has nothing to say about jobs a worker already holds', () => {
+    expect(foldQueued([edit({ state: 'sending' })])).toBeNull();
+  });
+});
+
+describe('draining a student rather than a document', () => {
+  /**
+   * Two saves in a row fire two triggers; the second loses the race for the
+   * lease. Without draining the *student*, it would sit queued until the next
+   * sweep noticed it a minute later.
+   */
+  it('sends a follow-up with the first rather than leaving it for the sweep', async () => {
+    const db = new FakeFirestore();
+    db.seed(`${UPSTREAM_EDITS}/a`, {
+      studentId: 'pco_101',
+      state: 'queued',
+      patch: { lastName: 'Chen' },
+      baseline: { lastName: 'Ramirez' },
+      createdAt: new Date(nowMs - 2000),
+    });
+    db.seed(`${UPSTREAM_EDITS}/b`, {
+      studentId: 'pco_101',
+      state: 'queued',
+      patch: { grade: 10 },
+      baseline: { grade: 9 },
+      createdAt: new Date(nowMs - 1000),
+    });
+
+    const sent: EditRecord[] = [];
+    await drainStudent('pco_101', deps(db, async (job) => {
+      sent.push(job);
+      return { kind: 'landed' };
+    }));
+
+    // One upstream write carrying both fields, not two.
+    expect(sent).toHaveLength(1);
+    expect(sent[0]!.patch).toEqual({ lastName: 'Chen', grade: 10 });
+    expect(db.get(`${UPSTREAM_EDITS}/b`)?.state).toBe('cancelled');
+    expect(db.get(`${UPSTREAM_EDITS}/a`)?.state).toBe('landed');
+  });
+
+  /**
+   * A held student is not touched at all — not even folded.
+   *
+   * Folding is two writes, retiring the superseded jobs and then moving their
+   * patch onto the survivor, and it used to happen before anything was
+   * claimed. Two drains arriving together could interleave between those
+   * writes: the second found a lone survivor still carrying the *older*
+   * patch and sent it, so a leader who corrected their own typo watched the
+   * typo reach Planning Center with the correction marked "folded into a
+   * later edit" that never went.
+   *
+   * The invariant that forbids it is this one, and it is worth stating as
+   * "nothing moved" rather than as "no upstream write happened": the damage
+   * was done by the bookkeeping, not by the send. Its absence cost an
+   * intermittent end-to-end failure at about one run in eight, whose shape —
+   * the right jobs in the right states, the wrong name upstream — is what a
+   * torn fold looks like from outside.
+   */
+  it('folds nothing while somebody else holds the student', async () => {
+    const db = new FakeFirestore();
+    db.seed(`${UPSTREAM_EDITS}/a`, {
+      studentId: 'pco_101',
+      state: 'queued',
+      patch: { lastName: 'Chen' },
+      baseline: { lastName: 'Chen-Ito' },
+      createdAt: new Date(nowMs - 2000),
+    });
+    db.seed(`${UPSTREAM_EDITS}/b`, {
+      studentId: 'pco_101',
+      state: 'queued',
+      patch: { grade: 10 },
+      baseline: { grade: 9 },
+      createdAt: new Date(nowMs - 1000),
+    });
+    db.seed(`${UPSTREAM_EDIT_LEASES}/pco_101`, {
+      editId: 'somebody-else',
+      untilMs: nowMs + LEASE_MS,
+    });
+
+    const sent: EditRecord[] = [];
+    const states = await drainStudent('pco_101', deps(db, async (job) => {
+      sent.push(job);
+      return { kind: 'landed' };
+    }));
+
+    expect(states).toEqual([]);
+    expect(sent).toEqual([]);
+    // Both jobs exactly as they were: no cancellation, no patch moved onto a
+    // survivor that a second drain could then send on its own.
+    expect(db.get(`${UPSTREAM_EDITS}/a`)?.state).toBe('queued');
+    expect(db.get(`${UPSTREAM_EDITS}/a`)?.patch).toEqual({ lastName: 'Chen' });
+    expect(db.get(`${UPSTREAM_EDITS}/b`)?.state).toBe('queued');
+    expect(db.get(`${UPSTREAM_EDITS}/b`)?.patch).toEqual({ grade: 10 });
+    // And the holder's claim is intact — a drain that took nothing must not
+    // release a lease it never had.
+    expect(db.get(`${UPSTREAM_EDIT_LEASES}/pco_101`)?.editId).toBe('somebody-else');
+  });
+
+  it('stops at the lease rather than spinning', async () => {
+    const db = new FakeFirestore();
+    db.seed(`${UPSTREAM_EDITS}/a`, { studentId: 'pco_101', state: 'queued', patch: { lastName: 'X' } });
+    db.seed(`${UPSTREAM_EDIT_LEASES}/pco_101`, { editId: 'other', untilMs: nowMs + LEASE_MS });
+
+    const states = await drainStudent('pco_101', deps(db, async () => ({ kind: 'landed' })));
+    expect(states).toEqual([]);
+    expect(db.get(`${UPSTREAM_EDITS}/a`)?.state).toBe('queued');
+  });
+});

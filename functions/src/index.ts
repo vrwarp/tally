@@ -20,6 +20,14 @@ import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { backendFailureStatus, describeBackendFailure } from './backends/errors.js';
+import {
+  drainStudent,
+  sweepEdits,
+  type DrainDeps,
+  type EditRecord,
+  type RunOutcome,
+  type SweepResult,
+} from './upstreamEdits.js';
 import { isHeldForReview } from './backends/pendingReview.js';
 import {
   a32AliasPairs,
@@ -130,7 +138,8 @@ import { materializeOccurrence as materializeOne, MINISTRY_TIME_ZONE } from './o
 // registry, and the entry point is the one place that decides what ships.
 import './attendees32/backend.js';
 import { createPcoBackend } from './pco/backend.js';
-import { createPcoClient } from './pco/client.js';
+import { A32ApiError } from './attendees32/client.js';
+import { createPcoClient, PcoApiError } from './pco/client.js';
 import { fetchLists } from './pco/lists.js';
 import { graftMergedStudent } from './pco/studentPerson.js';
 
@@ -366,6 +375,21 @@ async function requireCoreTeam(uid: string | undefined): Promise<void> {
   const caller = await readCaller(uid);
   if (!caller.active || (caller.role !== 'core' && caller.role !== 'admin')) {
     throw new HttpsError('permission-denied', 'Only the core team can do that.');
+  }
+}
+
+/**
+ * Admin, for the handful of things that are not a leader's to decide.
+ *
+ * The core team may edit the church's people database; deciding *when* Tally
+ * talks to it is a different question, and the queue's pacing exists because an
+ * API that rate-limits does not want a stampede.
+ */
+async function requireAdmin(uid: string | undefined): Promise<void> {
+  if (!uid) throw new HttpsError('unauthenticated', 'Sign in first.');
+  const caller = await readCaller(uid);
+  if (!caller.active || caller.role !== 'admin') {
+    throw new HttpsError('permission-denied', 'Only an admin can do that.');
   }
 }
 
@@ -2110,6 +2134,332 @@ export const onStudentCreated = onDocumentCreated(
         studentId: event.params.studentId,
         error: String(error),
       });
+    }
+  },
+);
+
+/* -------------------------------------------------------------------------- */
+/* The profile-edit queue                                                      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Runs one queued edit against whichever backend holds the student.
+ *
+ * Everything this function decides is a *classification*: it turns one
+ * backend's answer into one of the six outcomes `upstreamEdits.ts` knows how to
+ * write down, so the drain itself never has to know what Planning Center is.
+ * The two interesting judgements:
+ *
+ * **Merged is decided on the id, never on the values.** `readThroughMerges`
+ * follows a person through however many merges their record has been part of,
+ * so an edit against somebody merged mid-flight lands — on the survivor, under
+ * a different id than the job named. If the fields also differed, `differs`
+ * could describe it; if they did not, nothing would, and the job would report
+ * success while the student now resolves to a different human. So the id is
+ * compared first and wins outright.
+ *
+ * **`differs` is judged against the baseline the form was showing.** A field
+ * whose upstream value is neither what was typed nor what the form opened on is
+ * a field somebody else changed in between, and saying so is the difference
+ * between reporting a save and asserting a value nobody holds.
+ */
+async function runUpstreamEdit(edit: EditRecord): Promise<RunOutcome> {
+  const registry = await createRegistry(db());
+  const resolution = await backendForStudent(registry, db(), edit.studentId);
+  if ('error' in resolution) {
+    return { kind: 'refused', failure: 'writeBackOff', message: resolution.error };
+  }
+  const backend = resolution.backend;
+
+  if (backend.capabilities.writeBack !== 'full') {
+    return {
+      kind: 'refused',
+      failure: 'writeBackOff',
+      message: `Write-back to ${backend.displayName} is not switched on, so this edit was not saved. An admin can turn it on in Settings.`,
+    };
+  }
+
+  const patch = edit.patch as StudentProfilePatch;
+  const namedPersonId = personIdFromStudentId(edit.studentId);
+
+  let result;
+  try {
+    result = await backend.updateStudentProfile({
+      studentId: edit.studentId,
+      ...patch,
+      /*
+       * What the form was showing, which turns this into a compare-and-set.
+       *
+       * A queued edit may have been written minutes ago on a phone with no
+       * signal. Arriving second must not mean winning: if somebody in the
+       * church office changed the same field in between, nothing is written and
+       * a human is asked which is right.
+       */
+      expect: {
+        lastName: typeof edit.baseline.lastName === 'string' ? edit.baseline.lastName : undefined,
+        grade:
+          edit.baseline.grade === null || typeof edit.baseline.grade === 'number'
+            ? (edit.baseline.grade as number | null)
+            : undefined,
+      },
+      logger,
+    });
+  } catch (error) {
+    const status = backendFailureStatus(error);
+    if (status === 401 || status === 403) {
+      return {
+        kind: 'refused',
+        failure: 'auth',
+        message: `${backend.displayName} refused Tally's credentials. An admin has to reconnect it in Settings; sending this again will only help once they have.`,
+      };
+    }
+    if (status === 404 || status === 410) return { kind: 'orphaned' };
+    /*
+     * Anything else in the 4xx range is the backend having read the request and
+     * said no — a name it will not take, a grade outside its own range. The
+     * same patch sent again gets the same answer, so retrying it is four more
+     * round trips ending in "could not reach Planning Center", which is both
+     * untrue and points a leader at the network instead of at the value they
+     * typed. It goes to the screen at once, in the backend's own words.
+     *
+     * The exceptions are the ones where the request was fine and the moment
+     * was not: 408 and 409 are worth repeating as-is, and a 429 has already
+     * been retried inside the client with `Retry-After` honoured — reaching
+     * here means that ran out, not that the backend said no.
+     */
+    if (status !== null && status >= 400 && status < 500 && ![408, 409, 429].includes(status)) {
+      return {
+        kind: 'refused',
+        failure: 'validation',
+        message: describeBackendRefusal(error, backend.displayName),
+      };
+    }
+    // 429s, 5xx and anything that never got an answer at all.
+    return {
+      kind: 'retry',
+      retryAfterMs: retryAfterOf(error),
+      message: `Could not reach ${backend.displayName} to save this. It will try again on its own.`,
+    };
+  }
+
+  if (result.status === 'no-student' || result.status === 'not-in-planning-center') {
+    return { kind: 'orphaned', message: result.message };
+  }
+  if (result.status === 'invalid') {
+    return { kind: 'refused', failure: 'validation', message: result.message };
+  }
+  if (result.status === 'disabled') {
+    return { kind: 'refused', failure: 'writeBackOff', message: result.message };
+  }
+
+  const person = result.person;
+
+  // Identity first, and outright. See the note above.
+  if (person && namedPersonId && person.pcoPersonId !== namedPersonId) {
+    return {
+      kind: 'merged',
+      survivorPersonId: person.pcoPersonId,
+      survivorName: `${person.firstName} ${person.lastName}`.trim(),
+      message: result.message,
+    };
+  }
+
+  if (result.status === 'conflict') {
+    return {
+      kind: 'differs',
+      observed: disagreementsWith(edit, result.before) ?? {},
+      message: result.message,
+    };
+  }
+
+  if (result.status === 'updated') {
+    backend.resetCache();
+  } else {
+    // `unchanged` is often this browser discovering it was the stale one, and
+    // the roster row it hands back is the correction. Nothing was written, so
+    // the whole cache does not have to pay for it.
+    backend.invalidateReachability();
+  }
+  return { kind: 'landed', message: result.message };
+}
+
+/**
+ * What the backend was holding instead, for the strip to show beside what was
+ * typed.
+ *
+ * The refusal itself is the adapter's — it compares and declines to set, so
+ * nothing of the office's is overwritten by an edit that arrived second. This
+ * only reads the row that came back with that refusal.
+ *
+ * Only the two fields a roster row can answer for. An allergy note and a birth
+ * year are deliberately not on a roster row, so there is nothing here to
+ * disagree with, and inventing a disagreement would be worse than saying
+ * nothing.
+ */
+function disagreementsWith(
+  edit: EditRecord,
+  before: { lastName: string; grade: number | null } | null,
+): Record<string, unknown> | null {
+  if (!before) return null;
+  const out: Record<string, unknown> = {};
+
+  const wantedLast = edit.patch.lastName;
+  const baseLast = edit.baseline.lastName;
+  if (
+    typeof wantedLast === 'string' &&
+    before.lastName !== wantedLast &&
+    before.lastName !== baseLast
+  ) {
+    out.lastName = before.lastName;
+  }
+
+  const wantedGrade = edit.patch.grade;
+  const baseGrade = edit.baseline.grade;
+  if (
+    wantedGrade !== undefined &&
+    before.grade !== wantedGrade &&
+    before.grade !== (baseGrade ?? null)
+  ) {
+    out.grade = before.grade;
+  }
+
+  return Object.keys(out).length > 0 ? out : null;
+}
+
+/**
+ * What a backend said when it refused, in words a leader can act on.
+ *
+ * The error carries the backend's own `detail` lines, and they are the only
+ * account of *which* value was wrong — "Grade must be between 1 and 12" is a
+ * sentence somebody can go and fix, and a generic "Planning Center would not
+ * accept this" sends them back to the form to guess. They are written for
+ * developers, so they get a sentence of Tally's around them rather than being
+ * dropped on the screen alone, and a status-only fallback covers the backends
+ * that refuse without saying anything.
+ */
+function describeBackendRefusal(error: unknown, displayName: string): string {
+  /*
+   * Two shapes, because the two backends speak different dialects: Planning
+   * Center's JSON:API carries `{detail, title}` objects, and Attendees is a
+   * DRF app whose `detail` and field errors have already been flattened to
+   * lines by its client. Both are the backend's own words about what it
+   * refused, which is the only part a leader can act on.
+   */
+  const details = error instanceof PcoApiError
+    ? error.errors.map((detail) => detail.detail ?? detail.title).filter(Boolean)
+    : error instanceof A32ApiError
+      ? error.errors.filter(Boolean)
+      : [];
+  const said = details.join('; ').trim();
+  return said
+    ? `${displayName} would not accept this: ${said}`
+    : `${displayName} would not accept this, and sending it again unchanged will not help.`;
+}
+
+/** What the backend asked us to wait, where it said. */
+function retryAfterOf(error: unknown): number | null {
+  const value = (error as { retryAfterMs?: unknown } | null)?.retryAfterMs;
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function drainDeps(): DrainDeps {
+  return { db: db(), now: () => new Date(), run: runUpstreamEdit, logger };
+}
+
+/**
+ * The ordinary path: the device that made the edit asks for it to be sent.
+ *
+ * This used to be `onUpstreamEditCreated`, a Firestore trigger. The trigger's
+ * entire job was latency — start the drain in a second or two rather than
+ * waiting for the sweep — and the browser that just pressed Save can do that
+ * itself, sooner and with one less moving part: no Eventarc registration, no
+ * second function cold-starting behind the first.
+ *
+ * What it is *not* is the thing that makes an edit durable. That is the job
+ * document, which is written before this is called and is picked up by the
+ * sweep below whatever happens to the tab. So this may fail, be skipped, or
+ * never be called at all, and the only consequence is that the edit goes
+ * within the sweep's period instead of within a second. Nothing here is
+ * allowed to become load-bearing.
+ *
+ * Scoped to one student rather than the queue, and core team rather than
+ * admin: the caller has just created a job for that child and is asking for
+ * their own work to be done. `drainUpstreamEditsNow` remains the wide,
+ * admin-only poke, because deciding to talk to the whole church database at
+ * once is a different decision.
+ *
+ * Draining the *student* rather than the edit is what folds two saves in a
+ * row into one upstream write — the same reason the trigger did it.
+ */
+export const drainStudentEdits = onCall<{ studentId: string }, Promise<{ states: string[] }>>(
+  { secrets: BACKEND_SECRETS, timeoutSeconds: 300, memory: '256MiB' },
+  async (request): Promise<{ states: string[] }> => {
+    await requireCoreTeam(request.auth?.uid);
+
+    const studentId = request.data?.studentId;
+    if (typeof studentId !== 'string' || studentId.trim().length === 0) {
+      throw new HttpsError('invalid-argument', 'studentId is required.');
+    }
+
+    const states = await drainStudent(studentId, drainDeps());
+    return { states };
+  },
+);
+
+/**
+ * Drains the queue now, rather than within the minute.
+ *
+ * The callable twin of the schedule below, and every scheduled job in this
+ * codebase has one — `pushPendingVisitors` beside `pushPendingStudents`,
+ * `refreshKioskPhoneIndex` beside `rebuildKioskPhoneIndex`. The reason is the
+ * same each time: a job that only ever runs on a timer is one nobody can do
+ * anything about at the moment they are looking at it. An admin who has just
+ * reconnected a credential should not have to wait out a minute to find out
+ * whether it worked, and a queue that looks stuck should be pokeable.
+ *
+ * Admin only. It is not a write of its own — everything it can do, the schedule
+ * does anyway — but it decides *when* the church's people database is talked
+ * to, and pacing is the whole reason the sweep takes small batches.
+ */
+export const drainUpstreamEditsNow = onCall<{ limit?: number } | void, Promise<SweepResult>>(
+  { secrets: BACKEND_SECRETS, timeoutSeconds: 300, memory: '256MiB' },
+  async (request): Promise<SweepResult> => {
+    await requireAdmin(request.auth?.uid);
+    const limit = typeof request.data?.limit === 'number' ? request.data.limit : undefined;
+    const result = await sweepEdits(drainDeps(), limit);
+    logger.info('Drained the upstream edit queue on request', result);
+    return result;
+  },
+);
+
+/**
+ * Everything a browser cannot be trusted to cover.
+ *
+ * A job whose tab was closed between writing it and asking for it, one
+ * abandoned by a worker that died mid-request, a backed-off retry nobody is
+ * watching any more, and the sweeping of settled ones. In small batches: a
+ * queue that built up through an outage drains into an API that rate-limits,
+ * and stampeding it is how a recovery turns back into an outage.
+ *
+ * Every five minutes rather than every one. It stopped being the thing that
+ * decides how long an ordinary edit takes the moment the client began asking
+ * for its own drain — including for a retry, which the tab schedules against
+ * `nextAttemptAt` while it is open. What is left here is the case where there
+ * is no tab, and five minutes is a fair answer to "nobody is watching this".
+ * A ministry that edits nine profiles a week was paying for 1,440 sweeps a day
+ * to find nothing.
+ */
+export const drainUpstreamEdits = onSchedule(
+  {
+    schedule: 'every 5 minutes',
+    secrets: BACKEND_SECRETS,
+    timeoutSeconds: 300,
+    memory: '256MiB',
+  },
+  async () => {
+    const result = await sweepEdits(drainDeps());
+    if (result.ran > 0 || result.swept > 0) {
+      logger.info('Swept the upstream edit queue', result);
     }
   },
 );

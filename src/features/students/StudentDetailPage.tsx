@@ -50,6 +50,7 @@ import {
 import { AddParentContact } from '@/features/students/AddParentContact';
 import { EditBirthday } from '@/features/students/EditBirthday';
 import { StudentEditorModal } from '@/features/students/StudentEditorModal';
+import { StudentSyncStrip } from '@/features/students/StudentSyncStrip';
 import { useNow } from '@/hooks/useNow';
 import { usePersonDetails } from '@/hooks/usePersonDetails';
 import {
@@ -71,8 +72,14 @@ import {
 } from '@/services/functions';
 import { setStudentStatus } from '@/services/students';
 import {
+  cancelUpstreamEdit,
+  dismissUpstreamEdit,
+  retryUpstreamEdit,
+} from '@/services/upstreamEdits';
+import {
   backendLabelOf,
   backendOfStudent,
+  needsAHuman,
   studentFullName,
   type Student,
   type TallyEvent,
@@ -107,7 +114,8 @@ function dialable(phone: string): string {
 export function StudentDetailPage() {
   const { studentId } = useParams();
   const navigate = useNavigate();
-  const { students, events, series, settings, loading, rosterError, refreshRoster } = useData();
+  const { students, events, series, settings, loading, rosterError, refreshRoster, upstreamEdits } =
+    useData();
   const { user } = useAuth();
   const { show } = useToast();
   const now = useNow(60_000);
@@ -126,6 +134,25 @@ export function StudentDetailPage() {
   }>({ open: false, firstName: '', lastName: '' });
 
   const student = students.find((candidate) => candidate.id === studentId) ?? null;
+
+  /*
+   * The one edit this record is about, newest first.
+   *
+   * At most one is drawn, because a strip is a sentence and two of them stacked
+   * is a screen arguing with itself. Newest wins: a leader looking at this page
+   * cares what is happening now, and a job that needs a human keeps its place
+   * because nothing newer can settle it.
+   */
+  const edit = useMemo(() => {
+    if (!studentId) return null;
+    const mine = upstreamEdits
+      .filter((candidate) => candidate.studentId === studentId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    return mine[0] ?? null;
+  }, [upstreamEdits, studentId]);
+
+  /** Which way the record's own primary and the strip's trade weight. */
+  const editNeedsAHuman = edit !== null && needsAHuman(edit);
   const {
     details,
     loading: detailsLoading,
@@ -492,8 +519,34 @@ export function StudentDetailPage() {
         </div>
       </header>
 
+      {/*
+        The one edit in flight on this student, if there is one.
+        Above the actions rather than below them, because it changes what the
+        actions mean: a strip that needs a human takes the record's loud button
+        and `Edit profile` steps down, so there is exactly one loudest thing on
+        the page in every state.
+      */}
+      {edit ? (
+        <StudentSyncStrip
+          student={student}
+          edit={edit}
+          now={now}
+          uid={user?.uid ?? ''}
+          onCancel={() => void cancelUpstreamEdit(edit.id)}
+          onRetry={() => void retryUpstreamEdit(edit.id, edit.studentId)}
+          onDismiss={() => void dismissUpstreamEdit(edit.id)}
+          onFix={() => setEditorOpen(true)}
+          onRecreate={() => void recreate()}
+        />
+      ) : null}
+
       <div className="flex flex-wrap items-center gap-2">
-        <Button onClick={() => setEditorOpen(true)}>Edit profile</Button>
+        <Button
+          variant={editNeedsAHuman ? 'secondary' : 'primary'}
+          onClick={() => setEditorOpen(true)}
+        >
+          Edit profile
+        </Button>
         <Button
           variant={student.status === 'active' ? 'secondary' : 'success'}
           onClick={() => void toggleStatus()}

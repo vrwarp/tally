@@ -84,6 +84,7 @@ function show(event: TallyEvent | null = null, defaults?: Partial<EventDraft>) {
     canWork: () => true,
     refreshRoster: async () => {},
     applyRosterPerson: () => {},
+    upstreamEdits: [],
   };
 
   const auth = {

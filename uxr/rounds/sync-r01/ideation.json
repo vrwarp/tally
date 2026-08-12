@@ -1,0 +1,229 @@
+{
+  "changes": [
+    {
+      "scene": "sync-students",
+      "viewport": "both",
+      "addresses": [
+        "The sync chips wear the allergy badge's exact costume (bg-warn-500/15 text-warn-400 ring-warn-500/30) and the 'Queued' chip wears 'No contact''s — amber on a row must go back to meaning one thing",
+        "visual-phone: sending and waiting are the same amber, the same glyph, the same 11px; queued is rendered as a permanent attribute in ink-800",
+        "design-desktop: the allergy chip and a sync chip must never be the same shape in the same row"
+      ],
+      "change": "Gave the sync family one signature of its own: an unfilled, dashed pill (`.uxr-job` in the overrides block) instead of a filled badge. Standing flags — Allergy, No contact, No birthday, Visitor — keep the filled badge untouched, so a filled amber rectangle on a row means allergy and nothing else. Hue inside the dashed family carries only severity: warn for running, present for landed, danger for failed, ink for a job that is not running yet. Each state now has its own leading glyph so the glyph, not the word, sorts them: ◌ queued, ◷ sending, ‖ waiting, ✓ saved, ≠ changed upstream, ⚠ failed. Chip text is 12px on touch, 11px at lg.",
+      "rationale": "Both critics converged on 'separate them by form, not by a new hue', and the brief forbids a new colour. An outline is legible as provisional at a glance, and it is the one axis the existing badge vocabulary has not spent. Making the glyph carry the difference means a dim corridor does not have to resolve an 11px word.",
+      "breakpoint": "both — the treatment is identical; only the type size steps (12px below lg, 11px at lg and up)",
+      "implementation": "One `<JobChip tone state>` component in `src/components/`, used by `StudentRow` and by the record header. Classes: `inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-dashed bg-transparent px-2 py-px text-xs font-semibold lg:text-[11px]` plus per tone `text-warn-400 border-warn-500/50` (queued/sending/waiting), `text-present-400 border-present-500/50` (landed), `text-danger-400 border-danger-500/55` (failed/orphaned), `text-ink-400 border-ink-700` (no upstream record yet), `text-danger-400/70 border-danger-500/30` (held by an outage). Leave `StudentFlagChip` — the filled badge — exactly as it is."
+    },
+    {
+      "scene": "sync-students",
+      "viewport": "both",
+      "addresses": [
+        "Nothing on a row says an edit landed, so a finished row and an untouched row are identical (J2)",
+        "visual-desktop: 'differs' has no representation anywhere",
+        "visual-desktop: the state 'queued' has no representation on the list at all",
+        "visual-desktop: 'Queued' is used for a pending link, which is not what the word means"
+      ],
+      "change": "Seven of the forty-five rows now carry a job mark, one per state the brief names: Ava Chen ◌ Queued, Marcus Delacroix-Oyelaran ‖ Waiting, Sofia Okonkwo ◷ Sending, Zoe Martins ✓ Saved (present green, transient), Priya Raman ≠ Changed upstream, Benson Tsai ⚠ Failed, Amara Whitfield ◌ No record. Amara's chip was renamed off 'Queued' — it is a pending *link*, not a queued edit — and moved out of the flag cluster into the job slot. Every chip carries a `title` that says what the state means (the 'Waiting' one says rate-limited and resuming on its own).",
+      "rationale": "The absence of a chip meant two opposite things. A transient `✓ Saved` reports the job's outcome, not the value, so it shows nothing new about a minor and the no-copy rule holds. `differs` needed a row-level door as well as a record, or Priya's row looks clean.",
+      "breakpoint": "both",
+      "implementation": "The job document already has state and updatedAt; render the chip from `job.state` in `StudentRow`. `landed` decays out of the list after ~2 minutes client-side — it is a UI-only affordance, nothing is persisted as a copy of a managed field."
+    },
+    {
+      "scene": "sync-students",
+      "viewport": "desktop",
+      "addresses": [
+        "design-desktop: every row reserves ~350px between the name and the last-seen column and puts nothing in it, while long surnames truncate 350px short of the space that would hold them",
+        "visual-desktop: there is 500px of dead row — that is where who queued it and how long ago belong, and it is free",
+        "design-desktop: the chips a leader has to read as job state are split across two columns in two visual languages"
+      ],
+      "change": "At lg the job mark moved out of the right-hand flag cluster into the empty band between the name and the last-seen column, and the band now carries the field and the person: 'Last name, grade · you'. The name column widened from `lg:w-48` to `lg:w-72` so 'Marcus Delacroix-Oyelaran' and 'Benson “蔡秉洲” Tsai' stop truncating. Below lg the mark stays in the row's chip line beside the grade, short-worded.",
+      "rationale": "This is the same finding solved three ways at once: it spends the dead middle, it puts a target's width between the sync mark and the amber allergy badge, and it stops long chips from pushing the right-hand columns out of alignment (in the first pass of this round they did, and the Sat/grade columns jittered by 130px).",
+      "breakpoint": "at lg and up the mark is in the middle band with its age and author; below lg it is in the chip line with the short word only",
+      "implementation": "`StudentRow` renders `<JobChip className=\"shrink-0 lg:hidden\" short />` in the meta line and `<JobChip className=\"hidden lg:flex\" />` plus the `field · author` caption in the middle column span. One component, two slots — do not fork it."
+    },
+    {
+      "scene": "sync-students",
+      "viewport": "both",
+      "addresses": [
+        "The 'Needs you' filter chip wears the row's selected recipe while unselected",
+        "design-phone: its count pill is in the unselected grey, so the object is half dressed as pressed and half as not",
+        "visual-desktop: the pill says 'Needs you', which does not say a save was refused"
+      ],
+      "change": "The pill went back to the unselected chrome every other pill wears (`bg-ink-900 text-ink-400 ring-ink-800`) and the alarm moved into the count, which is now `bg-danger-500/20 text-danger-400`. It is relabelled 'Saves failed'. A second pill, 'In flight 4' with a warn-tinted count, was added beside it so the survey of a nine-edit run is one glance at a fixed spot rather than a scroll down 2199px.",
+      "rationale": "Selection must remain the only thing a filled, ringed chip means in that row. Severity has somewhere else to live — the numeral — and it reads at a glance without lying about state.",
+      "breakpoint": "both; the pill row already wraps to two lines on a phone and still does, so nothing moved down",
+      "implementation": "`StudentsPage` quick filters: same `QuickFilterChip` component, pass a `countTone` prop ('danger' | 'warn' | 'neutral') instead of colouring the chip body. Counts come from the job collection grouped by state."
+    },
+    {
+      "scene": "sync-profile",
+      "viewport": "both",
+      "addresses": [
+        "The strip says 'Saving to Planning Center' and 'queued by you' in the same breath — two different states with different rules, and the cancel affordance is only valid in one of them",
+        "'undo' is a word check-in has already spent",
+        "visual-phone: 'It carries on without this page — you can close the tab.' He has no tab. He has a lock button."
+      ],
+      "change": "The strip is now one state and says which: '◌ Queued for Planning Center — Last name and grade, by you 14 seconds ago. Nothing has reached Planning Center yet, so you can still stop it.' The action is 'Cancel this edit', which is only true of a queued job, and it is now a secondary ink button rather than a filled brand pill. The reassurance is device-aware: below lg it ends '…even if you lock your phone', at lg '…even if you close the tab'. The `sending` state is what the list shows on Sofia's row, with no cancel offered.",
+      "rationale": "Cancel is honest only while nothing has been claimed, so the render that offers cancel has to be the render that is queued. Picking `queued` for the record also gives the offline hold somewhere honest to live, because 'nothing has reached Planning Center yet' is true whether the job is sitting in Firestore or sitting on the device.",
+      "breakpoint": "both — one state per render; the closing clause is a `lg:hidden` / `hidden lg:inline` pair",
+      "implementation": "`StudentSyncStrip` takes the job and switches on `job.state`. `queued` → heading 'Queued for Planning Center', cancel button enabled. `sending` → heading 'Sending to Planning Center', no cancel. `waiting` → 'Waiting on Planning Center', no cancel, plus 'it resumes on its own'. Never render the word 'undo' outside check-in."
+    },
+    {
+      "scene": "sync-profile",
+      "viewport": "both",
+      "addresses": [
+        "'Undo this edit' is the loudest object on a record where nothing is wrong, and it duplicates the weight of 'Edit profile'",
+        "design-desktop: reserve the filled primary for the page's own action; let the strip earn it only in the states that require a human"
+      ],
+      "change": "Made it a rule across all five record scenes: a healthy in-flight strip gets a secondary action and the page keeps its one brand pill ('Edit profile'). A strip that requires a human — failed, orphaned, differs — gets the filled primary and the page's own 'Edit profile' steps down to secondary. Exactly one loudest object per record, in every state.",
+      "rationale": "The composition said 'act' while the words said 'carry on'. Trading the weight between the strip and the page rather than muting both keeps a loud primary available for the one moment that genuinely needs it.",
+      "breakpoint": "both",
+      "implementation": "`StudentDetailPage` passes `variant={jobNeedsAHuman ? 'secondary' : 'primary'}` to the Edit profile `Button`, and `StudentSyncStrip` does the inverse. One boolean, derived from `job.state in {failed, orphaned, differs}`."
+    },
+    {
+      "scene": "sync-profile",
+      "viewport": "desktop",
+      "addresses": [
+        "design-desktop: a fourteen-second background job is physically the largest object on a child's record and pushes the facts a leader came for down the page",
+        "the status strip does not have to be a full-bleed band in a 1440px window"
+      ],
+      "change": "At lg the strip becomes one object rather than a stacked band: the heading runs inline into the sentence, and the action sits inline on the right. On sync-profile it went from 133px to ~95px; on sync-failed from 157px to 138px with the same words plus a clearer hierarchy. Below lg the stacked full-bleed band is unchanged, because on a 390px screen it is right.",
+      "rationale": "This is the in-scope half of that finding. Re-laying the whole record into two columns at lg is the other half and is out of scope for this round (see declined).",
+      "breakpoint": "at lg and up: `lg:flex-row lg:items-start lg:py-2` on the strip, `lg:inline` on the heading and body so they run as one paragraph, actions stacked in a narrow right-hand column. Below lg: unchanged.",
+      "implementation": "`StudentSyncStrip` root: `flex flex-col gap-3 rounded-2xl px-4 py-3 ring-1 lg:flex-row lg:items-start lg:gap-4 lg:py-2`; heading `<p class=\"text-sm font-semibold lg:inline\">`, body `<p class=\"mt-0.5 text-sm text-ink-300 lg:mt-0 lg:inline\">` with a `hidden lg:inline` ' · ' separator. Pass `wide={false}` when the same component is rendered inside the 544px editor sheet, where the inline shape has no room."
+    },
+    {
+      "scene": "sync-profile",
+      "viewport": "both",
+      "addresses": [
+        "The dotted pending mark out-contrasts the value it marks and reads as a spellcheck squiggle",
+        "design-phone: it renders at two visibly different weights on the two lines because the decoration scales with the type"
+      ],
+      "change": "`.uxr-pending` is now a fixed 1px dotted rule in warn-500 at 55%, at 6px underline offset regardless of the type above it, and the pending grade line was lifted from `text-ink-500` to `text-ink-300` so the value out-contrasts its own annotation. Both pending values carry a `title` saying 'Typed here — not in Planning Center yet'.",
+      "rationale": "The critics' own direction: hold the mark at one weight, damp it below the value, lift the value rather than shouting the mark, and get the rule off a bold heading's baseline so it stops looking like a misspelling.",
+      "breakpoint": "both",
+      "implementation": "`<PendingValue>`: `[text-decoration-line:underline] [text-decoration-style:dotted] decoration-warn-500/55 decoration-1 underline-offset-[6px]`, and the caller renders the surrounding text at `text-ink-300` rather than `text-ink-500` while a value inside it is pending."
+    },
+    {
+      "scene": "sync-editor",
+      "viewport": "both",
+      "addresses": [
+        "visual-phone (blocker): every field is disabled — Notes and Status too, which the brief's must-not-change list says are Tally's own and are never blocked by the queue",
+        "visual-phone (blocker): do not lock the leader who owns the queued job out of their own record; let a second save supersede an unclaimed first",
+        "design-phone: the disabled state is uncorrelated with anything visible — the same hint sits under a greyed box and an editable one",
+        "visual-desktop: lock the fields the job names and leave the rest",
+        "visual-phone: J5 has no frame — the strip only knows how to say 'queued by you'"
+      ],
+      "change": "sync-editor is now the J5 collision and nothing in it is disabled. The notice names a person and a time — '◷ Marcus Webb is editing this record too. He queued a change to Last name and Grade from his phone 40 seconds ago, and it goes out before anything you save. Nothing here is locked — but those two boxes are about to change under you.' The two fields his job names carry a hint of their own in warn ('◷ Marcus's change to this is still going out.') instead of the neutral 'Saved in Planning Center' that sits under every other field.",
+      "rationale": "The lock was doing three wrong things at once: it froze Tally's own fields, it froze the owner out of the supersede path the brief explicitly asks for, and its greying had no visible cause. The critic's own alternative — a warning that names who and when — answers J5, which had no frame, and costs nothing. A leader's own unclaimed second save needs no UI at all; it is a server rule.",
+      "breakpoint": "both",
+      "implementation": "`StudentEditorDialog` takes `inFlight?: {fields, actor, queuedAt}`. It disables nothing. Fields named by another leader's job get `hint` replaced with the collision sentence in `text-warn-400`; every other field keeps its normal hint. Notes and Status are never passed through this path at all."
+    },
+    {
+      "scene": "sync-editor",
+      "viewport": "both",
+      "addresses": [
+        "design-desktop: a filled blue notice promising that Save writes these fields, sitting on top of fields that cannot be typed into; two filled panels stacked at the top of a 544px modal is one too many"
+      ],
+      "change": "The standing 'name, grade, birthday and allergies are Planning Center's' notice lost its filled brand panel and is now plain `text-xs text-ink-500` with the link still in brand. The only filled panel at the top of the sheet is the one that is about right now.",
+      "rationale": "A permanent explanation and a transient state were competing at the same weight. The permanent one is the one that can afford to be quiet.",
+      "breakpoint": "both",
+      "implementation": "In `StudentEditorDialog`, the managed-fields note becomes `<p class=\"text-xs leading-snug text-ink-500\">` unconditionally — not only when a job is in flight — since it is standing copy in every render."
+    },
+    {
+      "scene": "sync-blocked",
+      "viewport": "both",
+      "addresses": [
+        "design-phone / design-desktop: the record dimmed behind 'Edit Amara Whitfield' is Ava Chen's — the frame shows two different children at once, on the one scene whose subject is which person an instruction names",
+        "design-desktop: sync-blocked is compositionally identical to sync-editor",
+        "give the blocked state a move of its own",
+        "visual-phone: 'Push them now' belongs on the profile, where a 44px target and a sentence explaining what it writes both fit"
+      ],
+      "change": "The record behind the sheet is now Amara Whitfield's: initials, name, 7th grade, a Visitor badge and a `◌ No record in Planning Center` job chip, no allergy card, no parent contact, 'Nothing on file' for the birthday, first/last seen Today, and the Planning Center block says she is not there yet. The sheet's notice is the state's own object — '◌ Amara is not in Planning Center yet' — and it carries the move the row chip used to imply: **Create her in Planning Center**, with the sentence 'Creating her writes one new person, never a second copy'. The footer's primary is relabelled **Save notes**, because that is all Save can honestly do while the managed fields are held. The 60×20px 'push them now' button was deleted from the students row, which is now a label.",
+      "rationale": "A create is the one operation this codebase is most careful about duplicating, so the affordance that fires it does not belong at 20px inside a row whose whole area is a link. Moving it here gives the blocked state the move the brief asks for, at a size a thumb can hit, next to a sentence saying exactly what it writes.",
+      "breakpoint": "both",
+      "implementation": "`StudentRow` renders the pending-link state as a `<span>` label, never a button. `StudentEditorDialog` takes `upstreamPending` and renders the create action inside the notice; the submit label becomes 'Save notes' whenever every managed field is held. `StudentDetailPage` must pass the student the dialog is editing — the backdrop bug was a fixture, but the rule holds."
+    },
+    {
+      "scene": "sync-blocked",
+      "viewport": "both",
+      "addresses": [
+        "visual-phone (blocker): sync-blocked's banner says 'Notes are Tally's own and can be typed now' and the Notes box a scroll below it is greyed out",
+        "design-phone: a field that is not the reader's to type into needs a cause visible in the same frame and a hint that differs from the hint under a field that is"
+      ],
+      "change": "The lock now stops at the Planning Center boundary. First name, Last name, Nickname, Grade, Birthday and Allergies are held; Notes and Status are live at full contrast with their ordinary hints. Every held field's hint is replaced by '◌ Held until her record exists.' in warn — the same glyph as the notice above it — so the lock and its label move as one and the cause is in the same frame as the effect.",
+      "rationale": "This was the blocker, and it was also a violation of the journey brief's must-not-change list. Attaching the reason to the field rather than only to a banner means the rule is learnable without poking at boxes.",
+      "breakpoint": "both",
+      "implementation": "`StudentEditorDialog` derives held fields from `MANAGED_FIELDS` ∩ the reason for holding; `notes` and `status` are never in that set. `FormField` gains a `heldReason` prop that replaces the hint and applies `disabled`, so the two can never diverge."
+    },
+    {
+      "scene": "sync-failed",
+      "viewport": "both",
+      "addresses": [
+        "visual-phone: 'Fix and send again' and 'Discard the edit' are 7 CSS px apart, same height, same radius, same font — one reopens the correction, the other throws it away",
+        "design-phone: the pair reads as a flex row that ran out of room rather than a decision laid out on purpose",
+        "J4 asks for exactly one obvious next move"
+      ],
+      "change": "One full-width primary on the phone — 'Fix and send again' — then 16px of clearance, then 'Discard the edit' as a low-emphasis underlined text button at 44px hit height. They are no longer the same object at two widths. At lg the two stack in a narrow right-hand column at matched width beside the message.",
+      "rationale": "The critic offered two fixes — separate them, or move discard into the editor. Separating them keeps the escape hatch reachable in one tap without making the frame read as a fifty-fifty choice, and the weight difference means a thumb that misses lands on something visibly different rather than on a delete twin.",
+      "breakpoint": "below lg: primary `w-full`, discard `mt-1 w-full` as a text button. At lg and up: both `lg:w-auto` in a column beside the message.",
+      "implementation": "`StudentSyncStrip` actions slot: `<Button variant=\"primary\" className=\"w-full lg:w-auto\">` and `<Button variant=\"ghost\" className=\"mt-1 w-full lg:mt-0 lg:w-auto underline underline-offset-4 text-ink-400\">`. The ghost/text variant does not exist yet — add it; sync-differs and sync-orphaned use it too."
+    },
+    {
+      "scene": "sync-differs",
+      "viewport": "both",
+      "addresses": [
+        "visual-desktop: 'differs' — the state the brief flags as the one most likely to be dropped — appears nowhere; without it a job that landed on a value nobody typed shows as a clean row",
+        "visual-phone: `differs` has no mark at all"
+      ],
+      "change": "New scene, both widths. Ava's record header now reads 'Ava Ito' — what Planning Center actually holds — with no pending mark, because the job finished. The strip is warn, not danger: '≠ Planning Center holds a different last name. Your correction landed at 9:12, but the church office had changed the same field four minutes earlier.' Under it, two labelled cells side by side: YOU TYPED / Chen-Ito against PLANNING CENTER HOLDS / Ito. One move, 'Send mine again', with 'Keep theirs' as the quiet second. The list carries the matching `≠ Changed upstream` mark on Priya Raman's row — deliberately on a row that also has the amber allergy badge, so the two languages can be judged side by side.",
+      "rationale": "Showing what Dana typed would be Tally asserting a value nobody holds; showing only what Planning Center holds would silently lose her correction. The two-column comparison is the one place a 640px record column is exactly the right width, so it needed no responsive special case.",
+      "breakpoint": "both — the comparison is `grid grid-cols-2 gap-2` at every width; two short values fit in 358px",
+      "implementation": "The job document already keeps the requested value until it retires; on `differs` the drain records the observed upstream value alongside it. `StudentSyncStrip` renders the pair from `{requested, observed}` and retires the job on either action. Nothing is written to Firestore as a copy of a managed field — the pair lives on the job and dies with it."
+    },
+    {
+      "scene": "sync-orphaned",
+      "viewport": "both",
+      "addresses": [
+        "visual-desktop: 'orphaned' has no frame, and it is not the same as failed — the honest move is re-create with the edit riding along",
+        "visual-phone: a queued edit against a record deleted upstream has no presentation"
+      ],
+      "change": "New scene, both widths. The record header carries a `⊘ No Planning Center record` job chip beside the allergy badge. The strip is danger with its own glyph, not failed's: '⊘ Ava is no longer in Planning Center. Marcus Webb corrected her surname to Chen-Ito last Tuesday. It has nowhere to land: the person it names was deleted on 4 August. Nothing is lost — the correction is still held here, and so is every gathering she attended.' The single move is 'Re-create her in Planning Center', with the sentence 'Re-creating sends the correction with her, so nobody types it twice. It writes one new person and never a second copy.' The profile card's 'Open their profile' link is gone, because there is nothing to open.",
+      "rationale": "Failed reads as 'try again'; orphaned has nothing to try again against. Giving it a different glyph and a different single move is what stops a leader retrying their way into confusion, and re-create is the move the profile already offers, so no new object was invented.",
+      "breakpoint": "both",
+      "implementation": "Reuse `StudentSyncStrip` with `state=\"orphaned\"`; the action calls the existing re-create path with `carryJob: jobId` so the queued patch is folded into the create payload rather than being re-queued after it. The duplicate-delivery guard on create is the one that must hold here."
+    },
+    {
+      "scene": "sync-outage",
+      "viewport": "both",
+      "addresses": [
+        "visual-desktop: when credentials rotate every queued job fails at once — the brief says the screen must aggregate rather than print it nine times, and here it prints it nine times",
+        "visual-desktop: a pill that reads 'Needs you 9' without naming a cause or an admin"
+      ],
+      "change": "New scene, built on the students list because that is where somebody sees the whole ministry at once. One page-level danger strip above the filters: '⚠ Planning Center is refusing every save. All nine queued edits failed for the same reason: Tally's Planning Center connection was disconnected on Monday. Nothing typed is lost — they go out as soon as an admin reconnects it. Retrying will not.' Moves: 'Open Planning Center settings' and 'Show the 9 held edits'. The nine rows carry a deliberately quiet `‖ Held · since Monday` mark in damped danger, not nine red banners and not nine retry buttons, and the filter pill reads 'Saves held 9'. Each held row's middle band names the field, the leader and the minute at lg.",
+      "rationale": "Nine identical red banners each offering a retry that cannot work is the failure the brief calls out by name. One reason, said once, with the count as a door into the list, is both smaller and more actionable — and the quiet per-row mark still lets Priya see which nine without opening anything.",
+      "breakpoint": "both. Below lg the strip is the stacked band and costs the top of the list, which is correct for this moment. At lg it is one line and the list still shows fourteen rows above the fold.",
+      "implementation": "A `SyncOutageNotice` above `StudentsFilters`, rendered when jobs in `failed` share one `failureClass` (auth/config) above a threshold. Per-record strips render as the short 'held' reference instead of the full refusal while an outage notice is standing, so the reason is not repeated. The count is the same query the pill uses."
+    }
+  ],
+  "declined": [
+    {
+      "finding": "visual-desktop: 'At lg and up let the record be two columns in the 1216 it has: Profile on the left, Attendance and the gathering log on the right.'",
+      "why": "Out of scope for this refinement, per the round's instruction. It is a real critique of a screen that existed before the sync work and it would mean this round is judged on a page redesign it did not need. The in-scope half — the shape of the new status strip at 1440px — is fixed above."
+    },
+    {
+      "finding": "visual-desktop: 'Widen the dialog at lg and lay the managed fields against the Tally-owned ones in two columns, so the whole form is one screen with no internal scroll.'",
+      "why": "Same reason: the editor's width and internal scroll predate the queue and changing them here would restart the loop on a different problem. What the sync work owes that dialog — that the lock stops at the Planning Center boundary, and that the Tally-owned fields are visibly not part of it — is fixed above, in words rather than in geometry."
+    },
+    {
+      "finding": "visual-phone (major): 'An offline variant of the same amber strip, phrased about the device rather than the tab, with a matching row chip.'",
+      "why": "Partly fixed, not fully. The concrete harm the critic measured — a phone being told 'you can close the tab' — is gone: the strip's reassurance is now a responsive pair, and the state it shows is `queued`, whose sentence ('Nothing has reached Planning Center yet') is true whether the write is in Firestore or still on the device. A dedicated `sync-offline` frame would be a sixth new scene in a round that already adds three, and scene proliferation is how this loop stops converging. The wording it needs is settled and small: heading 'Queued on this phone — no signal', body 'It has not left the device yet. It goes as soon as you have signal, even if you lock the screen', same secondary Cancel, and the row chip is the existing `◌` mark in `uxr-job-mute`. Next round if a critic still wants the frame."
+    },
+    {
+      "finding": "visual-phone (minor) / visual-desktop: a `stalled` variant — the strip still reading 'Saving… 14 seconds ago' when a job has run past two minutes.",
+      "why": "Declined this round as a frame; the vocabulary is now in place to build it cheaply. `stalled` is the `sending` strip with the heading 'Taking longer than it should' and the sentence 'It may still land — nothing has failed', in warn, with no cancel. It does not need a new object, only a threshold on `job.claimedAt`, and adding a seventh frame this round buys less than the three states that had no representation at all."
+    },
+    {
+      "finding": "visual-desktop (minor): 'make the chip a target that opens the job rather than the whole profile.'",
+      "why": "Declined. On touch a row state is a label and nothing more — that is the settled fix for the 60×20px create button, and making the sync chip a competing target inside a row whose whole area is a link would reintroduce it in a new costume. The age and the reason now live in the chip's `title` and in the middle-band caption at lg, which is where a pointer can read them without a second click target."
+    }
+  ]
+}

@@ -40,6 +40,27 @@ const updateStudentProfile = vi.hoisted(() =>
     }),
   ),
 );
+const enqueueUpstreamEdit = vi.hoisted(() =>
+  /*
+   * Returns synchronously, like the real one: the job exists on the device the
+   * moment it is called, and the promise it hands back is the *server's*
+   * answer, which the screens deliberately do not wait for.
+   */
+  vi.fn<(...args: unknown[]) => { editId: string; written: Promise<void> }>(() => ({
+    editId: 'edit-1',
+    written: Promise.resolve(),
+  })),
+);
+vi.mock('@/services/upstreamEdits', () => ({
+  enqueueUpstreamEdit,
+  // The record's sync strip reads the queue through `useData`; nothing in this
+  // file drives it, and the real module reaches `@/lib/firebase`.
+  cancelUpstreamEdit: async () => {},
+  retryUpstreamEdit: async () => {},
+  dismissUpstreamEdit: async () => {},
+  subscribeUpstreamEdits: () => () => {},
+}));
+
 vi.mock('@/services/functions', () => ({
   updateStudentProfile,
   addRosterMember: vi.fn(),
@@ -137,6 +158,7 @@ function openProfile(student: Student, over: Partial<DataContextValue> = {}) {
     rosterFetchedAt: null,
     refreshRoster,
     applyRosterPerson,
+    upstreamEdits: [],
     ...over,
   } as unknown as DataContextValue;
 
@@ -272,7 +294,7 @@ describe('the birthday on a student profile', () => {
    * The whole point of putting it here: a leader is told a birthday while
    * looking at the student, and the answer goes in without leaving the page.
    */
-  it('takes a correction in place and writes it to Planning Center', async () => {
+  it('takes a correction in place and queues it upstream', async () => {
     openProfile(linked({ birthday: '03-14' }));
 
     await userEvent.click(screen.getByRole('button', { name: 'Change' }));
@@ -285,15 +307,20 @@ describe('the birthday on a student profile', () => {
     await userEvent.click(screen.getByRole('button', { name: /Save to Planning Center/ }));
 
     await waitFor(() =>
-      expect(updateStudentProfile).toHaveBeenCalledWith({
-        studentId: 'pco_4200003',
-        birthday: '03-15',
-      }),
+      expect(enqueueUpstreamEdit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          studentId: 'pco_4200003',
+          patch: { birthday: '03-15' },
+        }),
+      ),
     );
-    // The roster is where every screen's copy of a linked student's birthday
-    // comes from, this page included — and the corrected row comes back from
-    // the write, so the page is put right without re-reading the church.
-    await waitFor(() => expect(applyRosterPerson).toHaveBeenCalled());
+    /*
+     * Nothing re-reads and nothing is applied from an answer, because there is
+     * no answer yet: the queued job is what every screen's copy of this
+     * birthday comes from until the drain lands it, and `applyPendingEdits`
+     * draws it marked as not upstream.
+     */
+    expect(applyRosterPerson).not.toHaveBeenCalled();
     expect(refreshRoster).not.toHaveBeenCalled();
     // And the box closes, rather than leaving a form open over the value it
     // just changed.

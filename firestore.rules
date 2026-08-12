@@ -1122,6 +1122,158 @@ service cloud.firestore {
     }
 
     /* ---------------------------------------------------------------- */
+    /* upstreamEdits                                                     */
+    /* ---------------------------------------------------------------- */
+
+    /**
+     * One profile edit on its way to a people backend.
+     *
+     * A browser may *ask* for work and may never claim work was done. That is
+     * the whole shape of these rules: `create` pins every field the server owns
+     * to its empty value, and the only two updates a client may make are the
+     * two decisions that are genuinely a leader's — stopping a job nothing has
+     * picked up, and sending a refused one again.
+     *
+     * Enqueueing is a document write rather than a callable on purpose. A
+     * callable needs the network to *start* an operation whose entire point is
+     * not blocking on it; a write is held on the device and sent when the signal
+     * comes back, which is the counselor-in-a-corridor case the journey calls
+     * ordinary.
+     *
+     * Nothing here may name a field outside the patch shape. `status` is
+     * deliberately absent: who is on the roster is Tally's own list and is never
+     * written upstream in any mode, so a queue that could carry it would be a
+     * way to reach the church's database with a decision that was never theirs.
+     */
+    match /upstreamEdits/{editId} {
+      function patchFields() {
+        return ['firstName', 'nickname', 'lastName', 'grade', 'allergies', 'birthday'];
+      }
+
+      function validPatch(value) {
+        return value is map
+          && value.keys().hasOnly(patchFields())
+          // An empty patch is a job with nothing to do that would still be
+          // drawn on every screen showing the student.
+          && value.keys().size() > 0
+          && (!('firstName' in value) || (value.firstName is string && value.firstName.size() > 0))
+          && (!('lastName' in value) || (value.lastName is string && value.lastName.size() > 0))
+          && (!('nickname' in value) || value.nickname == null || value.nickname is string)
+          && (!('allergies' in value) || value.allergies == null || value.allergies is string)
+          && (!('birthday' in value) || value.birthday is string)
+          // Pre-K is -1 and it is Planning Center's own number; null is a child
+          // too young for one, and an adult on a hand-picked roster.
+          && (!('grade' in value) || value.grade == null
+              || (value.grade is int && value.grade >= -1 && value.grade <= 12));
+      }
+
+      function validBaseline(value) {
+        // The same shape, and allowed to be empty: a field with nothing on file
+        // has no baseline to record.
+        return value is map && value.keys().hasOnly(patchFields());
+      }
+
+      /**
+       * Everything the drain owns, pinned to the state a fresh job is in.
+       *
+       * Written as an explicit list rather than as "the client may set these
+       * few": a rule that names what a browser may write leaves whatever it
+       * forgot writable, and what would be forgotten here is a result field.
+       */
+      function serverFieldsUnclaimed() {
+        let d = request.resource.data;
+        return d.state == 'queued'
+          && d.attempts == 0
+          && d.nextAttemptAt == null
+          && d.leaseUntil == null
+          && d.failure == null
+          && d.message == null
+          && d.field == null
+          && d.observed == null
+          && d.survivorPersonId == null
+          && d.survivorName == null
+          && d.startedAt == null
+          && d.settledAt == null;
+      }
+
+      function validEdit() {
+        let d = request.resource.data;
+        return d.studentId is string && d.studentId.size() > 0
+          && validPatch(d.patch)
+          && validBaseline(d.baseline)
+          && d.createdBy == request.auth.uid
+          && d.createdByName is string
+          && d.updatedAt is timestamp;
+      }
+
+      // Core team only, like every other write into the church's people
+      // database. A counselor's one screen is check-in and never reaches this.
+      allow get, list: if isCore();
+
+      allow create: if isCore() && validEdit() && serverFieldsUnclaimed()
+        && request.resource.data.createdAt is timestamp;
+
+      /**
+       * Cancel, and only while nothing has claimed it.
+       *
+       * `sending` is not cancellable and the screen does not offer it: the
+       * patch may already be in flight to Planning Center, and a button that
+       * cannot keep its promise is worse than no button.
+       */
+      allow update: if isCore()
+        && resource.data.state == 'queued'
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['state', 'updatedAt', 'settledAt'])
+        && request.resource.data.state == 'cancelled';
+
+      /** Acknowledge a settled job that needed a human, and got one. */
+      allow update: if isCore()
+        && resource.data.state in ['landed', 'differs', 'merged', 'orphaned']
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['state', 'updatedAt', 'settledAt'])
+        && request.resource.data.state == 'cancelled';
+
+      /**
+       * Send a refused edit again, with what was typed intact.
+       *
+       * `attempts` resets rather than continuing, because a leader pressing
+       * this has usually changed the world — reconnected the credentials,
+       * switched write-back back on — and resuming the old backoff would make
+       * a connection that is fine look broken for its first minute.
+       */
+      allow update: if isCore()
+        && resource.data.state == 'failed'
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['state', 'attempts', 'failure', 'message', 'field',
+                       'nextAttemptAt', 'leaseUntil', 'updatedAt', 'settledAt'])
+        && request.resource.data.state == 'queued'
+        && request.resource.data.attempts == 0
+        && request.resource.data.failure == null
+        && request.resource.data.message == null
+        && request.resource.data.field == null
+        && request.resource.data.nextAttemptAt == null
+        && request.resource.data.leaseUntil == null
+        && request.resource.data.settledAt == null;
+
+      // The sweeper owns removal. A job a client could delete is a job whose
+      // failure a client could hide.
+      allow delete: if false;
+    }
+
+    /**
+     * Which worker holds a student, and until when.
+     *
+     * Server-only in every direction, and stated rather than left to the
+     * default: this is the lock that keeps two edits of one child in the order
+     * they were queued, and a browser that could write it could make one leader's
+     * correction overtake another's — or take a student and never give them
+     * back.
+     */
+    match /upstreamEditLeases/{studentId} {
+      allow read, write: if false;
+    }
+
+    /* ---------------------------------------------------------------- */
     /* Default deny                                                      */
     /* ---------------------------------------------------------------- */
 

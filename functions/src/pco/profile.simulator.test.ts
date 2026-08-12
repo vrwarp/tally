@@ -192,6 +192,109 @@ describe('updateStudentProfile against the simulator', () => {
    * ever drift, a save reports something the next refresh silently contradicts,
    * which is the exact failure the old forced refresh could not have.
    */
+  /**
+   * The compare-and-set, which exists for the edit queue.
+   *
+   * A save somebody is watching does not use it: they are looking at the form,
+   * and the value they read a second ago is the value they meant. A *queued*
+   * edit does, because it may have been written minutes ago on a phone with no
+   * signal — and arriving second must not mean winning an argument about a
+   * child's record in the church's permanent database.
+   */
+  describe('when the caller says what it expected to find', () => {
+    it('writes when nobody has touched the field', async () => {
+      h.db.seed(`students/pco_${FIXTURE_IDS.amara}`, annotation());
+      const held = h.store.personById(FIXTURE_IDS.amara)!;
+
+      const result = await updateStudentProfile({
+        db: h.db,
+        client: h.client,
+        config: config('full'),
+        studentId: `pco_${FIXTURE_IDS.amara}`,
+        lastName: 'Okonkwo-Hale',
+        expect: { lastName: held.last_name },
+      });
+
+      expect(result.status).toBe('updated');
+      expect(h.store.personById(FIXTURE_IDS.amara)?.last_name).toBe('Okonkwo-Hale');
+    });
+
+    /**
+     * The case the whole thing is for, and the assertion that matters most is
+     * the second one: **nothing was written**. Reporting a disagreement after
+     * overwriting the other person's value would be worse than not reporting
+     * it, because the screen says "nothing of theirs was lost".
+     */
+    it('writes nothing when somebody changed it first, and says what it found', async () => {
+      h.db.seed(`students/pco_${FIXTURE_IDS.amara}`, annotation());
+      const before = h.store.personById(FIXTURE_IDS.amara)!.last_name;
+      // The church office gets there first, with a different answer.
+      h.store.updatePerson(FIXTURE_IDS.amara, { last_name: 'Okonkwo-Boateng' });
+
+      const result = await updateStudentProfile({
+        db: h.db,
+        client: h.client,
+        config: config('full'),
+        studentId: `pco_${FIXTURE_IDS.amara}`,
+        lastName: 'Okonkwo-Hale',
+        expect: { lastName: before },
+      });
+
+      expect(result.status).toBe('conflict');
+      expect(h.store.personById(FIXTURE_IDS.amara)?.last_name).toBe('Okonkwo-Boateng');
+      expect(result.before?.lastName).toBe('Okonkwo-Boateng');
+    });
+
+    /**
+     * Somebody making the same correction first is agreement, not conflict —
+     * and a leader should not be asked to adjudicate between two identical
+     * answers.
+     */
+    it('treats the same correction arriving first as agreement', async () => {
+      h.db.seed(`students/pco_${FIXTURE_IDS.amara}`, annotation());
+      const before = h.store.personById(FIXTURE_IDS.amara)!.last_name;
+      h.store.updatePerson(FIXTURE_IDS.amara, { last_name: 'Okonkwo-Hale' });
+
+      const result = await updateStudentProfile({
+        db: h.db,
+        client: h.client,
+        config: config('full'),
+        studentId: `pco_${FIXTURE_IDS.amara}`,
+        lastName: 'Okonkwo-Hale',
+        expect: { lastName: before },
+      });
+
+      expect(result.status).toBe('unchanged');
+    });
+
+    it('is not applied to a save nobody said an expectation for', async () => {
+      h.db.seed(`students/pco_${FIXTURE_IDS.amara}`, annotation());
+      h.store.updatePerson(FIXTURE_IDS.amara, { last_name: 'Okonkwo-Boateng' });
+
+      // No `expect`: the leader is looking at the form and meant what they read.
+      const result = await save(`pco_${FIXTURE_IDS.amara}`, { lastName: 'Okonkwo-Hale' });
+
+      expect(result.status).toBe('updated');
+      expect(h.store.personById(FIXTURE_IDS.amara)?.last_name).toBe('Okonkwo-Hale');
+    });
+
+    /**
+     * `before` is the row as Planning Center held it when this call looked, and
+     * it has to be — the row returned *after* a write always agrees with what
+     * was sent, so a caller comparing against that could never see a
+     * disagreement at all.
+     */
+    it('reports the row it found, not the row it left behind', async () => {
+      h.db.seed(`students/pco_${FIXTURE_IDS.amara}`, annotation());
+      const held = h.store.personById(FIXTURE_IDS.amara)!.last_name;
+
+      const result = await save(`pco_${FIXTURE_IDS.amara}`, { lastName: 'Okonkwo-Hale' });
+
+      expect(result.before?.lastName).toBe(held);
+      expect(result.person?.lastName).toBe('Okonkwo-Hale');
+    });
+  });
+
   describe('the row it hands back', () => {
     const rosterRow = async (personId: string) => {
       const { people } = await fetchRoster({

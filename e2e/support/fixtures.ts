@@ -10,6 +10,7 @@ import { TEAM, signIn, type TeamRole } from './auth';
 import {
   clearSimulatorFaults,
   createSimulatorStudent,
+  patchSimulatorPerson,
   deleteDocument,
   failSimulator,
   readCollection,
@@ -54,6 +55,8 @@ export interface TallyFixtures {
     }) => Promise<void>;
     /** What the app actually asked Planning Center for. */
     requests: () => Promise<Array<{ method: string; path: string }>>;
+    /** Edits somebody upstream, as the church office would, through the API. */
+    patchPerson: (personId: string, attributes: Record<string, unknown>) => Promise<void>;
   };
   /**
    * The second backend, off unless a spec turns it on. `enable` writes the
@@ -131,6 +134,7 @@ export const test = base.extend<TallyFixtures, { seededWorld: void }>({
       people: simulatorPeople,
       createStudent: createSimulatorStudent,
       requests: simulatorRequests,
+      patchPerson: patchSimulatorPerson,
     });
     // Faults are armed per-test; leaving one armed would break whatever ran next
     // in a way that pointed at the wrong test. Only the faults are cleared —

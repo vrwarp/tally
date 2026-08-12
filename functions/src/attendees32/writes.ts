@@ -21,7 +21,11 @@ import { PATHS, SILENT_LOGGER, type FirestoreLike, type FunctionLogger } from '.
 import { parseStudentId } from '../generated/backendIds.js';
 import type { TtlCache } from '../pco/cache.js';
 import { normalizeEmail, normalizePhone, type SetParentContactResult } from '../pco/parentContact.js';
-import type { StudentProfilePatch, UpdateStudentProfileResult } from '../pco/profile.js';
+import type {
+  ProfileExpectations,
+  StudentProfilePatch,
+  UpdateStudentProfileResult,
+} from '../pco/profile.js';
 import type {
   AddParentResult,
   AdultCandidate,
@@ -36,6 +40,7 @@ import { migrateStudentMemberships } from '../backends/studentMigration.js';
 import { HELD_FOR_REVIEW_MESSAGE, isHeldForReview } from '../backends/pendingReview.js';
 import type { PersonCheck } from '../backends/types.js';
 import { isA32GoneError, type A32Client } from './client.js';
+import { followA32PersonLink } from './personLink.js';
 import {
   a32Grade,
   allPhonesOf,
@@ -161,8 +166,17 @@ export async function checkPerson(
     await client.get<A32Attendee>(API.attendeeById(personId));
     return { outcome: 'exists', personId };
   } catch (error) {
-    if (isA32GoneError(error)) return { outcome: 'gone' };
-    throw error;
+    if (!isA32GoneError(error)) throw error;
+    /*
+     * Gone is not the end of the question. A merged-away attendee answers
+     * `410` with the survivor, and adding somebody to a roster by an id that
+     * has since been merged should land on the person, not report them
+     * missing and offer to create a second duplicate of the record somebody
+     * has just finished de-duplicating.
+     */
+    const link = await followA32PersonLink(client, personId, error);
+    if (link.outcome === 'live') return { outcome: 'relinked', personId: link.personId };
+    return { outcome: 'gone' };
   }
 }
 
@@ -479,7 +493,8 @@ export async function findStudentCandidates(
 /* -------------------------------------------------------------------------- */
 
 export async function updateStudentProfile(
-  options: A32WriteOptions & { studentId: string } & StudentProfilePatch,
+  options: A32WriteOptions & { studentId: string; expect?: ProfileExpectations } &
+    StudentProfilePatch,
 ): Promise<UpdateStudentProfileResult> {
   const { db, client, config, studentId } = options;
 
@@ -490,14 +505,44 @@ export async function updateStudentProfile(
       message:
         'Editing an Attendees profile from Tally is switched off. A leader can turn on full write-back in Settings, or make the change in Attendees.',
       person: null,
+      before: null,
+    };
+  }
+
+  /*
+   * Refused rather than ignored, and refused rather than written.
+   *
+   * The nickname half of the composite is Attendees' CJK name, held in
+   * `first_name2`/`last_name2`, and `mapping.ts` deliberately never writes
+   * those: Tally cannot tell which half of a CJK string is the family name,
+   * and a wrong split written upstream is worse than a stale nickname. That
+   * decision was sound and its consequence was not — the field simply fell
+   * through this function, nothing was written, and the job reported `landed`
+   * under a strip that said "Saved in Attendees". A leader was told their
+   * correction had gone to the church's database when it had gone nowhere.
+   *
+   * So it is `invalid`: nothing is written, the whole patch is refused, and
+   * the record says which field and where to change it. Silent loss of a
+   * typed value is the failure this queue exists to make impossible.
+   */
+  if (options.nickname !== undefined) {
+    return {
+      status: 'invalid',
+      wrote: [],
+      message:
+        'Tally cannot change the bracketed name here — Attendees keeps it in its own ' +
+        'fields, and Tally cannot tell which half is the family name. Change it in ' +
+        'Attendees; everything else on this form can be saved from Tally.',
+      person: null,
+      before: null,
     };
   }
 
   if (options.firstName !== undefined && !options.firstName.trim()) {
-    return { status: 'invalid', wrote: [], message: 'A first name is required.', person: null };
+    return { status: 'invalid', wrote: [], message: 'A first name is required.', person: null, before: null };
   }
   if (options.lastName !== undefined && !options.lastName.trim()) {
-    return { status: 'invalid', wrote: [], message: 'A last name is required.', person: null };
+    return { status: 'invalid', wrote: [], message: 'A last name is required.', person: null, before: null };
   }
   if (
     options.grade !== undefined &&
@@ -508,12 +553,13 @@ export async function updateStudentProfile(
       wrote: [],
       message: `Grade must be between ${config.minGrade} and ${config.maxGrade}.`,
       person: null,
+      before: null,
     };
   }
 
   const resolved = await resolveA32Person(db, studentId);
   if (!resolved.exists || !resolved.active) {
-    return { status: 'no-student', wrote: [], message: 'That student is not on the roster.', person: null };
+    return { status: 'no-student', wrote: [], message: 'That student is not on the roster.', person: null, before: null };
   }
   if (!resolved.personId) {
     return {
@@ -521,20 +567,42 @@ export async function updateStudentProfile(
       wrote: [],
       message: 'This student has no Attendees record yet; push them first.',
       person: null,
+      before: null,
     };
   }
 
+  /*
+   * Read through merges, not a bare get.
+   *
+   * A merged attendee answers `410` with the survivor, and an edit that names
+   * the id somebody merged away is still an edit of that person — they have
+   * moved, not vanished. Following it here is what lets the queue report
+   * `merged` (the row that comes back carries a different id from the one the
+   * job named) instead of `orphaned`, which would offer a leader a re-create
+   * for a child who already exists under the survivor's id.
+   *
+   * `personId` rather than `resolved.personId` from here down: everything
+   * after this — the compare-and-set, the PATCH, the row handed back — has to
+   * be about whoever holds the record now.
+   */
+  let personId = resolved.personId;
   let attendee: A32Attendee;
   try {
-    attendee = await client.get<A32Attendee>(API.attendeeById(resolved.personId));
+    attendee = await client.get<A32Attendee>(API.attendeeById(personId));
   } catch (error) {
     if (!isA32GoneError(error)) throw error;
-    return {
-      status: 'no-student',
-      wrote: [],
-      message: 'Attendees no longer has this person.',
-      person: null,
-    };
+    const link = await followA32PersonLink(client, personId, error);
+    if (link.outcome !== 'live') {
+      return {
+        status: 'no-student',
+        wrote: [],
+        message: 'Attendees no longer has this person.',
+        person: null,
+        before: null,
+      };
+    }
+    personId = link.personId;
+    attendee = link.attendee;
   }
 
   const patch: Record<string, unknown> = {};
@@ -575,7 +643,7 @@ export async function updateStudentProfile(
   if (options.birthday !== undefined) {
     const dated = birthdayPatch(options.birthday, attendee);
     if (dated === null) {
-      return { status: 'invalid', wrote: [], message: 'That is not a birthday Tally can write.', person: null };
+      return { status: 'invalid', wrote: [], message: 'That is not a birthday Tally can write.', person: null, before: null };
     }
     const [field, value] = Object.entries(dated)[0]!;
     if (trimmed((attendee as unknown as Record<string, string | null>)[field]) !== value) {
@@ -585,23 +653,57 @@ export async function updateStudentProfile(
   }
   if (infosChanged) patch.infos = infos;
 
+  /*
+   * The same compare-and-set Planning Center's adapter makes, because a safety
+   * property that held for one backend and not the other would be worse than
+   * not having it: the church would not know which kind of record it had.
+   */
+  if (options.expect) {
+    const held = mapAttendeeToRosterPerson(attendee);
+    const wanted = options.expect;
+    const changedUnderneath =
+      (wanted.lastName !== undefined &&
+        options.lastName !== undefined &&
+        held.lastName !== wanted.lastName &&
+        held.lastName !== options.lastName) ||
+      (wanted.grade !== undefined &&
+        options.grade !== undefined &&
+        held.grade !== (wanted.grade ?? null) &&
+        held.grade !== options.grade);
+
+    if (changedUnderneath) {
+      return {
+        status: 'conflict',
+        wrote: [],
+        message: 'Somebody changed this in Attendees first, so nothing was written.',
+        person: null,
+        before: held,
+      };
+    }
+  }
+
   if (Object.keys(patch).length === 0) {
     return {
       status: 'unchanged',
       wrote: [],
       message: 'Attendees already matches.',
       person: mapAttendeeToRosterPerson(attendee),
+      // The same row: nothing was written, so before and after are one thing.
+      before: mapAttendeeToRosterPerson(attendee),
     };
   }
 
-  const updated = await client.patch<A32Attendee>(API.attendeeById(resolved.personId), patch, {
-    'X-Target-Attendee-Id': resolved.personId,
+  const updated = await client.patch<A32Attendee>(API.attendeeById(personId), patch, {
+    'X-Target-Attendee-Id': personId,
   });
   return {
     status: 'updated',
     wrote,
     message: `Saved ${wrote.join(', ')} to Attendees.`,
     person: mapAttendeeToRosterPerson(updated),
+    // What was on file when this call looked, which is what lets the edit queue
+    // tell "your edit landed" from "somebody had already changed this".
+    before: mapAttendeeToRosterPerson(attendee),
   };
 }
 

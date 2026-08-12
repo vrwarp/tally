@@ -128,3 +128,6 @@ docs/uxr/kiosk-walkthrough.html
 # the numbers they produced are quoted in the round's critique, which is tracked.
 /uxr/_*
 /uxr/.measure-*
+
+# The e2e log, when a run is driven by hand rather than by CI.
+e2e-run.log
