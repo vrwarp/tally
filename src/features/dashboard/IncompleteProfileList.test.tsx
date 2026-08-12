@@ -73,6 +73,24 @@ describe('IncompleteProfileList', () => {
     expect(screen.getByText('Waiting 24 days')).toBeInTheDocument();
   });
 
+  it('names the two school years that have no ordinal', () => {
+    /*
+     * The line used to be a short grade label plus the word "grade", which is
+     * fine for the twelve numbered years and wrong for both ends of the list:
+     * "K grade" is not English and "Pre-K grade" repeats itself. Pre-K is also
+     * where the number is Planning Center's `-1`, so a label that fell through
+     * to the digits printed a minus sign beside a four-year-old's name.
+     */
+    show([
+      makeStudent({ id: 'pco_1', firstName: 'Wren', lastName: 'Okafor', grade: -1, pcoPersonId: '1' }),
+      makeStudent({ id: 'pco_2', firstName: 'Tobias', lastName: 'Ruiz', grade: 0, pcoPersonId: '2' }),
+    ]);
+
+    expect(screen.getByText(/^Pre-K · /)).toBeInTheDocument();
+    expect(screen.getByText(/^Kindergarten · /)).toBeInTheDocument();
+    expect(screen.queryByText(/-1|K grade|Pre-K grade/)).not.toBeInTheDocument();
+  });
+
   it('does not date a roster student Tally never created', () => {
     /*
      * A student from Planning Center carries the epoch as `createdAt` so that no

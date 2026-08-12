@@ -448,6 +448,26 @@ describe('the four things a parent touches', () => {
     expect(screen.getByText('PQRS')).toBeTruthy();
   });
 
+  it('names the year below kindergarten rather than printing its number', async () => {
+    // Pre-K's number is Planning Center's, and it is -1. The chip grid used to
+    // stringify the grade it was given, so the first thing the parent of a
+    // four-year-old read — top left, ahead of "K" — was a chip saying "-1".
+    await mount();
+    await tap(/Register your child/);
+    await type('Robin');
+    await tap('Next');
+    await tap('Clear');
+    await type('Fields');
+    await tap('Next');
+
+    expect(screen.queryByText('-1')).toBeNull();
+    await tap('Pre-K');
+
+    // And it is a real answer, not a blank: the wizard records the year.
+    expect(screen.getByText('Robin Fields')).toBeTruthy();
+    expect(screen.getByText('Pre-K')).toBeTruthy();
+  });
+
   it('shows the children so far when it asks whether there are more', async () => {
     // The question is "anybody else?", and the parent of four cannot answer it
     // against their memory of what they typed forty seconds ago.

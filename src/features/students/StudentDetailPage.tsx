@@ -63,7 +63,7 @@ import { chainKey } from '@/lib/materialize';
 import { pcoPersonUrl } from '@/lib/planningCenter';
 import { sessionOutcome, type SessionOutcome } from '@/lib/sessionHistory';
 import { formatRelative, formatShortDate } from '@/lib/time';
-import { cn, formatPhone, gradeLabel, initials, joinList } from '@/lib/utils';
+import { cn, formatPhone, gradeSentence, initials, joinList } from '@/lib/utils';
 import {
   addRosterMember,
   pushStudentToPlanningCenter,
@@ -350,7 +350,7 @@ export function StudentDetailPage() {
   }
 
   const name = studentFullName(student);
-  const grade = gradeLabel(student);
+  const grade = gradeSentence(student);
   const backend = backendOfStudent(student);
   const backendName = backendLabelOf(student);
   const phone = details?.parentPhone?.trim() ?? '';
@@ -507,7 +507,7 @@ export function StudentDetailPage() {
             typed into Tally is a grade Tally has.
           */}
           <p className="mt-0.5 text-sm text-ink-500">
-            {grade ? `${grade} grade` : `No grade in ${backendName}`}
+            {grade ?? `No grade in ${backendName}`}
           </p>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {student.isVisitor ? <Badge tone="brand">Visitor</Badge> : null}

@@ -21,7 +21,7 @@
  */
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import { gradeDescription, haptic, NO_GRADE } from '@/lib/utils';
-import { GRADES, type Grade, type RegisterFamilyResult } from '@/types';
+import { GRADES, PRE_K, type Grade, type RegisterFamilyResult } from '@/types';
 import { Keyboard, type KioskKey } from '../components/Keyboard';
 import type { KioskBinding } from '../binding';
 import { PhonePad } from './PhonePad';
@@ -271,13 +271,13 @@ export function RegistrationFlow({
               {GRADES.map((grade) => (
                 <GradeChip
                   key={grade}
-                  label={grade === 0 ? 'K' : String(grade)}
+                  label={gradeChipLabel(grade)}
                   hint={gradeDescription(grade)}
                   onPick={() => dispatch({ type: 'grade', grade })}
                 />
               ))}
               {/* Last, because it is the one chip here that is not an answer.
-                  In reading position one, styled like the thirteen real values,
+                  In reading position one, styled like the fourteen real values,
                   it reads as the default — and what it produces is a
                   grade-less record for the core team to adjudicate. */}
               <GradeChip label={NO_GRADE} onPick={() => dispatch({ type: 'grade', grade: null })} />
@@ -700,6 +700,23 @@ function GradeChip({ label, hint, onPick }: { label: string; hint?: string; onPi
 /* -------------------------------------------------------------------------- */
 /* Words                                                                       */
 /* -------------------------------------------------------------------------- */
+
+/**
+ * What one grade chip says.
+ *
+ * Bare digits rather than `gradeName`'s ordinals, because fourteen chips in a
+ * three-wide grid are read by scanning and "4" lands before "4th" does — the
+ * aria label still says "4th grade" for anyone hearing the screen instead.
+ *
+ * The two years with no number of their own get their names. Pre-K is the one
+ * that matters: its number is Planning Center's `-1`, and spelling the label
+ * as `String(grade)` right here put a chip reading "-1" at the top left of the
+ * grid, in first reading position, in front of the parent of a four-year-old.
+ */
+function gradeChipLabel(grade: Grade): string {
+  if (grade === PRE_K) return 'Pre-K';
+  return grade === 0 ? 'K' : String(grade);
+}
 
 function titleFor(state: RegistrationState, childNumber: number): string {
   switch (state.step) {
