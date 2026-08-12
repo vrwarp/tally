@@ -29,7 +29,7 @@
  */
 import type { Page } from '@playwright/test';
 import { expect, test } from './support/fixtures';
-import { gotoReady, signIn, TEAM } from './support/auth';
+import { gotoReady, reloadReady, signIn, TEAM } from './support/auth';
 import {
   burySimulatorPerson,
   clearSimulatorFaults,
@@ -69,33 +69,38 @@ async function upstreamLastName(personId: string): Promise<string> {
 }
 
 /**
- * Opens one student's record, the way a leader reaches it, and says what it
- * found when the record is not there.
+ * Opens one student's record, the way a leader reaches it — including the part
+ * where a leader whose roster did not load presses the button that says so.
  *
- * Waiting on the button alone is what this did, and it is the wrong thing to
- * wait for. `Edit profile` renders unconditionally once `StudentDetailPage`
- * has a student, so its absence never means "slow" — it means the page gave up
- * and drew one of two empty states instead, and the two have entirely
- * different causes. A bare `toBeVisible` timeout cannot tell them apart, so the
- * first test in this file has been failing intermittently for some time with a
- * message that names neither: raising its budget from ten seconds to thirty
- * changed nothing, because there was never anything still loading.
+ * Waiting on `Edit profile` alone is what this did, and it is the wrong thing
+ * to wait for. The button renders unconditionally once `StudentDetailPage` has
+ * a student, so its absence never means "slow" — it means the page gave up and
+ * drew one of two empty states instead. Raising the wait from ten seconds to
+ * thirty was written up here as load and was not: the run after it failed the
+ * same way with `element(s) not found` for the whole thirty, because nothing
+ * was still loading.
  *
- * `gotoReady` has already waited out the loading state by the time this runs,
- * so whichever of the three has appeared is final. Racing all three therefore
- * fails in about as long as it takes to draw, rather than sitting out a
- * timeout, and reports which one:
+ * The two empty states have opposite causes and only one of them is this
+ * suite's business:
  *
- *   - "cannot be read right now" is `rosterError` — the roster read threw, and
- *     the app is holding an empty list. The screen is right and the backend is
- *     the story.
- *   - "No student with that link" is a roster that loaded *without this
- *     person*. The read worked and the ministry is what is wrong.
+ *   - **"cannot be read right now"** is `rosterError`. One Planning Center read
+ *     threw, `DataProvider` kept the empty list it already had, and nothing
+ *     asks again for ten minutes — so a single blip during a page load is
+ *     permanent for as long as a test is willing to wait. That is why this only
+ *     ever went off on the two mobile projects: they are the slowest, and the
+ *     window is a race. The app's own answer is the `Try again` on
+ *     `RosterErrorBanner`, and a reload is the same read from a colder start,
+ *     so taking it here is a leader's move rather than a retry bolted onto a
+ *     flaky assertion.
  *
- * Thirty seconds rather than the default ten is kept, on the same reasoning
- * `onServer` gives below: this is the first page load in the file and it lands
- * on an emulator the previous spec has just spent a quarter of an hour writing
- * to. It is headroom, not the fix.
+ *   - **"No student with that link"** is a roster that loaded *without this
+ *     person in it*. Reloading cannot help, and it must not look like it might:
+ *     this is the shape of the bug where a spec wipes the seeded ministry for
+ *     everything that runs after it, which is exactly what
+ *     `planningCenter.reset()` was doing until #167. It fails on sight, loudly,
+ *     and says where to look.
+ *
+ * Three goes at most, so a person who is genuinely gone still fails the run.
  */
 async function openProfile(page: Page, studentId: string) {
   await gotoReady(page, `/students/${studentId}`);
@@ -104,18 +109,32 @@ async function openProfile(page: Page, studentId: string) {
   const unreadable = page.getByText('This student cannot be read right now.');
   const absent = page.getByText('No student with that link.');
 
-  await expect(editProfile.or(unreadable).or(absent).first()).toBeVisible({ timeout: 30_000 });
-  if (await editProfile.isVisible()) return;
+  for (let attempt = 1; ; attempt += 1) {
+    // Racing all three rather than waiting on the button: whichever has
+    // appeared is final by now, so this settles as fast as the screen draws
+    // instead of sitting out a timeout that names nothing.
+    await expect(editProfile.or(unreadable).or(absent).first()).toBeVisible({ timeout: 30_000 });
+    if (await editProfile.isVisible()) return;
 
-  throw new Error(
-    (await unreadable.isVisible())
-      ? `The roster read failed, so ${studentId} had no record to draw. The screen is ` +
-        'reporting the backend correctly; the fault is upstream of it — a Planning Center ' +
-        'read that threw, most likely a fault left armed by whatever ran before this file.'
-      : `The roster loaded without ${studentId} in it. Planning Center answered, and the ` +
-        'person this file is written around was not among the people it returned — check ' +
-        'whether the seeded ministry survived the specs that ran first.',
-  );
+    if (await absent.isVisible()) {
+      throw new Error(
+        `The roster loaded without ${studentId} in it. Planning Center answered, and the ` +
+          'person this file is written around was not among the people it returned — check ' +
+          'whether the seeded ministry survived the specs that ran first.',
+      );
+    }
+
+    if (attempt === 3) {
+      throw new Error(
+        `The roster read failed on all ${attempt} attempts, so ${studentId} never had a ` +
+          'record to draw. The screen is reporting the backend correctly; the fault is ' +
+          'upstream of it — a Planning Center read that threw three times running is a real ' +
+          'outage rather than the blip this retries for.',
+      );
+    }
+
+    await reloadReady(page);
+  }
 }
 
 /** Types a new surname into the editor and presses Save. */
