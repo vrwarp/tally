@@ -38,7 +38,13 @@ import { gradeDescription, haptic } from '@/lib/utils';
 import { Keyboard, type KioskKey } from '../components/Keyboard';
 import { useTap, useTapGuard } from '../components/tapGuard';
 import type { KioskRefresh } from '../KioskApp';
-import { eventWindow, windowHasClosed, type KioskBinding } from '../binding';
+import {
+  eventWindow,
+  opensAtLabel,
+  windowHasClosed,
+  windowHasOpened,
+  type KioskBinding,
+} from '../binding';
 import { MAX_RESULTS, type KioskSearchOutcome, type KioskStudent } from '../search';
 
 function gradeLabel(grade: number | null): string {
@@ -165,7 +171,16 @@ export function SearchScreen({
    */
   onStaffGate: () => void;
 }) {
-  const closed = windowHasClosed(binding, Date.now());
+  const now = Date.now();
+  const closed = windowHasClosed(binding, now);
+  /*
+   * Bound, but not yet taking arrivals.
+   *
+   * Said in the header rather than left to the refusal a tap would meet,
+   * because the person who can act on it is a volunteer walking past — the
+   * parent this line is under cannot rebind a tablet. See `windowHasOpened`.
+   */
+  const notOpenYet = !windowHasOpened(binding, now);
 
   /*
    * The no-match panel is showing this same offer, in the same words, as its
@@ -351,7 +366,11 @@ export function SearchScreen({
           */}
         <div className="text-2xl font-semibold text-ink-100 kiosk:text-3xl">{binding.title}</div>
         <div className="text-base text-ink-500 kiosk:text-lg">
-          {closed ? 'Check-in window has closed — you can still check in.' : eventWindow(binding)}
+          {notOpenYet
+            ? `Check-in opens ${opensAtLabel(binding, now)}`
+            : closed
+              ? 'Check-in window has closed — you can still check in.'
+              : eventWindow(binding)}
         </div>
       </div>
 

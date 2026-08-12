@@ -13,6 +13,26 @@
  * only instruction is a subtitle is a control most people tap once and give up
  * on. Tapping a row still only selects, which is what keeps the button honest
  * and what keeps a scrolling thumb from re-pointing anything.
+ *
+ * Today, plus whatever is open — the same list the app's own chooser offers,
+ * in the same words, for the same reason. The server sends the week because
+ * `getKioskEvents` is also what materialises an occurrence nobody has created
+ * yet, and because a window that opened yesterday has to survive the calendar
+ * boundary; what a volunteer may actually point a tablet at is narrower than
+ * that. It used to be the whole week, and a thumb one row off on a list of
+ * identically-titled Wednesdays pointed a lobby screen at the wrong one — after
+ * which it took an evening's register against a gathering that had not
+ * happened, silently, because nothing downstream checks a check-in against a
+ * clock.
+ *
+ * Narrowed here rather than in the callable, and that is the one part of this
+ * worth arguing about. "Today" is a fact about the room the tablet is standing
+ * in, and only the tablet knows it: the function runs in UTC, so an evening
+ * gathering in the Americas is already tomorrow as far as the server is
+ * concerned, and a horizon cut server-side would drop exactly the gathering the
+ * kiosk is being set up for. The client has the church's own clock. The
+ * refusal in `KioskApp.onConfirm` is what covers everything this cannot — a
+ * binding made yesterday, a tablet left on overnight, a clock that drifted.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { HoldButton } from '../components/HoldButton';
@@ -45,11 +65,43 @@ export function EventChooser({
   onSetUpPrinter: () => void;
   onBound: (binding: KioskBinding) => void;
 }) {
-  const [entries, setEntries] = useState<KioskEventEntry[] | null>(null);
+  const [received, setReceived] = useState<KioskEventEntry[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
   const [binding, setBinding] = useState(false);
   const nowMs = useMemo(() => Date.now(), []);
+
+  /*
+   * Midnight tonight, by the tablet's own clock.
+   *
+   * `setHours(24, …)` rather than arithmetic on the epoch: a day is not always
+   * 86,400,000 milliseconds long, and the two nights a year it is not are
+   * nights a church still meets on.
+   */
+  const dayEndMs = useMemo(() => {
+    const end = new Date(nowMs);
+    end.setHours(24, 0, 0, 0);
+    return end.getTime();
+  }, [nowMs]);
+
+  /*
+   * What a volunteer may point this tablet at — see the note at the top.
+   *
+   * An open window beats the calendar boundary, exactly as it does on the app's
+   * chooser: a lock-in that began at eleven is on *yesterday* by the date and
+   * is the gathering somebody is standing at right now. That branch is also
+   * what keeps the "Ended — pickup only" row reachable, since the server only
+   * still sends it while its window is open.
+   */
+  const entries = useMemo(
+    () =>
+      received?.filter(
+        (entry) =>
+          entry.startAt < dayEndMs ||
+          (nowMs >= entry.checkInOpensAt && nowMs <= entry.checkInClosesAt),
+      ) ?? null,
+    [received, dayEndMs, nowMs],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -57,7 +109,7 @@ export function EventChooser({
       services
         .listEvents()
         .then((events) => {
-          if (!cancelled) setEntries(events);
+          if (!cancelled) setReceived(events);
         })
         .catch(() => {
           if (!cancelled) setFailed(true);
@@ -114,6 +166,19 @@ export function EventChooser({
             // the row a kiosk rebooting mid-pickup needs to find. Said out
             // loud so it cannot be mistaken for something upcoming.
             const ended = nowMs > entry.endAt;
+            /*
+             * The third state, and the one this list spent longest without.
+             *
+             * The chooser offers the week on purpose, so most rows on it are
+             * ahead — and a volunteer binding one is doing the ordinary thing,
+             * setting a tablet up before doors. What was missing was the
+             * consequence: the kiosk will not take arrivals there until the
+             * window opens, and a row that said nothing left that to be
+             * discovered by a family at the front of a queue. The day is
+             * already up in `dayLabel`; this is the sentence that turns it
+             * from a fact into a warning.
+             */
+            const notOpenYet = nowMs < entry.checkInOpensAt;
             const isSelected = selected === index;
             return (
               <HoldButton
@@ -147,6 +212,11 @@ export function EventChooser({
                   {dayLabel(entry.startAt, nowMs)} · {timeLabel(entry.startAt)}–{timeLabel(entry.endAt)}
                   {entry.location ? ` · ${entry.location}` : ''}
                   {live && <span className="pl-2 font-medium text-present-400">Check-in open</span>}
+                  {notOpenYet && (
+                    <span className="pl-2 font-medium text-ink-500">
+                      Check-in opens {timeLabel(entry.checkInOpensAt)}
+                    </span>
+                  )}
                   {ended && <span className="pl-2 font-medium text-ink-500">Ended — pickup only</span>}
                 </div>
               </HoldButton>
@@ -154,7 +224,11 @@ export function EventChooser({
           })}
           {entries?.length === 0 && (
             <div className="pt-12 text-center text-ink-400">
-              Nothing on the calendar this week. Events are created in Tally itself.
+              {/* "Today" rather than "this week", because that is now what the
+                  list holds — and a volunteer reading this on a Tuesday should
+                  go looking for tonight's gathering rather than concluding the
+                  calendar is empty until Sunday. */}
+              Nothing on today. Events are created in Tally itself.
             </div>
           )}
         </div>

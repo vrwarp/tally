@@ -268,6 +268,7 @@ export async function bindEntry(entry: KioskEventEntry): Promise<KioskBinding> {
     title: entry.title,
     startAtMs: entry.startAt,
     endAtMs: entry.endAt,
+    checkInOpensAtMs: entry.checkInOpensAt,
     checkInClosesAtMs: entry.checkInClosesAt,
     requiresCheckOut: entry.requiresCheckOut,
     // Sanitised even though the server sent it: this is the value the kiosk

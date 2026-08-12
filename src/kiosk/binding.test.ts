@@ -13,8 +13,10 @@ import {
   bindingEndsAt,
   bindingIsLive,
   clearBinding,
+  opensAtLabel,
   readBinding,
   windowHasClosed,
+  windowHasOpened,
   writeBinding,
   type KioskBinding,
 } from '@/kiosk/binding';
@@ -69,6 +71,64 @@ describe('windowHasClosed', () => {
   });
 });
 
+describe('windowHasOpened', () => {
+  /** Doors at 2000, gathering at 3000. The half hour a tablet is set up in. */
+  const OPENS_LATER: KioskBinding = { ...WINDOW_TRAILS, checkInOpensAtMs: 2000 };
+
+  it('is the floor the binding never had', () => {
+    expect(windowHasOpened(OPENS_LATER, 1999)).toBe(false);
+    expect(windowHasOpened(OPENS_LATER, 2000)).toBe(true);
+    expect(windowHasOpened(OPENS_LATER, 8999)).toBe(true);
+  });
+
+  it('lets a kiosk be bound before it may take anybody — the setup case', () => {
+    // Both true at once is the point: the tablet is on the right gathering an
+    // hour early and simply will not write until the doors open.
+    expect(bindingIsLive(OPENS_LATER, 1999)).toBe(true);
+    expect(windowHasOpened(OPENS_LATER, 1999)).toBe(false);
+  });
+
+  it('answers open for a binding written before the field existed', () => {
+    // The safe direction: the failure of guessing the other way is a lobby
+    // full of families a tablet refuses over a key it never stored.
+    expect(WINDOW_TRAILS.checkInOpensAtMs).toBeUndefined();
+    expect(windowHasOpened(WINDOW_TRAILS, 0)).toBe(true);
+  });
+
+  it('is not the mirror of windowHasClosed, and that is deliberate', () => {
+    // Late still writes; early does not. See the note on `windowHasOpened`.
+    expect(windowHasClosed(WINDOW_TRAILS, 9001)).toBe(true);
+    expect(windowHasOpened(WINDOW_TRAILS, 9001)).toBe(true);
+  });
+});
+
+describe('opensAtLabel', () => {
+  const NOON = new Date('2026-08-12T12:00:00Z').getTime();
+  const at = (ms: number) =>
+    new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+  it('gives the clock alone when it opens today', () => {
+    const later = NOON + 2 * 3_600_000;
+    const binding: KioskBinding = { ...WINDOW_TRAILS, checkInOpensAtMs: later };
+    expect(opensAtLabel(binding, NOON)).toBe(at(later));
+  });
+
+  it('carries the day when it does not — the misbinding this is for', () => {
+    const nextWeek = NOON + 7 * 24 * 3_600_000;
+    const binding: KioskBinding = { ...WINDOW_TRAILS, checkInOpensAtMs: nextWeek };
+    const label = opensAtLabel(binding, NOON);
+    expect(label).toContain(at(nextWeek));
+    expect(label).toMatch(/^\w+day, /);
+  });
+
+  it('falls back to the start when there is no window on file', () => {
+    // Nothing else to say, and saying nothing would be worse: a legacy binding
+    // never reaches this label anyway, so the fallback only has to be honest.
+    expect(WINDOW_TRAILS.checkInOpensAtMs).toBeUndefined();
+    expect(opensAtLabel(WINDOW_TRAILS, WINDOW_TRAILS.startAtMs)).toBe(at(WINDOW_TRAILS.startAtMs));
+  });
+});
+
 describe('persistence', () => {
   beforeEach(() => localStorage.clear());
 
@@ -91,6 +151,13 @@ describe('persistence', () => {
     // shipped must survive the deploy and simply not offer pickup.
     writeBinding(DOORS_CLOSE_EARLY);
     expect(readBinding()?.requiresCheckOut).toBeUndefined();
+  });
+
+  it('reads one written before the check-in floor existed, and simply has none', () => {
+    // Same bargain again: absent reads as "already open", which is the kiosk
+    // that shipped, and the next rebind picks the real answer up.
+    writeBinding(DOORS_CLOSE_EARLY);
+    expect(readBinding()?.checkInOpensAtMs).toBeUndefined();
   });
 
   it('reads one written before themes existed, and simply wears none', () => {
