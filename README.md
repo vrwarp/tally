@@ -164,6 +164,7 @@ happens when a family asks to be removed — is **[docs/minors-data.md](docs/min
 | [docs/deployment-setup.md](docs/deployment-setup.md) | Deploying, and everything that has to exist first |
 | [docs/error-handling.md](docs/error-handling.md) | The guards, why each exists, and the gaps that are still open |
 | [docs/fuzzing.md](docs/fuzzing.md) | The property suite, its invariants, and how to replay a failure |
+| [docs/kiosk-performance.md](docs/kiosk-performance.md) | The kiosk benchmark: what it measures, what it found, and the budgets it holds |
 | [e2e/README.md](e2e/README.md) | Running and writing end-to-end tests |
 | [docker/README.md](docker/README.md) | The containerised end-to-end runner |
 | [tools/pco-simulator/README.md](tools/pco-simulator/README.md) | The Planning Center API simulator |
