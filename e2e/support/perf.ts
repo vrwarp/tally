@@ -285,11 +285,34 @@ export interface ThreadTime {
   script: number;
   style: number;
   layout: number;
+  /**
+   * How many times the phase laid out and recalculated style.
+   *
+   * Counts rather than durations, and here because of what a slow device is
+   * slow at. The CPU throttle dilates script and nothing else — a Raspberry Pi
+   * is *also* slower at style, layout, raster and compositing, none of which
+   * any throttle models. So on the question "how will this feel on a Pi", the
+   * duration of a layout on this machine is nearly meaningless and the number
+   * of layouts a keystroke causes is the thing that carries over.
+   */
+  layouts: number;
+  styleRecalcs: number;
+  /** Elements in the document — the rough size of what layout has to walk. */
+  nodes: number;
   /** Heap in bytes at the end of the phase, not a delta. */
   heap: number;
 }
 
-const ZERO_THREAD_TIME: ThreadTime = { task: 0, script: 0, style: 0, layout: 0, heap: 0 };
+const ZERO_THREAD_TIME: ThreadTime = {
+  task: 0,
+  script: 0,
+  style: 0,
+  layout: 0,
+  layouts: 0,
+  styleRecalcs: 0,
+  nodes: 0,
+  heap: 0,
+};
 
 async function threadTime(cdp: CDPSession): Promise<ThreadTime> {
   const { metrics } = await cdp.send('Performance.getMetrics');
@@ -300,6 +323,9 @@ async function threadTime(cdp: CDPSession): Promise<ThreadTime> {
     script: of('ScriptDuration') * 1000,
     style: of('RecalcStyleDuration') * 1000,
     layout: of('LayoutDuration') * 1000,
+    layouts: of('LayoutCount'),
+    styleRecalcs: of('RecalcStyleCount'),
+    nodes: of('Nodes'),
     heap: of('JSHeapUsedSize'),
   };
 }
@@ -328,6 +354,10 @@ export async function measureThread<T>(
       script: after.script - before.script,
       style: after.style - before.style,
       layout: after.layout - before.layout,
+      layouts: after.layouts - before.layouts,
+      styleRecalcs: after.styleRecalcs - before.styleRecalcs,
+      // A level, not a delta: what layout has to walk is the whole document.
+      nodes: after.nodes,
       heap: after.heap,
     },
   };
@@ -704,10 +734,12 @@ export function writeReport(measurements: Measurement[], meta: Record<string, un
       '',
     );
     if (measurement.thread) {
-      const { task, script, style, layout, heap } = measurement.thread;
+      const { task, script, style, layout, layouts, styleRecalcs, nodes, heap } =
+        measurement.thread;
       lines.push(
         `Main thread: ${ms(task)} task, of which ${ms(script)} script, ${ms(style)} style, ` +
-          `${ms(layout)} layout. Heap ${(heap / 1024 / 1024).toFixed(1)} MB.`,
+          `${ms(layout)} layout. ${layouts} layouts and ${styleRecalcs} style recalcs over ` +
+          `${nodes} nodes. Heap ${(heap / 1024 / 1024).toFixed(1)} MB.`,
         '',
       );
     }

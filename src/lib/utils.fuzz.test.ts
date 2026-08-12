@@ -102,6 +102,50 @@ describe('utility properties', () => {
     expect(matchesQuery(name, query)).toBe(true);
   });
 
+  /**
+   * The three edits the matcher promises to forgive, on a fragment of a real
+   * name rather than on a whole one.
+   *
+   * Its neighbour above covers a single substitution into a full name. This one
+   * covers what a thumb actually does — a wrong letter, two letters swapped, a
+   * letter missed — against the part of a name somebody typed before they
+   * stopped. It exists because the typo pass is the expensive half of the
+   * search and therefore the half most likely to be optimized: anything that
+   * makes it cheaper by rejecting candidates earlier has to answer to this, and
+   * an over-eager rejection would show up in a lobby as "it stopped finding
+   * people who spell their own child's name slightly wrong" rather than as
+   * anything anybody would look for in a change made for speed.
+   *
+   * Latin letters and a bounded length, unlike its neighbours here, and both
+   * deliberately: this property is about typo tolerance and not about Unicode.
+   * `arbitraryString` produces astral characters, and a fragment taken from one
+   * by `slice` can be half a surrogate pair — which is not a fragment of the
+   * name, so the name is right not to match it. It also produces names past
+   * `FUZZY_MAX_LENGTH`, where the typo pass is skipped altogether so that an
+   * untrusted ten-thousand-character "name" cannot be made to cost a quadratic
+   * pass.
+   */
+  const LETTERS = 'abcdefghijklmnopqrstuvwxyz';
+
+  forAll('a name fragment damaged inside the budget still finds the name', (rng) => {
+    const length = rng.int(8, 24);
+    const name = Array.from({ length }, () => rng.pick([...LETTERS])).join('');
+    const start = rng.int(0, name.length - 7);
+    const fragment = name.slice(start, start + 7);
+    const at = rng.int(0, 5);
+    const kind = rng.pick(['substitute', 'transpose', 'drop']);
+    const typed =
+      kind === 'substitute'
+        ? // One substitution, into a letter that is certainly not the one there.
+          `${fragment.slice(0, at)}${fragment[at] === 'q' ? 'x' : 'q'}${fragment.slice(at + 1)}`
+        : kind === 'transpose'
+          ? `${fragment.slice(0, at)}${fragment[at + 1]}${fragment[at]}${fragment.slice(at + 2)}`
+          : `${fragment.slice(0, at)}${fragment.slice(at + 1)}`;
+    return { name, typed };
+  }, ({ name, typed }) => {
+    expect(matchesQuery(name, typed)).toBe(true);
+  });
+
   forAll('a one-character query is never fuzzy', (rng) => ({
     name: arbitraryString(rng),
     letter: rng.pick(['q', 'x', 'z', 'j']),

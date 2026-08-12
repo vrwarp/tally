@@ -734,11 +734,16 @@ test.describe('kiosk performance', () => {
     record({
       scenario: 'Check-in — row tap to the confirm screen, then to the tick',
       cpuThrottle: THROTTLE,
+      // Both halves of the gesture, summed — except the levels, which are
+      // levels: the heap and the node count are read at the end, not added up.
       thread: {
         task: thread.task + confirmThread.task,
         script: thread.script + confirmThread.script,
         style: thread.style + confirmThread.style,
         layout: thread.layout + confirmThread.layout,
+        layouts: thread.layouts + confirmThread.layouts,
+        styleRecalcs: thread.styleRecalcs + confirmThread.styleRecalcs,
+        nodes: confirmThread.nodes,
         heap: confirmThread.heap,
       },
       timings: {
@@ -1198,13 +1203,51 @@ test.describe('kiosk performance', () => {
     await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
   });
 
-  test('prints a label', async ({ browser }) => {
+  /**
+   * The kiosk a church that prints actually has.
+   *
+   * Worth saying plainly, because every other scenario in this file is a kiosk
+   * with *no* printer: `hasConfiguredPrinter()` is false, so the printing chunk
+   * is never imported and no worker ever starts. That is the right default —
+   * most kiosks do not print — but it means the boot and keystroke numbers
+   * above describe the lighter of the two devices, and the heavier one is the
+   * one bolted to a shelf next to a Brother QL.
+   *
+   * So this measures three things a non-printing kiosk cannot show: what the
+   * printing chunk costs at boot, what a label costs from the confirm tap, and
+   * — the one that matters for responsiveness — what the *next* family's
+   * keystrokes feel like while the previous family's sticker is still being
+   * drawn.
+   */
+  test('prints a label, and stays usable while it does', async ({ browser }) => {
     // Its own device: the recorder that stands in for the USB printer has to be
     // installed before the page loads, and so does the printer configuration
     // that makes the kiosk load the printing chunk at all.
     const printer = await instrumentedKiosk(browser, { printing: true });
     try {
-      await printer.page.goto(KIOSK_PATH);
+      await throttleCpu(printer.cdp, THROTTLE);
+      const { wall: bootWall, thread: bootThread } = await measureThread(printer.cdp, async () => {
+        await printer.page.goto(KIOSK_PATH);
+        await expect(printer.page.getByTestId('kiosk-pairing-code')).toBeVisible({
+          timeout: 60_000,
+        });
+      });
+      const bootProbe = await readProbe(printer.page);
+      record({
+        scenario: 'Cold boot of a kiosk that prints',
+        cpuThrottle: THROTTLE,
+        thread: bootThread,
+        timings: {
+          'nav to pairing code': bootWall,
+          ...pageTimings(bootProbe),
+        },
+        notes: [
+          'Compare against "Cold boot, unpaired" above: the difference is the ' +
+            'printing chunk parsing and the rasteriser’s worker starting.',
+        ],
+      });
+
+      await throttleCpu(printer.cdp, 1);
       await pairKiosk(printer.page, staff);
       await bindTo(printer.page, /nursery/i);
 
@@ -1236,6 +1279,88 @@ test.describe('kiosk performance', () => {
           'The rasteriser runs in a worker, so the main-thread numbers beside this ' +
             'are the app carrying on, not the drawing. The clock is the honest instrument here.',
           'Printing is fire-and-forget: nothing on screen waits for this.',
+        ],
+      });
+
+      /*
+       * The next family, while the last family's sticker is still being drawn.
+       *
+       * This is the sequence a printing kiosk is in for most of a busy twenty
+       * minutes, and the one place printing can reach a parent who is not
+       * printing anything: the raster runs in a worker, but the label template,
+       * the job assembly, the allergy read and the transfer are all main-thread
+       * work that lands between somebody's keystrokes.
+       *
+       * The window deliberately starts on the confirm tap rather than after it:
+       * dismissing the tick and typing the next name is what a volunteer does
+       * in the second the sticker takes.
+       */
+      /*
+       * A second family, so there is a raster actually in flight.
+       *
+       * The measurement above waits for the first label before it stops the
+       * clock, which means that by then there is nothing left to interfere with
+       * anything. So this checks somebody else in and starts typing without
+       * waiting — which is also the honest sequence: nobody in a queue waits for
+       * a sticker before stepping up to the screen.
+       *
+       * Everything that can be prepared is prepared first. The tick returns to
+       * the search screen on its own after four seconds (`AUTO_RETURN_MS` in
+       * SuccessScreen), which is less time than resolving three key positions
+       * takes on a throttled machine, so any setup inside the window would
+       * spend the window.
+       */
+      await printer.page.getByText(/welcome/i).click().catch(() => {});
+      await expect(printer.page.getByText(/^type a name$/i)).toBeVisible({ timeout: 10_000 });
+      // While the keyboard is still on screen — the confirm screen has none.
+      const pad = await keyPad(printer.page, 'JOS');
+
+      await typeOnKiosk(printer.page, 'NIA');
+      const nia = printer.page.getByRole('button', { name: /Nia/i }).first();
+      await expect(nia).toBeVisible({ timeout: 15_000 });
+      await nia.click();
+      await expect(printer.page.getByRole('button', { name: /^Check in$/ })).toBeVisible();
+
+      const before = (await recordedLabels(printer.page)).length;
+      await beginPhase(printer.page);
+
+      const { thread: busyThread } = await measureThread(printer.cdp, async () => {
+        await printer.page.getByRole('button', { name: /^Check in$/ }).click();
+        // Tapped if the tick is still up, waited out if it has already returned:
+        // both are what a volunteer meets, and neither is what is being measured.
+        await printer.page.getByText(/welcome/i).click({ timeout: 3000 }).catch(() => {});
+        await expect(printer.page.getByText(/^type a name$/i)).toBeVisible({ timeout: 10_000 });
+        await tapKeys(printer.page, pad, 'JOS');
+        await expect(printer.page.getByRole('button', { name: /Josiah/i }).first()).toBeVisible({
+          timeout: 15_000,
+        });
+      });
+
+      const busyProbe = await readProbe(printer.page);
+      const busyTaps = percentiles(busyProbe.taps.map((tap) => tap.ms));
+      const after = (await recordedLabels(printer.page)).length;
+
+      record({
+        scenario: 'Typing the next name while a label is being drawn',
+        cpuThrottle: THROTTLE,
+        thread: busyThread,
+        timings: {
+          'tap → paint p50': busyTaps.p50,
+          'tap → paint worst': busyTaps.max,
+          ...responsiveness(busyProbe),
+          'long tasks': busyProbe.longTasks.length,
+          'labels finished during the window': after - before,
+        },
+        notes: [
+          after > before
+            ? 'The raster really did land inside this window, so these keystrokes ' +
+              'were typed against a working rasteriser.'
+            : 'The label had already finished before the typing started — this run ' +
+              'measured ordinary typing and says nothing about interference.',
+          'The worker itself is NOT throttled: Playwright’s CDP session addresses the ' +
+            'page target, and `Emulation.setCPUThrottlingRate` cannot be sent to a ' +
+            'worker through it. On a Raspberry Pi every core is slow, so real ' +
+            'contention is worse than this — read it as a floor.',
         ],
       });
     } finally {

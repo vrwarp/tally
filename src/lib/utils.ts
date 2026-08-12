@@ -385,16 +385,44 @@ export function matchesQuery(searchName: string, query: string): boolean {
  * Adjacent transpositions cost one edit rather than two, because swapping two
  * letters ("Mracus") is how a name gets mistyped at speed.
  */
+/**
+ * The three rolling rows, allocated once for the life of the tab.
+ *
+ * This function runs for every student the plain substring pass missed, on
+ * every keystroke — four hundred children is twelve hundred typed arrays per
+ * letter, all of them garbage by the time the letter has painted. That is
+ * invisible on a laptop and it is not on a Raspberry Pi, where it was a
+ * measurable part of a keystroke that had grown to 136ms.
+ *
+ * Safe to share because the search is synchronous and single-threaded: there is
+ * no await inside this function and nothing else on the main thread can be
+ * inside it at the same time. They grow to fit the longest name seen and never
+ * shrink, which is bounded by `FUZZY_MAX_LENGTH` — the guard above this is what
+ * stops a ten-thousand-character "name" from a Firestore document sizing them.
+ */
+let dpTwoBack = new Uint16Array(0);
+let dpPrev = new Uint16Array(0);
+let dpRow = new Uint16Array(0);
+
 function approximatelyIncludes(text: string, needle: string, budget: number): boolean {
   const m = needle.length;
   const n = text.length;
   // Even a perfect alignment has to account for the length difference.
   if (m - budget > n) return false;
 
+  if (dpRow.length < n + 1) {
+    dpTwoBack = new Uint16Array(n + 1);
+    dpPrev = new Uint16Array(n + 1);
+    dpRow = new Uint16Array(n + 1);
+  }
   // Three rolling rows: the transposition rule reaches two rows back.
-  let twoBack = new Uint16Array(n + 1);
-  let prev = new Uint16Array(n + 1); // row 0, all zeroes: free start offset.
-  let row = new Uint16Array(n + 1);
+  let twoBack = dpTwoBack;
+  let prev = dpPrev;
+  let row = dpRow;
+  // Row 0 is all zeroes — that is what buys the needle a free start offset —
+  // and a reused buffer is only zero if it is made so. `row` needs no clearing:
+  // every cell of it is assigned before it is read.
+  prev.fill(0, 0, n + 1);
 
   for (let i = 1; i <= m; i += 1) {
     row[0] = i;

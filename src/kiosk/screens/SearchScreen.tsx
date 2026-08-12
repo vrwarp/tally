@@ -33,7 +33,7 @@
  * in the wrong place besides. A labelled key in a fixed position can be
  * described over the phone; the prompt is what makes it safe to be findable.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { gradeDescription, haptic } from '@/lib/utils';
 import { Keyboard, type KioskKey } from '../components/Keyboard';
 import { useTap, useTapGuard } from '../components/tapGuard';
@@ -181,6 +181,18 @@ export function SearchScreen({
    * parent this line is under cannot rebind a tablet. See `windowHasOpened`.
    */
   const notOpenYet = !windowHasOpened(binding, now);
+
+  /*
+   * The gathering's hours, worked out once per gathering rather than once per
+   * keystroke.
+   *
+   * This screen re-renders on every letter typed, and `eventWindow` formats two
+   * times through `Intl` — a string that cannot change until the kiosk is bound
+   * to something else. It was among the ten most expensive functions on the
+   * lobby screen; on a Raspberry Pi it was seven milliseconds of every letter.
+   * See docs/kiosk-performance.md.
+   */
+  const hours = useMemo(() => eventWindow(binding), [binding]);
 
   /*
    * The no-match panel is showing this same offer, in the same words, as its
@@ -370,7 +382,7 @@ export function SearchScreen({
             ? `Check-in opens ${opensAtLabel(binding, now)}`
             : closed
               ? 'Check-in window has closed — you can still check in.'
-              : eventWindow(binding)}
+              : hours}
         </div>
       </div>
 
