@@ -21,7 +21,7 @@ import {
 import { exportFilename } from '@/lib/csv';
 import type { OneOffOnlyStudent, OneOffRecap } from '@/features/dashboard/insights';
 import { formatRelative, formatShortDate } from '@/lib/time';
-import { gradeLabel, initials } from '@/lib/utils';
+import { gradeSentence, initials } from '@/lib/utils';
 import { studentFullName } from '@/types';
 
 export interface OneOffRecapListProps {
@@ -135,7 +135,7 @@ export function OneOffOnlyList({
 
       <ul className="divide-y divide-ink-800">
         {items.map((item) => {
-          const grade = gradeLabel(item.student);
+          const grade = gradeSentence(item.student);
 
           return (
             <li key={item.student.id} className="px-3 py-2">
@@ -157,7 +157,7 @@ export function OneOffOnlyList({
                   <span className="truncate text-xs text-ink-500">
                     {/* Dropped, not replaced, when Planning Center holds no grade
                         for them: where and when they were met is the line. */}
-                    {grade ? `${grade} grade · ` : ''}
+                    {grade ? `${grade} · ` : ''}
                     met at {item.events[0]?.title} · {formatShortDate(item.metAt)},{' '}
                     {formatRelative(item.metAt)}
                   </span>

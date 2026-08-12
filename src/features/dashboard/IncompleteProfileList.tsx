@@ -25,7 +25,7 @@ import {
 } from '@/features/dashboard/followUpCsv';
 import { exportFilename } from '@/lib/csv';
 import { formatShortDate } from '@/lib/time';
-import { gradeLabel, initials } from '@/lib/utils';
+import { gradeSentence, initials } from '@/lib/utils';
 import { studentFullName, type Student } from '@/types';
 
 /** Past this many days an unfinished profile stops being a fresh to-do. */
@@ -154,7 +154,7 @@ function IncompleteRow({
   onContactAdded?: () => void;
 }) {
   const days = waitingDays(student, now);
-  const grade = gradeLabel(student);
+  const grade = gradeSentence(student);
   const tone =
     days === null ? 'warn' : days >= VERY_STALE_DAYS ? 'danger' : days >= STALE_DAYS ? 'warn' : 'neutral';
   const badge =
@@ -198,7 +198,7 @@ function IncompleteRow({
               {/* Silent rather than "No grade" for a person Planning Center
                   holds no grade for — this line is about the wait, and a grade
                   Tally invented is not a fact worth the width. */}
-              {grade ? `${grade} grade · ` : ''}
+              {grade ? `${grade} · ` : ''}
               {days === null
                 ? 'no parent contact in Planning Center'
                 : `added ${formatShortDate(student.createdAt)}`}

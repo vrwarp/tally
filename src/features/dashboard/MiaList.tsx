@@ -23,7 +23,7 @@ import {
 } from '@/features/dashboard/followUpCsv';
 import { exportFilename } from '@/lib/csv';
 import { formatRelative, formatShortDate } from '@/lib/time';
-import { gradeLabel, initials } from '@/lib/utils';
+import { gradeSentence, initials } from '@/lib/utils';
 import { studentFullName, type MiaStudent } from '@/types';
 
 export interface MiaListProps {
@@ -128,7 +128,7 @@ function MiaRow({
 }) {
   const { student, consecutiveMisses, lastAttendedAt, lastAttendedEventTitle } = item;
   const name = studentFullName(student);
-  const grade = gradeLabel(student);
+  const grade = gradeSentence(student);
 
   /*
    * The gathering is named once per row, not twice.
@@ -188,7 +188,7 @@ function MiaRow({
                 date — the reason the row exists — into an ellipsis. An adult
                 Planning Center holds no grade for says nothing here at all
                 rather than "No grade", for the same reason. */}
-            {grade ? <span className="hidden lg:inline">{grade} grade · </span> : null}
+            {grade ? <span className="hidden lg:inline">{grade} · </span> : null}
             {lastSeen}
           </span>
           {showGathering ? (
