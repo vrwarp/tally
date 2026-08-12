@@ -325,8 +325,8 @@ const html = `<title>Tally — reprinting a name tag</title>
   <footer>
     <p>
       The design, the constraints and what was thrown out are in
-      <code>docs/kiosk-reprint.md</code>; the critique rounds behind it are in
-      <code>uxr/rounds/reprint-r01</code> through <code>r04</code>. Regenerate this page with
+      <code>docs/kiosk-reprint.md</code>; the critique rounds behind it are summarised in
+      <code>docs/refinements.md</code>. Regenerate this page with
       <code>npx tsx uxr/kiosk-reprint/walkthrough.ts</code> then
       <code>npx tsx scripts/build-reprint-walkthrough.ts</code>.
     </p>

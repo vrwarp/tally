@@ -165,7 +165,7 @@ export function PairingScreen({
             * core-team only — so on the Friday evenings when the person next to
             * the kiosk is a counselor, which is most of them, this sentence
             * named a door they had no key to. Kiosk is in the account menu for
-            * every active member; see `uxr/JOURNEY-kiosk.md`.
+            * every active member; see `docs/refinements.md`.
             */}
           <div className="max-w-md text-lg leading-relaxed text-ink-300">
             In Tally, tap your name and choose{' '}

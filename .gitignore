@@ -54,6 +54,12 @@ docs/walkthrough/walkthrough.html
 docs/walkthrough/parents/shots/
 docs/walkthrough/parents/index.html
 
+# The `.artifact.html` twin of a walkthrough page is the same frames again,
+# rebuilt for publishing rather than for reading in the repository. Nothing
+# links to one; both build alongside the page they twin.
+docs/walkthrough/*.artifact.html
+docs/walkthrough/*/*.artifact.html
+
 # The theme walkthrough follows the same split, and its `web/*.png` are PNG
 # rather than JPEG on purpose — a page arguing about which hue a gathering chose
 # should not ship through a codec that stores colour at half resolution. See the
@@ -72,25 +78,28 @@ tsconfig.tsbuildinfo
 # `npm run e2e` deletes is a measurement nobody can compare against.
 perf-results/
 
-# UXR refinement working files.
+# UXR refinement working files — none of them are committed.
 #
-# `uxr/baseline/` and `uxr/prototype/` ARE committed: they are the frozen
-# derivations of the live app the refinement was argued over, and the record of
-# what was decided is worth nothing without them. The renders are not — every
-# round re-shoots every frame from the HTML in a couple of seconds.
+# The frozen scenes, the prototypes edited on top of them and the frames shot
+# from those are all *working* files: they exist while a refinement is being
+# argued and are re-derived from the running app on demand. They used to be
+# committed on the reasoning that a critique is worth nothing without the frame
+# it judged — true while a loop is running, and the reason the loop's own
+# conclusions are now written down in prose instead. What survived those
+# arguments is in `src/`; what it settled is in `docs/refinements.md`.
+#
+# Everything below regenerates: `npm run uxr:capture` for the walked-to scenes,
+# `uxr:team` / `uxr:kiosk-setup` for the mounted ones, `uxr:shoot` for the PNGs.
+uxr/baseline/
+uxr/prototype*/
 uxr/renders/
-
-# Nor are the before/after captures of the finished work: `UXR_OUT=before|after
-# npm run uxr:capture` re-derives them from the running app, and what the
-# walkthrough actually ships is the optimised JPEGs under `docs/uxr/`. The Team
-# refinement's pair comes from `npm run uxr:team` instead of the capture spec,
-# and is no more worth committing than the others.
 uxr/before/
 uxr/after/
 uxr/before-team/
 uxr/after-team/
 uxr/before-kiosk/
 uxr/after-kiosk/
+uxr/before-sync/
 
 # Emitted JavaScript, kept ignored as a backstop.
 #
@@ -122,11 +131,9 @@ docs/uxr/walkthrough.html
 docs/uxr/team-walkthrough.html
 docs/uxr/kiosk-walkthrough.html
 
-# UXR renders — regenerable from the prototypes with `uxr/shoot.ts`, and a round
-# is a few megabytes of PNG. The critiques themselves are the record and are
-# tracked; the frames they were made from are not.
-/uxr/rounds/**/*.png
-/uxr/renders/
+# Round working directories, for a refinement that is currently running.
+# Converged campaigns are summarised in `docs/refinements.md` instead.
+/uxr/rounds/
 
 # One-off measuring scripts the critique agents write beside the prototypes to
 # read a rendered frame's geometry. They are a step in an argument, not a tool —

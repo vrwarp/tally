@@ -355,7 +355,7 @@ describe('the history', () => {
 /**
  * The calendar as a core member who has been added to almost nothing sees it.
  *
- * These are the claims the refinement loop in `uxr/rounds/ev-r0*` settled, and
+ * These are the claims the refinement loop settled — see `docs/refinements.md` — and
  * every one of them was a defect on the shipping screen: the state was stated
  * once per row instead of once per chain, it named nobody, and the page went on
  * offering writes the rules refuse.

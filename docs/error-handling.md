@@ -23,39 +23,29 @@ volunteer can act on.
 4. **Distinguish "not configured" from "broken".** A Planning Center card that
    has never run is not an error, and must not look like one.
 
-## What was found and fixed
+## The guards, and what each one is for
 
-### A render error left a blank white screen
+**`src/components/ErrorBoundary.tsx`** wraps the app shell and, separately, each
+lazily-loaded route. Without the outer one, any thrown render error unmounts the
+whole tree and a counselor mid-check-in is left staring at nothing. The per-route
+boundary matters as much: a lazy chunk that fails to load is the common field
+failure — a stale service worker pointing at a chunk a deploy removed — and it
+must not take the shell down with it. That case is worded specifically, *"Tally
+was updated while this page was open"*, because the fix is a reload rather than a
+retry and a generic apology sends someone down the wrong path.
 
-`src/components/ErrorBoundary.tsx` now wraps the app shell and, separately, each
-lazily-loaded route. Before, any thrown render error unmounted the whole tree —
-a counselor mid-check-in would have been left staring at nothing at all.
+**`AuthGate` gives up after eight seconds.** Restoring a session normally takes a
+moment but can stall indefinitely: a network that blocks Google's auth endpoints
+(school and church content filtering does exactly this), a wedged service worker,
+an IndexedDB the browser will not open in private mode. Found by running the
+end-to-end suite on a mobile user agent, where a blocked `apis.google.com` delayed
+the restore by roughly 25 seconds. The screen now explains itself and offers
+*Reload* and *Sign in again*.
 
-The per-route boundary matters as much as the outer one: a lazy chunk that fails
-to load is the common field failure (a stale service worker pointing at a chunk
-a deploy removed), and it must not take the shell down with it. That case is
-detected and worded specifically — "Tally was updated while this page was open"
-— because the fix is a reload, not a retry, and a generic apology would send
-someone down the wrong path.
-
-### Restoring a session could spin forever
-
-`AuthGate` showed a bare spinner while Firebase resolved the session. That
-normally takes a moment, but it can stall indefinitely: a network that blocks
-Google's auth endpoints (school and church content filtering does exactly this),
-a wedged service worker, an IndexedDB the browser will not open in private mode.
-
-This was found by running the end-to-end suite on a mobile user agent, where a
-blocked `apis.google.com` delayed the restore by roughly 25 seconds. After eight
-seconds the screen now explains itself and offers *Reload* and *Sign in again*.
-
-### Google sign-in could hang with no error at all
-
-The worst kind of failure, because no catch block can rescue it. In an installed
-PWA on Android, `signInWithPopup` opens a Custom Tab whose handshake never
-returns to the app window; on iOS the popup is blocked outright.
-
-`src/lib/embeddedBrowser.ts` now decides the strategy *before* the attempt:
+**`src/lib/embeddedBrowser.ts` picks the sign-in strategy before the attempt,**
+because a hung Google sign-in is the one failure no catch block can rescue. In an
+installed PWA on Android, `signInWithPopup` opens a Custom Tab whose handshake
+never returns to the app window; on iOS the popup is blocked outright.
 
 | Context | Strategy |
 | --- | --- |
@@ -67,70 +57,48 @@ returns to the app window; on iOS the popup is blocked outright.
 The third row is the subtle one: a third-party redirect handler loses its
 `sessionStorage` to Safari's storage partitioning and fails with "unable to
 process request due to missing initial state". Refusing beats a flow that
-half-works. Setting `authDomain` to the hosting domain — Firebase Hosting
-already serves `/__/auth/*` there — makes redirect available again.
+half-works. Setting `authDomain` to the hosting domain — Firebase Hosting already
+serves `/__/auth/*` there — makes redirect available again. Since Tally accepts
+Google and only Google, "unavailable" is a genuine dead end, so the login screen
+disables the button and says to open Tally in Safari or Chrome rather than
+offering something that silently does nothing. *Approach adapted from
+[`vrwarp/numbers`](https://github.com/vrwarp/numbers), which had already solved
+this.*
 
-"Unavailable" used to be softened by the email magic link, which worked in every
-one of these contexts. That path is gone — Tally accepts Google and only Google —
-so this is now a genuine dead end, and the login screen says so plainly: it
-disables the button and tells the person to open Tally in Safari or Chrome,
-instead of offering something that silently does nothing.
+**Every date `src/services/converters.ts` returns is finite.** `date-fns` throws a
+`RangeError` when asked to format an `Invalid Date`, so one malformed timestamp
+anywhere became a crash on the check-in screen. The guard sits at the boundary,
+where every path already passes, rather than in each consumer.
 
-*Approach adapted from [`vrwarp/numbers`](https://github.com/vrwarp/numbers),
-which had already solved this.*
+**`computeNewVisitors` filters on a validated timestamp.** Every comparison with
+`NaN` is false, so a student whose `firstAttendedAt` was unusable sat on the new
+visitor list permanently and nobody would think to question it.
 
-### An invalid date became a crash
+**`fromDateTimeLocalValue` rejects dates that do not exist.**
+`'2026-02-31T19:00'` used to roll forward to 3 March without complaining, which
+silently scheduled the wrong evening. Throwing is correct here: the caller is a
+form and can show the error.
 
-`date-fns` throws a `RangeError` when asked to format an `Invalid Date`, so one
-malformed timestamp anywhere became a crash on the check-in screen. Every date
-`src/services/converters.ts` returns is now finite — the guard sits at the
-boundary, where every path already passes, rather than in each consumer.
+**The Planning Center client keeps paginating while pages come back full.** It
+used to stop at any page carrying no `next` link, so a full page without one
+would have imported the first hundred students and dropped the rest, with no
+error anywhere. Still bounded by the page cap and the repeated-cursor check.
 
-Found by the fuzz suite; see [fuzzing.md](fuzzing.md).
+The last three were found by the property suite; see [fuzzing.md](fuzzing.md).
 
-### A corrupt timestamp pinned a student to a follow-up list
+## Deliberate non-guards
 
-Every comparison with `NaN` is false, so `computeNewVisitors` could not filter
-out a student whose `firstAttendedAt` was unusable — they would sit on the new
-visitor list permanently, and nobody would think to question it. Also found by
-fuzzing.
+Three places look like they are missing error handling and are not:
 
-### A typo'd date silently scheduled the wrong evening
+- **`parseTimeOfDay` throws on malformed input.** Every caller is either seed data
+  or a validated form, so the throw is unreachable in practice and swallowing it
+  would hide a real configuration mistake.
+- **A full sweep that scans zero people skips deactivation.** A deleted list looks
+  identical to "the ministry lost every student", and that write is not undoable
+  in one click.
+- **The roster algorithm has no `try`/`catch`,** per rule 3 above.
 
-`fromDateTimeLocalValue('2026-02-31T19:00')` used to roll forward to 3 March
-without complaining. It now rejects out-of-range fields and dates that do not
-exist. Throwing is correct here: the caller is a form and can show the error.
-
-### A full page of results with no cursor truncated the roster
-
-Not a UI failure but the same class of problem — a silent one. The Planning
-Center client stopped paginating at any page carrying no `next` link, so a full
-page without one would have imported the first hundred students and dropped the
-rest, with no error anywhere. It now keeps walking while pages come back full,
-still bounded by the page cap and the repeated-cursor check.
-
-## What was checked and left alone
-
-- **Check-in writes** (`src/features/checkin/**`). Already correct: a failed
-  `checkIn` toasts with the student's name and re-enables the row, and the
-  in-flight guard prevents a double tap firing twice. No change.
-- **Firestore listeners** (`src/context/DataProvider.tsx`). Every stream has an
-  error callback that both surfaces the message and marks that stream ready, so
-  a permanently denied listener cannot wedge the app behind a spinner. This was
-  right from the start and is worth not disturbing.
-- **The sync's terminal state** (`functions/src/sync/**`). A failing run already
-  writes a terminal `error` state rather than leaving `running` behind; there is
-  a test for it, and another for the case where Planning Center returns 500 for
-  every request.
-- **The empty-sweep guard.** A full sweep that scans zero people deliberately
-  skips deactivation, because a deleted list looks identical to "the ministry
-  lost every student" and that write is not undoable in one click. Left exactly
-  as it was.
-- **`parseTimeOfDay`** throws on malformed input. Every caller is either seed
-  data or a validated form, so the throw is unreachable in practice and
-  swallowing it would hide a real configuration mistake.
-
-## Not fixed
+## Known gaps
 
 - **Losing the network is not surfaced.** Tally is an online-only app: Firestore
   runs on an in-memory cache, so a check-in with no connection is a write that

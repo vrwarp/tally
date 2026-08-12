@@ -284,8 +284,8 @@ ${sections.join('\n')}
   <footer>
     Captured by <code>e2e/edit-queue-walkthrough.spec.ts</code> and assembled by
     <code>scripts/build-edit-queue-walkthrough.ts</code>. The reasoning behind the states is in
-    <code>docs/profile-edits.md</code>; the design rounds that produced them are in
-    <code>uxr/rounds/sync-r0*</code>.
+    <code>docs/profile-edits.md</code>; the design rounds that produced them are summarised in
+    <code>docs/refinements.md</code>.
   </footer>
 </main>
 </body>

@@ -22,8 +22,9 @@
  *
  * ## What the critique loop settled
  *
- * Four rounds, in `uxr/rounds/team-r0*`, and three decisions are worth knowing
- * before editing this file, because each looks like an oddity and is not:
+ * Four rounds — see `docs/refinements.md` — and three decisions are worth
+ * knowing before editing this file, because each looks like an oddity and is
+ * not:
  *
  * **The row is a container query, not a breakpoint.** An admin's roster shares
  * its width with the 24rem invite column, so at `lg` the row has 296px and at

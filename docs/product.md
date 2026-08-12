@@ -169,8 +169,9 @@ whose number matches. Neither holds the button, and not answering leaves exactly
 always run — but the sentence above the button says which way it will fall, because a reviewer
 should not have to press it to find out whether the church is about to get a second Rosa Salgado.
 The one answer this reaches that no matching ever could is the mother who is on file under the
-number she had last year. Five rounds of critique are recorded in [`uxr/rounds/`](../uxr/rounds/); the last
-two judged the shipping screen rather than a prototype.
+number she had last year. Five rounds of critique are summarised in
+[`docs/refinements.md`](refinements.md#the-review-queue--5-rounds); the last two judged the shipping
+screen rather than a prototype.
 
 **And the answer the screen was missing, which is none of the three.** Every button above decides
 *identity*; none of them says **the details are wrong**. A card reading `Micheal Okonkwo` left a
@@ -335,8 +336,8 @@ forty-three teenagers" is only sayable by inventing a custom field on every pers
 
 Team is its own route rather than the last card on Settings, which is where it lived until it was
 the one thing on that page anybody came back to and the only one below a colour picker. Four rounds
-of critique on the split-out screen are recorded in [`uxr/rounds/`](../uxr/rounds/) — `team-r01`
-through `team-r04` — and the before/after is
+of critique on the split-out screen are summarised in
+[`docs/refinements.md`](refinements.md#the-team-screen--4-rounds), and the before/after is
 [`docs/uxr/team-changes.json`](uxr/team-changes.json), built with `npm run uxr:team-walkthrough`.
 
 Tally writes back only what the church asked for: by default it creates a Person for a quick-added

@@ -7,7 +7,7 @@
  * parent genuinely reaches the review queue through the callable, and the card
  * at the end is the real `/review` reading a real Firestore document.
  *
- * It walks the four journeys in docs/uxr/counselor-parent-contact.md, in order,
+ * It walks the four journeys in docs/parent-contact.md, in order,
  * and shoots each at the two sizes a counselor actually holds — a phone at the
  * door, a laptop on a Tuesday.
  *
