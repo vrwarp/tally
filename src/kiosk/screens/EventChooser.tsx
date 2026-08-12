@@ -120,7 +120,19 @@ export function EventChooser({
                 key={`${entry.chain}:${entry.startAt}`}
                 onTap={() => setSelected(index)}
                 onHeld={() => void bind(index)}
-                className={`rounded-xl border-2 p-5 text-left transition-colors ${
+                /*
+                 * `active:` on a row, and the transition narrowed to the border
+                 * to let it land.
+                 *
+                 * A row is held as well as tapped, and a hold now waits
+                 * `HOLD_DELAY_MS` before its bar appears — so without a pressed
+                 * state the first fifth of a second of every press on this
+                 * screen was a row doing nothing at all. `transition-colors`
+                 * covered the background too, which would have faded that
+                 * answer in over its own 150ms and spent the delay twice; the
+                 * ring it was written for is the border, and that still moves.
+                 */
+                className={`rounded-xl border-2 p-5 text-left transition-[border-color] active:bg-ink-700 ${
                   binding ? 'pointer-events-none ' : ''
                 }${
                   isSelected
@@ -186,7 +198,7 @@ export function EventChooser({
           }}
           className={`w-full rounded-xl p-5 text-xl font-semibold ${
             selected !== null && !binding
-              ? 'bg-brand-600 text-white'
+              ? 'bg-brand-600 text-white active:bg-brand-500'
               : 'pointer-events-none bg-ink-800 text-ink-500'
           }`}
         >

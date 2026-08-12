@@ -12,6 +12,11 @@
  * browser is left free to say so. Past it the kiosk has decided this contact is
  * a hold: the bar starts filling and the page stops moving under the finger.
  *
+ * So the bar is no longer what answers the touch, and every caller has to bring
+ * a CSS `:active` fill of its own. Three of them did not, and for a fifth of a
+ * second each press on them was a control doing nothing whatever — which is the
+ * same failure as an invisible bar, arriving earlier.
+ *
  * Progress is driven by a CSS transition on a scaling bar rather than by
  * animation frames: the only JavaScript is two timers — one to arm, one to
  * complete — and the pointer handlers that cancel them.

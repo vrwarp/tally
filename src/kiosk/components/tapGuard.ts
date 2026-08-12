@@ -15,7 +15,14 @@
  * kiosk buys back the part that mattered by keeping the pressed-state fill on
  * CSS `:active`, which still lands the same frame as the touch. The glass
  * answers immediately; it just does not *act* until the hand has finished
- * saying what it meant.
+ * saying what it meant. Every control this guards has to carry that fill, or
+ * waiting for the lift becomes waiting with nothing to look at.
+ *
+ * The other half of the promise is that sliding off is *free*: a press can be
+ * thought better of, and thought better of again, and the control is still
+ * there when the thumb comes back. That is the behaviour people learned from
+ * every button on their phone, and it is why nothing here decides anything
+ * until the finger leaves the glass.
  *
  * The keyboard is the exception, and stays on contact — see components/
  * Keyboard.tsx. A key reports that the glass took the press, and a letter that
@@ -58,69 +65,115 @@ export function strayed(press: Press | null, event: React.PointerEvent): boolean
   );
 }
 
+/** Whether this pointer came off inside the control it went down on. */
+export function within(node: Element, event: React.PointerEvent): boolean {
+  const box = node.getBoundingClientRect();
+  return (
+    event.clientX >= box.left &&
+    event.clientX <= box.right &&
+    event.clientY >= box.top &&
+    event.clientY <= box.bottom
+  );
+}
+
 export interface TapHandlers {
   onPointerDown: (event: React.PointerEvent) => void;
-  onPointerMove: (event: React.PointerEvent) => void;
   onPointerUp: (event: React.PointerEvent) => void;
   onPointerCancel: () => void;
-  onPointerLeave: () => void;
 }
 
 /**
- * Returns a factory: call it with whatever the control stands for, spread the
- * result onto the control, and `onTap` fires with that value on a real tap.
+ * How far a press may wander and still mean the control it started on.
  *
- * One press is tracked at a time — a lobby kiosk has one thumb on it — so the
- * handlers all share the hook's own ref rather than one per control.
+ * Two answers, because the question is two questions.
  *
- * Which is also why the element that took the press is remembered alongside the
- * point. Rows in a list sit far enough apart that the slop alone told them
- * apart, but the buttons this now guards do not: two doors in a stack, or Back
- * beside Cancel, are a handful of pixels from each other, and a press that went
- * down on one and came up on the next must be neither rather than both.
+ * `bounds` is what a button asks, and it is what every native control asks:
+ * iOS and Android care whether the finger came off *inside the control*, not
+ * how far it travelled to get there. On a full-width `h-16` commit button
+ * nothing is under the thumb for a drift to have meant instead, so a wobble of
+ * twenty pixels is a press, exactly as it is everywhere else the person has
+ * ever pressed anything.
+ *
+ * `slop` is what a row in a scrolling list asks, and there the distance *is*
+ * the question: the first frame of a scroll is a press that has not moved yet,
+ * and a dozen pixels is where a held thumb ends and a drag begins. A row cannot
+ * use `bounds`, because a scroll that starts on a row and ends on it — the list
+ * having moved underneath — comes off inside a control it never meant.
  */
-export function useTapGuard<T>(onTap: (value: T) => void): (value: T) => TapHandlers {
+type Reach = 'bounds' | 'slop';
+
+function usePressGuard<T>(onTap: (value: T) => void, reach: Reach): (value: T) => TapHandlers {
   const pressRef = useRef<(Press & { node: EventTarget }) | null>(null);
   const tapRef = useRef(onTap);
   tapRef.current = onTap;
 
-  return useCallback((value: T) => {
-    const clear = () => {
-      pressRef.current = null;
-    };
-    return {
-      onPointerDown: (event: React.PointerEvent) => {
-        // Keeps the touch from selecting text or focusing the control mid-drag.
-        event.preventDefault();
-        pressRef.current = {
-          pointerId: event.pointerId,
-          x: event.clientX,
-          y: event.clientY,
-          node: event.currentTarget,
-        };
-      },
-      onPointerMove: (event: React.PointerEvent) => {
-        if (pressRef.current && strayed(pressRef.current, event)) clear();
-      },
-      onPointerUp: (event: React.PointerEvent) => {
-        const wasTap =
-          pressRef.current?.node === event.currentTarget && !strayed(pressRef.current, event);
-        clear();
-        if (wasTap) tapRef.current(value);
-      },
-      onPointerCancel: clear,
-      onPointerLeave: clear,
-    };
-  }, []);
+  return useCallback(
+    (value: T) => {
+      const clear = () => {
+        pressRef.current = null;
+      };
+      return {
+        onPointerDown: (event: React.PointerEvent) => {
+          // Keeps the touch from selecting text or focusing the control mid-drag.
+          event.preventDefault();
+          pressRef.current = {
+            pointerId: event.pointerId,
+            x: event.clientX,
+            y: event.clientY,
+            node: event.currentTarget,
+          };
+        },
+        /*
+         * Everything is decided here, and nothing before it.
+         *
+         * There was a `pointermove` handler that dropped the press the moment it
+         * strayed, and it made the cancellation one-way: a thumb that slid off a
+         * button and came back — which every platform re-arms, and which is the
+         * whole reason people trust that they can slide off — was pressing a
+         * control that had already stopped listening. Nothing needs the early
+         * exit. The browser sends `pointercancel` the instant it decides a touch
+         * is a scroll, which is the cancellation that actually matters, and a
+         * press that ends somewhere it should not simply fails this test.
+         */
+        onPointerUp: (event: React.PointerEvent) => {
+          const press = pressRef.current;
+          clear();
+          // The control that took the press is the only one that may answer it:
+          // two doors in a stack, or Back beside Cancel, are a handful of pixels
+          // apart, and a press that went down on one and came up on the next
+          // must be neither rather than both.
+          if (!press || press.node !== event.currentTarget) return;
+          if (press.pointerId !== event.pointerId) return;
+          const missed =
+            reach === 'bounds' ? !within(event.currentTarget, event) : strayed(press, event);
+          if (!missed) tapRef.current(value);
+        },
+        onPointerCancel: clear,
+      };
+    },
+    [reach],
+  );
+}
+
+/**
+ * Returns a factory: call it with whatever the row stands for, spread the
+ * result onto the row, and `onTap` fires with that value on a real tap.
+ *
+ * For rows in something that scrolls — see `Reach` above for why they are the
+ * ones measured by distance. One press is tracked at a time (a lobby kiosk has
+ * one thumb on it), so the handlers share the hook's own ref rather than one
+ * per row.
+ */
+export function useTapGuard<T>(onTap: (value: T) => void): (value: T) => TapHandlers {
+  return usePressGuard(onTap, 'slop');
 }
 
 /**
  * The same guard, for a control that means one thing rather than one of many.
  *
- * A button is a row whose value is the act itself, so this is `useTapGuard`
- * with the act passed where the row passes its student: call the hook once per
+ * A button is a row whose value is the act itself: call the hook once per
  * component, spread `tap(() => …)` onto each button, and the callback runs when
- * a finger that went down on *that* button comes off it having stayed put.
+ * a finger that went down on *that* button comes off inside it.
  *
  * Anything the press should also do at the moment of the act — the buzz, most
  * often — goes inside the callback, which is why the buzzes moved off contact
@@ -129,5 +182,5 @@ export function useTapGuard<T>(onTap: (value: T) => void): (value: T) => TapHand
  * what the screen was doing.
  */
 export function useTap(): (run: () => void) => TapHandlers {
-  return useTapGuard<() => void>((run) => run());
+  return usePressGuard<() => void>((run) => run(), 'bounds');
 }

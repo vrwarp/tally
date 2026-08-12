@@ -446,7 +446,11 @@ export function ConfirmScreen({
       ) : intent === 'check-out' ? (
         <HoldButton
           onHeld={() => onConfirm(chosen)}
-          className="w-full shrink-0 rounded-2xl bg-brand-600 p-7 text-3xl font-bold text-white"
+          /* `active:` because the bar no longer answers the touch: a hold waits
+             `HOLD_DELAY_MS` before it starts counting, and this button had
+             nothing else to say it had been pressed. The green button below it
+             has carried the same fill all along. */
+          className="w-full shrink-0 rounded-2xl bg-brand-600 p-7 text-3xl font-bold text-white active:bg-brand-500"
         >
           {others > 0 ? `Hold to collect all ${chosen.length}` : 'Hold to collect'}
         </HoldButton>
