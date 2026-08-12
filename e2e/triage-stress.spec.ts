@@ -324,21 +324,36 @@ test.describe('when the backend will not take them', () => {
     });
 
     try {
+      await gotoReady(page, '/review');
+      const card = cardFor(page, `Paz ${surname}`);
+      await expect(card).toBeVisible({ timeout: 30_000 });
+
       /*
-       * Every request, not a budget of two.
+       * Every request, not a budget of two — and armed here rather than before
+       * the page loads.
        *
        * A count was the obvious way to say "down for this one write" and it
        * failed the wrong requests: the push's own preflight reads
        * `/field_definitions` first, so a budget of two was spent before the
        * person write was attempted and the approval finished cleanly. What the
-       * test means is "the backend is down", and the reset below is what ends
-       * the outage.
+       * test means is "the backend is down", and `clearFaults` below is what
+       * ends the outage.
+       *
+       * But an unlimited outage armed before `gotoReady` is an outage the
+       * *review screen itself* has to load through, and this screen reads the
+       * roster to answer "is this child already on it". That read is served
+       * from a five-second cache, so whether the card ever appeared came down
+       * to how long the previous test took — under load the cache was cold,
+       * the roster read met the 503, and the card never rendered. The failure
+       * pointed at approval, which had not yet been reached.
+       *
+       * Arming it after the card is on screen is also the truthful
+       * arrangement, and the same one `renameThen` uses in
+       * `upstream-edits.spec.ts`: the backend was up while the reviewer read
+       * the card, and went down on the way out.
        */
       await planningCenter.fail(503, 'Planning Center is unavailable');
 
-      await gotoReady(page, '/review');
-      const card = cardFor(page, `Paz ${surname}`);
-      await expect(card).toBeVisible({ timeout: 30_000 });
       await approve(card);
 
       /*
@@ -360,8 +375,9 @@ test.describe('when the backend will not take them', () => {
       expect(held).toHaveLength(1);
       expect(held[0]!.data.pendingReview).toBe(false);
 
-      // Now the backend is back, and the same button finishes the job.
-      await planningCenter.reset();
+      // Now the backend is back, and the same button finishes the job. Only
+      // the outage is lifted: `reset` would take the seeded ministry with it.
+      await planningCenter.clearFaults();
       await page.reload();
       const again = cardFor(page, `Paz ${surname}`);
       await expect(again).toBeVisible({ timeout: 30_000 });
@@ -374,7 +390,7 @@ test.describe('when the backend will not take them', () => {
         })
         .toBe(1);
     } finally {
-      await planningCenter.reset();
+      await planningCenter.clearFaults();
       await removeRegistration(registrationId, 1);
     }
   });

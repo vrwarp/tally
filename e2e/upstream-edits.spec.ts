@@ -32,6 +32,7 @@ import { expect, test } from './support/fixtures';
 import { gotoReady, signIn, TEAM } from './support/auth';
 import {
   burySimulatorPerson,
+  clearSimulatorFaults,
   drainQueue,
   drainStudentNow,
   holdSimulator,
@@ -307,12 +308,38 @@ test.describe('an edit on its way to Planning Center', () => {
     // filled, or it would break the read that unlocks the boxes instead.
     await renameThen(page, 'Johnson-Reyes', () => rateLimitSimulator(99, 1));
 
-    await pump(studentId, ['waiting']);
-    await expect(strip(page)).toContainText('Waiting on Planning Center');
-    // The sentence that stops somebody retrying a thing that was never stuck.
-    await expect(strip(page)).toContainText('resumes on its own');
+    /*
+     * Waited for, not driven — and read in one look.
+     *
+     * Both halves of that are about the same fact: `waiting` is a blink, and
+     * there are only eight of them.
+     *
+     * A rate limit answers with `Retry-After`, and the Planning Center client
+     * believes it *inside a single job attempt*: four internal retries, each
+     * sleeping the second the header asked for, before the attempt is finally
+     * recorded as one failure. So a job cycles roughly four seconds `sending`
+     * for every one second `waiting`, and after `MAX_ATTEMPTS` of that it stops
+     * being a machine's problem and becomes `failed` — permanently, and about
+     * forty seconds in.
+     *
+     * This used to `pump`, which drains as it polls. That put a second driver
+     * beside the browser's own poke and burned the eight attempts twice as
+     * fast, and then asked for the heading and the promise in two consecutive
+     * assertions — two separate one-second windows, the second of them starting
+     * only once the first had spent one. Under load the job reached `failed`
+     * first and the spec reported "Could not reach Planning Center" as though
+     * the backoff were broken.
+     *
+     * So: nobody drives it but the browser, and the heading and the sentence
+     * are one assertion over one window. The sentence is the one that stops
+     * somebody retrying a thing that was never stuck, so it is still asserted —
+     * just not at the price of a second blink.
+     */
+    await waitForEditState(studentId, ['waiting'], 30_000);
+    await expect(strip(page)).toContainText(
+      /Waiting on Planning Center[\s\S]*resumes on its own/,
+    );
 
-    const { clearSimulatorFaults } = await import('./support/emulator');
     await clearSimulatorFaults();
 
     /*
