@@ -68,10 +68,23 @@ async function upstreamLastName(personId: string): Promise<string> {
   return String(match?.last_name ?? '');
 }
 
-/** Opens one student's record, the way a leader reaches it. */
+/**
+ * Opens one student's record, the way a leader reaches it.
+ *
+ * Thirty seconds rather than the default ten, for the reason `onServer` below
+ * gives about the same number: this is the first page load in the file, it
+ * lands on an emulator the previous spec file has just spent a quarter of an
+ * hour writing to, and the button it waits for is drawn from a details read
+ * served through a five-second cache that is reliably cold by then. Ten
+ * seconds was enough for the button on a quiet machine and not on a loaded
+ * one, which made the first test in this file fail perhaps one run in three —
+ * always here, and always reading as though the profile screen were broken.
+ */
 async function openProfile(page: Page, studentId: string) {
   await gotoReady(page, `/students/${studentId}`);
-  await expect(page.getByRole('button', { name: 'Edit profile' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Edit profile' })).toBeVisible({
+    timeout: 30_000,
+  });
 }
 
 /** Types a new surname into the editor and presses Save. */
@@ -117,8 +130,9 @@ async function renameTo(page: Page, surname: string) {
   const lastName = dialog.getByLabel(/^Last name/);
   // The managed boxes stay disabled until the details read has landed and said
   // write-back is `full`; typing before that would be typing into a form that
-  // has not yet seen what Planning Center holds.
-  await expect(lastName).toBeEnabled();
+  // has not yet seen what Planning Center holds. Thirty seconds for the same
+  // reason `openProfile` takes thirty: it is the same read, under the same load.
+  await expect(lastName).toBeEnabled({ timeout: 30_000 });
   await lastName.fill(surname);
   await dialog.getByRole('button', { name: 'Save changes' }).click();
   await expect(dialog).toBeHidden();
@@ -141,7 +155,7 @@ async function renameThen(
   await page.getByRole('button', { name: 'Edit profile' }).click();
   const dialog = page.getByRole('dialog');
   const lastName = dialog.getByLabel(/^Last name/);
-  await expect(lastName).toBeEnabled();
+  await expect(lastName).toBeEnabled({ timeout: 30_000 });
   await lastName.fill(surname);
   await arm();
   await dialog.getByRole('button', { name: 'Save changes' }).click();
