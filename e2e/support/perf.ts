@@ -65,9 +65,48 @@ export interface TapSample {
   ms: number;
 }
 
+/**
+ * One interaction, in the three pieces that say *why* it was slow.
+ *
+ * From the Event Timing API, which is the only instrument that can tell the
+ * difference between the two ways a screen fails to respond:
+ *
+ *  - **delay** — the browser had the event and could not deliver it, because
+ *    the main thread was busy with something else. A tap that lands 300ms after
+ *    the glass was touched feels ignored, and nothing the handler does can
+ *    recover it. This is the number a benchmark of handlers alone cannot see.
+ *  - **processing** — the app's own handler, which is what the profiler
+ *    attributes and what optimizing code changes.
+ *  - **presentation** — handler to pixels: style, layout, paint, composite.
+ *
+ * `durationThreshold` is 16ms because that is the floor the spec allows, so an
+ * interaction inside a frame is invisible here by construction. That is the
+ * right bar: this list is meant to be *empty* on a healthy screen.
+ */
+export interface Interaction {
+  name: string;
+  /**
+   * The browser's own grouping of the events one gesture produced.
+   *
+   * A single tap emits `pointerdown`, `pointerup` and `click` — three entries
+   * for one thing a person did. Counting entries therefore counts keyboards,
+   * not taps: sixty presses in the registration wizard reported six hundred
+   * "slow interactions", which is a number about the API. The spec gives every
+   * gesture an id and defines its latency as the longest of its events; zero
+   * means an event that belongs to no gesture.
+   */
+  interactionId: number;
+  delay: number;
+  processing: number;
+  presentation: number;
+  total: number;
+}
+
 /** What the page collected about itself. */
 export interface Probe {
   taps: TapSample[];
+  /** Interactions the browser itself judged slow — see {@link Interaction}. */
+  interactions: Interaction[];
   longTasks: { start: number; duration: number }[];
   firstPaint: number | null;
   firstContentfulPaint: number | null;
@@ -95,6 +134,7 @@ export async function installProbe(page: Page): Promise<void> {
   await page.addInitScript(() => {
     const probe: Probe = {
       taps: [],
+      interactions: [],
       longTasks: [],
       firstPaint: null,
       firstContentfulPaint: null,
@@ -115,6 +155,34 @@ export async function installProbe(page: Page): Promise<void> {
         /* Not supported here; the report says `null` rather than zero. */
       }
     };
+
+    /*
+     * Every interaction the browser considered worth reporting.
+     *
+     * `buffered` as well, so a tap that landed while the page was still booting
+     * — the one a probe installed later would miss entirely, and the one most
+     * likely to have been swallowed — is in the list.
+     */
+    try {
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          const timing = entry as PerformanceEventTiming;
+          probe.interactions.push({
+            name: timing.name,
+            interactionId: timing.interactionId ?? 0,
+            delay: timing.processingStart - timing.startTime,
+            processing: timing.processingEnd - timing.processingStart,
+            presentation: timing.startTime + timing.duration - timing.processingEnd,
+            total: timing.duration,
+          });
+        }
+        // `durationThreshold` is Event Timing's own option and is missing from
+        // the DOM lib's `PerformanceObserverInit`; without the cast this is a
+        // type error about a field the browser reads.
+      }).observe({ type: 'event', buffered: true, durationThreshold: 16 } as PerformanceObserverInit);
+    } catch {
+      /* No Event Timing here; the report says so by having no rows. */
+    }
 
     observe('longtask', (entries) => {
       for (const entry of entries) {
@@ -201,6 +269,7 @@ export async function beginPhase(page: Page): Promise<void> {
     const probe = window.__kioskPerf;
     if (!probe) return;
     probe.taps = [];
+    probe.interactions = [];
     probe.longTasks = [];
     probe.resources = [];
   });

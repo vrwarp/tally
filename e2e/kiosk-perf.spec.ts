@@ -30,6 +30,14 @@
  * the Planning Center simulator and arrive through the same callable, the same
  * join and the same cache as everybody else.
  *
+ * ## One file, one sequence
+ *
+ * These scenarios are a serial pipeline, not a bag of independent tests: the
+ * kiosk is paired once, bound once, and every later scenario inherits the
+ * screen the one before it left. Running a subset with `-g` therefore fails in
+ * confusing ways — a filtered run reaches "leave the gathering" on a kiosk that
+ * was never paired. Run the file.
+ *
  * ## What it will not tell you
  *
  * The emulators are on this machine, so every network number here is a floor —
@@ -63,6 +71,7 @@ import {
   readProbe,
   throttleCpu,
   writeReport,
+  type Interaction,
   type Measurement,
   type Probe,
 } from './support/perf';
@@ -75,6 +84,13 @@ const THROTTLE = Number(process.env.KIOSK_PERF_THROTTLE ?? 4);
 const ROSTER_TARGET = Number(process.env.KIOSK_PERF_ROSTER ?? 450);
 /** How long the idle scenario watches a kiosk nobody is touching. */
 const IDLE_MS = Number(process.env.KIOSK_PERF_IDLE_MS ?? 35_000);
+/**
+ * `PULSE_POLL_MS` in src/kiosk/KioskApp.tsx, copied rather than imported: that
+ * module is React, and pulling it into the test process to read one number
+ * would drag the whole app in behind it. If the kiosk's cadence changes, this
+ * scenario waits too little and says so in its own notes rather than lying.
+ */
+const PULSE_POLL_MS = 30_000;
 
 test.describe.configure({ mode: 'serial' });
 
@@ -142,6 +158,49 @@ function perTap(taps: readonly { label: string; ms: number }[]): Record<string, 
   return Object.fromEntries(
     taps.map((tap, index) => [`  tap ${index + 1} “${tap.label}”`, tap.ms]),
   );
+}
+
+/**
+ * The responsiveness lines: what the browser itself judged slow.
+ *
+ * Separate from the tap→paint stopwatch, and worth both. The stopwatch says how
+ * long the screen took; this says which of the three parts of an interaction it
+ * was — and one of those parts, the input delay, is the one a parent reads as
+ * "it ignored me". A screen whose handler is instant but whose main thread was
+ * busy for 200ms when the finger landed is unresponsive, and no measurement of
+ * the handler would ever say so.
+ *
+ * Empty is the healthy answer: nothing under 16ms is reported at all.
+ */
+function responsiveness(probe: Probe): Record<string, number | null> {
+  // One row per gesture, not per event: the longest event of an interaction is
+  // that interaction's latency, which is how INP is defined.
+  const byGesture = new Map<number, Interaction>();
+  for (const interaction of probe.interactions) {
+    if (interaction.interactionId === 0) continue;
+    const held = byGesture.get(interaction.interactionId);
+    if (!held || interaction.total > held.total) byGesture.set(interaction.interactionId, interaction);
+  }
+
+  const gestures = [...byGesture.values()].sort((a, b) => b.total - a.total);
+  const worst = gestures[0];
+  if (!worst) return { 'slow gestures (>16ms)': 0 };
+
+  return {
+    'slow gestures (>16ms)': gestures.length,
+    /*
+     * The bar a person feels rather than a spec's. A hundred milliseconds is
+     * where a response stops reading as caused by the touch and starts reading
+     * as the screen deciding something; on a kiosk that is where a parent
+     * presses again. This number is meant to be zero.
+     */
+    'gestures over 100ms': gestures.filter((gesture) => gesture.total > 100).length,
+    'worst gesture': worst.total,
+    '  of which input delay': worst.delay,
+    '  of which handler': worst.processing,
+    '  of which paint': worst.presentation,
+    'worst input delay of any': Math.max(...gestures.map((gesture) => gesture.delay)),
+  };
 }
 
 /** Records one scenario, and prints its headline so a watched run says something. */
@@ -471,6 +530,65 @@ test.describe('kiosk performance', () => {
     await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
   });
 
+  /**
+   * A tap while the kiosk is still waking up.
+   *
+   * The responsiveness failure a benchmark of a settled screen can never find,
+   * and the one a lobby produces constantly: a parent walks up to a tablet that
+   * has just been switched on, or has just done its 4am reload, sees a keyboard,
+   * and presses a letter. Between the first paint and the app being ready there
+   * is a window where the main thread is parsing the Firebase chunk and joining
+   * a roster — and an event that arrives in that window waits for it.
+   *
+   * `delay` in the interaction rows is the whole point here. A handler that
+   * takes 2ms is no comfort if the browser sat on the event for 300ms first:
+   * what the finger felt is the sum, and only one of the two is anybody's code.
+   */
+  test('answers a key pressed while it is still booting', async () => {
+    await throttleCpu(cdp, THROTTLE);
+    await beginPhase(kiosk);
+
+    const reloaded = kiosk.reload();
+    // Not `waitFor`: the point is to press as early as the glass allows, which
+    // is the moment the key has a box — a parent does not wait for readiness,
+    // they wait for something that looks like a keyboard.
+    const key = kiosk.locator('[data-key="J"]');
+    await key.waitFor({ state: 'visible', timeout: 60_000 });
+    const box = await key.boundingBox();
+    if (box) await kiosk.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await reloaded;
+    /*
+     * The letter has to have *landed*, and this is the assertion that says so:
+     * a J typed into a kiosk bound to the Nursery finds Josiah. A keyboard
+     * drawn before it works is a kiosk that eats the first character of every
+     * name typed at it, and the parent's evidence for that is a search that
+     * quietly returns the wrong people.
+     */
+    await expect(kiosk.getByRole('button', { name: /Josiah/i }).first()).toBeVisible({
+      timeout: 60_000,
+    });
+
+    const probe = await readProbe(kiosk);
+    const taps = percentiles(probe.taps.map((tap) => tap.ms));
+    record({
+      scenario: 'A key pressed while the kiosk is still booting',
+      cpuThrottle: THROTTLE,
+      timings: {
+        'tap → paint': taps.max,
+        ...responsiveness(probe),
+        'long tasks during boot': probe.longTasks.length,
+        'longest task': probe.longTasks.reduce((worst, task) => Math.max(worst, task.duration), 0),
+      },
+      notes: [
+        'The letter has to land: a keyboard drawn before it works is a kiosk that ' +
+          'swallows the first character of every name typed at it.',
+      ],
+    });
+
+    await kiosk.locator('[data-key="clear"]').click();
+    await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
+  });
+
   test('reboots warm, the way a shelf device does at 4am', async () => {
     await throttleCpu(cdp, THROTTLE);
     const { wall, thread } = await measureThread(cdp, async () => {
@@ -581,6 +699,7 @@ test.describe('kiosk performance', () => {
         'tap → paint worst': taps.max,
         'taps sampled': taps.count,
         ...perTap(probe.taps),
+        ...responsiveness(probe),
         'profiled main-thread time': sampledMs,
         'long tasks while typing': probe.longTasks.length,
       },
@@ -664,6 +783,7 @@ test.describe('kiosk performance', () => {
         'tap → paint p50': taps.p50,
         'tap → paint worst': taps.max,
         ...perTap(probe.taps),
+        ...responsiveness(probe),
         'long tasks': probe.longTasks.length,
       },
       notes: [
@@ -812,6 +932,7 @@ test.describe('kiosk performance', () => {
         'tap → paint worst': taps.max,
         'taps sampled': taps.count,
         ...perTap(probe.taps),
+        ...responsiveness(probe),
         'profiled main-thread time': sampledMs,
         'long tasks while typing': probe.longTasks.length,
       },
@@ -920,6 +1041,161 @@ test.describe('kiosk performance', () => {
           'drift between families rather than the absolute number.',
       ],
     });
+  });
+
+  /**
+   * A keystroke while the roster is being replaced underneath it.
+   *
+   * The kiosk refetches on a pulse: somebody adds a family in the office, the
+   * sentinel document's revision moves, and within thirty seconds four hundred
+   * children cross the wire, are joined against Tally's own documents, are
+   * written to localStorage and land in React state as a brand-new array. Every
+   * memo keyed on `students` then recomputes.
+   *
+   * A parent typing at that moment is the case no other scenario here covers,
+   * and it is the one where a hitch would be invisible in a bug report: it
+   * happens once, to one family, and by the time anybody looks the screen is
+   * fine. So the pulse is bumped deliberately and the typing is measured across
+   * the refetch it triggers.
+   */
+  test('keeps up while the roster is refreshed underneath it', async () => {
+    await throttleCpu(cdp, THROTTLE);
+    const pad = await keyPad(kiosk, 'JUNIPER');
+
+    // The sentinel the functions bump whenever kiosk-visible data changes. A
+    // revision the kiosk has not seen is the whole signal — see
+    // functions/src/kiosk/pulse.ts and `fetchPulse` in services.ts.
+    await writeDocument('kioskIndex/pulse', {
+      roster: { rev: Date.now(), at: new Date() },
+      phones: { rev: 1, at: new Date() },
+      participation: { rev: 1, at: new Date() },
+    });
+
+    await beginPhase(kiosk);
+    const { thread, wall } = await measureThread(cdp, async () => {
+      // The poll is every 30s and the bump could have landed just after one, so
+      // the window has to be wider than the interval.
+      await tapKeys(kiosk, pad, 'JUNIPER');
+      await kiosk.waitForTimeout(PULSE_POLL_MS + 5_000);
+    });
+    const probe = await readProbe(kiosk);
+    const taps = percentiles(probe.taps.map((tap) => tap.ms));
+    const refetched = probe.resources.some((resource) => resource.name.includes('/getRoster'));
+
+    record({
+      scenario: 'Typing while a pulse-driven roster refetch lands',
+      cpuThrottle: THROTTLE,
+      thread,
+      timings: {
+        'seven letters, then a full poll interval': wall,
+        'tap → paint p50': taps.p50,
+        'tap → paint worst': taps.max,
+        ...responsiveness(probe),
+        'long tasks': probe.longTasks.length,
+        'longest task': probe.longTasks.reduce((worst, task) => Math.max(worst, task.duration), 0),
+      },
+      notes: [
+        refetched
+          ? 'The refetch landed inside the window: the roster really was replaced here.'
+          : 'No getRoster in the window — the pulse did not fire, so this run measured ' +
+            'ordinary typing and its numbers say nothing about the refetch.',
+        'A long task here is a screen that stutters under somebody’s hands for a ' +
+          'reason they will never be able to describe.',
+      ],
+    });
+
+    await kiosk.locator('[data-key="clear"]').click();
+    await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
+  });
+
+  /**
+   * The longest thing anybody does at a kiosk: registering a family.
+   *
+   * Eleven screens for two children and a parent, most of them a name typed one
+   * letter at a time on the kiosk's own keyboard, and it ends in a callable that
+   * creates people upstream. Nobody has ever measured it, and it is the flow
+   * where a slow step is least forgivable — a parent who has already given you
+   * six screens is the one most likely to walk away.
+   */
+  test('registers a family', async () => {
+    await throttleCpu(cdp, THROTTLE);
+    const surname = 'Pennywhistle';
+
+    await beginPhase(kiosk);
+    const steps: Record<string, number> = {};
+    const step = async (name: string, body: () => Promise<void>) => {
+      const started = Date.now();
+      await body();
+      steps[`  ${name}`] = Date.now() - started;
+    };
+
+    const started = Date.now();
+    await kiosk.getByRole('button', { name: /Register your child/i }).click();
+
+    await step('first child', async () => {
+      await typeOnKiosk(kiosk, 'WREN');
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await kiosk.locator('[data-key="clear"]').click();
+      await typeOnKiosk(kiosk, surname);
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await kiosk.getByRole('button', { name: '4th grade', exact: true }).click();
+    });
+
+    await step('second child', async () => {
+      await kiosk.getByRole('button', { name: /Add another child/i }).click();
+      // The surname arrives already filled in from the first child.
+      await typeOnKiosk(kiosk, 'FOX');
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await kiosk.getByRole('button', { name: '2nd grade', exact: true }).click();
+      await kiosk.getByRole('button', { name: /That's everyone/i }).click();
+    });
+
+    await step('the parent', async () => {
+      await typeOnKiosk(kiosk, 'DANA');
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await kiosk.locator('[data-key="clear"]').click();
+      await typeOnKiosk(kiosk, surname);
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await typeOnKiosk(kiosk, '5550149911');
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+    });
+
+    await step('submit → checked in', async () => {
+      await expect(kiosk.getByText(`Wren ${surname}`)).toBeVisible();
+      await kiosk.getByRole('button', { name: /Check in everyone/i }).click();
+      await expect(kiosk.getByText(/are checked in/i)).toBeVisible({ timeout: 30_000 });
+    });
+
+    const wall = Date.now() - started;
+    const probe = await readProbe(kiosk);
+    const taps = percentiles(probe.taps.map((tap) => tap.ms));
+
+    record({
+      scenario: 'Registering a family — two children and a parent',
+      cpuThrottle: THROTTLE,
+      timings: {
+        'start to checked in': wall,
+        ...steps,
+        'tap → paint p50': taps.p50,
+        'tap → paint worst': taps.max,
+        'taps': taps.count,
+        ...responsiveness(probe),
+        'long tasks': probe.longTasks.length,
+      },
+      notes: [
+        'The wizard is typed at machine speed here; a parent is slower. What the ' +
+          'numbers are for is the per-step shape and the tap latency, not the total.',
+        'Typed by locator rather than by coordinate, unlike the search scenarios: ' +
+          'the wizard changes layout under the finger — a phone pad replaces the ' +
+          'keyboard — so a position measured on one step is a mis-tap on the next.',
+        '`registerFamily` creates the people upstream, so the last step is a real ' +
+          'round trip through the callable and the simulator.',
+      ],
+    });
+
+    await kiosk.getByRole('button', { name: /^Done$/ }).click();
+    await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
   });
 
   test('prints a label', async ({ browser }) => {

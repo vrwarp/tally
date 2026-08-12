@@ -12,8 +12,9 @@ So there is a benchmark, and it runs on the real thing.
 npm run perf:kiosk          # ~45 seconds, chromium-desktop
 ```
 
-It is `e2e/kiosk-perf.spec.ts` — eleven scenarios covering a boot, a keystroke,
-a check-in, a label, a shelf left idle and a queue at the door — and it drives
+It is `e2e/kiosk-perf.spec.ts` — fourteen scenarios covering a boot, a keystroke,
+a check-in, a label, a registration, a shelf left idle, a queue at the door and a
+roster replaced under somebody's hands — and it drives
 the same stack the end-to-end suite does: a production build behind
 `vite preview`, the Firebase emulators, the Planning Center simulator. Nothing is stubbed in the browser. It writes
 `perf-results/kiosk-perf.md` to read and
@@ -55,6 +56,7 @@ Four instruments, because each of them lies on its own (`e2e/support/perf.ts`):
 | Instrument | Answers |
 | --- | --- |
 | In-page probe | What a finger waits through: `pointerdown` → the next paint, long tasks, FCP/LCP |
+| Event Timing | *Why* an interaction was slow — input delay, handler, paint — grouped per gesture the way INP is |
 | `Performance.getMetrics` | Where a phase's main-thread time went: script, style, layout |
 | Sampling profiler | *Which function* — self time, resolved through source maps to `src/…` |
 | Resource timing | Which of it was the network, by channel |
@@ -83,6 +85,7 @@ same machine, so every network figure is a floor.
 | Confirm → raster job ready | 152 ms | 25.6 kB, in the worker |
 | Typing, scoped to a gathering | 22 ms p50 | 36 ms worst |
 | Typing, unscoped (whole church) | 22 ms p50 | 36 ms worst |
+| Registering a family | ~6.5 s | two children and a parent, typed at machine speed |
 | Idle for 35 s | 325 ms task | of which 25 ms script, no long tasks |
 | Queue of seven families | 313 → 390 ms | first to last; no drift beyond noise |
 
@@ -152,7 +155,7 @@ The keyboard is already memoized against a stable `onKey` (see
 not the forty keys. That was true before any of this and it is why the render
 row above is as small as it is.
 
-### Three scenarios that found nothing, which is the finding
+### Scenarios that found nothing, which is the finding
 
 - **Idle on a shelf** — 35 seconds of a kiosk nobody is touching costs 25 ms of
   script, no long tasks, four network requests (two pulse polls, two queue
@@ -167,6 +170,61 @@ row above is as small as it is.
 - **The confirm screen over the whole church**: 121 ms, the same as it costs
   scoped. `familyOf` scans all 412 children looking for the ones who answer to
   the same phone digits, and that scan does not show up.
+- **Registering a family** — the longest thing anybody does here, eleven screens
+  for two children and a parent — is 6.5 s typed at machine speed, and the split
+  is the one you would want: 2.2 s for the first child, 0.9 s for the second
+  (the surname arrives already filled in, which is the tax that flow exists to
+  remove), 2.8 s for the parent, and 0.4 s for a submit that creates people
+  upstream through a real callable.
+
+## Responsiveness
+
+Speed and responsiveness are not the same claim, and the second one needs its
+own instrument. A screen can answer every tap in 20 ms and still feel broken if
+one tap in fifty waits 300 ms for a busy main thread before the handler even
+runs — and a stopwatch around the handler will never see it. Event Timing splits
+every gesture into the three pieces that distinguish them:
+
+- **input delay** — the browser had the event and could not deliver it. This is
+  the one a parent reads as "it ignored me", and no amount of optimizing the
+  handler recovers it.
+- **handler** — the app's own code, which is what the profiler attributes.
+- **paint** — handler to pixels.
+
+Grouped per gesture rather than per event, because one tap emits `pointerdown`,
+`pointerup` and `click`: counting entries counted keyboards, not taps.
+
+Across every scenario, throttled ×4, with a 412-child roster:
+
+| | |
+| --- | --- |
+| Gestures over 100 ms — the bar where a response stops reading as caused by the touch | **0** |
+| Worst gesture anywhere | 72 ms, during a boot |
+| Worst input delay anywhere | 12 ms |
+| Typical split of a slow gesture | ~3 ms delay, ~1 ms handler, the rest paint |
+
+So the kiosk is never *blocked* when a finger lands, in any state this measures
+— including mid-boot, and including the thirty seconds in which a pulse replaces
+all 412 children underneath a parent who is typing. What a slow tap costs is
+paint, not blocking, which is the benign one of the two.
+
+Two specific cases are worth naming because they are the ones that would fail
+silently:
+
+- **A key pressed while the kiosk is still booting** lands. The scenario presses
+  a letter the moment the keyboard has a box on screen — before the app is ready
+  — and asserts the letter reaches the search. A keyboard drawn before it works
+  is a kiosk that eats the first character of every name typed at it, and nobody
+  would ever report that as a bug; they would report that the search is wrong.
+- **Typing while the roster is refetched underneath** is unaffected: the pulse is
+  bumped deliberately, all 412 children cross the wire and land in React state
+  mid-gesture, and no long task appears.
+
+At ×4 throttle almost every tap crosses the 16 ms floor Event Timing reports at,
+because a tap costs about 20 ms end to end. That is one frame and a bit on a
+machine pretending to be four times slower than it is, and it is the same on the
+search screen, the confirm screen and the registration wizard — there is no
+screen here that is measurably less responsive than the others.
 
 ## When you change something here
 
