@@ -736,16 +736,33 @@ function buildEvents(now: Date): BuiltEvent[] {
    * A nursery, so the check-out roster is one command away rather than a setup
    * ritual.
    *
-   * Deliberately later today rather than live. A second open gathering would
-   * compete with the guaranteed-live Friday below — both for the "is anything
-   * on?" test and for the top of the chooser — and every spec that opens a
-   * roster by reaching for the first card would start depending on which of
-   * the two sorted first. Check-in is never gated on the window anyway, so a
-   * roster three hours out is fully usable.
+   * Starts later today and takes arrivals *now*, which is a real shape — a
+   * room that opens its doors early — and which this used to get away without.
+   * The window sat three hours out on the argument that "check-in is never
+   * gated on the window anyway". That is no longer true on the kiosk: a lobby
+   * screen refuses to write an arrival before its gathering opens, because an
+   * evening recorded against a date that has not happened is wrong on a
+   * register somebody trusts next week (see `windowHasOpened`). A nursery is
+   * the one seeded gathering that hands children back, prints, and carries a
+   * theme, so it is the one every kiosk spec binds to — and a gathering a kiosk
+   * cannot work is no use to them.
+   *
+   * The competition this was avoiding is still avoided, just not by staying
+   * shut. `ChooseEvent` sorts open gatherings by start time ascending, and this
+   * one starts last of anything live, so the guaranteed-live Friday below is
+   * still the first card a spec reaching for one finds. `pickActiveEvent`
+   * orders the other way, and nothing renders its answer.
+   *
+   * Clamped to today for the reason the Friday below is: three hours past a
+   * seed run at ten at night is tomorrow, and a gathering the kiosk's chooser
+   * files under a different day is one no lobby screen will offer.
    */
-  const nurseryStart = addMinutes(now, 180);
+  const nurseryStart = new Date(
+    Math.min(addMinutes(now, 180).getTime(), atTime(now, '23:30').getTime()),
+  );
+  const nurseryId = `nursery-${isoDay(now)}`;
   events.push({
-    id: `nursery-${isoDay(now)}`,
+    id: nurseryId,
     title: 'Nursery',
     seriesId: SERIES_IDS.sundaySchool,
     isOneOff: true,
@@ -762,7 +779,10 @@ function buildEvents(now: Date): BuiltEvent[] {
     kioskTheme: { ground: 'light', accent: 'ember', confirm: 'forest', backdrop: 'amber' },
     startAt: nurseryStart,
     endAt: addMinutes(nurseryStart, 90),
-    checkInOpensAt: addMinutes(nurseryStart, -30),
+    // Doors already open — see the note above. Five minutes back rather than
+    // exactly `now` so the window is unambiguously open by the time the seed
+    // has finished writing and the first browser has loaded.
+    checkInOpensAt: addMinutes(now, -5),
     checkInClosesAt: addMinutes(nurseryStart, 150),
     isPast: false,
   });
@@ -780,9 +800,16 @@ function buildEvents(now: Date): BuiltEvent[] {
    * that does. It carries no attendance (it has not happened yet), and
    * `recentSeriesInstances` excludes events whose window is still open, so it
    * never pollutes the history that predicts its own roster.
+   *
+   * The nursery above does not count towards "something is live", even though
+   * its doors are now open. It is the kiosk's gathering — it hands children
+   * back, it prints, it is themed — and letting it satisfy this test would
+   * silently retire the plain, guaranteed-live Friday that every check-in spec
+   * reaches for on the days no real one falls.
    */
   const somethingIsLive = events.some(
-    (event) => event.checkInOpensAt <= now && event.checkInClosesAt >= now,
+    (event) =>
+      event.id !== nurseryId && event.checkInOpensAt <= now && event.checkInClosesAt >= now,
   );
 
   if (!somethingIsLive) {
