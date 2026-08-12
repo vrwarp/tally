@@ -508,9 +508,19 @@ describe('a gathering somebody else owns', () => {
     show([], locked());
 
     const past = await screen.findByRole('region', { name: /past gatherings/i });
-    const links = within(past)
-      .getAllByRole('link')
-      .map((link) => link.getAttribute('href'));
+    /*
+     * `findAllByRole`, because finding the region does not mean finding the
+     * links. `PastGatherings` renders its `<section>` and heading while the
+     * read is still in flight — it only returns null once it knows there is
+     * nothing to show — so the region resolves against a body of loading
+     * skeletons that contains no links at all. A synchronous `getAllByRole`
+     * here therefore threw "unable to find role" whenever the mock's promise
+     * settled a tick later than the render, which is never on a quiet machine
+     * and occasionally on a loaded CI runner.
+     */
+    const links = (await within(past).findAllByRole('link')).map((link) =>
+      link.getAttribute('href'),
+    );
 
     // `/event/` is the check-in route, whose refusal page offers a way back to
     // the counselor screen. Nobody reading the calendar came from there.
