@@ -15,7 +15,6 @@ import {
   failSimulator,
   readCollection,
   resetA32Simulator,
-  resetSimulator,
   setA32Down,
   simulatorPeople,
   simulatorRequests,
@@ -38,7 +37,19 @@ export interface TallyFixtures {
     ) => Promise<FirestoreDoc[]>;
   };
   planningCenter: {
-    reset: () => Promise<void>;
+    /**
+     * Ends an outage a spec armed, and nothing else.
+     *
+     * Deliberately the only way back: this used to also offer `reset`, which
+     * reads like "put the backend back the way it was" and in fact replaces
+     * the *organisation* — the seeded ministry the whole suite is written
+     * against, swapped for the simulator's built-in fixtures. A spec that
+     * called it to end its own outage silently deleted Maya Adebayo and Malik
+     * Johnson for every file that ran afterwards, and the specs that then
+     * could not find them read as bugs in the queue. See `resetSimulator` in
+     * `emulator.ts`, which says the same thing about the same call.
+     */
+    clearFaults: () => Promise<void>;
     fail: (status: number, message: string, count?: number) => Promise<void>;
     people: () => Promise<Array<Record<string, unknown>>>;
     /** Adds a student upstream, the way the church office would. */
@@ -129,7 +140,7 @@ export const test = base.extend<TallyFixtures, { seededWorld: void }>({
 
   planningCenter: async ({}, use) => {
     await use({
-      reset: resetSimulator,
+      clearFaults: clearSimulatorFaults,
       fail: failSimulator,
       people: simulatorPeople,
       createStudent: createSimulatorStudent,

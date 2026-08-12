@@ -129,9 +129,33 @@ export function PairingScreen({
       <div className="text-lg font-medium text-ink-400">Pair this kiosk</div>
       {code ? (
         <>
+          {/*
+            * Sized to the glass, not to a breakpoint.
+            *
+            * `text-8xl` is right on the 10" tablet the kiosk lives on and far
+            * too wide on a phone, where the code ran off both edges and the
+            * first and last characters were simply missing — the one thing on
+            * the screen that has to be read. Phones reach this screen often
+            * enough to matter: it is the URL a leader opens to see what a kiosk
+            * is asking for, and the first thing a new device shows before
+            * anyone decides what it will be.
+            *
+            * The width is knowable rather than guessed. The code is always
+            * `CODE_LENGTH` (6) characters, monospace, so every glyph advances
+            * the same ~0.6em, plus the 0.3em of tracking after each — call it
+            * 5.6em for the whole string with a little room for the widest
+            * monospace face in the stack. Divide the space actually available
+            * (the viewport less this screen's `p-8` on both sides) by that and
+            * the code fills the line exactly, then stops growing at the 6rem
+            * `text-8xl` was already giving the tablet.
+            *
+            * The negative inline-end margin takes back the trailing letter-space
+            * that tracking adds after the final character, which would otherwise
+            * hang off the right and push the code visibly left of centre.
+            */}
           <div
             data-testid="kiosk-pairing-code"
-            className="font-mono text-8xl font-bold tracking-[0.3em] text-ink-50"
+            className="-me-[0.3em] font-mono text-[length:min(6rem,calc((100vw_-_4rem)/5.6))] font-bold tracking-[0.3em] text-ink-50"
           >
             {code}
           </div>
