@@ -1,8 +1,9 @@
 # A profile edit, from the button to the church database — a walkthrough
 
-Twenty-seven frames of the six journeys in [the brief](../../uxr/JOURNEY-profile-sync.md)
-and every state in [profile-edits.md](../profile-edits.md), on both layouts and in
-all three backend configurations, [as a single page](edit-queue.html).
+Twenty-seven frames of every state in [profile-edits.md](../profile-edits.md), on
+both layouts and in all three backend configurations,
+[as a single page](edit-queue.html). What the design rounds behind it settled is
+[refinements.md](../refinements.md#the-profile-edit-queue--4-rounds).
 
 > Kept here rather than inside `edit-queue/` on purpose: that directory is the
 > frames, and clearing it before a capture is routine. This file was deleted by

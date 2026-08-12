@@ -3,12 +3,10 @@
 What was built, why it is shaped this way, and what the critique loop threw out
 on the way. The design was refined in `uxr/kiosk-reprint/` — four rounds, three
 critics a round, thirty frames a round at the shapes a lobby tablet actually
-takes, and a fifth pass that closed the residue they left. The rounds are in
-[`uxr/rounds/reprint-r01`](../uxr/rounds/reprint-r01)
-through `r05`; the brief they were judged against is
-[`uxr/BRIEF-reprint.md`](../uxr/BRIEF-reprint.md); and the journey it produced,
-frame by frame, is the
-[walkthrough](walkthrough/reprint/README.md).
+takes, and a fifth pass that closed the residue they left. What those rounds
+settled, and the brief they were judged against, is
+[`docs/refinements.md`](refinements.md#kiosk-reprint--5-rounds); the journey it
+produced, frame by frame, is the [walkthrough](walkthrough/reprint/README.md).
 
 ---
 
@@ -244,11 +242,8 @@ reaches the printing module on a kiosk that has no printer.
 
 Round 4 produced no finding above `minor`, which is where the loop stops. Five
 of the nine were cheap and belonged in the implementation rather than in another
-round; they are listed in full in
-[`uxr/rounds/reprint-r04/critique.md`](../uxr/rounds/reprint-r04/critique.md) and
-all five are now done. What each one measured before and after is
-[`uxr/rounds/reprint-r05/critique.md`](../uxr/rounds/reprint-r05/critique.md) —
-measured on the live harness, because every one of them is a claim about pixels.
+round, and all five are now done. Each was measured before and after on the live
+harness, because every one of them is a claim about pixels.
 
 - **the offer pill narrowed by 43px when the hint replaced its label**, so the
   target moved at the moment a parent was told to press it again. Both strings

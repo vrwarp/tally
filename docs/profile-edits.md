@@ -24,9 +24,8 @@ problem**: hand the edit to something durable, let the leader carry on, and be
 honest on every screen about what is in flight, what landed, and what did not.
 
 The design was worked out against rendered screens rather than in prose — four
-rounds of critique and ideation over nine scenes at two widths. The journey
-brief is [`uxr/JOURNEY-profile-sync.md`](../uxr/JOURNEY-profile-sync.md) and the
-rounds are in `uxr/rounds/sync-r0*`.
+rounds of critique and ideation over nine scenes at two widths. What those rounds
+settled is [`docs/refinements.md`](refinements.md#the-profile-edit-queue--4-rounds).
 
 ---
 

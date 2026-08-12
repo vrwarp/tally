@@ -9,30 +9,27 @@ the live app means an emulator suite, a Planning Center simulator, a functions
 build and a sign-in per idea. Refining it against a mockup means refining
 something that is not the app.
 
-So the loop iterates on **static derivations of the live demo**: the real DOM,
-the real stylesheet, the real seeded ministry, frozen into a single HTML file
-with the JavaScript stripped out. Opening one costs nothing. Editing one is
+So the loop iterates on **derivations of the live demo**: the real DOM, the real
+stylesheet, the real seeded ministry, either frozen into a single HTML file with
+the JavaScript stripped out or mounted straight from `src/`. Editing one is
 editing the same Tailwind classes the components emit, which is what makes the
 result portable back into `src/`.
+
+Everything this harness writes is a working file and none of it is committed —
+see `.gitignore`. What the finished campaigns settled is
+[docs/refinements.md](../docs/refinements.md).
 
 ## The pieces
 
 | Path | What it is |
 | --- | --- |
 | `BRIEF.md` | The context every agent reads: audiences, the two goals, the constraints that are not up for negotiation, the design system, the scene list. |
-| `capture.spec.ts` | Walks the live seeded app to each scene and freezes it. Six scenes × two viewports. |
+| `capture.spec.ts` | Walks the live seeded app to each scene and freezes it, at phone (390×844) and desktop (1440×900). |
 | `snapshot.ts` | The freeze: inlines every stylesheet, preserves the runtime custom properties and typed-in values, strips scripts, and appends an empty override block. |
-| `playwright.config.ts` | The end-to-end stack, at phone (390×844) and desktop (1440×900). |
 | `shoot.ts` | Renders prototype HTML to PNG. `-fold` is what fits without scrolling; `-full` is the whole page. |
-| `kiosk-live/` | The kiosk's screens mounted from `src/` and shot straight, state by state. See below. |
-| `team-live/` | The Team screen mounted from `src/` against a fixture, and frozen from there. Same argument as the kiosk: two subscriptions and a profile is not worth an emulator suite. |
-| `measure.ts` | Re-runs the walkthrough's measurements against the frozen scenes: how far each page scrolls, and whether it scrolls sideways. |
-| `kiosk-setup-live/` | The team's side of the kiosk — the pairing screen — mounted from `src/` inside the real app shell, with the account menu opened on the way past. See below. |
-| `JOURNEY-kiosk.md` | The brief for that scene: the Friday-evening moment, the person, and what the app used to do with it. |
-| `baseline/` | The frozen app as it was. Never edited. |
-| `prototype/` | The working copy the ideation agent edits. |
-| `rounds/` | One directory per round: what the critics found, what the ideator did about it. |
-| `renders/` | Throwaway PNGs. Gitignored. |
+| `measure.ts` | Re-runs the walkthrough's measurements against frozen scenes: how far each page scrolls, and whether it scrolls sideways. |
+| `locked-scene.ts` | Derives the "you are not on this gathering" state, which the seed never produces. |
+| `*-live/` | Screens mounted from `src/` against a fixture rather than walked to. See below. |
 
 ## The agents
 
@@ -57,78 +54,52 @@ npm run uxr:shoot -- uxr/prototype --out uxr/renders/r01
 
 The loop ends when a round produces no finding above `minor`.
 
-## The kiosk is shot live, not frozen
+A prototype may be changed by editing markup and classes directly, or through the
+empty `<style data-uxr="overrides">` block every frozen page carries. The override
+block is the cheap path and the honest one for pure styling; anything structural
+should be edited in the markup so the implementation step can read it straight
+across into React.
+
+## Mounted, not walked to
+
+Freezing exists because most scenes sit behind a sign-in, an emulator suite and a
+seeded ministry — reaching one costs more than copying it. Some screens invert
+that. The kiosk's `SearchScreen` and `RegistrationFlow` are pure functions of
+their props; `TeamPage` is two Firestore subscriptions and a profile. Those get a
+`*-live/` directory that aliases the modules they read from Firebase to a
+fixture, mounts the real component, and either shoots it directly or freezes it
+through the same `snapshot.ts` the capture spec uses.
 
 ```bash
-npm run uxr:kiosk -- --out uxr/renders/ks-r01     # → one PNG per state per viewport
+npm run uxr:kiosk -- --out uxr/renders/ks-r01     # shot straight, state by state
+npm run uxr:team -- --out uxr/prototype-team      # frozen from a live mount
+npm run uxr:kiosk-setup -- --out uxr/prototype-kiosk-setup
 ```
-
-Freezing exists because the app's scenes sit behind a sign-in, an emulator
-suite and a seeded ministry — reaching one costs more than copying it. The
-kiosk inverts that. `SearchScreen` and `RegistrationFlow` are pure functions of
-their props: a binding, a buffer, a search outcome. No store, no router, no
-network. So `kiosk-live/` mounts the real components in a dev server and drives
-their state from the query string, and a round of frames costs a few seconds.
 
 That matters beyond convenience. `kiosk-confirm.ts` — the generator that served
 the confirm-screen rounds — hand-writes a static copy of the component's markup
 and keeps its measurements in step by discipline, and a critique is only worth
-what the frame is worth. This cannot drift, because it is the app.
+what the frame is worth. A mounted scene cannot drift, because it is the app.
 
-It also asserts on the way past what a screenshot cannot show: whether any frame
+`kiosk-setup-live/` goes one step further and mounts the real `AppShell`, opening
+the account menu with a click before freezing, because on that campaign **the
+route to the screen was the finding**. Its `scene.tsx` is one line naming the
+component being photographed, and it is its own file so that a refinement's
+before-frames and after-frames come out of the same harness, browser and
+viewports.
+
+The kiosk shooter also asserts what a screenshot cannot show: whether any frame
 scrolls sideways. A fixed-height row whose contents are wider than the glass
 takes the whole grid with it rather than clipping, and the frame looks identical
 either way — it is the viewport in both cases. The shooter exits non-zero
 instead.
 
-## The team screen is mounted, not walked to
-
-```bash
-npm run uxr:team -- --out uxr/prototype-team      # freeze it from a live mount
-npm run uxr:shoot -- uxr/prototype-team --out uxr/renders/team-r01
-```
-
-`TeamPage` is two Firestore subscriptions and a profile, so `team-live/` aliases
-those four modules to a fixture — eleven staff, four invitations, every state
-the screen has — mounts the real component, and freezes the result through the
-same `snapshot.ts` the capture spec uses. The files it writes are ordinary
-prototypes: `uxr/shoot.ts` reads them, the ideation agent edits them.
-
-Re-run it after porting a round back into `src/` and it re-freezes what actually
-shipped, which is the only honest input to the before/after page.
-
-## The kiosk screen is mounted inside the real shell
-
-```bash
-npm run uxr:kiosk-setup -- --out uxr/prototype-kiosk-setup   # freeze it from a live mount
-npm run uxr:shoot -- uxr/prototype-kiosk-setup --out uxr/renders/ks-r01
-```
-
-`kiosk-setup-live/` is `team-live/` with one difference, and the difference is
-the point. Team re-draws the app frame by hand, because that screen is reached
-the way every other core screen is and the frame only has to be the right size.
-The kiosk screen's problem *was the route to it*: it lived behind a text link in
-a paragraph on the third card of Settings, and Settings is core-team only, so
-the counselor the kiosk's own screen sends there could not get there at all. So
-this harness mounts the real `AppShell`, aliases the four modules it reads from
-Firebase, and opens the account menu with a click before freezing — because the
-menu is the finding.
-
-Five scenes: the menu (admin and counselor), and the screen as an admin, as a
-counselor and on a deployment that cannot sign kiosk tokens. `scene.tsx` is one
-line naming the component being photographed, and it is its own file so that
-the before-frames of a refinement and the after-frames come out of the same
-harness, the same browser and the same two viewports.
-
-The brief for the scene is `JOURNEY-kiosk.md`; the rounds are
-`rounds/kiosk-setup-r0*`.
-
 ## The before/after page
 
-Once the result is ported into `src/`, the walkthrough is built from two fresh
-captures of the running app rather than from the prototypes — the prototypes
-drift from what actually shipped, and quoting their numbers is how the first
-version of the page came to be out by several hundred pixels.
+Once the result is ported into `src/`, the page is built from two fresh captures
+of the running app rather than from the prototypes — the prototypes drift from
+what actually shipped, and quoting their numbers is how the first version of the
+page came to be out by several hundred pixels.
 
 ```bash
 git worktree add ../tally-before <the-commit-before-the-work>   # and copy this
@@ -143,42 +114,18 @@ npm run uxr:walkthrough              # build, then drag every slider to prove it
 ```
 
 A screen that is mounted rather than walked to skips the worktree: freeze it
-before the work and again after, from the same `team-live/` mount.
+before the work and again after, from the same mount — `npm run uxr:team -- --out
+uxr/before-team`, then `--out uxr/after-team` once it has shipped, and
+`npx tsx uxr/measure.ts uxr/before-team uxr/after-team`.
 
-```bash
-npm run uxr:team -- --out uxr/before-team          # at the commit before the work
-npm run uxr:team -- --out uxr/after-team           # once it has shipped
-npx tsx uxr/measure.ts uxr/before-team uxr/after-team
-npm run uxr:shoot -- uxr/before-team --out uxr/renders/before
-npm run uxr:shoot -- uxr/after-team  --out uxr/renders/after
-npm run uxr:shots                                  # → docs/uxr/{before,after}/*.jpg
-npm run uxr:team-walkthrough                       # → docs/uxr/team-walkthrough.html
-```
-
-A screen whose *component was replaced* cannot skip the worktree, even though it
-is mounted: `kiosk-setup-live/scene.tsx` names the component being photographed
-in one line, and the component the before-frames want no longer exists here. So
-the worktree gets a copy of the harness with that line pointing at the old
+A screen whose *component was replaced* cannot skip the worktree even though it
+is mounted, because the component the before-frames want no longer exists here.
+The worktree gets a copy of the harness with `scene.tsx` pointing at the old
 screen, and the freeze runs from there into this repo's `uxr/before-kiosk/`.
 
-```bash
-git worktree add ../tally-before <the-commit-before-the-work>
-ln -s "$PWD/node_modules" ../tally-before/node_modules
-cp -r uxr/kiosk-setup-live ../tally-before/uxr/                 # then point its
-                                                               # scene.tsx at the
-                                                               # old component
-(cd ../tally-before && npx tsx uxr/kiosk-setup-live/freeze.ts --out "$OLDPWD/uxr/before-kiosk")
-npm run uxr:kiosk-setup -- --out uxr/after-kiosk                # once it has shipped
-npx tsx uxr/measure.ts uxr/before-kiosk uxr/after-kiosk
-npm run uxr:shoot -- uxr/before-kiosk --out uxr/renders/before
-npm run uxr:shoot -- uxr/after-kiosk  --out uxr/renders/after
-npm run uxr:shots                                  # → docs/uxr/{before,after}/*.jpg
-npm run uxr:kiosk-walkthrough                      # → docs/uxr/kiosk-walkthrough.html
-```
-
 `scripts/build-uxr-walkthrough.ts` takes the changes file and the output name as
-arguments, both defaulting to the first refinement's, so each refinement gets
-its own page rather than a shared one whose title and round counts are true of
+arguments, both defaulting to the first refinement's, so each refinement gets its
+own page rather than a shared one whose title and round counts are true of
 neither. `docs/uxr/team-changes.json` is the Team screen's;
 `docs/uxr/kiosk-changes.json` is the kiosk screen's.
 
@@ -188,4 +135,3 @@ that froze Insights while the parent-contact lookup was still in flight, so half
 the page's "before" was a row of spinners reading *Looking up contact details…*
 and a tile reading *—*. The slider then appeared to show a design improving when
 part of what it showed was a page finishing loading.
-

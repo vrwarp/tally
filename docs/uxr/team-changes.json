@@ -98,5 +98,5 @@
       ]
     }
   ],
-  "colophon": "<strong>Every frame on this page is the real application.</strong> The “before” shots are the screen as it was the day it was split out of Settings; the “after” shots were taken the same way, from the same mount, once four rounds of critique had been ported back into the component. Nothing here is a mockup, and nothing was re-drawn to make a point. The critiques themselves — including the twenty-two findings that were declined, and why — are committed in <code>uxr/rounds/team-r01</code> through <code>team-r04</code>."
+  "colophon": "<strong>Every frame on this page is the real application.</strong> The “before” shots are the screen as it was the day it was split out of Settings; the “after” shots were taken the same way, from the same mount, once four rounds of critique had been ported back into the component. Nothing here is a mockup, and nothing was re-drawn to make a point. What the four rounds settled is summarised in <code>docs/refinements.md</code>."
 }

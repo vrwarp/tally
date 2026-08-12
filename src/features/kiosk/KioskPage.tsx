@@ -8,8 +8,8 @@
  * It used to be two places. Approving a code was `/pair-kiosk`, reachable only
  * from a text link inside a paragraph on the third card of Settings; everything
  * else was that card. Settings is core-team only, so the counselor the kiosk's
- * own screen sends here could not get here at all — see `uxr/JOURNEY-kiosk.md`,
- * and `uxr/rounds/kiosk-setup-r0*` for the four rounds that shaped what follows.
+ * own screen sends here could not get here at all. See `docs/refinements.md`
+ * for the journey and the four rounds that shaped what follows.
  *
  * The page is one job and some reference material, and the composition says so:
  * the form is the page rather than a card on it, and everything below the rule

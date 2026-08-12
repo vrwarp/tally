@@ -144,29 +144,60 @@ happens when a family asks to be removed — is **[docs/minors-data.md](docs/min
 
 ## Documentation
 
+**Start here.** What the app does and why it is shaped that way:
+
 | Document | What it covers |
 | --- | --- |
 | [docs/product.md](docs/product.md) | Every journey the app supports, and why each screen works the way it does |
 | [docs/walkthrough](docs/walkthrough/README.md) | A guided tour of every feature, screenshotted from the running app |
-| [docs/development.md](docs/development.md) | Running Tally locally: setup, signing in, every script, the `functions/` package |
 | [docs/architecture.md](docs/architecture.md) | Repository layout, what is live versus fetched once, what needs a server, the kiosk |
 | [docs/data-model.md](docs/data-model.md) | Every collection, who may write it, and why it is shaped that way |
-| [docs/configuration.md](docs/configuration.md) | The two config surfaces and which file applies when |
-| [docs/review-corrections.md](docs/review-corrections.md) | Correcting a self-registered family before approving them: the journeys, and the rules the screen follows |
-| [docs/walkthrough/corrections](docs/walkthrough/corrections/README.md) | The same five journeys, frame by frame, captured from the running screen |
 | [docs/minors-data.md](docs/minors-data.md) | What Tally stores about children, and what it refuses to |
-| [docs/profile-edits.md](docs/profile-edits.md) | Why a profile edit is a queued job, what every state means, and what is deliberately not blocked |
-| [docs/queue-ownership.md](docs/queue-ownership.md) | Who decides when a queued edit runs — the browser, a trigger or a schedule — and what each choice costs |
-| [docs/walkthrough/edit-queue.md](docs/walkthrough/edit-queue.md) | Every one of those states, photographed from the running app with the far end held open |
-| [docs/planning-center.md](docs/planning-center.md) | Tokens, configuration, roster modes, write-back, troubleshooting |
-| [docs/backends.md](docs/backends.md) | The people-backend abstraction: ids, capabilities, partial failure, adding one |
-| [docs/attendees32.md](docs/attendees32.md) | The Attendees backend: setup command, field mapping, caveats |
-| [docs/label-printing.md](docs/label-printing.md) | Setting up a Brother QL at the kiosk: models, media, per-platform quirks, what a label may say |
-| [docs/error-handling.md](docs/error-handling.md) | What happens when things fail, what was fixed, and what is still open |
-| [docs/fuzzing.md](docs/fuzzing.md) | The property suite, its invariants, and how to replay a failure |
+
+**Working on it.** Running, testing and shipping:
+
+| Document | What it covers |
+| --- | --- |
+| [docs/development.md](docs/development.md) | Running Tally locally: setup, signing in, every script, the `functions/` package |
+| [docs/configuration.md](docs/configuration.md) | The two config surfaces and which file applies when |
 | [docs/ci.md](docs/ci.md) | What runs on a pull request and how to reproduce it |
 | [docs/deployment-setup.md](docs/deployment-setup.md) | Deploying, and everything that has to exist first |
+| [docs/error-handling.md](docs/error-handling.md) | The guards, why each exists, and the gaps that are still open |
+| [docs/fuzzing.md](docs/fuzzing.md) | The property suite, its invariants, and how to replay a failure |
+| [docs/kiosk-performance.md](docs/kiosk-performance.md) | The kiosk benchmark: what it measures, what it found, and the budgets it holds |
 | [e2e/README.md](e2e/README.md) | Running and writing end-to-end tests |
 | [docker/README.md](docker/README.md) | The containerised end-to-end runner |
 | [tools/pco-simulator/README.md](tools/pco-simulator/README.md) | The Planning Center API simulator |
-| [uxr/README.md](uxr/README.md) | The UXR refinement harness |
+
+**The people backends.** Tally holds no copy of the church's people:
+
+| Document | What it covers |
+| --- | --- |
+| [docs/planning-center.md](docs/planning-center.md) | Tokens, configuration, roster modes, write-back, troubleshooting |
+| [docs/backends.md](docs/backends.md) | The people-backend abstraction: ids, capabilities, partial failure, adding one |
+| [docs/attendees32.md](docs/attendees32.md) | The Attendees backend: setup command, field mapping, caveats |
+| [docs/profile-edits.md](docs/profile-edits.md) | Why a profile edit is a queued job, what every state means, and what is deliberately not blocked |
+| [docs/queue-ownership.md](docs/queue-ownership.md) | Who decides when a queued edit runs — the browser, a trigger or a schedule — and what each choice costs |
+
+**The screens with a long argument behind them.** Each pairs a reasoned document
+with the same ground photographed from the running app:
+
+| Document | Walkthrough |
+| --- | --- |
+| [docs/review-corrections.md](docs/review-corrections.md) — correcting a self-registered family before approving them | [frame by frame](docs/walkthrough/corrections/README.md) |
+| [docs/kiosk-reprint.md](docs/kiosk-reprint.md) — reprinting a name tag, and the two wider designs that were refused | [frame by frame](docs/walkthrough/reprint/README.md) |
+| [docs/parent-contact.md](docs/parent-contact.md) — taking a parent's number at the door without slowing the queue | — |
+| [docs/label-printing.md](docs/label-printing.md) — setting up a Brother QL: models, media, per-platform quirks, what a label may say | — |
+| [docs/profile-edits.md](docs/profile-edits.md) — the edit queue | [every state](docs/walkthrough/edit-queue.md) |
+| — | [the lobby registration wizard](docs/walkthrough/registration/README.md) |
+| — | [a parent at the kiosk](docs/walkthrough/parents/README.md) |
+| — | [light and dark](docs/walkthrough/themes/README.md) |
+| — | [the long tour](docs/walkthrough/tour/README.md) |
+
+**How it got there.** Enough history to explain the odd-looking decisions,
+and no more:
+
+| Document | What it covers |
+| --- | --- |
+| [docs/refinements.md](docs/refinements.md) | The eight design campaigns that changed the product: what was argued, and what each settled |
+| [uxr/README.md](uxr/README.md) | The harness that runs those campaigns, for the next one |
