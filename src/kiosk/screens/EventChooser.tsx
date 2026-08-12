@@ -114,6 +114,19 @@ export function EventChooser({
             // the row a kiosk rebooting mid-pickup needs to find. Said out
             // loud so it cannot be mistaken for something upcoming.
             const ended = nowMs > entry.endAt;
+            /*
+             * The third state, and the one this list spent longest without.
+             *
+             * The chooser offers the week on purpose, so most rows on it are
+             * ahead — and a volunteer binding one is doing the ordinary thing,
+             * setting a tablet up before doors. What was missing was the
+             * consequence: the kiosk will not take arrivals there until the
+             * window opens, and a row that said nothing left that to be
+             * discovered by a family at the front of a queue. The day is
+             * already up in `dayLabel`; this is the sentence that turns it
+             * from a fact into a warning.
+             */
+            const notOpenYet = nowMs < entry.checkInOpensAt;
             const isSelected = selected === index;
             return (
               <HoldButton
@@ -147,6 +160,11 @@ export function EventChooser({
                   {dayLabel(entry.startAt, nowMs)} · {timeLabel(entry.startAt)}–{timeLabel(entry.endAt)}
                   {entry.location ? ` · ${entry.location}` : ''}
                   {live && <span className="pl-2 font-medium text-present-400">Check-in open</span>}
+                  {notOpenYet && (
+                    <span className="pl-2 font-medium text-ink-500">
+                      Check-in opens {timeLabel(entry.checkInOpensAt)}
+                    </span>
+                  )}
                   {ended && <span className="pl-2 font-medium text-ink-500">Ended — pickup only</span>}
                 </div>
               </HoldButton>

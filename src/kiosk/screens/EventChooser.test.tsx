@@ -204,3 +204,40 @@ describe('tapping a gathering', () => {
     expect(onBound).toHaveBeenCalledWith(bindingFor(NURSERY));
   });
 });
+
+/**
+ * The three states a row can be in, and the one it spent longest without.
+ *
+ * The chooser offers the week on purpose, so most rows on it are ahead — and a
+ * volunteer binding one is doing the ordinary thing, setting a tablet up before
+ * doors. What was missing was the consequence: the kiosk will not take arrivals
+ * there until the window opens (see `windowHasOpened`), and a row that said
+ * nothing left that to be discovered by a family at the front of a queue.
+ */
+describe('what a row says about its window', () => {
+  it('rings the one taking arrivals now, and does not tell it to wait', async () => {
+    await renderChooser(servicesWith(vi.fn()));
+    expect(row('Nursery')).toHaveTextContent(/Check-in open(?!s)/);
+    expect(row('Nursery')).not.toHaveTextContent(/Check-in opens/);
+  });
+
+  it('says when the one that is not will start', async () => {
+    await renderChooser(servicesWith(vi.fn()));
+    // Youth group opens four hours out. The row carried its date already; what
+    // it did not carry was that the date is a constraint and not a caption.
+    expect(row('Youth group')).toHaveTextContent(/Check-in opens \d/);
+  });
+
+  it('still lets it be bound — setting up early is the point of the list', async () => {
+    const bindEntry = vi.fn(async () => bindingFor(YOUTH));
+    const onBound = await renderChooser(servicesWith(bindEntry));
+
+    down(row('Youth group'));
+    await tick(HOLD_DELAY_MS + HOLD_MS);
+    up(row('Youth group'));
+    await tick();
+
+    expect(bindEntry).toHaveBeenCalledWith(YOUTH);
+    expect(onBound).toHaveBeenCalled();
+  });
+});

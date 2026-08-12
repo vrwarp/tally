@@ -35,7 +35,9 @@ import {
   bindingIsLive,
   clearBinding,
   eventWindow,
+  opensAtLabel,
   readBinding,
+  windowHasOpened,
   writeBinding,
   type KioskBinding,
 } from './binding';
@@ -73,6 +75,7 @@ import { PrinterScreen } from './screens/PrinterScreen';
 import { SearchScreen } from './screens/SearchScreen';
 import { ChangeEventScreen } from './screens/ChangeEventScreen';
 import { SuccessScreen } from './screens/SuccessScreen';
+import { NotOpenScreen } from './screens/NotOpenScreen';
 
 export type KioskServices = typeof ServicesModule;
 export type KioskPrinting = typeof PrintingModule;
@@ -178,6 +181,15 @@ type Overlay =
   | { kind: 'reprint-confirm'; student: KioskStudent; from: ReprintFrom }
   | { kind: 'printer' }
   | { kind: 'success'; students: KioskStudent[]; intent: KioskIntent }
+  /**
+   * The refusal — a check-in offered to a gathering that has not opened yet.
+   *
+   * Carries the sentence rather than the binding so the screen does no clock
+   * work of its own: the moment that matters is the tap, and an overlay that
+   * re-derived "is it today" on every render would relabel itself under a
+   * parent's eyes at midnight. See NotOpenScreen.
+   */
+  | { kind: 'not-open'; opensAt: string }
   /**
    * The staff gate's question — see ChangeEventScreen.
    *
@@ -1018,6 +1030,29 @@ export function KioskApp() {
     (confirm: ConfirmOverlay, chosen: KioskStudent[]) => {
       if (!services || !binding || !uid || chosen.length === 0) return;
       const { intent } = confirm;
+
+      /*
+       * The floor under every arrival this kiosk writes.
+       *
+       * Here rather than on the search screen, and here rather than in
+       * `performCheckIn`. The search screen is where the sentence goes but not
+       * where the decision belongs — a parent can reach a confirm through the
+       * sibling screen and the registration wizard too, and all three land on
+       * this one callback. `performCheckIn` is too late for the opposite
+       * reason: by then the tick has painted, the label has been printed and
+       * the row is green, so a refusal down there would tell a family they are
+       * checked in and quietly not do it.
+       *
+       * Check-in only. A pickup is never premature — a child cannot be
+       * collected from an evening they were not checked into, so the presence
+       * that makes `check-out` reachable already proves the window opened —
+       * and `done` writes nothing at all.
+       */
+      if (intent === 'check-in' && !windowHasOpened(binding, Date.now())) {
+        setOverlay({ kind: 'not-open', opensAt: opensAtLabel(binding, Date.now()) });
+        return;
+      }
+
       // Optimistic: the tick paints now; the writes follow.
       setOverlay({ kind: 'success', students: chosen, intent });
 
@@ -1240,10 +1275,35 @@ export function KioskApp() {
    * once-per-family work did not earn a standing second door, and the wizard
    * asks everything the phone form asked.
    */
+  /**
+   * Whether an arrival may be written at all right now.
+   *
+   * The wizard is a check-in door as much as the keypad is — `registerFamily`
+   * creates the children *and* marks them present in one call — so it is gated
+   * on the same clock, and refused at the door rather than six questions in.
+   * A family who typed a guardian's name and three birthdays only to be told
+   * the gathering has not started would have been asked for all of it for
+   * nothing.
+   */
+  const arrivalsOpen = useCallback(
+    () => !binding || windowHasOpened(binding, Date.now()),
+    [binding],
+  );
+
+  const refuseAsNotOpen = useCallback(() => {
+    if (!binding) return;
+    setOverlay({ kind: 'not-open', opensAt: opensAtLabel(binding, Date.now()) });
+    setBuffer('');
+  }, [binding]);
+
   const startWizard = useCallback(() => {
+    if (!arrivalsOpen()) {
+      refuseAsNotOpen();
+      return;
+    }
     setBuffer('');
     setRegistering({ registrationId: newRegistrationId(), anchors: [] });
-  }, []);
+  }, [arrivalsOpen, refuseAsNotOpen]);
 
   /**
    * The registration half of "who else is with them".
@@ -1254,11 +1314,18 @@ export function KioskApp() {
    * anchor before it believes any of it. The overlay closes first — the parent
    * is leaving the confirm screen, not stacking a third thing on it.
    */
-  const startSiblingWizard = useCallback((anchors: KioskStudent[]) => {
-    setOverlay(null);
-    setBuffer('');
-    setRegistering({ registrationId: newRegistrationId(), anchors });
-  }, []);
+  const startSiblingWizard = useCallback(
+    (anchors: KioskStudent[]) => {
+      if (!arrivalsOpen()) {
+        refuseAsNotOpen();
+        return;
+      }
+      setOverlay(null);
+      setBuffer('');
+      setRegistering({ registrationId: newRegistrationId(), anchors });
+    },
+    [arrivalsOpen, refuseAsNotOpen],
+  );
 
   /**
    * A family that exists now, and did not a second ago.
@@ -1637,6 +1704,19 @@ export function KioskApp() {
             // rather than the whole queue behind them reading the last one's
             // name — and a kiosk left alone mid-search shows nothing about
             // whoever walked away from it.
+            setOverlay(null);
+            setBuffer('');
+          }}
+        />
+      );
+    }
+    if (overlay?.kind === 'not-open') {
+      return (
+        <NotOpenScreen
+          opensAt={overlay.opensAt}
+          onDone={() => {
+            // Home, cleared — the same landing the tick makes, for the same
+            // reason: the next family starts from blank glass.
             setOverlay(null);
             setBuffer('');
           }}

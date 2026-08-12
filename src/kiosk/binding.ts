@@ -16,6 +16,15 @@
  * that the field be a timestamp, so a seed, a migration or an older client can
  * produce one. Taking the later of the two cannot shorten any binding, which
  * a bare `checkInClosesAt` would.
+ *
+ * The binding has an upper bound and a lower one, and they are not symmetric.
+ * A kiosk may be bound *before* its gathering opens — the chooser offers the
+ * week on purpose, and a volunteer setting a tablet up at four for a half-six
+ * gathering is the ordinary case — but it may not take check-ins there. That is
+ * the one direction Tally has never allowed anywhere: the app's own chooser
+ * offers today and a tail of finished gatherings and nothing ahead, because
+ * recording a Friday somebody forgot is real work and recording a Friday that
+ * has not happened is always a mistake. See `windowHasOpened`.
  */
 import type { KioskGround, KioskPalette } from '@/lib/kioskTheme';
 import type { LabelTemplate } from '@/lib/labelTemplate';
@@ -46,6 +55,19 @@ export interface KioskBinding {
   title: string;
   startAtMs: number;
   endAtMs: number;
+  /**
+   * When this gathering starts taking arrivals — the floor under every
+   * check-in this kiosk writes.
+   *
+   * Optional for the same reason `requiresCheckOut` is: a binding written
+   * before this existed has no such key, and a paired lobby screen must not be
+   * logged out by a deploy. Absent reads as "already open", which is the
+   * behaviour the kiosk has always had and the only safe direction here — the
+   * failure of guessing the other way is a lobby full of families the tablet
+   * refuses on the strength of a field it never stored. The next rebind picks
+   * the real answer up.
+   */
+  checkInOpensAtMs?: number;
   checkInClosesAtMs: number;
   /**
    * Whether this gathering hands children back — the one behaviour flag the
@@ -140,6 +162,24 @@ export function windowHasClosed(binding: KioskBinding, nowMs: number): boolean {
 }
 
 /**
+ * Whether this gathering has started taking arrivals yet.
+ *
+ * The counterpart `windowHasClosed` never had, and the asymmetry between them
+ * is the point. A closed window is advisory — the kiosk says so and keeps
+ * working, because a family collected at 21:10 from a gathering whose doors
+ * shut at 20:00 still walked out of the building. A window that has not opened
+ * is a refusal: nobody can have arrived at an evening that has not happened,
+ * and a kiosk bound to next Wednesday by a thumb one row off would otherwise
+ * take a whole night's register against the wrong date, silently, while the
+ * screen showed nothing but a pair of clock times.
+ *
+ * True when the field is absent — see the field's own note.
+ */
+export function windowHasOpened(binding: KioskBinding, nowMs: number): boolean {
+  return binding.checkInOpensAtMs === undefined || nowMs >= binding.checkInOpensAtMs;
+}
+
+/**
  * "6:30 – 8:00 PM" — when this gathering runs.
  *
  * `Intl` rather than the `date-fns` helper the rest of the app formats times
@@ -152,12 +192,36 @@ export function windowHasClosed(binding: KioskBinding, nowMs: number): boolean {
  * 8:00 PM" is the same fact said twice and this line sits under a title it
  * must not compete with.
  */
+function clock(ms: number): string {
+  return new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
 export function eventWindow(binding: KioskBinding): string {
-  const clock = (ms: number) =>
-    new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   const start = clock(binding.startAtMs);
   const end = clock(binding.endAtMs);
   const meridiem = /\s?([AP]M)$/i.exec(start);
   const shared = meridiem && end.toUpperCase().endsWith(meridiem[1]!.toUpperCase());
   return `${shared ? start.slice(0, meridiem.index) : start} – ${end}`;
+}
+
+/**
+ * "6:30 PM", or "Wednesday, Aug 19 at 6:30 PM" when that is not today.
+ *
+ * The day is carried on purpose, and it is the more important half. A kiosk
+ * bound one row off shows the wrong gathering's clock times and looks entirely
+ * ordinary; a bare "opens at 6:30 PM" would read to a volunteer as "come back
+ * after supper" rather than as "this tablet is set to next week". The date is
+ * the fact that makes a misbinding obvious to the one person who can fix it.
+ */
+export function opensAtLabel(binding: KioskBinding, nowMs: number): string {
+  const opensAtMs = binding.checkInOpensAtMs ?? binding.startAtMs;
+  const opens = new Date(opensAtMs);
+  const at = clock(opensAtMs);
+  if (opens.toDateString() === new Date(nowMs).toDateString()) return at;
+  const day = opens.toLocaleDateString(undefined, {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+  });
+  return `${day} at ${at}`;
 }
