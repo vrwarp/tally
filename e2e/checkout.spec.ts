@@ -51,11 +51,33 @@ async function openNursery(page: Page, child?: string): Promise<string> {
   const id = await nurseryId();
   await gotoReady(page, `/event/${id}`);
   await expect(page.getByRole('heading', { name: /nursery/i })).toBeVisible();
-  await expect(
-    child
-      ? page.getByRole('button', { name: new RegExp(`^Check in ${child}`) })
-      : page.getByRole('button', { name: /quick add a visitor/i }),
-  ).toBeVisible({ timeout: 30_000 });
+
+  const target = child
+    ? page.getByRole('button', { name: new RegExp(`^Check in ${child}`) })
+    : page.getByRole('button', { name: /quick add a visitor/i });
+
+  /*
+   * Out of the room and onto the whole roster.
+   *
+   * The seeded nursery takes arrivals now — it has to, or no kiosk could work
+   * it — and a live check-out gathering opens on the room rather than on the
+   * ministry (`setFocus` in CheckInPage). Its room is empty until a test puts
+   * somebody in it, so a screen that used to arrive listing everybody now
+   * arrives listing nobody. That is the right default for a nursery volunteer
+   * mid-morning and the wrong starting point for these tests, every one of
+   * which is about a named child who has not arrived yet.
+   *
+   * The way out is the rung under the list, which is the one a volunteer would
+   * take. Twice, because it is deliberately one rung at a time: the screen
+   * offers the gathering's own people before it offers all of Tally.
+   */
+  for (let rung = 0; rung < 2 && (await target.count()) === 0; rung += 1) {
+    const widen = page.getByRole('button', { name: /^Show all \d+ / }).first();
+    await widen.waitFor({ timeout: 30_000 });
+    await widen.click();
+  }
+
+  await expect(target).toBeVisible({ timeout: 30_000 });
   return id;
 }
 
