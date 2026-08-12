@@ -78,19 +78,6 @@ function bar(): HTMLElement {
   return screen.getByRole('button').querySelector('span')!;
 }
 
-/**
- * A drag on the glass, and whether the control swallowed it.
- *
- * A plain `Event` named `touchmove` rather than a `TouchEvent`: the listener
- * only ever reads `preventDefault`, and jsdom's touch support is thin enough
- * that constructing the real thing buys nothing but a chance to break.
- */
-function dragged(button: HTMLElement): boolean {
-  const event = new Event('touchmove', { bubbles: true, cancelable: true });
-  fireEvent(button, event);
-  return !event.defaultPrevented;
-}
-
 describe('the grace before the count', () => {
   /*
    * A press and the first frame of a drag are the same event. The delay is the
@@ -166,17 +153,23 @@ describe('the grace before the count', () => {
   });
 });
 
-describe('what the list under the thumb is allowed to do', () => {
+describe('a drag that beats the hold', () => {
   /*
-   * The two halves of the arbitration, on the one caller that has a list: for
-   * the length of the grace the browser keeps the gesture and a drag scrolls;
-   * once the count is running the row has claimed the finger and the page holds
-   * still under it, or a parent watches a bar fill while the thing it is filling
-   * slides out from under their thumb.
+   * The arbitration, and the kiosk's side of it.
+   *
+   * A hold on a row cannot pin the list under it — `touch-action` is read when
+   * the gesture begins and the pan is on the compositor by the time the count
+   * starts, which a version of this component learned the hard way (the note in
+   * HoldButton.tsx has the measurement). So the browser decides, and it says the
+   * scroll wins: `pointercancel` arrives, and everything this control was in the
+   * middle of has to stop with it — no fire, and an emptied bar, because a bar
+   * left filling under a list that is moving is the control lying about what it
+   * is still doing.
    */
-  it('scrolls during the grace and stops once the count starts', async () => {
+  it('gives up the count the moment the browser claims the gesture', async () => {
+    const onHeld = vi.fn();
     render(
-      <HoldButton onHeld={vi.fn()} onTap={vi.fn()}>
+      <HoldButton onHeld={onHeld} onTap={vi.fn()}>
         Hold me
       </HoldButton>,
     );
@@ -184,21 +177,31 @@ describe('what the list under the thumb is allowed to do', () => {
 
     await act(async () => {
       fireEvent.pointerDown(button, { pointerId: 1, clientX: 100, clientY: 100 });
-    });
-    expect(dragged(button)).toBe(true);
-    expect(button.style.touchAction).toBe('pan-y');
-
-    await act(async () => {
       await vi.advanceTimersByTimeAsync(HOLD_DELAY_MS + 50);
     });
-    expect(dragged(button)).toBe(false);
-    expect(button.style.touchAction).toBe('none');
+    expect(bar().style.transform).toBe('scaleX(1)');
+
+    await act(async () => {
+      fireEvent.pointerCancel(button, { pointerId: 1 });
+    });
+    expect(bar().style.transform).toBe('scaleX(0)');
+
+    // And the count that was running does not go off in the background.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(HOLD_MS * 2);
+    });
+    expect(onHeld).not.toHaveBeenCalled();
   });
 
-  /* And the lock lifts with the hand, not with the component. */
-  it('gives the list back when the gesture ends', async () => {
+  /*
+   * The grace is the only real say the kiosk has, and this is what it buys: a
+   * finger still at `HOLD_DELAY_MS` has not asked the browser for a scroll, so
+   * the fight never starts.
+   */
+  it('is not started at all by a press that was already moving', async () => {
+    const onHeld = vi.fn();
     render(
-      <HoldButton onHeld={vi.fn()} onTap={vi.fn()}>
+      <HoldButton onHeld={onHeld} onTap={vi.fn()}>
         Hold me
       </HoldButton>,
     );
@@ -206,14 +209,14 @@ describe('what the list under the thumb is allowed to do', () => {
 
     await act(async () => {
       fireEvent.pointerDown(button, { pointerId: 1, clientX: 100, clientY: 100 });
-      await vi.advanceTimersByTimeAsync(HOLD_DELAY_MS + 50);
+      fireEvent.pointerMove(button, { pointerId: 1, clientX: 100, clientY: 100 + TAP_SLOP_PX * 4 });
     });
     await act(async () => {
-      fireEvent.pointerUp(button, { pointerId: 1, clientX: 100, clientY: 100 });
+      await vi.advanceTimersByTimeAsync(HOLD_DELAY_MS + HOLD_MS + 50);
     });
 
-    expect(dragged(button)).toBe(true);
-    expect(button.style.touchAction).toBe('pan-y');
+    expect(onHeld).not.toHaveBeenCalled();
+    expect(bar().style.transform).toBe('scaleX(0)');
   });
 });
 
