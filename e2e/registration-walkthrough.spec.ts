@@ -190,7 +190,7 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
         state: 'Registering',
         title: 'Grade, or none',
         caption:
-          'Thirteen chips and "No grade", which is an answer rather than a blank somebody fills in later: a child too young for a grade has none. On a gathering that hands children back the question opens on "No grade" for the same reason — making a parent clear a field is the same mistake as making a volunteer reach for undo.',
+          'Fourteen chips and "No grade", which is an answer rather than a blank somebody fills in later: a child too young for a grade has none. On a gathering that hands children back the question opens on "No grade" for the same reason — making a parent clear a field is the same mistake as making a volunteer reach for undo.',
       });
 
       await kiosk.getByRole('button', { name: '4th grade', exact: true }).click();
