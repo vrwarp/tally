@@ -34,6 +34,15 @@ device is a cheap Android tablet or a hand-me-down iPad on a shelf, and an
 unthrottled runner reports that everything is instant. Only script is dilated,
 which is the right shape — script is what this app spends.
 
+**`KIOSK_PERF_THROTTLE` is also how you ask about a different device.** ×4 is a
+cheap tablet; ×10 is Raspberry-Pi-4 territory; ×20 is a Pi 3, or a Pi 4 with
+something else running on it. Sweeping it is the closest this can get to a
+device lab:
+
+```bash
+for rate in 4 10 20; do KIOSK_PERF_THROTTLE=$rate npm run perf:kiosk; done
+```
+
 **`KIOSK_PERF_IDLE_MS`** (default 35 000) is how long the idle scenario watches
 a kiosk nobody is touching. Long enough for two pulse polls and two queue
 replays; a window long enough to see the five-minute register poll would be a
@@ -225,6 +234,90 @@ because a tap costs about 20 ms end to end. That is one frame and a bit on a
 machine pretending to be four times slower than it is, and it is the same on the
 search screen, the confirm screen and the registration wizard — there is no
 screen here that is measurably less responsive than the others.
+
+## On a Raspberry Pi
+
+A Pi is the likeliest thing a church actually bolts to a shelf, so the numbers
+above — taken at ×4 — are not the ones that decide whether this works. Sweeping
+the throttle is:
+
+| | ×4 | ×10 (Pi 4) | ×20 (Pi 3) |
+| --- | ---: | ---: | ---: |
+| Typing, p50 | 20 ms | 40 ms | 85 ms |
+| Typing, worst gesture | 32 ms | 72 ms | 145 ms |
+| Row tap → confirm | 22 ms | 81 ms | 203 ms |
+| Gestures over 100 ms | 0 | 0–1 | 4–11 per scenario |
+
+**A Pi 4 is fine.** One gesture in a whole run crosses 100 ms, and it is the key
+pressed during boot. **A Pi 3 is not**: typing sits at 85 ms per letter, taps
+that open a screen take a fifth of a second, and every scenario has gestures a
+person would notice.
+
+Two things about that table are worth saying out loud, because they cut in
+opposite directions and a single number would hide both:
+
+- **The throttle only slows the main thread.** A real Pi is also slower at
+  style, layout, raster and compositing, none of which any throttle models, and
+  its storage is an SD card. So these numbers are a *floor* on how bad a Pi
+  feels, not a prediction.
+- **What grows is script, not blocking.** At ×20 the worst gesture is
+  145 ms — 18 ms of input delay, ~75 ms of handler, ~50 ms of paint. Input delay
+  stays small at every speed, so even a Pi 3 is not *ignoring* taps; it is
+  taking a visible moment to answer them. Layout counts are flat across the
+  sweep — about one layout and two style recalcs per keystroke — so nothing is
+  thrashing; the screen is simply doing its work more slowly.
+
+### What that bought
+
+The sweep put a number on something ×4 had made look not worth fixing: the typo
+pass, a Damerau–Levenshtein matrix that runs for every child the plain substring
+match missed. It allocated **three `Uint16Array`s per child per keystroke** —
+about twelve hundred typed arrays per letter on a four-hundred-child roster, all
+garbage before the letter had painted.
+
+Hoisting those three buffers to module scope (safe: the search is synchronous
+and non-reentrant) took **garbage collection during typing from 13 ms to zero**,
+and the heap down by 2 MB. On a device with a couple of gigabytes and a slow
+collector that is worth more than the sampled milliseconds suggest.
+
+`eventWindow` was the other one: the search screen re-renders on every letter,
+and it formatted the gathering's hours through `Intl` twice per render for a
+string that changes only when the kiosk is bound to something else. It is a
+`useMemo` now, and it has left the profile.
+
+### And an experiment that did not pay
+
+The obvious next move was to guard the matrix with a cheap necessary condition —
+count how many of the query's letters the name lacks entirely, and skip the
+matrix when that exceeds the edit budget. It is sound, it is about forty lines,
+and **it made things slightly worse**: the guard cost as much as it saved,
+because `haystack[index]` allocates a one-character string for every character
+of every name, which put the garbage collection back (0 ms → 8 ms). Measured
+three ways at ×10, medians of three runs:
+
+| | app frames | GC | typing p50 |
+| --- | ---: | ---: | ---: |
+| baseline | 112 ms | 13 ms | 41 ms |
+| + buffer reuse | **85 ms** | **0 ms** | **36 ms** |
+| + buffer reuse + guard | 97 ms | 8 ms | 44 ms |
+
+So the guard is not in the tree, and this paragraph is here so that the next
+person to have the same good idea can have it in ten minutes instead of an
+afternoon. A version indexing by `charCodeAt` into a flat array would avoid the
+allocation — but it would be more clever code in the one function every search
+in the app depends on being correct, for a saving this harness cannot resolve
+above its own noise.
+
+### The next lever, if a Pi 3 ever has to work
+
+Rendering. At every speed the largest app frame during typing is
+`SearchScreen`'s own render — about 5 ms per keystroke at ×10 and 15 ms at ×20 —
+and the keyboard is already memoized out of it. What re-renders per letter that
+need not is the header and the standing offers, which depend on the binding and
+not on the buffer. Splitting those into memoized children is the obvious move,
+and it is not made here for an honest reason: the noise floor of these
+measurements is around ±12 ms, which is the size of the thing being fixed. It
+needs a quieter machine or a narrower instrument than a whole-phase profile.
 
 ## When you change something here
 

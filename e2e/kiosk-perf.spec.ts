@@ -734,11 +734,16 @@ test.describe('kiosk performance', () => {
     record({
       scenario: 'Check-in — row tap to the confirm screen, then to the tick',
       cpuThrottle: THROTTLE,
+      // Both halves of the gesture, summed — except the levels, which are
+      // levels: the heap and the node count are read at the end, not added up.
       thread: {
         task: thread.task + confirmThread.task,
         script: thread.script + confirmThread.script,
         style: thread.style + confirmThread.style,
         layout: thread.layout + confirmThread.layout,
+        layouts: thread.layouts + confirmThread.layouts,
+        styleRecalcs: thread.styleRecalcs + confirmThread.styleRecalcs,
+        nodes: confirmThread.nodes,
         heap: confirmThread.heap,
       },
       timings: {
