@@ -265,6 +265,19 @@ export async function measureThread<T>(
 }
 
 /**
+ * The JS heap, right now, in bytes.
+ *
+ * Separate from `measureThread` because the question it answers is different:
+ * that one reports a level at the end of a phase, and what a device left on a
+ * shelf for a month needs is the *difference* across one.
+ */
+export async function heapBytes(cdp: CDPSession): Promise<number> {
+  await cdp.send('Performance.enable').catch(() => {});
+  const { metrics } = await cdp.send('Performance.getMetrics');
+  return metrics.find((metric) => metric.name === 'JSHeapUsedSize')?.value ?? 0;
+}
+
+/**
  * Slows the machine down to something a shelf device would recognise.
  *
  * A rate of 1 is "off". Chromium's throttle is a busy-wait on the main thread,

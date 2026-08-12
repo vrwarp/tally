@@ -204,6 +204,32 @@ describe('createSearchMatcher: ranking the ü variants', () => {
     const matcher = createSearchMatcher('lyu');
     expect(matcher.rank(student('Lu', 'Chen'))).toBeLessThan(matcher.rank(student('Wei', 'Lu')));
   });
+
+  it('gives the same answer the second time it is asked about a student', () => {
+    // Both callers rank from inside a sort comparator, so the same student is
+    // asked about O(n log n) times and the answer is memoized. A memo that
+    // could disagree with the function it stands in for would reorder a list
+    // by how many comparisons the sort happened to make.
+    const matcher = createSearchMatcher('lu');
+    const wei = student('Wei', 'Lyu');
+    expect(matcher.rank(wei)).toBe(matcher.rank(wei));
+    expect(matcher.rank(wei)).toBe(createSearchMatcher('lu').rank(student('Wei', 'Lyu')));
+  });
+});
+
+describe('the normalized-name cache', () => {
+  /**
+   * Matching is memoized on the name, and the memo is cleared wholesale when it
+   * fills. Nothing about an answer may depend on which side of that it fell.
+   */
+  it('answers the same after enough distinct names to have been cleared', () => {
+    const matcher = createSearchMatcher('josé');
+    const before = matcher.matches('josé garcía');
+    // Comfortably past the cap, so the clear has certainly happened.
+    for (let index = 0; index < 5000; index += 1) matchesQuery(`name ${index}`, 'zz');
+    expect(matcher.matches('josé garcía')).toBe(before);
+    expect(before).toBe(true);
+  });
 });
 
 describe('normalizeForSearch', () => {

@@ -210,8 +210,8 @@ WebKit is guaranteed to be present, so it is the reference environment.
 
 One file here is not a test. `kiosk-perf.spec.ts` drives this same stack with a
 throttled CPU and four hundred children on the roster, and reports what the
-kiosk *costs* — boot, keystroke latency, check-in, the label — down to self time
-per function.
+kiosk *costs* — a boot, a keystroke, a check-in, a label, a shelf left idle, a
+queue of families at the door — down to self time per function.
 
 ```bash
 npm run perf:kiosk

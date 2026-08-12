@@ -55,6 +55,7 @@ import {
 } from './support/kiosk';
 import {
   beginPhase,
+  heapBytes,
   installProbe,
   measureThread,
   percentiles,
@@ -72,6 +73,8 @@ import { cpus, totalmem } from 'node:os';
 const THROTTLE = Number(process.env.KIOSK_PERF_THROTTLE ?? 4);
 /** How many children the church has, in total, once the extras are seeded. */
 const ROSTER_TARGET = Number(process.env.KIOSK_PERF_ROSTER ?? 450);
+/** How long the idle scenario watches a kiosk nobody is touching. */
+const IDLE_MS = Number(process.env.KIOSK_PERF_IDLE_MS ?? 35_000);
 
 test.describe.configure({ mode: 'serial' });
 
@@ -673,6 +676,52 @@ test.describe('kiosk performance', () => {
     await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
   });
 
+  /**
+   * What the kiosk costs when nobody is touching it.
+   *
+   * Which is nearly all of its life: a shelf device is checked into for twenty
+   * minutes on a Sunday and left running for the rest of the week. Four things
+   * tick in the background — the pulse every 30s, the queue replay every 30s,
+   * the register every five minutes, and the clock that decides when the
+   * binding has expired — and the failure mode is not any one of them being
+   * slow. It is a screen that quietly repaints, or a heap that only grows,
+   * discovered a fortnight later as a tablet nobody can check anybody in on.
+   *
+   * Long enough to cover two pulses and two replays. Not long enough to see the
+   * register poll, which is why its interval is named in the notes rather than
+   * measured: a benchmark that took five minutes would be a benchmark nobody
+   * runs.
+   */
+  test('idles on a shelf', async () => {
+    await throttleCpu(cdp, THROTTLE);
+    await beginPhase(kiosk);
+    const before = await heapBytes(cdp);
+
+    const { thread } = await measureThread(cdp, async () => {
+      await kiosk.waitForTimeout(IDLE_MS);
+    });
+    const probe = await readProbe(kiosk);
+    const after = await heapBytes(cdp);
+
+    record({
+      scenario: `Idle on the search screen for ${Math.round(IDLE_MS / 1000)}s`,
+      cpuThrottle: THROTTLE,
+      thread,
+      timings: {
+        'main-thread time while idle': thread.task,
+        'long tasks': probe.longTasks.length,
+        'longest task': probe.longTasks.reduce((worst, task) => Math.max(worst, task.duration), 0),
+        'network requests': probe.resources.length,
+        'heap growth (KB)': (after - before) / 1024,
+      },
+      notes: [
+        'Pulse every 30s and queue replay every 30s; the register every 5 minutes ' +
+          'and the expiry clock every minute are longer than this window.',
+        'The whole point is for these numbers to be boring.',
+      ],
+    });
+  });
+
   test('searches the whole church at scale', async () => {
     await throttleCpu(cdp, 1);
     const gathering = await seedFreshGathering();
@@ -769,6 +818,106 @@ test.describe('kiosk performance', () => {
       notes: [
         'Bound to a gathering with no history, so nothing narrows the pool — the ' +
           'state every first-ever meeting of a gathering is in.',
+      ],
+    });
+
+    /*
+     * The tap after the search, at the same scale.
+     *
+     * The confirm screen is the one place the kiosk deliberately works over the
+     * *whole* roster rather than the scoped pool: `familyOf` walks every child
+     * looking for the ones who answer to the same phone digits, and the
+     * check-in scenario earlier is bound to a gathering whose pool is fifty.
+     * A sibling offer that takes a second to appear is a parent tapping the row
+     * again.
+     */
+    await beginPhase(kiosk);
+    const row = kiosk.getByRole('button', { name: /Adaeze/i }).first();
+    const { thread: confirmThread, wall: confirmWall } = await measureThread(cdp, async () => {
+      await row.click();
+      await expect(kiosk.getByRole('button', { name: /^Check in$/ })).toBeVisible();
+    });
+    const confirmProbe = await readProbe(kiosk);
+
+    record({
+      scenario: `Row tap → confirm screen, unscoped (${roster} children)`,
+      cpuThrottle: THROTTLE,
+      thread: confirmThread,
+      timings: {
+        'row tap → confirm screen': confirmWall,
+        'tap → paint worst': percentiles(confirmProbe.taps.map((tap) => tap.ms)).max,
+        'long tasks': confirmProbe.longTasks.length,
+      },
+      notes: [
+        '`familyOf` scans the whole roster for children sharing this one’s phone ' +
+          'digits — deliberately, because the scope narrows the front door and not ' +
+          'the family behind it.',
+      ],
+    });
+
+    // Back keeps the query — a parent who tapped the wrong Adaeze is still
+    // looking for an Adaeze — so the buffer is cleared separately.
+    await kiosk.getByRole('button', { name: /← Back/ }).click();
+    await kiosk.locator('[data-key="clear"]').click();
+    await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
+  });
+
+  /**
+   * A queue at the door, which is the only load a kiosk ever really has.
+   *
+   * Every other scenario here measures one gesture from a standing start. This
+   * one measures the eighth in a row: the state a lobby screen accumulates as
+   * families arrive — the register it has ticked optimistically, the arrivals it
+   * has recorded, the labels it has queued — is state that every subsequent
+   * search and render carries. If any of that is O(what has happened tonight),
+   * the last family through the door waits longer than the first, and no
+   * single-gesture benchmark would ever say so.
+   *
+   * Reported as first, median and last rather than as a total, because the
+   * question is not "how fast" but "does it drift".
+   */
+  test('takes a queue of families back to back', async () => {
+    await throttleCpu(cdp, THROTTLE);
+    // Distinct given names, so each round meets a child who is not already on
+    // the register — a checked-in row is inert on a gathering that does not
+    // track pickup, and the rush would measure taps that do nothing.
+    const QUEUE = ['BETHANY', 'CALLUM', 'DELPHINE', 'EZEKIEL', 'FIONA', 'GIDEON', 'HALIMA'];
+    const pad = await keyPad(kiosk, QUEUE.join(''));
+    const before = await heapBytes(cdp);
+    const cycles: number[] = [];
+
+    for (const name of QUEUE) {
+      const started = Date.now();
+      await tapKeys(kiosk, pad, name.slice(0, 4));
+      const row = kiosk.getByRole('button', { name: new RegExp(name, 'i') }).first();
+      await expect(row).toBeVisible({ timeout: 15_000 });
+      await row.click();
+      await kiosk.getByRole('button', { name: /^Check in$/ }).click();
+      await expect(kiosk.getByText(/welcome/i)).toBeVisible({ timeout: 30_000 });
+      cycles.push(Date.now() - started);
+      // The tick is dismissed the way a parent dismisses it, which is also what
+      // clears the buffer for the family behind them.
+      await kiosk.getByText(/welcome/i).click();
+      await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
+    }
+
+    const after = await heapBytes(cdp);
+    const sorted = [...cycles].sort((a, b) => a - b);
+    record({
+      scenario: `A queue of ${QUEUE.length} families, unscoped (${roster} children)`,
+      cpuThrottle: THROTTLE,
+      timings: {
+        'first family, search to tick': cycles[0] ?? null,
+        'median family': sorted[Math.floor(sorted.length / 2)] ?? null,
+        'last family': cycles[cycles.length - 1] ?? null,
+        'slowest family': sorted[sorted.length - 1] ?? null,
+        'heap growth over the queue (KB)': (after - before) / 1024,
+      },
+      notes: [
+        'Four letters, a row tap, a confirm and the dismiss — the whole gesture a ' +
+          'family makes, seven times without a pause.',
+        'Includes Playwright’s own locator work between the taps, so read the ' +
+          'drift between families rather than the absolute number.',
       ],
     });
   });

@@ -12,9 +12,10 @@ So there is a benchmark, and it runs on the real thing.
 npm run perf:kiosk          # ~45 seconds, chromium-desktop
 ```
 
-It is `e2e/kiosk-perf.spec.ts`, and it drives the same stack the end-to-end
-suite does: a production build behind `vite preview`, the Firebase emulators,
-the Planning Center simulator. Nothing is stubbed in the browser. It writes
+It is `e2e/kiosk-perf.spec.ts` — eleven scenarios covering a boot, a keystroke,
+a check-in, a label, a shelf left idle and a queue at the door — and it drives
+the same stack the end-to-end suite does: a production build behind
+`vite preview`, the Firebase emulators, the Planning Center simulator. Nothing is stubbed in the browser. It writes
 `perf-results/kiosk-perf.md` to read and
 `perf-results/kiosk-perf.json` to diff against.
 
@@ -25,12 +26,17 @@ already — `scripts/check-kiosk-budget.mjs`, which fails the build — and byte
 the part of kiosk performance a number can honestly police. This measures the
 other part.
 
-## The two knobs
+## The knobs
 
 **`KIOSK_PERF_THROTTLE`** (default 4) throttles the CPU through CDP. The target
 device is a cheap Android tablet or a hand-me-down iPad on a shelf, and an
 unthrottled runner reports that everything is instant. Only script is dilated,
 which is the right shape — script is what this app spends.
+
+**`KIOSK_PERF_IDLE_MS`** (default 35 000) is how long the idle scenario watches
+a kiosk nobody is touching. Long enough for two pulse polls and two queue
+replays; a window long enough to see the five-minute register poll would be a
+benchmark nobody runs.
 
 **`KIOSK_PERF_ROSTER`** (default 450) grows the church. The seed is a couple of
 dozen children, which is a youth group; a search that runs on every keystroke
@@ -63,77 +69,104 @@ hotspots — which is worse than not running, because it looks like a result.
 
 ## Baseline
 
-Taken 2026-08-12, 4-core Xeon at 2.1 GHz, CPU throttled ×4, 412 children on the
-roster. Compare shapes, not digits: the emulators are on the same machine, so
-every network figure is a floor.
+Median of three runs, 2026-08-12, 4-core Xeon at 2.1 GHz, CPU throttled ×4, 412
+children on the roster. Compare shapes, not digits: the emulators are on the
+same machine, so every network figure is a floor.
 
-| Scenario | Wall | Notes |
+| Scenario | Median | Notes |
 | --- | ---: | --- |
-| First-ever boot → pairing code | 660 ms | FCP 296 ms, one 51 ms long task |
-| Warm reboot → search screen | ~400 ms | Everything from localStorage. The 4am reload |
-| Cold caches → searchable roster | 716 ms | Roster, phone index, participation, register |
-| Row tap → confirm screen | 120 ms | |
-| Confirm → the tick | 119 ms | Optimistic; the write follows the paint |
-| Confirm → raster job ready | 213 ms | 25.6 kB, in the worker |
-| Typing, scoped to a gathering | 26 ms p50 | 41 ms worst |
-| **Typing, unscoped** | **37 ms p50** | **148 ms on the first letter** |
+| First-ever boot → pairing code | 702 ms | FCP ~300 ms, one long task of ~50 ms |
+| Warm reboot → search screen | 438 ms | Everything from localStorage. The 4am reload |
+| Cold caches → searchable roster | 773 ms | Roster, phone index, participation, register |
+| Row tap → confirm screen | 121–130 ms | Same either scoped or over the whole church |
+| Confirm → the tick | 117 ms | Optimistic; the write follows the paint |
+| Confirm → raster job ready | 152 ms | 25.6 kB, in the worker |
+| Typing, scoped to a gathering | 22 ms p50 | 36 ms worst |
+| Typing, unscoped (whole church) | 22 ms p50 | 36 ms worst |
+| Idle for 35 s | 325 ms task | of which 25 ms script, no long tasks |
+| Queue of seven families | 313 → 390 ms | first to last; no drift beyond noise |
 
-Boot is healthy and printing is fine. The finding is the last line.
+The two typing rows being the same number is the point of the section below.
 
-## The hotspot: the first letter of an unscoped search
+## What the first run found, and what it cost to fix
 
-Bound to a gathering with history, the kiosk searches only the children that
-gathering has seen, and every keystroke lands inside a frame or two. Bound to a
-gathering with *no* history — every first-ever meeting of anything — the pool is
-the whole church, and the first letter costs **148 ms**: nine frames, one
-uncancelled long task, between a thumb and the letter appearing.
+Before any of this, typing on a kiosk bound to a gathering with **no history** —
+every first-ever meeting of anything, where the pool is the whole church rather
+than the children that gathering has seen — cost **148–174 ms on the first
+letter**. Nine frames, one long task, between a thumb and a letter appearing;
+which is how a screen that is merely slow becomes a screen that typed two
+letters, because the parent pressed the key again.
 
-The profile of six keystrokes over 412 children:
+Three ordinary shapes, composing:
+
+| What | Where | Self time |
+| --- | --- | ---: |
+| Every match sorted so eight could be shown, on a comparator that resolved collator options per call | `sortByName`, src/lib/utils.ts | 101 ms |
+| `searchName` re-normalised per student per keystroke — `NFD` and four regexes over a string that had not changed since the roster loaded | `normalizeForSearch`/`compact` | 47 ms |
+| `rank` called *from inside the sort comparator*, so O(n log n) times rather than n, each re-normalising three more names | `bandFor` via the comparator | — |
+| `Intl.DateTimeFormat` rebuilt on every render of the header | `clock`, src/kiosk/binding.ts | 10 ms |
+
+None of it is wrong, and none of it shows at twenty children. The fixes are the
+obvious ones and they are all in shared code, so the app's own roster search got
+them too:
+
+- **One collator, hoisted** (`NAME_COLLATOR`). `localeCompare(other, undefined,
+  { sensitivity: 'base' })` resolves those options into a collator on every
+  call, and this comparator runs inside every sort of every list of people Tally
+  draws. 101 ms → 2 ms.
+- **A bounded cache of normalized name forms** (`searchKeyOf`). A miss does the
+  work; correctness never depends on it. It fixes every caller of the matcher,
+  not just the kiosk. 47 ms → under 6 ms, and most of that is now paid once at
+  boot while the cache fills.
+- **`rank` memoized per matcher**, weakly, keyed on the student — and the kiosk's
+  own search decorated-sorted-undecorated so it asks once per candidate rather
+  than once per comparison.
+- **One `Intl.DateTimeFormat`**, hoisted, for the same reason as the collator.
+
+The result is the two typing rows in the baseline being identical: **the size of
+the roster no longer reaches the keystroke.** Worst-case first letter went from
+148–174 ms to 36 ms, and the search no longer appears in its own profile's top
+five.
+
+## Where the time goes now
+
+Six keystrokes over 412 children, throttled ×4:
 
 | self ms | share | function | file |
 | ---: | ---: | --- | --- |
-| 101 | 12.2% | `sortByName` | src/lib/utils.ts:483 |
-| 37.4 | 4.5% | `normalizeForSearch` | src/lib/utils.ts:67 |
-| 9.7 | 1.2% | `compact` | src/lib/utils.ts:83 |
-| 9.6 | 1.2% | `clock` | src/kiosk/binding.ts:195 |
-| 9.0 | 1.1% | render | src/kiosk/screens/SearchScreen.tsx:321 |
-| 8.2 | 1.0% | `approximatelyIncludes` | src/lib/utils.ts:320 |
-| 7.4 | 0.9% | `bandFor` | src/lib/utils.ts:239 |
+| 16 | 1.9% | render | src/kiosk/screens/SearchScreen.tsx |
+| 10 | 1.1% | `approximatelyIncludes` | src/lib/utils.ts |
+| 6 | 0.7% | `KioskApp` render | src/kiosk/KioskApp.tsx |
+| 5 | 0.6% | `searchStudents` | src/kiosk/search.ts |
 
-(`(program)` and `(idle)` are omitted here; the generated report keeps them, and
-explains why they mean nothing on their own.)
+That is about six milliseconds of Tally's own code per keystroke, against a
+16 ms frame, on a machine pretending to be four times slower than it is. The
+next thing in the table is the typo pass — a Damerau-Levenshtein DP that runs
+for every student a plain substring match missed — and a sound prefilter for it
+is perfectly possible. It is not worth writing: it would buy about two
+milliseconds a keystroke and cost a page of clever code in the one function
+every search in the app depends on being correct.
 
-Three things are visible in that table, and all of them are in `searchStudents`
-(`src/kiosk/search.ts:97`):
+The keyboard is already memoized against a stable `onKey` (see
+`components/Keyboard.tsx`), so typing re-renders the readout and the results and
+not the forty keys. That was true before any of this and it is why the render
+row above is as small as it is.
 
-```ts
-const results = students
-  .filter((student) => matcher.matches(student.searchName))
-  .sort((a, b) => matcher.rank(a) - matcher.rank(b) || sortByName(a, b));
-return { mode: 'name', results: results.slice(0, MAX_RESULTS), total: results.length };
-```
+### Three scenarios that found nothing, which is the finding
 
-1. **Every match is sorted so that eight can be shown.** On a one-letter query
-   over an unscoped roster the match set *is* the roster, and `sortByName` is two
-   `localeCompare` calls with an options object per comparison — a fresh
-   collator lookup each time. It is the single most expensive function in the
-   kiosk, by a factor of three.
-2. **`rank` is called from inside the comparator**, so it runs O(n log n) times
-   rather than n. Each call re-normalises the student's given name, surname and
-   search name, which is where `normalizeForSearch` and `compact` are being paid
-   for over and over.
-3. **`matches` re-normalises `searchName`**, which was already normalised when
-   the roster row was built — an `NFD` pass and four regexes per student per
-   keystroke, and the roster is in memory and never changes between them.
-
-None of it is wrong, and none of it shows at twenty children. All three are
-ordinary shapes — sort-then-slice, an expensive comparator key computed inline,
-an idempotent normaliser called defensively — and they compose into nine frames
-of latency on the one screen that cannot afford them.
-
-`clock` is a smaller one of the same kind: `toLocaleTimeString` builds an
-`Intl.DateTimeFormat` on every render of the header, to print a time that only
-changes when the binding does.
+- **Idle on a shelf** — 35 seconds of a kiosk nobody is touching costs 25 ms of
+  script, no long tasks, four network requests (two pulse polls, two queue
+  replays) and no heap growth beyond what the collector takes back. The register
+  poll is every five minutes and the expiry clock every minute; neither is in
+  the window, and both are one small read.
+- **A queue of seven families**, back to back, unscoped: 313 ms for the first
+  family's whole gesture and 390 ms for the last, which is inside the run-to-run
+  noise on this machine. Nothing about the state a lobby accumulates — the
+  optimistic register, the arrivals map, the label queue — is O(what has
+  happened tonight).
+- **The confirm screen over the whole church**: 121 ms, the same as it costs
+  scoped. `familyOf` scans all 412 children looking for the ones who answer to
+  the same phone digits, and that scan does not show up.
 
 ## When you change something here
 

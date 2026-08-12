@@ -94,8 +94,26 @@ export function searchStudents(
   }
 
   const matcher = createSearchMatcher(trimmed);
-  const results = students
-    .filter((student) => matcher.matches(student.searchName))
-    .sort((a, b) => matcher.rank(a) - matcher.rank(b) || sortByName(a, b));
-  return { mode: 'name', results: results.slice(0, MAX_RESULTS), total: results.length };
+  /*
+   * Decorated, sorted, undecorated — rather than ranking inside the comparator.
+   *
+   * A comparator runs O(n log n) times and `rank` is the expensive half of it:
+   * three prefix tests over three normalized names, and again for every ü
+   * variant. Asking it once per candidate turns four thousand of those into
+   * four hundred. The matcher memoizes as well, so this is belt and braces —
+   * but the belt is the one that stops the whole church being ranked five times
+   * over on the first letter of a name.
+   */
+  const scored: { student: KioskStudent; rank: number }[] = [];
+  for (const student of students) {
+    if (matcher.matches(student.searchName)) {
+      scored.push({ student, rank: matcher.rank(student) });
+    }
+  }
+  scored.sort((a, b) => a.rank - b.rank || sortByName(a.student, b.student));
+  return {
+    mode: 'name',
+    results: scored.slice(0, MAX_RESULTS).map((entry) => entry.student),
+    total: scored.length,
+  };
 }

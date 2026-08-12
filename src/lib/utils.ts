@@ -84,6 +84,47 @@ function compact(normalized: string): string {
   return normalized.replace(/ /g, '');
 }
 
+/** A name in both the forms matching needs: word gaps kept, and taken out. */
+interface SearchKey {
+  normalized: string;
+  compact: string;
+}
+
+/**
+ * Both forms of one name, computed once ever.
+ *
+ * The normalization is not expensive; doing it four hundred times per keystroke
+ * is. `matches` is called for every student on every character typed, and
+ * `rank` asks the same question again of the given name and the surname — so a
+ * roster of four hundred children costs upwards of a thousand `NFD`
+ * normalizations and four thousand regex passes per letter, over a set of
+ * strings that has not changed since the roster loaded. It was 47ms of a 148ms
+ * keystroke on the lobby kiosk; see docs/kiosk-performance.md.
+ *
+ * A cache and not a precomputed field on the row, because the roster is not the
+ * only caller — the students page, the RSVP manager and the predictive roster
+ * all match against strings they hold in different shapes — and a cache fixes
+ * every one of them without changing what a row is.
+ *
+ * Cleared wholesale when it gets big rather than evicted one entry at a time.
+ * The working set is a roster and the prefixes somebody has typed, which is
+ * thousands at most; the cap is only here so that a kiosk left running for a
+ * month cannot turn a search box into a memory leak. Correctness does not
+ * depend on the cache at all — a miss simply does the work.
+ */
+const SEARCH_KEY_CACHE = new Map<string, SearchKey>();
+const SEARCH_KEY_CACHE_MAX = 4096;
+
+function searchKeyOf(value: string): SearchKey {
+  const held = SEARCH_KEY_CACHE.get(value);
+  if (held) return held;
+  const normalized = normalizeForSearch(value);
+  const key: SearchKey = { normalized, compact: compact(normalized) };
+  if (SEARCH_KEY_CACHE.size >= SEARCH_KEY_CACHE_MAX) SEARCH_KEY_CACHE.clear();
+  SEARCH_KEY_CACHE.set(value, key);
+  return key;
+}
+
 /**
  * How many typos to forgive, by query length.
  *
@@ -240,13 +281,13 @@ function bandFor(
   student: { firstName: string; lastName: string; searchName: string },
   needle: string,
 ): number {
-  if (compact(normalizeForSearch(student.firstName)).startsWith(needle)) {
+  if (searchKeyOf(student.firstName).compact.startsWith(needle)) {
     return MatchRank.givenNamePrefix;
   }
-  if (compact(normalizeForSearch(student.lastName)).startsWith(needle)) {
+  if (searchKeyOf(student.lastName).compact.startsWith(needle)) {
     return MatchRank.lastNamePrefix;
   }
-  if (compact(normalizeForSearch(student.searchName)).includes(needle)) {
+  if (searchKeyOf(student.searchName).compact.includes(needle)) {
     return MatchRank.contained;
   }
   return MatchRank.approximate;
@@ -267,11 +308,26 @@ export function createSearchMatcher(query: string): SearchMatcher {
   const budget = needle.length <= FUZZY_MAX_LENGTH ? editBudget(needle.length) : 0;
   const variants = umlautVariants(normalizeForSearch(query));
 
+  /*
+   * One answer per student per query.
+   *
+   * `rank` is a pure function of the student and the query, and this matcher is
+   * one query — so a repeat question has one answer and it is worth keeping.
+   * Not a micro-optimization: both callers rank *from inside a sort
+   * comparator*, so a list of n matches asks this O(n log n) times rather than
+   * n, and every one of those calls does up to three prefix tests over three
+   * normalized names.
+   *
+   * Weak, so a roster that is replaced between keystrokes — every refetch mints
+   * new objects — is not held alive by the matcher that happened to be current
+   * when it arrived.
+   */
+  const ranked = new WeakMap<object, number>();
+
   return {
     isEmpty: false,
     matches(searchName: string): boolean {
-      const normalized = normalizeForSearch(searchName);
-      const haystack = compact(normalized);
+      const { normalized, compact: haystack } = searchKeyOf(searchName);
       if (haystack.includes(needle)) return true;
       // A variant is a different spelling, not a different name, so it is
       // checked before the typo pass and is not charged against its budget.
@@ -287,13 +343,25 @@ export function createSearchMatcher(query: string): SearchMatcher {
       return approximatelyIncludes(haystack, needle, budget);
     },
     rank(student): number {
+      const held = ranked.get(student);
+      if (held !== undefined) return held;
+
+      let answer = rankOf(MatchRank.approximate, false);
       const band = bandFor(student, needle);
-      if (band !== MatchRank.approximate) return rankOf(band, false);
-      for (const variant of variants) {
-        const alternate = bandFor(student, variant);
-        if (alternate !== MatchRank.approximate) return rankOf(alternate, true);
+      if (band !== MatchRank.approximate) {
+        answer = rankOf(band, false);
+      } else {
+        for (const variant of variants) {
+          const alternate = bandFor(student, variant);
+          if (alternate !== MatchRank.approximate) {
+            answer = rankOf(alternate, true);
+            break;
+          }
+        }
       }
-      return rankOf(MatchRank.approximate, false);
+
+      ranked.set(student, answer);
+      return answer;
     },
   };
 }
@@ -465,6 +533,21 @@ export function formatPhoneInput(raw: string): string {
 }
 
 /**
+ * One collator, built once, for every name comparison in the app.
+ *
+ * `localeCompare(other, undefined, { sensitivity: 'base' })` has to resolve
+ * those options into a collator on every single call, and this comparator runs
+ * inside every sort of every list of people Tally draws. On the lobby kiosk it
+ * was the most expensive function in the whole application by a factor of three
+ * — 101ms of a profile whose next entry was 37ms — because a search sorts its
+ * matches on every keystroke. Hoisting it is behaviour-for-behaviour identical
+ * and costs nothing anywhere else.
+ *
+ * `undefined` locale on purpose: the browser's, which is the reader's.
+ */
+const NAME_COLLATOR = new Intl.Collator(undefined, { sensitivity: 'base' });
+
+/**
  * One ordering key for every list of students in the app: given name first.
  *
  * It used to be surname-first here and given-name-first in the student
@@ -482,10 +565,11 @@ export function formatPhoneInput(raw: string): string {
  */
 export function sortByName<T extends { lastName: string; firstName: string }>(a: T, b: T): number {
   return (
-    a.firstName.localeCompare(b.firstName, undefined, { sensitivity: 'base' }) ||
-    a.lastName.localeCompare(b.lastName, undefined, { sensitivity: 'base' })
+    NAME_COLLATOR.compare(a.firstName, b.firstName) ||
+    NAME_COLLATOR.compare(a.lastName, b.lastName)
   );
 }
+
 
 /**
  * Whether two arrays hold the very same items in the same order.
