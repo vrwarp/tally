@@ -69,22 +69,53 @@ async function upstreamLastName(personId: string): Promise<string> {
 }
 
 /**
- * Opens one student's record, the way a leader reaches it.
+ * Opens one student's record, the way a leader reaches it, and says what it
+ * found when the record is not there.
  *
- * Thirty seconds rather than the default ten, for the reason `onServer` below
- * gives about the same number: this is the first page load in the file, it
- * lands on an emulator the previous spec file has just spent a quarter of an
- * hour writing to, and the button it waits for is drawn from a details read
- * served through a five-second cache that is reliably cold by then. Ten
- * seconds was enough for the button on a quiet machine and not on a loaded
- * one, which made the first test in this file fail perhaps one run in three —
- * always here, and always reading as though the profile screen were broken.
+ * Waiting on the button alone is what this did, and it is the wrong thing to
+ * wait for. `Edit profile` renders unconditionally once `StudentDetailPage`
+ * has a student, so its absence never means "slow" — it means the page gave up
+ * and drew one of two empty states instead, and the two have entirely
+ * different causes. A bare `toBeVisible` timeout cannot tell them apart, so the
+ * first test in this file has been failing intermittently for some time with a
+ * message that names neither: raising its budget from ten seconds to thirty
+ * changed nothing, because there was never anything still loading.
+ *
+ * `gotoReady` has already waited out the loading state by the time this runs,
+ * so whichever of the three has appeared is final. Racing all three therefore
+ * fails in about as long as it takes to draw, rather than sitting out a
+ * timeout, and reports which one:
+ *
+ *   - "cannot be read right now" is `rosterError` — the roster read threw, and
+ *     the app is holding an empty list. The screen is right and the backend is
+ *     the story.
+ *   - "No student with that link" is a roster that loaded *without this
+ *     person*. The read worked and the ministry is what is wrong.
+ *
+ * Thirty seconds rather than the default ten is kept, on the same reasoning
+ * `onServer` gives below: this is the first page load in the file and it lands
+ * on an emulator the previous spec has just spent a quarter of an hour writing
+ * to. It is headroom, not the fix.
  */
 async function openProfile(page: Page, studentId: string) {
   await gotoReady(page, `/students/${studentId}`);
-  await expect(page.getByRole('button', { name: 'Edit profile' })).toBeVisible({
-    timeout: 30_000,
-  });
+
+  const editProfile = page.getByRole('button', { name: 'Edit profile' });
+  const unreadable = page.getByText('This student cannot be read right now.');
+  const absent = page.getByText('No student with that link.');
+
+  await expect(editProfile.or(unreadable).or(absent).first()).toBeVisible({ timeout: 30_000 });
+  if (await editProfile.isVisible()) return;
+
+  throw new Error(
+    (await unreadable.isVisible())
+      ? `The roster read failed, so ${studentId} had no record to draw. The screen is ` +
+        'reporting the backend correctly; the fault is upstream of it — a Planning Center ' +
+        'read that threw, most likely a fault left armed by whatever ran before this file.'
+      : `The roster loaded without ${studentId} in it. Planning Center answered, and the ` +
+        'person this file is written around was not among the people it returned — check ' +
+        'whether the seeded ministry survived the specs that ran first.',
+  );
 }
 
 /** Types a new surname into the editor and presses Save. */
