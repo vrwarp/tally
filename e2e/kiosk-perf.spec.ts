@@ -12,7 +12,7 @@
  * Measuring is slow, and a measurement is not an assertion: nothing in here
  * fails a build for being 12ms slower than yesterday, because a number that
  * gates CI on a shared runner is a number that will be silenced within a month.
- * What it produces instead is a report — `test-results/kiosk-perf/kiosk-perf.md`
+ * What it produces instead is a report — `perf-results/kiosk-perf.md`
  * and its JSON twin — naming where the time went, function by function.
  *
  * ## The two knobs that decide whether the numbers mean anything

@@ -220,7 +220,7 @@ npm run perf:kiosk
 It is ignored unless `KIOSK_PERF=1` (see `SPEC_IGNORE` in
 `playwright.config.ts`), which is also what switches the build to emitting
 source maps, and it asserts nothing: it writes
-`test-results/kiosk-perf/kiosk-perf.md`. It seeds several hundred people and
+`perf-results/kiosk-perf.md`. It seeds several hundred people and
 reseeds the world on the way out, so run it on its own.
 [docs/kiosk-performance.md](../docs/kiosk-performance.md) has the instruments,
 the baseline and what the last run found.

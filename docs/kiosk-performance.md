@@ -15,8 +15,8 @@ npm run perf:kiosk          # ~45 seconds, chromium-desktop
 It is `e2e/kiosk-perf.spec.ts`, and it drives the same stack the end-to-end
 suite does: a production build behind `vite preview`, the Firebase emulators,
 the Planning Center simulator. Nothing is stubbed in the browser. It writes
-`test-results/kiosk-perf/kiosk-perf.md` to read and
-`test-results/kiosk-perf/kiosk-perf.json` to diff against.
+`perf-results/kiosk-perf.md` to read and
+`perf-results/kiosk-perf.json` to diff against.
 
 It is **opt-in** (`KIOSK_PERF=1`, which `npm run perf:kiosk` sets) and asserts
 nothing. That is deliberate: a latency budget enforced on a shared CI runner is

@@ -551,7 +551,12 @@ export interface Measurement {
   thread?: ThreadTime;
 }
 
-const REPORT_DIR = join(ROOT, 'test-results', 'kiosk-perf');
+/**
+ * Not under `test-results/`, which is Playwright's `outputDir` and is emptied
+ * at the start of every run. A report the next `npm run e2e` deletes is a
+ * report nobody can diff against, which is half of what it is for.
+ */
+const REPORT_DIR = join(ROOT, 'perf-results');
 
 function ms(value: number | null | undefined): string {
   if (value === null || value === undefined) return '—';

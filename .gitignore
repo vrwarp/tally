@@ -67,6 +67,11 @@ test-results/
 blob-report/
 tsconfig.tsbuildinfo
 
+# The kiosk benchmark's report. Deliberately not under test-results/, which
+# Playwright empties at the start of every run — a measurement that the next
+# `npm run e2e` deletes is a measurement nobody can compare against.
+perf-results/
+
 # UXR refinement working files.
 #
 # `uxr/baseline/` and `uxr/prototype/` ARE committed: they are the frozen
