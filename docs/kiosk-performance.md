@@ -12,12 +12,12 @@ So there is a benchmark, and it runs on the real thing.
 npm run perf:kiosk          # ~45 seconds, chromium-desktop
 ```
 
-It is `e2e/kiosk-perf.spec.ts` — fourteen scenarios covering a boot, a keystroke,
-a check-in, a label, a registration, a shelf left idle, a queue at the door and a
-roster replaced under somebody's hands — and it drives
+It is `e2e/kiosk-perf.spec.ts` — fifteen scenarios covering a boot, a keystroke,
+a check-in, a label, a registration, a shelf left idle, a queue at the door, a
+roster replaced under somebody's hands and a kiosk that prints — and it drives
 the same stack the end-to-end suite does: a production build behind
-`vite preview`, the Firebase emulators, the Planning Center simulator. Nothing is stubbed in the browser. It writes
-`perf-results/kiosk-perf.md` to read and
+`vite preview`, the Firebase emulators, the Planning Center simulator. Nothing
+is stubbed in the browser. It writes `perf-results/kiosk-perf.md` to read and
 `perf-results/kiosk-perf.json` to diff against.
 
 It is **opt-in** (`KIOSK_PERF=1`, which `npm run perf:kiosk` sets) and asserts
@@ -60,7 +60,7 @@ measuring nothing.
 
 ## What it measures, and with what
 
-Four instruments, because each of them lies on its own (`e2e/support/perf.ts`):
+Five instruments, because each of them lies on its own (`e2e/support/perf.ts`):
 
 | Instrument | Answers |
 | --- | --- |
@@ -91,7 +91,7 @@ same machine, so every network figure is a floor.
 | Cold caches → searchable roster | 773 ms | Roster, phone index, participation, register |
 | Row tap → confirm screen | 121–130 ms | Same either scoped or over the whole church |
 | Confirm → the tick | 117 ms | Optimistic; the write follows the paint |
-| Confirm → raster job ready | 152 ms | 25.6 kB, in the worker |
+| Confirm → raster job ready | 152 ms | 25.6 kB; mostly main-thread work, not the worker |
 | Typing, scoped to a gathering | 22 ms p50 | 36 ms worst |
 | Typing, unscoped (whole church) | 22 ms p50 | 36 ms worst |
 | Registering a family | ~6.5 s | two children and a parent, typed at machine speed |
@@ -307,6 +307,49 @@ afternoon. A version indexing by `charCodeAt` into a flat array would avoid the
 allocation — but it would be more clever code in the one function every search
 in the app depends on being correct, for a saving this harness cannot resolve
 above its own noise.
+
+### The kiosk that prints is a different kiosk
+
+Worth saying plainly, because it is easy to read the table above as covering
+every kiosk: it does not. Thirteen of the fifteen scenarios run a device with no
+printer configured, so `hasConfiguredPrinter()` is false, the printing chunk is
+never imported and no rasteriser worker ever starts. That is the right default —
+most kiosks do not print — but the one bolted to a shelf beside a Brother QL is
+the heavier device, and it is also the one most likely to be a Pi.
+
+Measured, at the same throttles:
+
+| | ×10 (Pi 4) | ×20 (Pi 3) |
+| --- | ---: | ---: |
+| Cold boot, no printer | 1688 ms | 3393 ms |
+| Cold boot, printer configured | 1710 ms | 3456 ms |
+| Confirm → raster job ready | 281 ms | 502 ms |
+| Typing, nothing printing (p50) | 38 ms | 93 ms |
+| Typing while a label is drawn (p50) | 53 ms | 74 ms |
+| …gestures over 100 ms | 0 | 3 |
+
+Three things in that:
+
+- **Printing costs nothing at boot.** 1710 against 1688 ms is noise, and first
+  contentful paint is identical. The chunk is lazy, it is inside its own byte
+  budget, and neither it nor the worker starting is visible in a boot.
+- **A label is not as off-thread as it looks.** The raster runs in a worker, but
+  "confirm → job ready" scales with the *main* thread — 150 ms at ×4, 281 at
+  ×10, 502 at ×20 — which says most of that time is the label template, the
+  allergy read, the job assembly and the hand-off, not the drawing. A faster
+  rasteriser would not move it.
+- **Typing during a raster is slower but not unresponsive.** On a Pi 4 the
+  median keystroke goes from 38 ms to 53 ms while a sticker is being drawn, and
+  nothing crosses 100 ms. The scenario checks that the raster really did land
+  inside the window it measured, so a run where the label finished early says so
+  rather than quietly reporting ordinary typing.
+
+One caveat that cuts the wrong way, and cannot be fixed from here: **the worker
+is not throttled.** Playwright's CDP session addresses the page target, and
+`Emulation.setCPUThrottlingRate` cannot be sent to a worker through it — so in
+these runs the rasteriser has a full-speed core while the main thread is slowed
+ten or twenty times. On a Pi every core is slow. Read the interference row as a
+floor, not an estimate.
 
 ### The next lever, if a Pi 3 ever has to work
 
