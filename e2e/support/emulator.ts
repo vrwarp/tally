@@ -226,6 +226,40 @@ export async function writeDocument(
   }
 }
 
+/**
+ * Writes many documents in one round trip, for state measured in hundreds.
+ *
+ * `writeDocument` is right for the two or three documents a test arranges by
+ * hand; it is the wrong shape for a benchmark that puts four hundred children
+ * on the roster, where four hundred sequential PATCHes are most of the setup
+ * time and none of the point. Chunked, because the emulator (like Firestore)
+ * caps a commit's writes.
+ */
+export async function writeDocuments(
+  documents: readonly { path: string; data: Record<string, WritableValue> }[],
+): Promise<void> {
+  const CHUNK = 200;
+  for (let start = 0; start < documents.length; start += CHUNK) {
+    const writes = documents.slice(start, start + CHUNK).map((document) => ({
+      update: {
+        // A commit names documents absolutely; everything else here is relative.
+        name: `projects/${E2E.projectId}/databases/(default)/documents/${document.path}`,
+        fields: encodeFields(document.data),
+      },
+    }));
+    const response = await fetch(`${FIRESTORE_ROOT}:commit`, {
+      method: 'POST',
+      headers: { ...ADMIN, 'content-type': 'application/json' },
+      body: JSON.stringify({ writes }),
+    });
+    if (!response.ok) {
+      throw new Error(
+        `Writing ${writes.length} documents failed: HTTP ${response.status} ${await response.text()}.`,
+      );
+    }
+  }
+}
+
 /* -------------------------------------------------------------------------- */
 /* Planning Center simulator control plane                                     */
 /* -------------------------------------------------------------------------- */

@@ -206,6 +206,25 @@ docker compose -f docker-compose.e2e.yml run --rm e2e --project=webkit-mobile
 See [docker/README.md](../docker/README.md). The container is the only place
 WebKit is guaranteed to be present, so it is the reference environment.
 
+## Measuring instead of asserting
+
+One file here is not a test. `kiosk-perf.spec.ts` drives this same stack with a
+throttled CPU and four hundred children on the roster, and reports what the
+kiosk *costs* — boot, keystroke latency, check-in, the label — down to self time
+per function.
+
+```bash
+npm run perf:kiosk
+```
+
+It is ignored unless `KIOSK_PERF=1` (see `SPEC_IGNORE` in
+`playwright.config.ts`), which is also what switches the build to emitting
+source maps, and it asserts nothing: it writes
+`test-results/kiosk-perf/kiosk-perf.md`. It seeds several hundred people and
+reseeds the world on the way out, so run it on its own.
+[docs/kiosk-performance.md](../docs/kiosk-performance.md) has the instruments,
+the baseline and what the last run found.
+
 ## Writing a test
 
 Assert on what the PRD promises, not on markup. The app's rows carry real
