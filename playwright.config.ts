@@ -60,9 +60,18 @@ const launchOptions = (executablePath: string | undefined) =>
  * a pickup button and waiting for a "Check in" that was never coming — and
  * everything it registered on the way through poisoned whatever ran after it.
  */
-const SPEC_IGNORE = process.env.WALKTHROUGH
-  ? []
-  : ['**/*walkthrough.spec.ts', '**/tour.spec.ts'];
+const SPEC_IGNORE = [
+  ...(process.env.WALKTHROUGH ? [] : ['**/*walkthrough.spec.ts', '**/tour.spec.ts']),
+  /*
+   * The benchmarks are opted in with `KIOSK_PERF=1` (`npm run perf:kiosk`) for
+   * the same reason the walkthrough is: they are not tests. They measure — a
+   * throttled boot, a profiled keystroke, a roster grown to four hundred
+   * children — and they take minutes to do it, mutate the seeded world on
+   * purpose, and answer with a report rather than a verdict. A number that
+   * gated CI on a shared runner would be silenced inside a month.
+   */
+  ...(process.env.KIOSK_PERF ? [] : ['**/kiosk-perf.spec.ts']),
+];
 
 const BROWSERS = [
   { name: 'chromium-desktop', use: { ...devices['Desktop Chrome'], ...launchOptions(chromiumExecutable) } },
@@ -193,7 +202,15 @@ export default defineConfig({
       // `VITE_E2E_HOOKS` bakes in the sign-in hook the suite falls back to when
       // the browser cannot reach Google (see e2e/support/auth.ts). It is a build
       // flag rather than a runtime one so it cannot reach a real deployment.
-      command: `VITE_E2E_HOOKS=true npm run build -- --mode emulated && npx vite preview --mode emulated --port ${PORTS.app} --strictPort`,
+      // `--sourcemap` under KIOSK_PERF and never otherwise: a CPU profile of the
+      // shipped bundle attributes every hotspot to `kiosk-DkB2ctgC.js:1:84213`,
+      // which is true and useless. The maps are emitted beside the chunks and
+      // read from `dist/` by e2e/support/perf.ts; the page itself downloads a
+      // `sourceMappingURL` comment and nothing more, so what is measured is
+      // still the bundle a church would be served.
+      command:
+        `VITE_E2E_HOOKS=true npm run build -- --mode emulated${process.env.KIOSK_PERF ? ' --sourcemap' : ''}` +
+        ` && npx vite preview --mode emulated --port ${PORTS.app} --strictPort`,
       url: E2E.baseURL,
       reuseExistingServer: !process.env.CI,
       timeout: 180_000,

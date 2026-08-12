@@ -192,8 +192,19 @@ export function windowHasOpened(binding: KioskBinding, nowMs: number): boolean {
  * 8:00 PM" is the same fact said twice and this line sits under a title it
  * must not compete with.
  */
+/**
+ * Built once, not per call.
+ *
+ * `toLocaleTimeString` resolves its options into a formatter every time, and
+ * this line is drawn by the search screen's header — so it was being rebuilt
+ * twice on every render, which on a screen that re-renders per keystroke put it
+ * among the kiosk's ten most expensive functions for a string that changes only
+ * when the binding does. See docs/kiosk-performance.md.
+ */
+const CLOCK = new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit' });
+
 function clock(ms: number): string {
-  return new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return CLOCK.format(new Date(ms));
 }
 
 export function eventWindow(binding: KioskBinding): string {

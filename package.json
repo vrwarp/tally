@@ -39,6 +39,7 @@
     "e2e:chromium": "playwright test --project=chromium-desktop --project=chromium-mobile",
     "e2e:install": "playwright install --with-deps chromium webkit",
     "e2e:report": "playwright show-report",
+    "perf:kiosk": "KIOSK_PERF=1 playwright test --project=chromium-desktop e2e/kiosk-perf.spec.ts",
     "typecheck:e2e": "tsc -p tsconfig.e2e.json",
     "walkthrough:capture": "WALKTHROUGH=1 playwright test --project=chromium-desktop e2e/walkthrough.spec.ts && WALKTHROUGH=1 playwright test --project=chromium-mobile e2e/walkthrough.spec.ts",
     "walkthrough:build": "tsx scripts/build-walkthrough.ts",
