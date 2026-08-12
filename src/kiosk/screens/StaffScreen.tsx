@@ -43,6 +43,7 @@
  * over here to read.
  */
 import { haptic } from '@/lib/utils';
+import { useTap } from '../components/tapGuard';
 
 /**
  * The one row class. See the note above: the whole screen's legibility rests on
@@ -110,6 +111,8 @@ export function StaffScreen({
   onChangeEvent: () => void;
   onStay: () => void;
 }) {
+  const tap = useTap();
+
   /*
    * One or two words, never a sentence — the full sentence lives on the printer
    * screen, which is where somebody who cares is going.
@@ -170,10 +173,10 @@ export function StaffScreen({
             <button
               type="button"
               tabIndex={-1}
-              onPointerDown={() => {
+              {...tap(() => {
                 haptic();
                 onReprint();
-              }}
+              })}
               className={DOOR}
             >
               Reprint a name tag
@@ -209,10 +212,10 @@ export function StaffScreen({
         <button
           type="button"
           tabIndex={-1}
-          onPointerDown={() => {
+          {...tap(() => {
             haptic();
             onPrinter();
-          }}
+          })}
           className={DOOR}
         >
           <span className="min-w-0 truncate">Label printer</span>
@@ -224,10 +227,10 @@ export function StaffScreen({
         <button
           type="button"
           tabIndex={-1}
-          onPointerDown={() => {
+          {...tap(() => {
             haptic();
             onChangeEvent();
-          }}
+          })}
           className={DOOR}
         >
           Change event
@@ -242,10 +245,10 @@ export function StaffScreen({
         <button
           type="button"
           tabIndex={-1}
-          onPointerDown={() => {
+          {...tap(() => {
             haptic();
             onStay();
-          }}
+          })}
           className="flex h-16 w-full items-center justify-center rounded-xl bg-brand-600 text-xl font-semibold text-white active:bg-brand-500 kiosk:h-24 kiosk:text-3xl"
         >
           Keep checking in

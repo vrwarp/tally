@@ -36,7 +36,7 @@
 import { useEffect, useRef } from 'react';
 import { gradeDescription, haptic } from '@/lib/utils';
 import { Keyboard, type KioskKey } from '../components/Keyboard';
-import { useTapGuard } from '../components/tapGuard';
+import { useTap, useTapGuard } from '../components/tapGuard';
 import type { KioskRefresh } from '../KioskApp';
 import { eventWindow, windowHasClosed, type KioskBinding } from '../binding';
 import { MAX_RESULTS, type KioskSearchOutcome, type KioskStudent } from '../search';
@@ -73,17 +73,18 @@ function WidenButton({
   /** The standing row's weight, beside a keyboard somebody is aiming at. */
   quiet?: boolean;
 }) {
+  const tap = useTap();
+
   return (
     <button
       type="button"
       tabIndex={-1}
       aria-label="Search everyone"
       aria-busy={widening}
-      onPointerDown={(event) => {
-        event.preventDefault();
+      {...tap(() => {
         haptic(quiet ? 8 : undefined);
         onWiden();
-      }}
+      })}
       className={
         quiet
           ? /* No ring on the standing one. Rows became `ink-800` so a child's
@@ -211,6 +212,7 @@ export function SearchScreen({
    * components/tapGuard.ts for why that has to be, and what counts as a tap.
    */
   const rowTap = useTapGuard(onPick);
+  const tap = useTap();
 
   /*
    * Whether this state has rows in it, which decides where its content sits in
@@ -598,10 +600,10 @@ export function SearchScreen({
                 <button
                   type="button"
                   tabIndex={-1}
-                  onPointerDown={() => {
+                  {...tap(() => {
                     haptic();
                     onRegister();
-                  }}
+                  })}
                   className="flex h-14 items-center justify-center rounded-xl bg-brand-600 px-8 text-lg font-semibold text-white active:bg-brand-500 tall:h-16 kiosk:text-xl lg:flex-1"
                 >
                   Register your child
@@ -796,10 +798,10 @@ export function SearchScreen({
           <button
             type="button"
             tabIndex={-1}
-            onPointerDown={() => {
+            {...tap(() => {
               haptic(8);
               onRegister();
-            }}
+            })}
             /* The `tall:` step every other control got. Quiet in weight — a
                tinted chip beside a keyboard — is a different lever from quiet
                in legibility, and on a portrait tablet this was simultaneously

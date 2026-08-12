@@ -21,6 +21,7 @@
  * lands on somebody other than the person pressing it.
  */
 import { haptic } from '@/lib/utils';
+import { useTap } from '../components/tapGuard';
 
 export function ChangeEventScreen({
   title,
@@ -32,6 +33,8 @@ export function ChangeEventScreen({
   onStay: () => void;
   onLeave: () => void;
 }) {
+  const tap = useTap();
+
   return (
     <div className="flex h-full flex-col items-center justify-center gap-8 p-8 text-center">
       <div className="flex flex-col gap-4">
@@ -67,10 +70,10 @@ export function ChangeEventScreen({
         <button
           type="button"
           tabIndex={-1}
-          onPointerDown={() => {
+          {...tap(() => {
             haptic();
             onStay();
-          }}
+          })}
           className="flex h-16 w-full items-center justify-center rounded-xl bg-brand-600 text-xl font-semibold text-white active:bg-brand-500"
         >
           Keep checking in
@@ -78,10 +81,10 @@ export function ChangeEventScreen({
         <button
           type="button"
           tabIndex={-1}
-          onPointerDown={() => {
+          {...tap(() => {
             haptic();
             onLeave();
-          }}
+          })}
           className="flex h-14 w-full items-center justify-center rounded-xl bg-ink-800 text-lg font-semibold text-ink-200 active:bg-ink-700"
         >
           <span className="truncate">Leave {title}</span>

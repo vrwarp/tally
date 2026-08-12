@@ -194,8 +194,13 @@ function configurePrinter(): void {
 }
 
 async function tap(text: RegExp | string): Promise<void> {
+  // Down *and* up, because every button on the kiosk waits for the lift now —
+  // a press alone is a gesture the control has not decided about yet (see
+  // components/tapGuard.ts).
+  const button = screen.getByText(text).closest('button')!;
   await act(async () => {
-    fireEvent.pointerDown(screen.getByText(text).closest('button')!);
+    fireEvent.pointerDown(button);
+    fireEvent.pointerUp(button);
   });
   await settle();
 }

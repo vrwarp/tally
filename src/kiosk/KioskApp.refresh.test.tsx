@@ -135,9 +135,9 @@ async function type(text: string): Promise<void> {
 /**
  * A tap: contact *and* release.
  *
- * Every control here commits on `pointerdown`, so the lift changes nothing for
- * them — but a finger that never leaves the glass is not a tap, and one key on
- * this keyboard now cares. Holding **Clear** is the staff gate (see
+ * The release is the half that acts. Every button on the kiosk waits for the
+ * lift (see components/tapGuard.ts), and the keys that do not still care that
+ * it arrives: holding **Clear** is the staff gate (see
  * KioskApp.staffGate.test.tsx), so a synthetic press that never lifts leaves
  * that timer armed, and the next test that advances the clock opens a screen
  * nobody asked for.
@@ -430,8 +430,10 @@ describe('the Search everyone button', () => {
     // Pressing a spinner is exactly what an impatient parent does, and the
     // button is deliberately not disabled — it is still a real target, it
     // simply has nothing new to ask for.
+    const spinner = searchEveryone();
     await act(async () => {
-      fireEvent.pointerDown(searchEveryone());
+      fireEvent.pointerDown(spinner);
+      fireEvent.pointerUp(spinner);
     });
     await settle();
     expect(services.refreshDirectory).toHaveBeenCalledTimes(1);

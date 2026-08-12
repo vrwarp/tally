@@ -15,7 +15,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { KioskApp, type KioskServices } from '@/kiosk/KioskApp';
-import { HOLD_MS } from '@/kiosk/components/HoldButton';
+import { HOLD_DELAY_MS, HOLD_MS } from '@/kiosk/components/HoldButton';
 import { KIOSK_KEYS } from '@/kiosk/storage';
 import type { KioskBinding } from '@/kiosk/binding';
 import type { KioskStudent } from '@/kiosk/search';
@@ -146,8 +146,13 @@ async function untick(name: string): Promise<void> {
 }
 
 async function tap(text: RegExp | string): Promise<void> {
+  // Down *and* up, because every button on the kiosk waits for the lift now —
+  // a press alone is a gesture the control has not decided about yet (see
+  // components/tapGuard.ts).
+  const button = screen.getByText(text).closest('button')!;
   await act(async () => {
-    fireEvent.pointerDown(screen.getByText(text).closest('button')!);
+    fireEvent.pointerDown(button);
+    fireEvent.pointerUp(button);
   });
   await settle();
 }
@@ -158,7 +163,8 @@ async function hold(text: RegExp | string): Promise<void> {
     fireEvent.pointerDown(button);
   });
   await act(async () => {
-    await vi.advanceTimersByTimeAsync(HOLD_MS);
+    // The grace before the count, and then the count.
+    await vi.advanceTimersByTimeAsync(HOLD_DELAY_MS + HOLD_MS);
   });
   await settle();
 }

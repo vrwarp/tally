@@ -24,7 +24,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { haptic } from '@/lib/utils';
-import { useTapGuard } from '../components/tapGuard';
+import { useTap, useTapGuard } from '../components/tapGuard';
 import { useOverflowFade } from '../components/useOverflowFade';
 import type { KioskPrinting } from '../KioskApp';
 // Type-only. Every value this screen needs from the library arrives through the
@@ -99,6 +99,7 @@ export function PrinterScreen({
   const [status, setStatus] = useState<PrinterStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const rowTap = useTapGuard(onReprint);
+  const tap = useTap();
   const { regionRef, contentRef, overflowing, fadeVars } = useOverflowFade();
 
   useEffect(() => printing.subscribe(setState), [printing]);
@@ -336,10 +337,10 @@ export function PrinterScreen({
             <button
               type="button"
               tabIndex={-1}
-              onPointerDown={() => {
+              {...tap(() => {
                 haptic();
                 onReprintByName();
-              }}
+              })}
               className="flex h-16 w-full shrink-0 items-center justify-center rounded-xl bg-brand-600 text-lg font-semibold text-white active:bg-brand-500 kiosk:h-20 kiosk:text-xl"
             >
               Reprint a name tag
@@ -400,7 +401,7 @@ export function PrinterScreen({
         <button
           type="button"
           tabIndex={-1}
-          onPointerDown={onDone}
+          {...tap(onDone)}
           className="flex h-14 items-center justify-center rounded-xl bg-ink-800 px-10 text-base font-semibold whitespace-nowrap text-ink-100 active:bg-ink-700 tall:h-16 kiosk:text-lg"
         >
           Done

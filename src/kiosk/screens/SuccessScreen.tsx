@@ -13,6 +13,7 @@
  * them, and a sequence of screens is a sequence nobody watches to the end.
  */
 import { useEffect, useRef } from 'react';
+import { useTap } from '../components/tapGuard';
 import type { KioskIntent } from '../KioskApp';
 import type { KioskStudent } from '../search';
 
@@ -36,6 +37,7 @@ export function SuccessScreen({
 }) {
   const doneRef = useRef(onDone);
   doneRef.current = onDone;
+  const tap = useTap();
 
   useEffect(() => {
     const timer = setTimeout(() => doneRef.current(), AUTO_RETURN_MS);
@@ -49,7 +51,10 @@ export function SuccessScreen({
   return (
     <div
       className="flex h-full flex-col items-center justify-center gap-8 p-8 text-center"
-      onPointerDown={() => doneRef.current()}
+      /* The whole screen is the dismiss, so it is also the whole screen that a
+         hand can brush on its way past — which is the one place on the kiosk
+         where waiting for the lift is worth naming twice. */
+      {...tap(() => doneRef.current())}
     >
       <div
         className={`flex h-36 w-36 shrink-0 items-center justify-center rounded-full text-8xl text-white ${
