@@ -586,7 +586,16 @@
   background-image: linear-gradient(rgb(255 255 255 / 0.35), rgb(255 255 255 / 0.35));
   background-repeat: no-repeat;
   background-size: 0% 100%;
-  animation: tally-hold-fill calc(var(--hold-ms, 2000ms) - 400ms) linear 400ms forwards;
+  /*
+   * The fill lands on the same instant the timer does, and the two halves of
+   * that sum are why it takes two variables. `--hold-delay-ms` is the grace
+   * every hold on the kiosk now waits out before it counts; the 400ms is this
+   * key's own, longer wait before it draws anything, so an ordinary tap on
+   * Clear — which still just clears the buffer — never flashes a bar. The
+   * second swallows the first, so the drawing starts once and ends on time.
+   */
+  animation: tally-hold-fill
+    calc(var(--hold-ms, 2000ms) + var(--hold-delay-ms, 0ms) - 400ms) linear 400ms forwards;
 }
 
 /*

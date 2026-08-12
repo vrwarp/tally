@@ -6,17 +6,23 @@
  * looked past rather than at — so the vibrator carries feedback the eyes may
  * never collect: the key took, the child is checked in.
  *
- * These pin the deliberate asymmetry between the two. Keys buzz on contact,
+ * These pin the deliberate asymmetry between the three. Keys buzz on contact,
  * every one of them, including the presses the buffer refuses — a key reports
  * that the glass took the press, not that the press meant anything. A hold
  * buzzes only when it completes, and that is the more important half: a hold
  * that buzzed on contact would tell a thumb the gesture had happened when it
  * had only started.
+ *
+ * The buttons sit between them and buzz on the lift, because that is when they
+ * act. They used to buzz on contact, back when they also fired on contact, and
+ * the two moved together on purpose: a buzz is the kiosk saying *taken*, and a
+ * kiosk that said it while the finger could still slide off and mean nothing
+ * would be lying in the one channel a parent is not looking at.
  */
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { HoldButton, HOLD_MS } from '@/kiosk/components/HoldButton';
+import { HOLD_DELAY_MS, HoldButton, HOLD_MS } from '@/kiosk/components/HoldButton';
 import { Keyboard } from '@/kiosk/components/Keyboard';
 import { ConfirmScreen } from '@/kiosk/screens/ConfirmScreen';
 import type { KioskStudent } from '@/kiosk/search';
@@ -53,13 +59,22 @@ afterEach(() => {
 });
 
 /**
- * `fireEvent.pointerDown` rather than a click, throughout: the kiosk listens on
- * `pointerdown` because it fires on glass contact, and the keyboard delegates a
- * single listener on its container — so the event has to be a real bubbling one
- * on the key itself.
+ * `fireEvent.pointerDown` rather than a click: the keyboard delegates a single
+ * listener on its container, so the event has to be a real bubbling one on the
+ * key itself, and jsdom has no `PointerEvent` for a click to synthesise.
+ *
+ * Contact only, which is all a key is. The buttons need the lift as well and
+ * have `tap` below — the split between the two is the point of this file's
+ * second and third groups.
  */
 function press(element: Element): void {
   fireEvent.pointerDown(element);
+}
+
+/** A whole press on a button: down, and the lift that means it. */
+function tap(element: Element): void {
+  fireEvent.pointerDown(element);
+  fireEvent.pointerUp(element);
 }
 
 function key(label: string): Element {
@@ -120,10 +135,12 @@ describe('confirming at the kiosk', () => {
       />,
     );
 
-    press(screen.getByText('Check in'));
+    tap(screen.getByText('Check in'));
 
-    // On contact, with the confirmation — not after the write, which the
-    // success screen does not wait for either.
+    // On the lift, with the confirmation — not after the write, which the
+    // success screen does not wait for either. The buzz moved off contact when
+    // the button did: it says the press was taken, so it has to arrive when the
+    // press is taken and not a gesture earlier.
     expect(vibrate).toHaveBeenCalledTimes(1);
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
@@ -143,7 +160,7 @@ describe('confirming at the kiosk', () => {
       />,
     );
 
-    press(screen.getByText(/Already checked in/));
+    tap(screen.getByText(/Already checked in/));
 
     expect(vibrate).not.toHaveBeenCalled();
   });
@@ -161,7 +178,7 @@ describe('the press-and-hold gate', () => {
     press(screen.getByText('Hold to collect'));
     expect(vibrate).not.toHaveBeenCalled();
 
-    vi.advanceTimersByTime(HOLD_MS);
+    vi.advanceTimersByTime(HOLD_DELAY_MS + HOLD_MS);
 
     // Two seconds is long enough that a thumb needs telling when it may
     // leave, and a buzz on contact would say the gesture had already happened.
@@ -179,9 +196,9 @@ describe('the press-and-hold gate', () => {
 
     const button = screen.getByText('Hold to collect');
     press(button);
-    vi.advanceTimersByTime(HOLD_MS - 100);
+    vi.advanceTimersByTime(HOLD_DELAY_MS + HOLD_MS - 100);
     fireEvent.pointerUp(button);
-    vi.advanceTimersByTime(HOLD_MS);
+    vi.advanceTimersByTime(HOLD_DELAY_MS + HOLD_MS);
 
     expect(vibrate).not.toHaveBeenCalled();
     expect(onHeld).not.toHaveBeenCalled();

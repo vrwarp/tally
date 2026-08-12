@@ -25,6 +25,7 @@ import { GRADES, type Grade, type RegisterFamilyResult } from '@/types';
 import { Keyboard, type KioskKey } from '../components/Keyboard';
 import type { KioskBinding } from '../binding';
 import { PhonePad } from './PhonePad';
+import { useTap } from '../components/tapGuard';
 import {
   advance,
   answerAnother,
@@ -149,6 +150,7 @@ export function RegistrationFlow({
   const anchorIds = useMemo(() => (anchors ?? []).map((sibling) => sibling.id), [anchors]);
 
   const onKey = useCallback((key: KioskKey) => dispatch({ type: 'key', key }), []);
+  const tap = useTap();
 
   /* ---- Walked away ------------------------------------------------------- */
 
@@ -305,10 +307,10 @@ export function RegistrationFlow({
                 tabIndex={-1}
                 role="checkbox"
                 aria-checked={state.noAllergies}
-                onPointerDown={() => {
+                {...tap(() => {
                   haptic();
                   dispatch({ type: 'no-allergies' });
-                }}
+                })}
                 className={`flex h-16 w-full items-center gap-4 rounded-xl px-5 text-left text-xl font-semibold ${
                   state.noAllergies
                     ? 'bg-brand-600/15 text-brand-300 ring-1 ring-brand-500/40'
@@ -563,6 +565,8 @@ function Header({
   canClose: boolean;
   onClose: () => void;
 }) {
+  const tap = useTap();
+
   return (
     /*
      * Three slots, not a centred title with two controls floated over it.
@@ -584,7 +588,7 @@ function Header({
       <button
         type="button"
         tabIndex={-1}
-        onPointerDown={onBack}
+        {...tap(onBack)}
         className="h-12 rounded-lg px-3 text-sm text-ink-400 active:bg-ink-800"
       >
         ← Back
@@ -600,7 +604,9 @@ function Header({
       <button
         type="button"
         tabIndex={-1}
-        onPointerDown={canClose ? onClose : undefined}
+        {...tap(() => {
+          if (canClose) onClose();
+        })}
         className={`h-12 rounded-lg px-3 text-sm text-ink-400 active:bg-ink-800 ${
           canClose ? '' : 'invisible'
         }`}
@@ -647,16 +653,18 @@ function Big({
   tone?: 'brand';
   disabled?: boolean;
 }) {
+  const tap = useTap();
+
   return (
     <button
       type="button"
       tabIndex={-1}
       disabled={disabled}
-      onPointerDown={() => {
+      {...tap(() => {
         if (disabled) return;
         haptic();
         onPick();
-      }}
+      })}
       className={`flex h-16 w-full items-center justify-center rounded-xl text-xl font-semibold ${
         disabled
           ? 'bg-ink-900 text-ink-600'
@@ -671,15 +679,17 @@ function Big({
 }
 
 function GradeChip({ label, hint, onPick }: { label: string; hint?: string; onPick: () => void }) {
+  const tap = useTap();
+
   return (
     <button
       type="button"
       tabIndex={-1}
       aria-label={hint ?? label}
-      onPointerDown={() => {
+      {...tap(() => {
         haptic();
         onPick();
-      }}
+      })}
       className="flex h-16 items-center justify-center rounded-xl bg-ink-800 text-xl font-semibold text-ink-100 active:bg-ink-600"
     >
       {label}

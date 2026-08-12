@@ -31,6 +31,7 @@
 import { haptic } from '@/lib/utils';
 import type { KioskStudent } from '../search';
 import { StaffMark } from '../components/StaffMark';
+import { useTap } from '../components/tapGuard';
 
 export function ReprintConfirmScreen({
   student,
@@ -50,6 +51,8 @@ export function ReprintConfirmScreen({
   onPrint: () => void;
   onBack: () => void;
 }) {
+  const tap = useTap();
+
   /* The inactivity return lives on the gate — see `StaffSession`. */
   return (
     <div
@@ -119,11 +122,10 @@ export function ReprintConfirmScreen({
              control on its own — a test, or a volunteer using a screen reader.
              The name is on the button too, where it costs no pixels. */
           aria-label={`Print ${student.firstName} ${student.lastName}'s name tag`}
-          onPointerDown={(event) => {
-            event.preventDefault();
+          {...tap(() => {
             haptic();
             onPrint();
-          }}
+          })}
           className="w-full rounded-2xl bg-brand-600 p-7 text-3xl font-bold text-white active:bg-brand-500"
           style={{ touchAction: 'manipulation' }}
         >
@@ -137,10 +139,7 @@ export function ReprintConfirmScreen({
       <button
         type="button"
         tabIndex={-1}
-        onPointerDown={(event) => {
-          event.preventDefault();
-          onBack();
-        }}
+        {...tap(() => onBack())}
         className="mt-8 shrink-0 rounded-xl px-8 py-4 text-xl text-ink-400 active:bg-ink-800"
         style={{ touchAction: 'manipulation' }}
       >

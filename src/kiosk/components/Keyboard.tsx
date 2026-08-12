@@ -10,7 +10,13 @@
  * Latency posture, in order of importance:
  *  - One delegated `pointerdown` listener on the container, not one per key.
  *    `pointerdown` fires on glass contact; `click` waits for the finger to
- *    leave.
+ *    leave. This is now the kiosk's one exception — every button on every
+ *    screen waits for the lift (see components/tapGuard.ts) — and it stays the
+ *    exception because a key is not a decision. What the buttons buy with those
+ *    few milliseconds is the chance to be wrong about what a press meant; a
+ *    letter cannot be wrong in that way, and forty keys that each wait for a
+ *    lift is a keyboard that feels like it is thinking about every character.
+ *    A mistyped letter also has a key next to it that undoes the mistake.
  *  - Pressed-state feedback is CSS `:active` only — zero JavaScript, zero
  *    re-render, visible the same frame as the touch.
  *  - The whole subtree is memoized against a stable `onKey`, so typing
@@ -24,7 +30,7 @@
  */
 import { memo, useCallback, useEffect, useRef } from 'react';
 import { haptic } from '@/lib/utils';
-import { HOLD_MS } from './HoldButton';
+import { HOLD_DELAY_MS, HOLD_MS } from './HoldButton';
 
 export type KioskKey =
   | { kind: 'char'; value: string }
@@ -115,13 +121,17 @@ export const Keyboard = memo(function Keyboard({
   const startHold = useCallback(() => {
     if (!heldRef.current) return;
     cancelHold();
+    // `HOLD_DELAY_MS` on top, the same grace `HoldButton` gives every other hold
+    // on the kiosk. Nothing here can be mistaken for a scroll, so the delay buys
+    // this key nothing on its own — it is here so that a volunteer told "hold
+    // Clear" is holding it for exactly as long as they hold anything else.
     timerRef.current = setTimeout(() => {
       timerRef.current = null;
       // The one press on this keyboard that is not reporting contact but
       // completion, so it buzzes longer than the 8ms every key gets.
       haptic(24);
       heldRef.current?.();
-    }, HOLD_MS);
+    }, HOLD_DELAY_MS + HOLD_MS);
   }, [cancelHold]);
   useEffect(() => cancelHold, [cancelHold]);
 
@@ -220,7 +230,14 @@ export const Keyboard = memo(function Keyboard({
           className={`${KEY_CLASS} flex-[1.5] text-base font-medium text-ink-300 ${
             onClearHeld ? 'kiosk-hold-key' : ''
           }`}
-          style={onClearHeld ? ({ '--hold-ms': `${HOLD_MS}ms` } as React.CSSProperties) : undefined}
+          style={
+            onClearHeld
+              ? ({
+                  '--hold-ms': `${HOLD_MS}ms`,
+                  '--hold-delay-ms': `${HOLD_DELAY_MS}ms`,
+                } as React.CSSProperties)
+              : undefined
+          }
         >
           Clear
         </button>

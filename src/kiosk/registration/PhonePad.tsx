@@ -11,6 +11,10 @@
  * Same posture as the keyboard beside it — one delegated `pointerdown`, CSS
  * `:active` for the pressed state, a haptic tick on contact — so the two feel
  * like one device rather than two components that happen to share a screen.
+ * That includes committing on contact rather than on the lift, which the kiosk's
+ * buttons no longer do: the reasoning is in components/Keyboard.tsx, and the
+ * two boards have to answer a thumb identically or the exception becomes a
+ * quirk of whichever one you are on.
  */
 import { memo, useCallback, useRef } from 'react';
 import { haptic } from '@/lib/utils';

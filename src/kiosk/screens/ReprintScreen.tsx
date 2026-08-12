@@ -29,7 +29,7 @@
 import { useEffect } from 'react';
 import { gradeDescription, haptic } from '@/lib/utils';
 import { Keyboard, type KioskKey } from '../components/Keyboard';
-import { useTapGuard } from '../components/tapGuard';
+import { useTap, useTapGuard } from '../components/tapGuard';
 import type { KioskStudent } from '../search';
 import { StaffMark } from '../components/StaffMark';
 import { useOverflowFade } from '../components/useOverflowFade';
@@ -106,6 +106,7 @@ export function ReprintScreen({
   onDone: () => void;
 }) {
   const rowTap = useTapGuard(onPick);
+  const tap = useTap();
   const { regionRef, contentRef, overflowing, fadeVars } = useOverflowFade();
 
   useEffect(() => {
@@ -337,10 +338,10 @@ export function ReprintScreen({
         <button
           type="button"
           tabIndex={-1}
-          onPointerDown={() => {
+          {...tap(() => {
             haptic(8);
             onDone();
-          }}
+          })}
           className="flex h-14 min-w-0 shrink items-center justify-center truncate rounded-xl bg-ink-800 px-6 text-base font-semibold whitespace-nowrap text-ink-100 active:bg-ink-700 tall:h-16 tall:px-8 kiosk:text-lg"
         >
           Done — back to check-in

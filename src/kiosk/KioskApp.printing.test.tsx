@@ -20,7 +20,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { KioskApp, type KioskPrinting, type KioskServices } from '@/kiosk/KioskApp';
-import { HOLD_MS } from '@/kiosk/components/HoldButton';
+import { HOLD_DELAY_MS, HOLD_MS } from '@/kiosk/components/HoldButton';
 import { DEFAULT_LABEL_TEMPLATE } from '@/lib/labelTemplate';
 import { KIOSK_KEYS, KIOSK_ROSTER_VERSION } from '@/kiosk/storage';
 import type { KioskBinding } from '@/kiosk/binding';
@@ -145,15 +145,13 @@ async function mount(bound: KioskBinding = binding()): Promise<void> {
 /**
  * Search for Ada and open the confirm screen.
  *
- * `fireEvent.pointerDown` rather than a click throughout: the kiosk listens on
- * `pointerdown` because it fires on glass contact, and the keyboard delegates a
- * single listener on its container — so the event has to be a real bubbling one
- * on the key itself. jsdom has no `PointerEvent` constructor, which is what
- * `fireEvent` is for.
+ * `fireEvent` rather than a click throughout: jsdom has no `PointerEvent`
+ * constructor, and the keyboard delegates a single listener on its container —
+ * so the event has to be a real bubbling one on the key itself.
  *
- * A result row is the exception and takes the finger off again: the results
- * list scrolls, so a row waits for `pointerup` to tell a tap from the start of
- * a drag (see screens/SearchScreen.tsx).
+ * The keys act on contact and everything else waits for the lift, which is why
+ * the rows and the buttons here take the finger off again and the typing does
+ * not (see components/tapGuard.ts).
  */
 async function pickAda(): Promise<void> {
   for (const key of ['A', 'D', 'A']) {
@@ -171,8 +169,13 @@ async function pickAda(): Promise<void> {
 
 /** Tap a button by its visible text, the way the kiosk expects to be tapped. */
 async function tap(text: RegExp | string): Promise<void> {
+  // Down *and* up, because every button on the kiosk waits for the lift now —
+  // a press alone is a gesture the control has not decided about yet (see
+  // components/tapGuard.ts).
+  const button = screen.getByText(text).closest('button')!;
   await act(async () => {
-    fireEvent.pointerDown(screen.getByText(text).closest('button')!);
+    fireEvent.pointerDown(button);
+    fireEvent.pointerUp(button);
   });
   await settle();
 }
@@ -190,7 +193,8 @@ async function hold(text: RegExp | string): Promise<void> {
     fireEvent.pointerDown(button);
   });
   await act(async () => {
-    await vi.advanceTimersByTimeAsync(HOLD_MS);
+    // The grace before the count, and then the count.
+    await vi.advanceTimersByTimeAsync(HOLD_DELAY_MS + HOLD_MS);
   });
   await settle();
 }

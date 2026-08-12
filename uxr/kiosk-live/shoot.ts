@@ -181,7 +181,10 @@ for (const scene of SCENES) {
     for (const press of scene.drive ?? []) {
       const key = page.locator(`[data-key="${press}"]`).first();
       const target = (await key.count()) > 0 ? key : page.getByRole('button', { name: press }).first();
+      // Down and up: the keys act on contact, the buttons wait for the lift
+      // (src/kiosk/components/tapGuard.ts), and this drives both.
       await target.dispatchEvent('pointerdown');
+      await target.dispatchEvent('pointerup');
       await page.waitForTimeout(60);
     }
 

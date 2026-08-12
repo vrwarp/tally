@@ -14,7 +14,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventChooser } from '@/kiosk/screens/EventChooser';
-import { HOLD_MS } from '@/kiosk/components/HoldButton';
+import { HOLD_DELAY_MS, HOLD_MS } from '@/kiosk/components/HoldButton';
 import { TAP_SLOP_PX } from '@/kiosk/components/tapGuard';
 import type { KioskEventEntry, KioskServices } from '@/kiosk/KioskApp';
 import type { KioskBinding } from '@/kiosk/binding';
@@ -126,7 +126,7 @@ describe('holding a gathering', () => {
     const onBound = await renderChooser(servicesWith(bindEntry));
 
     down(row('Youth group'));
-    await tick(HOLD_MS);
+    await tick(HOLD_DELAY_MS + HOLD_MS);
 
     expect(bindEntry).toHaveBeenCalledWith(YOUTH);
     expect(onBound).toHaveBeenCalledWith(bindingFor(YOUTH));
@@ -140,7 +140,7 @@ describe('holding a gathering', () => {
     down(row('Nursery'));
     up(row('Nursery'));
     down(row('Youth group'));
-    await tick(HOLD_MS);
+    await tick(HOLD_DELAY_MS + HOLD_MS);
 
     expect(bindEntry).toHaveBeenCalledTimes(1);
     expect(bindEntry).toHaveBeenCalledWith(YOUTH);
@@ -151,9 +151,9 @@ describe('holding a gathering', () => {
     await renderChooser(servicesWith(bindEntry));
 
     down(row('Nursery'));
-    await tick(HOLD_MS - 100);
+    await tick(HOLD_DELAY_MS + HOLD_MS - 100);
     up(row('Nursery'));
-    await tick(HOLD_MS);
+    await tick(HOLD_DELAY_MS + HOLD_MS);
 
     expect(bindEntry).not.toHaveBeenCalled();
   });
@@ -165,7 +165,7 @@ describe('holding a gathering', () => {
     const nursery = row('Nursery');
     down(nursery);
     pointer('pointermove', nursery, 100, 100 + TAP_SLOP_PX * 4);
-    await tick(HOLD_MS);
+    await tick(HOLD_DELAY_MS + HOLD_MS);
     up(nursery, TAP_SLOP_PX * 4);
 
     // Neither gesture: the hold was cancelled by the drag, and a lift that far
@@ -198,7 +198,7 @@ describe('tapping a gathering', () => {
 
     const button = screen.getByText('Hold to set kiosk').closest('button')!;
     fireEvent.pointerDown(button, { pointerId: 2 });
-    await tick(HOLD_MS);
+    await tick(HOLD_DELAY_MS + HOLD_MS);
 
     expect(bindEntry).toHaveBeenCalledWith(NURSERY);
     expect(onBound).toHaveBeenCalledWith(bindingFor(NURSERY));

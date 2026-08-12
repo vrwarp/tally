@@ -19,7 +19,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { KioskApp, type KioskPrinting, type KioskServices } from '@/kiosk/KioskApp';
-import { HOLD_MS } from '@/kiosk/components/HoldButton';
+import { HOLD_DELAY_MS, HOLD_MS } from '@/kiosk/components/HoldButton';
 import { OFFER_WINDOW_MS } from '@/kiosk/reprintOffer';
 import { DEFAULT_LABEL_TEMPLATE } from '@/lib/labelTemplate';
 import { KIOSK_KEYS, KIOSK_ROSTER_VERSION } from '@/kiosk/storage';
@@ -181,8 +181,13 @@ async function pickRow(name: string): Promise<void> {
 }
 
 async function tap(text: RegExp | string): Promise<void> {
+  // Down *and* up, because every button on the kiosk waits for the lift now —
+  // a press alone is a gesture the control has not decided about yet (see
+  // components/tapGuard.ts).
+  const button = screen.getByText(text).closest('button')!;
   await act(async () => {
-    fireEvent.pointerDown(screen.getByText(text).closest('button')!);
+    fireEvent.pointerDown(button);
+    fireEvent.pointerUp(button);
   });
   await settle();
 }
@@ -193,7 +198,8 @@ async function hold(text: RegExp | string): Promise<void> {
     fireEvent.pointerDown(button);
   });
   await act(async () => {
-    await vi.advanceTimersByTimeAsync(HOLD_MS);
+    // The grace before the count, and then the count.
+    await vi.advanceTimersByTimeAsync(HOLD_DELAY_MS + HOLD_MS);
   });
   await settle();
 }
@@ -205,7 +211,7 @@ async function holdClear(): Promise<void> {
     fireEvent.pointerDown(clear);
   });
   await act(async () => {
-    await vi.advanceTimersByTimeAsync(HOLD_MS);
+    await vi.advanceTimersByTimeAsync(HOLD_DELAY_MS + HOLD_MS);
   });
   await settle();
 }

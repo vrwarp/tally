@@ -6,9 +6,15 @@
  * lobby, and the gate only has to be beyond a wandering toddler and an
  * accidental brush, not beyond an adult who could also just unplug the thing.
  *
+ * The count does not start on contact. `HOLD_DELAY_MS` of stillness comes
+ * first, and until it is spent the gesture is still anybody's — a thumb that
+ * lands and immediately drags is scrolling the list, not holding a row, and the
+ * browser is left free to say so. Past it the kiosk has decided this contact is
+ * a hold: the bar starts filling and the page stops moving under the finger.
+ *
  * Progress is driven by a CSS transition on a scaling bar rather than by
- * animation frames: the only JavaScript is one timer for completion and the
- * pointer handlers that arm and cancel it.
+ * animation frames: the only JavaScript is two timers — one to arm, one to
+ * complete — and the pointer handlers that cancel them.
  *
  * The bar is a white wash, and has to be something like it. Every caller draws
  * this control on a dark surface — `bg-brand-600` on the two committing buttons,
@@ -36,13 +42,15 @@
  * so a finger that drags away is neither a hold nor a tap (the reasoning, and
  * the slop, are `components/tapGuard.ts`'s), and `touchAction` has to leave the
  * vertical pan to the browser rather than swallowing it, or the list under the
- * rows stops scrolling wherever a row happens to be.
+ * rows stops scrolling wherever a row happens to be — up to the moment the
+ * count starts and the row takes the finger for itself.
  *
- * `HOLD_MS` is exported and reused rather than restated. The staff gate no
+ * `HOLD_MS` and `HOLD_DELAY_MS` are exported and reused rather than restated. The staff gate no
  * longer draws this control — it is a hold on the keyboard's Clear key, whose
  * progress is CSS bound to `:active` because that subtree must not re-render
  * (see components/Keyboard.tsx) — but a kiosk with two hold gestures of
- * different lengths would be a kiosk that teaches its staff nothing.
+ * different lengths — or two that begin at different moments — would be a kiosk
+ * that teaches its staff nothing.
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { haptic } from '@/lib/utils';
@@ -59,6 +67,28 @@ import { strayed, type Press } from './tapGuard';
  * tablet are all gone well before one second.
  */
 export const HOLD_MS = 2000;
+
+/**
+ * The grace between contact and the count, in which the gesture is still free
+ * to have been something else.
+ *
+ * A hold and the first moment of a drag are the same event: a finger down and
+ * not yet moved. Arming on contact meant the kiosk answered before the hand had
+ * finished the sentence — the bar started filling under a thumb that was on its
+ * way past, and on the chooser's rows a scroll had to fight a control that had
+ * already claimed the touch.
+ *
+ * A fifth of a second is what separates them. Below it nothing anybody does
+ * deliberately has happened yet, so nothing is lost by waiting; above it a
+ * finger that has not moved is a finger that means to stay. It is also short
+ * enough to be invisible: by the time an eye could notice the bar had not
+ * started, it has.
+ *
+ * Exported for the same reason `HOLD_MS` is — the staff gate's hold lives in
+ * `components/Keyboard.tsx` and in CSS, and two holds that arm at different
+ * moments would be two gestures a volunteer has to learn separately.
+ */
+export const HOLD_DELAY_MS = 200;
 
 /**
  * How long the cancellation notice outlives the hand that caused it.
@@ -137,18 +167,28 @@ export function HoldButton({
      contact — never by the lift itself, so the sentence is still there when the
      thumb comes off to read it. */
   const [slipped, setSlipped] = useState(false);
+  /* The grace, and then the count. Two timers because they mean different
+     things: the first can still be beaten by a drag, the second cannot. */
+  const armRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const restoreRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pressRef = useRef<Press | null>(null);
+  const nodeRef = useRef<HTMLButtonElement | null>(null);
+  /* What the touch listener below reads. It cannot read `holding`: the listener
+     is registered once, on mount, precisely so that it is non-passive. */
+  const holdingRef = useRef(false);
   const heldRef = useRef(onHeld);
   heldRef.current = onHeld;
   const tappedRef = useRef(onTap);
   tappedRef.current = onTap;
 
   const cancel = useCallback(() => {
+    if (armRef.current) clearTimeout(armRef.current);
+    armRef.current = null;
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = null;
     pressRef.current = null;
+    holdingRef.current = false;
     setHolding(false);
   }, []);
 
@@ -158,16 +198,59 @@ export function HoldButton({
     restoreRef.current = null;
     pressRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
     setSlipped(false);
-    setHolding(true);
-    timerRef.current = setTimeout(() => {
-      timerRef.current = null;
-      // The gesture has spent itself: the lift that follows is the end of a
-      // hold that already fired, never a tap on top of it.
-      pressRef.current = null;
-      setHolding(false);
-      haptic();
-      heldRef.current();
-    }, HOLD_MS);
+    /*
+     * Nothing yet — not the bar, not the count, not the claim on the gesture.
+     * A press this new is indistinguishable from the first frame of a scroll,
+     * and `HOLD_DELAY_MS` is the kiosk declining to guess. A tap that comes and
+     * goes inside the window never draws a bar at all, which is the other half
+     * of why the delay is here: on the chooser's rows, where a press has a
+     * second and lighter meaning, a fill that flashed on every selection said
+     * a hold had begun and been abandoned.
+     */
+    armRef.current = setTimeout(() => {
+      armRef.current = null;
+      holdingRef.current = true;
+      setHolding(true);
+      timerRef.current = setTimeout(() => {
+        timerRef.current = null;
+        // The gesture has spent itself: the lift that follows is the end of a
+        // hold that already fired, never a tap on top of it.
+        pressRef.current = null;
+        holdingRef.current = false;
+        setHolding(false);
+        haptic();
+        heldRef.current();
+      }, HOLD_MS);
+    }, HOLD_DELAY_MS);
+  }, []);
+
+  /*
+   * Once the count is running, the page stops moving under the finger.
+   *
+   * `touchAction` alone cannot do this. It is read when the gesture begins, and
+   * the whole point of the grace above is that the gesture begins before the
+   * kiosk knows what it is — so a row in the chooser has to start out pannable
+   * or the list stops scrolling wherever a thumb happens to land. The switch
+   * has to happen mid-gesture, and mid-gesture only a non-passive `touchmove`
+   * that calls `preventDefault` will do it.
+   *
+   * Which is safe exactly here and nowhere else: at the moment the count starts
+   * the finger has been still for a fifth of a second, so no scroll is under
+   * way to be too late to stop. A finger that moved instead took the browser's
+   * offer, and `pointercancel` had already ended the hold.
+   *
+   * Registered by hand rather than through `onTouchMove`, because React puts
+   * its touch listeners on the root as passive ones and a passive listener's
+   * `preventDefault` does nothing at all.
+   */
+  useEffect(() => {
+    const node = nodeRef.current;
+    if (!node) return;
+    const pin = (event: TouchEvent) => {
+      if (holdingRef.current) event.preventDefault();
+    };
+    node.addEventListener('touchmove', pin, { passive: false });
+    return () => node.removeEventListener('touchmove', pin);
   }, []);
 
   const move = useCallback(
@@ -224,6 +307,7 @@ export function HoldButton({
 
   return (
     <button
+      ref={nodeRef}
       type="button"
       tabIndex={-1}
       aria-label={ariaLabel}
@@ -232,8 +316,9 @@ export function HoldButton({
       // exactly the gesture that raises the callout, and a kiosk has no use for
       // one. `touchAction` keeps the same press from being read as a scroll —
       // except where the control is a row in a list, which has to go on
-      // scrolling under a thumb that came down on it.
-      style={{ touchAction: onTap ? 'pan-y' : 'none', WebkitTouchCallout: 'none' }}
+      // scrolling under a thumb that came down on it, right up until the count
+      // starts and the row claims the finger.
+      style={{ touchAction: onTap && !holding ? 'pan-y' : 'none', WebkitTouchCallout: 'none' }}
       onContextMenu={(event) => event.preventDefault()}
       onPointerDown={start}
       onPointerMove={move}

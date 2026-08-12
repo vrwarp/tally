@@ -31,6 +31,8 @@ export const KIOSK_PATH = '/kiosk.html';
 
 /** `HOLD_MS` in components/HoldButton.tsx, plus room for a slow CI machine. */
 const HOLD_MS = 2000;
+/** `HOLD_DELAY_MS` there too: the grace a hold waits out before it counts. */
+const HOLD_DELAY_MS = 200;
 const HOLD_SLACK_MS = 700;
 
 /**
@@ -79,7 +81,10 @@ export async function hold(
 
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
-  await page.waitForTimeout(HOLD_MS / 2);
+  // The grace first, and then half the count — the bar has not started drawing
+  // until the grace is spent, so a sample taken across it would be sampling an
+  // empty button and calling the fill invisible.
+  await page.waitForTimeout(HOLD_DELAY_MS + HOLD_MS / 2);
   await expectProgressShows(page, box);
   await page.waitForTimeout(HOLD_MS / 2 + HOLD_SLACK_MS);
   await page.mouse.up();
@@ -114,9 +119,9 @@ export async function leaveGathering(kiosk: Page): Promise<void> {
  * only thing that distinguishes that from working, so that is what is asserted.
  *
  * At the half-way point the fill covers somewhere between a third and a half of
- * the control — `HoldButton` starts drawing immediately, the Clear key waits
- * 400ms so an ordinary tap never flashes a bar — so a sample near the left edge
- * is filled and one near the right edge is not, on either of them. The 6% and
+ * the control — `HoldButton` starts drawing the moment the count does, the Clear
+ * key waits 400ms so an ordinary tap never flashes a bar — so a sample near the
+ * left edge is filled and one near the right edge is not, on either of them. The 6% and
  * 94% margins are what keep that true for both, and they also keep the samples
  * clear of the label in the middle and the rounded corners at the ends.
  */

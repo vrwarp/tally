@@ -23,7 +23,7 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { HOLD_MS, HoldButton, STRAY_HINT_MS } from './HoldButton';
+import { HOLD_DELAY_MS, HOLD_MS, HoldButton, STRAY_HINT_MS } from './HoldButton';
 import { TAP_SLOP_PX } from './tapGuard';
 
 beforeEach(() => {
@@ -49,7 +49,7 @@ async function holdFrom(
     });
   }
   await act(async () => {
-    await vi.advanceTimersByTimeAsync(HOLD_MS + 50);
+    await vi.advanceTimersByTimeAsync(HOLD_DELAY_MS + HOLD_MS + 50);
   });
 }
 
@@ -72,6 +72,150 @@ function saying(): string {
     .join('')
     .trim();
 }
+
+/** The fill, which is the first thing inside the button and always there. */
+function bar(): HTMLElement {
+  return screen.getByRole('button').querySelector('span')!;
+}
+
+/**
+ * A drag on the glass, and whether the control swallowed it.
+ *
+ * A plain `Event` named `touchmove` rather than a `TouchEvent`: the listener
+ * only ever reads `preventDefault`, and jsdom's touch support is thin enough
+ * that constructing the real thing buys nothing but a chance to break.
+ */
+function dragged(button: HTMLElement): boolean {
+  const event = new Event('touchmove', { bubbles: true, cancelable: true });
+  fireEvent(button, event);
+  return !event.defaultPrevented;
+}
+
+describe('the grace before the count', () => {
+  /*
+   * A press and the first frame of a drag are the same event. The delay is the
+   * kiosk declining to guess, and it is the whole reason the gesture can be
+   * arbitrated at all — so the two seconds are two seconds *of holding*, and
+   * they start when the holding is established rather than when the glass is
+   * touched.
+   */
+  it('does not fire at two seconds flat', async () => {
+    const onHeld = vi.fn();
+    render(<HoldButton onHeld={onHeld}>Hold me</HoldButton>);
+
+    await act(async () => {
+      fireEvent.pointerDown(screen.getByText('Hold me'), { pointerId: 1, clientX: 100, clientY: 100 });
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(HOLD_MS);
+    });
+    expect(onHeld).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(HOLD_DELAY_MS);
+    });
+    expect(onHeld).toHaveBeenCalledTimes(1);
+  });
+
+  /*
+   * And nothing is drawn inside it. On the chooser's rows a press means
+   * *select* as well as *hold*, so a bar that flashed on every selection would
+   * report a hold begun and abandoned on the one gesture that succeeded.
+   */
+  it('draws nothing until the count starts', async () => {
+    render(
+      <HoldButton onHeld={vi.fn()} onTap={vi.fn()}>
+        Hold me
+      </HoldButton>,
+    );
+    const button = screen.getByText('Hold me');
+
+    await act(async () => {
+      fireEvent.pointerDown(button, { pointerId: 1, clientX: 100, clientY: 100 });
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(HOLD_DELAY_MS - 50);
+    });
+    expect(bar().style.transform).toBe('scaleX(0)');
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+    expect(bar().style.transform).toBe('scaleX(1)');
+  });
+
+  /* A tap is still a tap, and lands inside the window every time. */
+  it('lets a short press through as a tap, having drawn nothing', async () => {
+    const onTap = vi.fn();
+    const onHeld = vi.fn();
+    render(
+      <HoldButton onHeld={onHeld} onTap={onTap}>
+        Hold me
+      </HoldButton>,
+    );
+    const button = screen.getByText('Hold me');
+
+    await act(async () => {
+      fireEvent.pointerDown(button, { pointerId: 1, clientX: 100, clientY: 100 });
+      fireEvent.pointerUp(button, { pointerId: 1, clientX: 100, clientY: 100 });
+    });
+
+    expect(onTap).toHaveBeenCalledTimes(1);
+    expect(onHeld).not.toHaveBeenCalled();
+    expect(bar().style.transform).toBe('scaleX(0)');
+  });
+});
+
+describe('what the list under the thumb is allowed to do', () => {
+  /*
+   * The two halves of the arbitration, on the one caller that has a list: for
+   * the length of the grace the browser keeps the gesture and a drag scrolls;
+   * once the count is running the row has claimed the finger and the page holds
+   * still under it, or a parent watches a bar fill while the thing it is filling
+   * slides out from under their thumb.
+   */
+  it('scrolls during the grace and stops once the count starts', async () => {
+    render(
+      <HoldButton onHeld={vi.fn()} onTap={vi.fn()}>
+        Hold me
+      </HoldButton>,
+    );
+    const button = screen.getByRole('button');
+
+    await act(async () => {
+      fireEvent.pointerDown(button, { pointerId: 1, clientX: 100, clientY: 100 });
+    });
+    expect(dragged(button)).toBe(true);
+    expect(button.style.touchAction).toBe('pan-y');
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(HOLD_DELAY_MS + 50);
+    });
+    expect(dragged(button)).toBe(false);
+    expect(button.style.touchAction).toBe('none');
+  });
+
+  /* And the lock lifts with the hand, not with the component. */
+  it('gives the list back when the gesture ends', async () => {
+    render(
+      <HoldButton onHeld={vi.fn()} onTap={vi.fn()}>
+        Hold me
+      </HoldButton>,
+    );
+    const button = screen.getByRole('button');
+
+    await act(async () => {
+      fireEvent.pointerDown(button, { pointerId: 1, clientX: 100, clientY: 100 });
+      await vi.advanceTimersByTimeAsync(HOLD_DELAY_MS + 50);
+    });
+    await act(async () => {
+      fireEvent.pointerUp(button, { pointerId: 1, clientX: 100, clientY: 100 });
+    });
+
+    expect(dragged(button)).toBe(true);
+    expect(button.style.touchAction).toBe('pan-y');
+  });
+});
 
 describe('a hold that stands alone', () => {
   it('fires after two seconds', async () => {

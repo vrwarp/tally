@@ -51,7 +51,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { gradeDescription, haptic } from '@/lib/utils';
 import { HoldButton } from '../components/HoldButton';
 import type { ReprintOffer } from '../reprintOffer';
-import { useTapGuard } from '../components/tapGuard';
+import { useTap, useTapGuard } from '../components/tapGuard';
 import type { KioskIntent } from '../KioskApp';
 import type { KioskStudent } from '../search';
 
@@ -113,6 +113,7 @@ export function ConfirmScreen({
   // Whose ticks start off. Decided by the caller — see `skippedFor` — because
   // it depends on things this screen has no business knowing about.
   const memberTap = useTapGuard(onToggle);
+  const tap = useTap();
 
   const chosen = [student, ...family.filter((member) => !skipped.has(member.id))];
   const others = chosen.length - 1;
@@ -283,11 +284,10 @@ export function ConfirmScreen({
           <button
             type="button"
             tabIndex={-1}
-            onPointerDown={(event) => {
-              event.preventDefault();
+            {...tap(() => {
               haptic();
               onFindSibling?.([student, ...family]);
-            }}
+            })}
             className="flex h-16 shrink-0 items-center rounded-xl bg-brand-600/30 pr-5 pl-12 text-left text-xl font-semibold text-brand-300 ring-1 ring-brand-500/40 active:bg-brand-600/45"
             style={{ touchAction: 'manipulation' }}
           >
@@ -454,16 +454,15 @@ export function ConfirmScreen({
         <button
           type="button"
           tabIndex={-1}
-          onPointerDown={(event) => {
-            event.preventDefault();
-            // The confirmation buzz, on contact rather than on the write — the
+          {...tap(() => {
+            // The confirmation buzz, on the lift rather than on the write — the
             // success screen is painted optimistically for the same reason, and
             // a parent already turning to walk their child in feels this when
             // they have stopped looking at the screen. One buzz for the family,
             // not one per child: it says the button took, and the button is one.
             haptic();
             onConfirm(chosen);
-          }}
+          })}
           className="w-full shrink-0 rounded-2xl bg-present-600 p-7 text-3xl font-bold text-white active:bg-present-500"
           style={{ touchAction: 'manipulation' }}
         >
@@ -474,10 +473,7 @@ export function ConfirmScreen({
       <button
         type="button"
         tabIndex={-1}
-        onPointerDown={(event) => {
-          event.preventDefault();
-          onBack();
-        }}
+        {...tap(() => onBack())}
         className="mt-8 shrink-0 rounded-xl px-8 py-4 text-xl text-ink-400 active:bg-ink-800"
         style={{ touchAction: 'manipulation' }}
       >

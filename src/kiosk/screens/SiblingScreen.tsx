@@ -47,7 +47,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { gradeDescription, haptic } from '@/lib/utils';
 import { Keyboard, type KioskKey } from '../components/Keyboard';
-import { useTapGuard } from '../components/tapGuard';
+import { useTap, useTapGuard } from '../components/tapGuard';
 import { searchStudents, MAX_RESULTS, type KioskStudent } from '../search';
 
 export function SiblingScreen({
@@ -90,6 +90,7 @@ export function SiblingScreen({
   );
 
   const rowTap = useTapGuard(onPick);
+  const tap = useTap();
 
   const resultsRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -102,10 +103,7 @@ export function SiblingScreen({
         <button
           type="button"
           tabIndex={-1}
-          onPointerDown={(event) => {
-            event.preventDefault();
-            onBack();
-          }}
+          {...tap(() => onBack())}
           className="absolute top-[max(0.75rem,var(--spacing-safe-top))] left-4 h-12 rounded-lg px-3 text-base text-ink-400 active:bg-ink-800"
         >
           ← Back
@@ -194,10 +192,10 @@ export function SiblingScreen({
         <button
           type="button"
           tabIndex={-1}
-          onPointerDown={() => {
+          {...tap(() => {
             haptic(8);
             onRegister();
-          }}
+          })}
           className="flex h-12 items-center justify-center rounded-xl bg-brand-600/15 px-6 text-base font-semibold text-brand-300 ring-1 ring-brand-500/40 active:bg-brand-600/30"
         >
           Not on the list? Add a new child

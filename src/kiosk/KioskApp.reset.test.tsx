@@ -14,7 +14,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { KioskApp, type KioskServices } from '@/kiosk/KioskApp';
-import { HOLD_MS } from '@/kiosk/components/HoldButton';
+import { HOLD_DELAY_MS, HOLD_MS } from '@/kiosk/components/HoldButton';
 import { KIOSK_KEYS, KIOSK_ROSTER_VERSION } from '@/kiosk/storage';
 import type { KioskBinding } from '@/kiosk/binding';
 import type { KioskStudent } from '@/kiosk/search';
@@ -115,10 +115,10 @@ async function type(text: string): Promise<void> {
 /**
  * Pick Ada out of the results.
  *
- * The one control here that takes the finger off again: the results list
- * scrolls, so a row commits on `pointerup` to tell a tap from the start of a
- * drag (see components/tapGuard.ts). Contact alone leaves the kiosk on the
- * search screen.
+ * A row commits on `pointerup`, to tell a tap from the start of a drag down a
+ * list that scrolls (see components/tapGuard.ts). So does every button on the
+ * kiosk now; the keys are what is left of pressing on contact. Contact alone
+ * leaves the kiosk on the search screen.
  */
 async function pickAda(): Promise<void> {
   const row = screen.getByText('Ada Lovelace').closest('button')!;
@@ -130,8 +130,13 @@ async function pickAda(): Promise<void> {
 }
 
 async function tap(text: RegExp | string): Promise<void> {
+  // Down *and* up, because every button on the kiosk waits for the lift now —
+  // a press alone is a gesture the control has not decided about yet (see
+  // components/tapGuard.ts).
+  const button = screen.getByText(text).closest('button')!;
   await act(async () => {
-    fireEvent.pointerDown(screen.getByText(text).closest('button')!);
+    fireEvent.pointerDown(button);
+    fireEvent.pointerUp(button);
   });
   await settle();
 }
@@ -142,15 +147,18 @@ async function hold(text: RegExp | string): Promise<void> {
     fireEvent.pointerDown(button);
   });
   await act(async () => {
-    await vi.advanceTimersByTimeAsync(HOLD_MS);
+    // The grace before the count, and then the count.
+    await vi.advanceTimersByTimeAsync(HOLD_DELAY_MS + HOLD_MS);
   });
   await settle();
 }
 
 /** Dismiss the success screen the way a parent does — a tap anywhere on it. */
 async function tapSuccess(): Promise<void> {
+  const anywhere = screen.getByText(/tap anywhere to carry on/i);
   await act(async () => {
-    fireEvent.pointerDown(screen.getByText(/tap anywhere to carry on/i));
+    fireEvent.pointerDown(anywhere);
+    fireEvent.pointerUp(anywhere);
   });
   await settle();
 }
