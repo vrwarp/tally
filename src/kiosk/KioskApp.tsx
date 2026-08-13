@@ -246,6 +246,28 @@ const NO_MATCH_SWEEP_DEBOUNCE_MS = 2_000;
  * press that finds somebody takes the whole panel off the screen.
  */
 const MIN_WIDEN_SPINNER_MS = 1_500;
+/**
+ * How long the glass has to go untouched before the kiosk stops believing
+ * there is anybody in front of it.
+ *
+ * The expiry clock below refuses to unbind a kiosk somebody is using, and the
+ * test for "somebody is using it" is what is on screen — a query typed, an
+ * overlay open, a wizard part-answered. That is exactly right while a parent is
+ * standing there and exactly wrong an hour after they walked off mid-tap: the
+ * state they abandoned is indistinguishable from the state they are working in,
+ * so a kiosk left on a confirm screen at the end of a nursery Sunday stayed
+ * bound to it — and stayed showing one child's name on a lobby shelf — until
+ * somebody drove out and reloaded it. This is the backstop under that.
+ *
+ * Two minutes, so the flows that clean up after themselves get there first and
+ * this is never the thing a person meets: the wizard puts a half-typed
+ * registration away after ninety seconds (`INACTIVITY_MS`), the staff gate
+ * hands the kiosk back after forty-five (`STAFF_RETURN_MS`), and a success
+ * screen returns in four. What is left is the search buffer and the confirm
+ * screens, which have no clock of their own because a parent reading a list of
+ * their own children should not be raced by one.
+ */
+const ABANDONED_MS = 2 * 60_000;
 
 /**
  * The id one run of the registration wizard submits under, for as many attempts
@@ -377,6 +399,29 @@ export function KioskApp() {
   // A family halfway through the wizard is not an idle kiosk: the binding must
   // not expire under them and the 4am reload must not take the screen away.
   idleRef.current = buffer === '' && overlay === null && registering === null;
+
+  /**
+   * When the glass was last touched — the other half of that question.
+   *
+   * What is on screen says whether somebody *was* here; only a touch says
+   * whether they still are. Recorded on the window in the capture phase so it
+   * counts every press, including the ones a control swallows, and cheap enough
+   * to run on a Pi: one ref write, no render. `keydown` is here for the
+   * walkthrough runner and a bench with a real keyboard on it, not for the
+   * lobby.
+   */
+  const touchedAtRef = useRef(Date.now());
+  useEffect(() => {
+    const touched = () => {
+      touchedAtRef.current = Date.now();
+    };
+    window.addEventListener('pointerdown', touched, { capture: true });
+    window.addEventListener('keydown', touched, { capture: true });
+    return () => {
+      window.removeEventListener('pointerdown', touched, { capture: true });
+      window.removeEventListener('keydown', touched, { capture: true });
+    };
+  }, []);
 
   /**
    * The pulse revisions this kiosk last acted on — seeded from disk, so the
@@ -598,20 +643,58 @@ export function KioskApp() {
     applyKioskTheme(wearing?.kioskGround, wearing?.kioskPalette);
   }, [binding]);
 
+  /* ---- Leaving a gathering ----------------------------------------------- */
+
+  /**
+   * Everything the kiosk holds about the gathering it was on, put down at once.
+   *
+   * One function because there are two doors out — a volunteer choosing
+   * **Leave** on the staff gate, and the clock below reaching the end of the
+   * evening — and they were clearing different halves of the same state. The
+   * clock's half was the dangerous one to get wrong: it dropped the register
+   * and kept `forgetGathering`'s side of it, so a kiosk that unbound itself at
+   * the end of a nursery Sunday sat in the lobby all week still holding that
+   * morning's allergy notes and the list of which children had a name tag
+   * printed. Which door was used is not a fact about how much a lobby tablet
+   * should remember.
+   *
+   * `phase` moves only off `ready`: the expiry clock runs in every phase, and a
+   * kiosk on its pairing screen or halfway through printer setup must not be
+   * pushed to the chooser by a binding it is not looking at.
+   */
+  const leaveGathering = useCallback(() => {
+    printing?.forgetGathering();
+    clearBinding();
+    setBinding(null);
+    setBuffer('');
+    setOverlay(null);
+    setRegistering(null);
+    setPresentIds(new Set());
+    setCheckedOutIds(new Set());
+    setArrivals(new Map());
+    setCheckedInAtMs(new Map());
+    setReprintedIds(new Set());
+    setSentId(null);
+    setPhase((current) => (current === 'ready' ? 'choosing' : current));
+  }, [printing]);
+
   /* ---- The clock: binding expiry and the nightly reload ------------------ */
 
   useEffect(() => {
     const tick = setInterval(() => {
-      if (!idleRef.current) return;
-      if (binding && !bindingIsLive(binding, Date.now())) {
-        clearBinding();
-        setBinding(null);
-        setBuffer('');
-        setOverlay(null);
-        setPresentIds(new Set());
-        setCheckedOutIds(new Set());
-        setPhase((current) => (current === 'ready' ? 'choosing' : current));
-      }
+      /*
+       * Nobody on it, or nobody on it for long enough.
+       *
+       * The first test is what is on screen and the second is when the glass
+       * was last touched, and the binding needs only one of them. On its own
+       * the first is a guard that a parent can leave latched: a query typed at
+       * ten past eight and walked away from is "in use" for as long as the
+       * page lives, which is weeks — so the evening ended, the gathering was
+       * over, and the kiosk stayed on it. See ABANDONED_MS.
+       */
+      const free = idleRef.current || Date.now() - touchedAtRef.current >= ABANDONED_MS;
+      if (!free) return;
+      if (binding && !bindingIsLive(binding, Date.now())) leaveGathering();
       // A page that runs for weeks needs a moment to shed what Chromium
       // accumulates; 4am while unbound-or-idle is that moment, and the
       // no-cache kiosk.html makes it double as the update channel.
@@ -620,7 +703,7 @@ export function KioskApp() {
       }
     }, 60_000);
     return () => clearInterval(tick);
-  }, [binding]);
+  }, [binding, leaveGathering]);
 
   /* ---- Input ------------------------------------------------------------- */
 
@@ -1561,22 +1644,12 @@ export function KioskApp() {
              * gate, so there is no cheaper way back in.
              */
             onStay={() => setOverlay({ kind: 'staff' })}
-            onLeave={() => {
-              // A kiosk that has left a gathering has no business still holding
-              // notes about the children who were at it — nor the evening's list
-              // of who had a name tag printed, which is the same argument about
-              // the same names.
-              printing?.forgetGathering();
-              clearBinding();
-              setBinding(null);
-              setBuffer('');
-              setOverlay(null);
-              setPresentIds(new Set());
-              setCheckedInAtMs(new Map());
-              setReprintedIds(new Set());
-              setSentId(null);
-              setPhase('choosing');
-            }}
+            // A kiosk that has left a gathering has no business still holding
+            // notes about the children who were at it — nor the evening's list
+            // of who had a name tag printed, which is the same argument about
+            // the same names. All of it goes, by whichever door: see
+            // `leaveGathering`.
+            onLeave={leaveGathering}
           />
         ) : overlay.kind === 'staff' ? (
           <StaffScreen

@@ -539,6 +539,16 @@ migration can produce a window that closes before its event ends, and taking the
 cannot shorten any binding. A gathering that has ended but is still collecting appears in the
 chooser labelled `Ended — pickup only`.
 
+**And the kiosk hands itself back on its own.** A minute-by-minute clock in `KioskApp.tsx` puts the
+gathering down once that window has passed — the binding, the register, the arrivals, the evening's
+allergy notes and the log of who had a name tag printed, all of it, by the same `leaveGathering()`
+the staff gate's **Leave** uses — and returns the screen to the chooser. It will not do this over
+somebody's shoulder: a query typed, a confirm open or a wizard part-answered holds the binding, and
+so does any touch inside the last two minutes. Only the second half of that is what makes the first
+half true. A parent who taps a name and walks away leaves a half-finished screen behind them, and a
+guard reading only the screen would take that for a person and keep the tablet on Sunday's nursery
+until somebody reloaded it — with a child's name still on the glass.
+
 | Field | Type | Notes |
 | --- | --- | --- |
 | `secretHash` | string | SHA-256 of the kiosk-held secret. The plaintext never touches Firestore — the code is public by design (it is on a screen in a lobby), and the secret is what stops a bystander who saw it from racing the kiosk for the token. |
