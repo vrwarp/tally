@@ -530,6 +530,44 @@ describe('a gathering somebody else owns', () => {
 
 /* -------------------------------------------------------------------------- */
 
+describe('reaching a gathering that has already happened', () => {
+  /*
+   * The same destination as the locked band above, for the rows the reader
+   * *can* work — which is where this was wrong.
+   *
+   * Every other row on this page goes to the event page: today's hero, the week
+   * ahead, a locked chain's head. Only the history band went to the register,
+   * and for a one-off already held there is no other row anywhere pointing at
+   * it — no future occurrence, nothing in the chain the projection still draws.
+   * So editing it, cancelling it, or deleting the Friday somebody recorded
+   * twice was reachable only by typing the address.
+   */
+  it('sends a past one-off to the event page, where the danger zone is', async () => {
+    fetchPastEvents.mockResolvedValue({
+      events: [
+        event({
+          id: 'summer-trip',
+          title: 'Summer Trip',
+          mode: 'oneoff',
+          startAt: at(18, 9),
+          endAt: at(18, 17),
+        }),
+      ],
+      cursor: null,
+      hasMore: false,
+    });
+
+    show([]);
+
+    const past = await screen.findByRole('region', { name: /past gatherings/i });
+    const link = await within(past).findByRole('link', { name: /summer trip/i });
+
+    expect(link).toHaveAttribute('href', '/events/summer-trip');
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+
 describe('the week boundary', () => {
   it('counts the seventh day as part of the next seven', async () => {
     // Today is Wednesday 29 July. Wednesday 5 August is seven days out, and a

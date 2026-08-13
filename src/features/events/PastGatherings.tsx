@@ -1,6 +1,9 @@
 /**
- * The history at the foot of the check-in screen: every gathering that has
+ * The history at the foot of the events calendar: every gathering that has
  * already happened, newest first, going back as far as somebody keeps scrolling.
+ * `PastEventRow` is exported from here because the check-in screen hangs a short
+ * tail of the same rows off its chooser — see `PastEventDestination` for the one
+ * way the two differ.
  *
  * Two things distinguish this from the "Recently" list it replaced. It is not
  * capped at five, because the reason a counselor comes down here is to
@@ -154,6 +157,29 @@ function AttendanceStat({
 }
 
 /**
+ * Where tapping a finished gathering should land.
+ *
+ * The two readers of this list want opposite things from the same row, and
+ * sending both to one screen strands one of them.
+ *
+ *  - `register` — the check-in screen's catch-up tail. A counselor down here is
+ *    back-filling a night nobody took the register for, and the register is the
+ *    whole errand; an event page in between is a tap they did not ask for.
+ *  - `page` — the events calendar. A core-team leader paging back through
+ *    history came to *do something about* a night: rename it, cancel it, or
+ *    delete the Friday that was recorded twice. None of that is on the register,
+ *    and the event page carries a "Take attendance" button at the top of it, so
+ *    this direction loses nothing and the other loses everything.
+ *
+ * This used to be one hard-coded `/event/` for both, which made the calendar's
+ * whole history band a dead end: every other row on that page — today's hero,
+ * the week ahead, a locked chain — goes to `/events/`, and a one-off that had
+ * already happened had no other row anywhere to reach it by. Deleting one was
+ * unreachable except by editing the address bar.
+ */
+export type PastEventDestination = 'register' | 'page';
+
+/**
  * One finished gathering. Exported because the check-in screen shows a short
  * tail of these as its catch-up escape, and two renderings of "a Friday that
  * already happened" would drift.
@@ -162,6 +188,7 @@ export function PastEventRow({
   event,
   count,
   locked,
+  destination = 'register',
 }: {
   event: TallyEvent;
   count: number | undefined;
@@ -171,11 +198,16 @@ export function PastEventRow({
    * locked gatherings by chain instead. See `AttendanceStat`.
    */
   locked?: boolean;
+  /**
+   * Defaults to the register, which is what the check-in screen wants and what
+   * this row has always done. See `PastEventDestination`.
+   */
+  destination?: PastEventDestination;
 }) {
   return (
     <li>
       <Link
-        to={`/event/${event.id}`}
+        to={destination === 'page' ? `/events/${event.id}` : `/event/${event.id}`}
         className="flex min-h-16 min-w-0 items-center gap-3 rounded-xl bg-ink-900 px-3 py-2.5 ring-1 ring-ink-800 hover:bg-ink-800/40 active:bg-ink-800"
       >
         <EventIcon name={event.icon} size="md" />
@@ -282,7 +314,14 @@ export function PastGatherings({ before }: PastGatheringsProps) {
               </h3>
               <ul className="flex flex-col gap-2">
                 {own.map((event) => (
-                  <PastEventRow key={event.id} event={event} count={counts.get(event.id)} />
+                  <PastEventRow
+                    key={event.id}
+                    event={event}
+                    count={counts.get(event.id)}
+                    // The calendar sends every other row to the event page, and
+                    // for a one-off already held this row is the only way there.
+                    destination="page"
+                  />
                 ))}
               </ul>
 
