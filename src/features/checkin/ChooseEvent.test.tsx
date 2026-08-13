@@ -430,6 +430,21 @@ describe('the catch-up tail', () => {
     expect(within(tail).getByText('4 students checked in')).toBeInTheDocument();
     // No paging controls: the full history is the Events tab's job.
     expect(screen.queryByRole('button', { name: /load older/i })).not.toBeInTheDocument();
+
+    /*
+     * Straight to the register, still.
+     *
+     * The same row on the events calendar now goes to the event page instead —
+     * a leader paging back through history came to change something about the
+     * night, not to take it. Here the errand is the opposite one: the heading
+     * above says "Open one of these and add them now", and a counselor who
+     * landed on an event page would have to find the button that finally opens
+     * the list they were promised.
+     */
+    expect(within(tail).getByRole('link', { name: /friday fellowship/i })).toHaveAttribute(
+      'href',
+      '/event/last-friday',
+    );
   });
 
   it('stays out of the way entirely when there is no history', async () => {
