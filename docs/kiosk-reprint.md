@@ -142,7 +142,8 @@ sit unattended with five children's names and arrival times on it.
 - Four new overlays — `staff`, `reprint`, `reprint-confirm`, `printer` — rather
   than phases, which is what keeps the kiosk bound while a volunteer works. It
   also keeps `idleRef` honest for free: a kiosk with somebody on it is not idle,
-  so the binding cannot expire and the 4am reload cannot fire underneath them.
+  so the binding cannot expire and the 4am reload cannot fire underneath them —
+  for two minutes after the last touch, which is the backstop under that guard.
   `unbind` is unchanged and is now reached from the staff screen.
 - The printer screen is still a `phase` when it is reached from the chooser
   during setup — the one time it is opened with the kiosk on no gathering, so it
@@ -171,7 +172,11 @@ sit unattended with five children's names and arrival times on it.
   the rasteriser does with the drawing left off.
 - `forgetGathering()` clears the log with the allergy notes unbinding already
   cleared. Both are lists of children's names in memory on a device that sits in
-  a lobby for weeks.
+  a lobby for weeks. Called by `leaveGathering()` in `KioskApp.tsx`, which is
+  the single teardown behind *both* doors out — the staff gate's **Leave** and
+  the clock running out of evening. The automatic door used to clear a different
+  half of the same state, so a kiosk that unbound itself at the end of a Sunday
+  kept the morning's notes and label log all week.
 
 ### Screens
 
