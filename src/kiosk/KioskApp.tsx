@@ -447,7 +447,24 @@ export function KioskApp() {
         return;
       }
       const stored = readBinding();
-      setPhase(stored && bindingIsLive(stored, Date.now()) ? 'ready' : 'choosing');
+      const live = stored !== null && bindingIsLive(stored, Date.now());
+      /*
+       * A binding that did not survive the night is put down here, not left for
+       * the clock.
+       *
+       * The chooser is already what this kiosk shows — the phase below sees to
+       * that — but the dead binding stayed in state and on disk until the first
+       * tick a minute later, and a tablet opened and closed inside that minute
+       * carried last Sunday's gathering to the next boot, and the one after
+       * that. Nothing else is loaded yet at this point in the boot, so this is
+       * the whole teardown: there is no register, no arrival, no label log and
+       * no printing module to forget them from.
+       */
+      if (stored && !live) {
+        clearBinding();
+        setBinding(null);
+      }
+      setPhase(live ? 'ready' : 'choosing');
     });
     return () => {
       cancelled = true;
@@ -680,30 +697,69 @@ export function KioskApp() {
 
   /* ---- The clock: binding expiry and the nightly reload ------------------ */
 
+  /**
+   * Whether there is anybody in front of this kiosk.
+   *
+   * Nobody on it, or nobody on it for long enough. The first test is what is on
+   * screen and the second is when the glass was last touched, and everything
+   * below needs only one of them. On its own the first is a guard a parent can
+   * leave latched: a query typed at ten past eight and walked away from is "in
+   * use" for as long as the page lives, which is weeks — so the evening ended,
+   * the gathering was over, and the kiosk stayed on it. See ABANDONED_MS.
+   */
+  const unattended = useCallback(
+    () => idleRef.current || Date.now() - touchedAtRef.current >= ABANDONED_MS,
+    [],
+  );
+
+  /** One look at "is this gathering still on?" — for the clock and for a wake. */
+  const sweepBinding = useCallback(() => {
+    if (!unattended()) return;
+    if (binding && !bindingIsLive(binding, Date.now())) leaveGathering();
+  }, [binding, leaveGathering, unattended]);
+
   useEffect(() => {
     const tick = setInterval(() => {
-      /*
-       * Nobody on it, or nobody on it for long enough.
-       *
-       * The first test is what is on screen and the second is when the glass
-       * was last touched, and the binding needs only one of them. On its own
-       * the first is a guard that a parent can leave latched: a query typed at
-       * ten past eight and walked away from is "in use" for as long as the
-       * page lives, which is weeks — so the evening ended, the gathering was
-       * over, and the kiosk stayed on it. See ABANDONED_MS.
-       */
-      const free = idleRef.current || Date.now() - touchedAtRef.current >= ABANDONED_MS;
-      if (!free) return;
-      if (binding && !bindingIsLive(binding, Date.now())) leaveGathering();
+      sweepBinding();
       // A page that runs for weeks needs a moment to shed what Chromium
       // accumulates; 4am while unbound-or-idle is that moment, and the
       // no-cache kiosk.html makes it double as the update channel.
-      if (isQuietHour() && (!binding || !bindingIsLive(binding, Date.now()))) {
+      if (unattended() && isQuietHour() && (!binding || !bindingIsLive(binding, Date.now()))) {
         window.location.reload();
       }
     }, 60_000);
     return () => clearInterval(tick);
-  }, [binding, leaveGathering]);
+  }, [binding, sweepBinding, unattended]);
+
+  /*
+   * And again the moment the kiosk is looked at.
+   *
+   * The interval is not the whole answer, because a tablet is not a page that
+   * runs uninterrupted: a kiosk app switched away from — or a screen locked
+   * with the browser behind it — has its timers frozen by the platform, and an
+   * installed PWA brought back days later comes back to *the same page*, with
+   * the binding it had when it went away. It cannot be a reload either, which
+   * is what makes this different from the boot path: nothing re-reads the clock
+   * on the way back in, so the first thing the volunteer opening the app saw
+   * was last week's gathering, and the interval's next tick was up to a minute
+   * behind them.
+   *
+   * `pageshow` as well as `visibilitychange`, because a restore out of the
+   * back/forward cache is the other way a frozen page resumes and it does not
+   * always come with a visibility change. Both land on the same idempotent
+   * sweep — a binding that is still live is left exactly alone.
+   */
+  useEffect(() => {
+    const wake = () => {
+      if (document.visibilityState === 'visible') sweepBinding();
+    };
+    document.addEventListener('visibilitychange', wake);
+    window.addEventListener('pageshow', wake);
+    return () => {
+      document.removeEventListener('visibilitychange', wake);
+      window.removeEventListener('pageshow', wake);
+    };
+  }, [sweepBinding]);
 
   /* ---- Input ------------------------------------------------------------- */
 

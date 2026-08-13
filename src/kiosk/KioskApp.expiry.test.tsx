@@ -212,6 +212,74 @@ describe('the binding expiring', () => {
   });
 });
 
+/**
+ * The tablet that was put away mid-evening and picked up next week.
+ *
+ * Two different journeys wear the same clothes, and only one of them was ever
+ * covered. A kiosk *reloaded* has always read the clock on the way in and
+ * landed on the chooser. A kiosk **resumed** — an installed app switched away
+ * from, a screen locked with the browser behind it — comes back to the same
+ * page it left, with the same binding in the same React state, and on a
+ * platform that froze its timers while it was away. Nothing re-read the clock
+ * on the way back in, so the first thing the volunteer opening the app saw was
+ * a gathering that finished days ago.
+ */
+describe('a kiosk coming back', () => {
+  const DAYS_AGO = 3 * 86_400_000;
+
+  /** A gathering that finished long before the app was opened again. */
+  const lastWeek = () =>
+    binding({
+      startAtMs: Date.now() - DAYS_AGO,
+      endAtMs: Date.now() - DAYS_AGO + 3_600_000,
+      checkInClosesAtMs: Date.now() - DAYS_AGO + 3_600_000,
+      boundAtMs: Date.now() - DAYS_AGO,
+    });
+
+  it('boots to the chooser and takes the dead binding off the disk with it', async () => {
+    await mount(lastWeek());
+
+    expect(screen.getByText(CHOOSER)).toBeTruthy();
+    /*
+     * Cleared at boot rather than at the first tick. The screen was already
+     * right; what was wrong was that a tablet opened and closed inside that
+     * minute carried last week's gathering to the next boot, and the one after.
+     */
+    expect(localStorage.getItem(KIOSK_KEYS.binding)).toBeNull();
+  });
+
+  it('lets go the moment it is looked at again, without waiting for the clock', async () => {
+    // Live at mount, over by the time anybody comes back — the app put away
+    // mid-evening. The page stays up; only the platform's clock moves on.
+    await mount();
+    expect(screen.getByText(SEARCH)).toBeTruthy();
+
+    // Away. A frozen page gets no ticks, which is why the interval is not the
+    // whole answer: this advances the clock without running one.
+    vi.setSystemTime(Date.now() + DAYS_AGO);
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await settle();
+
+    expect(screen.getByText(CHOOSER)).toBeTruthy();
+    expect(localStorage.getItem(KIOSK_KEYS.binding)).toBeNull();
+  });
+
+  it('leaves a gathering that is still running alone', async () => {
+    // The other half: an app switched away from for a moment during the
+    // evening, or a screen locked between two families.
+    await mount(binding({ endAtMs: Date.now() + 3_600_000, checkInClosesAtMs: Date.now() + 3_600_000 }));
+
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await settle();
+
+    expect(screen.getByText(SEARCH)).toBeTruthy();
+  });
+});
+
 describe('a kiosk somebody walked away from', () => {
   it('does not unbind under a parent who is still typing', async () => {
     await mount();
