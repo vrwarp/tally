@@ -21,15 +21,24 @@
  * lands on somebody other than the person pressing it.
  */
 import { haptic } from '@/lib/utils';
+import { EventName } from '../components/EventName';
 import { useTap } from '../components/tapGuard';
 
 export function ChangeEventScreen({
   title,
+  iconPath,
   onStay,
   onLeave,
 }: {
   /** The gathering this kiosk is on, named so nobody leaves the wrong one. */
   title: string;
+  /**
+   * Its mark, for the same reason the name is here. Not hung on either of the
+   * lines below: both are sentences the name sits *inside*, so the mark is a
+   * word in a line rather than the start of one, and there is no axis for it to
+   * take anything off.
+   */
+  iconPath?: string | null;
   onStay: () => void;
   onLeave: () => void;
 }) {
@@ -40,7 +49,15 @@ export function ChangeEventScreen({
       <div className="flex flex-col gap-4">
         <div className="text-4xl font-semibold text-ink-100">Change event?</div>
         <p className="mx-auto max-w-xl text-xl text-ink-400">
-          This kiosk is checking in to <span className="text-ink-200">{title}</span>.
+          This kiosk is checking in to{' '}
+          {/* No `whitespace-nowrap` here, whatever the mark's presence
+              suggests: this is a sentence, and the longest gathering name a
+              church types has to be allowed to wrap inside it. Held on one
+              line it took the whole screen sideways. */}
+          <span className="text-ink-200">
+            <EventName path={iconPath} title={title} />
+          </span>
+          .
         </p>
 
         {/*
@@ -85,9 +102,31 @@ export function ChangeEventScreen({
             haptic();
             onLeave();
           })}
-          className="flex h-14 w-full items-center justify-center rounded-xl bg-ink-800 text-lg font-semibold text-ink-200 active:bg-ink-700"
+          /*
+           * `px-5`, because this label is the one on the screen that truncates:
+           * without it a long gathering name ran to the plate's corner radius
+           * and the ellipsis sat against the right edge, which reads as a
+           * button clipping its label rather than a label being shortened.
+           *
+           * `mt-3` on top of the stack's own `gap-3`. These two answers are not
+           * peers — one keeps the door open and one shuts it on everybody
+           * standing at it, with no second confirmation — and twelve pixels is
+           * inside the overshoot a hurried thumb makes. Nothing here is
+           * destructive, so the answer is air rather than another hold.
+           */
+          className="mt-3 flex h-14 w-full items-center justify-center rounded-xl bg-ink-800 px-5 text-lg font-semibold text-ink-200 active:bg-ink-700"
         >
-          <span className="truncate">Leave {title}</span>
+          {/*
+            * `min-w-0`, or the truncation is decorative.
+            *
+            * A flex item's floor is its content, so a long gathering name made
+            * this span wider than the button that holds it: the ellipsis never
+            * arrived and the whole screen scrolled sideways instead — which the
+            * kiosk shooter asserts against, and which is how this was found.
+            */}
+          <span className="min-w-0 truncate">
+            Leave <EventName path={iconPath} title={title} />
+          </span>
         </button>
       </div>
     </div>

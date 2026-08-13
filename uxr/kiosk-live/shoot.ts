@@ -80,11 +80,32 @@ const SCENES: {
   drive?: readonly string[];
 }[] = [
   { id: 'search-idle', query: '', views: ['phone', 'kiosktall', 'kioskwide'] },
+  /*
+   * The same screen wearing the gathering's icon — and the plain one above it
+   * stays, because an icon is something a leader opts into and the header
+   * without one is still the ordinary evening.
+   */
+  { id: 'search-idle-icon', query: 'icon=groups', views: ['phone', 'kiosktall', 'kioskwide'] },
   { id: 'search-idle-pickup', query: 'pickup=1', views: ['phone', 'kiosktall'] },
   {
     id: 'search-idle-longtitle',
     query: 'title=Wednesday+Night+Middle+School+Gathering',
     views: ['phone'],
+  },
+  /*
+   * The header's worst case: the longest name a church actually types, beside a
+   * glyph, on the narrowest glass. If the icon costs the results region a row
+   * anywhere, it costs it here.
+   */
+  {
+    id: 'search-idle-longtitle-icon',
+    query: 'title=Wednesday+Night+Middle+School+Gathering&icon=groups',
+    views: ['phone', 'kiosktall'],
+  },
+  {
+    id: 'search-typed-icon',
+    query: 'buffer=Alva&present=2&icon=groups',
+    views: ['phone', 'kioskwide'],
   },
   {
     id: 'search-typed',
@@ -129,6 +150,46 @@ const SCENES: {
     views: ['phone', 'kiosktall', 'kioskwide'],
     drive: ['R', 'O', 'Next', 'F', 'O', 'X', 'Next'],
   },
+  /*
+   * The chooser, which is the screen the icon is on the row for. Three lists:
+   * every gathering wearing one, half of them wearing one (a church partway
+   * through choosing), and none — which has to come out as the list that
+   * shipped, with no empty column down its left edge.
+   */
+  { id: 'chooser-icons', query: 'screen=chooser', views: ['phone', 'kiosktall', 'kioskwide'] },
+  { id: 'chooser-some', query: 'screen=chooser&icons=some', views: ['phone', 'kiosktall'] },
+  { id: 'chooser-none', query: 'screen=chooser&icons=none', views: ['phone'] },
+  /*
+   * The row pair this screen was narrowed to prevent — two sittings of one
+   * gathering on one day — and the row *selected*, which is the state a
+   * volunteer spends two seconds looking at while they hold to bind. Neither
+   * had ever been photographed.
+   */
+  {
+    id: 'chooser-twins',
+    query: 'screen=chooser&twins=1',
+    views: ['phone', 'kiosktall'],
+  },
+  {
+    id: 'chooser-selected',
+    query: 'screen=chooser&twins=1',
+    views: ['phone', 'kiosktall'],
+    drive: ['Wednesday Night'],
+  },
+  /*
+   * The two staff screens that name the gathering — the menu behind the Clear
+   * hold, and the question it asks before unbinding. Both wear the mark for the
+   * same reason the header does: wherever this device says which gathering it
+   * is on, it says it the same way.
+   */
+  { id: 'staff-icon', query: 'screen=staff&icon=groups', views: ['phone', 'kiosktall'] },
+  { id: 'staff', query: 'screen=staff', views: ['phone'] },
+  { id: 'unbind-icon', query: 'screen=unbind&icon=groups', views: ['phone', 'kiosktall'] },
+  {
+    id: 'unbind-longtitle-icon',
+    query: 'screen=unbind&icon=groups&title=Wednesday+Night+Middle+School+Gathering',
+    views: ['phone'],
+  },
   {
     id: 'register-confirm',
     query: 'screen=register',
@@ -147,6 +208,15 @@ const SCENES: {
 ];
 
 const args = process.argv.slice(2);
+/*
+ * `--only <substring>` shoots the scenes whose id contains it.
+ *
+ * A round of critique is usually about two or three states, and re-shooting the
+ * other twenty to look at them costs a minute a round. The full set is still
+ * what a campaign ends on — this is for the middle of one.
+ */
+const onlyFlag = args.indexOf('--only');
+const only = onlyFlag === -1 ? null : args[onlyFlag + 1]!;
 const outFlag = args.indexOf('--out');
 const outDir = resolve(outFlag === -1 ? 'uxr/renders/kiosk-live' : args[outFlag + 1]!);
 await mkdir(outDir, { recursive: true });
@@ -165,6 +235,7 @@ const written: string[] = [];
 const sideways: string[] = [];
 
 for (const scene of SCENES) {
+  if (only && !scene.id.includes(only)) continue;
   for (const view of scene.views) {
     const { width, height, scale } = VIEWPORTS[view];
     const context = await browser.newContext({
@@ -180,11 +251,42 @@ for (const scene of SCENES) {
 
     for (const press of scene.drive ?? []) {
       const key = page.locator(`[data-key="${press}"]`).first();
-      const target = (await key.count()) > 0 ? key : page.getByRole('button', { name: press }).first();
-      // Down and up: the keys act on contact, the buttons wait for the lift
-      // (src/kiosk/components/tapGuard.ts), and this drives both.
-      await target.dispatchEvent('pointerdown');
-      await target.dispatchEvent('pointerup');
+      /*
+       * A key, then a button by its whole label, then a button that merely
+       * *contains* the words. The third is what reaches a chooser row: its
+       * accessible name is the title plus the day, the time range, the room and
+       * whatever status the row carries, so nothing addresses it by a name
+       * somebody would write in a scene list.
+       */
+      const target =
+        (await key.count()) > 0
+          ? key
+          : (await page.getByRole('button', { name: press, exact: true }).count()) > 0
+            ? page.getByRole('button', { name: press, exact: true }).first()
+            : page.getByRole('button', { name: press }).first();
+      /*
+       * Down and up, *at the middle of the control*: the keys act on contact,
+       * the buttons wait for the lift, and `tapGuard` only counts a lift that
+       * came off inside the box it went down on.
+       *
+       * The coordinates are the whole of that second half. A bare
+       * `dispatchEvent('pointerup')` synthesises an event at (0, 0), which is
+       * outside every control on the screen — so for as long as this drove the
+       * wizard, every key landed and every **Next** was silently discarded, and
+       * the frames named `register-grade` and `register-confirm` were both the
+       * first step of the flow with a fixture's worth of letters typed into it.
+       * Nobody looking at them could tell, because a wizard photographed on the
+       * wrong step still looks like a wizard.
+       */
+      const box = await target.boundingBox();
+      const at = {
+        pointerId: 1,
+        isPrimary: true,
+        clientX: (box?.x ?? 0) + (box?.width ?? 0) / 2,
+        clientY: (box?.y ?? 0) + (box?.height ?? 0) / 2,
+      };
+      await target.dispatchEvent('pointerdown', at);
+      await target.dispatchEvent('pointerup', at);
       await page.waitForTimeout(60);
     }
 

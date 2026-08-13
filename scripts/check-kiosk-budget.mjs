@@ -13,7 +13,9 @@
  *   1. Nothing reachable from kiosk.html is the full Firestore chunk — the
  *      chunk-splitting in vite.config.ts exists so the kiosk (firestore/lite
  *      only) never downloads it, and one careless import anywhere under
- *      src/kiosk/ would quietly undo that.
+ *      src/kiosk/ would quietly undo that. The same test is run twice more, for
+ *      the two libraries the kiosk is deliberately handed the *answers* from
+ *      rather than the code: the colour maths and the icon catalogue.
  *   2. The gzipped total of the reachable graph stays under the budget, and
  *      the *first-paint* subset (the statically referenced chunks) under its
  *      own smaller one.
@@ -155,6 +157,37 @@ if (withColourMaths.length > 0) {
       'Something under src/kiosk/ imports a value from lib/kioskTheme. It may import ' +
       'the types (which cost nothing at build time) and nothing else: palettes are ' +
       'resolved on the server and arrive on the chooser row as finished hex.',
+  );
+  process.exit(1);
+}
+
+/*
+ * The icon catalogue must never reach the kiosk either, and for the same money.
+ *
+ * `src/lib/eventIcons.ts` is sixty kilobytes of path data for a hundred and
+ * nine glyphs. A bound kiosk draws exactly one of them, so the lookup happens in
+ * `functions/src/kiosk/events.ts` while the chooser row is built and the row
+ * carries finished path data — see `src/kiosk/icon.ts`. One
+ * `import { findEventIcon }` instead of the string the server already sent would
+ * put the other hundred and eight on a lobby tablet's critical path.
+ *
+ * Matched on path data from two glyphs rather than on a name, on the same
+ * argument as the colour maths above: a minifier renames every export it can
+ * and cannot touch a string literal. Two of them because tree-shaking cannot
+ * drop either — they are entries in one frozen array — but a future refactor
+ * that splits the catalogue could, and one surviving match still fails.
+ */
+const ICON_CATALOGUE = /M580-240q-42 0-71-29|M400-120q-66 0-113-47/;
+
+const withCatalogue = [...reachable].filter((name) =>
+  ICON_CATALOGUE.test(readFileSync(join(DIST, `assets/${name}`), 'utf8')),
+);
+if (withCatalogue.length > 0) {
+  console.error(
+    `The kiosk graph reaches the icon catalogue: ${withCatalogue.join(', ')}\n` +
+      'Something under src/kiosk/ imports a value from lib/eventIcons. It may import ' +
+      'the types and nothing else: a gathering\'s icon is looked up on the server and ' +
+      'arrives on the chooser row as path data.',
   );
   process.exit(1);
 }

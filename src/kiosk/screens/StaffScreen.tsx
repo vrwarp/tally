@@ -43,6 +43,7 @@
  * over here to read.
  */
 import { haptic } from '@/lib/utils';
+import { EventName } from '../components/EventName';
 import { useTap } from '../components/tapGuard';
 
 /**
@@ -78,6 +79,7 @@ const DOOR = `${ROW} bg-ink-800 text-ink-100 active:bg-ink-700`;
 
 export function StaffScreen({
   title,
+  iconPath,
   window: eventWindow,
   printer,
   trouble,
@@ -87,6 +89,8 @@ export function StaffScreen({
   onStay,
 }: {
   title: string;
+  /** The gathering's mark, drawn wherever the kiosk says its name. */
+  iconPath?: string | null;
   window: string;
   /**
    * What the printer is doing. `none` means *nothing here to print* — no
@@ -147,8 +151,19 @@ export function StaffScreen({
             ladder is title, then label, then the line you read once. */}
         <div className="text-4xl font-semibold text-ink-100">Staff</div>
         <p className="mx-auto max-w-xl text-lg text-ink-400 kiosk:text-2xl">
-          <span className="text-ink-200">{title}</span> ·{' '}
-          <span className="whitespace-nowrap">{eventWindow}</span>
+          <span className="text-ink-200">
+            <EventName path={iconPath} title={title} />
+          </span>
+          {/*
+            * The same rule the chooser row keeps: the middot is drawn only
+            * where the two facts share a line, so a wrap can never leave a
+            * separator hanging at the end of one. This line is 98% of the
+            * phone's measure before the mark is on it, so it wraps there
+            * whether or not the gathering wears one — and now it wraps the
+            * same way both times.
+            */}
+          <span className="hidden sm:inline"> · </span>
+          <span className="block whitespace-nowrap sm:inline">{eventWindow}</span>
         </p>
       </div>
 

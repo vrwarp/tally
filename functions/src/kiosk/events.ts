@@ -13,6 +13,7 @@
  * the gathering is as real as any other.
  */
 import type { FirestoreLike, FunctionLogger } from '../firestore.js';
+import { findEventIcon } from '../generated/eventIcons.js';
 import { kioskPalette, type KioskGround, type KioskPalette } from '../generated/kioskTheme.js';
 import type { LabelTemplate } from '../generated/labelTemplate.js';
 import {
@@ -106,6 +107,23 @@ export interface KioskEventEntry {
   ground?: KioskGround;
   /** `--color-ink-950` → `#0e0406`, and only the slots that actually moved. */
   palette?: KioskPalette;
+  /**
+   * The gathering's icon, already looked up: SVG path data on Material's
+   * `0 -960 960 960` viewBox, or absent for a gathering nobody gave one.
+   *
+   * The *path*, not the name, for the same reason `palette` is hex rather than
+   * four hue names. The catalogue is sixty kilobytes of path data for a hundred
+   * and nine glyphs (`generated/eventIcons.ts`), the kiosk needs exactly one of
+   * them per gathering, and its first-paint budget is the tightest number in the
+   * repo — so the lookup happens here, where the list already has to exist, and
+   * what lands on the row is the one string the lobby screen will draw.
+   *
+   * A name the catalogue no longer holds resolves to nothing at all rather than
+   * to a substitute, which is `findEventIcon`'s own rule: a gathering whose icon
+   * was dropped should look like one that never had an icon, not like one
+   * wearing somebody else's.
+   */
+  iconPath?: string;
 }
 
 export const DEFAULT_KIOSK_EVENT_DAYS = 7;
@@ -151,6 +169,17 @@ function kioskLook(
   return palette ? { ground: theme.ground, palette } : { ground: theme.ground };
 }
 
+/**
+ * The icon, or nothing at all.
+ *
+ * Spread like `kioskLook`, and for the same reason: most gatherings have no
+ * icon, and the common case should not pay a key for saying so.
+ */
+function kioskIcon(name: string | null): { iconPath?: string } {
+  const icon = findEventIcon(name);
+  return icon ? { iconPath: icon.path } : {};
+}
+
 function entryFromSource(
   source: OccurrenceSource,
   data: Record<string, unknown> | null,
@@ -170,6 +199,7 @@ function entryFromSource(
     requiresCheckOut: source.requiresCheckOut,
     labelTemplate: source.labelTemplate,
     allergiesSupported,
+    ...kioskIcon(source.icon),
     ...kioskLook(source.kioskTheme),
   };
 }

@@ -118,6 +118,22 @@ export interface KioskBinding {
    */
   kioskGround?: KioskGround | null;
   kioskPalette?: KioskPalette | null;
+  /**
+   * The gathering's icon, as SVG path data on Material's `0 -960 960 960`
+   * viewBox — or absent for a gathering nobody gave one, which is most of them.
+   *
+   * Optional for the same reason `requiresCheckOut` is: a binding written
+   * before the kiosk drew icons has no such key, and a paired lobby screen must
+   * not be logged out by a deploy. Absent reads as "no icon", which is exactly
+   * what the kiosk looked like before this existed, and the next rebind picks
+   * up whatever the gathering actually wears.
+   *
+   * Path data rather than the Material name the event stores, for the reason
+   * `kioskPalette` is finished hex rather than four hue names: the catalogue is
+   * sixty kilobytes and the kiosk needs one glyph out of it. The server looks it
+   * up while building the chooser row. See `src/kiosk/icon.ts`.
+   */
+  iconPath?: string | null;
   boundAtMs: number;
 }
 

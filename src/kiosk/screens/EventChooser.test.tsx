@@ -255,6 +255,63 @@ describe('what a row says about its window', () => {
 });
 
 /**
+ * The gathering's mark, where a leader gave it one.
+ *
+ * The interesting half is the row *without* one: the icon began as a reserved
+ * column with a spacer holding it open, and the spacer was billed to the meta
+ * line — the only line that tells two sittings of one gathering apart. Inside
+ * the title it costs a row with no icon exactly nothing.
+ */
+/**
+ * What the button says it is about to do.
+ *
+ * The row a volunteer picked is at the top of a tablet and the button is at the
+ * bottom — half a phone screen away, three quarters of a portrait kiosk — so
+ * for the two seconds of the hold, "Hold to set kiosk" named nothing. Where the
+ * list holds two sittings of one gathering, that is the whole question.
+ */
+describe('the hold button', () => {
+  it('names the gathering and the time it is about to bind', async () => {
+    await renderChooser(servicesWith(vi.fn()));
+    // Nothing picked: the button is a prompt and has nothing to name.
+    expect(screen.getByText('Pick a gathering')).toBeInTheDocument();
+
+    const picked = row('Youth group');
+    down(picked);
+    up(picked);
+    await tick();
+
+    const button = screen.getByText('Hold to set kiosk').closest('button')!;
+    expect(button).toHaveTextContent('Youth group');
+    // The time, which is the fact two sittings of one gathering differ by.
+    expect(button).toHaveTextContent(/\d{1,2}:\d{2}/);
+  });
+});
+
+describe('the icon on a row', () => {
+  it('draws the gathering’s mark inside its title', async () => {
+    const services = {
+      listEvents: vi.fn(async () => [{ ...NURSERY, iconPath: 'M480-480h120v-40H480v40Z' }]),
+      bindEntry: vi.fn(),
+    } as unknown as KioskServices;
+    await renderChooser(services);
+
+    // Matched by role rather than by `row()`: the mark and the name's first
+    // word are one unbreakable span (see EventName), so the title's element no
+    // longer holds the whole string as one text node.
+    const marked = screen.getByRole('button', { name: /Nursery/ });
+    const glyph = marked.querySelector('svg');
+    expect(glyph?.getAttribute('aria-hidden')).toBe('true');
+    expect(glyph?.querySelector('path')?.getAttribute('d')).toBe('M480-480h120v-40H480v40Z');
+  });
+
+  it('draws nothing at all for a gathering with no icon', async () => {
+    await renderChooser(servicesWith(vi.fn()));
+    expect(row('Nursery').querySelector('svg')).toBeNull();
+  });
+});
+
+/**
  * What a volunteer may point the tablet at.
  *
  * The server sends the week — it is also what materialises an occurrence

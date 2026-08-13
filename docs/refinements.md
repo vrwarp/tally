@@ -183,6 +183,97 @@ Shipped behaviour and the two refusals:
 
 ---
 
+## The gathering's icon on the kiosk — 7 rounds
+
+An event in Tally can wear an icon a leader picked from a curated slice of
+Material Symbols. Every screen in the app draws it. The lobby kiosk — the one
+screen a parent walks up to, and the one a volunteer points at a gathering —
+never had.
+
+The plumbing decided itself, because the kiosk's first-paint budget is the
+tightest number in the repo: the catalogue is sixty kilobytes of path data for a
+hundred and nine glyphs, a bound kiosk needs exactly one of them, so the lookup
+happens in `functions/src/kiosk/events.ts` while the chooser row is built and the
+row carries finished path data — the same split, for the same reason, as the
+gathering's colours. `scripts/check-kiosk-budget.mjs` now fails the build if
+`lib/eventIcons` ever turns up in the kiosk's own graph, the way it already does
+for the colour maths.
+
+The design took seven rounds to stop being an object and start being a character.
+
+**Rounds 1–2: a tile is a promise of a target.** It shipped as a 48px filled,
+ringed square beside the title, and both critics took it apart from four
+directions at once: its fill was `ink-800` and its ring `ink-700`, pixel-identical
+to every result card, keyboard key and chooser row — a plate that does nothing, on
+a screen whose whole instruction is *tap the thing*. It was the largest and
+emptiest object in the header while the mark inside it was small and dim. It cost
+the header twenty pixels, which the landscape kiosk pays for out of a results
+track already under three hundred — enough to push the third name in a list from
+readable into the fade. And when the title wrapped, the flex row pushed it against
+the left padding while the name receded to the middle of the screen, so the one
+thing an icon exists to say — *this mark belongs to this gathering* — was what the
+layout stopped saying exactly when the name got long. In the chooser the same tile
+billed 61 CSS px of a 390px phone to the **meta** line, which is the only line
+that tells two sittings of one gathering apart.
+
+All of it was the same mistake: an icon laid out *beside* the text rather than set
+*in* it. The answer was one component-wide change — inline, sized in `em`,
+cap-height, no fill, no ring — and it closed every one of those findings at once.
+
+**Rounds 3–4: the hang, tried and reverted.** An inline mark's advance sits
+entirely on one side of the words, so a centred line puts the *name* about
+seven tenths of an em right of the axis the hours line under it keeps. Hanging the
+mark in the margin fixes that exactly, and it was in for two rounds. What killed it
+is that a hung mark needs room to hang into, a centred block can only reserve that
+room by giving up twice as much measure, and the measure comes off *every* line of
+the title: the longest name a church types went from two lines to three on a phone
+and broke across "Middle School". Unreserved, the same name balanced onto one
+full-measure line and the mark went off the glass, sliced by the bezel, at the top
+of the screen a family sees first. Both are worse than being off centre. The mark
+sits in the line: a marked header is the unmarked header with a glyph in front of
+the name — same height, same measure, same wrap.
+
+**Rounds 5–7: what the icon cannot do, and the states nobody had photographed.**
+The mark belongs to the *gathering*, so two sittings of one gathering wear the
+same glyph — it is silent at exactly the point where this screen's one expensive
+mistake lives. That put three findings on the chooser that have nothing to do with
+icons and everything to do with the row the icon landed on: the time range, the
+only real discriminator, was set in the base weight of the dimmest line, so it
+came up a step; the hold button at the foot of the tablet named nothing at all,
+five hundred pixels below the row a volunteer had picked, so it now carries the
+mark, the name and the start time, above the label rather than under the thumb
+that covers it; and a wrap on the phone merged the room and the check-in status
+into one phrase.
+
+Three of the round's findings were about frames that did not exist. Asking for the
+*selected* row and for two identically-titled sittings produced them. Asking for a
+gathering that had already **ended** — still offered, because a kiosk rebooting
+mid-pickup has to find it again — produced a row that said "Check-in open" in
+green and "Ended — pickup only" in amber at the same time, wore the list's only
+green ring while being the one row that must not be bound for an ordinary evening,
+and clipped its dated time range clean out of the card on a phone. None of that
+was new; it had simply never been drawn.
+
+The last defect was the mark's own, and it took two attempts. An SVG is an atomic
+inline, and a line may break between an atomic inline and the text after it — so
+inside a sentence ("This kiosk is checking in to …") the glyph wrapped to the end
+of one line and left the name opening the next, unmarked: the tile's failure
+arrived at from the other direction. A word joiner is the tidy answer and does not
+work — Chrome breaks after the atomic inline regardless, which the next round
+caught by looking at the frame rather than at the markup, and a standalone
+measurement then confirmed. What does work is `white-space: nowrap` over the mark
+and the name's *first word*, and only the first word, because a long name inside a
+sentence still has to wrap somewhere. That is what turned a glyph component into
+`EventName`: the mark and the name are one object, so the component that draws
+one draws both.
+
+Shipped: `src/kiosk/components/EventName.tsx`, on the lobby header, the chooser
+row, the hold button, the staff menu and the change-event question — five
+surfaces, one rule: *wherever the kiosk names a gathering, the name wears its
+mark.*
+
+---
+
 ## Pairing a kiosk — 4 rounds
 
 **Friday, 6:40pm.** The first person in the building carries the lobby iPad out of
