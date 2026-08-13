@@ -1548,6 +1548,7 @@ export function KioskApp() {
         overlay.kind === 'unbind' ? (
           <ChangeEventScreen
             title={binding.title}
+            iconPath={binding.iconPath}
             /*
              * Back to the menu it was opened from, not out to the search screen.
              *
@@ -1580,6 +1581,7 @@ export function KioskApp() {
         ) : overlay.kind === 'staff' ? (
           <StaffScreen
             title={binding.title}
+            iconPath={binding.iconPath}
             window={eventWindow(binding)}
             /*
              * `none` means *there is nothing here to print*, and nothing else.

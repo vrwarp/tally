@@ -56,6 +56,7 @@ import {
   type RegisterFamilyResult,
 } from '@/types';
 import type { KioskBinding } from './binding';
+import { sanitizeIconPath } from './icon';
 import { joinKioskRoster } from './roster';
 import { sanitizeKioskPalette } from './theme';
 import type { KioskStudent } from './search';
@@ -164,6 +165,13 @@ export interface KioskEventEntry {
    */
   ground?: KioskGround;
   palette?: KioskPalette;
+  /**
+   * The gathering's icon as SVG path data, resolved server-side from the
+   * Material name the event stores — absent when it has none, or when it names
+   * an icon the catalogue no longer holds. See `KioskEventEntry` in
+   * `functions/src/kiosk/events.ts`.
+   */
+  iconPath?: string;
 }
 
 const startKioskPairing = httpsCallable<void, { code: string; secret: string; expiresInSeconds: number }>(
@@ -285,6 +293,11 @@ export async function bindEntry(entry: KioskEventEntry): Promise<KioskBinding> {
     // gathering nobody themed says nothing about colour at all.
     kioskGround: entry.ground === 'light' || entry.ground === 'dark' ? entry.ground : undefined,
     kioskPalette: sanitizeKioskPalette(entry.palette),
+    // Same argument again, one field along: a `d` attribute read back out of
+    // localStorage all evening should be a string something has looked at.
+    // Undefined rather than null when there is nothing, so an unthemed,
+    // un-iconed gathering's binding carries no key at all.
+    iconPath: sanitizeIconPath(entry.iconPath) ?? undefined,
     boundAtMs: Date.now(),
   };
 }

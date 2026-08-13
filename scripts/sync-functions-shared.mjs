@@ -36,6 +36,7 @@ export const SHARED_FILES = [
   'recurrenceCore.ts',
   'labelTemplate.ts',
   'kioskTheme.ts',
+  'eventIcons.ts',
   'materialize.ts',
   'phoneDigits.ts',
   'registrationFields.ts',

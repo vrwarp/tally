@@ -35,6 +35,7 @@
  * binding made yesterday, a tablet left on overnight, a clock that drifted.
  */
 import { useEffect, useMemo, useState } from 'react';
+import { EventName } from '../components/EventName';
 import { HoldButton } from '../components/HoldButton';
 import { InstallPrompt } from '../components/InstallPrompt';
 import type { KioskEventEntry, KioskServices } from '../KioskApp';
@@ -46,7 +47,18 @@ function dayLabel(startAtMs: number, nowMs: number): string {
   const today = new Date(nowMs);
   const sameDay = start.toDateString() === today.toDateString();
   if (sameDay) return 'Today';
-  return start.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+  /*
+   * `short`, and the difference is one line on a phone.
+   *
+   * Nearly every row on this list says "Today" — it is narrowed to today, plus
+   * whatever is still open — so the dated row is the gathering left running
+   * from last night, and it is the only row where this string has to share a
+   * line with a full time range. "Wednesday, Aug 12" did not fit and took the
+   * range onto a second line, leaving the middot that joins them hanging at the
+   * end of the first. "Wed" fits, says the same thing, and is the fix that
+   * costs the row nothing.
+   */
+  return start.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
 function timeLabel(ms: number): string {
@@ -102,6 +114,9 @@ export function EventChooser({
       ) ?? null,
     [received, dayEndMs, nowMs],
   );
+
+  /** The row the hold button is about, or null while nothing is picked. */
+  const selectedEntry = selected === null ? null : (entries?.[selected] ?? null);
 
   useEffect(() => {
     let cancelled = false;
@@ -161,6 +176,15 @@ export function EventChooser({
         )}
         <div className="mx-auto flex max-w-2xl flex-col gap-3">
           {entries?.map((entry, index) => {
+            /*
+             * Taking arrivals now — and the ring that says so is spent on the
+             * row somebody should actually bind. A gathering that has finished
+             * keeps an open window on purpose (a kiosk rebooting mid-pickup has
+             * to find it again), so it satisfied this too, and the loudest
+             * signal on the list was pointing at the one row that must not be
+             * bound for an ordinary evening. It says "Ended — pickup only" in
+             * amber instead; see below.
+             */
             const live = nowMs >= entry.checkInOpensAt && nowMs <= entry.checkInClosesAt;
             // Finished, but still offered because its window has not closed —
             // the row a kiosk rebooting mid-pickup needs to find. Said out
@@ -202,22 +226,125 @@ export function EventChooser({
                 }${
                   isSelected
                     ? 'border-brand-500 bg-ink-800'
-                    : live
+                    : live && !ended
                       ? 'border-present-500/60 bg-ink-900'
                       : 'border-ink-800 bg-ink-900'
                 }`}
               >
-                <div className="text-xl font-semibold text-ink-100">{entry.title}</div>
+                {/*
+                  * The gathering's mark, in the title rather than in a column
+                  * of its own.
+                  *
+                  * A column was the first answer and it was billed to the wrong
+                  * line: sixty pixels off a 390px phone, taken out of the *meta*
+                  * line — which is the one line on this screen that tells two
+                  * occurrences of the same weekly gathering apart, and the whole
+                  * reason this list was narrowed to today. An icon cannot do
+                  * that job at all (both Wednesdays wear the same glyph, because
+                  * it belongs to the gathering and not to the night), so it must
+                  * not be the thing that crowds the line that can.
+                  *
+                  * Set in the title it costs one character of the title's own
+                  * measure, keeps the rows' left edge without a spacer, and is
+                  * simply absent on a gathering nobody gave an icon.
+                  */}
+                <div className="text-xl font-semibold text-ink-100">
+                  {/* No slot held open for a gathering with no mark. It was,
+                      for a round, so that titles in a half-marked list kept one
+                      left edge — and an empty slot beside a filled one reads as
+                      a mark that failed to draw rather than as a gathering that
+                      never had one. The card's own edge is the column here; the
+                      title simply starts with its first letter, which is what
+                      the mark does on every other screen it appears on. */}
+                  <EventName path={entry.iconPath} title={entry.title} />
+                </div>
                 <div className="pt-1 text-ink-400">
-                  {dayLabel(entry.startAt, nowMs)} · {timeLabel(entry.startAt)}–{timeLabel(entry.endAt)}
-                  {entry.location ? ` · ${entry.location}` : ''}
-                  {live && <span className="pl-2 font-medium text-present-400">Check-in open</span>}
+                  {/*
+                    * Bound so a wrap breaks *between* facts, never after the
+                    * middot that joins them. On the phone this line always
+                    * wraps, and it used to leave a separator hanging at the
+                    * right edge of line one and open line two with the tail of
+                    * the room — after which the status, set off by nothing but
+                    * a word-space, read as a phrase about the room.
+                    */}
+                  {/*
+                    * The day is free to break, the hours are not.
+                    *
+                    * Both bound together took a dated row — "Wednesday, Aug 12
+                    * · 10:31 PM–12:01 AM", which is what a gathering still open
+                    * from yesterday looks like — clean out of the card on a
+                    * phone. A time range broken across two lines is unreadable,
+                    * a date is not, so the range is the half that is held.
+                    */}
+                  {dayLabel(entry.startAt, nowMs)}
+                  {' · '}
+                  {/*
+                    * The hours, a step louder than the line they are in.
+                    *
+                    * The one fact that tells two sittings of one gathering
+                    * apart, and until now the quietest thing on the row: two
+                    * identical titles, two identical marks, one green border on
+                    * whichever happened to be open, and the discriminator set
+                    * in the base weight of the dimmest line. Everything loud on
+                    * the row pointed at the same place; the volunteer picked on
+                    * colour. This is the only fact on a row that a mark cannot
+                    * carry — an icon belongs to the gathering, so both sittings
+                    * wear it — which is exactly why it is the one that had to
+                    * come up.
+                    */}
+                  <span className="font-medium whitespace-nowrap text-ink-200">
+                    {timeLabel(entry.startAt)}–{timeLabel(entry.endAt)}
+                  </span>
+                  {entry.location ? (
+                    <>
+                      {/* The middot is drawn only where the room follows the
+                          hours on the same line. A separator is a join, and a
+                          join has nothing to do at the start of a line — which
+                          is where the phone puts this, every time, because
+                          three facts and a status do not fit in 297 pixels. */}
+                      <span className="hidden sm:inline"> · </span>
+                      <span className="block whitespace-nowrap sm:inline">{entry.location}</span>
+                    </>
+                  ) : (
+                    ''
+                  )}
+                  {/* Where the gathering is becomes what the gathering is
+                      doing, and on a phone that step has to be a line rather
+                      than a wider space — the fold puts them side by side. */}
+                  {/*
+                    * Open, *unless* the gathering has already ended — the two
+                    * were drawn together, because a finished gathering whose
+                    * window is still open is both, and the row said "Check-in
+                    * open" in green directly above "Ended — pickup only" in
+                    * amber. Two statuses on one row is one too many, and the
+                    * later fact is the one a volunteer has to act on.
+                    */}
+                  {live && !ended && (
+                    <span className="block font-medium text-present-400 sm:inline sm:pl-4">
+                      Check-in open
+                    </span>
+                  )}
                   {notOpenYet && (
-                    <span className="pl-2 font-medium text-ink-500">
+                    <span className="block font-medium text-ink-500 sm:inline sm:pl-4">
                       Check-in opens {timeLabel(entry.checkInOpensAt)}
                     </span>
                   )}
-                  {ended && <span className="pl-2 font-medium text-ink-500">Ended — pickup only</span>}
+                  {/*
+                    * The one status on this list that is a warning rather than
+                    * a fact. "Check-in opens 6:30" is the ordinary case — a
+                    * volunteer setting a tablet up before doors — and quiet ink
+                    * is right for it. A gathering that has *ended* is still
+                    * offered only so a kiosk rebooting mid-pickup can find it
+                    * again, and binding one for an ordinary evening is a
+                    * mistake; it read in the same grey as the ordinary case,
+                    * which is the row saying nothing at the one place it has
+                    * something to say.
+                    */}
+                  {ended && (
+                    <span className="block font-medium text-warn-400 sm:inline sm:pl-4">
+                      Ended — pickup only
+                    </span>
+                  )}
                 </div>
               </HoldButton>
             );
@@ -276,6 +403,58 @@ export function EventChooser({
               : 'pointer-events-none bg-ink-800 text-ink-500'
           }`}
         >
+          {/*
+            * What is about to be bound, on the thing being held.
+            *
+            * The two seconds this button exists to spend were being spent
+            * looking at a label that named nothing: the row a volunteer picked
+            * is at the top of a tablet and the button is at the bottom — half a
+            * phone screen away, three quarters of a portrait kiosk — and where
+            * two sittings of one gathering are on the list, the row's border
+            * changing colour up there is not an answer to "which one". The
+            * hours are what disambiguate, so the hours are what this carries,
+            * and the mark comes with them because here it costs one character
+            * of a line that had nothing on it.
+            *
+            * *Above* the instruction, and that is not decoration. A thumb
+            * occludes downward from where it lands, so a fact printed under the
+            * label is a fact covered for exactly the two seconds it was added
+            * for — and a volunteer who lifts to read it has cancelled the hold
+            * they were reading about. The instruction goes under the finger
+            * instead: it has already been read, and the row above says it too.
+            *
+            * The name truncates and the time does not. One `truncate` over the
+            * whole run clipped from the right, which is where the clock is —
+            * so the first thing a long gathering name cost the button was the
+            * only fact on it that tells two sittings apart. A long name losing
+            * its tail costs nothing here: both sittings share it.
+            */}
+          {/*
+            * The line's height is held whether or not there is anything on it.
+            *
+            * Added, it grew the button by 28px — and this block is anchored to
+            * the bottom of the screen, so the tap that picked a gathering paid
+            * for those pixels upward: the printer door and the foot of the
+            * scrolling list both jumped under the thumb that had just landed.
+            * The band above is empty in both states, so holding the taller
+            * geometry costs nothing to look at and keeps the promise the roster
+            * makes about its own rows — a tap moves nothing.
+            */}
+          {(binding || !selectedEntry) && (
+            <span aria-hidden className="invisible mb-1 block text-base font-medium">
+              &nbsp;
+            </span>
+          )}
+          {!binding && selectedEntry && (
+            <span className="mb-1 flex items-baseline justify-center gap-1 text-base font-medium">
+              {/* Quieter than the time, for the reason the row is: on a list of
+                  two sittings this half is the half they have in common. */}
+              <span className="min-w-0 truncate text-white/75">
+                <EventName path={selectedEntry.iconPath} title={selectedEntry.title} tone="inherit" />
+              </span>
+              <span className="shrink-0 text-white">· {timeLabel(selectedEntry.startAt)}</span>
+            </span>
+          )}
           {binding ? 'Setting up…' : selected !== null ? 'Hold to set kiosk' : 'Pick a gathering'}
         </HoldButton>
       </div>

@@ -35,6 +35,7 @@
  */
 import { useEffect, useMemo, useRef } from 'react';
 import { gradeDescription, haptic } from '@/lib/utils';
+import { EventName } from '../components/EventName';
 import { Keyboard, type KioskKey } from '../components/Keyboard';
 import { useTap, useTapGuard } from '../components/tapGuard';
 import type { KioskRefresh } from '../KioskApp';
@@ -376,7 +377,31 @@ export function SearchScreen({
           * what the parent is doing, not the label on the room they are
           * standing in.
           */}
-        <div className="text-2xl font-semibold text-ink-100 kiosk:text-3xl">{binding.title}</div>
+        {/*
+          * The gathering's own mark, set in its name rather than beside it.
+          *
+          * Inside the title's own line, which is the whole of what keeps this
+          * header the header that shipped: cap-height and in `em`, so it adds
+          * no line and no pixel of height — and the landscape kiosk pays for
+          * header height out of a results track already under three hundred
+          * pixels. It also cannot pull the title off the centre the hours line
+          * and everything below it share, because it is *in* the line being
+          * centred rather than a sibling of it. See EventName, which was a
+          * tile beside the title for exactly one round of critique — and hung
+          * this mark in the margin for one round after that, until the room a
+          * hung mark needs turned out to cost the longest gathering names a
+          * line of the title.
+          *
+          * `text-balance` is here because the mark is: one character of measure
+          * lands entirely on the wrap decision, and on the portrait kiosk it
+          * was enough to buy a second line and orphan one word on it. Balanced,
+          * the break comes off the whole string, and a long name breaks the
+          * same way whether or not the gathering wears a mark — which is also
+          * what the registration flow's header has always done.
+          */}
+        <div className="text-2xl font-semibold text-balance text-ink-100 kiosk:text-3xl">
+          <EventName path={binding.iconPath} title={binding.title} />
+        </div>
         <div className="text-base text-ink-500 kiosk:text-lg">
           {notOpenYet
             ? `Check-in opens ${opensAtLabel(binding, now)}`

@@ -188,6 +188,49 @@ describe('listKioskEvents', () => {
     expect(entry?.palette?.['--color-brand-400']).toBeDefined();
   });
 
+  /*
+   * The icon is looked up here for the same reason the palette is resolved
+   * here: the catalogue is sixty kilobytes, the kiosk needs one glyph out of
+   * it, and its first-paint budget is the tightest number in the repo.
+   */
+  it('resolves an icon name into path data on the way out', async () => {
+    const db = new FakeFirestore();
+    seedEvent(
+      db,
+      'campfire',
+      {
+        start: '2026-08-09T10:00:00Z',
+        end: '2026-08-09T12:00:00Z',
+        closes: '2026-08-09T13:00:00Z',
+      },
+      { icon: 'local_fire_department' },
+    );
+
+    const entry = (await listKioskEvents(db, NOW, logger))[0];
+    // A name went in; a path comes out, on Material's own viewBox.
+    expect(entry?.iconPath).toMatch(/^[Mm]/);
+  });
+
+  it('sends no icon for a name the catalogue no longer holds', async () => {
+    // `findEventIcon`'s rule, carried onto the wire: a gathering whose icon was
+    // dropped should look like one that never had an icon, not like one wearing
+    // somebody else's.
+    const db = new FakeFirestore();
+    seedEvent(
+      db,
+      'retired',
+      {
+        start: '2026-08-09T10:00:00Z',
+        end: '2026-08-09T12:00:00Z',
+        closes: '2026-08-09T13:00:00Z',
+      },
+      { icon: 'no_such_glyph' },
+    );
+
+    const entry = (await listKioskEvents(db, NOW, logger))[0];
+    expect(entry && 'iconPath' in entry).toBe(false);
+  });
+
   it('says nothing at all about a gathering nobody themed', async () => {
     // Most gatherings, and the chooser can list a month of them: the ordinary
     // case has to cost this payload nothing.
@@ -201,6 +244,8 @@ describe('listKioskEvents', () => {
     const entry = (await listKioskEvents(db, NOW, logger))[0];
     expect(entry && 'ground' in entry).toBe(false);
     expect(entry && 'palette' in entry).toBe(false);
+    // And nothing about one nobody gave an icon, which is the same gathering.
+    expect(entry && 'iconPath' in entry).toBe(false);
   });
 
   it('keeps the ground when a gathering moved only that', async () => {
