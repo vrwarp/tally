@@ -47,14 +47,18 @@ export function LockedEventRow({ event, sharedWeekday = false, detail = null }: 
   return (
     <li>
       {/*
-        `/events/`, not `/event/`.
+        `/events/`, not `/event/`, like every other row on this calendar.
 
         Both routes end at `LockedGathering` for a gathering the reader is not
         on, and they end at *different* ones: the check-in route takes the
         default back link and offers a way out to the counselor screen, which is
-        not where anybody reading the calendar came from. The rows above this one
-        in the past list keep `/event/` deliberately — for a gathering that *is*
-        the reader's, the register is the useful destination.
+        not where anybody reading the calendar came from.
+
+        This row used to be the exception that proved a rule the page did not
+        actually follow — the unlocked rows beside it went to the register. They
+        do not any more. Which tab you came from decides where a gathering opens:
+        the calendar manages, the chooser takes the register, and the one
+        crossing is the "Take attendance" button at the top of the event page.
       */}
       <Link
         to={`/events/${event.id}`}
