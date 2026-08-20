@@ -60,7 +60,8 @@ measuring nothing.
 
 ## What it measures, and with what
 
-Five instruments, because each of them lies on its own (`e2e/support/perf.ts`):
+Six instruments, because each of them lies on its own (`e2e/support/perf.ts`,
+and `src/kiosk/renderTally.ts` for the last):
 
 | Instrument | Answers |
 | --- | --- |
@@ -69,6 +70,17 @@ Five instruments, because each of them lies on its own (`e2e/support/perf.ts`):
 | `Performance.getMetrics` | Where a phase's main-thread time went: script, style, layout |
 | Sampling profiler | *Which function* — self time, resolved through source maps to `src/…` |
 | Resource timing | Which of it was the network, by channel |
+| Render counts | *Which component* re-rendered, and how many times — the fact that carries between machines |
+
+The render counts are the narrow instrument the rest of this file kept
+wishing for. A duration is a claim about the machine it was taken on, and the
+fixes left on this screen are smaller than the harness's own noise; a count is
+a claim about the code — the same argument the layout counts make — and "the
+keyboard rendered six times for six letters" is exact on any hardware. The
+counters live in the components themselves (`tallyRender`), cost one property
+read per render when nobody is measuring, and count nothing at all on a real
+kiosk, where the probe object they look for does not exist. No special build:
+the bundle being measured stays the bundle a church is served.
 
 The perf build emits source maps (`--sourcemap`, wired into the `webServer`
 command behind `KIOSK_PERF`) and the profile is walked back through them; without
@@ -353,14 +365,117 @@ floor, not an estimate.
 
 ### The next lever, if a Pi 3 ever has to work
 
-Rendering. At every speed the largest app frame during typing is
+Rendering. At every speed the largest app frame during typing was
 `SearchScreen`'s own render — about 5 ms per keystroke at ×10 and 15 ms at ×20 —
-and the keyboard is already memoized out of it. What re-renders per letter that
-need not is the header and the standing offers, which depend on the binding and
-not on the buffer. Splitting those into memoized children is the obvious move,
-and it is not made here for an honest reason: the noise floor of these
-measurements is around ±12 ms, which is the size of the thing being fixed. It
-needs a quieter machine or a narrower instrument than a whole-phase profile.
+and the keyboard is memoized out of it. What re-rendered per letter that need
+not is the header and the standing offers, which depend on the binding and not
+on the buffer. Splitting those into memoized children was the obvious move,
+and it was not made in that round for an honest reason: the noise floor of
+these measurements is around ±12 ms, which is the size of the thing being
+fixed. It needed a quieter machine or a narrower instrument than a whole-phase
+profile.
+
+The narrower instrument is the render counts, and the round below is what they
+drove.
+
+## What the counts found (2026-08-20)
+
+A different runner from the baseline above — four cores, no GPU, so Chromium
+rasterises in software and every paint figure on it runs high. None of the
+numbers in this section compare with the tables above; all of them compare
+before-and-after on the same machine, same throttle, same 410-child roster,
+which is the only comparison this file ever endorses anyway.
+
+The counts were added first and read before anything was changed, and the
+first thing they said was embarrassing in the way instrumentation is supposed
+to be: **the forty keys were re-rendering on every letter typed.** The
+keyboard's whole latency posture is a memo that keeps typing away from it, and
+the row above that says the render cost is small *because* of that memo was
+true when it was written — and then the staff gate arrived, its handler was an
+inline arrow, and every render handed the memo a fresh prop. Nothing slow
+enough to notice on the machine it was built on; `renders: Keyboard 6.0`
+against six taps, on every typing scenario, in the first instrumented run.
+A claim a count refutes in one line is a claim nobody re-litigates.
+
+The profiler then priced the rest of the letter, at ×10 and ×20, in order:
+
+| self time, six letters, ×20 | what it was |
+| ---: | --- |
+| 131 ms | `scrollTop = 0`, the every-keystroke reset of the results scroll |
+| ~28 ms | the typo pass (`approximatelyIncludes`) — known, and still not worth a prefilter |
+| ~21 ms | `readJson` — `hasConfiguredPrinter()` parsing localStorage once per render |
+
+The scroll reset was the biggest single piece of app code in the keystroke —
+bigger than the search the keystroke exists to run. Writing `scrollTop` makes
+the engine clamp the value against the scrollable extent, which means bringing
+layout up to date, and the write sat in an effect that runs immediately after
+the keystroke has dirtied that layout: a forced synchronous reflow per letter,
+for a reset that matters only if somebody has scrolled, which mid-word almost
+nobody has. And the search itself was running up to three times per letter:
+once for the screen, once for a reprint screen nobody had opened (its memo
+keyed on the same buffer), and — while a search was coming up empty — once more
+at full roster width for the silent sweep's guard, every letter, even where
+the scoped pool *is* the full roster and even after the sweep had already
+answered.
+
+None of it is wrong, none of it shows at twenty children on a laptop, and all
+of it is the same shape as the first round's findings: ordinary code paying a
+per-keystroke tax it only owes per binding, per scroll, or per screen. The
+fixes are in one commit and they are all declines — the header and the console
+row became memoized children handed finished values and stable handlers; the
+result rows memoized on the student they name; the staff-gate handler a
+`useCallback`; the scroll reset gated on a scroll listener having seen
+anything to undo; the duplicate searches gated on the screen that wants them;
+the printer check moved from localStorage to the state that mirrors it.
+
+### What that bought, same machine, same throttle
+
+Six letters, scoped, 410 children on the roster:
+
+| | ×4 | ×10 (Pi 4) | ×20 (Pi 3) |
+| --- | ---: | ---: | ---: |
+| tap → paint p50 | 52 → 33 ms | 56 → 37 ms | 131 → 86 ms |
+| script, whole phase | 58 → 35 ms | 185 → 126 ms | 375 → 282 ms |
+| gestures over 100 ms | 2 → 1 | **1 → 0** | 5 → 4 |
+| `renders: Keyboard` | 6 → 0 | 6 → 0 | 6 → 0 |
+| `renders: SearchHeader` | — → 0 | — → 0 | — → 0 |
+| `renders: SearchConsole` | — → 1 | — → 1 | — → 1 |
+| `renders: ResultRow` | — → 5 | — → 5 | — → 5 |
+
+The counts are the verification, and they are exact: the keyboard, the header
+and the console no longer hear about keystrokes at all — the console renders
+once, when the first letter turns the widen button on — and eight rows'
+worth of work per letter became five row renders across all six, because a
+narrowing search mostly keeps its best matches and a memoized row whose child
+did not change is skipped. The `scrollTop` line is simply gone from the
+profile's app rows, at every throttle. The milliseconds agree but are the
+weaker witness on this runner; the counts would have caught the keyboard
+regression the day it landed, and now they will.
+
+The scenario that gained most is the one built to fail silently: typing while
+the pulse replaces all 410 children mid-gesture went from 566 ms of script and
+seven gestures over 100 ms to 301 ms and four, at ×20 — the roster landing in
+state no longer drags a keyboard, a header and a console behind it. Typing
+against a working rasteriser: 366 → 248 ms of script, p50 130 → 113 ms. The
+queue of seven families' last family: 1928 → 1510 ms. And the letter pressed
+mid-boot spends 40 ms in handlers where it spent 202.
+
+### What is left, and where it is
+
+At ×10 the answer to "is the kiosk responsive" is now **yes, everywhere this
+suite looks**: zero gestures over 100 ms in every typing scenario, including
+mid-refetch and mid-raster. At ×20 what remains over the bar is
+presentation-heavy — the worst gestures spend 76–149 ms past the handler, on a
+machine whose raster runs on the CPU, against 0–58 ms in it — and one
+structural cost this round deliberately did not touch: **the screen swap.** A row tap unmounts the search screen,
+keyboard and all, mounts the confirm, and reverses the whole trade a moment
+later; at ×20 that is most of a 260 ms tap → paint, split roughly evenly
+between script, layout and paint. Keeping the search screen mounted under the
+overlays — `display` toggling, or true layering — would cut the script and
+some of the layout, and it is not made here because it changes what every
+overlay *is* to this app, for a cost that only clears the bar on hardware the
+×10 column already acquits. If a Pi 3 ever has to work, start there, and let
+`renders: ConfirmScreen` and the thread split say whether it paid.
 
 ## When you change something here
 
@@ -368,3 +483,10 @@ Run it before and after, at the same throttle and the same roster size, and
 diff the JSON. Both knobs are in the report's header, and two numbers taken at
 different settings are not comparable — which is exactly why they are printed
 at the top of every run.
+
+Read the `renders:` rows first. They are the only lines in the report with no
+noise in them at all, so they are the ones that can convict or acquit a change
+in a single run — a memo that held says zero, a memo that broke says exactly
+how badly, and neither answer changes with the weather the way a millisecond
+does. The milliseconds are what the renders cost *here*; the counts are what
+your change did.
