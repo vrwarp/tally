@@ -565,6 +565,65 @@ main-thread animation left on the kiosk is the hold-key fill
 knowingly: while it runs it is the only thing moving, and the thing it would
 jank is itself.
 
+### Did the responsiveness round move the jank?
+
+Measurable directly, because the jank spec is independent of the app source:
+running it against the pre-fix tree gives the before this file otherwise
+never had. Late frames during six letters of typing, before the
+responsiveness fixes → after them:
+
+| | ×10 (Pi 4) | ×20 (Pi 3) |
+| --- | ---: | ---: |
+| Typing, scoped | 1 → 0 | 6 → 6 |
+| Typing, unscoped | 2 → 0 | 5 → 6 |
+
+Both columns are the truth, and the second one teaches the more useful
+lesson. The fixes removed about a third of each keystroke's script; at ×10
+that took the whole frame under the API's 50 ms bar, and typing jank went to
+*zero*. At ×20 the same third came off and the counts did not move, because a
+late-frame count is a threshold metric: a frame improved from 131 ms to 86 ms
+is a frame a parent feels differently and this instrument counts identically.
+What moved at ×20 is severity — the boot keystroke's worst frame 566 → 317 ms,
+the spinner window's 269 → 171 ms — and the p50s in the tables above. To take
+the ×20 *counts* down, a keystroke's whole frame — script, style, layout,
+paint — has to fit in 50 ms at twenty-times dilation, which is about 2.5 ms of
+real work; the kiosk spends roughly four. That arithmetic, not any single
+hotspot, is the ×20 wall.
+
+### Two swings at that wall
+
+**Background data lands as a transition now.** `startTransition` around the
+setters the refetches feed (`landStudents` and friends in KioskApp) makes the
+four-hundred-student commit interruptible instead of one synchronous frame.
+Verified where a landing happens under something somebody watches — the widen
+spinner over the church-wide sweep: blocking inside the window's late frames
+**332 → 163 ms at ×20**, 58 → 32 ms at ×10, late frames 8 → 4 and 5 → 2,
+dropped pacing gaps 11 → 7 and 5 → 3. The refetch-while-typing scenario eased
+rather than emptied (longest task 126 → 111 ms, worst gesture 168 → 152 at
+×20) — its late frames are mostly the seven keystrokes themselves, which no
+scheduling change reaches. The optimistic paths — the tick, a family a wizard
+just registered — deliberately stay synchronous; an interruptible answer to a
+question somebody is standing at the glass asking is the wrong trade.
+
+**The results ramp is painted, not masked.** `mask-image` on the results
+scroller meant rastering the region through a mask on every keystroke's
+repaint; the ramp is now an overlaid gradient of the page ground — same
+stops, same pixels over an opaque ground, strictly less rasteriser work
+(`.kiosk-list-fade-overlay`). Kept on that mechanism, and said plainly: this
+harness could not resolve its effect above run-to-run paint noise — four of
+the five typing p50s at ×20 moved down after it, one moved up. The printer
+and reprint screens keep the mask; their ramp depth is measured and they do
+not repaint per keystroke.
+
+**And the swing not taken.** Parking the search screen under the confirm and
+success overlays (`display` toggling) remains the structural answer to the
+~260 ms ×20 screen swap, and it now has a named price beyond taste: a dozen
+unit tests assert that student names are *out of the document* during those
+overlays, and a parked screen keeps them in it, hidden. Taking that swing
+means deciding those assertions should mean "not visible" rather than "not
+present" — a change to what the tests promise, not just to what the code
+does, and this file does not make that call unilaterally.
+
 ## When you change something here
 
 Run it before and after, at the same throttle and the same roster size, and

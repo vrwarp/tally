@@ -701,17 +701,17 @@ export function SearchScreen({
         * anything to press. Written twice because the kiosk runs on whatever
         * tablet the church owns and WebKit still wants the prefix.
         */}
+      {/* The ramp is a painted overlay rather than a mask on the scroller —
+          same pixels over a solid ground, without the per-keystroke cost of
+          rastering the whole region through a mask on the hardware this
+          targets. See `.kiosk-list-fade-overlay` in index.css. The wrapper
+          carries the grid track's min-height and the gutter; the scroller
+          fills it. */}
+      <div className="relative mb-4 min-h-0">
       <div
         ref={resultsRef}
         onScroll={onResultsScroll}
-        className={`mb-4 flex min-h-0 flex-col overflow-y-auto overscroll-contain scroll-touch px-6 ${
-          /* Only where there is a list to run past. The panel that fills the
-             region on a failed search ends with "or see a leader." — the door
-             that costs the church nothing — and an unconditional ramp dimmed it
-             below legible, so the state read as a block that had been cut off
-             rather than one that finished. */
-          outcome.results.length > 0 ? 'kiosk-list-fade' : ''
-        }`}
+        className="flex h-full flex-col overflow-y-auto overscroll-contain scroll-touch px-6"
         style={{ touchAction: 'pan-y' }}
       >
         {/* The bottom padding rides on the column, not the scroller: end
@@ -996,6 +996,16 @@ export function SearchScreen({
             More names than fit — keep typing.
           </div>
         )}
+      </div>
+
+      {/* Only where there is a list to run past. The panel that fills the
+          region on a failed search ends with "or see a leader." — the door
+          that costs the church nothing — and an unconditional ramp dimmed it
+          below legible, so the state read as a block that had been cut off
+          rather than one that finished. */}
+      {rows && (
+        <div className="kiosk-list-fade-overlay pointer-events-none absolute inset-x-0 bottom-0" />
+      )}
       </div>
 
       {/*

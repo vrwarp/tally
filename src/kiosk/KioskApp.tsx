@@ -18,7 +18,7 @@
  * synchronously from localStorage at mount, so a warm kiosk is searchable before
  * the SDK has parsed. Only the write needs the network to have caught up.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 // Type-only, so the services chunk stays out of this graph — the value import
 // below is dynamic, and that boundary is the whole startup strategy.
 import type * as ServicesModule from './services';
@@ -565,24 +565,56 @@ export function KioskApp() {
 
   /* ---- Bound: load the roster, the index, who is already here ------------ */
 
+  /*
+   * Background data lands as a transition, and the split is deliberate.
+   *
+   * A roster refetch commits four hundred new student objects into state, and
+   * every memo keyed on `students` recomputes in the render that follows —
+   * which used to be one synchronous frame. Measured on a Pi-3-class throttle,
+   * that frame is the worst stutter the kiosk has outside a boot: the
+   * pulse-refetch scenario's longest task, landing under whoever happens to be
+   * typing. `startTransition` makes that render interruptible, so a keystroke
+   * arriving mid-commit is answered first and the roster finishes landing
+   * around it. Numbers in docs/kiosk-performance.md.
+   *
+   * Only the *background* landings come through here: pulse-driven refetches,
+   * the hydrate reads behind a warm boot, the five-minute register poll, the
+   * church-wide sweep. Everything a person is watching for stays synchronous —
+   * the optimistic tick in `onConfirm`, and a just-registered family entering
+   * the roster in `onRegistered` — because an interruptible answer to a
+   * question somebody is standing at the screen asking is a screen that
+   * flickers its truth in late.
+   */
+  const landStudents = useCallback((students: KioskStudent[]) => {
+    startTransition(() => setStudents(students));
+  }, []);
+  const landLast4 = useCallback((last4: Record<string, string[]>) => {
+    startTransition(() => setLast4Index(last4));
+  }, []);
+  const landScope = useCallback((scope: KioskParticipation) => {
+    startTransition(() => setScope(scope));
+  }, []);
+
   const hydrate = useCallback(
     (loaded: KioskServices, bound: KioskBinding) => {
-      void loaded.loadRoster(setStudents).then(setStudents);
-      void loaded.loadPhoneIndex(setLast4Index).then(setLast4Index);
+      void loaded.loadRoster(landStudents).then(landStudents);
+      void loaded.loadPhoneIndex(landLast4).then(landLast4);
       // Per binding rather than per boot: a kiosk moved from Friday to Sunday
       // is a kiosk asking about a different set of children.
-      void loaded.loadParticipation(bound.predictsFrom, setScope).then(setScope).catch(() => {});
+      void loaded.loadParticipation(bound.predictsFrom, landScope).then(landScope).catch(() => {});
       void loaded
         .fetchAttendance(bound.eventId)
         .then((register) => {
-          setPresentIds(register.present);
-          setCheckedOutIds(register.checkedOut);
-          setArrivals(register.arrivals);
+          startTransition(() => {
+            setPresentIds(register.present);
+            setCheckedOutIds(register.checkedOut);
+            setArrivals(register.arrivals);
+          });
         })
         .catch(() => {});
       void loaded.replayQueue().catch(() => {});
     },
-    [],
+    [landStudents, landLast4, landScope],
   );
 
   /**
@@ -609,12 +641,12 @@ export function KioskApp() {
     // everything this could refetch, so seeing the revs is enough.
     if (!seen) return;
 
-    if (fresh.roster !== seen.roster) void services.refetchRoster(setStudents);
-    if (fresh.phones !== seen.phones) void services.refetchPhoneIndex(setLast4Index);
+    if (fresh.roster !== seen.roster) void services.refetchRoster(landStudents);
+    if (fresh.phones !== seen.phones) void services.refetchPhoneIndex(landLast4);
     if (fresh.participation !== seen.participation) {
-      void services.refetchParticipation(binding.predictsFrom, setScope);
+      void services.refetchParticipation(binding.predictsFrom, landScope);
     }
-  }, [services, binding]);
+  }, [services, binding, landStudents, landLast4, landScope]);
 
   useEffect(() => {
     if (phase !== 'ready' || !services || !binding) return;
@@ -626,15 +658,19 @@ export function KioskApp() {
       void services
         .fetchAttendance(binding.eventId)
         .then((register) => {
-          // Never un-green a row this kiosk itself marked: the union keeps an
-          // optimistic tick standing until the server copy includes it. The
-          // same argument applies to a pickup — both are one-way here, and a
-          // staff undo on the main app is picked up on the next rebind.
-          setPresentIds((held) => new Set([...register.present, ...held]));
-          setCheckedOutIds((held) => new Set([...register.checkedOut, ...held]));
-          // Same union, same reason: an arrival this kiosk recorded a second
-          // ago must not vanish because the server copy has not caught up.
-          setArrivals((held) => new Map([...register.arrivals, ...held]));
+          // A poll landing, so it lands as a transition like the rest of the
+          // background reads — a lobby mid-queue must not stutter for it.
+          startTransition(() => {
+            // Never un-green a row this kiosk itself marked: the union keeps an
+            // optimistic tick standing until the server copy includes it. The
+            // same argument applies to a pickup — both are one-way here, and a
+            // staff undo on the main app is picked up on the next rebind.
+            setPresentIds((held) => new Set([...register.present, ...held]));
+            setCheckedOutIds((held) => new Set([...register.checkedOut, ...held]));
+            // Same union, same reason: an arrival this kiosk recorded a second
+            // ago must not vanish because the server copy has not caught up.
+            setArrivals((held) => new Map([...register.arrivals, ...held]));
+          });
         })
         .catch(() => {});
     }, PRESENT_REFRESH_MS);
@@ -855,7 +891,7 @@ export function KioskApp() {
     // waiting behind a rebuild of every phone number in the church, and a half
     // that failed leaves what the kiosk already held alone.
     const sweep = services
-      .refreshDirectory(setStudents, setLast4Index)
+      .refreshDirectory(landStudents, landLast4)
       .then(() => {
         refreshedAtRef.current = Date.now();
         setRefresh('done');
@@ -866,7 +902,7 @@ export function KioskApp() {
       });
     sweepRef.current = sweep;
     return sweep;
-  }, [services]);
+  }, [services, landStudents, landLast4]);
 
   /* ---- Check-in and pickup ------------------------------------------------ */
 

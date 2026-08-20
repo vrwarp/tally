@@ -256,9 +256,39 @@
   );
 }
 
+/*
+ * The same ramp, painted over the rows instead of masked into them.
+ *
+ * For the search screen only, and the difference is cost, not looks. A
+ * `mask-image` on a scroll container makes the engine raster the region to
+ * its own surface and filter it through the mask on every repaint — and the
+ * search screen repaints that region on every keystroke, on the slowest
+ * hardware the kiosk targets. The page ground is an opaque solid
+ * (`--color-ink-950`, which is also what a themed gathering overwrites), so a
+ * gradient of that ground laid *over* the clipped rows produces the same
+ * pixels as fading the rows to reveal it — same stops as the mask above, with
+ * the alphas inverted. `pointer-events-none` keeps the strip exactly what the
+ * mask left there: a peek that offers nothing to press.
+ *
+ * The printer and reprint screens keep the mask: their ramp depth rides
+ * `--kiosk-hidden` from useOverflowFade, they repaint when somebody prints
+ * rather than per keystroke, and two implementations of one ramp is already
+ * one more than ideal.
+ */
+.kiosk-list-fade-overlay {
+  height: var(--kiosk-fade-max, 4rem);
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    color-mix(in srgb, var(--color-ink-950) 90%, transparent) 30%,
+    var(--color-ink-950)
+  );
+}
+
 /* Rows step up on a screen stood on end, so the ramp does too. */
 @media (min-height: 1000px) {
-  .kiosk-list-fade {
+  .kiosk-list-fade,
+  .kiosk-list-fade-overlay {
     --kiosk-fade-max: 5rem;
   }
 }
@@ -273,7 +303,8 @@
  * continuing below. The cue has to be dissolution, not dimming.
  */
 @media (min-width: 1024px) {
-  .kiosk-list-fade {
+  .kiosk-list-fade,
+  .kiosk-list-fade-overlay {
     --kiosk-fade-max: 5.5rem;
   }
 }
