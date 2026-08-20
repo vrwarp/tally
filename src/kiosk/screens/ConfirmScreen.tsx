@@ -49,6 +49,7 @@
  */
 import { useLayoutEffect, useRef, useState } from 'react';
 import { gradeDescription, haptic } from '@/lib/utils';
+import { tallyRender } from '../renderTally';
 import { HoldButton } from '../components/HoldButton';
 import type { ReprintOffer } from '../reprintOffer';
 import { useTap, useTapGuard } from '../components/tapGuard';
@@ -110,6 +111,7 @@ export function ConfirmScreen({
   onFindSibling?: (anchors: KioskStudent[]) => void;
   onBack: () => void;
 }) {
+  tallyRender('ConfirmScreen');
   // Whose ticks start off. Decided by the caller — see `skippedFor` — because
   // it depends on things this screen has no business knowing about.
   const memberTap = useTapGuard(onToggle);

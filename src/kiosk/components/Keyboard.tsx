@@ -30,6 +30,7 @@
  */
 import { memo, useCallback, useEffect, useRef } from 'react';
 import { haptic } from '@/lib/utils';
+import { tallyRender } from '../renderTally';
 import { HOLD_DELAY_MS, HOLD_MS } from './HoldButton';
 
 export type KioskKey =
@@ -96,6 +97,7 @@ export const Keyboard = memo(function Keyboard({
    */
   onClearHeld?: () => void;
 }) {
+  tallyRender('Keyboard');
   // The latest handler behind a stable identity, so this subtree's memo holds
   // even if a parent re-creates its callback.
   const handlerRef = useRef(onKey);

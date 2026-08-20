@@ -102,23 +102,59 @@ export interface Interaction {
   total: number;
 }
 
+/**
+ * One animation frame the screen owed and delivered late.
+ *
+ * From the Long Animation Frames API, and the reason it exists beside the
+ * long-task rows: a long task says the thread was busy, which a screen with
+ * nothing moving can absorb invisibly, while a long animation frame says a
+ * frame the compositor was waiting for arrived late — which is the thing a
+ * person watching a spinner, a hold bar filling, or a list under their thumb
+ * experiences as a stutter. `blocking` is the part of it that would also have
+ * delayed input had a finger landed, which is Chrome's own "how bad was this
+ * really" number; `styleAndLayout` says whether the late frame was spent in
+ * rendering rather than in script.
+ */
+export interface LongFrame {
+  start: number;
+  duration: number;
+  blocking: number;
+  styleAndLayout: number;
+}
+
 /** What the page collected about itself. */
 export interface Probe {
   taps: TapSample[];
   /** Interactions the browser itself judged slow — see {@link Interaction}. */
   interactions: Interaction[];
   longTasks: { start: number; duration: number }[];
+  /** Frames over 50ms, per the Long Animation Frames API — see {@link LongFrame}. */
+  longAnimationFrames: LongFrame[];
   firstPaint: number | null;
   firstContentfulPaint: number | null;
   largestContentfulPaint: number | null;
   /** `domContentLoadedEventEnd`, for a boot that is mostly parse. */
   domContentLoaded: number | null;
   resources: { name: string; start: number; duration: number; transferSize: number }[];
+  /**
+   * How many times each instrumented component rendered — see
+   * `src/kiosk/renderTally.ts`, which is the half of this that lives in the
+   * app. Counts rather than durations for the same reason `ThreadTime` keeps
+   * layout counts: a duration is a fact about this machine, and a count is the
+   * fact that carries over to the Raspberry Pi. This is the instrument narrow
+   * enough to say "the header re-rendered on every letter", which the
+   * whole-phase profile cannot resolve above its own ±12ms of noise.
+   */
+  renders: Record<string, number>;
 }
 
 declare global {
   interface Window {
     __kioskPerf?: Probe;
+    /** Arms the frame-pacing sampler — see {@link startFramePacing}. */
+    __kioskPaceStart?: () => void;
+    /** Disarms it and returns the frame-to-frame gaps it saw, in ms. */
+    __kioskPaceStop?: () => number[];
   }
 }
 
@@ -141,8 +177,56 @@ export async function installProbe(page: Page): Promise<void> {
       largestContentfulPaint: null,
       domContentLoaded: null,
       resources: [],
+      renders: {},
+      longAnimationFrames: [],
     };
     window.__kioskPerf = probe;
+
+    /*
+     * The frame-pacing sampler, armed by the scenario and never by default.
+     *
+     * A requestAnimationFrame loop records the gap between consecutive frame
+     * callbacks. While it runs, frames are produced every vsync whether or not
+     * anything else asks for them — which is why it must not idle armed: a
+     * kiosk on a shelf produces no frames at all, and that is a fact worth
+     * measuring, not a stutter.
+     *
+     * Two things about what its numbers mean, both measured rather than
+     * assumed (see docs/kiosk-performance.md):
+     *
+     * - **Its gaps are the main thread's.** A composited animation — a
+     *   transform spinner, an opacity pulse — is drawn by the compositor and
+     *   keeps moving straight through a gap this loop reports. So the dropped
+     *   row is the jank a *main-thread-driven* animation (colour, background,
+     *   anything layout) would have shown, and an upper bound for everything
+     *   else; and it is the delay any script-driven update met.
+     * - **It taxes the style rows of its own window.** Every vsync the loop
+     *   claims becomes a main frame, and a main frame ticks the style of
+     *   every active animation, composited or not — one recalc per frame for
+     *   the window, ~120 over two seconds. Read a paced window's recalc and
+     *   style figures against that floor, not against zero.
+     */
+    let paceGaps: number[] | null = null;
+    let paceHandle = 0;
+    let paceLast = 0;
+    const pace = (now: number) => {
+      if (paceGaps === null) return;
+      if (paceLast > 0) paceGaps.push(now - paceLast);
+      paceLast = now;
+      paceHandle = requestAnimationFrame(pace);
+    };
+    window.__kioskPaceStart = () => {
+      paceGaps = [];
+      paceLast = 0;
+      cancelAnimationFrame(paceHandle);
+      paceHandle = requestAnimationFrame(pace);
+    };
+    window.__kioskPaceStop = () => {
+      cancelAnimationFrame(paceHandle);
+      const gaps = paceGaps ?? [];
+      paceGaps = null;
+      return gaps;
+    };
 
     /** Observers a browser may not have are skipped rather than fatal. */
     const observe = (type: string, handle: (entries: PerformanceEntryList) => void) => {
@@ -187,6 +271,28 @@ export async function installProbe(page: Page): Promise<void> {
     observe('longtask', (entries) => {
       for (const entry of entries) {
         probe.longTasks.push({ start: entry.startTime, duration: entry.duration });
+      }
+    });
+    /*
+     * Long Animation Frames — the jank instrument. Chromium-only like the
+     * profiler and the throttle, which is the suite's standing bargain; the
+     * 50ms threshold is the API's own and cannot be lowered, so a frame has to
+     * be three vsyncs late before it lands here. That is the right bar for a
+     * list meant to be empty: at ×20 the interesting question is how *far*
+     * over it the frames go, which is what `blocking` answers.
+     */
+    observe('long-animation-frame', (entries) => {
+      for (const entry of entries) {
+        const frame = entry as PerformanceEntry & {
+          blockingDuration?: number;
+          styleAndLayoutDuration?: number;
+        };
+        probe.longAnimationFrames.push({
+          start: entry.startTime,
+          duration: entry.duration,
+          blocking: frame.blockingDuration ?? 0,
+          styleAndLayout: frame.styleAndLayoutDuration ?? 0,
+        });
       }
     });
     observe('paint', (entries) => {
@@ -272,7 +378,42 @@ export async function beginPhase(page: Page): Promise<void> {
     probe.interactions = [];
     probe.longTasks = [];
     probe.resources = [];
+    probe.renders = {};
+    probe.longAnimationFrames = [];
   });
+}
+
+/* -------------------------------------------------------------------------- */
+/* Frame pacing                                                               */
+/* -------------------------------------------------------------------------- */
+
+/** What the pacing sampler saw across one animated window. */
+export interface FramePace {
+  frames: number;
+  /** Frame-to-frame gap, ms. ~17 is a healthy 60Hz screen. */
+  p95: number | null;
+  worst: number | null;
+  /** Gaps of two vsyncs or more — frames an animation on screen skipped. */
+  dropped: number;
+}
+
+/**
+ * Arms the in-page requestAnimationFrame sampler.
+ *
+ * Only inside a window that is already animating — a spinner, a hold bar,
+ * letters landing under a raster — because the loop itself asks for a frame
+ * every vsync, and an idle kiosk producing no frames is healthy, not janky.
+ * See the note beside the sampler in `installProbe`.
+ */
+export async function startFramePacing(page: Page): Promise<void> {
+  await page.evaluate(() => window.__kioskPaceStart?.());
+}
+
+/** Disarms it and reduces what it saw to the numbers a stutter shows up in. */
+export async function stopFramePacing(page: Page): Promise<FramePace> {
+  const gaps = await page.evaluate(() => window.__kioskPaceStop?.() ?? []);
+  const { p95, max, count } = percentiles(gaps);
+  return { frames: count, p95, worst: max, dropped: gaps.filter((gap) => gap > 34).length };
 }
 
 /* -------------------------------------------------------------------------- */

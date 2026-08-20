@@ -33,11 +33,12 @@
  * in the wrong place besides. A labelled key in a fixed position can be
  * described over the phone; the prompt is what makes it safe to be findable.
  */
-import { useEffect, useMemo, useRef } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import { gradeDescription, haptic } from '@/lib/utils';
+import { tallyRender } from '../renderTally';
 import { EventName } from '../components/EventName';
 import { Keyboard, type KioskKey } from '../components/Keyboard';
-import { useTap, useTapGuard } from '../components/tapGuard';
+import { useTap, useTapGuard, type TapHandlers } from '../components/tapGuard';
 import type { KioskRefresh } from '../KioskApp';
 import {
   eventWindow,
@@ -117,6 +118,293 @@ function WidenButton({
   );
 }
 
+/**
+ * The header, memoized out of the keystroke.
+ *
+ * Everything up here answers *where and when* — the gathering's name wearing
+ * its mark, the hours under it, the printer's amber dot — and none of it
+ * depends on what has been typed. It re-rendered per letter anyway, because
+ * the screen it sits on does; on a Raspberry-Pi-class throttle the render
+ * counts said so and the profile priced it. The second line arrives as a
+ * finished string and the rest are primitives, so the memo compares values:
+ * a minute crossing the opens-at boundary still repaints on the next render,
+ * exactly as it did when this was inline.
+ */
+const SearchHeader = memo(function SearchHeader({
+  iconPath,
+  title,
+  line,
+  printerNeedsAttention,
+}: {
+  iconPath: string | null | undefined;
+  title: string;
+  /** The line under the title, already decided: the hours, opens-at, or closed. */
+  line: string;
+  printerNeedsAttention: boolean;
+}) {
+  tallyRender('SearchHeader');
+  return (
+    /* The staff gate used to be an invisible square over this corner; it is a
+       hold on **Clear** now — see `onStaffGate`. */
+    <div className="relative px-6 pt-[max(1rem,var(--spacing-safe-top))] pb-2 text-center">
+      {/*
+        * The printer, when it has stopped working.
+        *
+        * A dot, absolutely positioned, and only ever in the corner: a parent
+        * cannot fix a printer and telling them about it beside a green tick
+        * reads as "your check-in failed". Absolute because this file promises
+        * that a keystroke changes text and never geometry, and a warning that
+        * appears mid-evening must not push the results down by a line.
+        *
+        * What a volunteer does about it is hold the opposite corner and look
+        * at the printer screen, which says what is actually wrong.
+        */}
+      {printerNeedsAttention && (
+        <span
+          aria-label="The label printer needs attention"
+          className="absolute top-[max(1rem,var(--spacing-safe-top))] right-4 h-3 w-3 rounded-full bg-warn-500"
+        />
+      )}
+      {/*
+        * The header answers *where and when*, and nothing else.
+        *
+        * It used to answer "what do I do" as well — "Welcome! Check in
+        * below." — which put the one instruction a parent needs in the
+        * smallest type on the screen, four hundred pixels above the keys, in
+        * a line they read after the title and forget before the keyboard.
+        * That sentence has moved into the body, where a parent's eye
+        * actually goes and where the results will replace it (see the idle
+        * panel below).
+        *
+        * What is left is identity. A parent walking up wants to know they
+        * are at the right screen for the right evening — a church can run
+        * two gatherings in two rooms on one night — so the title carries
+        * real weight, and the window under it is the fact that settles it.
+        * Not a display size: the loudest thing on this screen has to stay
+        * what the parent is doing, not the label on the room they are
+        * standing in.
+        */}
+      {/*
+        * The gathering's own mark, set in its name rather than beside it.
+        *
+        * Inside the title's own line, which is the whole of what keeps this
+        * header the header that shipped: cap-height and in `em`, so it adds
+        * no line and no pixel of height — and the landscape kiosk pays for
+        * header height out of a results track already under three hundred
+        * pixels. It also cannot pull the title off the centre the hours line
+        * and everything below it share, because it is *in* the line being
+        * centred rather than a sibling of it. See EventName, which was a
+        * tile beside the title for exactly one round of critique — and hung
+        * this mark in the margin for one round after that, until the room a
+        * hung mark needs turned out to cost the longest gathering names a
+        * line of the title.
+        *
+        * `text-balance` is here because the mark is: one character of measure
+        * lands entirely on the wrap decision, and on the portrait kiosk it
+        * was enough to buy a second line and orphan one word on it. Balanced,
+        * the break comes off the whole string, and a long name breaks the
+        * same way whether or not the gathering wears a mark — which is also
+        * what the registration flow's header has always done.
+        */}
+      <div className="text-2xl font-semibold text-balance text-ink-100 kiosk:text-3xl">
+        <EventName path={iconPath} title={title} />
+      </div>
+      <div className="text-base text-ink-500 kiosk:text-lg">{line}</div>
+    </div>
+  );
+});
+
+/**
+ * The console row — the standing offers — memoized out of the keystroke.
+ *
+ * The row's whole design is that a keystroke never moves it, and it turns out
+ * a keystroke never *changes* it either: what it renders hangs off whether the
+ * search found anybody, not off what was typed. So its props are three
+ * booleans, a sentence, and two handlers the parent hands over behind stable
+ * identities (see the trampolines in SearchScreen), and typing leaves the
+ * whole subtree alone. It still re-renders at the moments it exists to mark —
+ * the first letter that finds somebody, the search that empties — which is a
+ * handful of times per family rather than once per letter.
+ */
+const SearchConsole = memo(function SearchConsole({
+  offeredAbove,
+  canWiden,
+  widening,
+  offerPrompt,
+  onWiden,
+  onRegister,
+}: {
+  offeredAbove: boolean;
+  canWiden: boolean;
+  widening: boolean;
+  offerPrompt: string;
+  onWiden: () => void;
+  onRegister: () => void;
+}) {
+  tallyRender('SearchConsole');
+  const tap = useTap();
+
+  return (
+    /* `overflow-hidden` is load-bearing, not tidiness: two nowrap labels
+        side by side have a min-content width, and a grid track will widen
+        past the screen to honour it rather than let them shrink — which took
+        the header, the results and the keyboard sideways with it on a narrow
+        phone. Hidden overflow lets the track fall back to zero, so a screen
+        too narrow for both labels crops them instead of scrolling the whole
+        kiosk. */
+    /*
+      * The exit sits on the left, and the gap between the two is wider than
+      * the gap between two name rows.
+      *
+      * These are not a matched pair. **Search everyone** is a retry: press it
+      * by accident and the search runs wider, which is a second of waiting.
+      * **Register your child** is an exit, and completed it makes a duplicate
+      * of a child the church already has, for the review queue to judge. They
+      * used to sit six pixels apart — less than the space between two rows on
+      * the same screen — with the exit the wider of the two and on the right,
+      * which on a phone held one-handed is exactly where a thumb travels.
+      * The air comes out of the row's own side margins, which were doing
+      * nothing.
+      */
+    /* `pt-2` is the console's interior. The rule and this row's first
+            pixel were two apart while every other gap inside the console was
+            40 or more, so the edge separated without containing — it read as
+            the button's own top border run out to the screen. */
+    <div className="mx-auto flex h-14 w-full max-w-2xl flex-row-reverse items-center justify-center gap-4 overflow-hidden px-2 pt-2 tall:h-20 tall:gap-6 lg:max-w-5xl">
+      {/*
+        * The way out of the scope, standing beside the way out of the search.
+        *
+        * It used to live only on the no-match panel, which meant it appeared
+        * for exactly the family who did not need it and was missing for the
+        * one who did. A scoped search that returns *somebody* — the other
+        * Noah, the Ramirez who is not theirs — is the commonest way a parent
+        * is shown confident, wrong rows, and until now the only door open to
+        * them was the one that registers a child the church already has.
+        *
+        * Hidden only while the no-match panel is up, because that panel is
+        * showing this same control in its primary weight a hand's width
+        * higher: the standing pair steps aside rather than appearing twice.
+        */}
+      {!offeredAbove && canWiden && <WidenButton widening={widening} onWiden={onWiden} quiet />}
+      {!offeredAbove && (
+        <button
+          type="button"
+          tabIndex={-1}
+          {...tap(() => {
+            haptic(8);
+            onRegister();
+          })}
+          /* The `tall:` step every other control got. Quiet in weight — a
+             tinted chip beside a keyboard — is a different lever from quiet
+             in legibility, and on a portrait tablet this was simultaneously
+             the only accented object on the glass and the smallest type on
+             it, read at arm's length. */
+          className="flex h-11 min-w-0 shrink items-center justify-center truncate rounded-xl bg-brand-600/15 px-3 text-sm font-semibold whitespace-nowrap text-brand-300 ring-1 ring-brand-500/40 active:bg-brand-600/30 tall:h-14 tall:px-5 kiosk:text-base"
+        >
+          {/*
+            * The question goes first and, on a narrow screen standing beside
+            * **Search everyone**, goes away.
+            *
+            * Both controls and the question do not fit across a phone held
+            * upright: what they did instead was wrap the button onto three
+            * lines, which overran this row's fixed height and painted over
+            * the last row of the results. Dropping the question there rather
+            * than truncating the label keeps the half that says what the
+            * button does — and it is only ever dropped where the other
+            * button is crowding it, so the wider screens, where the pair fits
+            * with room to spare, still get the sentence.
+            *
+            * On width, never on state: this row's height is fixed and its
+            * contents must not reflow because a keystroke found somebody.
+            */}
+          {canWiden ? (
+            <>
+              <span className="sm:hidden">Not yours?&nbsp;Register</span>
+              <span className="hidden sm:inline">{offerPrompt}&nbsp;Register your child</span>
+            </>
+          ) : (
+            <>{offerPrompt}&nbsp;Register your child</>
+          )}
+        </button>
+      )}
+    </div>
+  );
+});
+
+/**
+ * One result row, memoized on the child it names.
+ *
+ * A keystroke that narrows a search usually keeps its best matches: typing the
+ * next letter of a name re-ranks the same handful of children more often than
+ * it replaces them. The students themselves are stable objects — the roster
+ * array is replaced wholesale, its rows are not — and `rowTap` is the guard
+ * hook's stable factory, so a row whose child and register state are unchanged
+ * is skipped entirely. The rows that do change are the ones the parent is
+ * watching change, which is the one part of a keystroke's work that cannot be
+ * declined.
+ */
+const ResultRow = memo(function ResultRow({
+  student,
+  present,
+  collected,
+  tracksCheckOut,
+  rowTap,
+}: {
+  student: KioskStudent;
+  present: boolean;
+  /** Present, and handed back — only ever true where check-out is tracked. */
+  collected: boolean;
+  tracksCheckOut: boolean;
+  rowTap: (student: KioskStudent) => TapHandlers;
+}) {
+  tallyRender('ResultRow');
+  const inert = present && !tracksCheckOut;
+  return (
+    <button
+      type="button"
+      tabIndex={-1}
+      {...rowTap(student)}
+      /*
+       * `ink-800`, not `ink-900`: a row is a button and has to look
+       * like one in a dim lobby. Against `ink-950` a 900 card is
+       * 1.24:1 — not a shape, just a bright name floating in the
+       * dark — and the only object on the screen that unmistakably
+       * read as pressable was the register offer, which is the wrong
+       * door. It is the same fill the quiet **Search everyone**
+       * carries, so nothing new enters the palette.
+       */
+      /* `lg:w-full` is not decoration. Multi-column flow drops these out of
+         the flex column that was stretching them, and a `button` in
+         normal flow is shrink-to-fit — so every card became as wide as
+         its own name, the grade stopped being a right-hand column, and
+         checking a child in *resized their row*, which is the one thing
+         this list promises never to do. */
+      className={`flex h-16 w-full shrink-0 items-center justify-between rounded-xl px-5 text-left tall:h-20 lg:break-inside-avoid lg:not-first:mt-2 ${
+        collected
+          ? 'bg-ink-800/50 opacity-60'
+          : present
+            ? 'bg-present-600/20'
+            : 'bg-ink-800 active:bg-ink-600'
+      } ${inert || collected ? '' : 'active:bg-ink-600'}`}
+    >
+      <span className="truncate text-xl font-semibold text-ink-100 kiosk:text-2xl">
+        {student.firstName} {student.lastName}
+      </span>
+      <span className="pl-3 text-base whitespace-nowrap text-ink-400 kiosk:text-lg">
+        {collected ? (
+          <span className="font-semibold text-ink-400">Collected</span>
+        ) : present && tracksCheckOut ? (
+          <span className="font-semibold text-brand-300">Tap to collect</span>
+        ) : present ? (
+          <span className="font-semibold text-present-400">✓ Checked in</span>
+        ) : (
+          gradeLabel(student.grade)
+        )}
+      </span>
+    </button>
+  );
+});
+
 export function SearchScreen({
   binding,
   buffer,
@@ -172,6 +460,7 @@ export function SearchScreen({
    */
   onStaffGate: () => void;
 }) {
+  tallyRender('SearchScreen');
   const now = Date.now();
   const closed = windowHasClosed(binding, now);
   /*
@@ -194,6 +483,19 @@ export function SearchScreen({
    * See docs/kiosk-performance.md.
    */
   const hours = useMemo(() => eventWindow(binding), [binding]);
+
+  /*
+   * The header's second line, finished here so the header can be memoized on
+   * values. The compares behind it are two number comparisons per render;
+   * `opensAtLabel` formats through `Intl` only on the rare screen that is
+   * bound before its gathering opens. The header itself re-renders only when
+   * one of these strings actually changes — see SearchHeader.
+   */
+  const headerLine = notOpenYet
+    ? `Check-in opens ${opensAtLabel(binding, now)}`
+    : closed
+      ? 'Check-in window has closed — you can still check in.'
+      : hours;
 
   /*
    * The no-match panel is showing this same offer, in the same words, as its
@@ -241,6 +543,20 @@ export function SearchScreen({
    */
   const rowTap = useTapGuard(onPick);
   const tap = useTap();
+
+  /*
+   * The latest handlers behind stable identities — the same trick the keyboard
+   * plays with `onKey`, for the same reason. `onWiden` is rebuilt by the app on
+   * every keystroke (its closure reads the buffer), and a memoized console
+   * whose props change per letter is a memo in name only. The refs carry the
+   * freshest closure; the identities the console compares never change.
+   */
+  const widenRef = useRef(onWiden);
+  widenRef.current = onWiden;
+  const registerRef = useRef(onRegister);
+  registerRef.current = onRegister;
+  const steadyWiden = useCallback(() => widenRef.current(), []);
+  const steadyRegister = useCallback(() => registerRef.current(), []);
 
   /*
    * Whether this state has rows in it, which decides where its content sits in
@@ -329,87 +645,43 @@ export function SearchScreen({
    * who scrolled down a broad match and then typed one more letter would be
    * looking at the bottom of a list short enough to have no bottom — an empty
    * box, under a buffer that says their name is being searched for.
+   *
+   * Behind a flag, and the flag is the finding. Writing `scrollTop` makes the
+   * engine bring layout up to date first — the write has to clamp against the
+   * scrollable extent — and this effect runs off a keystroke that has just
+   * dirtied that layout, so the reset was a forced synchronous reflow inside
+   * every letter typed. The profiler priced it at more per keystroke than the
+   * search itself, at every throttle (see docs/kiosk-performance.md). Almost
+   * nobody scrolls mid-word, so the write now happens only when there is a
+   * scroll to undo: the listener is one ref write on an event that fires only
+   * while somebody is actually dragging the list.
    */
   const resultsRef = useRef<HTMLDivElement>(null);
+  const scrolledRef = useRef(false);
+  const onResultsScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
+    // The programmatic reset below lands here too, with scrollTop back at 0 —
+    // one handler keeps the flag honest in both directions.
+    scrolledRef.current = event.currentTarget.scrollTop > 0;
+  }, []);
   useEffect(() => {
-    if (resultsRef.current) resultsRef.current.scrollTop = 0;
+    if (!scrolledRef.current) return;
+    const region = resultsRef.current;
+    if (region) {
+      region.scrollTop = 0;
+      scrolledRef.current = false;
+    }
   }, [buffer]);
 
   return (
     <div className="grid h-full grid-rows-[auto_1fr_auto_auto_auto_auto]">
-      {/* Header. The staff gate used to be an invisible square over its left
-          corner; it is a hold on **Clear** now — see `onStaffGate`. */}
-      <div className="relative px-6 pt-[max(1rem,var(--spacing-safe-top))] pb-2 text-center">
-        {/*
-          * The printer, when it has stopped working.
-          *
-          * A dot, absolutely positioned, and only ever in the corner: a parent
-          * cannot fix a printer and telling them about it beside a green tick
-          * reads as "your check-in failed". Absolute because this file promises
-          * that a keystroke changes text and never geometry, and a warning that
-          * appears mid-evening must not push the results down by a line.
-          *
-          * What a volunteer does about it is hold the opposite corner and look
-          * at the printer screen, which says what is actually wrong.
-          */}
-        {printerNeedsAttention && (
-          <span
-            aria-label="The label printer needs attention"
-            className="absolute top-[max(1rem,var(--spacing-safe-top))] right-4 h-3 w-3 rounded-full bg-warn-500"
-          />
-        )}
-        {/*
-          * The header answers *where and when*, and nothing else.
-          *
-          * It used to answer "what do I do" as well — "Welcome! Check in
-          * below." — which put the one instruction a parent needs in the
-          * smallest type on the screen, four hundred pixels above the keys, in
-          * a line they read after the title and forget before the keyboard.
-          * That sentence has moved into the body, where a parent's eye
-          * actually goes and where the results will replace it (see the idle
-          * panel below).
-          *
-          * What is left is identity. A parent walking up wants to know they
-          * are at the right screen for the right evening — a church can run
-          * two gatherings in two rooms on one night — so the title carries
-          * real weight, and the window under it is the fact that settles it.
-          * Not a display size: the loudest thing on this screen has to stay
-          * what the parent is doing, not the label on the room they are
-          * standing in.
-          */}
-        {/*
-          * The gathering's own mark, set in its name rather than beside it.
-          *
-          * Inside the title's own line, which is the whole of what keeps this
-          * header the header that shipped: cap-height and in `em`, so it adds
-          * no line and no pixel of height — and the landscape kiosk pays for
-          * header height out of a results track already under three hundred
-          * pixels. It also cannot pull the title off the centre the hours line
-          * and everything below it share, because it is *in* the line being
-          * centred rather than a sibling of it. See EventName, which was a
-          * tile beside the title for exactly one round of critique — and hung
-          * this mark in the margin for one round after that, until the room a
-          * hung mark needs turned out to cost the longest gathering names a
-          * line of the title.
-          *
-          * `text-balance` is here because the mark is: one character of measure
-          * lands entirely on the wrap decision, and on the portrait kiosk it
-          * was enough to buy a second line and orphan one word on it. Balanced,
-          * the break comes off the whole string, and a long name breaks the
-          * same way whether or not the gathering wears a mark — which is also
-          * what the registration flow's header has always done.
-          */}
-        <div className="text-2xl font-semibold text-balance text-ink-100 kiosk:text-3xl">
-          <EventName path={binding.iconPath} title={binding.title} />
-        </div>
-        <div className="text-base text-ink-500 kiosk:text-lg">
-          {notOpenYet
-            ? `Check-in opens ${opensAtLabel(binding, now)}`
-            : closed
-              ? 'Check-in window has closed — you can still check in.'
-              : hours}
-        </div>
-      </div>
+      {/* Everything above the results, memoized so a keystroke leaves it
+          alone — the header's own reasoning lives on SearchHeader. */}
+      <SearchHeader
+        iconPath={binding.iconPath}
+        title={binding.title}
+        line={headerLine}
+        printerNeedsAttention={printerNeedsAttention}
+      />
 
       {/*
         * Results — fixed-height rows in a fixed region that scrolls past them.
@@ -429,16 +701,17 @@ export function SearchScreen({
         * anything to press. Written twice because the kiosk runs on whatever
         * tablet the church owns and WebKit still wants the prefix.
         */}
+      {/* The ramp is a painted overlay rather than a mask on the scroller —
+          same pixels over a solid ground, without the per-keystroke cost of
+          rastering the whole region through a mask on the hardware this
+          targets. See `.kiosk-list-fade-overlay` in index.css. The wrapper
+          carries the grid track's min-height and the gutter; the scroller
+          fills it. */}
+      <div className="relative mb-4 min-h-0">
       <div
         ref={resultsRef}
-        className={`mb-4 flex min-h-0 flex-col overflow-y-auto overscroll-contain scroll-touch px-6 ${
-          /* Only where there is a list to run past. The panel that fills the
-             region on a failed search ends with "or see a leader." — the door
-             that costs the church nothing — and an unconditional ramp dimmed it
-             below legible, so the state read as a block that had been cut off
-             rather than one that finished. */
-          outcome.results.length > 0 ? 'kiosk-list-fade' : ''
-        }`}
+        onScroll={onResultsScroll}
+        className="flex h-full flex-col overflow-y-auto overscroll-contain scroll-touch px-6"
         style={{ touchAction: 'pan-y' }}
       >
         {/* The bottom padding rides on the column, not the scroller: end
@@ -684,64 +957,24 @@ export function SearchScreen({
               <div className="text-base text-ink-400 kiosk:text-lg">or see a leader.</div>
             </div>
           )}
-          {outcome.results.slice(0, MAX_RESULTS).map((student) => {
-            const present = presentIds.has(student.id);
-            /*
-             * Three states where check-out is tracked, two everywhere else.
-             *
-             * A present child stops being an inert "already done" row and
-             * becomes the collect target — which is the whole pickup flow.
-             * A collected one goes inert again, dimmed, so a parent cannot
-             * hand the same child back twice.
-             */
-            const collected = tracksCheckOut && checkedOutIds.has(student.id);
-            const inert = present && !tracksCheckOut;
-            return (
-              <button
-                key={student.id}
-                type="button"
-                tabIndex={-1}
-                {...rowTap(student)}
-                /*
-                 * `ink-800`, not `ink-900`: a row is a button and has to look
-                 * like one in a dim lobby. Against `ink-950` a 900 card is
-                 * 1.24:1 — not a shape, just a bright name floating in the
-                 * dark — and the only object on the screen that unmistakably
-                 * read as pressable was the register offer, which is the wrong
-                 * door. It is the same fill the quiet **Search everyone**
-                 * carries, so nothing new enters the palette.
-                 */
-                /* `lg:w-full` is not decoration. Multi-column flow drops these out of
-                   the flex column that was stretching them, and a `button` in
-                   normal flow is shrink-to-fit — so every card became as wide as
-                   its own name, the grade stopped being a right-hand column, and
-                   checking a child in *resized their row*, which is the one thing
-                   this list promises never to do. */
-                className={`flex h-16 w-full shrink-0 items-center justify-between rounded-xl px-5 text-left tall:h-20 lg:break-inside-avoid lg:not-first:mt-2 ${
-                  collected
-                    ? 'bg-ink-800/50 opacity-60'
-                    : present
-                      ? 'bg-present-600/20'
-                      : 'bg-ink-800 active:bg-ink-600'
-                } ${inert || collected ? '' : 'active:bg-ink-600'}`}
-              >
-                <span className="truncate text-xl font-semibold text-ink-100 kiosk:text-2xl">
-                  {student.firstName} {student.lastName}
-                </span>
-                <span className="pl-3 text-base whitespace-nowrap text-ink-400 kiosk:text-lg">
-                  {collected ? (
-                    <span className="font-semibold text-ink-400">Collected</span>
-                  ) : present && tracksCheckOut ? (
-                    <span className="font-semibold text-brand-300">Tap to collect</span>
-                  ) : present ? (
-                    <span className="font-semibold text-present-400">✓ Checked in</span>
-                  ) : (
-                    gradeLabel(student.grade)
-                  )}
-                </span>
-              </button>
-            );
-          })}
+          {outcome.results.slice(0, MAX_RESULTS).map((student) => (
+            <ResultRow
+              key={student.id}
+              student={student}
+              present={presentIds.has(student.id)}
+              /*
+               * Three states where check-out is tracked, two everywhere else.
+               *
+               * A present child stops being an inert "already done" row and
+               * becomes the collect target — which is the whole pickup flow.
+               * A collected one goes inert again, dimmed, so a parent cannot
+               * hand the same child back twice.
+               */
+              collected={tracksCheckOut && checkedOutIds.has(student.id)}
+              tracksCheckOut={tracksCheckOut}
+              rowTap={rowTap}
+            />
+          ))}
         </div>
 
         {/*
@@ -763,6 +996,16 @@ export function SearchScreen({
             More names than fit — keep typing.
           </div>
         )}
+      </div>
+
+      {/* Only where there is a list to run past. The panel that fills the
+          region on a failed search ends with "or see a leader." — the door
+          that costs the church nothing — and an unconditional ramp dimmed it
+          below legible, so the state read as a block that had been cut off
+          rather than one that finished. */}
+      {rows && (
+        <div className="kiosk-list-fade-overlay pointer-events-none absolute inset-x-0 bottom-0" />
+      )}
       </div>
 
       {/*
@@ -809,89 +1052,18 @@ export function SearchScreen({
         * promise this file makes about geometry: present from the first paint,
         * so it cannot be the thing that moves when a keystroke lands.
         */}
-      {/* `overflow-hidden` is load-bearing, not tidiness: two nowrap labels
-          side by side have a min-content width, and a grid track will widen
-          past the screen to honour it rather than let them shrink — which took
-          the header, the results and the keyboard sideways with it on a narrow
-          phone. Hidden overflow lets the track fall back to zero, so a screen
-          too narrow for both labels crops them instead of scrolling the whole
-          kiosk. */}
-      {/*
-        * The exit sits on the left, and the gap between the two is wider than
-        * the gap between two name rows.
-        *
-        * These are not a matched pair. **Search everyone** is a retry: press it
-        * by accident and the search runs wider, which is a second of waiting.
-        * **Register your child** is an exit, and completed it makes a duplicate
-        * of a child the church already has, for the review queue to judge. They
-        * used to sit six pixels apart — less than the space between two rows on
-        * the same screen — with the exit the wider of the two and on the right,
-        * which on a phone held one-handed is exactly where a thumb travels.
-        * The air comes out of the row's own side margins, which were doing
-        * nothing.
-        */}
-      {/* `pt-2` is the console's interior. The rule and this row's first
-              pixel were two apart while every other gap inside the console was
-              40 or more, so the edge separated without containing — it read as
-              the button's own top border run out to the screen. */}
-      <div className="mx-auto flex h-14 w-full max-w-2xl flex-row-reverse items-center justify-center gap-4 overflow-hidden px-2 pt-2 tall:h-20 tall:gap-6 lg:max-w-5xl">
-        {/*
-          * The way out of the scope, standing beside the way out of the search.
-          *
-          * It used to live only on the no-match panel, which meant it appeared
-          * for exactly the family who did not need it and was missing for the
-          * one who did. A scoped search that returns *somebody* — the other
-          * Noah, the Ramirez who is not theirs — is the commonest way a parent
-          * is shown confident, wrong rows, and until now the only door open to
-          * them was the one that registers a child the church already has.
-          *
-          * Hidden only while the no-match panel is up, because that panel is
-          * showing this same control in its primary weight a hand's width
-          * higher: the standing pair steps aside rather than appearing twice.
-          */}
-        {!offeredAbove && canWiden && <WidenButton widening={widening} onWiden={onWiden} quiet />}
-        {!offeredAbove && (
-          <button
-            type="button"
-            tabIndex={-1}
-            {...tap(() => {
-              haptic(8);
-              onRegister();
-            })}
-            /* The `tall:` step every other control got. Quiet in weight — a
-               tinted chip beside a keyboard — is a different lever from quiet
-               in legibility, and on a portrait tablet this was simultaneously
-               the only accented object on the glass and the smallest type on
-               it, read at arm's length. */
-            className="flex h-11 min-w-0 shrink items-center justify-center truncate rounded-xl bg-brand-600/15 px-3 text-sm font-semibold whitespace-nowrap text-brand-300 ring-1 ring-brand-500/40 active:bg-brand-600/30 tall:h-14 tall:px-5 kiosk:text-base"
-          >
-            {/*
-              * The question goes first and, on a narrow screen standing beside
-              * **Search everyone**, goes away.
-              *
-              * Both controls and the question do not fit across a phone held
-              * upright: what they did instead was wrap the button onto three
-              * lines, which overran this row's fixed height and painted over
-              * the last row of the results. Dropping the question there rather
-              * than truncating the label keeps the half that says what the
-              * button does — and it is only ever dropped where the other
-              * button is crowding it, so the wider screens, where the pair fits
-              * with room to spare, still get the sentence.
-              *
-              * On width, never on state: this row's height is fixed and its
-              * contents must not reflow because a keystroke found somebody.
-              */}
-            {canWiden ? (
-              <>
-                <span className="sm:hidden">Not yours?&nbsp;Register</span>
-                <span className="hidden sm:inline">{offerPrompt}&nbsp;Register your child</span>
-              </>
-            ) : (
-              <>{offerPrompt}&nbsp;Register your child</>
-            )}
-          </button>
-        )}
-      </div>
+      {/* The row itself is SearchConsole, memoized out of the keystroke: its
+          contents hang off whether the search found anybody, never off what
+          was typed, and the handlers cross behind the stable identities made
+          above. Its layout reasoning rides with it. */}
+      <SearchConsole
+        offeredAbove={offeredAbove}
+        canWiden={canWiden}
+        widening={widening}
+        offerPrompt={offerPrompt}
+        onWiden={steadyWiden}
+        onRegister={steadyRegister}
+      />
 
       {/*
         * The buffer. A div, never an input — the native keyboard must not rise.
