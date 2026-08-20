@@ -60,8 +60,8 @@ measuring nothing.
 
 ## What it measures, and with what
 
-Six instruments, because each of them lies on its own (`e2e/support/perf.ts`,
-and `src/kiosk/renderTally.ts` for the last):
+Eight instruments, because each of them lies on its own (`e2e/support/perf.ts`;
+`src/kiosk/renderTally.ts` for the render counts):
 
 | Instrument | Answers |
 | --- | --- |
@@ -71,6 +71,8 @@ and `src/kiosk/renderTally.ts` for the last):
 | Sampling profiler | *Which function* — self time, resolved through source maps to `src/…` |
 | Resource timing | Which of it was the network, by channel |
 | Render counts | *Which component* re-rendered, and how many times — the fact that carries between machines |
+| Long Animation Frames | A frame the screen owed, delivered over 50ms late — the stutter itself, and how much of it would have blocked a finger |
+| Frame pacing | Whether a *running animation* actually skipped frames — armed only inside windows that are already animating |
 
 The render counts are the narrow instrument the rest of this file kept
 wishing for. A duration is a claim about the machine it was taken on, and the
@@ -81,6 +83,20 @@ counters live in the components themselves (`tallyRender`), cost one property
 read per render when nobody is measuring, and count nothing at all on a real
 kiosk, where the probe object they look for does not exist. No special build:
 the bundle being measured stays the bundle a church is served.
+
+The last two are the jank instruments, and they exist because responsiveness
+and smoothness are different claims. Every other row here is about an *input*
+— a tap answered, a letter landing — and a screen can pass all of them while a
+spinner on it freezes, because nothing was pressed while it froze. A **long
+animation frame** is Chromium's own record of a frame the compositor waited
+more than 50ms for, with the share of it that would have delayed a finger had
+one landed; the observer is passive, so every scenario now carries the rows
+for free, and zero is the healthy answer. **Frame pacing** answers the
+narrower question the passive observer cannot: whether an animation someone
+was watching actually skipped. It is a `requestAnimationFrame` loop measuring
+the gap between frames — armed only inside a window that is already animating,
+because the loop itself asks for a frame every vsync, and an idle kiosk
+producing no frames is a healthy kiosk, not a janky one.
 
 The perf build emits source maps (`--sourcemap`, wired into the `webServer`
 command behind `KIOSK_PERF`) and the profile is walked back through them; without

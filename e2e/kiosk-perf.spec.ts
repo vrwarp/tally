@@ -69,8 +69,11 @@ import {
   percentiles,
   profile,
   readProbe,
+  startFramePacing,
+  stopFramePacing,
   throttleCpu,
   writeReport,
+  type FramePace,
   type Interaction,
   type Measurement,
   type Probe,
@@ -221,6 +224,36 @@ function renderCounts(probe: Probe): Record<string, number> {
       .sort(([, a], [, b]) => b - a)
       .map(([component, count]) => [`renders: ${component}`, count]),
   );
+}
+
+/**
+ * The jank lines: frames the screen owed and delivered late.
+ *
+ * Distinct from the long-task rows on purpose. A long task is the thread
+ * being busy, which a static screen absorbs invisibly; a long animation frame
+ * is a frame the compositor was waiting on arriving over 50ms late, which is
+ * the thing a person watching a spinner or a filling hold bar reads as a
+ * stutter. `blocking` is Chrome's own accounting of how much of those frames
+ * would also have delayed a landing finger. Zero rows is the healthy answer,
+ * exactly as it is for the interactions list.
+ */
+function jank(probe: Probe): Record<string, number> {
+  const frames = probe.longAnimationFrames;
+  return {
+    'long animation frames (>50ms)': frames.length,
+    'worst animation frame': frames.reduce((worst, frame) => Math.max(worst, frame.duration), 0),
+    '  of which blocking': frames.reduce((total, frame) => total + frame.blocking, 0),
+  };
+}
+
+/** The pacing lines, for a window `startFramePacing` covered. */
+function paced(pace: FramePace): Record<string, number | null> {
+  return {
+    'frames in the window': pace.frames,
+    'frame gap p95': pace.p95,
+    'worst frame gap': pace.worst,
+    'frame gaps over 34ms (dropped)': pace.dropped,
+  };
 }
 
 /** Records one scenario, and prints its headline so a watched run says something. */
@@ -596,6 +629,7 @@ test.describe('kiosk performance', () => {
       timings: {
         'tap → paint': taps.max,
         ...responsiveness(probe),
+        ...jank(probe),
         'long tasks during boot': probe.longTasks.length,
         'longest task': probe.longTasks.reduce((worst, task) => Math.max(worst, task.duration), 0),
       },
@@ -720,6 +754,7 @@ test.describe('kiosk performance', () => {
         'taps sampled': taps.count,
         ...perTap(probe.taps),
         ...responsiveness(probe),
+        ...jank(probe),
         // From the first, unprofiled pass: the clear tap and the profiled pass
         // came after `readProbe`, so six letters is what these counts cover.
         ...renderCounts(probe),
@@ -774,6 +809,7 @@ test.describe('kiosk performance', () => {
         'confirm → welcome': confirmWall,
         'tap → paint worst': percentiles(probe.taps.map((tap) => tap.ms)).max,
         'long tasks': probe.longTasks.length,
+        ...jank(probe),
         ...renderCounts(probe),
       },
       notes: [
@@ -813,12 +849,79 @@ test.describe('kiosk performance', () => {
         'tap → paint worst': taps.max,
         ...perTap(probe.taps),
         ...responsiveness(probe),
+        ...jank(probe),
         ...renderCounts(probe),
         'long tasks': probe.longTasks.length,
       },
       notes: [
         'The fourth digit is the expensive one: it flips the buffer into a phone ' +
           'query, indexes the last-4 map and sorts the answer.',
+      ],
+    });
+
+    await kiosk.locator('[data-key="clear"]').click();
+    await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
+  });
+
+  /**
+   * The one long animation a parent actually watches: the widen spinner.
+   *
+   * **Search everyone** holds its spinner for at least a second and a half
+   * (`MIN_WIDEN_SPINNER_MS`) while the church-wide re-read runs, which makes
+   * it the kiosk's only continuously animated surface with real work behind
+   * it: the sweep lands four hundred students and a rebuilt phone index in
+   * React state mid-spin. Every other instrument here would call that healthy
+   * — the handler is instant, no tap is waiting — but a spinner that freezes
+   * while the one thing it exists to say is "working" is jank a parent reads
+   * as the kiosk dying, and only frame pacing can see it.
+   *
+   * Pacing is armed for exactly this window and no other, because the sampler
+   * itself asks for a frame every vsync: armed on an idle screen it would
+   * *create* the frames it measures. Inside a window that is already
+   * animating it adds one callback per frame, and a gap in it is a frame the
+   * spinner visibly skipped. See the note in e2e/support/perf.ts.
+   */
+  test('keeps the spinner turning while the church is re-read', async () => {
+    await throttleCpu(cdp, THROTTLE);
+    // Letters no name answers to, so the no-match panel and its Search
+    // everyone button come up. Setup, not measurement.
+    await typeOnKiosk(kiosk, 'XQWZK');
+    const widen = kiosk.getByRole('button', { name: 'Search everyone' }).first();
+    await expect(widen).toBeVisible({ timeout: 15_000 });
+    // Resolved to a point before the window opens: pressing by locator runs
+    // Playwright's injected script inside the very frames being paced.
+    const box = await widen.boundingBox();
+    if (!box) throw new Error('The Search everyone button has no box on screen.');
+
+    await beginPhase(kiosk);
+    await startFramePacing(kiosk);
+    const { thread } = await measureThread(cdp, async () => {
+      await kiosk.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+      // A fixed wait a little past the spinner's floor, rather than polling
+      // for it to stop — polling is injected script in the page, inside the
+      // window being measured.
+      await kiosk.waitForTimeout(1_800);
+    });
+    const pace = await stopFramePacing(kiosk);
+    const probe = await readProbe(kiosk);
+
+    record({
+      scenario: 'The “Search everyone” spinner, while the church-wide re-read lands',
+      cpuThrottle: THROTTLE,
+      thread,
+      timings: {
+        ...paced(pace),
+        ...jank(probe),
+        ...responsiveness(probe),
+        ...renderCounts(probe),
+        'long tasks': probe.longTasks.length,
+      },
+      notes: [
+        'The silent no-match sweep may already be in flight when the button is ' +
+          'pressed — the press then rides that read, which is the deliberate ' +
+          'sharing in `runSweep` and exactly what a parent’s press meets.',
+        'Read the dropped-frames row against the window’s ~108 frames: a spinner ' +
+          'is turning the whole time, so every gap here was visible on the glass.',
       ],
     });
 
@@ -967,6 +1070,7 @@ test.describe('kiosk performance', () => {
         'taps sampled': taps.count,
         ...perTap(probe.taps),
         ...responsiveness(probe),
+        ...jank(probe),
         ...renderCounts(probe),
         'profiled main-thread time': sampledMs,
         'long tasks while typing': probe.longTasks.length,
@@ -1126,6 +1230,7 @@ test.describe('kiosk performance', () => {
         'tap → paint p50': taps.p50,
         'tap → paint worst': taps.max,
         ...responsiveness(probe),
+        ...jank(probe),
         // Seven keystrokes plus whatever the refetch forced: the gap between
         // this row and the typing scenarios' is the roster landing in state.
         ...renderCounts(probe),
@@ -1219,6 +1324,7 @@ test.describe('kiosk performance', () => {
         'tap → paint worst': taps.max,
         'taps': taps.count,
         ...responsiveness(probe),
+        ...jank(probe),
         'long tasks': probe.longTasks.length,
       },
       notes: [
@@ -1381,6 +1487,7 @@ test.describe('kiosk performance', () => {
           'tap → paint p50': busyTaps.p50,
           'tap → paint worst': busyTaps.max,
           ...responsiveness(busyProbe),
+          ...jank(busyProbe),
           ...renderCounts(busyProbe),
           'long tasks': busyProbe.longTasks.length,
           'labels finished during the window': after - before,
