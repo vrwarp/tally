@@ -189,11 +189,22 @@ export async function installProbe(page: Page): Promise<void> {
      * callbacks. While it runs, frames are produced every vsync whether or not
      * anything else asks for them — which is why it must not idle armed: a
      * kiosk on a shelf produces no frames at all, and that is a fact worth
-     * measuring, not a stutter. Inside a window that is already animating — a
-     * spinner spinning, a hold bar filling, letters landing — the loop adds
-     * one callback and one subtraction per frame, and a gap in it is a frame
-     * any animation on screen missed. That is jank, measured as a person
-     * meets it.
+     * measuring, not a stutter.
+     *
+     * Two things about what its numbers mean, both measured rather than
+     * assumed (see docs/kiosk-performance.md):
+     *
+     * - **Its gaps are the main thread's.** A composited animation — a
+     *   transform spinner, an opacity pulse — is drawn by the compositor and
+     *   keeps moving straight through a gap this loop reports. So the dropped
+     *   row is the jank a *main-thread-driven* animation (colour, background,
+     *   anything layout) would have shown, and an upper bound for everything
+     *   else; and it is the delay any script-driven update met.
+     * - **It taxes the style rows of its own window.** Every vsync the loop
+     *   claims becomes a main frame, and a main frame ticks the style of
+     *   every active animation, composited or not — one recalc per frame for
+     *   the window, ~120 over two seconds. Read a paced window's recalc and
+     *   style figures against that floor, not against zero.
      */
     let paceGaps: number[] | null = null;
     let paceHandle = 0;

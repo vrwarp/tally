@@ -920,8 +920,11 @@ test.describe('kiosk performance', () => {
         'The silent no-match sweep may already be in flight when the button is ' +
           'pressed — the press then rides that read, which is the deliberate ' +
           'sharing in `runSweep` and exactly what a parent’s press meets.',
-        'Read the dropped-frames row against the window’s ~108 frames: a spinner ' +
-          'is turning the whole time, so every gap here was visible on the glass.',
+        'The spinner and the word-pulse are composited, so they coast through the ' +
+          'gaps this window reports: read the dropped row as the stutter a ' +
+          'main-thread animation would have shown, and as the lateness script-driven ' +
+          'updates met. The style recalcs here include the sampler’s own per-frame ' +
+          'animation tick — see the note in e2e/support/perf.ts.',
       ],
     });
 

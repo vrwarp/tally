@@ -96,7 +96,12 @@ narrower question the passive observer cannot: whether an animation someone
 was watching actually skipped. It is a `requestAnimationFrame` loop measuring
 the gap between frames — armed only inside a window that is already animating,
 because the loop itself asks for a frame every vsync, and an idle kiosk
-producing no frames is a healthy kiosk, not a janky one.
+producing no frames is a healthy kiosk, not a janky one. It has two honest
+limits of its own, found the hard way and written up under "Whether the screen
+stutters" below: its gaps belong to the main thread, which composited
+animations glide straight through, and every frame it forces ticks the style
+of every active animation — so a paced window's recalc rows carry the
+sampler's own tax.
 
 The perf build emits source maps (`--sourcemap`, wired into the `webServer`
 command behind `KIOSK_PERF`) and the profile is walked back through them; without
@@ -492,6 +497,73 @@ some of the layout, and it is not made here because it changes what every
 overlay *is* to this app, for a cost that only clears the bar on hardware the
 ×10 column already acquits. If a Pi 3 ever has to work, start there, and let
 `renders: ConfirmScreen` and the thread split say whether it paid.
+
+## Whether the screen stutters (2026-08-20)
+
+Everything above asks whether the kiosk *answered*; none of it asks whether
+the kiosk *moved smoothly*, and a screen can pass every row here while a
+spinner on it freezes, because nothing was pressed while it froze. So the two
+jank instruments in the table were added and the whole suite swept again, on
+the same runner as the previous section.
+
+The passive half first, because its landscape is the finding. Long animation
+frames per scenario — frames delivered over 50 ms late:
+
+| | ×4 | ×10 (Pi 4) | ×20 (Pi 3) |
+| --- | ---: | ---: | ---: |
+| Typing, scoped | 0 | 1 | 5 |
+| Typing, unscoped | 0 | 2 | 6 |
+| Typing while the roster is refetched | 0 | 4 | 13 |
+| Typing while a label is drawn | 0 | 2 | 5 |
+| Check-in, tap to tick | 0 | 2 | 2 |
+| The widen spinner under the sweep | 1 | 3 | 7 |
+| Registering a family (~60 gestures) | 0 | 8 | 63 |
+| A key pressed mid-boot | 2 | 5 | 10 |
+
+At ×4 the list is empty, which is what it is designed to be. At ×10 it is
+single digits with small blocking totals — a Pi 4 does not stutter anywhere
+this suite drives. At ×20 every scenario pays, and the worst row is not a
+defect: the registration wizard typed at machine speed is sixty-odd gestures,
+each committing a frame a 20×-slowed machine cannot finish in 50 ms. That is
+the ×20 typing cost this file already knows, seen through a third instrument.
+
+### The spinner, and the instrument catching itself
+
+The paced scenario — the widen spinner holding its 1.5 s floor while the
+church-wide re-read lands — reported something with a smell: **one style
+recalc per frame, at every throttle** (~90–105 over the window), costing 57 ms
+of style at ×4 and 187 ms at ×20. The first attribution was the "Still" word
+pulse, whose colour keyframes cannot leave the main thread. It was half right,
+and measuring it properly caught the other half. In isolation, on the suite's
+own Chromium: a colour pulse ticks ~120 main-thread recalcs over two seconds;
+the same pulse as opacity ticks zero; the transform spinner ticks zero — and
+**any of them plus a `requestAnimationFrame` loop ticks ~120**, because every
+frame the loop forces is a main frame, and a main frame restyles every active
+animation, composited or not. The sampler was taxing its own window, which is
+now written on the sampler; the per-frame recalcs in the paced rows are its
+floor, not the app's.
+
+The word pulse is opacity now anyway, because the isolated numbers are the
+real kiosk's: colour made the main thread produce every frame of the pulse's
+two seconds — the same two seconds the sweep is landing four hundred students
+in React state — and a main-thread pulse also *freezes with* the main thread,
+stopping mid-dip at the exact moment the screen is busiest. Composited, it
+keeps breathing through the stall, and on a themed kiosk it now dips toward
+the gathering's own ground rather than to a slate the theme never contained.
+The suite's paced rows cannot show this particular win, and this paragraph
+exists so nobody re-measures it there and concludes it did nothing.
+
+What the paced rows *do* say, read with the sampler's limits in mind: at ×10
+the window holds sixty frames a second with three gaps over two vsyncs (worst
+83 ms); at ×20 it drops to forty-odd a second with eight to eleven, worst
+150–170 ms.
+Those gaps are the main thread's — the spinner and the pulse, both composited,
+glide through them — so they are the stutter a main-thread-driven animation
+would have shown, and the lateness any script-driven update met. The one
+main-thread animation left on the kiosk is the hold-key fill
+(`background-size`, two seconds, staff gesture), and it is left alone
+knowingly: while it runs it is the only thing moving, and the thing it would
+jank is itself.
 
 ## When you change something here
 

@@ -515,17 +515,28 @@
  * what makes them look: three cycles and done, because a lobby screen that
  * blinks indefinitely is a lobby screen everybody stops reading.
  *
- * Colour rather than opacity: the sentence around it is `ink-400`, so
- * brightening to `ink-100` and back reads as emphasis on a word rather than
- * as text struggling to load.
+ * Opacity, and it used to be colour — `ink-100` dipping to `ink-500`. Colour
+ * is not a property the compositor can animate, so for the pulse's two
+ * seconds the main thread had to produce every frame itself: sixty style
+ * recalcs a second for one word, measured in isolation on the benchmark's own
+ * Chromium (a colour keyframe ticks ~120 recalcs over two seconds; the same
+ * pulse as opacity ticks zero — see docs/kiosk-performance.md). Those are the
+ * two seconds the church-wide re-read is landing four hundred students in
+ * React state, on the screen's slowest path, and a main-thread pulse also
+ * freezes with the main thread — the word stops mid-dip exactly when the
+ * screen is busiest. Composited, it keeps breathing through the stall. The
+ * word still dips as it did: half opacity over the shipped ground lands
+ * within a step of the old `ink-500`, and on a themed kiosk it now dips
+ * toward the gathering's own ground rather than to a slate that theme never
+ * contained — the fade a dimming word should have had all along.
  */
 @keyframes tally-word-pulse {
   0%,
   100% {
-    color: var(--color-ink-100);
+    opacity: 1;
   }
   50% {
-    color: var(--color-ink-500);
+    opacity: 0.45;
   }
 }
 
