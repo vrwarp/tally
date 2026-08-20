@@ -615,14 +615,26 @@ the five typing p50s at ×20 moved down after it, one moved up. The printer
 and reprint screens keep the mask; their ramp depth is measured and they do
 not repaint per keystroke.
 
-**And the swing not taken.** Parking the search screen under the confirm and
-success overlays (`display` toggling) remains the structural answer to the
-~260 ms ×20 screen swap, and it now has a named price beyond taste: a dozen
-unit tests assert that student names are *out of the document* during those
-overlays, and a parked screen keeps them in it, hidden. Taking that swing
-means deciding those assertions should mean "not visible" rather than "not
-present" — a change to what the tests promise, not just to what the code
-does, and this file does not make that call unilaterally.
+**And the swing that did not pay.** Parking the search screen under the
+per-family overlays — `display` toggling instead of unmounting, so a row tap
+stops rebuilding forty keys twice a family — was the obvious structural
+answer to the ~260 ms screen swap, and it was made, measured, and taken back
+out the same afternoon. Functionally it held: the whole unit suite passed
+with text queries scoped to the visible glass, and the kiosk's end-to-end
+spec passed against it in a real browser. The stopwatch is why it is not in
+the tree. At ×10 — the throttle the sections above had just gotten clean —
+the row tap → confirm went **273 → 483 ms**, the queue's median family
+**831 → 1185 ms**, and typing regained two gestures over 100 ms; at ×20 the
+queue paid a third more per family. The mechanism is obvious exactly once:
+a parked screen keeps *rendering*. The optimistic tick lands in its hidden
+rows mid-overlay, every overlay commit carries both subtrees, and the
+`display` flip re-pays the subtree's full style and layout on every return —
+while the thing unmounting was being blamed for, creating sixty-odd DOM
+nodes, turns out to be the cheap part. What that swap actually needs is a
+subtree that is genuinely *frozen* while hidden — React's Activity boundary,
+when a stable release carries it — and until then the swap stays, known and
+priced. This paragraph is here so the next person to have the same good idea
+can have it in ten minutes instead of an afternoon.
 
 ## When you change something here
 
