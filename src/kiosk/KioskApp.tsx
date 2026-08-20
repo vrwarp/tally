@@ -42,6 +42,7 @@ import {
   type KioskBinding,
 } from './binding';
 import { applyKioskTheme } from './theme';
+import { tallyRender } from './renderTally';
 import type { KioskKey } from './components/Keyboard';
 import { sortByName } from '@/lib/utils';
 import { buildFamilyDigits, familyOf } from './family';
@@ -304,6 +305,7 @@ function isQuietHour(): boolean {
 }
 
 export function KioskApp() {
+  tallyRender('KioskApp');
   const [phase, setPhase] = useState<Phase>('booting');
   const [services, setServices] = useState<KioskServices | null>(null);
   const [printing, setPrinting] = useState<KioskPrinting | null>(null);

@@ -203,6 +203,26 @@ function responsiveness(probe: Probe): Record<string, number | null> {
   };
 }
 
+/**
+ * How many times each instrumented component rendered during the phase.
+ *
+ * The narrow instrument the profiler cannot be: a whole-phase profile resolves
+ * nothing under its own ±12ms of noise, and the question "did the header
+ * re-render on every letter" is a question about a count, not a duration. The
+ * counts come from `tallyRender` calls in the components themselves (see
+ * src/kiosk/renderTally.ts) and carry over to any machine, the same way the
+ * layout counts in `ThreadTime` do.
+ *
+ * Sorted by count so the row that grew is the row at the top.
+ */
+function renderCounts(probe: Probe): Record<string, number> {
+  return Object.fromEntries(
+    Object.entries(probe.renders)
+      .sort(([, a], [, b]) => b - a)
+      .map(([component, count]) => [`renders: ${component}`, count]),
+  );
+}
+
 /** Records one scenario, and prints its headline so a watched run says something. */
 function record(measurement: Measurement): void {
   measurements.push(measurement);
@@ -700,6 +720,9 @@ test.describe('kiosk performance', () => {
         'taps sampled': taps.count,
         ...perTap(probe.taps),
         ...responsiveness(probe),
+        // From the first, unprofiled pass: the clear tap and the profiled pass
+        // came after `readProbe`, so six letters is what these counts cover.
+        ...renderCounts(probe),
         'profiled main-thread time': sampledMs,
         'long tasks while typing': probe.longTasks.length,
       },
@@ -751,6 +774,7 @@ test.describe('kiosk performance', () => {
         'confirm → welcome': confirmWall,
         'tap → paint worst': percentiles(probe.taps.map((tap) => tap.ms)).max,
         'long tasks': probe.longTasks.length,
+        ...renderCounts(probe),
       },
       notes: [
         'The tick is optimistic: the Firestore write follows the paint, so this is ' +
@@ -789,6 +813,7 @@ test.describe('kiosk performance', () => {
         'tap → paint worst': taps.max,
         ...perTap(probe.taps),
         ...responsiveness(probe),
+        ...renderCounts(probe),
         'long tasks': probe.longTasks.length,
       },
       notes: [
@@ -838,6 +863,10 @@ test.describe('kiosk performance', () => {
         'longest task': probe.longTasks.reduce((worst, task) => Math.max(worst, task.duration), 0),
         'network requests': probe.resources.length,
         'heap growth (KB)': (after - before) / 1024,
+        // Renders while nobody is touching it. Zero is the healthy answer, and
+        // a screen that quietly repaints on a shelf is exactly the failure this
+        // scenario watches for.
+        ...renderCounts(probe),
       },
       notes: [
         'Pulse every 30s and queue replay every 30s; the register every 5 minutes ' +
@@ -938,6 +967,7 @@ test.describe('kiosk performance', () => {
         'taps sampled': taps.count,
         ...perTap(probe.taps),
         ...responsiveness(probe),
+        ...renderCounts(probe),
         'profiled main-thread time': sampledMs,
         'long tasks while typing': probe.longTasks.length,
       },
@@ -1096,6 +1126,9 @@ test.describe('kiosk performance', () => {
         'tap → paint p50': taps.p50,
         'tap → paint worst': taps.max,
         ...responsiveness(probe),
+        // Seven keystrokes plus whatever the refetch forced: the gap between
+        // this row and the typing scenarios' is the roster landing in state.
+        ...renderCounts(probe),
         'long tasks': probe.longTasks.length,
         'longest task': probe.longTasks.reduce((worst, task) => Math.max(worst, task.duration), 0),
       },
@@ -1348,6 +1381,7 @@ test.describe('kiosk performance', () => {
           'tap → paint p50': busyTaps.p50,
           'tap → paint worst': busyTaps.max,
           ...responsiveness(busyProbe),
+          ...renderCounts(busyProbe),
           'long tasks': busyProbe.longTasks.length,
           'labels finished during the window': after - before,
         },

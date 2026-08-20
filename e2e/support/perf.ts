@@ -114,6 +114,16 @@ export interface Probe {
   /** `domContentLoadedEventEnd`, for a boot that is mostly parse. */
   domContentLoaded: number | null;
   resources: { name: string; start: number; duration: number; transferSize: number }[];
+  /**
+   * How many times each instrumented component rendered — see
+   * `src/kiosk/renderTally.ts`, which is the half of this that lives in the
+   * app. Counts rather than durations for the same reason `ThreadTime` keeps
+   * layout counts: a duration is a fact about this machine, and a count is the
+   * fact that carries over to the Raspberry Pi. This is the instrument narrow
+   * enough to say "the header re-rendered on every letter", which the
+   * whole-phase profile cannot resolve above its own ±12ms of noise.
+   */
+  renders: Record<string, number>;
 }
 
 declare global {
@@ -141,6 +151,7 @@ export async function installProbe(page: Page): Promise<void> {
       largestContentfulPaint: null,
       domContentLoaded: null,
       resources: [],
+      renders: {},
     };
     window.__kioskPerf = probe;
 
@@ -272,6 +283,7 @@ export async function beginPhase(page: Page): Promise<void> {
     probe.interactions = [];
     probe.longTasks = [];
     probe.resources = [];
+    probe.renders = {};
   });
 }
 

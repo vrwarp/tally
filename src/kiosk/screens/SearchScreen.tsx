@@ -35,6 +35,7 @@
  */
 import { useEffect, useMemo, useRef } from 'react';
 import { gradeDescription, haptic } from '@/lib/utils';
+import { tallyRender } from '../renderTally';
 import { EventName } from '../components/EventName';
 import { Keyboard, type KioskKey } from '../components/Keyboard';
 import { useTap, useTapGuard } from '../components/tapGuard';
@@ -172,6 +173,7 @@ export function SearchScreen({
    */
   onStaffGate: () => void;
 }) {
+  tallyRender('SearchScreen');
   const now = Date.now();
   const closed = windowHasClosed(binding, now);
   /*
