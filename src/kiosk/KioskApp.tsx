@@ -49,7 +49,6 @@ import { buildFamilyDigits, familyOf } from './family';
 import {
   DEFAULT_PRINTER_LABEL,
   DEFAULT_PRINTER_MODEL,
-  hasConfiguredPrinter,
   readPrinterConfig,
   type PrinterConfig,
 } from './printing/device';
@@ -269,6 +268,18 @@ const MIN_WIDEN_SPINNER_MS = 1_500;
  * their own children should not be raced by one.
  */
 const ABANDONED_MS = 2 * 60_000;
+
+/**
+ * What the reprint search shows while nobody has that screen open.
+ *
+ * One frozen object rather than a fresh `{ results: [] }` per render, so the
+ * memo that hands it out cannot be the thing that invalidates a downstream
+ * comparison.
+ */
+const NO_REPRINT_MATCHES: { results: KioskStudent[]; total: number } = {
+  results: [],
+  total: 0,
+};
 
 /**
  * The id one run of the registration wizard submits under, for as many attempts
@@ -497,7 +508,18 @@ export function KioskApp() {
    * re-arms on every pointer event, so tapping a dead-looking tablet is what
    * holds it there.
    */
-  const wantsPrinting = phase === 'printer' || overlay?.kind === 'printer' || hasConfiguredPrinter();
+  /*
+   * From the state, not from `hasConfiguredPrinter()`. The function is a
+   * localStorage read and a JSON.parse, and this line used to call it on every
+   * render — which is every keystroke, so the profiler found the kiosk parsing
+   * the same forty bytes of printer config once per letter typed (~20ms over
+   * six letters at a Pi-3-class throttle). `printerConfig` was read from the
+   * same key at mount and is re-read at every printer-screen exit; the one
+   * window in which the module writes the key without that state catching up —
+   * pairing or reconfiguring, mid-setup — is a window in which the first two
+   * clauses are true anyway, because the printer screen is what is up.
+   */
+  const wantsPrinting = phase === 'printer' || overlay?.kind === 'printer' || printerConfig !== null;
 
   useEffect(() => {
     if (!wantsPrinting) return;
@@ -1058,15 +1080,32 @@ export function KioskApp() {
   useEffect(() => {
     if (outcome.mode !== 'phone' && outcome.mode !== 'name') return;
     if (outcome.results.length > 0) return;
-    if (searchStudents(buffer, students, last4Index).results.length > 0) return;
+    /*
+     * Before the full-roster search, not after it. This effect re-runs on
+     * every keystroke of an empty result — which is every letter of a name the
+     * kiosk does not hold, the family already having the worst night the lobby
+     * offers — and once a sweep has answered (`done`, or `failed`), the search
+     * below was being run per letter only to reach a guard that returned
+     * anyway.
+     */
     if (refresh !== 'idle') return;
+    /*
+     * The identity test is the memo's own shortcut: `searchable` *is*
+     * `students` whenever nothing scopes the pool (no history, or widened), and
+     * then `outcome` above already answers for the whole roster — empty, by the
+     * guard before this one. Only a scoped pool can hide a child the wider
+     * roster holds, so only a scoped pool pays for the second look.
+     */
+    if (searchable !== students && searchStudents(buffer, students, last4Index).results.length > 0) {
+      return;
+    }
     if (outcome.mode === 'phone') {
       runSweep();
       return;
     }
     const timer = setTimeout(runSweep, NO_MATCH_SWEEP_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [outcome, buffer, students, last4Index, refresh, runSweep]);
+  }, [outcome, searchable, buffer, students, last4Index, refresh, runSweep]);
 
   /**
    * The brothers and sisters this tap could cover.
@@ -1345,13 +1384,23 @@ export function KioskApp() {
    * and a child whose family came to Sunday nursery is exactly the case where
    * the label went missing.
    */
+  /*
+   * And only while that screen is up. This memo depends on `buffer`, so it
+   * recomputes on every keystroke — which meant every letter a *parent* typed
+   * on the search screen ran the roster search twice, once for the screen they
+   * were looking at and once for a staff screen nobody had opened. The reprint
+   * flow clears the buffer on its way in and out, so nothing is stale when the
+   * screen does open: the first keystroke typed on it computes fresh.
+   */
+  const reprintOpen = overlay?.kind === 'reprint';
   const reprintOutcome = useMemo(() => {
+    if (!reprintOpen) return NO_REPRINT_MATCHES;
     const found = searchStudents(buffer, students as KioskStudent[], last4Index);
     return {
       results: found.results.slice(0, MAX_REPRINT_RESULTS),
       total: found.total ?? found.results.length,
     };
-  }, [buffer, students, last4Index]);
+  }, [reprintOpen, buffer, students, last4Index]);
 
   /** The evening's attempts. Held by the queue, not by React — see `printTick`. */
   const printedTonight = useMemo(() => {
@@ -1406,6 +1455,19 @@ export function KioskApp() {
     setBuffer('');
     setSentId(null);
   }, []);
+
+  /**
+   * The staff gate fired — **Clear**, held for two seconds.
+   *
+   * A `useCallback` and not an inline arrow, and the identity is the point:
+   * this handler rides through `SearchScreen` into the keyboard's `onClearHeld`,
+   * and the keyboard is memoized against its props. As an arrow it was a fresh
+   * function on every render, which broke that memo on every keystroke — the
+   * render counts said the forty keys were re-rendering once per letter typed,
+   * on the one subtree whose whole design is that they never do (see
+   * components/Keyboard.tsx, and the counts in docs/kiosk-performance.md).
+   */
+  const onStaffGate = useCallback(() => setOverlay({ kind: 'staff' }), []);
 
   /* ---- Registration ------------------------------------------------------- */
 
@@ -2012,7 +2074,7 @@ export function KioskApp() {
          * kiosk back where it already was. It opens the doors now, and leaving
          * the gathering is one of them rather than all of them.
          */
-        onStaffGate={() => setOverlay({ kind: 'staff' })}
+        onStaffGate={onStaffGate}
       />
     );
   }
