@@ -139,7 +139,18 @@ export function StatTile({
       >
         {value}
       </p>
-      {hint ? <p className="mt-0.5 text-xs text-ink-500">{hint}</p> : null}
+      {/*
+        Two lines' room for the hint on a phone, one where two words fit on one.
+
+        A tile is drawn before its number is known and again after, and the hint
+        is the part that changes length: "first one in this window" is one line
+        at 188px, "Sunday School · +6 vs 18 before" is two. The tiles share a
+        grid row, so the longest hint sets the row's height — and the row sits
+        directly above the call lists, which meant every one of them dropped
+        16px the moment the registers answered. Reserving the second line costs
+        a phone a little air inside four tiles and costs a laptop nothing.
+      */}
+      {hint ? <p className="mt-0.5 min-h-8 text-xs text-ink-500 sm:min-h-4">{hint}</p> : null}
     </div>
   );
 }

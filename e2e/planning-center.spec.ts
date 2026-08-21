@@ -24,6 +24,21 @@ import { expect, test } from './support/fixtures';
  */
 const ROSTER_STUDENT = 'Adebayo';
 
+/**
+ * The same student, named in full — for anything that reaches past the roster
+ * into the church's whole directory.
+ *
+ * A surname is enough to find somebody on a roster of forty-five and is not
+ * enough to find them in a directory that also holds their family. Searching
+ * Planning Center for "Adebayo" offers Maya *and* Adaeze, the adult in her
+ * household, and "the first result" is not reliably the child. The test that
+ * takes a student off the roster and puts them back was adding the parent
+ * instead — and then passing, because the row it checked for only had to match
+ * the surname. Maya stayed off the roster, and the specs that run afterwards
+ * and are written around her failed with the seeded ministry apparently gone.
+ */
+const ROSTER_STUDENT_FULL_NAME = 'Maya Adebayo';
+
 test.describe('Planning Center', () => {
   test('the roster on screen comes from Planning Center, not from Firestore', async ({
     page,
@@ -273,15 +288,31 @@ test.describe('Planning Center', () => {
     // And back again, because a student who left in March comes back in June.
     await page.getByRole('button', { name: /add from planning center/i }).click();
     const dialog = page.getByRole('dialog', { name: /add from planning center/i });
-    await dialog.getByLabel(/search planning center/i).fill(ROSTER_STUDENT);
-    const restore = dialog.getByRole('button', { name: /^add$/i }).first();
+    /*
+     * The student by name, and the Add button on *her* row.
+     *
+     * This search reaches the whole church directory rather than the roster, so
+     * a surname finds the family as well as the child: "Adebayo" offers Maya
+     * and Adaeze, the adult in her household. Taking the first row put the
+     * parent on a roster of minors and left Maya off it — and the check below
+     * passed anyway, because it only had to find a row whose name matched the
+     * surname. Everything after this file that is written around Maya then
+     * failed, reporting that the seeded ministry had gone missing.
+     */
+    await dialog.getByLabel(/search planning center/i).fill(ROSTER_STUDENT_FULL_NAME);
+    const restore = dialog
+      .getByRole('listitem')
+      .filter({ hasText: ROSTER_STUDENT_FULL_NAME })
+      .getByRole('button', { name: /^add$/i });
     await restore.waitFor({ timeout: 20_000 });
     await restore.click();
     await dialog.getByRole('button', { name: /done/i }).click();
 
     await gotoReady(page, '/students');
-    await expect(page.getByRole('link', { name: new RegExp(ROSTER_STUDENT) }).first()).toBeVisible({
-      timeout: 30_000,
-    });
+    // The student herself, in full: a row that only matches the surname is the
+    // failure this test used to report as a pass.
+    await expect(
+      page.getByRole('link', { name: new RegExp(ROSTER_STUDENT_FULL_NAME) }).first(),
+    ).toBeVisible({ timeout: 30_000 });
   });
 });

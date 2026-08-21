@@ -806,13 +806,38 @@ const StudentListRow = memo(function StudentListRow({
               pressLabel={`Read what ${name} is allergic to`}
             />
           ) : null}
+          {/*
+            A column, like the grade and the last-seen date either side of it —
+            and for a reason those two do not have: this is the one badge on the
+            row whose answer arrives from Planning Center seconds after the
+            names do.
+
+            Rendered on every row at `lg` and simply not painted where nobody
+            is missing, so the lane's width is settled before the answer is.
+            Conditional, it was the badge that moved the row: the pack is
+            right-aligned, so a chip appearing pushed the grade, the note and
+            the last-seen column of exactly the rows a leader had started
+            reading — and reserving room only while the read was in flight just
+            moved the jump to the rows that came back reachable.
+
+            `invisible` rather than a spacer of a guessed width: the reservation
+            is the badge itself, so it cannot drift from what it stands for, and
+            `visibility: hidden` keeps it out of the accessibility tree. Below
+            `lg` the lane wraps and has no spare width to hold open, so there it
+            stays conditional.
+          */}
           {unreachable ? (
             <WarningBadge
               warning="incomplete-profile"
               onPress={() => onBadge(student, 'contact')}
               pressLabel={`Add a parent contact for ${name}`}
             />
-          ) : null}
+          ) : (
+            <WarningBadge
+              warning="incomplete-profile"
+              className="invisible hidden lg:inline-flex"
+            />
+          )}
           {student.status === 'inactive' ? (
             <Badge
               tone="neutral"

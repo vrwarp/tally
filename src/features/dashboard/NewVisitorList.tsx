@@ -28,6 +28,7 @@ import {
   type FollowUpCsvContext,
 } from '@/features/dashboard/followUpCsv';
 import { hasNoParentContact, reachableFor } from '@/features/dashboard/insights';
+import { CallListLoadingRows } from '@/features/dashboard/LoadingRows';
 import { exportFilename } from '@/lib/csv';
 import { formatRelative, formatShortDate } from '@/lib/time';
 import { gradeLabel, initials, NO_GRADE } from '@/lib/utils';
@@ -37,6 +38,12 @@ export interface NewVisitorListProps {
   items: readonly NewVisitor[];
   /** `settings.newVisitorWindowDays`. */
   windowDays: number;
+  /**
+   * True while the roster or the history is still being read — `items` is not
+   * yet an answer. The card keeps its header over pulse rows, in place, so the
+   * answer landing swaps rows rather than recomposing the column.
+   */
+  loading?: boolean;
   /** The gathering being shown, or null when every gathering is in the list. */
   gatheringTitle?: string | null;
   /**
@@ -67,6 +74,7 @@ export interface NewVisitorListProps {
 export function NewVisitorList({
   items,
   windowDays,
+  loading = false,
   gatheringTitle = null,
   reachable,
   onContactAdded,
@@ -76,14 +84,17 @@ export function NewVisitorList({
     <Card>
       <CardHeader
         title="New faces"
-        count={items.length}
+        count={loading ? undefined : items.length}
         description={
           gatheringTitle
             ? `First seen at ${gatheringTitle} in the last ${windowDays} days.`
             : `First time in the last ${windowDays} days.`
         }
         action={
-          items.length > 0 ? (
+          // The real control, disabled at zero, so a loading header is the
+          // settled header greyed rather than a placeholder of a guessed width.
+          // See the note in `MiaList`.
+          loading || items.length > 0 ? (
             <ExportCsvButton
               build={() => ({
                 filename: exportFilename({
@@ -100,7 +111,9 @@ export function NewVisitorList({
         }
       />
 
-      {items.length === 0 ? (
+      {loading ? (
+        <CallListLoadingRows rows={2} />
+      ) : items.length === 0 ? (
         <EmptyState
           title={
             gatheringTitle ? `No first-timers at ${gatheringTitle}.` : 'No first-timers this week.'

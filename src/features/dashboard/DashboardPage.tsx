@@ -25,13 +25,12 @@
  * `useEventSnapshots`) — a Friday from six weeks ago will not change while a
  * leader reads this.
  */
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Card,
   EmptyState,
   ErrorBanner,
   LoadingScreen,
-  SkeletonRows,
   StatTile,
   TabBar,
 } from '@/components/ui';
@@ -52,6 +51,7 @@ import {
   computeOneOffOnly,
   computeOneOffRecaps,
   computeSummary,
+  gatheringsOnCalendar,
   groupByGathering,
   mergeMia,
   seenAt,
@@ -158,6 +158,26 @@ export function DashboardPage() {
    */
   const workable = useMemo(() => recentEvents.filter(canWork), [recentEvents, canWork]);
   const { snapshots, loading: snapshotsLoading, error } = useEventSnapshots(workable);
+  /**
+   * No register has come back yet, so nothing on this screen that is counted
+   * from one can be drawn. Declared up here rather than beside its two
+   * siblings below because the tabs consult it, and they are settled before
+   * anything is rendered.
+   *
+   * "Not yet", never "again" — the same rule `rosterSettled` states for the
+   * roster, and it earns its keep for the same reason. The window is rebuilt
+   * whenever the calendar or this reader's access does, and a rebuilt window is
+   * briefly a set of nights nothing is cached for: `snapshots` empties, this
+   * would go true a second time, and the chart a leader was already looking at
+   * would drop back to a placeholder and then redraw. Once history has landed
+   * once, what is in flight is a revalidation with nothing to correct until it
+   * comes back different.
+   */
+  const sawHistory = useRef(false);
+  useEffect(() => {
+    if (snapshots.length > 0) sawHistory.current = true;
+  }, [snapshots]);
+  const awaitingHistory = snapshotsLoading && snapshots.length === 0 && !sawHistory.current;
 
   /** The gatherings excluded from every number on this screen, by title. */
   const excluded = useMemo(() => {
@@ -175,9 +195,28 @@ export function DashboardPage() {
    */
   const gatherings = useMemo(() => groupByGathering(snapshots, series), [snapshots, series]);
 
+  /**
+   * What the tabs offer: the gatherings that were held, or — until the
+   * registers say which those are — the ones the calendar shows ran.
+   *
+   * The row sits above everything else on this screen, so drawing it only once
+   * the registers had landed pushed the tiles, the call lists and the chart
+   * down 60px, seconds after a leader started reading them. Which gatherings
+   * ran is a fact about the calendar, and the calendar has streamed in before
+   * this screen paints at all.
+   *
+   * It hands over to the history rather than standing in for it, because the
+   * two can honestly disagree: a chain that was scheduled and that nobody ever
+   * checked into is not a gathering this screen can say anything about, and
+   * `groupByGathering` is what decides that. So the calendar's answer holds the
+   * row until the real one arrives, and the real one wins.
+   */
+  const planned = useMemo(() => gatheringsOnCalendar(workable, series), [workable, series]);
+  const tabs = awaitingHistory ? planned : gatherings;
+
   // A tab can vanish when the window scrolls past a dormant gathering; fall back
   // rather than render lists for a chain that is no longer offered.
-  const active = gatherings.some((gathering) => gathering.key === selected) ? selected : ALL;
+  const active = tabs.some((gathering) => gathering.key === selected) ? selected : ALL;
   const activeGathering = gatherings.find((gathering) => gathering.key === active) ?? null;
 
   /** The nights the header counts: one gathering's, or every gathering's. */
@@ -301,7 +340,6 @@ export function DashboardPage() {
 
   if (loading) return <LoadingScreen message="Loading insights…" />;
 
-  const awaitingHistory = snapshotsLoading && snapshots.length === 0;
   /*
    * The roster arrives separately from the streams — it is read from Planning
    * Center — and every list on this screen is a statement about who is on it.
@@ -365,7 +403,18 @@ export function DashboardPage() {
     <PageFrame width="lg">
       <header>
         <h1 className="text-xl font-bold text-ink-50">Insights</h1>
-        <p className="mt-0.5 text-sm text-ink-500">
+        {/*
+          Two lines' room on a phone, one where the sentence fits on one.
+
+          What this line will say — which gathering, which night, how many of
+          them — is the last thing on the screen to be known, and it sits above
+          everything else on it. "Reading the recent attendance…" is one line at
+          any width; the sentence that replaces it is two on a phone, so the
+          whole screen dropped 20px the moment the registers answered. The
+          reservation costs a phone a line of air under the heading while the
+          read is out, and costs a laptop nothing.
+        */}
+        <p className="mt-0.5 min-h-10 text-sm text-ink-500 sm:min-h-5">
           {awaitingHistory
             ? 'Reading the recent attendance…'
             : lastGathering
@@ -385,12 +434,12 @@ export function DashboardPage() {
 
       {/* Only worth offering when there is more than one gathering to tell
           apart. A ministry with a single Friday sees the screen it always saw. */}
-      {gatherings.length > 1 ? (
+      {tabs.length > 1 ? (
         <TabBar
           label="Show insights for"
           options={[
             { id: ALL, label: 'All' },
-            ...gatherings.map((gathering) => ({ id: gathering.key, label: gathering.title })),
+            ...tabs.map((gathering) => ({ id: gathering.key, label: gathering.title })),
           ]}
           selected={active}
           onSelect={setSelected}
@@ -462,16 +511,42 @@ export function DashboardPage() {
         one that grows; the short lists get a fixed 28rem, which is the width at
         which a name like "Bree Sandoval" stops truncating.
       */}
+      {/*
+        Said once for the whole screen: three cards are waiting on the same two
+        reads, and three interleaved "loading" announcements name no more than
+        one does.
+      */}
+      {awaiting ? (
+        <span role="status" className="sr-only">
+          {awaitingRoster ? 'Loading the roster' : 'Loading attendance history'}
+        </span>
+      ) : null}
+
       <div className="contents lg:grid lg:grid-cols-[minmax(0,1fr)_28rem] lg:items-start lg:gap-6">
         <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
-          {awaiting ? (
-            <Card>
-              <span role="status" className="sr-only">
-                {awaitingRoster ? 'Loading the roster' : 'Loading attendance history'}
-              </span>
-              <SkeletonRows count={4} />
-            </Card>
-          ) : recentEvents.length === 0 ? (
+          {/*
+            While the roster or the history is still in flight, the waiting
+            shape is the settled shape: the same cards, in the same order, with
+            the same headers, holding pulse rows where the names will land —
+            drawn *by the cards themselves*, so the swap happens inside a DOM
+            node that stays put.
+
+            It used to be one anonymous skeleton card standing in for the whole
+            column, with the right-hand column simply absent — so when a slow
+            Planning Center answer finally came back, the entire screen below
+            the tiles recomposed under a leader who had started reading it.
+            What the cards will be called and roughly what a row costs are both
+            known before any answer is; only the names are not, so only the
+            names arrive late.
+          */}
+          {/*
+            Whether the calendar holds anything is known before this screen
+            paints at all — `loading` above holds it behind a spinner until the
+            streams are in — so the ministry with no gatherings yet gets its
+            empty state immediately, rather than a loading card that becomes
+            one a second later.
+          */}
+          {recentEvents.length === 0 ? (
             <Card>
               <EmptyState
                 title="No gatherings on record yet."
@@ -479,41 +554,48 @@ export function DashboardPage() {
               />
             </Card>
           ) : (
-            <>
-              <MiaList
-                items={mia}
-                threshold={settings.miaConsecutiveMisses}
-                gatheringTitle={activeGathering?.title ?? null}
-                onContactAdded={parentContact.refresh}
-                exportContext={exportContext}
-              />
-              {/*
-                Ordered by question on a phone, by column on a laptop.
+            <MiaList
+              items={mia}
+              threshold={settings.miaConsecutiveMisses}
+              loading={awaiting}
+              gatheringTitle={activeGathering?.title ?? null}
+              onContactAdded={parentContact.refresh}
+              exportContext={exportContext}
+            />
+          )}
+          {/*
+            Ordered by question on a phone, by column on a laptop.
 
-                The two column wrappers above are `display: contents` below
-                `lg`, so all six sections are flex children of the page again —
-                which means the desktop split cannot decide the phone's reading
-                order as a side effect. It did once: the chart ended up gating
-                "who is new", so a leader passed a block with no names in it to
-                reach a two-name list they could act on. The chart is the one
-                section here nobody phones anybody about, so it sorts after the
-                three that are call lists.
-              */}
-              <AttendanceTrend
-                snapshots={snapshots}
-                gatheringKey={activeGathering?.key ?? null}
-                gatheringTitle={activeGathering?.title ?? null}
-                className="order-5 lg:order-none"
-              />
-            </>
+            The two column wrappers above are `display: contents` below
+            `lg`, so all six sections are flex children of the page again —
+            which means the desktop split cannot decide the phone's reading
+            order as a side effect. It did once: the chart ended up gating
+            "who is new", so a leader passed a block with no names in it to
+            reach a two-name list they could act on. The chart is the one
+            section here nobody phones anybody about, so it sorts after the
+            three that are call lists.
+
+            Gated on the history alone, unlike the lists beside it: every bar
+            is a head count from the registers, which stream from Firestore,
+            so the chart has its answer while the roster is still being read.
+          */}
+          {recentEvents.length === 0 ? null : (
+            <AttendanceTrend
+              snapshots={snapshots}
+              loading={awaitingHistory}
+              gatheringKey={activeGathering?.key ?? null}
+              gatheringTitle={activeGathering?.title ?? null}
+              className="order-5 lg:order-none"
+            />
           )}
         </div>
 
         <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
-          {!awaiting && recentEvents.length > 0 ? (
+          {recentEvents.length > 0 ? (
             <NewVisitorList
               items={newVisitors}
               windowDays={settings.newVisitorWindowDays}
+              loading={awaiting}
               gatheringTitle={activeGathering?.title ?? null}
               reachable={parentContact.reachable}
               onContactAdded={parentContact.refresh}
@@ -532,22 +614,27 @@ export function DashboardPage() {
               Every one of the three lists on this screen is a view of the same
               answer — who the ministry can reach — so a contact added in any of
               them asks Planning Center again for all of them. */}
-          {awaitingRoster ? null : (
-            <IncompleteProfileList
-              students={incomplete}
-              now={now}
-              checking={awaitingContacts}
-              error={parentContact.error}
-              gatheringTitle={activeGathering?.title ?? null}
-              onContactAdded={parentContact.refresh}
-              exportContext={exportContext}
-            />
-          )}
+          <IncompleteProfileList
+            students={incomplete}
+            now={now}
+            loading={awaitingRoster}
+            checking={awaitingContacts}
+            error={parentContact.error}
+            gatheringTitle={activeGathering?.title ?? null}
+            onContactAdded={parentContact.refresh}
+            exportContext={exportContext}
+          />
 
           {/* Outside the tabs on purpose: a one-off belongs to no chain of
               repeats, so it neither filters by one nor answers the questions
-              they do. */}
-          {!awaiting && (oneOffRecaps.length > 0 || oneOffOnly.length > 0) ? (
+              they do.
+
+              Not gated on the roster, unlike the call lists above: a recap is
+              a head count, and head counts come from the registers. Holding
+              both cards back until the slowest read of the screen returned
+              meant the one card that already had its answer arrived with the
+              rest — landing at the foot of a column somebody was reading. */}
+          {oneOffRecaps.length > 0 || oneOffOnly.length > 0 ? (
             <>
               <OneOffRecapList items={oneOffRecaps} className="order-6 lg:order-none" />
               <OneOffOnlyList
