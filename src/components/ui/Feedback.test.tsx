@@ -13,12 +13,15 @@ import { describe, expect, it } from 'vitest';
 import { ErrorBanner, SkeletonRows } from '@/components/ui/Feedback';
 
 describe('SkeletonRows', () => {
-  it('announces the wait it is drawing', () => {
+  it('says nothing until a caller gives it a sentence', () => {
     render(<SkeletonRows count={2} />);
 
-    // Every caller gets this by existing, which is the point: the announcement
-    // moved here precisely because only one of the many call sites had one.
-    expect(screen.getByRole('status')).toHaveTextContent('Loading');
+    // Announcing by default put a second `role="status"` inside `<main>` on
+    // every screen with a skeleton, next to live regions those screens already
+    // keep — the sync strip on a student's record among them. Two live regions
+    // describing different things is the failure this component was meant to
+    // fix, not one to introduce, so the announcement is asked for.
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('takes a better sentence from a caller that has one', () => {

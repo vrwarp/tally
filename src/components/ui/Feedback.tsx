@@ -95,19 +95,27 @@ export function ErrorBanner({
  * Planning Center read, and the check-in roster's prediction — are exactly the
  * two where that silence lasts.
  *
- * So the announcement lives here rather than at the call sites, and every
- * caller gets it by existing. `label` is the sentence: a caller with a better
- * one passes it ("Loading the roster"), and a caller that already announces for
- * itself passes `label={null}` so the two do not speak over each other.
+ * So the announcement lives here rather than at the call sites: `label` is the
+ * sentence, and a caller that has one passes it ("Loading the roster").
  *
- * The rows carry `aria-hidden` individually now rather than as a block, because
- * the wrapper has to stay in the accessibility tree for the status beside them
- * to be in it. `sr-only` is absolutely positioned, so it takes no part in the
- * flex column and moves nothing.
+ * It is opt-in rather than on by default, which is the opposite of the first
+ * attempt. Announcing from every skeleton put a second `role="status"` inside
+ * `<main>` on every screen that has one, and the screens this component is used
+ * on already keep a live region of their own — the sync strip on a student's
+ * record is one. Two status nodes under one `<main>` is not just a strict-mode
+ * violation in the suite; it is two live regions describing different things,
+ * which is the failure the doc comment above is arguing against. A caller that
+ * wants the announcement asks for it, and the ones still silent are listed in
+ * docs/uxr/walkthrough-critique.md.
+ *
+ * The rows carry `aria-hidden` individually rather than as a block, because the
+ * wrapper has to stay in the accessibility tree for a status beside them to be
+ * in it. `sr-only` is absolutely positioned, so it takes no part in the flex
+ * column and moves nothing.
  */
 export function SkeletonRows({
   count = 6,
-  label = 'Loading',
+  label = null,
 }: {
   count?: number;
   label?: string | null;

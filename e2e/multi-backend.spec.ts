@@ -13,10 +13,11 @@ import type { Page } from '@playwright/test';
 import { gotoReady, reloadReady } from './support/auth';
 import { a32PersonIdOf, removeA32Residue } from './support/emulator';
 import { expect, test } from './support/fixtures';
+import { rosterAction } from './support/rosterActions';
 
 /** Adds one Attendees person to the roster through the UI, and waits for the row. */
 async function addFromAttendees(page: Page, name: string) {
-  await page.getByRole('button', { name: /add from directory/i }).click({ timeout: 20_000 });
+  await (await rosterAction(page, /add from directory/i, { timeout: 20_000 })).click();
   const dialog = page.getByRole('dialog', { name: /add a student/i });
   await dialog.getByLabel(/search your directories/i).fill(name);
   const row = dialog.locator('li').filter({ hasText: name });
@@ -113,7 +114,7 @@ test.describe('Two backends at once', () => {
      * so all this test does is add somebody and watch the linkage arrive.
      */
     await gotoReady(page, '/students');
-    await page.getByRole('button', { name: /new visitor/i }).click();
+    await (await rosterAction(page, /new visitor/i)).click();
     const editor = page.getByRole('dialog', { name: /add a student/i });
     await editor.getByLabel(/first name/i).fill('Keanu');
     await editor.getByLabel(/last name/i).fill('Māhoe');
@@ -169,7 +170,7 @@ test.describe('Two backends at once', () => {
 
     // The fanned-out search recognises the pair and shows one row — the
     // Planning Center one, since that is the side holding the pointer.
-    await page.getByRole('button', { name: /add from directory/i }).click({ timeout: 20_000 });
+    await (await rosterAction(page, /add from directory/i, { timeout: 20_000 })).click();
     const dialog = page.getByRole('dialog', { name: /add a student/i });
     await dialog.getByLabel(/search your directories/i).fill('Tomás Beltrán');
     const row = dialog.locator('li').filter({ hasText: 'Tomás Beltrán' });
