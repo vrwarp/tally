@@ -48,6 +48,21 @@ the failure looks like the app rather than the environment. If you see it, check
 whether an Eventarc emulator line ever appeared in the log — if the only mention
 is "Stopping Eventarc Emulator", it never started.
 
+The same two lines have a second cause: an outbound **HTTPS proxy**.
+firebase-tools routes *every* request through `HTTPS_PROXY`/`https_proxy` when
+one is set — `apiv2.js` installs an undici `ProxyAgent` without consulting
+`NO_PROXY` — so the trigger-registration POST to the Firestore emulator on
+`127.0.0.1` goes to the proxy instead, and "upstream request failed" is the
+proxy's own answer. (A `MetadataLookupWarning … status code 502` earlier in the
+same log is the tell: that call was to a link-local address no proxy can
+reach.) The fix is to start the emulators with the proxy variables unset —
+everything they talk to is on this machine:
+
+```bash
+env -u HTTPS_PROXY -u https_proxy -u HTTP_PROXY -u http_proxy \
+  npx firebase emulators:start --project demo-tally --only auth,firestore,functions
+```
+
 ## Arranging the far end
 
 Most specs only need the simulator to *hold* a ministry. A few need it to
@@ -224,6 +239,39 @@ source maps, and it asserts nothing: it writes
 reseeds the world on the way out, so run it on its own.
 [docs/kiosk-performance.md](../docs/kiosk-performance.md) has the instruments,
 the baseline and what the last run found.
+
+## Watching a screen hold still
+
+`layout-shift.spec.ts` is the one file that looks at a screen *while* it is
+still loading. Everything else here waits for the app to settle first, which is
+exactly why none of it can see the thing a leader complains about: a screen
+that moves under them when a slow Planning Center answer lands.
+
+It arms the simulator's hold gate so **every** request blocks, opens a screen,
+lets it settle into the shape it wears while the API hangs, and then releases
+the answers and watches what moves. Two numbers per screen, scored separately:
+what shifted *after* the release (the budget is zero — a screen must reserve
+room for what it knows is coming) and what shifted before it, while the first
+paint composed.
+
+```bash
+npx playwright test --project=chromium-desktop e2e/layout-shift.spec.ts
+LAYOUT_SHIFT_REPORT=1 npx playwright test e2e/layout-shift.spec.ts  # …and write the readout
+```
+
+Unlike the benchmark above it *is* a test and runs by default, because what it
+guards is a promise rather than a number: it fails with the readout attached —
+every element that moved, from which rectangle to which, and everything that
+changed size between the two moments. `LAYOUT_SHIFT_REPORT=1` writes the same
+readout per screen to `perf-results/layout-stability/` even when green, which
+is what to read when tuning a placeholder against the row it stands for.
+
+Chromium only. `layout-shift` is a Chromium entry type, and what it verifies is
+not browser-specific: every fix it has produced is a matter of sizing rather
+than timing.
+
+[docs/layout-stability.md](../docs/layout-stability.md) has the instruments,
+what the first run found on each screen, and what still moves on purpose.
 
 ## Writing a test
 

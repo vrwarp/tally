@@ -91,19 +91,23 @@ test.describe('dashboard', () => {
       const block = page.getByRole('group', { name: `Parent contact for ${name}` }).first();
 
       /*
-       * Two honest outcomes: a way to reach them, or a plain statement of why
-       * there is none — which tells a leader exactly what to go and fix. What
+       * Three honest outcomes: a way to reach them, the form that adds one —
+       * the pill is the whole statement on a phone, where the sentence beside
+       * it is not printed — or a plain statement of why neither exists. What
        * must never happen is a row that resolves to nothing, or spins forever,
        * which is the unactionable row this test exists to catch.
        */
       const reachOut = block.getByRole('link', {
         name: new RegExp(`about ${escapeForRegExp(name)} at `, 'i'),
       });
+      const addOne = block.getByRole('button', {
+        name: new RegExp(`^Add parent contact for ${escapeForRegExp(name)}`),
+      });
       const nobodyToCall = block.getByText(
-        /has no parent contact for|no longer has a record for|Not in Planning Center yet/,
+        /no longer has a record for|Not in Planning Center yet/,
       );
 
-      await expect(reachOut.or(nobodyToCall).first()).toBeVisible({ timeout: 20_000 });
+      await expect(reachOut.or(addOne).or(nobodyToCall).first()).toBeVisible({ timeout: 20_000 });
       if ((await reachOut.count()) > 0) reachable += 1;
     }
 
@@ -130,22 +134,23 @@ test.describe('dashboard', () => {
      * Planning Center tab. What the form then offers is the server's decision —
      * a number, a whole parent, or a pointer upstream on an install that will
      * not let Tally write — so this asserts the promise rather than the
-     * outcome: every row that says nobody can be reached also offers the way to
-     * fix it, and pressing it lands somewhere that names the family.
+     * outcome: a row with nobody to ring offers the way to fix it, and pressing
+     * it lands somewhere that names the family.
      */
     /*
-     * Each of these rows is one Planning Center read, so counting before they
-     * land counts nothing — which is a pass-shaped failure. Wait for the first,
-     * then hold the rest to the same promise.
+     * The pill is the whole statement now, and that is deliberate: it used to
+     * be a sentence with the pill under it, which made this the one state on a
+     * follow-up row taller than a single line — so a call list grew under
+     * whoever was reading it, row by row, as each lookup landed. Its label
+     * names the student, which is what a list of them needs.
+     *
+     * Each of these rows is one Planning Center read, so looking before they
+     * land finds nothing — which is a pass-shaped failure. Wait for the first.
      */
     const stuck = page
       .getByRole('group', { name: /^Parent contact for / })
-      .filter({ hasText: 'has no parent contact for' });
+      .filter({ has: page.getByRole('button', { name: /^Add parent contact for / }) });
     await expect(stuck.first()).toBeVisible({ timeout: 20_000 });
-
-    for (const block of await stuck.all()) {
-      await expect(block.getByRole('button', { name: /^Add parent contact for / })).toBeVisible();
-    }
 
     /*
      * And the list this whole change is about: a first-timer off the roster

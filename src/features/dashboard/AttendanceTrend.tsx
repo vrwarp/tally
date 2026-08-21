@@ -21,6 +21,16 @@ import type { EventAttendanceSnapshot } from '@/types';
 const MAX_BAR_PX = 88;
 const MIN_BAR_PX = 4;
 
+/**
+ * The placeholder chart's bars, in the order it draws them.
+ *
+ * One of them is `MAX_BAR_PX`, which is not decoration: the tallest real bar is
+ * always exactly that — every bar is scaled against the peak — so a placeholder
+ * containing one is exactly as tall as the chart it stands in for. The rest
+ * only have to look like a head count that moves around.
+ */
+const PLACEHOLDER_BARS = [40, 62, 30, MAX_BAR_PX, 52, 36, 68, 44] as const;
+
 export interface AttendanceTrendProps {
   snapshots: readonly EventAttendanceSnapshot[];
   /** One chain of repeats, or null for every gathering at once. */
@@ -28,6 +38,12 @@ export interface AttendanceTrendProps {
   /** Named in the description, so the card says which nights it is drawing. */
   gatheringTitle?: string | null;
   limit?: number;
+  /**
+   * True while the registers are still streaming in — `snapshots` is not yet
+   * an answer. The card keeps its header over a chart-sized pulse block, in
+   * place, so the history landing paints bars rather than moving the column.
+   */
+  loading?: boolean;
   /** Lets the dashboard order this card differently on a phone. */
   className?: string;
 }
@@ -37,6 +53,7 @@ export function AttendanceTrend({
   gatheringKey = null,
   gatheringTitle = null,
   limit = 8,
+  loading = false,
   className,
 }: AttendanceTrendProps) {
   const points = useMemo(
@@ -61,7 +78,43 @@ export function AttendanceTrend({
         }
       />
 
-      {points.length === 0 ? (
+      {loading ? (
+        /*
+         * The chart's own markup with the ink taken out of it.
+         *
+         * Same wrappers, same type, same paddings — and a bar at the full
+         * `MAX_BAR_PX`, which is what the tallest real bar is by construction —
+         * so the placeholder is exactly as tall as the chart that replaces it
+         * rather than as tall as somebody guessed. A block of a hand-measured
+         * height was ten pixels short, which is ten pixels of everything below
+         * this card moving the moment the registers answered.
+         *
+         * `text-transparent` over real characters rather than empty spans: an
+         * empty span has no line box, and the two lines of small type around
+         * the bars are a fifth of this card's height.
+         */
+        <div aria-hidden="true" className="px-3 pb-3 pt-3">
+          <div className="flex items-end gap-1.5">
+            {Array.from({ length: limit }, (_, index) => (
+              <div
+                key={index}
+                className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1"
+              >
+                <span className="text-[10px] font-semibold tabular-nums text-transparent">0</span>
+                <div
+                  style={{ height: `${PLACEHOLDER_BARS[index % PLACEHOLDER_BARS.length]}px` }}
+                  className="w-full animate-pulse rounded-t-md bg-ink-800/60"
+                />
+                <span className="w-full truncate text-center text-[10px] text-transparent">—</span>
+              </div>
+            ))}
+          </div>
+
+          <p className="mt-3 border-t border-ink-800 pt-2 text-xs text-transparent">
+            counting the recent gatherings
+          </p>
+        </div>
+      ) : points.length === 0 ? (
         <EmptyState
           title="No gatherings to chart yet."
           description="Once a couple of gatherings have been checked in, the trend fills in here."

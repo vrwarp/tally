@@ -138,19 +138,28 @@ export function FollowUpActions({ student, className, onContactAdded }: FollowUp
      * form. What opens is decided inside `ParentContactModal`: a number on the
      * adult on file, a parent and a household where there is neither, or the
      * pointer at Planning Center on an install that will not let Tally write.
+     *
+     * The pill alone, on the one line every other answer here fits on.
+     *
+     * It used to be a sentence with the pill under it, which made this the one
+     * state taller than the rest — so a call list a leader had started reading
+     * grew, row by row, as each row's lookup landed. Putting the sentence
+     * beside the pill was not enough either: at the width this column has on a
+     * laptop the two together wrap, which is the same extra line by another
+     * route. The pill is not a poorer statement than the sentence was — it is
+     * amber, it says "Add parent contact", and its label names the student —
+     * and the incomplete-profiles card on the same screen has always offered
+     * exactly this and nothing else.
      */
     body = (
-      <div className="flex flex-col items-start gap-1.5">
-        <p className="text-xs text-warn-400">{label} has no parent contact for {name}.</p>
-        <AddParentContactButton
-          student={student}
-          onAdded={() => {
-            // The row is looking at an answer its own write just made wrong.
-            refresh();
-            onContactAdded?.();
-          }}
-        />
-      </div>
+      <AddParentContactButton
+        student={student}
+        onAdded={() => {
+          // The row is looking at an answer its own write just made wrong.
+          refresh();
+          onContactAdded?.();
+        }}
+      />
     );
   } else if (phone) {
     body = (
@@ -215,11 +224,26 @@ export function FollowUpActions({ student, className, onContactAdded }: FollowUp
    * number it is belongs in that name too — "contact details for Aaron Sun"
    * read as Aaron's own.
    */
+  /*
+   * `min-h-12 items-center`: the strip is one action-pill line tall from its
+   * first frame, whatever it currently holds.
+   *
+   * Twelve rather than eleven because that is what the pills actually come to:
+   * they are `inline-flex` at `min-h-11`, and an inline box carries its
+   * line-height's leading on top of its own height.
+   *
+   * This row lands in stages — a spinner line, then whichever answer Planning
+   * Center gives — and the answers are mostly 44px pills while the waiting
+   * states are a line of small text. Sized by content, every row on a call
+   * list grew ~24px as its lookup landed, one row at a time, under a leader
+   * who had already started reading. Reserving the pill's height makes the
+   * swap invisible: text states centre in the space the buttons will take.
+   */
   return (
     <div
       role="group"
       aria-label={`Parent contact for ${name}`}
-      className={cn('min-w-0', className)}
+      className={cn('flex min-h-12 min-w-0 items-center', className)}
     >
       {body}
     </div>

@@ -16,6 +16,7 @@ import {
   computeOneOffRecaps,
   computeSummary,
   computeUnseen,
+  gatheringsOnCalendar,
   groupByGathering,
   hasNoParentContact,
   isUnreachable,
@@ -336,6 +337,75 @@ describe('computeMia', () => {
     expect(
       computeMia([student], [makeSnapshot(makeOneOff({ id: 'retreat' }), [REGULAR])], settings),
     ).toEqual([]);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* gatheringsOnCalendar                                                        */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * The tab row's stand-in while the registers are still being read. What it has
+ * to get right is agreement: it names the same gatherings, in the same order,
+ * under the same titles as `groupByGathering` will a moment later — otherwise
+ * the row it is holding open changes under whoever is reading it, which is the
+ * one thing it exists to prevent.
+ */
+describe('gatheringsOnCalendar', () => {
+  const sundays = () => makeWeeklyEvents({ count: 2, seriesId: SUNDAY, title: 'Sunday School' });
+
+  it('names the same gatherings, in the same order, as the history will', () => {
+    const events = [...fridays(3), ...sundays()];
+
+    const planned = gatheringsOnCalendar(events);
+    const held = groupByGathering(events.map((event) => makeSnapshot(event, ['a'])));
+
+    expect(planned.map((gathering) => gathering.key)).toEqual([FRIDAY, SUNDAY]);
+    expect(planned).toEqual(held.map(({ key, title }) => ({ key, title })));
+  });
+
+  it('takes a name from the series document, exactly as the history does', () => {
+    const series = [
+      {
+        id: FRIDAY,
+        title: 'Friday Fellowship (renamed)',
+        dayOfWeek: 5,
+        startTime: '19:00',
+        endTime: '21:00',
+        checkInOpensMinutesBefore: 60,
+        checkInClosesMinutesAfter: 60,
+        active: true,
+        order: 1,
+      },
+    ];
+
+    expect(gatheringsOnCalendar(fridays(2), series)[0]!.title).toBe('Friday Fellowship (renamed)');
+  });
+
+  it('leaves one-offs out — a retreat is not an instance of anything', () => {
+    const retreat = makeOneOff({ id: 'retreat', title: 'Winter Retreat' });
+
+    expect(gatheringsOnCalendar([...fridays(2), retreat]).map((g) => g.key)).toEqual([FRIDAY]);
+  });
+
+  /*
+   * The reason this stands in rather than substitutes. A chain that was
+   * scheduled and that nobody ever checked into is on the calendar and is not a
+   * gathering the screen can say anything about, so the row hands over to
+   * `groupByGathering` the moment the registers answer — see `DashboardPage`.
+   */
+  it('offers a chain nobody was checked into, which the history will not', () => {
+    const events = [...fridays(2), ...sundays()];
+
+    const planned = gatheringsOnCalendar(events);
+    const held = groupByGathering(
+      events.map((event) =>
+        makeSnapshot(event, event.seriesId === SUNDAY ? [] : ['a']),
+      ),
+    );
+
+    expect(planned.map((gathering) => gathering.key)).toEqual([FRIDAY, SUNDAY]);
+    expect(held.map((gathering) => gathering.key)).toEqual([FRIDAY]);
   });
 });
 

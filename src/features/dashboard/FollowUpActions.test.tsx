@@ -100,17 +100,22 @@ describe('FollowUpActions', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
-  it('says so when the record has no way to reach a parent, and offers to fix it', async () => {
+  it('offers the fix when the record has no way to reach a parent', async () => {
     getPersonDetails.mockResolvedValue({ data: details() });
 
     mount(inPlanningCenter());
 
-    expect(await screen.findByText(/no parent contact for Iris Chen/)).toBeInTheDocument();
-    // The fix is upstream either way; the difference is whether the row makes a
-    // leader go and find the person themselves.
+    /*
+     * The pill is the whole answer, and naming the student is what makes it
+     * one: this row sits in a list of them. It used to be a sentence with the
+     * pill under it, which was the only state here taller than one line — and
+     * so the state that grew a call list under somebody reading it as each
+     * row's lookup landed.
+     */
     expect(
-      screen.getByRole('button', { name: 'Add parent contact for Iris Chen' }),
+      await screen.findByRole('button', { name: 'Add parent contact for Iris Chen' }),
     ).toBeInTheDocument();
+    expect(screen.queryByText(/no parent contact for Iris Chen/)).not.toBeInTheDocument();
   });
 
   it('writes the contact from the row itself where write-back allows it', async () => {

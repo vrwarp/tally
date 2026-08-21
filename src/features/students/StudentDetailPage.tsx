@@ -155,11 +155,21 @@ export function StudentDetailPage() {
   const editNeedsAHuman = edit !== null && needsAHuman(edit);
   const {
     details,
-    loading: detailsLoading,
     error: detailsError,
     loaded: detailsLoaded,
+    unavailable: detailsUnavailable,
     refresh: refreshDetails,
   } = usePersonDetails(student);
+
+  /*
+   * "Not answered yet", not merely "in flight". `loading` is raised inside an
+   * effect, which runs after the first paint — so a screen branching on it
+   * draws one frame of "nobody can reach this family" before the spinner, and
+   * that frame moves everything below it twice. `loaded` is false from the
+   * start; `unavailable` (a student no backend holds) never loads and must not
+   * wait forever.
+   */
+  const detailsPending = !detailsLoaded && !detailsUnavailable && !detailsError;
 
   const recentEvents = useMemo(() => historyWindow(events, now), [events, now]);
 
@@ -578,8 +588,36 @@ export function StudentDetailPage() {
               // A backend outage must not read as "this family has no phone
               // number" — those look identical and mean opposite things.
               <p className="mt-1 text-sm text-danger-400">{detailsError}</p>
-            ) : detailsLoading ? (
-              <p className="mt-1 text-sm text-ink-500">Looking this up in {backendName}…</p>
+            ) : detailsPending ? (
+              /*
+               * Shaped like the answer, not like a sentence about the answer.
+               *
+               * This block is the first thing on the page that lands late — the
+               * contact lives upstream and the read takes as long as Planning
+               * Center takes. As a line of text it grew ~56px into the buttons
+               * once the read landed, moving the birthday, the dates and the
+               * whole attendance card under a leader who was already reading
+               * them. Two pill-sized bars and a text bar hold the room the
+               * common answer takes; the rarer, shorter answers leave a little
+               * air rather than pulling the page up.
+               */
+              <div className="mt-2" role="status" aria-label={`Looking this up in ${backendName}`}>
+                <div aria-hidden="true" className="flex items-center gap-2">
+                  <div className="h-11 w-24 animate-pulse rounded-xl bg-ink-800/60" />
+                  <div className="h-11 w-24 animate-pulse rounded-xl bg-ink-800/60" />
+                </div>
+                {/* Two lines of it on a phone, where a parent's name, number
+                    and address are two lines — the same room the settled line
+                    below holds open, so the swap paints rather than moves. */}
+                <div
+                  aria-hidden="true"
+                  className="mt-2 h-5 w-64 max-w-full animate-pulse rounded-md bg-ink-800/60"
+                />
+                <div
+                  aria-hidden="true"
+                  className="mt-1 h-5 w-40 max-w-full animate-pulse rounded-md bg-ink-800/60 sm:hidden"
+                />
+              </div>
             ) : phone || email ? (
               <>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -611,7 +649,14 @@ export function StudentDetailPage() {
                     </ContactLink>
                   ) : null}
                 </div>
-                <p className="mt-2 text-sm text-ink-300">
+                {/* Two lines' room on a phone whether or not this family needs
+                    them: a name with a number is one line and a name with a
+                    number and an address is two, and which of those a student
+                    has is the last thing this page finds out. Reserving the
+                    second line is what keeps the birthday, the dates and the
+                    whole attendance card below from stepping down when the
+                    answer arrives. */}
+                <p className="mt-2 min-h-10 text-sm text-ink-300 sm:min-h-5">
                   {details?.parentName ? `${details.parentName} · ` : ''}
                   {phone ? <span className="tabular-nums">{formatPhone(phone)}</span> : null}
                   {phone && email ? ' · ' : ''}
@@ -629,7 +674,7 @@ export function StudentDetailPage() {
                 Allergies
               </p>
               <p className="mt-0.5 text-sm text-ink-100">
-                {details?.allergies ?? (detailsLoading ? 'Loading…' : `Recorded in ${backendName}.`)}
+                {details?.allergies ?? (detailsPending ? 'Loading…' : `Recorded in ${backendName}.`)}
               </p>
             </div>
           ) : null}
@@ -649,7 +694,7 @@ export function StudentDetailPage() {
              * Offering a box the write path then refuses is worse than a link.
              */
             writable={Boolean(student.pcoPersonId) && details?.profileWritable === true}
-            gateLoading={detailsLoading && !detailsLoaded}
+            gateLoading={detailsPending}
             recordGone={recordGone}
             now={now}
             // The year on this page comes from the details, and the edit has
@@ -1096,8 +1141,26 @@ function BirthdaySection({
       ) : (
         <>
           <div className="mt-1 flex flex-wrap items-center gap-2">
-            <p className={cn('text-sm', day ? 'text-ink-100' : 'text-ink-400')}>
+            <p className={cn('text-sm tabular-nums', day ? 'text-ink-100' : 'text-ink-400')}>
               {day ?? 'Not on file'}
+              {/*
+                The year's room, held whether or not there is a year to put in
+                it.
+
+                This line is drawn twice: from the roster's `MM-DD` the moment
+                the page opens, and again from Planning Center's full date when
+                the details read lands — "20 August" becoming "20 August 2013"
+                and shoving the cake badge 40px sideways, seconds after
+                somebody started reading. Reserving four digits' width holds
+                that still, and holding it for a student Planning Center has no
+                year for as well is what keeps the reservation from becoming a
+                second jump when the answer is "there isn't one". `tabular-nums`
+                above is what makes the placeholder and a real year the same
+                width.
+              */}
+              {day && birthdayYear(onFile) === null ? (
+                <span aria-hidden="true" className="invisible"> 0000</span>
+              ) : null}
             </p>
             {state !== 'missing' && state !== 'quiet' ? (
               <Badge tone={state === 'today' ? 'success' : state === 'soon' ? 'brand' : 'neutral'}>
