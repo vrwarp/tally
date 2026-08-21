@@ -330,6 +330,23 @@ describe('the history', () => {
     expect(within(past).getByRole('heading', { name: /july 2026/i })).toBeInTheDocument();
   });
 
+  /*
+   * A ministry on its first week, on the screen where "New event" is the thing
+   * to find.
+   *
+   * This half used to render nothing at all when there was no history — and the
+   * column it sits in carries the divider rule, which deliberately runs the
+   * height of the taller column. So a fresh install got a full-height hairline
+   * down the side of a void, which reads as a broken screen rather than a new
+   * one. The half states itself instead.
+   */
+  it('says so on a first run rather than leaving a ruled void', async () => {
+    show([]);
+
+    const past = await screen.findByRole('region', { name: /past gatherings/i });
+    expect(within(past).getByText('Nothing has happened yet')).toBeInTheDocument();
+  });
+
   it('will not print a bold nought for a gathering that never happened', async () => {
     // Tally reads a finished event with no attendance as one that did not run.
     fetchPastEvents.mockResolvedValue({

@@ -23,8 +23,10 @@
  * centred phone column after the other four stopped, so a leader moving from
  * Students to Check in watched the page slide 80px right and the rail detach
  * from what it navigates. It now takes the same left edge as its siblings via
- * `pageFrameWidth`, and is the reason `widen` exists: it is the one page whose
- * *measure* should stay where it was.
+ * `pageFrameWidth` — and, since the roster learned to draw two columns of
+ * names and the chooser two cards to a row, the same measure as well. Both
+ * screens of that tab widen together, because the shared left edge is the
+ * thing a counselor tapping from one to the other must not see move.
  */
 import type { ReactNode } from 'react';
 import { pageFrameWidth, type PageFrameWidthOptions } from '@/components/pageFrameWidth';

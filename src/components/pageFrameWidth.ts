@@ -31,12 +31,20 @@ export interface PageFrameWidthOptions {
    * Whether the frame takes the window above `lg`.
    *
    * By default it does, because the room beside the rail is there to be spent
-   * on columns. The check-in tab is the exception: a roster row stretched
-   * across a monitor puts a student's name and the control that checks them in
-   * a foot apart, so it keeps its phone measure and has nothing else to spend
-   * the width on. It still stops *centring* — that half of the frame is about
-   * where a page starts, not how wide it is, and it has to be the same on every
-   * screen or the left edge moves as a leader changes tabs.
+   * on columns — and the rule is that it *is* spent on columns, never on a
+   * longer line.
+   *
+   * Check-in was the long-standing exception, on the reasoning that a roster
+   * row stretched across a monitor puts a student's name and the control that
+   * checks them in a foot apart. That was an argument against one row per
+   * window, not against the width: the roster now draws two ~600px columns and
+   * the gathering chooser two cards to a row, so both take it like everything
+   * else. What remains behind this flag is the kiosk preview, which genuinely
+   * has nothing to put beside itself.
+   *
+   * Either way the frame stops *centring* — that half is about where a page
+   * starts, not how wide it is, and it has to be the same on every screen or
+   * the left edge moves as a leader changes tabs.
    */
   widen?: boolean;
 }

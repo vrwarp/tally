@@ -7,6 +7,25 @@
  * — one gathering with its check-ins, or a whole repeat with all of them — is
  * the thing that cannot be undone, and it lives at the foot of the page behind
  * a typed confirmation. See `EventDangerZone`.
+ *
+ * ## The frame, and the two columns inside it
+ *
+ * This page is reached from the calendar, and it was the one screen in that
+ * journey that never adopted `PageFrame`: a hand-written 512px column, centred,
+ * with no `lg:` anything in it. Beside a 224px rail on a 1280px window that is
+ * 992px of content area holding 512px of page — a ~240px void either side, and
+ * a left edge that moved every time a leader arrived here from Events. It takes
+ * the same frame as its siblings now, and above `lg` it splits: what the
+ * gathering *is* on the left, what happened and who may touch it on the right.
+ *
+ * ## Why the cards reorder
+ *
+ * An Attendance card on a retreat three weeks out says nothing three times — a
+ * `0`, a tile reading "still ahead", and a line saying nobody has been checked
+ * in — and it said it above the RSVP list, which is the only thing on the page
+ * with anything to report. So when the gathering is still ahead the RSVPs come
+ * first and Attendance collapses to its one line. No new data, no new card,
+ * just the order they can answer in.
  */
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -21,6 +40,7 @@ import {
   SkeletonRows,
   StatTile,
 } from '@/components/ui';
+import { PageFrame } from '@/components/PageFrame';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useEvent } from '@/hooks/useEvent';
@@ -105,13 +125,15 @@ export function EventDetailPage() {
   if (!event) {
     if (loading || eventLoading) {
       return (
-        <div className="mx-auto max-w-lg px-4 py-4">
+        // The same frame as the loaded page: a skeleton that stands somewhere
+        // else is a page that jumps sideways the moment it arrives.
+        <PageFrame width="lg">
           <SkeletonRows count={3} />
-        </div>
+        </PageFrame>
       );
     }
     return (
-      <div className="mx-auto max-w-lg px-4 py-4">
+      <PageFrame width="lg">
         <EmptyState
           icon="🗓"
           title="That event is not here"
@@ -125,7 +147,7 @@ export function EventDetailPage() {
             </Link>
           }
         />
-      </div>
+      </PageFrame>
     );
   }
 
@@ -159,6 +181,19 @@ export function EventDetailPage() {
    * leader to wonder why the night is missing from the trend strip.
    */
   const readsAsCancelled = !cancelled && event.checkInClosesAt < now && attendance.length === 0;
+
+  /*
+   * Whether Attendance has anything to say yet, and therefore where it goes.
+   *
+   * On a gathering that has not happened, "checked in" is zero by definition —
+   * the number is not news, it is arithmetic. So the card shrinks to the one
+   * sentence that *is* news ("still ahead") and the RSVP list, which is the
+   * only thing on the page with names in it, takes the place under the hero.
+   */
+  const stillAhead = event.startAt > now;
+  const attendanceAhead = stillAhead && attendance.length === 0;
+  const rsvpFirst =
+    event.mode === 'oneoff' && (stillAhead || (event.requiresRsvp && attendance.length === 0));
 
   const studentsById = new Map(students.map((student) => [student.id, student]));
   const present = attendance
@@ -202,259 +237,282 @@ export function EventDetailPage() {
     }
   };
 
+  const rsvpCard = event.mode === 'oneoff' ? <RsvpManager event={event} /> : null;
+
   return (
-    <div className="mx-auto flex max-w-lg flex-col gap-4 px-4 py-4">
+    <PageFrame width="lg">
       <Link to="/events" className="text-sm font-semibold text-brand-300">
         ‹ Events
       </Link>
 
-      <Card>
-        <div className="flex flex-col gap-3 p-4">
-          <div className="flex min-w-0 items-start gap-3">
-            <EventIcon name={event.icon} size="lg" tone="brand" />
-            <div className="min-w-0 flex-1">
-              <h1
-                className={cn(
-                  'text-xl font-bold',
-                  cancelled ? 'text-ink-400 line-through' : 'text-ink-50',
-                )}
-              >
-                {event.title}
-              </h1>
-              <p className="mt-1 text-sm text-ink-400">
-                {formatEventDay(event.startAt, now)} · {formatEventWindow(event)}
-              </p>
-            </div>
-          </div>
+      {/*
+        One column under a thumb, two under a pointer.
 
-          {event.description ? (
-            <p className="text-sm leading-relaxed text-ink-300">{event.description}</p>
-          ) : null}
-
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Badge tone={event.mode === 'recurring' ? 'neutral' : 'brand'}>
-              {event.mode === 'recurring' ? 'Recurring' : 'One-off'}
-            </Badge>
-            {cancelled ? <Badge tone="danger">Cancelled</Badge> : null}
-            {!cancelled && isCheckInOpen(event, now) ? (
-              <Badge tone="success">Check-in open</Badge>
-            ) : null}
-            {event.requiresRsvp ? <Badge tone="warn">RSVP only</Badge> : null}
-            {event.requiresCheckOut ? <Badge tone="neutral">Check-out</Badge> : null}
-          </div>
-
-          <dl className="divide-y divide-ink-800 border-t border-ink-800 pt-1">
-            {seriesTitle ? <DetailRow label="Series" value={seriesTitle} /> : null}
-            {predictedFrom ? <DetailRow label="Regulars from" value={predictedFrom} /> : null}
-            {event.recurrence ? (
-              <DetailRow
-                label="Repeats"
-                value={describeRecurrence(event.recurrence, event.startAt)}
-              />
-            ) : null}
-            {event.location ? <DetailRow label="Location" value={event.location} /> : null}
-            <DetailRow
-              label="Check-in"
-              value={`${formatClock(event.checkInOpensAt)} – ${formatClock(event.checkInClosesAt)}`}
-            />
-          </dl>
-
-          {event.notes ? (
-            <p className="whitespace-pre-line rounded-xl bg-ink-950 p-3 text-sm text-ink-300 ring-1 ring-ink-800">
-              {event.notes}
-            </p>
-          ) : null}
-
-          <div className="flex flex-col gap-2">
-            <Link
-              to={`/event/${event.id}`}
-              className="inline-flex min-h-14 w-full items-center justify-center rounded-xl bg-brand-500 px-5 text-base font-semibold text-white active:bg-brand-600"
-            >
-              Take attendance
-            </Link>
-            <div className="flex gap-2">
-              <Button variant="secondary" className="flex-1" onClick={() => setEditorOpen(true)}>
-                Edit
-              </Button>
-
-              {/*
-                * Cancelling used to be one tap, sitting right beside Edit with
-                * only colour between them — a stray thumb calls off a gathering
-                * forty families are expecting. Un-cancelling stays one tap,
-                * because putting friction on the recovery is backwards.
-                */}
-              {cancelled ? (
-                <Button
-                  variant="secondary"
-                  className="flex-1"
-                  loading={busy}
-                  onClick={() => void toggleStatus()}
-                >
-                  Un-cancel
-                </Button>
-              ) : confirmingCancel ? (
-                <div className="flex flex-1 gap-2">
-                  <Button variant="ghost" className="flex-1" onClick={() => setConfirmingCancel(false)}>
-                    Keep it
-                  </Button>
-                  <Button
-                    variant="danger"
-                    className="flex-1"
-                    loading={busy}
-                    onClick={() => {
-                      setConfirmingCancel(false);
-                      void toggleStatus();
-                    }}
+        The seam is between what the gathering *is* — the hero, its details and
+        the actions that change them — and what it has to report: who came, who
+        may take the register, and the foot of the page. The left column is
+        capped at the measure the whole page used to be, so the prose in it
+        reads the way it always did and the recovered width goes to the half
+        that is a list.
+      */}
+      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,32rem)_minmax(0,1fr)] lg:items-start lg:gap-8">
+        <div className="flex min-w-0 flex-col gap-4">
+          <Card>
+            <div className="flex flex-col gap-3 p-4">
+              <div className="flex min-w-0 items-start gap-3">
+                <EventIcon name={event.icon} size="lg" tone="brand" />
+                <div className="min-w-0 flex-1">
+                  <h1
+                    className={cn(
+                      'text-xl font-bold',
+                      cancelled ? 'text-ink-400 line-through' : 'text-ink-50',
+                    )}
                   >
-                    Yes, cancel
-                  </Button>
+                    {event.title}
+                  </h1>
+                  <p className="mt-1 text-sm text-ink-400">
+                    {formatEventDay(event.startAt, now)} · {formatEventWindow(event)}
+                  </p>
                 </div>
-              ) : (
-                <Button variant="secondary" className="flex-1" onClick={() => setConfirmingCancel(true)}>
-                  Cancel event
-                </Button>
-              )}
-            </div>
-
-            {confirmingCancel ? (
-              <p role="alert" className="text-center text-xs text-ink-400">
-                Cancelling hides {event.title} from check-in. Attendance already recorded is kept.
-              </p>
-            ) : null}
-          </div>
-        </div>
-      </Card>
-
-      <Card>
-        <CardHeader
-          title="Attendance"
-          count={attendance.length}
-          action={
-            // Not offered on a gathering nothing has been recorded against, and
-            // not on a projected one: `materialized === false` means this id
-            // names a document that does not exist, so a register read comes
-            // back empty and a file would assert nobody came.
-            event.materialized && !locked ? (
-              <div onPointerEnter={() => setTeamArmed(true)} onFocus={() => setTeamArmed(true)}>
-                <ExportCsvButton
-                  build={buildRegisterExport}
-                  count={registerExportRows.length}
-                  noun="check-ins"
-                />
               </div>
-            ) : undefined
-          }
-        />
-        <div className="flex flex-col gap-3 p-3">
-          {attendanceError ? <ErrorBanner message={attendanceError} /> : null}
 
-          <StatTile
-            label="Checked in"
-            value={attendance.length}
-            tone={attendance.length > 0 ? 'success' : 'neutral'}
-            hint={
-              event.startAt > now
-                ? 'Nothing recorded yet — this event is still ahead.'
-                : readsAsCancelled
-                  ? 'Counted as a cancelled gathering.'
-                  : undefined
-            }
-          />
+              {event.description ? (
+                <p className="text-sm leading-relaxed text-ink-300">{event.description}</p>
+              ) : null}
 
-          {/* Neutral whatever the number: a gathering where half the children
-              were signed out by a parent who then walked off without telling
-              anybody is a normal morning, not a failure to report. */}
-          {event.requiresCheckOut ? (
-            <StatTile
-              label="Checked out"
-              value={collected.length}
-              tone="neutral"
-              hint={
-                attendance.length > 0
-                  ? `${collected.length} of ${attendance.length} collected.`
-                  : undefined
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Badge tone={event.mode === 'recurring' ? 'neutral' : 'brand'}>
+                  {event.mode === 'recurring' ? 'Recurring' : 'One-off'}
+                </Badge>
+                {cancelled ? <Badge tone="danger">Cancelled</Badge> : null}
+                {!cancelled && isCheckInOpen(event, now) ? (
+                  <Badge tone="success">Check-in open</Badge>
+                ) : null}
+                {event.requiresRsvp ? <Badge tone="warn">RSVP only</Badge> : null}
+                {event.requiresCheckOut ? <Badge tone="neutral">Check-out</Badge> : null}
+              </div>
+
+              <dl className="divide-y divide-ink-800 border-t border-ink-800 pt-1">
+                {seriesTitle ? <DetailRow label="Series" value={seriesTitle} /> : null}
+                {predictedFrom ? <DetailRow label="Regulars from" value={predictedFrom} /> : null}
+                {event.recurrence ? (
+                  <DetailRow
+                    label="Repeats"
+                    value={describeRecurrence(event.recurrence, event.startAt)}
+                  />
+                ) : null}
+                {event.location ? <DetailRow label="Location" value={event.location} /> : null}
+                <DetailRow
+                  label="Check-in"
+                  value={`${formatClock(event.checkInOpensAt)} – ${formatClock(event.checkInClosesAt)}`}
+                />
+              </dl>
+
+              {event.notes ? (
+                <p className="whitespace-pre-line rounded-xl bg-ink-950 p-3 text-sm text-ink-300 ring-1 ring-ink-800">
+                  {event.notes}
+                </p>
+              ) : null}
+
+              <div className="flex flex-col gap-2">
+                <Link
+                  to={`/event/${event.id}`}
+                  className="inline-flex min-h-14 w-full items-center justify-center rounded-xl bg-brand-500 px-5 text-base font-semibold text-white active:bg-brand-600"
+                >
+                  Take attendance
+                </Link>
+                <div className="flex gap-2">
+                  <Button variant="secondary" className="flex-1" onClick={() => setEditorOpen(true)}>
+                    Edit
+                  </Button>
+
+                  {/*
+                    * Cancelling used to be one tap, sitting right beside Edit with
+                    * only colour between them — a stray thumb calls off a gathering
+                    * forty families are expecting. Un-cancelling stays one tap,
+                    * because putting friction on the recovery is backwards.
+                    */}
+                  {cancelled ? (
+                    <Button
+                      variant="secondary"
+                      className="flex-1"
+                      loading={busy}
+                      onClick={() => void toggleStatus()}
+                    >
+                      Un-cancel
+                    </Button>
+                  ) : confirmingCancel ? (
+                    <div className="flex flex-1 gap-2">
+                      <Button variant="ghost" className="flex-1" onClick={() => setConfirmingCancel(false)}>
+                        Keep it
+                      </Button>
+                      <Button
+                        variant="danger"
+                        className="flex-1"
+                        loading={busy}
+                        onClick={() => {
+                          setConfirmingCancel(false);
+                          void toggleStatus();
+                        }}
+                      >
+                        Yes, cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button variant="secondary" className="flex-1" onClick={() => setConfirmingCancel(true)}>
+                      Cancel event
+                    </Button>
+                  )}
+                </div>
+
+                {confirmingCancel ? (
+                  <p role="alert" className="text-center text-xs text-ink-400">
+                    Cancelling hides {event.title} from check-in. Attendance already recorded is kept.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-4">
+          {rsvpFirst ? rsvpCard : null}
+
+          <Card>
+            <CardHeader
+              title="Attendance"
+              count={attendance.length}
+              action={
+                // Not offered on a gathering nothing has been recorded against, and
+                // not on a projected one: `materialized === false` means this id
+                // names a document that does not exist, so a register read comes
+                // back empty and a file would assert nobody came.
+                event.materialized && !locked ? (
+                  <div onPointerEnter={() => setTeamArmed(true)} onFocus={() => setTeamArmed(true)}>
+                    <ExportCsvButton
+                      build={buildRegisterExport}
+                      count={registerExportRows.length}
+                      noun="check-ins"
+                    />
+                  </div>
+                ) : undefined
               }
             />
-          ) : null}
+            {attendanceAhead ? (
+              /* One line, where there used to be three ways of saying zero: the
+                 header count, a 97px tile, and a sentence under it. */
+              <p className="px-4 py-3 text-sm text-ink-500">
+                Nothing recorded yet — this event is still ahead.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-3 p-3">
+                {attendanceError ? <ErrorBanner message={attendanceError} /> : null}
 
-          {present.length === 0 ? (
-            readsAsCancelled ? (
-              <div className="rounded-xl bg-ink-950 px-3 py-2 ring-1 ring-ink-800">
-                <p className="text-sm text-ink-300">
-                  Nobody was checked in, so Tally reads this as a cancelled gathering: it is not
-                  counted as a miss for anybody, and it does not inform the predictive roster or the
-                  trend strip.
-                </p>
-                <p className="mt-1 text-xs text-ink-500">
-                  If it did go ahead and nobody took attendance, you can still take it now. If it
-                  was called off, cancelling the event says so on purpose.
+                <StatTile
+                  label="Checked in"
+                  value={attendance.length}
+                  tone={attendance.length > 0 ? 'success' : 'neutral'}
+                  hint={readsAsCancelled ? 'Counted as a cancelled gathering.' : undefined}
+                />
+
+                {/* Neutral whatever the number: a gathering where half the children
+                    were signed out by a parent who then walked off without telling
+                    anybody is a normal morning, not a failure to report. */}
+                {event.requiresCheckOut ? (
+                  <StatTile
+                    label="Checked out"
+                    value={collected.length}
+                    tone="neutral"
+                    hint={
+                      attendance.length > 0
+                        ? `${collected.length} of ${attendance.length} collected.`
+                        : undefined
+                    }
+                  />
+                ) : null}
+
+                {/* No bare "Nobody has been checked in." under it: the header's count
+                    and the tile have both already said zero, and a third copy of it is
+                    what pushed the names that far down the page. */}
+                {present.length === 0 ? (
+                  readsAsCancelled ? (
+                    <div className="rounded-xl bg-ink-950 px-3 py-2 ring-1 ring-ink-800">
+                      <p className="text-sm text-ink-300">
+                        Nobody was checked in, so Tally reads this as a cancelled gathering: it is not
+                        counted as a miss for anybody, and it does not inform the predictive roster or the
+                        trend strip.
+                      </p>
+                      <p className="mt-1 text-xs text-ink-500">
+                        If it did go ahead and nobody took attendance, you can still take it now. If it
+                        was called off, cancelling the event says so on purpose.
+                      </p>
+                    </div>
+                  ) : null
+                ) : (
+                  <ul className="flex flex-col gap-2">
+                    {present.map(({ record, student }) => (
+                      <li
+                        key={record.id}
+                        className="flex min-h-12 items-center gap-3 rounded-xl bg-ink-950 px-3 py-2 ring-1 ring-ink-800"
+                      >
+                        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink-100">
+                          {student ? studentFullName(student) : 'Former student'}
+                        </span>
+                        {student ? (
+                          <span className="shrink-0 text-xs text-ink-500">
+                            {gradeLabel(student) ?? NO_GRADE}
+                          </span>
+                        ) : null}
+                        <span className="shrink-0 text-xs tabular-nums text-ink-500">
+                          {formatClock(record.checkedInAt)}
+                        </span>
+                        {/* Only where there is one. A student with no pickup recorded
+                            gets nothing here — no badge, no dash, no colour. */}
+                        {event.requiresCheckOut && record.checkedOutAt ? (
+                          <span className="shrink-0 text-xs tabular-nums text-ink-400">
+                            → {formatClock(record.checkedOutAt)}
+                          </span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </Card>
+
+          {rsvpFirst ? null : rsvpCard}
+
+          {/*
+            Who's on this gathering.
+            Above the danger zone and below the register, because it is an ordinary
+            setting rather than something destructive — but it is the one setting on
+            this page that changes what other people can see, so it is not buried in
+            the editor modal either.
+          */}
+          <Card>
+            <div className="flex items-center justify-between gap-3 p-4">
+              <div className="min-w-0">
+                <h2 className="text-sm font-semibold text-ink-100">Who's on this gathering</h2>
+                <p className="truncate text-xs text-ink-500">
+                  {accessList?.restricted
+                    ? `${accessList.members.size} ${accessList.members.size === 1 ? 'person' : 'people'} — everyone else sees it locked`
+                    : 'Everyone on the team can take this register'}
                 </p>
               </div>
-            ) : (
-              <p className="px-1 text-sm text-ink-500">Nobody has been checked in.</p>
-            )
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {present.map(({ record, student }) => (
-                <li
-                  key={record.id}
-                  className="flex min-h-12 items-center gap-3 rounded-xl bg-ink-950 px-3 py-2 ring-1 ring-ink-800"
-                >
-                  <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink-100">
-                    {student ? studentFullName(student) : 'Former student'}
-                  </span>
-                  {student ? (
-                    <span className="shrink-0 text-xs text-ink-500">
-                      {gradeLabel(student) ?? NO_GRADE}
-                    </span>
-                  ) : null}
-                  <span className="shrink-0 text-xs tabular-nums text-ink-500">
-                    {formatClock(record.checkedInAt)}
-                  </span>
-                  {/* Only where there is one. A student with no pickup recorded
-                      gets nothing here — no badge, no dash, no colour. */}
-                  {event.requiresCheckOut && record.checkedOutAt ? (
-                    <span className="shrink-0 text-xs tabular-nums text-ink-400">
-                      → {formatClock(record.checkedOutAt)}
-                    </span>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          )}
+              <Button variant="secondary" onClick={() => setAccessOpen(true)}>
+                {accessList?.restricted ? 'Change' : 'Limit'}
+              </Button>
+            </div>
+          </Card>
+
+          <EventDangerZone
+            event={event}
+            checkedIn={attendance.length}
+            onDeleted={() => navigate('/events', { replace: true })}
+          />
         </div>
-      </Card>
-
-      {/*
-        Who's on this gathering.
-        Above the danger zone and below the register, because it is an ordinary
-        setting rather than something destructive — but it is the one setting on
-        this page that changes what other people can see, so it is not buried in
-        the editor modal either.
-      */}
-      <Card>
-        <div className="flex items-center justify-between gap-3 p-4">
-          <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-ink-100">Who's on this gathering</h2>
-            <p className="truncate text-xs text-ink-500">
-              {accessList?.restricted
-                ? `${accessList.members.size} ${accessList.members.size === 1 ? 'person' : 'people'} — everyone else sees it locked`
-                : 'Everyone on the team can take this register'}
-            </p>
-          </div>
-          <Button variant="secondary" onClick={() => setAccessOpen(true)}>
-            {accessList?.restricted ? 'Change' : 'Limit'}
-          </Button>
-        </div>
-      </Card>
-
-      {event.mode === 'oneoff' ? <RsvpManager event={event} /> : null}
-
-      <EventDangerZone
-        event={event}
-        checkedIn={attendance.length}
-        onDeleted={() => navigate('/events', { replace: true })}
-      />
+      </div>
 
       <EventEditorModal
         open={editorOpen}
@@ -468,6 +526,6 @@ export function EventDetailPage() {
         event={event}
         now={now}
       />
-    </div>
+    </PageFrame>
   );
 }

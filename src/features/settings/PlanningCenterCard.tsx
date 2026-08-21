@@ -134,7 +134,25 @@ export function PlanningCenterCard() {
         {error ? <ErrorBanner message={error} /> : null}
 
         {loading && !status ? (
-          <SkeletonRows count={3} />
+          <>
+            {/*
+             * Three pulsing bars are furniture, not content, so the skeleton
+             * says nothing — which left a screen reader with silence between
+             * the card's description and the facts arriving. This card names
+             * what it is waiting for, because "loading" is not the answer to
+             * "is Planning Center working".
+             *
+             * The skeleton is hidden here rather than asked to stay quiet: it
+             * is a shared component whose own announcement is not this card's
+             * to rely on, and one loading region must not have two voices.
+             */}
+            <span role="status" className="sr-only">
+              Checking the Planning Center connection
+            </span>
+            <div aria-hidden="true">
+              <SkeletonRows count={3} />
+            </div>
+          </>
         ) : status ? (
           <>
             <div className="flex flex-wrap items-center gap-2">
@@ -180,7 +198,18 @@ export function PlanningCenterCard() {
               </p>
             ) : null}
 
-            <dl className="flex flex-col gap-2 text-sm">
+            {/*
+             * Three facts, laid out by how much width this card actually has.
+             *
+             * Stacked they were three full-measure lines — and in a page frame
+             * that widens to `max-w-7xl` that measure was the whole card. The
+             * width belongs to columns instead, but only where a column is
+             * still readable: `auto-fit` takes another one each time 15rem is
+             * free and otherwise leaves the list stacked, so this reads as two
+             * or three columns of fact on a wide laptop and as one column on a
+             * phone, without a breakpoint guessing at either.
+             */}
+            <dl className="grid gap-2 text-sm lg:grid-cols-[repeat(auto-fit,minmax(15rem,1fr))] lg:gap-x-6">
               <div>
                 <dt className="text-xs font-medium uppercase tracking-wide text-ink-500">Roster</dt>
                 <dd className="text-ink-300">

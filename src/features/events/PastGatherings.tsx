@@ -19,7 +19,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
-import { Badge, ErrorBanner } from '@/components/ui';
+import { Badge, EmptyState, ErrorBanner } from '@/components/ui';
 import { EventIcon } from '@/components/ui/EventIcon';
 import { LockedChainGroup } from '@/features/events/LockedChainGroup';
 import { partitionBand } from '@/features/events/lockedChains';
@@ -46,6 +46,9 @@ interface MonthGroup {
  * two screens: every Friday looks like every other Friday, and the only thing
  * that distinguishes them — how long ago — is the one thing a bare weekday and
  * day-of-month cannot say. The month headings are the ruler.
+ *
+ * A ruler that scrolls off the top of the screen is not a ruler, which is why
+ * the heading below is `sticky` — see the note on it.
  */
 function groupByMonth(events: readonly TallyEvent[]): MonthGroup[] {
   const groups: MonthGroup[] = [];
@@ -287,7 +290,22 @@ export function PastGatherings({ before }: PastGatheringsProps) {
     return () => observer.disconnect();
   }, [hasMore, error, loadMore, events.length]);
 
-  if (!loading && !error && events.length === 0) return null;
+  /*
+   * A ministry on its first week, which used to render as nothing at all.
+   *
+   * Returning `null` here was right about the content and wrong about the
+   * page: `EventsPage` draws this half of the calendar inside a column that
+   * carries the divider rule, and the rule deliberately runs the height of the
+   * taller column — so an install with no history got a full-height hairline
+   * with a void beside it, next to a left column saying "Nothing scheduled
+   * yet". A brand-new ministry read as a broken screen on the exact page where
+   * "New event" is the thing to find.
+   *
+   * So the half states itself instead. It is the quieter of the two empty
+   * states on purpose — no icon, where the left column has one — because the
+   * answer on that screen is on the other side of the rule.
+   */
+  const empty = !loading && !error && events.length === 0;
 
   return (
     <section aria-labelledby="past-gatherings">
@@ -296,6 +314,13 @@ export function PastGatherings({ before }: PastGatheringsProps) {
       <h2 id="past-gatherings" className="pb-3 text-lg font-bold text-ink-50">
         Past gatherings
       </h2>
+
+      {empty ? (
+        <EmptyState
+          title="Nothing has happened yet"
+          description="Gatherings appear here once they are past."
+        />
+      ) : null}
 
       <div className="flex flex-col gap-5">
         {groups.map((group) => {
@@ -308,8 +333,32 @@ export function PastGatherings({ before }: PastGatheringsProps) {
               {/* One eyebrow style for both halves of the calendar. This was a
                   step quieter and a step lighter than the bands opposite it,
                   which put the structure at the same value as the rows it
-                  governs. */}
-              <h3 className="pb-2 text-xs font-bold uppercase tracking-wider text-ink-400">
+                  governs.
+
+                  And it sticks, because it is the ruler and the rows are
+                  measured against it. A row here reads "Fri 24 · 7:00 PM" and
+                  deliberately does not name its month — the heading was
+                  supposed to carry that. But a 64px row on a 72px pitch means
+                  a month with two series running is 648–720px on its own, and
+                  one flick into a five-Friday month left eight rows on screen
+                  with the month nowhere on it. "Fri 24" happens in July, in
+                  April and in January, and opening the right weekday in the
+                  wrong month means reading the wrong head count off it.
+
+                  Opaque `ink-950` — the page's own ground, and a token because
+                  the ramp flips wholesale in daylight. Not the translucent
+                  band the roster's headings use: the rows passing under this
+                  one are `ink-900` cards, and they smear through a blur.
+
+                  `top` is measured rather than assumed: the phone's app bar is
+                  sticky at the top of the same scroller and carries a
+                  safe-area inset on a notched phone, and it is not there at
+                  all on a desktop. Same idiom as the check-in roster's own
+                  sticky headings. Costs the desktop column nothing. */}
+              <h3
+                style={{ top: 'var(--app-header-h, 0px)' }}
+                className="sticky z-10 bg-ink-950 pt-1 pb-2 text-xs font-bold uppercase tracking-wider text-ink-400"
+              >
                 {group.label}
               </h3>
               <ul className="flex flex-col gap-2">

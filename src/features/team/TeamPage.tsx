@@ -160,6 +160,14 @@ export function TeamPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const [invitations, setInvitations] = useState<Invitation[] | null>(null);
+  const [invitationsError, setInvitationsError] = useState<string | null>(null);
+  /**
+   * Which invitation, if any, is one tap from being deleted.
+   *
+   * One id rather than a set: arming a second row disarms the first, which is
+   * the behaviour a half-finished confirmation should have.
+   */
+  const [confirmingWithdrawal, setConfirmingWithdrawal] = useState<string | null>(null);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<Role>('counselor');
   const [inviting, setInviting] = useState(false);
@@ -197,9 +205,19 @@ export function TeamPage() {
   // so a core-team subscription would just be a denial in the console. It is
   // also why a core member's screen says outstanding invitations exist rather
   // than showing them — the browser cannot read them to count.
+  //
+  // Three states, the same three the roster above already has: `null` while
+  // the first snapshot is in flight, a string when the read failed, and `[]`
+  // only ever from a snapshot that actually arrived.
+  //
+  // The error callback used to answer `setInvitations([])`, which is not a
+  // record of a failure but a claim: the card then drew a count badge reading
+  // `0` and an empty state saying everybody invited had signed in. On a dropped
+  // connection that is a screen telling an admin — about access to a roster of
+  // minors — that four outstanding invitations are not outstanding.
   useEffect(() => {
     if (!isAdmin) return;
-    return subscribeInvitations(setInvitations, () => setInvitations([]));
+    return subscribeInvitations(setInvitations, (cause) => setInvitationsError(cause.message));
   }, [isAdmin]);
 
   const patchMember = async (member: UserProfile, changes: { role?: Role; active?: boolean }) => {
@@ -249,11 +267,40 @@ export function TeamPage() {
     }
   };
 
+  /**
+   * Puts a withdrawn invitation back, exactly as it was.
+   *
+   * The document id is derived from the address, so re-inviting writes the same
+   * document the delete removed rather than a second one — which is what makes
+   * an undo possible at all here. The one thing `inviteToTally` cannot express
+   * is a suspended invitation: it always writes `active: true`. Restoring a
+   * switched-off address as switched-on would be an undo that quietly grants
+   * access, so the hold is put back explicitly.
+   */
+  const restoreInvitation = async (invitation: Invitation) => {
+    if (!profile) return;
+    setBusyId(invitation.id);
+    try {
+      await inviteToTally(invitation.email, invitation.role, profile.id, invitation.note);
+      if (!invitation.active) await setInvitationActive(invitation.id, false);
+      show(`${invitation.email} invited again`, { tone: 'success' });
+    } catch {
+      show('Could not restore that invitation.', { tone: 'error' });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const dropInvitation = async (invitation: Invitation) => {
     setBusyId(invitation.id);
     try {
       await withdrawInvitation(invitation.id);
-      show(`${invitation.email} withdrawn`, { tone: 'success' });
+      // The only way back from a `deleteDoc`. Without it the confirmation of an
+      // irreversible act is the one toast in the app that offers nothing.
+      show(`${invitation.email} withdrawn`, {
+        tone: 'success',
+        action: { label: 'Undo', onPress: () => void restoreInvitation(invitation) },
+      });
     } catch {
       show('Could not withdraw that invitation.', { tone: 'error' });
     } finally {
@@ -338,7 +385,20 @@ export function TeamPage() {
               <ErrorBanner message={usersError} />
             </div>
           ) : !ordered ? (
-            <SkeletonRows count={3} />
+            /* Pulsing bars are nothing to read, so they are hidden — and
+               hidden, they are silence, which is exactly what an empty list
+               also sounds like. The sentence beside them is the difference.
+               `aria-hidden` on the wrapper rather than a prop on the shared
+               component: whatever `SkeletonRows` does or does not announce for
+               itself, this region announces once, and says which region. */
+            <>
+              <span role="status" className="sr-only">
+                Loading the team
+              </span>
+              <div aria-hidden="true">
+                <SkeletonRows count={3} />
+              </div>
+            </>
           ) : ordered.length === 0 ? (
             <EmptyState
               title="Nobody has signed in yet."
@@ -504,15 +564,23 @@ export function TeamPage() {
                       ▸
                     </span>
                     Invited
-                    {invitations ? (
+                    {/* No number at all when the read failed: a stale count is
+                        the same false claim the empty state used to make. */}
+                    {invitations && !invitationsError ? (
                       <span className="rounded-full bg-ink-800 px-2 py-0.5 text-xs font-semibold text-ink-300">
                         {invitations.length}
                       </span>
                     ) : null}
                   </h2>
                   {/* Shut, the card would otherwise report a clean 4 when one of
-                      the four is switched off. */}
-                  {suspendedInvites > 0 ? (
+                      the four is switched off — or, when the read failed, say
+                      nothing whatever beside a "＋ Invite someone" that reads as
+                      "nobody is waiting". The banner itself is inside the card. */}
+                  {invitationsError ? (
+                    <p className="mt-0.5 group-open:hidden lg:hidden">
+                      <Badge tone="danger">Not loaded</Badge>
+                    </p>
+                  ) : suspendedInvites > 0 ? (
                     <p className="mt-0.5 group-open:hidden lg:hidden">
                       <Badge tone="danger">{suspendedInvites} suspended</Badge>
                     </p>
@@ -563,8 +631,19 @@ export function TeamPage() {
                 </Button>
               </form>
 
-              {!invitations ? (
-                <SkeletonRows count={2} />
+              {invitationsError ? (
+                <div className="px-4 py-3">
+                  <ErrorBanner message={invitationsError} />
+                </div>
+              ) : !invitations ? (
+                <>
+                  <span role="status" className="sr-only">
+                    Loading invitations
+                  </span>
+                  <div aria-hidden="true">
+                    <SkeletonRows count={2} />
+                  </div>
+                </>
               ) : invitations.length === 0 ? (
                 <EmptyState
                   title="No pending invitations."
@@ -602,27 +681,64 @@ export function TeamPage() {
                           </p>
                         }
                       />
-                      {/* The reversible control at the thumb's edge and the
-                          destructive one at the other: they used to sit 12px
-                          apart, both under 44px. */}
-                      <div className="flex items-center justify-between gap-4">
-                        <Button
-                          variant="ghost"
-                          disabled={busyId === invitation.id}
-                          onClick={() => void dropInvitation(invitation)}
-                          // A ring at rest where there is no hover to say this
-                          // is a control — the same answer the role select next
-                          // to it already uses.
-                          className="ring-1 ring-ink-700 pointer-fine:-ml-4 pointer-fine:ring-transparent"
-                        >
-                          Withdraw
-                        </Button>
+                      {/*
+                        * The reversible control at the thumb's edge and the
+                        * destructive one at the other: they used to sit 12px
+                        * apart, both under 44px.
+                        *
+                        * They were also the wrong way round in weight.
+                        * Withdrawing is a `deleteDoc` and it wore `ghost`, the
+                        * quietest variant in the system — quieter than the
+                        * *reversible* toggle beside it — and fired on one tap,
+                        * on a row where those two are the only two things a
+                        * thumb can land on. It now costs a second, red tap, the
+                        * shape the event page already uses for calling off a
+                        * gathering, and the toast that follows offers the way
+                        * back. The toggle is untouched: friction on the
+                        * reversible act is backwards.
+                        */}
+                      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                        {confirmingWithdrawal === invitation.id ? (
+                          <div className="flex items-center gap-2">
+                            <Button variant="ghost" onClick={() => setConfirmingWithdrawal(null)}>
+                              Keep it
+                            </Button>
+                            <Button
+                              variant="danger"
+                              loading={busyId === invitation.id}
+                              onClick={() => {
+                                setConfirmingWithdrawal(null);
+                                void dropInvitation(invitation);
+                              }}
+                            >
+                              Yes, withdraw
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            variant="secondary"
+                            disabled={busyId === invitation.id}
+                            onClick={() => setConfirmingWithdrawal(invitation.id)}
+                          >
+                            Withdraw
+                          </Button>
+                        )}
                         <AccessToggle
                           checked={invitation.active}
                           disabled={busyId === invitation.id}
                           label={`${invitation.email} may sign in`}
                           onChange={(active) => void patchInvitation(invitation, active)}
                         />
+                        {/* `basis-full` drops the consequence onto its own line
+                            inside the same row rather than adding a wrapper the
+                            three layouts would each have to be re-checked
+                            against. Short, because in the tablet band the row is
+                            shrink-to-fit and a long sentence sets its width. */}
+                        {confirmingWithdrawal === invitation.id ? (
+                          <p role="alert" className="basis-full text-xs text-ink-400">
+                            This deletes the invitation for good.
+                          </p>
+                        ) : null}
                       </div>
                     </li>
                   ))}

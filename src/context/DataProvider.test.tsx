@@ -23,6 +23,18 @@ const fetchRoster = vi.hoisted(() => vi.fn());
 
 const rememberRosterPerson = vi.hoisted(() => vi.fn());
 
+/**
+ * The calendar stream's own handlers, held rather than fired and forgotten.
+ *
+ * A test needs to be able to kill this listener and then bring it back, because
+ * that pair is the whole of what the banner over it has to answer to: a failure
+ * that names its stream, and a stream that can take its own banner down again.
+ */
+const calendar = vi.hoisted(() => ({
+  deliver: (() => {}) as (events: never[]) => void,
+  fail: (() => {}) as (cause: Error) => void,
+}));
+
 vi.mock('@/services/roster', () => ({
   fetchRoster,
   rememberRosterPerson,
@@ -61,7 +73,16 @@ vi.mock('@/services/events', async () => {
     return () => {};
   };
   return {
-    subscribeEvents: empty,
+    subscribeEvents: (
+      next: (value: never[]) => void,
+      _options: unknown,
+      onError: (cause: Error) => void,
+    ) => {
+      calendar.deliver = next;
+      calendar.fail = onError;
+      next([]);
+      return () => {};
+    },
     subscribeEventSeries: empty,
     subscribeSettings: (next: (value: unknown) => void) => {
       next(DEFAULT_SETTINGS);
@@ -379,5 +400,44 @@ describe('applying one row a write handed back', () => {
 describe('the calendar window', () => {
   it('reaches at least as far back as participation counts', () => {
     expect(EVENT_WINDOW_DAYS).toBeGreaterThanOrEqual(PARTICIPATION_MAX_AGE_DAYS);
+  });
+});
+
+/**
+ * The banner over a refused listener, and the two things it never did.
+ *
+ * `fail` marks the stream ready on purpose — a permanently blocked stream must
+ * not wedge the app behind a spinner — and the cost is that every screen then
+ * renders its empty state over a read that never happened: "Nothing scheduled
+ * yet · Use New event above" for a calendar nobody could load. Saying *which*
+ * stream died is what lets a screen say that instead. And nothing ever cleared
+ * the error, so a stream that failed once and recovered kept a red bar until
+ * the tab was closed — which is how a banner stops being read.
+ */
+describe('DataProvider, when a stream is refused', () => {
+  it('names the stream, and lets the stream take its own banner down', async () => {
+    mount();
+    await waitFor(() => expect(latest?.loading).toBe(false));
+    expect(latest?.error).toBeNull();
+
+    act(() => {
+      calendar.fail(new Error('Missing or insufficient permissions.'));
+    });
+
+    await waitFor(() =>
+      expect(latest?.error).toBe('Could not load events: Missing or insufficient permissions.'),
+    );
+    // Which read died, not only that one did.
+    expect(latest?.streamErrors?.events).toBe(latest?.error);
+    expect(latest?.streamErrors?.students).toBeUndefined();
+    // And still not held behind a spinner, which is the trade this all sits on.
+    expect(latest?.loading).toBe(false);
+
+    act(() => {
+      calendar.deliver([]);
+    });
+
+    await waitFor(() => expect(latest?.error).toBeNull());
+    expect(latest?.streamErrors?.events).toBeUndefined();
   });
 });

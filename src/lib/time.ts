@@ -156,8 +156,37 @@ export function formatEventDay(date: Date, now: Date = new Date()): string {
   return format(date, 'EEE, MMM d');
 }
 
-export function formatEventWindow(event: Pick<TallyEvent, 'startAt' | 'endAt'>): string {
-  return `${format(event.startAt, 'h:mm a')} – ${format(event.endAt, 'h:mm a')}`;
+/**
+ * When a gathering runs: "7:00 PM – 9:00 PM".
+ *
+ * The second date is written whenever the end lands on a different calendar
+ * day, and only then. Two bare clock times are a complete sentence for a Friday
+ * night and a lie for anything longer: a retreat that leaves at 5:00 PM on
+ * Friday and gets back at 3:00 PM on Sunday rendered as "5:00 PM – 3:00 PM",
+ * which reads as ending fourteen hours before it began — on the one screen a
+ * leader opens to find out when the bus is back, and directly under a
+ * description saying "two nights". A lock-in did the same thing more quietly:
+ * "7:00 PM – 8:00 AM" is only obvious as an overnight to somebody who already
+ * knew it was one.
+ *
+ * The start day is *not* repeated here. Nearly every caller prints it already
+ * — `formatEventDay(event.startAt, now) · formatEventWindow(event)` — and it is
+ * the end nobody could work out, so this adds the missing half rather than a
+ * date the line has said once.
+ *
+ * `endAt` is optional and nullable on purpose: an event with no end formats as
+ * its start time alone rather than throwing on an invalid date, because a
+ * missing field is not a reason for a calendar row to disappear.
+ */
+export function formatEventWindow(event: { startAt: Date; endAt?: Date | null }): string {
+  const start = format(event.startAt, 'h:mm a');
+  if (!event.endAt) return start;
+
+  const end = isSameDay(event.startAt, event.endAt)
+    ? format(event.endAt, 'h:mm a')
+    : format(event.endAt, 'EEE, MMM d, h:mm a');
+
+  return `${start} – ${end}`;
 }
 
 export function formatDateTime(date: Date): string {

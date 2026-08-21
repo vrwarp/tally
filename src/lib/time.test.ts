@@ -10,6 +10,7 @@ import {
   addMinutes,
   atTimeOfDay,
   daysAgo,
+  formatEventWindow,
   formatSeenShort,
   fromDateTimeLocalValue,
   isCheckInOpen,
@@ -502,5 +503,95 @@ describe('formatSeenShort', () => {
       formatSeenShort(new Date(now.getTime() - days * 24 * 60 * 60 * 1000), now),
     );
     for (const sample of samples) expect(sample.length).toBeLessThanOrEqual(10);
+  });
+});
+
+/**
+ * When a gathering runs, said so that "when does it end" is answerable.
+ *
+ * The bug these pin down was a real one on real seeded data: the Winter
+ * Retreat leaves on a Friday afternoon and comes back on a Sunday afternoon,
+ * and the event page printed "5:00 PM – 3:00 PM" — a window that appears to
+ * close fourteen hours before it opens, on the one screen a leader opens to
+ * find out when the bus gets back, directly under a description saying "two
+ * nights at Camp Silverpine".
+ *
+ * The assertions are about the *end* date appearing and the same-day form not
+ * changing. Nearly every caller already prints the start day beside this
+ * string, so a start date in here would be the same fact twice.
+ */
+describe('formatEventWindow', () => {
+  it('prints two clock times for a gathering that starts and ends the same day', () => {
+    expect(
+      formatEventWindow({
+        startAt: new Date(2026, 1, 13, 19, 0),
+        endAt: new Date(2026, 1, 13, 21, 0),
+      }),
+    ).toBe('7:00 PM – 9:00 PM');
+  });
+
+  it('says which day a lock-in ends on when it runs past midnight', () => {
+    // Fri 24 Oct 7:00 PM -> Sat 25 Oct 8:00 AM. Five hours short of a day and
+    // still a different date, which is the only thing that decides this.
+    expect(
+      formatEventWindow({
+        startAt: new Date(2025, 9, 24, 19, 0),
+        endAt: new Date(2025, 9, 25, 8, 0),
+      }),
+    ).toBe('7:00 PM – Sat, Oct 25, 8:00 AM');
+  });
+
+  it('says which day a multi-day trip ends on', () => {
+    // The Winter Retreat: two nights, and the end time alone reads as earlier
+    // than the start.
+    expect(
+      formatEventWindow({
+        startAt: new Date(2026, 8, 11, 17, 0),
+        endAt: new Date(2026, 8, 13, 15, 0),
+      }),
+    ).toBe('5:00 PM – Sun, Sep 13, 3:00 PM');
+  });
+
+  it('crosses a month and a year boundary without losing the date', () => {
+    expect(
+      formatEventWindow({
+        startAt: new Date(2025, 11, 31, 21, 0),
+        endAt: new Date(2026, 0, 1, 1, 0),
+      }),
+    ).toBe('9:00 PM – Thu, Jan 1, 1:00 AM');
+  });
+
+  it('states the start alone when there is no end, rather than throwing', () => {
+    const startAt = new Date(2026, 1, 13, 19, 0);
+    expect(formatEventWindow({ startAt })).toBe('7:00 PM');
+    expect(formatEventWindow({ startAt, endAt: null })).toBe('7:00 PM');
+    expect(formatEventWindow({ startAt, endAt: undefined })).toBe('7:00 PM');
+  });
+
+  it('counts calendar days, not elapsed hours', () => {
+    // Two minutes long, and on two different dates. The second date is the
+    // whole point of the line, so it is written.
+    expect(
+      formatEventWindow({
+        startAt: new Date(2026, 1, 13, 23, 59),
+        endAt: new Date(2026, 1, 14, 0, 1),
+      }),
+    ).toBe('11:59 PM – Sat, Feb 14, 12:01 AM');
+
+    // Twenty-three hours long, and on one date.
+    expect(
+      formatEventWindow({
+        startAt: new Date(2026, 1, 13, 0, 30),
+        endAt: new Date(2026, 1, 13, 23, 30),
+      }),
+    ).toBe('12:30 AM – 11:30 PM');
+  });
+
+  it('takes a whole event, so every caller can pass the one it already has', () => {
+    const event = makeEvent({
+      startAt: new Date(2026, 1, 13, 19, 0),
+      endAt: new Date(2026, 1, 14, 7, 0),
+    });
+    expect(formatEventWindow(event)).toBe('7:00 PM – Sat, Feb 14, 7:00 AM');
   });
 });

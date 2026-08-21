@@ -318,3 +318,55 @@ that no longer exists, and there is no frame anywhere covering the invite / prom
 suspend job. Somebody reading it to understand what protects a database of minors comes
 away believing the only control is which gatherings a volunteer is on. Recapture, and add
 the admin's Team screen and the same screen as a core member.
+
+---
+
+## What shipped, and what is blocked
+
+Twelve implementation passes ran against disjoint file partitions. The tree is green:
+`tsc -b` clean, 139 test files / 2150 tests passing (from 125 / 2037), `eslint` 0 errors,
+`npm run build` within every kiosk budget.
+
+**Landed.** The toast tap-swallowing and the quick-add data loss; the access sheet's
+inverted state, its missing pre-commit count and its two search empty states; `PageFrame`
+on both detail pages with a real second column; the roster and chooser as two columns at
+`lg` with keyboard roving focus; the MIA fold brought down to the reference desktop; the
+tab bar's sideways-scroll; the invitations error state and a two-step Withdraw with Undo;
+per-stream error identity in `DataProvider` and a Reload on the banner; sticky month
+headings; a focus summary on the event editor; the settings two-column grid; the
+multi-day time format; the tone rulebook consolidated; the focus ring and the primary
+button's label contrast; three missing ramp rungs, plus a `tokens.test.ts` guard that
+fails the build on any class naming a step `@theme` does not declare.
+
+**Declined, with arithmetic.** The three-track dashboard at `xl` is unbuildable at the
+reference width — 1.4fr:1fr:1fr over a 992px body gives 277px side tracks, *narrower than
+the 358px those same cards get on a phone*. Widening the left column for the MIA fold
+answers more rows above the fold, so that won. The honest cost: the empty-page-beside-
+live-content is now slightly worse, and a real fix needs a wider frame or masonry.
+
+**Blocked by the kiosk ramp guard.** `src/lib/kioskTheme.test.ts` pins every
+`--color-{family}-{NNN}` in `index.css` to a hand copy in a file the token pass did not
+own, so three verified failures could not be applied. They are recorded as `todo`s in
+`src/tokens.test.ts` with measured ratios, so they surface in test output rather than
+here:
+
+- dark `ink-500` is **3.75:1** on a card — fails at 173 sites. → `#7c8ba3` (5.17 / 5.84).
+- `ink-600` fails in **both** themes (2.36 / 2.80) and is used as text at ~21 sites.
+  It is a border and `disabled:` colour; those sites want `ink-500`.
+- light `brand-400` is **3.87:1** and shares a hex with `brand-500`. → `#0a6fa0`
+  (5.23 / 4.83). Note the originally-proposed `#075985` clears contrast but is *darker*
+  than `brand-300`, inverting the ramp it was meant to restore.
+- light `warn-400` / `present-400` fail **on their own tints** (4.03 / 4.40) though they
+  pass bare on a card. Two `warn-500/40`–`/50` sites stay under 4.5 whatever the token
+  becomes; those alphas are a call-site fix.
+
+Applying these means moving `KIOSK_SOURCE_RAMPS` in step, which is a kiosk change — out
+of scope for this round by instruction, and the next thing worth doing.
+
+**Follow-ups named by the agents that found them.** Seven files hand-roll
+`bg-brand-500 text-white` (2.77:1 dark) instead of using `Button`; five call sites should
+drop their hand-rolled skeleton announcement now that `SkeletonRows` takes a `label`;
+four `truncate` lanes may clip the longer multi-day time string; four badge call sites
+should read their tone from `warnings.ts` rather than hand-picking it; and the feature
+screens can now ask `streamErrors` which stream died instead of rendering "Nothing
+scheduled yet" over a failed read.

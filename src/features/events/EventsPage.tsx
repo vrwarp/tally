@@ -305,8 +305,30 @@ function Today({ events, now }: { events: readonly TallyEvent[]; now: Date }) {
         should re-sort by ownership and the answer was no: what is *visible* in a
         band stays in date order, and the demoted block is a separate container
         below a rule.
+
+        Two abreast once there are two, and only then.
+
+        A hero card is ~232px tall and the Upcoming column is ~480px wide on a
+        1280px laptop, so two gatherings on one night cost 490px of column
+        before anything else — and what they push under the fold is "Next in
+        each series", the two-tap shortcut for the thing somebody has to do
+        every single week (see the note at the top of this file). Side by side
+        they cost one card's height and the shortcut stays on screen.
+
+        `xl:` rather than `lg:`, because the column is only wide enough for two
+        cards abreast once the window is: at `lg` the same grid gives two 230px
+        cards whose titles wrap mid-word.
+
+        And only from two cards up. One card in a two-column grid is a hero
+        occupying half a column with a hole beside it; a single gathering is one
+        answer and takes the whole width, which is what the stack already does.
       */}
-      <div className="flex flex-col gap-3">
+      <div
+        className={cn(
+          'flex flex-col gap-3',
+          own.length > 1 && 'xl:grid xl:grid-cols-2 xl:gap-3',
+        )}
+      >
         {own.map((event) => (
           <EventHeroCard
             key={event.id}
@@ -679,9 +701,40 @@ export function EventsPage() {
           never be the same length, so the answer was not to equalise them but to
           draw the boundary that was missing. `lg:items-start` is gone from the
           grid so the rule runs the height of the taller column.
+
+          That rule is also why this wrapper is not itself the sticky thing.
+          A grid item stretches to the row's height, which is what draws the
+          hairline all the way down; `position: sticky` on a box that is already
+          as tall as its container has nowhere to travel, and `lg:self-start`
+          would buy the travel back by cutting the rule short. So the stretched
+          wrapper keeps the rule and the *inner* block sticks inside it.
+
+          The wrapper is never empty, either: `PastGatherings` states its own
+          first run rather than returning null, so a ministry with no history
+          gets a sentence beside the rule instead of a full-height hairline
+          drawn down the side of nothing. See the note on `empty` there.
         */}
         <div className="flex min-w-0 flex-col lg:border-l lg:border-ink-800 lg:pl-8">
-          <PastGatherings before={dayStart} />
+          {/*
+            Above `lg` the history stays put while the future scrolls past it.
+
+            The left column runs to the recurrence horizon and the right one is
+            a history that ends, so the short one used to leave ~512px of a
+            1280px window — 42% of the screen, full height — blank while eight
+            future rows were still on the other side of the rule. Sticky, the
+            history is on screen for the whole of that scroll, which is the
+            column somebody is cross-referencing *against* the future when they
+            ask "did we already do this last month".
+
+            With its own overflow, because a paged list is not guaranteed to be
+            the shorter column: past the second or third page it outgrows the
+            viewport, and a sticky box taller than the screen has a bottom
+            nobody can ever reach. `100dvh` less the frame's own `lg:py-6` at
+            each end, so it lines up with the page rather than bleeding off it.
+          */}
+          <div className="lg:sticky lg:top-6 lg:max-h-[calc(100dvh_-_3rem)] lg:overflow-y-auto">
+            <PastGatherings before={dayStart} />
+          </div>
         </div>
       </div>
 

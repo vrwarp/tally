@@ -33,6 +33,7 @@ import {
   SkeletonRows,
   StatTile,
 } from '@/components/ui';
+import { PageFrame } from '@/components/PageFrame';
 import { RosterErrorBanner } from '@/components/RosterErrorBanner';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
@@ -322,7 +323,10 @@ export function StudentDetailPage() {
   if (!student) {
     if (loading) return <LoadingScreen message="Loading student…" />;
     return (
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-3 px-4 py-4">
+      /* The same frame as the page it stands in for. A hand-written container
+         here was how this branch used to sit 80px left of every other screen
+         in the app, on the one screen a leader arrives at from a link. */
+      <PageFrame width="2xl">
         {/* Without this the screen blames the link, which is the one thing that
             is not wrong: the student is on the roster, their name is not. */}
         <RosterErrorBanner />
@@ -345,7 +349,7 @@ export function StudentDetailPage() {
             }
           />
         </Card>
-      </div>
+      </PageFrame>
     );
   }
 
@@ -480,7 +484,16 @@ export function StudentDetailPage() {
   const streakTone = streak >= settings.miaConsecutiveMisses ? 'danger' : streak > 0 ? 'warn' : 'success';
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-4 py-4">
+    /*
+      The frame the other core-team screens have stood in since it existed.
+      This page never adopted it: a 672px column centred in a 1440px window,
+      with not one breakpoint class in the file. So the two cards below were
+      always stacked, and the year of attendance that justifies the phone call
+      — the evidence this page exists to show — started around y=700 with every
+      night chip below that. Same measure on a phone, the room beside the rail
+      on a laptop.
+    */
+    <PageFrame width="2xl">
       <Link
         to="/students"
         className="inline-flex min-h-11 w-fit items-center gap-1 text-sm text-ink-400 hover:text-ink-100"
@@ -561,364 +574,389 @@ export function StudentDetailPage() {
         </span>
       </div>
 
-      <Card>
-        <CardHeader title="Profile" />
-        <div className="flex flex-col gap-4 px-4 py-3">
-          <div>
-            <h3 className="text-xs font-medium uppercase tracking-wide text-ink-400">
-              Parent contact
-            </h3>
-            {recordGone ? (
-              <p className="mt-1 text-sm text-warn-400">
-                {backendName} no longer has a record for {name} — deleted or merged there.
-                Parent contact lives on that record, so there is nothing to show until it is
-                sorted out below.
-              </p>
-            ) : detailsError ? (
-              // A backend outage must not read as "this family has no phone
-              // number" — those look identical and mean opposite things.
-              <p className="mt-1 text-sm text-danger-400">{detailsError}</p>
-            ) : detailsLoading ? (
-              <p className="mt-1 text-sm text-ink-500">Looking this up in {backendName}…</p>
-            ) : phone || email ? (
-              <>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  {phone ? (
-                    <>
-                      <ContactLink
-                        href={`tel:${dialable(phone)}`}
-                        label={`Call ${parentLabel} at ${formatPhone(phone)}`}
-                        icon="📞"
-                      >
-                        Call
-                      </ContactLink>
-                      <ContactLink
-                        href={`sms:${dialable(phone)}`}
-                        label={`Text ${parentLabel} at ${formatPhone(phone)}`}
-                        icon="💬"
-                      >
-                        Text
-                      </ContactLink>
-                    </>
-                  ) : null}
-                  {email ? (
-                    <ContactLink
-                      href={`mailto:${email}`}
-                      label={`Email ${parentLabel} at ${email}`}
-                      icon="✉"
-                    >
-                      Email
-                    </ContactLink>
-                  ) : null}
-                </div>
-                <p className="mt-2 text-sm text-ink-300">
-                  {details?.parentName ? `${details.parentName} · ` : ''}
-                  {phone ? <span className="tabular-nums">{formatPhone(phone)}</span> : null}
-                  {phone && email ? ' · ' : ''}
-                  {email ? <span className="break-all">{email}</span> : null}
-                </p>
-              </>
-            ) : (
-              <AddParentContact student={student} details={details} onAdded={refreshDetails} />
-            )}
-          </div>
+      {/*
+        Profile beside Attendance, where there is a window to put them in.
 
-          {student.hasAllergies ? (
-            <div className="rounded-xl bg-warn-500/10 px-3 py-2 ring-1 ring-warn-500/25">
-              <p className="text-xs font-semibold uppercase tracking-wide text-warn-400">
-                Allergies
-              </p>
-              <p className="mt-0.5 text-sm text-ink-100">
-                {details?.allergies ?? (detailsLoading ? 'Loading…' : `Recorded in ${backendName}.`)}
-              </p>
-            </div>
-          ) : null}
+        Stacked, the streak and the year of night chips that evidence it were
+        always below the fold: a leader deciding whether to phone a family
+        read the contact card, then scrolled past it to find out whether there
+        was anything to phone about. Side by side the decision is one screen —
+        about thirty-three facts above the fold instead of sixteen.
 
-          <BirthdaySection
-            student={student}
-            // The whole date once Planning Center has been read, the roster's
-            // day until then — so the year appears a moment after the page
-            // does, rather than never. The roster is the fallback rather than
-            // the loser of a disagreement: a read that came back with nothing
-            // must not blank a day this page was already showing.
-            onFile={details?.birthdate ?? student.birthday}
-            /*
-             * The same gate every other write to Planning Center is behind, and
-             * for the same reason: the browser cannot see `PCO_WRITE_BACK`, so
-             * the server's answer on the person details is the only honest one.
-             * Offering a box the write path then refuses is worse than a link.
-             */
-            writable={Boolean(student.pcoPersonId) && details?.profileWritable === true}
-            gateLoading={detailsLoading && !detailsLoaded}
-            recordGone={recordGone}
-            now={now}
-            // The year on this page comes from the details, and the edit has
-            // just changed it upstream.
-            onSaved={refreshDetails}
-          />
-
-          <dl className="grid grid-cols-2 gap-3 text-sm">
-            <Detail label="Status" value={student.status === 'active' ? 'Active' : 'Inactive'} />
-            <Detail
-              label="First seen"
-              value={seen.firstSeenAt ? formatShortDate(seen.firstSeenAt) : 'Never'}
-            />
-            <Detail
-              label="Last seen"
-              value={
-                seen.lastSeenAt
-                  ? formatShortDate(seen.lastSeenAt)
-                  : // Not "Never": the year below holds no sighting, which is a
-                    // smaller claim than never having come at all.
-                    seen.unseenInWindow
-                    ? 'Not in the last year'
-                    : 'Never'
-              }
-            />
-          </dl>
-
-          {student.notes ? (
+        Profile keeps its current measure on the left (34rem is what it was
+        laid out at) and Attendance takes the rest, because the history grid
+        is the half that grows with the window. `items-start` so the shorter
+        card stops where it ends rather than stretching to match the taller.
+      */}
+      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)] lg:items-start lg:gap-6">
+        <Card>
+          <CardHeader title="Profile" />
+          <div className="flex flex-col gap-4 px-4 py-3">
             <div>
-              <h3 className="text-xs font-medium uppercase tracking-wide text-ink-400">Notes</h3>
-              <p className="mt-1 whitespace-pre-line text-sm text-ink-200">{student.notes}</p>
-            </div>
-          ) : null}
-
-          <div className="border-t border-ink-800 pt-3">
-            <h3 className="text-xs font-medium uppercase tracking-wide text-ink-400">
-              {backendName}
-            </h3>
-            {recordGone ? (
-              <div className="mt-1 flex flex-col gap-2 rounded-xl bg-warn-500/10 px-3 py-2 ring-1 ring-warn-500/25">
-                <p className="text-sm text-warn-300">
+              <h3 className="text-xs font-medium uppercase tracking-wide text-ink-400">
+                Parent contact
+              </h3>
+              {recordGone ? (
+                <p className="mt-1 text-sm text-warn-400">
                   {backendName} no longer has a record for {name} — deleted or merged there.
-                  Check-ins are frozen, past nights included, until this is sorted out: take
-                  them off the roster, or put a record back.
+                  Parent contact lives on that record, so there is nothing to show until it is
+                  sorted out below.
                 </p>
-                {recreateForm.open ? (
-                  <div className="flex flex-col gap-2">
-                    <p className="text-xs text-ink-400">
-                      Tally never stored their name — it lived on the deleted record. Enter it
-                      to re-create them.
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <input
-                        className="min-h-11 flex-1 rounded-lg border border-ink-700 bg-ink-900 px-3 text-sm text-ink-100"
-                        placeholder="First name"
-                        value={recreateForm.firstName}
-                        onChange={(event) =>
-                          setRecreateForm((form) => ({ ...form, firstName: event.target.value }))
-                        }
-                      />
-                      <input
-                        className="min-h-11 flex-1 rounded-lg border border-ink-700 bg-ink-900 px-3 text-sm text-ink-100"
-                        placeholder="Last name"
-                        value={recreateForm.lastName}
-                        onChange={(event) =>
-                          setRecreateForm((form) => ({ ...form, lastName: event.target.value }))
-                        }
-                      />
-                    </div>
+              ) : detailsError ? (
+                // A backend outage must not read as "this family has no phone
+                // number" — those look identical and mean opposite things.
+                <p className="mt-1 text-sm text-danger-400">{detailsError}</p>
+              ) : detailsLoading ? (
+                <p className="mt-1 text-sm text-ink-500">Looking this up in {backendName}…</p>
+              ) : phone || email ? (
+                <>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {phone ? (
+                      <>
+                        <ContactLink
+                          href={`tel:${dialable(phone)}`}
+                          label={`Call ${parentLabel} at ${formatPhone(phone)}`}
+                          icon="📞"
+                        >
+                          Call
+                        </ContactLink>
+                        <ContactLink
+                          href={`sms:${dialable(phone)}`}
+                          label={`Text ${parentLabel} at ${formatPhone(phone)}`}
+                          icon="💬"
+                        >
+                          Text
+                        </ContactLink>
+                      </>
+                    ) : null}
+                    {email ? (
+                      <ContactLink
+                        href={`mailto:${email}`}
+                        label={`Email ${parentLabel} at ${email}`}
+                        icon="✉"
+                      >
+                        Email
+                      </ContactLink>
+                    ) : null}
                   </div>
-                ) : null}
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    variant="secondary"
-                    onClick={() => void recreate()}
-                    loading={recreateBusy}
-                    disabled={
-                      recreateForm.open &&
-                      (!recreateForm.firstName.trim() || !recreateForm.lastName.trim())
-                    }
-                  >
-                    Re-create in {backendName}
-                  </Button>
-                  <span className="text-xs text-ink-500">
-                    If they were merged into another record, this relinks instead of creating a
-                    duplicate.
-                  </span>
-                </div>
-              </div>
-            ) : backend !== null ? (
-              <p className="mt-1 text-sm text-ink-300">
-                {/* Not "synced": nothing was copied. This screen read the
-                    backend a moment ago and is showing what it said. */}
-                Read from {backendName}.
-                {backend === 'pco' && student.pcoPersonId ? (
-                  // Only Planning Center has a product page to link out to.
-                  <>
-                    {' '}
-                    <a
-                      href={pcoPersonUrl(student.pcoPersonId)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="font-semibold text-brand-300 underline"
-                    >
-                      Open their profile
-                    </a>
-                  </>
-                ) : null}
-              </p>
-            ) : (
-              <div className="mt-1 flex flex-col gap-2">
-                <p className="text-sm text-ink-300">
-                  {student.upstreamPushPending
-                    ? `Created in Tally. Waiting to be pushed to ${backendName} — send them now, or the next push retry will.`
-                    : `Created in Tally and not linked to a ${backendName} person.`}
+                  <p className="mt-2 text-sm text-ink-300">
+                    {details?.parentName ? `${details.parentName} · ` : ''}
+                    {phone ? <span className="tabular-nums">{formatPhone(phone)}</span> : null}
+                    {phone && email ? ' · ' : ''}
+                    {email ? <span className="break-all">{email}</span> : null}
+                  </p>
+                </>
+              ) : (
+                <AddParentContact student={student} details={details} onAdded={refreshDetails} />
+              )}
+            </div>
+
+            {student.hasAllergies ? (
+              <div className="rounded-xl bg-warn-500/10 px-3 py-2 ring-1 ring-warn-500/25">
+                <p className="text-xs font-semibold uppercase tracking-wide text-warn-400">
+                  Allergies
                 </p>
-                {student.upstreamPushPending ? (
+                <p className="mt-0.5 text-sm text-ink-100">
+                  {details?.allergies ?? (detailsLoading ? 'Loading…' : `Recorded in ${backendName}.`)}
+                </p>
+              </div>
+            ) : null}
+
+            <BirthdaySection
+              student={student}
+              // The whole date once Planning Center has been read, the roster's
+              // day until then — so the year appears a moment after the page
+              // does, rather than never. The roster is the fallback rather than
+              // the loser of a disagreement: a read that came back with nothing
+              // must not blank a day this page was already showing.
+              onFile={details?.birthdate ?? student.birthday}
+              /*
+               * The same gate every other write to Planning Center is behind, and
+               * for the same reason: the browser cannot see `PCO_WRITE_BACK`, so
+               * the server's answer on the person details is the only honest one.
+               * Offering a box the write path then refuses is worse than a link.
+               */
+              writable={Boolean(student.pcoPersonId) && details?.profileWritable === true}
+              gateLoading={detailsLoading && !detailsLoaded}
+              recordGone={recordGone}
+              now={now}
+              // The year on this page comes from the details, and the edit has
+              // just changed it upstream.
+              onSaved={refreshDetails}
+            />
+
+            {/*
+              Four across where the card is wide enough, two where it is not.
+
+              A hard `grid-cols-2` orphaned "Last seen" on a row of its own
+              with an empty cell beside it — the one fact on this card a
+              leader is scanning for, alone under two others. These are three
+              short words and a date apiece; at the card’s desk measure they
+              are one band.
+            */}
+            <dl className="grid grid-cols-2 gap-3 text-sm lg:grid-cols-4">
+              <Detail label="Status" value={student.status === 'active' ? 'Active' : 'Inactive'} />
+              <Detail
+                label="First seen"
+                value={seen.firstSeenAt ? formatShortDate(seen.firstSeenAt) : 'Never'}
+              />
+              <Detail
+                label="Last seen"
+                value={
+                  seen.lastSeenAt
+                    ? formatShortDate(seen.lastSeenAt)
+                    : // Not "Never": the year below holds no sighting, which is a
+                      // smaller claim than never having come at all.
+                      seen.unseenInWindow
+                      ? 'Not in the last year'
+                      : 'Never'
+                }
+              />
+            </dl>
+
+            {student.notes ? (
+              <div>
+                <h3 className="text-xs font-medium uppercase tracking-wide text-ink-400">Notes</h3>
+                <p className="mt-1 whitespace-pre-line text-sm text-ink-200">{student.notes}</p>
+              </div>
+            ) : null}
+
+            <div className="border-t border-ink-800 pt-3">
+              <h3 className="text-xs font-medium uppercase tracking-wide text-ink-400">
+                {backendName}
+              </h3>
+              {recordGone ? (
+                <div className="mt-1 flex flex-col gap-2 rounded-xl bg-warn-500/10 px-3 py-2 ring-1 ring-warn-500/25">
+                  <p className="text-sm text-warn-300">
+                    {backendName} no longer has a record for {name} — deleted or merged there.
+                    Check-ins are frozen, past nights included, until this is sorted out: take
+                    them off the roster, or put a record back.
+                  </p>
+                  {recreateForm.open ? (
+                    <div className="flex flex-col gap-2">
+                      <p className="text-xs text-ink-400">
+                        Tally never stored their name — it lived on the deleted record. Enter it
+                        to re-create them.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <input
+                          className="min-h-11 flex-1 rounded-lg border border-ink-700 bg-ink-900 px-3 text-sm text-ink-100"
+                          placeholder="First name"
+                          value={recreateForm.firstName}
+                          onChange={(event) =>
+                            setRecreateForm((form) => ({ ...form, firstName: event.target.value }))
+                          }
+                        />
+                        <input
+                          className="min-h-11 flex-1 rounded-lg border border-ink-700 bg-ink-900 px-3 text-sm text-ink-100"
+                          placeholder="Last name"
+                          value={recreateForm.lastName}
+                          onChange={(event) =>
+                            setRecreateForm((form) => ({ ...form, lastName: event.target.value }))
+                          }
+                        />
+                      </div>
+                    </div>
+                  ) : null}
                   <div className="flex flex-wrap items-center gap-2">
                     <Button
                       variant="secondary"
-                      onClick={() => void pushToPlanningCenter()}
-                      loading={push.state === 'busy'}
-                      disabled={push.state === 'done'}
-                    >
-                      {push.state === 'done' ? 'Pushed' : `Push to ${backendName}`}
-                    </Button>
-                    <span
-                      role="status"
-                      aria-live="polite"
-                      className={
-                        push.state === 'error' ? 'text-xs text-danger-400' : 'text-xs text-ink-400'
+                      onClick={() => void recreate()}
+                      loading={recreateBusy}
+                      disabled={
+                        recreateForm.open &&
+                        (!recreateForm.firstName.trim() || !recreateForm.lastName.trim())
                       }
                     >
-                      {push.message}
+                      Re-create in {backendName}
+                    </Button>
+                    <span className="text-xs text-ink-500">
+                      If they were merged into another record, this relinks instead of creating a
+                      duplicate.
                     </span>
                   </div>
-                ) : null}
-              </div>
-            )}
-          </div>
-        </div>
-      </Card>
-
-      <Card>
-        <CardHeader
-          title="Attendance"
-          description={`The last year, by gathering — ${recentEvents.length} finished ${
-            recentEvents.length === 1 ? 'gathering' : 'gatherings'
-          }.`}
-        />
-
-        <div className="grid grid-cols-2 gap-2 px-4 py-3">
-          <StatTile
-            label="Missed in a row"
-            value={streak}
-            hint={
-              // Named, always. "Missed 3 in a row" without saying three of what
-              // is the pooled number this page used to print, and it read as an
-              // accusation about the whole ministry rather than about a Friday.
-              worst.scope
-                ? streak >= settings.miaConsecutiveMisses
-                  ? `${worst.scope} — on the MIA list at ${settings.miaConsecutiveMisses}`
-                  : `${worst.scope}, their worst run`
-                : streak > 0
-                  ? 'not seen at any gathering'
-                  : 'no gathering of their own yet'
-            }
-            tone={streakTone}
-          />
-          <StatTile
-            label="Last seen"
-            value={
-              seen.lastSeenAt
-                ? formatRelative(seen.lastSeenAt)
-                : // The grid's own mark for a night with nothing on record. The
-                  // hint carries the claim, which is about the year rather than
-                  // about all of history.
-                  seen.unseenInWindow
-                  ? '—'
-                  : 'Never'
-            }
-            hint={
-              seen.lastSeenAt
-                ? formatShortDate(seen.lastSeenAt)
-                : seen.unseenInWindow
-                  ? 'not at any gathering in the last year'
-                  : 'no check-ins yet'
-            }
-          />
-        </div>
-
-        {historyError ? (
-          <div className="px-4 pb-3">
-            <ErrorBanner message={`Could not load attendance history. ${historyError}`} />
-          </div>
-        ) : null}
-
-        {withheldTitles.length > 0 ? (
-          <div className="px-4 pb-3">
-            {/* Not an error — being off one gathering is an ordinary thing to
-                be, and a red banner over it would read as a fault to fix. It
-                is a footnote on the numbers, so it looks like one. */}
-            <p className="rounded-xl bg-ink-950 px-3 py-2 text-xs text-ink-400 ring-1 ring-ink-800">
-              {joinList(withheldTitles)}{' '}
-              {withheldTitles.length === 1 ? 'is' : 'are'} left out — not{' '}
-              {withheldTitles.length === 1 ? 'a gathering' : 'gatherings'} you work. Nothing above
-              counts those nights, so this is a shorter history than somebody on{' '}
-              {withheldTitles.length === 1 ? 'it' : 'them'} would see.
-            </p>
-          </div>
-        ) : null}
-
-        {historyLoading && groups.length === 0 ? (
-          <SkeletonRows count={4} />
-        ) : groups.length === 0 ? (
-          <EmptyState
-            title="No gatherings on record yet."
-            description="Attendance appears here as soon as this student has been checked into something."
-          />
-        ) : (
-          groups.map((group) => (
-            <section key={group.key} className="border-t border-ink-800">
-              <header className="flex items-baseline justify-between gap-3 bg-ink-950/40 px-4 py-2">
-                <h3 className="min-w-0 truncate text-sm font-semibold text-ink-100">
-                  {group.title}
-                </h3>
-                <p className="shrink-0 text-xs text-ink-500">
-                  {group.key === ONE_OFF_GROUP
-                    ? // Nothing to be missed: a retreat is not an instance of
-                      // anything, and a streak over trips would mean nothing.
-                      'Trips and retreats — no streak applies'
-                    : group.standing === null
-                      ? 'None of these gatherings happened'
-                      : !group.standing.wasRegular
-                        ? // Nobody was expecting them here, so nothing was
-                          // missed. A bare "8 missed in a row" beside a student
-                          // who goes on Fridays, or who dropped in once in the
-                          // spring, is an accusation rather than a count — and
-                          // the MIA list will not name them here either.
-                          group.standing.attended === 0
-                          ? 'Not one they come to'
-                          : `Drops in — ${group.standing.attended} of ${group.standing.eligible}`
-                        : group.standing.consecutiveMisses === 0
-                          ? 'At the most recent one'
-                          : `${group.standing.consecutiveMisses} missed in a row${
-                              group.standing.consecutiveMisses >= settings.miaConsecutiveMisses
-                                ? ' · MIA'
-                                : ''
-                            }`}
+                </div>
+              ) : backend !== null ? (
+                <p className="mt-1 text-sm text-ink-300">
+                  {/* Not "synced": nothing was copied. This screen read the
+                      backend a moment ago and is showing what it said. */}
+                  Read from {backendName}.
+                  {backend === 'pco' && student.pcoPersonId ? (
+                    // Only Planning Center has a product page to link out to.
+                    <>
+                      {' '}
+                      <a
+                        href={pcoPersonUrl(student.pcoPersonId)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-semibold text-brand-300 underline"
+                      >
+                        Open their profile
+                      </a>
+                    </>
+                  ) : null}
                 </p>
-              </header>
+              ) : (
+                <div className="mt-1 flex flex-col gap-2">
+                  <p className="text-sm text-ink-300">
+                    {student.upstreamPushPending
+                      ? `Created in Tally. Waiting to be pushed to ${backendName} — send them now, or the next push retry will.`
+                      : `Created in Tally and not linked to a ${backendName} person.`}
+                  </p>
+                  {student.upstreamPushPending ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        variant="secondary"
+                        onClick={() => void pushToPlanningCenter()}
+                        loading={push.state === 'busy'}
+                        disabled={push.state === 'done'}
+                      >
+                        {push.state === 'done' ? 'Pushed' : `Push to ${backendName}`}
+                      </Button>
+                      <span
+                        role="status"
+                        aria-live="polite"
+                        className={
+                          push.state === 'error' ? 'text-xs text-danger-400' : 'text-xs text-ink-400'
+                        }
+                      >
+                        {push.message}
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+              )}
+            </div>
+          </div>
+        </Card>
 
-              {/* Oldest to newest, left to right, which is how a run of misses
-                  reads as a run rather than as a list to count backwards. */}
-              <ul className="flex flex-wrap gap-1.5 px-4 py-3">
-                {[...group.entries].reverse().map((entry) => (
-                  <NightChip
-                    key={entry.event.id}
-                    entry={entry}
-                    // A trip is nobody's regular gathering, but "not on it" is
-                    // still worth saying out loud, so one-offs always count.
-                    theirs={group.key === ONE_OFF_GROUP || Boolean(group.standing?.wasRegular)}
-                  />
-                ))}
-              </ul>
-            </section>
-          ))
-        )}
-      </Card>
+        <Card>
+          <CardHeader
+            title="Attendance"
+            description={`The last year, by gathering — ${recentEvents.length} finished ${
+              recentEvents.length === 1 ? 'gathering' : 'gatherings'
+            }.`}
+          />
+
+          <div className="grid grid-cols-2 gap-2 px-4 py-3">
+            <StatTile
+              label="Missed in a row"
+              value={streak}
+              hint={
+                // Named, always. "Missed 3 in a row" without saying three of what
+                // is the pooled number this page used to print, and it read as an
+                // accusation about the whole ministry rather than about a Friday.
+                worst.scope
+                  ? streak >= settings.miaConsecutiveMisses
+                    ? `${worst.scope} — on the MIA list at ${settings.miaConsecutiveMisses}`
+                    : `${worst.scope}, their worst run`
+                  : streak > 0
+                    ? 'not seen at any gathering'
+                    : 'no gathering of their own yet'
+              }
+              tone={streakTone}
+            />
+            <StatTile
+              label="Last seen"
+              value={
+                seen.lastSeenAt
+                  ? formatRelative(seen.lastSeenAt)
+                  : // The grid's own mark for a night with nothing on record. The
+                    // hint carries the claim, which is about the year rather than
+                    // about all of history.
+                    seen.unseenInWindow
+                    ? '—'
+                    : 'Never'
+              }
+              hint={
+                seen.lastSeenAt
+                  ? formatShortDate(seen.lastSeenAt)
+                  : seen.unseenInWindow
+                    ? 'not at any gathering in the last year'
+                    : 'no check-ins yet'
+              }
+            />
+          </div>
+
+          {historyError ? (
+            <div className="px-4 pb-3">
+              <ErrorBanner message={`Could not load attendance history. ${historyError}`} />
+            </div>
+          ) : null}
+
+          {withheldTitles.length > 0 ? (
+            <div className="px-4 pb-3">
+              {/* Not an error — being off one gathering is an ordinary thing to
+                  be, and a red banner over it would read as a fault to fix. It
+                  is a footnote on the numbers, so it looks like one. */}
+              <p className="rounded-xl bg-ink-950 px-3 py-2 text-xs text-ink-400 ring-1 ring-ink-800">
+                {joinList(withheldTitles)}{' '}
+                {withheldTitles.length === 1 ? 'is' : 'are'} left out — not{' '}
+                {withheldTitles.length === 1 ? 'a gathering' : 'gatherings'} you work. Nothing above
+                counts those nights, so this is a shorter history than somebody on{' '}
+                {withheldTitles.length === 1 ? 'it' : 'them'} would see.
+              </p>
+            </div>
+          ) : null}
+
+          {historyLoading && groups.length === 0 ? (
+            <SkeletonRows count={4} />
+          ) : groups.length === 0 ? (
+            <EmptyState
+              title="No gatherings on record yet."
+              description="Attendance appears here as soon as this student has been checked into something."
+            />
+          ) : (
+            groups.map((group) => (
+              <section key={group.key} className="border-t border-ink-800">
+                <header className="flex items-baseline justify-between gap-3 bg-ink-950/40 px-4 py-2">
+                  <h3 className="min-w-0 truncate text-sm font-semibold text-ink-100">
+                    {group.title}
+                  </h3>
+                  <p className="shrink-0 text-xs text-ink-500">
+                    {group.key === ONE_OFF_GROUP
+                      ? // Nothing to be missed: a retreat is not an instance of
+                        // anything, and a streak over trips would mean nothing.
+                        'Trips and retreats — no streak applies'
+                      : group.standing === null
+                        ? 'None of these gatherings happened'
+                        : !group.standing.wasRegular
+                          ? // Nobody was expecting them here, so nothing was
+                            // missed. A bare "8 missed in a row" beside a student
+                            // who goes on Fridays, or who dropped in once in the
+                            // spring, is an accusation rather than a count — and
+                            // the MIA list will not name them here either.
+                            group.standing.attended === 0
+                            ? 'Not one they come to'
+                            : `Drops in — ${group.standing.attended} of ${group.standing.eligible}`
+                          : group.standing.consecutiveMisses === 0
+                            ? 'At the most recent one'
+                            : `${group.standing.consecutiveMisses} missed in a row${
+                                group.standing.consecutiveMisses >= settings.miaConsecutiveMisses
+                                  ? ' · MIA'
+                                  : ''
+                              }`}
+                  </p>
+                </header>
+
+                {/* Oldest to newest, left to right, which is how a run of misses
+                    reads as a run rather than as a list to count backwards. */}
+                <ul className="flex flex-wrap gap-1.5 px-4 py-3">
+                  {[...group.entries].reverse().map((entry) => (
+                    <NightChip
+                      key={entry.event.id}
+                      entry={entry}
+                      // A trip is nobody's regular gathering, but "not on it" is
+                      // still worth saying out loud, so one-offs always count.
+                      theirs={group.key === ONE_OFF_GROUP || Boolean(group.standing?.wasRegular)}
+                    />
+                  ))}
+                </ul>
+              </section>
+            ))
+          )}
+        </Card>
+      </div>
 
       {/* The record under the analysis: every night on file, reaching past the
           window the card above is derived from. See `EarlierAttendance`. */}
@@ -937,7 +975,7 @@ export function StudentDetailPage() {
         // contact this page is showing, not just the roster row behind it.
         onSaved={refreshDetails}
       />
-    </div>
+    </PageFrame>
   );
 }
 

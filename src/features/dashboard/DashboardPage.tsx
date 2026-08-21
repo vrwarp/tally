@@ -59,7 +59,7 @@ import {
 import { chainKey } from '@/lib/materialize';
 import { presumedCancelled } from '@/lib/sessionHistory';
 import { formatShortDate } from '@/lib/time';
-import { sameItems } from '@/lib/utils';
+import { cn, sameItems } from '@/lib/utils';
 import type { TallyEvent } from '@/types';
 
 /**
@@ -350,9 +350,88 @@ export function DashboardPage() {
       : delta === 0
         ? `same as the ${previous} before`
         : `${delta > 0 ? '+' : ''}${delta} vs ${previous} before`;
-  // Named under "All", where the tile would otherwise be a number about a
-  // gathering the reader has not been told about.
-  const deltaHint = activeGathering || !headCount ? change : `${headCount.title} · ${change}`;
+  /*
+   * Named under "All", where the tile would otherwise be a number about a
+   * gathering the reader has not been told about — and said at all only when
+   * there is a gathering behind it. With nothing on record the tile read "0 ·
+   * first one in this window": a delta about a gathering that does not exist,
+   * printed directly above a card saying there are none.
+   */
+  const deltaHint = !headCount
+    ? undefined
+    : activeGathering
+      ? change
+      : `${headCount.title} · ${change}`;
+
+  /*
+   * The tiles, as the row that is actually going to be rendered.
+   *
+   * Assembled first and measured second, because the template has to answer
+   * their number rather than assert one: four is the usual answer, but the
+   * check-out tile is non-null for any ministry that collects children, and a
+   * fifth tile in a four-wide template wrapped into an implicit second row —
+   * an orphan on a laptop, a half-width one under a 2+2 on a phone, for
+   * exactly the ministries the feature exists for.
+   */
+  const tiles = [
+    <StatTile key="last" label="Last gathering" value={summary.lastEventCount} hint={deltaHint} />,
+    <StatTile
+      key="mia"
+      label="MIA"
+      value={pending(summary.miaCount)}
+      hint={`${settings.miaConsecutiveMisses}+ missed in a row`}
+      tone={!awaitingRoster && summary.miaCount > 0 ? 'danger' : 'neutral'}
+      // The one tile in the row that is a call to action, and so the one
+      // that gets the tinted field.
+      emphasis
+    />,
+    <StatTile
+      key="new"
+      label="New faces"
+      value={pending(summary.newVisitorCount)}
+      hint={`last ${settings.newVisitorWindowDays} days`}
+      tone={!awaitingRoster && summary.newVisitorCount > 0 ? 'success' : 'neutral'}
+    />,
+    <StatTile
+      key="incomplete"
+      label="Incomplete"
+      value={awaitingContacts ? '—' : pending(summary.incompleteCount)}
+      hint="no parent contact"
+      tone={
+        !awaitingRoster && !awaitingContacts && summary.incompleteCount > 0 ? 'warn' : 'neutral'
+      }
+    />,
+    /* Only for a ministry that actually collects children — see
+       `checkOutRate`. Neutral whatever it says: this is a record of what got
+       written down, not a score. */
+    ...(summary.checkOutRate !== null
+      ? [
+          <StatTile
+            key="checkout"
+            label="Checked out"
+            value={`${summary.checkOutRate}%`}
+            hint="of check-ins on check-out gatherings"
+            tone="neutral"
+          />,
+        ]
+      : []),
+  ];
+
+  /*
+   * Enumerated rather than computed, because Tailwind reads these as literals.
+   *
+   * Four tiles keep the row they were designed for: three over the left column,
+   * one over the right, so the row shares the body's seam and its gutter
+   * instead of running its own — which means it follows that seam when the
+   * body's right column narrows at `xl`. Five cannot share a seam that is not
+   * there, so they take a five-wide row of their own, and while the grid is
+   * still two and three wide the odd tile out spans the pair below it rather
+   * than sitting half-width beside a hole.
+   */
+  const tileTemplate =
+    tiles.length === 5
+      ? 'grid-cols-2 [&>*:last-child]:col-span-2 sm:grid-cols-3 lg:grid-cols-5 lg:[&>*:last-child]:col-span-1'
+      : 'grid-cols-2 sm:grid-cols-4 lg:grid-cols-[repeat(3,minmax(0,1fr))_28rem] xl:grid-cols-[repeat(3,minmax(0,1fr))_24rem]';
 
   const scopeLabel = activeGathering
     ? `of ${activeGathering.title}`
@@ -407,49 +486,21 @@ export function DashboardPage() {
 
       {error ? <ErrorBanner message={`Could not load attendance history. ${error}`} /> : null}
 
-      {/* Three tiles over the left column, one over the right, so the row
-          shares the body's seam and its gutter instead of running its own. */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-[repeat(3,minmax(0,1fr))_28rem] lg:gap-6">
-        <StatTile
-          label="Last gathering"
-          value={summary.lastEventCount}
-          hint={deltaHint}
-        />
-        <StatTile
-          label="MIA"
-          value={pending(summary.miaCount)}
-          hint={`${settings.miaConsecutiveMisses}+ missed in a row`}
-          tone={!awaitingRoster && summary.miaCount > 0 ? 'danger' : 'neutral'}
-          // The one tile in the row that is a call to action, and so the one
-          // that gets the tinted field.
-          emphasis
-        />
-        <StatTile
-          label="New faces"
-          value={pending(summary.newVisitorCount)}
-          hint={`last ${settings.newVisitorWindowDays} days`}
-          tone={!awaitingRoster && summary.newVisitorCount > 0 ? 'success' : 'neutral'}
-        />
-        <StatTile
-          label="Incomplete"
-          value={awaitingContacts ? '—' : pending(summary.incompleteCount)}
-          hint="no parent contact"
-          tone={
-            !awaitingRoster && !awaitingContacts && summary.incompleteCount > 0 ? 'warn' : 'neutral'
-          }
-        />
-        {/* Only for a ministry that actually collects children — see
-            `checkOutRate`. Neutral whatever it says: this is a record of what
-            got written down, not a score. */}
-        {summary.checkOutRate !== null ? (
-          <StatTile
-            label="Checked out"
-            value={`${summary.checkOutRate}%`}
-            hint="of check-ins on check-out gatherings"
-            tone="neutral"
-          />
-        ) : null}
-      </div>
+      {/*
+        No tiles at all until something has been recorded.
+
+        With no history the row answered with four confident zeros — "MIA 0 ·
+        3+ missed in a row", "New faces 0 · last 7 days" — facts derived from
+        nothing, sitting above a card saying there are no gatherings on record.
+        It read as "your ministry has nobody" rather than "nothing has been
+        recorded yet", which is the opposite of true for a ministry setting
+        Tally up. The empty state below says the one thing there is to say, and
+        the profiles nobody can reach still carry their own count on their own
+        card.
+      */}
+      {recentEvents.length > 0 ? (
+        <div className={cn('grid gap-2 lg:gap-6', tileTemplate)}>{tiles}</div>
+      ) : null}
 
       {/*
         Two columns where there is a pointer, one where there is a thumb.
@@ -461,15 +512,33 @@ export function DashboardPage() {
         are on one screen. The long list gets the fluid column because it is the
         one that grows; the short lists get a fixed 28rem, which is the width at
         which a name like "Bree Sandoval" stops truncating.
+
+        At `xl` the short lists give 4rem of that back, and it is the single
+        biggest density win on the screen. 1280 is the commonest laptop width;
+        there the body is 992px, so a 28rem right column leaves 520 on the left
+        and every MIA row rendered four lines tall with Call and Text stacked
+        underneath — exactly as on a phone, on the screen whose whole job is
+        "who do I phone this week". At 24rem the left column is 584 and the
+        contact block folds up beside the name instead of under it: four names
+        above the fold instead of three, and every name still whole — see
+        `MiaList`, which had to give the phone number a line of its own to keep
+        that promise at this width. 384px is what the short lists actually need —
+        "Bree Sandoval" and its grade take 154 of the 214 a row leaves for a
+        name there, and 384 is still wider than the 358 the same cards get on a
+        phone.
       */}
-      <div className="contents lg:grid lg:grid-cols-[minmax(0,1fr)_28rem] lg:items-start lg:gap-6">
+      <div className="contents lg:grid lg:grid-cols-[minmax(0,1fr)_28rem] lg:items-start lg:gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
         <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
           {awaiting ? (
             <Card>
-              <span role="status" className="sr-only">
-                {awaitingRoster ? 'Loading the roster' : 'Loading attendance history'}
-              </span>
-              <SkeletonRows count={4} />
+              {/* The one announcement on the screen. `SkeletonRows` makes it
+                  itself from `label`, and the card used to hand it a sentence
+                  of its own beside the default one — two live regions saying
+                  different things about the same wait. */}
+              <SkeletonRows
+                count={4}
+                label={awaitingRoster ? 'Loading the roster' : 'Loading attendance history'}
+              />
             </Card>
           ) : recentEvents.length === 0 ? (
             <Card>
@@ -510,7 +579,26 @@ export function DashboardPage() {
         </div>
 
         <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
-          {!awaiting && recentEvents.length > 0 ? (
+          {/*
+            The right column holds its footprint too.
+
+            The left one has always rendered a skeleton card and every branch
+            over here rendered nothing, so a leader on a laptop watched half a
+            screen of blank page for the length of the load and then had three
+            cards appear under their eyes at once. This file goes to some
+            lengths to avoid the neighbouring failure — a list that fills in
+            after the fact is one a leader has already read — and then let the
+            layout jump instead.
+
+            Silent, and only where there are columns: the announcement beside it
+            is already speaking for both, and a phone has one column and one
+            skeleton, which is what it always had.
+          */}
+          {awaiting ? (
+            <Card className="hidden lg:block">
+              <SkeletonRows count={3} label={null} />
+            </Card>
+          ) : recentEvents.length > 0 ? (
             <NewVisitorList
               items={newVisitors}
               windowDays={settings.newVisitorWindowDays}

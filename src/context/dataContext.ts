@@ -12,6 +12,18 @@ import type {
 } from '@/types';
 
 /**
+ * The Firestore streams the provider opens at the root, by name.
+ *
+ * The names are the ones the provider already used in its failure sentence
+ * ("Could not load events: …"), lifted into a type so that a screen can ask
+ * about its own read rather than parse that sentence back apart.
+ */
+export type DataStream = 'students' | 'events' | 'series' | 'settings' | 'access';
+
+/** Whichever of those streams are currently broken, and what each one said. */
+export type StreamErrors = Partial<Record<DataStream, string>>;
+
+/**
  * App-wide live data.
  *
  * The Firestore collections here are small, needed on nearly every screen, and
@@ -33,8 +45,35 @@ export interface DataContextValue {
   settings: AppSettings;
   /** True until every stream has delivered its first snapshot. */
   loading: boolean;
-  /** Set when a listener was rejected, usually by security rules. */
+  /**
+   * Set when a listener was rejected, usually by security rules.
+   *
+   * Every broken stream's sentence, joined — one of them for the case that has
+   * always existed, which is one stream refused. `streamErrors` is the same
+   * failures kept apart.
+   */
   error: string | null;
+  /**
+   * Which streams are broken, keyed by the read that failed.
+   *
+   * `error` says something could not be loaded; this says *what*, and the
+   * difference is the whole problem it exists for. A refused listener is
+   * deliberately still marked ready — a permanently blocked stream must not
+   * wedge the app behind a spinner — so every screen goes on to render its
+   * cheerful empty state over the hole: "Nothing scheduled yet · Use New event
+   * above" for a calendar nobody could read, an empty directory for a ministry
+   * of forty-five. A screen that can ask which read died can say that instead.
+   *
+   * A stream drops out of here the moment it delivers again, so a blip's
+   * banner does not outlive the blip.
+   *
+   * Empty in a healthy session, which is nearly all of them — and optional
+   * rather than required only so that adding it stayed additive: the provider
+   * always supplies it, but several tests hand-build this whole interface as a
+   * literal, and a new required field would have been a compile error in every
+   * one of them for a value none of them are about.
+   */
+  streamErrors?: StreamErrors;
 
   /* ---- Roster ------------------------------------------------------------ */
   /** True while the roster is being read from Planning Center. */

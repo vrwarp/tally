@@ -25,7 +25,12 @@ import {
   type TallyEvent,
   type UpstreamEdit,
 } from '@/types';
-import { DataContext, type DataContextValue } from '@/context/dataContext';
+import {
+  DataContext,
+  type DataContextValue,
+  type DataStream,
+  type StreamErrors,
+} from '@/context/dataContext';
 
 /**
  * How much event history to keep in memory for prediction and the dashboard.
@@ -48,6 +53,16 @@ import { DataContext, type DataContextValue } from '@/context/dataContext';
  * held live, not what can be opened.
  */
 export const EVENT_WINDOW_DAYS = 365;
+
+/**
+ * Every stream this provider opens, in the order a banner names them.
+ *
+ * Fixed rather than derived from whatever order the failures happened to
+ * arrive in, so that two streams refused by one rules change produce one
+ * sentence rather than two different sentences depending on which listener the
+ * network answered first.
+ */
+const STREAMS: readonly DataStream[] = ['students', 'events', 'series', 'settings', 'access'];
 
 /**
  * How often the roster is re-read while the app is open.
@@ -169,36 +184,68 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const [access, setAccess] = useState<Map<string, EventAccess>>(() => new Map());
 
-  const [ready, setReady] = useState({
+  const [ready, setReady] = useState<Record<DataStream, boolean>>({
     students: false,
     events: false,
     series: false,
     settings: false,
     access: false,
   });
-  const [error, setError] = useState<string | null>(null);
+  /**
+   * Which reads are broken, rather than only that something is.
+   *
+   * It was a single string, written in one place and cleared in none — so a
+   * stream that failed once and recovered kept its red bar until the tab was
+   * closed, which is how a banner stops being read. Keyed by stream, a failure
+   * can be taken down by the thing that caused it, and a screen can ask about
+   * its own read instead of inheriting a sentence about somebody else's.
+   */
+  const [streamErrors, setStreamErrors] = useState<StreamErrors>({});
 
   useEffect(() => {
-    const markReady = (key: keyof typeof ready) =>
+    const markReady = (key: DataStream) =>
       setReady((current) => (current[key] ? current : { ...current, [key]: true }));
 
-    const fail = (label: string) => (cause: Error) => {
-      setError(`Could not load ${label}: ${cause.message}`);
+    /**
+     * A snapshot arrived: the stream is ready, and whatever it last said is
+     * over.
+     *
+     * Firestore's own error handler is terminal — the listener is gone — so in
+     * practice this clears a failure the SDK recovered from on its own, or one
+     * a re-subscription answered. The point is that it *can* be cleared: a
+     * banner that outlives the fault teaches people to ignore the next one.
+     */
+    const land = (label: DataStream) => {
+      markReady(label);
+      setStreamErrors((current) => {
+        if (current[label] === undefined) return current;
+        const next = { ...current };
+        delete next[label];
+        return next;
+      });
+    };
+
+    const fail = (label: DataStream) => (cause: Error) => {
+      const sentence = `Could not load ${label}: ${cause.message}`;
+      setStreamErrors((current) =>
+        current[label] === sentence ? current : { ...current, [label]: sentence },
+      );
       // Still mark ready — a permanently blocked stream must not wedge the app
-      // behind a spinner forever.
-      markReady(label as keyof typeof ready);
+      // behind a spinner forever. What that costs is every screen's empty state
+      // painted over a hole, which is what `streamErrors` is for.
+      markReady(label);
     };
 
     const unsubscribers = [
       subscribeStudents((next) => {
         setDocuments(next);
-        markReady('students');
+        land('students');
       }, fail('students')),
 
       subscribeEvents(
         (next) => {
           setStoredEvents(next);
-          markReady('events');
+          land('events');
         },
         { sinceDaysAgo: EVENT_WINDOW_DAYS },
         fail('events'),
@@ -206,22 +253,38 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
       subscribeEventSeries((next) => {
         setSeries(next);
-        markReady('series');
+        land('series');
       }, fail('series')),
 
       subscribeSettings((next) => {
         setSettings(next);
-        markReady('settings');
+        land('settings');
       }, fail('settings')),
 
       subscribeEventAccess((next) => {
         setAccess(next);
-        markReady('access');
+        land('access');
       }, fail('access')),
     ];
 
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
   }, []);
+
+  /**
+   * The aggregate sentence, for the banner that has always shown one.
+   *
+   * Identical to what the old single string produced in the only case anybody
+   * has seen — one refused stream, one sentence. Several are joined rather than
+   * the newest silently replacing the rest, because a rules change that shuts a
+   * role out shuts it out of three collections at once and the other two
+   * failures were being thrown away.
+   */
+  const error = useMemo(() => {
+    const sentences = STREAMS.map((label) => streamErrors[label]).filter(
+      (sentence): sentence is string => sentence !== undefined,
+    );
+    return sentences.length > 0 ? sentences.join(' · ') : null;
+  }, [streamErrors]);
 
   /* ---- The roster -------------------------------------------------------- */
 
@@ -461,6 +524,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       canWork,
       loading,
       error,
+      streamErrors,
       rosterLoading,
       rosterSettled,
       rosterError,
@@ -480,6 +544,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       canWork,
       loading,
       error,
+      streamErrors,
       rosterLoading,
       rosterSettled,
       rosterError,

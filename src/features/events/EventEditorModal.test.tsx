@@ -277,6 +277,72 @@ describe('EventEditorModal: a one-off borrowing a gathering', () => {
 });
 
 /*
+ * The submit that is refused, which used to be a dead end.
+ *
+ * The dialog body scrolls under a pinned footer, so the primary button is under
+ * the thumb the whole time while ~1500px of form moves behind it. Writing the
+ * message into the field and stopping there meant a leader who left the title
+ * blank pressed a button that appeared to do nothing, with the explanation a
+ * screen and a half above them.
+ */
+describe('EventEditorModal: a submit the form refuses', () => {
+  it('moves the caret to the field that is wrong and says so beside the button', async () => {
+    const user = userEvent.setup();
+    show();
+
+    await user.click(screen.getByRole('button', { name: 'Schedule event' }));
+
+    expect(screen.getByLabelText(/^Title/)).toHaveFocus();
+    expect(screen.getByRole('status')).toHaveTextContent('Title: Give this event a name.');
+    expect(createEvent).not.toHaveBeenCalled();
+  });
+
+  it('names the first problem in reading order and counts the rest', async () => {
+    const user = userEvent.setup();
+    show();
+
+    // Two problems: the blank title, and an end date that no longer parses.
+    await user.clear(screen.getByLabelText(/^Next end/));
+    await user.click(screen.getByRole('button', { name: 'Schedule event' }));
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Title: Give this event a name. (+1 more)',
+    );
+    expect(screen.getByLabelText(/^Title/)).toHaveFocus();
+  });
+
+  /*
+   * The second press on an unchanged form. The errors are identical, so nothing
+   * about the render differs — which is why the focus move is keyed on a count
+   * of refusals rather than on the errors themselves.
+   */
+  it('moves the caret again when the same press is repeated', async () => {
+    const user = userEvent.setup();
+    show();
+
+    await user.click(screen.getByRole('button', { name: 'Schedule event' }));
+    await user.click(screen.getByLabelText(/^Location/));
+    expect(screen.getByLabelText(/^Title/)).not.toHaveFocus();
+
+    await user.click(screen.getByRole('button', { name: 'Schedule event' }));
+    expect(screen.getByLabelText(/^Title/)).toHaveFocus();
+  });
+
+  it('says nothing at all while there is nothing wrong', async () => {
+    const user = userEvent.setup();
+    show();
+
+    expect(screen.getByRole('status')).toHaveTextContent('');
+
+    await user.type(screen.getByLabelText(/^Title/), 'Winter Retreat');
+    await user.click(screen.getByRole('button', { name: 'Schedule event' }));
+
+    await waitFor(() => expect(createEvent).toHaveBeenCalled());
+    expect(screen.getByRole('status')).toHaveTextContent('');
+  });
+});
+
+/*
  * What an edit must not quietly change about *which gathering this is*.
  *
  * `chainKey` reads `seriesId ?? recurrenceRootId ?? id`, and almost everything

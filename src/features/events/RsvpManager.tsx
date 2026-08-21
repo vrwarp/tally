@@ -10,6 +10,21 @@
  * A declined student keeps their row rather than being removed. `no` is often
  * reversed by a parent a day later, and a row that vanished would have to be
  * found and re-added from scratch.
+ *
+ * ## The two controls on a row, and why they are sized the way they are
+ *
+ * Going / Maybe / No used to be three segments packed into one strip with no
+ * gap between them: 44px tall, and "No" about 38px wide, so the smallest target
+ * on the row was the one that does the most damage. With `requiresRsvp` set, a
+ * student on `no` fails the eligibility gate — they are not on the predictive
+ * roster and search does not find them either, so a mis-tap on a Tuesday is a
+ * teenager standing at the coach on Friday who does not exist in the app. The
+ * three are equal-width, spaced and 48px now.
+ *
+ * Removing is the other write that cannot be seen afterwards: the row that
+ * would have reported it is the row that just disappeared. So it is the one
+ * place in this file that raises a toast on success, and the toast carries the
+ * Undo — one tap, restoring the status the student had rather than a bare `yes`.
  */
 import { useMemo, useRef, useState } from 'react';
 import {
@@ -31,10 +46,18 @@ import { addRsvps, removeRsvp, setRsvpStatus } from '@/services/rsvps';
 import { studentFullName, type Rsvp, type RsvpStatus, type Student, type TallyEvent } from '@/types';
 
 const STATUS_OPTIONS: { value: RsvpStatus; label: string; active: string }[] = [
-  { value: 'yes', label: 'Going', active: 'bg-present-500/20 text-present-400' },
-  { value: 'maybe', label: 'Maybe', active: 'bg-warn-500/20 text-warn-400' },
-  { value: 'no', label: 'No', active: 'bg-ink-700 text-ink-200' },
+  { value: 'yes', label: 'Going', active: 'bg-present-500/20 text-present-400 ring-present-500/40' },
+  { value: 'maybe', label: 'Maybe', active: 'bg-warn-500/20 text-warn-400 ring-warn-500/40' },
+  { value: 'no', label: 'No', active: 'bg-ink-700 text-ink-100 ring-ink-600' },
 ];
+
+/**
+ * How long the undo stays up.
+ *
+ * Longer than an ordinary toast, because this one is not a receipt — it is the
+ * only way back from a write that took the row reporting it off the screen.
+ */
+const UNDO_MS = 8000;
 
 interface RsvpRow {
   rsvp: Rsvp;
@@ -258,12 +281,32 @@ export function RsvpManager({ event }: RsvpManagerProps) {
     );
   };
 
+  /** Puts back exactly what was removed, `maybe` and `no` included. */
+  const restore = async (row: RsvpRow, status: RsvpStatus, uid: string) => {
+    try {
+      await addRsvps(event.id, [row.rsvp.studentId], uid, status);
+      setAnnouncement(`${row.name} put back on the RSVP list`);
+    } catch {
+      show(`Could not put ${row.name} back.`, { tone: 'error' });
+    }
+  };
+
   const handleRemove = (row: RsvpRow) => {
+    const actor = user;
+    if (!actor) return;
+    // Read now: by the time the toast is pressed this row is gone from `rows`.
+    const previous = row.rsvp.status;
+
     void run(
       `${row.rsvp.studentId}:remove`,
       async () => {
         await removeRsvp(event.id, row.rsvp.studentId);
         setAnnouncement(`${row.name} removed from the RSVP list`);
+        show(`${row.name} removed from the list`, {
+          tone: 'info',
+          durationMs: UNDO_MS,
+          action: { label: 'Undo', onPress: () => void restore(row, previous, actor.uid) },
+        });
       },
       `Could not remove ${row.name}.`,
     );
@@ -322,56 +365,78 @@ export function RsvpManager({ event }: RsvpManagerProps) {
               const { rsvp } = row;
 
               return (
-                <li key={rsvp.id} className="rounded-xl bg-ink-950 p-3 ring-1 ring-ink-800">
-                  <div className="flex items-start gap-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="flex items-baseline gap-2">
-                        <span className="truncate font-semibold text-ink-50">{row.name}</span>
-                        {row.student ? (
-                          <span className="shrink-0 text-xs text-ink-500">
-                            {gradeLabel(row.student) ?? NO_GRADE}
-                          </span>
-                        ) : null}
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handleRemove(row)}
-                      disabled={pending.has(`${rsvp.studentId}:remove`)}
-                      aria-label={`Remove ${row.name} from the RSVP list`}
-                      className="-mr-1 -mt-1 flex size-11 shrink-0 items-center justify-center rounded-xl text-xl leading-none text-ink-500 active:bg-ink-800 disabled:opacity-50"
-                    >
-                      <span aria-hidden="true">×</span>
-                    </button>
+                /*
+                 * One line where there is a pointer, two where there is a thumb.
+                 *
+                 * `order` rather than a second copy of the remove button: the
+                 * segmented control takes the whole width below `lg`, which
+                 * wraps it under the name, and moves between the name and the ×
+                 * above it. One button, one accessible name, both layouts.
+                 */
+                <li
+                  key={rsvp.id}
+                  className="flex flex-wrap items-center gap-2 rounded-xl bg-ink-950 p-3 ring-1 ring-ink-800"
+                >
+                  <div className="order-1 min-w-0 flex-1">
+                    <p className="flex items-baseline gap-2">
+                      <span className="truncate font-semibold text-ink-50">{row.name}</span>
+                      {row.student ? (
+                        <span className="shrink-0 text-xs text-ink-500">
+                          {gradeLabel(row.student) ?? NO_GRADE}
+                        </span>
+                      ) : null}
+                    </p>
+                    {/* Said on the row it is true of, because with `requiresRsvp`
+                        a declined student is not merely marked — they are off
+                        the check-in roster and search will not find them. */}
+                    {event.requiresRsvp && rsvp.status === 'no' ? (
+                      <p className="mt-0.5 text-xs text-ink-500">Not on the check-in roster.</p>
+                    ) : null}
                   </div>
 
-                  <div className="mt-2">
-                    <div
-                      role="group"
-                      aria-label={`RSVP for ${row.name}`}
-                      className="inline-flex rounded-xl bg-ink-900 p-0.5 ring-1 ring-ink-800"
-                    >
-                      {STATUS_OPTIONS.map((option) => {
-                        const active = rsvp.status === option.value;
-                        return (
-                          <button
-                            key={option.value}
-                            type="button"
-                            aria-pressed={active}
-                            aria-label={`${option.label} — ${row.name}`}
-                            disabled={pending.has(`${rsvp.studentId}:status`)}
-                            onClick={() => handleStatus(row, option.value)}
-                            className={cn(
-                              'min-h-11 rounded-lg px-3 text-xs font-semibold transition-colors disabled:opacity-50',
-                              active ? option.active : 'text-ink-400 active:bg-ink-800',
-                            )}
-                          >
-                            {option.label}
-                          </button>
-                        );
-                      })}
-                    </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemove(row)}
+                    disabled={pending.has(`${rsvp.studentId}:remove`)}
+                    aria-label={`Remove ${row.name} from the RSVP list`}
+                    className="order-2 -mr-1 flex size-11 shrink-0 items-center justify-center rounded-xl text-xl leading-none text-ink-500 hover:bg-ink-800 active:bg-ink-800 disabled:opacity-50 lg:order-3"
+                  >
+                    <span aria-hidden="true">×</span>
+                  </button>
+
+                  {/*
+                    Three equal columns with air between them, 48px tall.
+                    "No" is the destructive third — it takes a student off the
+                    roster entirely on an RSVP-only event — and it used to be
+                    the smallest target on the row.
+                  */}
+                  <div
+                    role="group"
+                    aria-label={`RSVP for ${row.name}`}
+                    className="order-3 grid w-full max-w-xs grid-cols-3 gap-2 lg:order-2 lg:w-64 lg:shrink-0"
+                  >
+                    {STATUS_OPTIONS.map((option) => {
+                      const active = rsvp.status === option.value;
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          aria-pressed={active}
+                          aria-label={`${option.label} — ${row.name}`}
+                          disabled={pending.has(`${rsvp.studentId}:status`)}
+                          onClick={() => handleStatus(row, option.value)}
+                          className={cn(
+                            'min-h-12 w-full rounded-xl px-2 text-sm font-semibold ring-1',
+                            'transition-colors disabled:opacity-50 pointer-fine:min-h-10',
+                            active
+                              ? option.active
+                              : 'bg-ink-900 text-ink-400 ring-ink-800 hover:bg-ink-800 hover:text-ink-200 active:bg-ink-800',
+                          )}
+                        >
+                          {option.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 </li>
               );

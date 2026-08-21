@@ -19,7 +19,7 @@ export interface BadgeProps {
   className?: string;
   title?: string;
   /**
-   * Makes the badge a button.
+   * Makes the badge a button — above `lg`, and only there.
    *
    * A badge states a fact, and almost every fact on a roster row is one
    * somebody could do something about: a missing phone number is a number to
@@ -29,8 +29,23 @@ export interface BadgeProps {
    *
    * The hit area is the badge, which is smaller than a thumb target on purpose:
    * these live on the desktop roster, where the pointer is precise and the
-   * whole row is already a link to the place with room to do everything. On a
-   * phone the same badges stay readable and are simply not the way in.
+   * whole row is already a link to the place with room to do everything.
+   *
+   * ## Why the phone gets a span instead
+   *
+   * That last paragraph was a comment and nothing else — a promise the code
+   * did not keep. A pressable badge is `text-[11px]` in `py-0.5`: about 21 CSS
+   * px tall, under half the 44px floor, and on the roster it is drawn directly
+   * on top of a row-wide `<Link>` with no gap between them and a different
+   * consequence on each. A thumb aiming at the row lands on the cake badge in
+   * the middle of it and gets a modal; a thumb aiming at "No contact" misses as
+   * often as not and is thrown to the detail page.
+   *
+   * So below `lg` the badge really is what the comment always said it was: the
+   * plain chip, with nothing to press and nothing to intercept the row beneath
+   * it. Both forms are rendered and the breakpoint picks one, which keeps this
+   * a fact about the viewport rather than about what a caller remembered to
+   * pass — every caller of `onPress` gets it.
    */
   onPress?: () => void;
   /** What the action is, for a screen reader. Required with `onPress`. */
@@ -52,31 +67,45 @@ const SHAPE =
 export function Badge({ tone = 'neutral', children, className, title, onPress, pressLabel }: BadgeProps) {
   if (onPress) {
     return (
-      <button
-        type="button"
-        title={title}
-        aria-label={pressLabel}
-        onClick={(event) => {
-          // These sit on top of a row-wide link. Without this a press on the
-          // badge navigates to the detail page as well as opening the panel.
-          event.preventDefault();
-          event.stopPropagation();
-          onPress();
-        }}
-        className={cn(
-          SHAPE,
-          TONES[tone],
-          'cursor-pointer transition-[filter,box-shadow] hover:brightness-125',
-          // No focus ring spelled out here: the one in `index.css` is the same
-          // ring, drawn inside the badge so the roster row's `overflow-hidden`
-          // card cannot clip it. Restating it with a positive offset — which is
-          // what this line used to do — put the outward version back on the one
-          // control most likely to be inside a clipping box.
-          className,
-        )}
-      >
-        {children}
-      </button>
+      <>
+        {/*
+          The phone's badge: the same chip, stated rather than offered.
+
+          The display classes come *after* `className` so they win the merge —
+          a caller that hands this badge its own `hidden lg:inline-flex`, as the
+          desktop-only "No birthday" one does, still gets exactly one of the two
+          forms on screen at each width rather than both at `lg`.
+        */}
+        <span title={title} className={cn(SHAPE, TONES[tone], className, 'lg:hidden')}>
+          {children}
+        </span>
+        <button
+          type="button"
+          title={title}
+          aria-label={pressLabel}
+          onClick={(event) => {
+            // These sit on top of a row-wide link. Without this a press on the
+            // badge navigates to the detail page as well as opening the panel.
+            event.preventDefault();
+            event.stopPropagation();
+            onPress();
+          }}
+          className={cn(
+            SHAPE,
+            TONES[tone],
+            'cursor-pointer transition-[filter,box-shadow] hover:brightness-125',
+            // No focus ring spelled out here: the one in `index.css` is the same
+            // ring, drawn inside the badge so the roster row's `overflow-hidden`
+            // card cannot clip it. Restating it with a positive offset — which is
+            // what this line used to do — put the outward version back on the one
+            // control most likely to be inside a clipping box.
+            className,
+            'hidden lg:inline-flex',
+          )}
+        >
+          {children}
+        </button>
+      </>
     );
   }
 
@@ -151,8 +180,17 @@ export function WarningBadge({
       ) : null}
       {/* The full sentence for a screen reader, the short form for the eye —
           unless the button already carries its own label, in which case a
-          second one inside it would be read out twice. */}
-      {pressLabel ? null : <span className="sr-only">{spoken}</span>}
+          second one inside it would be read out twice.
+
+          `lg:hidden` rather than nothing at all, because below `lg` there is no
+          button and no label on it: the badge is the plain span, whose only
+          other text is `aria-hidden`. Without this the phone's chip would say
+          the warning to the eye and nothing to a screen reader. */}
+      {pressLabel ? (
+        <span className="sr-only lg:hidden">{spoken}</span>
+      ) : (
+        <span className="sr-only">{spoken}</span>
+      )}
       {note ? (
         <span aria-hidden="true" className="min-w-0 break-words text-xs leading-snug">
           {meta.short}: <span className="font-medium">{note}</span>

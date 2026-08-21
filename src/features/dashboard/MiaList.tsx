@@ -70,7 +70,12 @@ export function MiaList({
             <>
               <CopyContactsButton
                 students={students}
-                title={`Follow-up — ${items.length} students we have not seen:`}
+                // The toast beside this one has always got it right ("Copied 1
+                // name"); this string is the one that leaves the app, and "1
+                // students" landed in the team group chat.
+                title={`Follow-up — ${items.length} ${
+                  items.length === 1 ? 'student' : 'students'
+                } we have not seen:`}
               />
               <ExportCsvButton
                 build={() => ({
@@ -160,15 +165,24 @@ function MiaRow({
       Call/Text land on one screen. Stacked below the fold: Call and Text under
       the name is right at 358px, where they have to be thumb targets.
 
-      The fold happens at `2xl` rather than `lg`, because that is where it
-      actually fits. This column is 264px wide at 1024 and 520 at 1280 — the
-      folded row wants around 530 before the student's name gets a pixel, so
-      every laptop between the two was rendering a row whose name had been
-      squeezed to nothing while the phone number beside it stayed whole. It is
-      the name that has to survive: a call list of blank rows is not a call
-      list. Past 1536 the column reaches 744 and everything fits at once.
+      The fold happens at `xl` rather than `lg`, because that is where it
+      actually fits. This column is 264px wide at 1024 — narrower than a phone —
+      and the folded row spends 546px on the avatar, the streak, the gutters and
+      the contact block before the student's name gets a pixel. It is the name
+      that has to survive: a call list of blank rows is not a call list.
+
+      1280 is the commonest laptop width and the one this had to reach, and it
+      is exactly the width where 546 does not fit twice: the body is 992px, the
+      short lists beside it cannot go below the 358 they get on a phone, and
+      546 + a name + 358 does not fit in 992. What made it fit was capping the
+      *contact block* rather than the name — see the class on `FollowUpActions`
+      below. Between `xl` and `2xl` Call and Text take one line and the phone
+      number wraps under them, the row is 80px instead of 125, and the name
+      keeps 128px at 1280 and 214 at 1366. Past 1536 the frame stops widening
+      at 80rem, the column settles at 808, the cap comes off and the whole row
+      is one 72px line.
     */
-    <li className="px-3 py-2 2xl:flex 2xl:items-center 2xl:gap-4">
+    <li className="px-3 py-2 xl:flex xl:items-center xl:gap-4">
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <span
           aria-hidden="true"
@@ -228,10 +242,21 @@ function MiaRow({
         </span>
       </div>
 
+      {/*
+        The cap is what lets the row fold at 1280 at all.
+
+        Call, Text and the phone number are 378px side by side, and 378 beside
+        the 168 the rest of the row costs leaves 38px of a 584px column for the
+        student's name. Held to 18rem the block keeps its two buttons on one
+        line and wraps the number underneath — it is the least load-bearing
+        thing on the row, and `tel:` still carries it — which buys the name
+        back. Off again at `2xl`, where the column is 808 and nothing has to
+        give way.
+      */}
       <FollowUpActions
         student={student}
         onContactAdded={onContactAdded}
-        className="mt-1 pb-1 pl-14 2xl:mt-0 2xl:shrink-0 2xl:pb-0 2xl:pl-0"
+        className="mt-1 pb-1 pl-14 xl:mt-0 xl:max-w-72 xl:shrink-0 xl:pb-0 xl:pl-0 2xl:max-w-none"
       />
     </li>
   );
