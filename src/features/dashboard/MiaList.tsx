@@ -201,10 +201,11 @@ function MiaRow({
       546 + a name + 358 does not fit in 992. What made it fit was capping the
       *contact block* rather than the name — see the class on `FollowUpActions`
       below. Between `xl` and `2xl` Call and Text take one line and the phone
-      number wraps under them, the row is 80px instead of 125, and the name
-      keeps 128px at 1280 and 214 at 1366. Past 1536 the frame stops widening
-      at 80rem, the column settles at 808, the cap comes off and the whole row
-      is one 72px line.
+      number wraps under them, the row is 84px instead of 125 — before the
+      answer as well as after it, because the block reserves that second line
+      the way it already reserved the first — and the name keeps 128px at 1280
+      and 214 at 1366. Past 1536 the frame stops widening at 80rem, the column
+      settles at 808, the cap comes off and the whole row is one 72px line.
     */
     <li className="px-3 py-2 xl:flex xl:items-center xl:gap-4">
       <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -276,11 +277,37 @@ function MiaRow({
         thing on the row, and `tel:` still carries it — which buys the name
         back. Off again at `2xl`, where the column is 808 and nothing has to
         give way.
+
+        Both of the cap's dimensions have to be paid for before the answer
+        arrives, because folded, this block is no longer a strip under the row
+        — it is the row's second column, and everything about its size is now
+        something the rest of the row can feel.
+
+        *Height.* `FollowUpActions` reserves one pill line for itself
+        (`min-h-12`, 48px) so a row does not grow when Planning Center finally
+        answers — but that reservation is for an answer on one line, and inside
+        this cap the answer is two: 44px of pills, the 8px flex gap, and the
+        16px line the number wraps onto, 68px in all. Measured, not guessed: at
+        1280 the settled block is 68px and the empty one 48, and 12 of the 20
+        came out of the row (the identity column beside it is 56 tall), which
+        is exactly the 73→85px jump this fold introduced.
+
+        *Width.* 18rem as a floor as well as a ceiling. "Looking up parent
+        contact…" is 198px wide and the pills are the full 288, so a cap alone
+        let every row's block widen by 91px as its own lookup landed — dragging
+        the streak badge and the end of the student's name leftward with it,
+        one row at a time. Sized rather than capped, the two columns are the
+        same two columns before and after, and the badges line up down the
+        list instead of settling into place.
+
+        Both come off at `2xl`, where the column is 808, nothing has to give
+        way, and the one-line answer makes 48px and its own width the truth
+        again.
       */}
       <FollowUpActions
         student={student}
         onContactAdded={onContactAdded}
-        className="mt-1 pb-1 pl-14 xl:mt-0 xl:max-w-72 xl:shrink-0 xl:pb-0 xl:pl-0 2xl:max-w-none"
+        className="mt-1 pb-1 pl-14 xl:mt-0 xl:min-h-17 xl:w-72 xl:shrink-0 xl:pb-0 xl:pl-0 2xl:min-h-12 2xl:w-auto"
       />
     </li>
   );

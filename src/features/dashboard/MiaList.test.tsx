@@ -86,6 +86,13 @@ describe('MiaList', () => {
    * the row folds onto one line where the column can hold it, and the contact
    * block is what gives way there rather than the student's name. At 1280 the
    * left column is 584px and the block's natural 378 would leave the name 38.
+   *
+   * Sized rather than capped, and 68px rather than the 48 one pill line comes
+   * to, because folded the block is the row's second column: inside 18rem the
+   * phone number wraps onto a second line, and a block that finds that out
+   * when Planning Center answers grows the row 12px and widens it 91 under
+   * whoever is reading the list. Both dimensions are the settled ones from the
+   * first frame, and both come off again at `2xl`. See `e2e/layout-shift`.
    */
   it('folds the row where a laptop column can hold it, without spending the name', () => {
     const { container } = mount([mia('Bree', 'Sandoval', 'pco:1')]);
@@ -93,8 +100,10 @@ describe('MiaList', () => {
     const row = container.querySelector('li');
     expect(row).toHaveClass('xl:flex');
     expect(screen.getByRole('group', { name: /Parent contact for Bree Sandoval/ })).toHaveClass(
-      'xl:max-w-72',
-      '2xl:max-w-none',
+      'xl:w-72',
+      'xl:min-h-17',
+      '2xl:w-auto',
+      '2xl:min-h-12',
     );
   });
 });
