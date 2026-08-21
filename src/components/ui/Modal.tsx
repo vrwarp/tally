@@ -72,6 +72,13 @@ export function Modal({
   size = 'md',
 }: ModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  /**
+   * Has anybody put anything into this dialog since it opened?
+   *
+   * A ref rather than state: nothing on screen changes when it flips, and the
+   * quick-add sheet cannot afford a re-render per keystroke.
+   */
+  const dirtyRef = useRef(false);
   const headingId = useId();
   const descriptionId = `${headingId}-description`;
 
@@ -80,6 +87,9 @@ export function Modal({
     if (!dialog) return;
 
     if (open && !dialog.open) {
+      // Every showing starts clean, including the second showing of a modal
+      // the caller keeps mounted.
+      dirtyRef.current = false;
       dialog.showModal();
       // Put the caret in the first field so a counselor can start typing
       // immediately instead of aiming at a text box.
@@ -88,9 +98,39 @@ export function Modal({
       );
       firstField?.focus();
     } else if (!open && dialog.open) {
+      dirtyRef.current = false;
       dialog.close();
     }
   }, [open]);
+
+  /*
+   * Watch the whole dialog for a first edit.
+   *
+   * Deliberately a listener on the subtree rather than a prop: it needs no
+   * cooperation from the fifteen callers, it cannot be forgotten by the
+   * sixteenth, and a modal that holds no fields never sees an event and so is
+   * never dirty — which is what keeps its backdrop dismissing exactly as it
+   * does today.
+   *
+   * Both events are needed and both bubble: `input` is typing, `change` is the
+   * select, checkbox, date and file controls somebody can fill in without ever
+   * pressing a key.
+   */
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    const markDirty = () => {
+      dirtyRef.current = true;
+    };
+
+    dialog.addEventListener('input', markDirty);
+    dialog.addEventListener('change', markDirty);
+    return () => {
+      dialog.removeEventListener('input', markDirty);
+      dialog.removeEventListener('change', markDirty);
+    };
+  }, []);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -139,8 +179,20 @@ export function Modal({
         'sm:items-center sm:p-6',
       )}
       onClick={(event) => {
-        // Clicking the backdrop (the dialog element itself) dismisses.
-        if (event.target === dialogRef.current) onClose();
+        // Clicking the backdrop (the dialog element itself) dismisses — unless
+        // there is something to lose.
+        //
+        // On a phone the backdrop is the empty band above the sheet, and
+        // tapping empty space is what everybody does to put the keyboard away.
+        // Doing that halfway through a visitor used to throw the visitor away
+        // silently, with a queue waiting and no way to tell whether it saved.
+        // So once a field has been touched the gesture only dismisses the
+        // keyboard (the browser blurs the field for us) and the sheet stays
+        // put. Escape, the × and the Cancel button are all untouched: leaving
+        // is still one deliberate action away.
+        if (event.target !== dialogRef.current) return;
+        if (dirtyRef.current) return;
+        onClose();
       }}
     >
       <div
