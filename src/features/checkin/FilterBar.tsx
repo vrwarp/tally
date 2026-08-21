@@ -133,7 +133,12 @@ export function FilterBar({
           absolutely positioned, and `overflow-x-auto` clips in both axes — the
           panel would open into a hidden strip. */}
       <div className="flex items-center gap-1.5">
-        <div className="scroll-touch flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
+        {/* `lg:flex-initial` — grows on a phone, where the scroller is the whole
+            row and the grade chip belongs hard against the right edge; takes
+            only what it needs at `lg`, where this row is riding beside the
+            search box and the grade chip should stay with the chips rather than
+            being flung 600px away from them. It can still shrink and scroll. */}
+        <div className="scroll-touch flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto lg:flex-initial">
           <div role="group" aria-label="Show" className="flex shrink-0 items-center gap-1.5">
             {showRecent ? (
               <Chip

@@ -14,6 +14,7 @@
  */
 import { gotoReady, openCheckIn } from './support/auth';
 import { expect, test } from './support/fixtures';
+import { rosterAction } from './support/rosterActions';
 
 /**
  * A student the seed put in Planning Center and nowhere else.
@@ -117,7 +118,7 @@ test.describe('Planning Center', () => {
     // Not on the roster yet, however real they are upstream.
     await expect(page.getByRole('link', { name: /Wendell/ })).toHaveCount(0);
 
-    await page.getByRole('button', { name: /add from planning center/i }).click();
+    await (await rosterAction(page, /add from planning center/i)).click();
     const dialog = page.getByRole('dialog', { name: /add from planning center/i });
     await dialog.getByLabel(/search planning center/i).fill('Ashgrove');
 
@@ -286,7 +287,7 @@ test.describe('Planning Center', () => {
     await expect(page.getByRole('link', { name: new RegExp(ROSTER_STUDENT) })).toHaveCount(0);
 
     // And back again, because a student who left in March comes back in June.
-    await page.getByRole('button', { name: /add from planning center/i }).click();
+    await (await rosterAction(page, /add from planning center/i)).click();
     const dialog = page.getByRole('dialog', { name: /add from planning center/i });
     /*
      * The student by name, and the Add button on *her* row.

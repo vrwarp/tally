@@ -12,6 +12,7 @@
  */
 import { expect, test } from './support/fixtures';
 import { gotoReady } from './support/auth';
+import { rosterAction } from './support/rosterActions';
 
 const ROUTES = [
   '/',
@@ -86,7 +87,7 @@ test.describe('layout', () => {
       'Vandersteen-Okonkwo Fitzwilliam Abernathy Featherstonehaugh Wintermute Vasquez';
 
     await gotoReady(page, '/students');
-    await page.getByRole('button', { name: /new visitor/i }).click();
+    await (await rosterAction(page, /new visitor/i)).click();
 
     const dialog = page.getByRole('dialog');
     await dialog.getByLabel(/first name/i).fill('Bartholomew');

@@ -21,6 +21,7 @@ import {
   writeDocument,
 } from './support/emulator';
 import { expect, test } from './support/fixtures';
+import { rosterAction } from './support/rosterActions';
 
 /**
  * Drives one student's queue until it settles, the way `upstream-edits.spec`
@@ -62,7 +63,7 @@ test.describe('Attendees (attendees32)', () => {
     await gotoReady(page, '/students');
 
     // With two backends connected the button stops naming one of them.
-    await page.getByRole('button', { name: /add from directory/i }).click({ timeout: 20_000 });
+    await (await rosterAction(page, /add from directory/i, { timeout: 20_000 })).click();
     const dialog = page.getByRole('dialog', { name: /add a student/i });
     await dialog.getByLabel(/search your directories/i).fill('Priya Raghunathan');
 

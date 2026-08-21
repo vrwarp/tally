@@ -24,7 +24,7 @@
  * around a dozen controls, taller than a laptop viewport, and it was scrolling
  * inside a panel two thousand pixels wide.
  */
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import {
   Button,
   CheckboxField,
@@ -205,6 +205,63 @@ function validateForm(form: EditorForm): { errors: EditorErrors; times: ParsedTi
   return { errors, times };
 }
 
+/*
+ * What a refused submit says, and where it says it.
+ *
+ * The dialog body scrolls under a pinned footer, so "Schedule event" is under
+ * the thumb the entire time while ~1500px of form moves behind it — about two
+ * and a half screens on a phone. A submit that only wrote `errors` into the
+ * fields therefore looked like a button that did nothing: "Give this event a
+ * name." was rendered a screen and a half above the thumb that had just pressed
+ * it, and the check-in window's errors are below everything else.
+ *
+ * Two answers, and the form does both. Focus moves to the first control that is
+ * wrong, which scrolls the body to it for free and lets a screen reader read the
+ * message out. And the summary below rides the footer, beside the button that
+ * fired it, so the press has a visible consequence where the press happened.
+ */
+const ERROR_FIELDS: { key: keyof EditorErrors; label: (mode: EventMode) => string }[] = [
+  { key: 'title', label: () => 'Title' },
+  { key: 'start', label: (mode) => (mode === 'recurring' ? 'Next start' : 'Starts') },
+  { key: 'end', label: (mode) => (mode === 'recurring' ? 'Next end' : 'Ends') },
+  { key: 'recurrence', label: () => 'Repeats' },
+  { key: 'checkInOpens', label: () => 'Check-in opens' },
+  { key: 'checkInCloses', label: () => 'Check-in closes' },
+];
+
+/**
+ * The first problem in reading order, named by the words on its own label, and
+ * a count of whatever else is wrong.
+ *
+ * Named rather than quoted alone because two of the messages — "Pick a time." —
+ * do not say which time, and the field they belong to is the collapsed check-in
+ * window at the far end of the other column.
+ */
+function summariseErrors(errors: EditorErrors, mode: EventMode): string | null {
+  const found: string[] = [];
+  for (const { key, label } of ERROR_FIELDS) {
+    const message = errors[key];
+    if (message) found.push(`${label(mode)}: ${message}`);
+  }
+
+  const [first, ...rest] = found;
+  if (!first) return null;
+  return rest.length === 0 ? first : `${first} (+${rest.length} more)`;
+}
+
+/**
+ * The action bar, restated.
+ *
+ * `Modal` lays out its footer's *direct children* — two buttons, split by the
+ * thumb on a phone and right-aligned on a pointer — so a third child would take
+ * a share of the same row and squeeze the buttons it is explaining. The dialog
+ * gets one child instead, and the summary and the buttons are arranged inside
+ * it. Kept in step with `ACTIONS` in `components/ui/Modal.tsx`.
+ */
+const ACTION_BAR =
+  'flex items-center gap-2 [&>*]:flex-1 [&>*:last-child]:flex-[2] ' +
+  'sm:justify-end sm:[&>*]:flex-none sm:[&>*:last-child]:flex-none sm:[&>*]:min-w-28';
+
 /**
  * A column of the form, named.
  *
@@ -261,6 +318,18 @@ export function EventEditorModal({
   const [form, setForm] = useState<EditorForm>(() => buildForm(event ?? null, defaults, new Date()));
   const [errors, setErrors] = useState<EditorErrors>({});
   const [saving, setSaving] = useState(false);
+  /*
+   * How many times the button has been pressed and refused.
+   *
+   * A counter rather than a boolean, because the second press on an unchanged
+   * form has to move the focus again: the errors are identical, so nothing else
+   * about the render differs and an effect keyed on them would not run. It is
+   * also what makes this an effect rather than work in the handler — the
+   * control to focus does not exist until the render carrying `errors` has
+   * landed, and the check-in window only opens itself once one is inside it.
+   */
+  const [refusals, setRefusals] = useState(0);
+  const formRef = useRef<HTMLFormElement>(null);
 
   // Identity of what is being edited. `defaults` itself is a fresh object on
   // every render of the parent, so it cannot be a dependency directly.
@@ -278,8 +347,24 @@ export function EventEditorModal({
     if (!open) return;
     setForm(buildForm(event ?? null, defaults, new Date()));
     setErrors({});
+    setRefusals(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, seedKey]);
+
+  /*
+   * The one field to look at, in reading order.
+   *
+   * `aria-invalid` is already on every control the errors reach — `Field`
+   * writes it, and `RecurrenceField` and `CheckInWindowField` both pass their
+   * message down to one — so the DOM knows which controls are wrong and in
+   * which order without this file keeping a ref per field. Moving the caret
+   * there scrolls the dialog body to it, which is the half of the fix a thumb
+   * notices.
+   */
+  useEffect(() => {
+    if (refusals === 0) return;
+    formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+  }, [refusals]);
 
   const patch = (next: Partial<EditorForm>) => setForm((current) => ({ ...current, ...next }));
 
@@ -414,11 +499,16 @@ export function EventEditorModal({
     submitted.preventDefault();
     const { errors: found, times } = validateForm(form);
     setErrors(found);
-    if (Object.keys(found).length > 0 || !times) return;
+    if (Object.keys(found).length > 0 || !times) {
+      // The press has to land somewhere. See `ERROR_FIELDS` above.
+      setRefusals((count) => count + 1);
+      return;
+    }
     void save(times);
   };
 
   const formId = `event-editor-${event?.id ?? 'new'}`;
+  const summary = summariseErrors(errors, form.mode);
 
   // The gatherings a trip can borrow its regulars from. Only offered on a
   // one-off, so it costs nothing to compute for the other half of the form.
@@ -447,14 +537,38 @@ export function EventEditorModal({
       }
       size="lg"
       footer={
-        <>
-          <Button variant="secondary" size="lg" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" form={formId} size="lg" loading={saving}>
-            {isEditing ? 'Save changes' : 'Schedule event'}
-          </Button>
-        </>
+        // One child, so the summary can sit beside the buttons rather than
+        // taking a share of their row. See `ACTION_BAR`. `sm:justify-end`
+        // because the footer's own right alignment now lands on this wrapper
+        // rather than on the buttons inside it.
+        <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
+          {/*
+            * Mounted whether or not there is anything to say, so that the
+            * message *arriving* is a change inside a live region a screen
+            * reader is already watching — a region that appears with its text
+            * already in it is announced by roughly nobody. `sr-only` takes it
+            * out of flow while it is empty, so it costs the footer no height
+            * and the buttons sit exactly where they always did.
+            */}
+          <p
+            role="status"
+            className={cn(
+              'min-w-0 text-xs font-medium leading-snug text-danger-400 sm:flex-1',
+              !summary && 'sr-only',
+            )}
+          >
+            {summary}
+          </p>
+
+          <div className={ACTION_BAR}>
+            <Button variant="secondary" size="lg" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" form={formId} size="lg" loading={saving}>
+              {isEditing ? 'Save changes' : 'Schedule event'}
+            </Button>
+          </div>
+        </div>
       }
     >
       {/*
@@ -468,6 +582,7 @@ export function EventEditorModal({
         */}
       <form
         id={formId}
+        ref={formRef}
         onSubmit={handleSubmit}
         className="grid gap-6 lg:grid-cols-2 lg:gap-x-0"
         noValidate

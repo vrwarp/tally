@@ -68,11 +68,16 @@ export function OneOffRecapList({ items, className }: OneOffRecapListProps & { c
                 >
                   {item.count}
                 </span>
+                {/* "checked in", not "came": this is the number of people
+                    somebody tapped, which is a smaller and more honest claim
+                    than the number who were there — and it is the word the
+                    event card and the hero card already use for the same count
+                    ("Finished · 24 checked in"). Three screens, one noun. */}
                 <span
                   aria-hidden="true"
                   className="block text-[10px] uppercase tracking-wide text-ink-400"
                 >
-                  came
+                  checked in
                 </span>
               </span>
             </li>
@@ -174,11 +179,27 @@ export function OneOffOnlyList({
                   >
                     {item.missedSince}
                   </span>
+                  {/*
+                    The unit belongs on the visible caption, not only in the
+                    sentence underneath it.
+
+                    This read "4 / since" — a number over an adverb, with no
+                    unit and no object — while the screen-reader line two
+                    elements up said the whole thing. And it borrows the MIA
+                    list's geometry exactly: a big tabular number over a small
+                    caption in a ringed chip, two cards further up, where the
+                    number counts *missed instances of one gathering*. A leader
+                    scanning both lists was being invited to compare "5 missed"
+                    with "4 since" as if they measured the same thing, and to
+                    phone the wrong family on the strength of it. Naming the
+                    unit is what makes the two numbers visibly different
+                    measures.
+                  */}
                   <span
                     aria-hidden="true"
                     className="block text-[10px] uppercase tracking-wide text-ink-400"
                   >
-                    since
+                    {item.missedSince === 1 ? 'gathering since' : 'gatherings since'}
                   </span>
                 </span>
               </div>

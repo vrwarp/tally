@@ -65,18 +65,35 @@ function ThemeIcon({ preference }: { preference: ThemePreference }) {
   );
 }
 
-export function ThemeCard() {
+export function ThemeCard({ className }: { className?: string }) {
   const { preference, theme, setPreference } = useTheme();
 
   return (
-    <Card>
+    <Card className={className}>
       <CardHeader
         title="Appearance"
         description="Just for this device — it is not shared with the rest of the team."
       />
 
-      <div className="flex flex-col gap-2 px-4 py-3">
-        <div role="radiogroup" aria-label="Theme" className="grid grid-cols-3 gap-2">
+      {/*
+       * The picker keeps a phone's width and no more.
+       *
+       * Three options in a `grid-cols-3` with nothing capping it stretched to
+       * whatever the card was — inside a widened page frame that is ~340px per
+       * option, and a segmented control that wide stops reading as one control
+       * and starts reading as three cards. Capped at `w-80` above `lg` it is a
+       * control again, and the sentence that says what the choice *does* moves
+       * up beside it instead of sitting under a mostly-empty row.
+       *
+       * The options themselves are untouched: `min-h-20` is the same 80px
+       * target under a thumb that it always was, at every width.
+       */}
+      <div className="flex flex-col gap-2 px-4 py-3 lg:flex-row lg:items-center lg:gap-4">
+        <div
+          role="radiogroup"
+          aria-label="Theme"
+          className="grid grid-cols-3 gap-2 lg:w-80 lg:max-w-md lg:shrink-0"
+        >
           {THEME_PREFERENCES.map((option) => {
             const selected = preference === option;
             return (

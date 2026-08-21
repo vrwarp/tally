@@ -143,7 +143,15 @@ export function BackendsSection() {
           {error ? <ErrorBanner message={error} /> : null}
 
           {loading && !a32 ? (
-            <SkeletonRows count={2} />
+            <>
+              {/* Named, and said once — see the Planning Center card. */}
+              <span role="status" className="sr-only">
+                Checking the Attendees connection
+              </span>
+              <div aria-hidden="true">
+                <SkeletonRows count={2} />
+              </div>
+            </>
           ) : a32 && settings ? (
             <>
               <div className="flex flex-wrap items-center gap-2">
@@ -173,8 +181,17 @@ export function BackendsSection() {
                 </p>
               ) : null}
 
+              {/*
+               * Columns where there is width for columns, one column where
+               * there is not — the same `auto-fit` list as the Planning Center
+               * card above, and for the same reason: stacked, these facts were
+               * set at the full measure of a card in a page frame that widens
+               * to `max-w-7xl`. A column is only taken when 15rem is free for
+               * it, so nothing is ever squeezed into a measure too narrow to
+               * read.
+               */}
               {a32.configured ? (
-                <dl className="flex flex-col gap-2 text-sm">
+                <dl className="grid gap-2 text-sm lg:grid-cols-[repeat(auto-fit,minmax(15rem,1fr))] lg:gap-x-6">
                   <div>
                     <dt className="text-xs font-medium uppercase tracking-wide text-ink-500">
                       Roster

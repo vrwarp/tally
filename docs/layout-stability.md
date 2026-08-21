@@ -132,6 +132,19 @@ not a gathering this screen can say anything about.
 - **The birthday** reserves the four digits of a year that may or may not be
   on file, so "20 August" becoming "20 August 2013" no longer shoves the cake
   badge sideways.
+- **The MIA row's contact block is sized, not capped, once the row folds.**
+  `FollowUpActions` reserves one pill line for itself, which is the whole
+  answer until the row folds onto a single line on a laptop. The fold is only
+  affordable because the block is held to 18rem between `xl` and `2xl` — and
+  held there it stops being a strip under the row and becomes the row's second
+  column, so both of its dimensions are things the rest of the row can feel.
+  Inside 18rem the phone number wraps under Call and Text, so the answer is
+  68px against the 48 reserved: every row grew 12px as its own lookup landed
+  and pushed the rows below it down. And "Looking up parent contact…" is 198px
+  against the pills' 288, so every row also widened 91px, dragging the streak
+  badge and the end of the student's name leftward. Both are reserved at their
+  settled values for exactly the widths the cap applies to, and handed back at
+  `2xl` where the number sits beside the pills again.
 - **The directory's "No contact" badge** is a column now, like the grade and
   the last-seen date either side of it — always rendered, painted only when
   somebody is missing. The badge lane is packed against the right, so a chip

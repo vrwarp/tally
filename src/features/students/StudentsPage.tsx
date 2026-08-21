@@ -24,6 +24,7 @@ import {
   Button,
   Card,
   EmptyState,
+  Modal,
   SelectField,
   SkeletonRows,
   TextField,
@@ -97,6 +98,8 @@ export function StudentsPage() {
   const [quick, setQuick] = useState<QuickFilter>('none');
   const [editorOpen, setEditorOpen] = useState(false);
   const [addFromPcoOpen, setAddFromPcoOpen] = useState(false);
+  /** The phone's one header control, open. See the header below. */
+  const [actionsOpen, setActionsOpen] = useState(false);
   /** Which badge on which row is open. See `RowBadgeModal`. */
   const [badge, setBadge] = useState<{ student: Student; action: RowBadgeAction } | null>(null);
 
@@ -285,15 +288,49 @@ export function StudentsPage() {
 
   return (
     <PageFrame width="2xl">
+      {/*
+        One band of chrome on a phone, three controls on a laptop.
+
+        The three actions used to stack: right-aligned, one 44px line each, a
+        ragged stair of administrative buttons above the list this page exists
+        to show. On a 390px screen that was 98px before the export joined them
+        and 142px after — a whole student row and a half, then three — for acts
+        a leader performs a handful of times a year. The first name started at
+        y=408 of an 838px screen; five of fifty students were on it.
+
+        So below `lg` they collapse into the one control the design system
+        already reaches for when a header cannot hold its actions — see
+        `CardHeader`, which serves the title first and gives the actions their
+        own line under it. Here there is no line to give: this header is the
+        page's own, the actions are rare, and a sheet holds all three at full
+        width and full height within a thumb's reach of the bottom of the
+        screen. Nothing shrinks — the title is one 44px band and every target
+        inside the sheet is still 44px. Above `lg` the row is what it was.
+      */}
       <header className="flex items-start justify-between gap-3">
-        <div>
+        <div className="flex min-h-11 flex-col justify-center">
           <h1 className="text-xl font-bold text-ink-50">Students</h1>
           <p className="mt-0.5 text-sm text-ink-500">
             <span className="tabular-nums">{visible.length}</span>
-            {visible.length === students.length ? ' students' : ` of ${students.length}`}
+            {visible.length === students.length
+              ? // "1 students" is what this printed for a ministry with one
+                // student on it. The filtered branch beside it — "1 of 50" —
+                // was always right, which is how it survived this long.
+                visible.length === 1
+                ? ' student'
+                : ' students'
+              : ` of ${students.length}`}
           </p>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <Button
+          variant="secondary"
+          className="shrink-0 lg:hidden"
+          aria-haspopup="dialog"
+          onClick={() => setActionsOpen(true)}
+        >
+          Actions
+        </Button>
+        <div className="hidden flex-wrap items-center justify-end gap-2 lg:flex">
           {/*
             Two ways onto the roster, weekly first.
 
@@ -324,6 +361,54 @@ export function StudentsPage() {
           />
         </div>
       </header>
+
+      {/*
+        Mounted only while it is open, unlike the two modals at the foot of this
+        page: it holds a second `ExportCsvButton`, and two of those in the
+        document at once is two controls answering to the same name.
+      */}
+      {actionsOpen ? (
+        <Modal
+          open
+          onClose={() => setActionsOpen(false)}
+          title="Roster actions"
+          description="Two ways onto the roster, and the one file that leaves it."
+          size="sm"
+        >
+          <div className="flex flex-col gap-2">
+            <Button
+              variant="secondary"
+              fullWidth
+              onClick={() => {
+                // Closed first, so the editor is the only sheet on screen
+                // rather than a second one stacked on this.
+                setActionsOpen(false);
+                setEditorOpen(true);
+              }}
+            >
+              New visitor
+            </Button>
+            <Button
+              variant="secondary"
+              fullWidth
+              onClick={() => {
+                setActionsOpen(false);
+                setAddFromPcoOpen(true);
+              }}
+            >
+              {multiBackend ? 'Add from directory' : 'Add from Planning Center'}
+            </Button>
+            <ExportCsvButton
+              build={buildExport}
+              count={visible.length}
+              noun="students"
+              blockedReason={exportBlockedReason}
+              confirm={confirmExport}
+              className="w-full"
+            />
+          </div>
+        </Modal>
+      ) : null}
 
       <RosterErrorBanner />
 
@@ -377,6 +462,15 @@ export function StudentsPage() {
             placeholder="Name…"
             value={query}
             onChange={(changed) => setQuery(changed.target.value)}
+            /*
+              Tally's clear button, rather than Chromium's.
+              Without `onClear` the field is not `clearable`, and what shipped
+              on a phone was `::-webkit-search-cancel-button` — a ~10px glyph
+              inside a 48px field, on the control this screen is mostly used
+              through. `Field.tsx` already reserves the gutter for the app's
+              own: a 44px target, Escape to clear, and the browser's hidden.
+            */
+            onClear={() => setQuery('')}
           />
         </div>
 
@@ -511,7 +605,23 @@ export function StudentsPage() {
             />
           )
         ) : (
-          <ul className="divide-y divide-ink-800">
+          /*
+            Two columns of names where there is room for them, and only there.
+
+            At 1440 a row is about 999px wide and roughly half of it is carrying
+            nothing: the note lane is blank on almost every row and the badge
+            lane's spacer is blank on every row without a flag. The brief rules
+            out spending that width on more *about* a minor, and parent contact
+            is fetched per student on purpose — so the width goes back into
+            rows, which is the thing this screen is short of: twelve of fifty
+            above the fold becomes about twenty-four.
+
+            `columns-2` rather than a grid because column flow is down-then-
+            across: the list is A–Z and stays A–Z, with the first half in the
+            left column. `break-inside-avoid` on the row is what stops a name
+            being cut in half at the foot of the first column.
+          */
+          <ul className="divide-y divide-ink-800 xl:columns-2 xl:gap-x-6">
             {visible.map((student) => (
               <StudentListRow
                 key={student.id}
@@ -654,7 +764,7 @@ const StudentListRow = memo(function StudentListRow({
       badges sit above it. Pressing anywhere else still opens the student, which
       is what the row was always for.
     */
-    <li className="relative flex min-h-16 items-center gap-3 px-3 py-2 hover:bg-ink-800/40 lg:min-h-11 lg:py-1">
+    <li className="relative flex min-h-16 break-inside-avoid items-center gap-3 px-3 py-2 hover:bg-ink-800/40 lg:min-h-11 lg:py-1">
       {/* `rounded-lg` on an invisible layer is there for one thing: the focus
           ring traces the border radius, and a square ring over a rounded row
           reads as a misalignment. The ring itself is the app's, from
@@ -742,7 +852,23 @@ const StudentListRow = memo(function StudentListRow({
           one fact every row shares, at a different x on every row, which is the
           precise thing this lane was given a fixed width to stop.
         */}
-        <span className="relative z-10 mt-0.5 flex flex-wrap items-center gap-2 text-xs text-ink-500 lg:mt-0 lg:min-w-72 lg:shrink-0 lg:flex-nowrap">
+        {/*
+          `lg:relative lg:z-10`, not `relative z-10`.
+
+          The lane is raised above the row's link so a pointer can press the
+          badges in it. Below `lg` there is nothing in it to press — see
+          `Badge` — and a raised lane of unpressable chips is worse than
+          either: a 288px-wide dead patch across the middle of a 64px row,
+          swallowing the taps the link underneath was meant to catch. Left
+          unpositioned, the absolutely-positioned link paints over the lane and
+          the whole row is one target again, which is what a thumb is aiming at.
+
+          `xl:` is the two-column list. The lane's fixed measure exists to keep
+          the badges in a column down a 999px row; in a 596px one it is most of
+          the row, so there it sizes to its contents and wraps rather than
+          pushing a name into the column beside it.
+        */}
+        <span className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-ink-500 lg:relative lg:z-10 lg:mt-0 lg:min-w-72 lg:shrink-0 lg:flex-nowrap xl:min-w-0 xl:shrink xl:flex-wrap">
           {/*
             Never the thing that gives way.
 
@@ -764,7 +890,11 @@ const StudentListRow = memo(function StudentListRow({
             caption carrying the field and the author is `lg:` only.
           */}
           {edit ? <JobChip edit={edit} now={now} short className="lg:hidden" /> : null}
-          <span className="hidden lg:block lg:flex-1" />
+          {/* The slack that pushes the badges to the lane's trailing edge, and
+              the second of the two blank lanes finding 4 counted: about 248px
+              of nothing on eleven rows in thirteen. In the two-column list
+              there is no slack to take, so it stands down. */}
+          <span className="hidden lg:block lg:flex-1 xl:hidden" />
 
           {student.isVisitor ? (
             <Badge
@@ -905,7 +1035,11 @@ function JobBand({
 
   return (
     <span className="hidden min-w-0 flex-1 items-center gap-2 text-xs text-ink-500 lg:flex">
-      <span className="flex min-w-36 shrink-0">
+      {/* `xl:min-w-0`: the fixed lane is what keeps the caption's left edge
+          still down a 999px row, and it is 144px this row cannot spare in the
+          two-column list — where a job's chip would otherwise be pushed over
+          the last-seen column beside it. */}
+      <span className="flex min-w-36 shrink-0 xl:min-w-0">
         <JobChip edit={edit} now={now} />
       </span>
       {/*
@@ -1062,6 +1196,11 @@ function BirthdayBadge({
       onPress={onPress}
       pressLabel={TITLES[state]}
     >
+      {/* Everything visible on this badge is a glyph or a shorthand date, so
+          the button's own `pressLabel` is the only thing that ever spoke it.
+          Below `lg` there is no button — see `Badge` — and the sentence has to
+          come from inside the chip instead. */}
+      <span className="sr-only lg:hidden">{TITLES[state]}</span>
       <span aria-hidden="true">🎂</span>
       <span aria-hidden="true">{state === 'today' ? 'Today' : day}</span>
     </Badge>

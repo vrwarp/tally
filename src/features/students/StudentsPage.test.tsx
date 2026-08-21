@@ -338,7 +338,10 @@ describe('StudentsPage roster rows', () => {
       { pco_9: false },
     );
 
-    expect(within(row(/Alena/)).getByText('No contact')).toBeInTheDocument();
+    // Twice over: the plain chip a phone gets and the button a pointer gets
+    // are both in the document, and the breakpoint shows exactly one of them.
+    // See `Badge` — and `Badge.test.tsx`, which pins that pair.
+    expect(within(row(/Alena/)).getAllByText('No contact').length).toBeGreaterThan(0);
   });
 });
 
@@ -459,7 +462,7 @@ describe('StudentsPage birthday badges', () => {
 
   it('says so when Planning Center holds no birthdate', () => {
     renderRoster([withBirthday(null)]);
-    expect(within(row(/Bea/)).getByText('No birthday')).toBeInTheDocument();
+    expect(within(row(/Bea/)).getAllByText('No birthday').length).toBeGreaterThan(0);
   });
 
   it('does not say it about a student Planning Center has never heard of', () => {
@@ -477,7 +480,7 @@ describe('StudentsPage birthday badges', () => {
     ]);
 
     expect(within(row(/Kylie/)).queryByText('No birthday')).not.toBeInTheDocument();
-    expect(within(row(/Kylie/)).getByText('Queued')).toBeInTheDocument();
+    expect(within(row(/Kylie/)).getAllByText('Queued').length).toBeGreaterThan(0);
   });
 
   it('says nothing at all the rest of the year', () => {
@@ -680,5 +683,104 @@ describe('StudentsPage export', () => {
     await user.click(within(dialog).getByRole('button', { name: /Try again/ }));
 
     expect(downloadCsv).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The chrome above the list, which on a phone was most of the screen.
+ *
+ * The first student row did not begin until y=408 of an 838px screen — 49% of
+ * it spent before the list this page exists to show, and heading for 61% once
+ * the export button and the third and fourth quick-filter chips arrived. The
+ * worst of it was two administrative buttons, one full 44px line each, for acts
+ * a leader performs a handful of times a year.
+ */
+describe('StudentsPage header', () => {
+  const ONE = [makeStudent({ id: 'pco_1', firstName: 'Amara', lastName: 'Okafor' })];
+
+  it('collapses the three actions into one control below lg', () => {
+    renderRoster(ONE);
+
+    // The phone's control, and the desktop row it stands in for. Both are in
+    // the document; the breakpoint draws exactly one of them.
+    const actions = screen.getByRole('button', { name: 'Actions' });
+    expect(actions).toHaveClass('lg:hidden');
+
+    const wide = screen.getByRole('button', { name: 'New visitor' }).parentElement!;
+    expect(wide).toHaveClass('hidden', 'lg:flex');
+  });
+
+  it('offers all three of them behind that one control', async () => {
+    const user = userEvent.setup();
+    renderRoster(ONE);
+
+    await user.click(screen.getByRole('button', { name: 'Actions' }));
+
+    const sheet = await screen.findByRole('dialog');
+    expect(within(sheet).getByRole('button', { name: 'New visitor' })).toBeInTheDocument();
+    expect(
+      within(sheet).getByRole('button', { name: /Add from Planning Center/ }),
+    ).toBeInTheDocument();
+    expect(within(sheet).getByRole('button', { name: /Export CSV/ })).toBeInTheDocument();
+  });
+
+  it('closes itself on the way to the sheet it opens', async () => {
+    const user = userEvent.setup();
+    renderRoster(ONE);
+
+    await user.click(screen.getByRole('button', { name: 'Actions' }));
+    await user.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'New visitor' }),
+    );
+
+    // The student editor, and only it: the actions sheet stood down rather
+    // than stacking a second sheet under the one it opened.
+    await waitFor(() =>
+      expect(screen.getByRole('dialog')).toHaveAccessibleName('Add a student'),
+    );
+  });
+
+  /** The line under the heading, which is the count and nothing else. */
+  function countLine() {
+    return screen.getByRole('heading', { name: 'Students' }).nextElementSibling!;
+  }
+
+  it('says "1 student" when there is one of them', () => {
+    renderRoster(ONE);
+    // Anchored: "1 students" contains "1 student", which is exactly the bug.
+    expect(countLine()).toHaveTextContent(/^1 student$/);
+  });
+
+  it('still counts the rest in the plural', () => {
+    renderRoster([
+      ...ONE,
+      makeStudent({ id: 'pco_2', firstName: 'Ben', lastName: 'Cole' }),
+    ]);
+    expect(countLine()).toHaveTextContent(/^2 students$/);
+  });
+});
+
+/**
+ * The clear button on the search field, which was Chromium's rather than
+ * Tally's: `::-webkit-search-cancel-button` is a ~10px glyph in a 48px field,
+ * on the control this screen is mostly used through. `Field` carries a 44px one
+ * and reserves the room for it; all it ever needed was `onClear`.
+ */
+describe('StudentsPage search', () => {
+  it('gives the search field the app’s own clear button', async () => {
+    const user = userEvent.setup();
+    renderRoster([
+      makeStudent({ id: 'pco_1', firstName: 'Amara', lastName: 'Okafor' }),
+      makeStudent({ id: 'pco_2', firstName: 'Ben', lastName: 'Cole' }),
+    ]);
+
+    const search = screen.getByRole('searchbox', { name: 'Search' });
+    await user.type(search, 'Amara');
+    expect(screen.queryByRole('link', { name: /Ben/ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Clear search' }));
+
+    expect(search).toHaveValue('');
+    expect(screen.getByRole('link', { name: /Ben/ })).toBeInTheDocument();
   });
 });

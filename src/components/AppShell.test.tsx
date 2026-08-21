@@ -13,10 +13,12 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Role } from '@/types';
 
 let role: Role = 'counselor';
+/** Whatever `DataProvider` is currently saying about its streams. */
+let dataError: string | null = null;
 const RANK: Record<Role, number> = { counselor: 0, core: 1, admin: 2 };
 
 vi.mock('@/context/authContext', () => ({
@@ -28,20 +30,28 @@ vi.mock('@/context/authContext', () => ({
 }));
 
 vi.mock('@/context/dataContext', () => ({
-  useData: () => ({ error: null }),
+  useData: () => ({ error: dataError }),
 }));
 
 const { AppShell } = await import('@/components/AppShell');
 
-async function openAccountMenu(who: Role) {
+beforeEach(() => {
+  dataError = null;
+});
+
+function renderShell(who: Role) {
   role = who;
-  render(
+  return render(
     <MemoryRouter>
       <AppShell>
         <p>a screen</p>
       </AppShell>
     </MemoryRouter>,
   );
+}
+
+async function openAccountMenu(who: Role) {
+  renderShell(who);
   // Both shell slots carry the same control; either opens the same surface.
   await userEvent.click(screen.getAllByRole('button', { name: /Sam Whitfield/ })[0]!);
 }
@@ -98,5 +108,35 @@ describe('the shell with one destination', () => {
     // be the way home rather than a label.
     expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Tally' })).toHaveAttribute('href', '/');
+  });
+});
+
+/**
+ * The banner over a dead Firestore listener.
+ *
+ * `onSnapshot`'s error handler is terminal — the listener is gone and nothing
+ * re-opens it — and `DataProvider` marks the stream ready anyway so the app is
+ * not wedged behind a spinner. What that leaves is every screen's cheerful
+ * empty state painted over a read that never happened: "Nothing scheduled yet"
+ * for a calendar nobody could load. The banner was the only thing saying
+ * otherwise, and it offered nothing to do about it — not a retry, not a
+ * dismissal, not the reload that is the actual recovery.
+ */
+describe('the shell over a broken stream', () => {
+  it('offers the reload the failure can actually be fixed by', () => {
+    dataError = 'Could not load events: Missing or insufficient permissions.';
+    renderShell('core');
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('Could not load events');
+    // In the alert rather than beside it: a recovery somebody has to already
+    // know about is not a recovery the product ships.
+    expect(within(alert).getByRole('button', { name: 'Reload' })).toBeInTheDocument();
+  });
+
+  it('says nothing at all while every stream is alive', () => {
+    renderShell('core');
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });

@@ -249,6 +249,11 @@ export const StudentRow = memo(function StudentRow({
         <div className="flex items-stretch">
           <button
             type="button"
+            /* The handle the roster's arrow-key walk holds onto. A row is one
+               button, and this is the one — the check mark beside it is a
+               different verb and is deliberately not in the walk. See
+               `RosterList`. */
+            data-roster-row=""
             onClick={() => onPress(entry)}
             disabled={busy || unavailable}
             aria-busy={busy || undefined}
@@ -381,45 +386,74 @@ export const StudentRow = memo(function StudentRow({
             correction. Nothing is lost — the strip carries it for both states.
           */}
           {here && !swapping ? (
-            <button
-              type="button"
-              onClick={() =>
-                gone ? onUndoCheckOut?.(entry) : tracksCheckOut ? onCheckOut?.(entry) : onUndo?.(entry)
-              }
-              disabled={busy}
-              aria-busy={busy || undefined}
-              aria-label={
-                gone
-                  ? `Put ${name}${gradeClause} back in the room — collected at ${formatClock(attendance.checkedOutAt!)}`
-                  : tracksCheckOut
-                    ? `Check out ${name}${gradeClause}, checked in at ${formatClock(attendance.checkedInAt)}`
-                    : `Undo check-in for ${name}${gradeClause}, checked in at ${formatClock(attendance.checkedInAt)}`
-              }
+            /*
+              The slot, and the strip of nothing at the front of it.
+
+              The two targets on a checked-in row do opposite things: the row
+              body opens the corrections strip, which is recoverable, and this
+              one deletes the check-in, which is not. They used to share an
+              edge — a 1px `border-l` and nothing else — with the destructive
+              one owning the trailing edge of the card, where a right thumb
+              lands most easily. An 8px overshoot from the row body landed
+              inside the delete, for the whole height of the row.
+
+              A confirmation is not the fix: undo is one tap and never a dialog,
+              which is the whole reason a mis-tap is cheap here. So the divider
+              stays exactly where it was, drawn by this slot, and the button
+              inside it starts 8px further right. An overshoot now lands on the
+              slot, which is not a button and does nothing. The target keeps its
+              full row height and 55px of width, well clear of the 44px floor.
+            */
+            <div
               className={cn(
-                'flex w-16 shrink-0 flex-col items-center justify-center gap-0.5 px-2',
-                // The right-hand end of the card, minus its bottom corner
-                // whenever the actions strip is open underneath. See `rowCorners`.
-                'rounded-tr-xl',
-                !open && 'rounded-br-xl',
-                'border-l disabled:opacity-60',
-                gone
-                  ? 'border-ink-800 text-ink-400 hover:bg-ink-800/60 active:bg-ink-800/60'
-                  : 'border-present-500/20 text-present-400 hover:bg-present-500/15 active:bg-present-500/15',
+                'flex w-16 shrink-0 border-l',
+                gone ? 'border-ink-800' : 'border-present-500/20',
               )}
             >
-              <span
-                aria-hidden="true"
+              <button
+                type="button"
+                onClick={() =>
+                  gone ? onUndoCheckOut?.(entry) : tracksCheckOut ? onCheckOut?.(entry) : onUndo?.(entry)
+                }
+                disabled={busy}
+                aria-busy={busy || undefined}
+                aria-label={
+                  gone
+                    ? `Put ${name}${gradeClause} back in the room — collected at ${formatClock(attendance.checkedOutAt!)}`
+                    : tracksCheckOut
+                      ? `Check out ${name}${gradeClause}, checked in at ${formatClock(attendance.checkedInAt)}`
+                      : `Undo check-in for ${name}${gradeClause}, checked in at ${formatClock(attendance.checkedInAt)}`
+                }
                 className={cn(
-                  'leading-none',
-                  gone || !tracksCheckOut ? 'text-xl' : 'text-[13px] font-semibold',
+                  // `ml-2` is the dead strip: a transparent margin inside the
+                  // slot, so the hit region starts where the eye already reads
+                  // the button as starting. `px-1` gives the clock back the
+                  // 47px it had between the old padding.
+                  'ml-2 flex flex-1 flex-col items-center justify-center gap-0.5 px-1',
+                  // The right-hand end of the card, minus its bottom corner
+                  // whenever the actions strip is open underneath. See `rowCorners`.
+                  'rounded-tr-xl',
+                  !open && 'rounded-br-xl',
+                  'disabled:opacity-60',
+                  gone
+                    ? 'text-ink-400 hover:bg-ink-800/60 active:bg-ink-800/60'
+                    : 'text-present-400 hover:bg-present-500/15 active:bg-present-500/15',
                 )}
               >
-                {gone ? '↺' : tracksCheckOut ? 'Out' : '✓'}
-              </span>
-              <span aria-hidden="true" className="text-[11px] tabular-nums text-ink-500">
-                {formatClock(gone ? attendance.checkedOutAt! : attendance.checkedInAt)}
-              </span>
-            </button>
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    'leading-none',
+                    gone || !tracksCheckOut ? 'text-xl' : 'text-[13px] font-semibold',
+                  )}
+                >
+                  {gone ? '↺' : tracksCheckOut ? 'Out' : '✓'}
+                </span>
+                <span aria-hidden="true" className="text-[11px] tabular-nums text-ink-500">
+                  {formatClock(gone ? attendance.checkedOutAt! : attendance.checkedInAt)}
+                </span>
+              </button>
+            </div>
           ) : null}
         </div>
 

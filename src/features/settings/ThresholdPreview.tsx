@@ -196,7 +196,10 @@ export function ThresholdPreview({ draft, saved, valid }: ThresholdPreviewProps)
             // they are signing themselves up for this week.
             <span className="text-ink-500"> · was {miaSaved}</span>
           ) : (
-            <span className="text-ink-500"> students</span>
+            // "1 students" is the same bug the follow-up copy used to paste
+            // into a group chat, and this line is read while somebody decides
+            // how many phone calls they are signing up for.
+            <span className="text-ink-500"> {miaNow === 1 ? 'student' : 'students'}</span>
           )}
         </span>
       </p>

@@ -141,6 +141,11 @@ export function EventHeroCard({
           // page: 56px is a thumb's target, and the header's own buttons already
           // drop to 36px.
           'flex min-h-14 w-full items-center justify-center rounded-xl px-5 text-base font-semibold pointer-fine:min-h-10 pointer-fine:text-sm',
+          // Two cards sharing a grid row are the same height whatever their
+          // descriptions say, and the shorter one would otherwise leave its
+          // call to action floating halfway up a card with a gap under it.
+          // No-op in a column, where there is no spare height to absorb.
+          'mt-auto',
           open
             ? 'bg-brand-500 text-white'
             : 'bg-ink-800 text-ink-100 ring-1 ring-ink-700',

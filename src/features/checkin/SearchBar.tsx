@@ -10,7 +10,7 @@
  * desktop that had shrunk every other field, and it never picked up the icon
  * the shared search fields draw.
  */
-import type { RefObject } from 'react';
+import type { KeyboardEventHandler, RefObject } from 'react';
 import { TextField } from '@/components/ui/Field';
 
 export interface SearchBarProps {
@@ -25,6 +25,15 @@ export interface SearchBarProps {
    * check-in filed against the wrong one.
    */
   inputRef?: RefObject<HTMLInputElement | null>;
+  /**
+   * Keys the field itself has nothing to do with — the down arrow that hands
+   * the keyboard to the first result. See `CheckInPage`.
+   *
+   * Deliberately *not* Enter: several results are students who are already
+   * checked in, whose Enter means "open the corrections strip", and a field
+   * that submitted its top match blind is how the wrong record gets written.
+   */
+  onKeyDown?: KeyboardEventHandler<HTMLInputElement>;
 }
 
 export function SearchBar({
@@ -33,6 +42,7 @@ export function SearchBar({
   placeholder = 'Search students…',
   onQuickAdd,
   inputRef,
+  onKeyDown,
 }: SearchBarProps) {
   /*
     Quick-add lives in the search band rather than floating over the list.
@@ -87,6 +97,7 @@ export function SearchBar({
           placeholder={placeholder}
           value={value}
           inputRef={inputRef}
+          onKeyDown={onKeyDown}
           onChange={(event) => onChange(event.target.value)}
           onClear={() => onChange('')}
         />

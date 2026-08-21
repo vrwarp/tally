@@ -25,7 +25,16 @@
  * a roster, which saved a tap and made the app capable of being confidently,
  * silently wrong about which night forty check-ins belonged to.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  // Aliased: the document-level handler below is given the DOM event of the
+  // same name, and the two are not interchangeable.
+  type KeyboardEvent as ReactKeyboardEvent,
+} from 'react';
 import { useParams } from 'react-router-dom';
 import { pageFrameWidth } from '@/components/pageFrameWidth';
 import { RosterErrorBanner } from '@/components/RosterErrorBanner';
@@ -71,9 +80,32 @@ import { studentFullName, type Grade, type RosterEntry } from '@/types';
  * each other and, more to the point, with Insights, Events, Students and
  * Settings: same gutter off the rail, same measure, same page.
  *
- * `widen: false` is the deliberate half. See `PageFrame`.
+ * It widens at `lg` like every other tab. It used to hold the phone measure on
+ * the reasoning that a roster row stretched across a monitor puts a name and
+ * the control that checks it in a foot apart — which was true while the list
+ * was one 704px line per student, and pinned 8 or 9 names on a 1440×900 screen
+ * out of a roster of 49, with about half the window left as gutter. The width
+ * is spent on a second column of names rather than on a longer line: see the
+ * grid in `RosterList`, and the two-per-row chooser in `ChooseEvent`, which
+ * widens in the same change so the left edge does not move between the two
+ * screens of one tab.
  */
-const BAND = pageFrameWidth({ width: '3xl', widen: false });
+const BAND = pageFrameWidth({ width: '3xl' });
+
+/**
+ * Whether this is the laptop layout — asked at the moment of a check-in rather
+ * than held in state, because nothing *renders* differently on the answer.
+ *
+ * The one thing it decides is what happens to the query after a check-in that
+ * came out of a search. On a laptop, clearing it and putting the caret back is
+ * the difference between thirty back-filled students and thirty select-alls. On
+ * a phone it would pull the list out from under a thumb that has just landed —
+ * a search result checked in on a phone leaves the query alone, as it always
+ * has.
+ */
+function onLaptop(): boolean {
+  return typeof window !== 'undefined' && window.matchMedia?.('(min-width: 64rem)').matches === true;
+}
 
 /** Long enough to register as confirmation, short enough not to lag the queue. */
 const FLASH_MS = 700;
@@ -190,6 +222,7 @@ export function CheckInPage() {
    */
   const [swapForId, setSwapForId] = useState<string | null>(null);
   const searchInput = useRef<HTMLInputElement | null>(null);
+  const rosterList = useRef<HTMLUListElement | null>(null);
 
   /*
    * The gathering in front of the counselor becomes a document, if it was not
@@ -491,6 +524,7 @@ export function CheckInPage() {
       if (!event || !user) return;
       if (refuseFrozen(entry)) return;
       const name = studentFullName(entry.student);
+      const searched = query.trim() !== "";
 
       await write([entry.student.id], `Could not check in ${name}. Try again.`, async () => {
         // Paint and buzz first — the confirmation must land on the tap, not on
@@ -507,8 +541,24 @@ export function CheckInPage() {
           event,
           student: entry.student,
           uid: user.uid,
-          method: query.trim() ? "search" : "tap",
+          method: searched ? "search" : "tap",
         });
+
+        /*
+         * An empty box and a caret, ready for the next name.
+         *
+         * Only after the write actually lands — `write` swallows the failure,
+         * so anything past the await is a check-in that happened — and only
+         * for a check-in that came out of a search, on a laptop. That is the
+         * back-fill loop: a core member with a paper register types three
+         * letters, arrows down, presses Enter, and types the next three. The
+         * alternative was select-all-and-retype thirty times, or two device
+         * switches per student.
+         */
+        if (searched && onLaptop()) {
+          setQuery("");
+          searchInput.current?.focus();
+        }
       });
     },
     [event, user, query, flash, write, refuseFrozen],
@@ -658,6 +708,35 @@ export function CheckInPage() {
   }, []);
 
   /*
+   * The keyboard's way out of the search box.
+   *
+   * Search was a dead end for anybody not holding a mouse: the field filtered
+   * the list and then had nowhere to send you, so the only route from a typed
+   * name to a check-in was keyboard → mouse → click → keyboard → select all →
+   * retype, per student. The down arrow hands focus to the first result and
+   * `RosterList` walks from there.
+   *
+   * Enter is deliberately left alone. Several results are students who are
+   * already checked in, whose Enter means "open the corrections strip" rather
+   * than "check in" — a field that submitted its top match blind would write
+   * the wrong thing on the wrong row, quietly, at speed.
+   */
+  const onSearchKeyDown = useCallback((keyEvent: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (keyEvent.key !== "ArrowDown") return;
+    const first = rosterList.current?.querySelector<HTMLButtonElement>(
+      '[data-roster-row]:not(:disabled)',
+    );
+    if (!first) return;
+    keyEvent.preventDefault();
+    first.focus();
+  }, []);
+
+  /** Escape, from a row. The box is the only other place a keyboard belongs. */
+  const returnToSearch = useCallback(() => {
+    searchInput.current?.focus();
+  }, []);
+
+  /*
    * Escape leaves the picker — on the second press, if something has been typed.
    *
    * The search field clears itself on the first one (see `TextField`), and that
@@ -774,6 +853,40 @@ export function CheckInPage() {
       ? 'participated'
       : 'all';
 
+  /*
+   * The filter row, built once and placed twice.
+   *
+   * On a phone it keeps the row of its own it has always had, under the sticky
+   * search box, and scrolls away with the header. At `lg` it rides the search
+   * box's line instead — the field is a name lookup and does not need 656px to
+   * hold two letters, and the chips were sitting on their own row with ~430px
+   * of nothing to their right. That is ~45px of chrome recovered above the
+   * first name, which is most of a roster row.
+   *
+   * Two placements rather than one element that moves, because the phone's
+   * stacking depends on *only* the search box being sticky: a filter row inside
+   * that band would pin itself on a phone too and cost a row of queue for the
+   * whole shift. `hidden`/`lg:hidden` means exactly one of them is rendered at
+   * any width, and a display-none copy is out of the accessibility tree.
+   */
+  const filters = (
+    <FilterBar
+      grades={grades}
+      onGradesChange={setGrades}
+      focus={appliedFocus}
+      onFocusChange={setFocus}
+      showRecent={showRecentChip}
+      recentCount={counts.recent}
+      showParticipated={showParticipatedChip}
+      participatedCount={counts.participated}
+      present={counts.present}
+      availableGrades={roster.gradesPresent}
+      tracksCheckOut={tracksCheckOut}
+      inRoomCount={counts.inRoom}
+      checkedOutCount={counts.checkedOut}
+    />
+  );
+
   return (
     <div className="flex flex-col">
       {/* Scrolls away, and is meant to. Which event, what time, how many are
@@ -811,7 +924,11 @@ export function CheckInPage() {
         style={{ top: 'var(--app-header-h, 0px)' }}
         ref={searchBar}
       >
-        <div className={BAND}>
+        {/* At `lg` the rule under the filters comes up here, because the
+            filters do. It still ends where the band does — it used to run the
+            full width of the window while everything inside it stopped at a
+            centred column. */}
+        <div className={cn(BAND, 'lg:border-b lg:border-ink-800')}>
           {/* Rides the sticky band rather than sitting above the list, so the
               question stays on screen for the whole hunt. A counselor who
               scrolls past it and forgets what a tap now does is the one way
@@ -843,40 +960,35 @@ export function CheckInPage() {
             </div>
           ) : null}
 
-          <SearchBar
-            value={query}
-            onChange={setQuery}
-            inputRef={searchInput}
-            placeholder={swapSource ? 'Search for the right student…' : undefined}
-            /* Quick-add is stood down while a check-in is being moved: it
-               creates a *new* student and checks them in on the server clock,
-               which is the one thing this correction exists to avoid. */
-            onQuickAdd={swapSource ? undefined : () => setQuickAddOpen(true)}
-          />
+          <div className="lg:flex lg:items-end lg:gap-3">
+            {/* Capped, because it is a name lookup and not prose: two or three
+                letters is the whole query this field was built for, and at the
+                full width of a laptop band it was 656px of box holding "ma".
+                The room goes to the chips beside it. */}
+            <div className="lg:w-[22rem] lg:shrink-0">
+              <SearchBar
+                value={query}
+                onChange={setQuery}
+                inputRef={searchInput}
+                onKeyDown={onSearchKeyDown}
+                placeholder={swapSource ? 'Search for the right student…' : undefined}
+                /* Quick-add is stood down while a check-in is being moved: it
+                   creates a *new* student and checks them in on the server clock,
+                   which is the one thing this correction exists to avoid. */
+                onQuickAdd={swapSource ? undefined : () => setQuickAddOpen(true)}
+              />
+            </div>
+
+            <div className="hidden lg:block lg:min-w-0 lg:flex-1">{filters}</div>
+          </div>
         </div>
       </div>
 
-      {/* The rule ends where the chips do. It used to run the full width of the
-          window while everything inside it stopped at a centred column, which
-          drew a full-bleed layout the page never delivered and underlined
-          nothing at all for 336px on either side. */}
-      <div className={cn(BAND, 'border-b border-ink-800')}>
-        <FilterBar
-          grades={grades}
-          onGradesChange={setGrades}
-          focus={appliedFocus}
-          onFocusChange={setFocus}
-          showRecent={showRecentChip}
-          recentCount={counts.recent}
-          showParticipated={showParticipatedChip}
-          participatedCount={counts.participated}
-          present={counts.present}
-          availableGrades={roster.gradesPresent}
-          tracksCheckOut={tracksCheckOut}
-          inRoomCount={counts.inRoom}
-          checkedOutCount={counts.checkedOut}
-        />
-      </div>
+      {/* The phone's own filter row. The rule ends where the chips do. It used
+          to run the full width of the window while everything inside it stopped
+          at a centred column, which drew a full-bleed layout the page never
+          delivered and underlined nothing at all for 336px on either side. */}
+      <div className={cn(BAND, 'border-b border-ink-800 lg:hidden')}>{filters}</div>
 
       {/* Nothing floats over the end of this list any more — quick-add rides
           the search band, see `SearchBar`. */}
@@ -1001,6 +1113,8 @@ export function CheckInPage() {
               flashing={flashing}
               busy={pending}
               allergyNotes={allergyNotes}
+              listRef={rosterList}
+              onLeave={returnToSearch}
             />
 
             {/* The way back out. A filtered list looks exactly like a short
@@ -1008,11 +1122,15 @@ export function CheckInPage() {
                 told the rest of the ministry is one tap away before they
                 conclude the student is missing and quick-add a duplicate. */}
             {appliedFocus !== "all" ? (
-              <div className="pb-3">
+              /* Full width is right on a phone, where it is the width of the
+                 list it widens. At `lg` the list is two columns of a 1152px
+                 band and a 1152px button is a banner, so it shrinks to its
+                 words and centres under them. */
+              <div className="pb-3 lg:flex lg:justify-center">
                 <button
                   type="button"
                   onClick={() => setFocus(widenTo)}
-                  className="min-h-11 w-full rounded-xl bg-ink-900 px-4 text-sm font-semibold text-ink-300 ring-1 ring-ink-800 hover:bg-ink-800 active:bg-ink-800"
+                  className="min-h-11 w-full rounded-xl bg-ink-900 px-4 text-sm font-semibold text-ink-300 ring-1 ring-ink-800 hover:bg-ink-800 active:bg-ink-800 lg:w-auto lg:px-6"
                 >
                   {widenTo === "participated"
                     ? `Show all ${counts.participated} who have participated`

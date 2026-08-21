@@ -103,7 +103,17 @@
   /* `brand-200` is used for tinted body copy on a brand-washed panel. It was
      referenced in five places before it existed, which Tailwind resolves by
      simply not emitting the class — so that text quietly inherited and nobody
-     noticed. Defined now. */
+     noticed. Defined now.
+
+     `brand-100`, `present-300` and `warn-300` were the same bug, still open: a
+     filter chip's count, a check-in date under the tick and the "no record
+     upstream" warning on a student were each naming a rung the ramp did not
+     hold, and each was silently inheriting the ink of whatever held it. Rather
+     than fix them one at a time again, `src/tokens.test.ts` now compiles the
+     question — every ramp class used anywhere under `src/` has to resolve to a
+     step declared here — so the next one is a red build instead of a colour
+     nobody notices is missing. */
+  --color-brand-100: #e0f2fe;
   --color-brand-200: #bae6fd;
   --color-brand-300: #7dd3fc;
   --color-brand-400: #38bdf8;
@@ -111,17 +121,55 @@
   --color-brand-600: #0284c7;
   --color-brand-700: #0369a1;
 
+  --color-present-300: #86efac;
   --color-present-400: #4ade80;
   --color-present-500: #22c55e;
   --color-present-600: #16a34a;
 
+  --color-warn-300: #fde047;
   --color-warn-400: #facc15;
   --color-warn-500: #eab308;
   --color-warn-600: #ca8a04;
 
+  /* `danger-700` is the rung a destructive button hovers to. Red is the one
+     accent that is dark on both grounds, so its label is pale in both and the
+     press has to go *down* the ramp rather than up — see the fill notes below. */
   --color-danger-400: #f87171;
   --color-danger-500: #ef4444;
   --color-danger-600: #dc2626;
+  --color-danger-700: #b91c1c;
+
+  /*
+   * The ink that goes *on* an accent fill, and the brand fill it goes on.
+   *
+   * `text-white` is not a token, so it cannot flip, and a filled button is
+   * exactly where that costs something. White measured 2.77:1 on the dark brand
+   * fill and 4.10:1 on the light one — under AA on both grounds and a whole tier
+   * apart between them, on the control this app is pressed by most. The label is
+   * a token now, one per family, because the three accents do not sit at one
+   * lightness: blue and green fills are pale enough to take the *ground* as
+   * their label, while red is dark enough on both themes that its label stays
+   * pale either way.
+   *
+   * `brand-fill` exists because the ramp cannot say what the light theme needs.
+   * Dark brand runs pale-to-deep across 200…700; the light block re-picks it as
+   * a mirror, where 400 and 500 are one hex and 300 and 600 are another — and
+   * that shared 400/500 hex is the one lightness where neither a pale label nor
+   * a dark one clears 4.5:1. So the light fill is a rung deeper than the dark
+   * one, which no single class can express. `present` needs the same trick for
+   * its hover, and for the same reason: its light ramp is a mirror too.
+   *
+   * Aliases rather than hexes, so a themed kiosk that rotates a family carries
+   * these with it instead of leaving a hand-picked colour behind.
+   */
+  --color-brand-ink: var(--color-ink-950);
+  --color-brand-fill: var(--color-brand-500);
+  --color-brand-fill-hover: var(--color-brand-400);
+
+  --color-present-ink: var(--color-ink-950);
+  --color-present-fill-hover: var(--color-present-500);
+
+  --color-danger-ink: var(--color-ink-50);
 
   /* Safe-area aware sizing for the persistent check-in chrome. */
   --spacing-safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -186,6 +234,7 @@
   --color-ink-950: #e4f1fe;
 
   /* Accents re-picked for a white ground, not lightened versions of the dark ones. */
+  --color-brand-100: #0c4a6e;
   --color-brand-200: #075985;
   --color-brand-300: #0369a1;
   --color-brand-400: #0284c7;
@@ -196,11 +245,21 @@
   /* 400 and 600 were the same green until the page stopped being near-white.
      They answer different questions: 400 is the "✓ Checked in" line and has to
      clear 4.5:1 as text on the page, while 600 is a fill under white text and
-     needs 3:1 the other way. Darkening the one that carries the harder job. */
+     needs 3:1 the other way. Darkening the one that carries the harder job.
+
+     The three new 300s below are the same judgement carried one rung further,
+     and they are measured against the *tint* rather than against the card. A
+     paler ground is the harder ground, and it is the one these are actually
+     printed on: the check-in date sits on a present wash, the stale-record
+     warning on an amber one, the chip count on a brand one. Picked bare on a
+     card, each would have arrived a fraction under AA the moment it was laid on
+     the wash it exists for. */
+  --color-present-300: #005a27;
   --color-present-400: #007634;
   --color-present-500: #16a34a;
   --color-present-600: #15803d;
 
+  --color-warn-300: #713f12;
   --color-warn-400: #a16207;
   --color-warn-500: #ca8a04;
   --color-warn-600: #854d0e;
@@ -208,6 +267,21 @@
   --color-danger-400: #b91c1c;
   --color-danger-500: #dc2626;
   --color-danger-600: #991b1b;
+  --color-danger-700: #7f1d1d;
+
+  /* The other end of every pair above. The ground is pale here, so the label on
+     a filled control is the card rather than the page, and the fill of the one
+     control whose ramp cannot express it goes a rung deeper than the dark
+     theme's. Hover moves *away* from the reader on paper and toward them in the
+     dark, which is why these are named slots and not ramp steps. */
+  --color-brand-ink: var(--color-ink-900);
+  --color-brand-fill: var(--color-brand-600);
+  --color-brand-fill-hover: var(--color-brand-700);
+
+  --color-present-ink: var(--color-ink-900);
+  --color-present-fill-hover: var(--color-present-400);
+
+  --color-danger-ink: var(--color-ink-900);
 }
 
 /*
@@ -429,6 +503,17 @@
    * outline drawn within the border box has nothing left to clip it. It costs
    * the small halo of daylight around a focused control and buys a ring that is
    * whole everywhere, which is the part a keyboard user is actually reading.
+   *
+   * What it also costs is the assumption that one ring colour works: drawn
+   * inside the box, the ring lands on the control's own fill rather than on the
+   * page. On the neutral fills that is fine — this blue is 6.8:1 on a chip in
+   * the dark theme and 3.3:1 in the light one, both clear of the 3:1 a non-text
+   * indicator needs, if not by much in daylight. On a *filled* control it was
+   * invisible: 1.29:1 on the primary button in the dark theme, and exactly
+   * 1.00:1 in the light one, where this slot and the fill beneath it are the
+   * same hex. So `Button` names its own ring per variant, in the ink it already
+   * prints its label in — the one colour on that control known to have been
+   * measured against that fill. Everything unfilled keeps the ring below.
    */
   :focus-visible {
     @apply outline-2 -outline-offset-2 outline-brand-400;

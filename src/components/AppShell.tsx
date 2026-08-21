@@ -4,7 +4,22 @@ import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useHeightVar } from '@/hooks/useHeightVar';
 import { cn } from '@/lib/utils';
-import { ErrorBanner } from '@/components/ui';
+import { pageFrameWidth } from '@/components/pageFrameWidth';
+import { Button, ErrorBanner } from '@/components/ui';
+
+/**
+ * The bar's own measure, in the shape that has no rail.
+ *
+ * The same call the bands beneath it make — check-in's `BAND` — rather than a
+ * pair of caps copied across and then left behind. Copied, they were
+ * `max-w-lg`/`lg:max-w-2xl` against a page on `max-w-3xl`: the wordmark started
+ * 48px right of the heading above `lg` and 128px right of it between `md` and
+ * `lg`, which is the exact defect the comment at the call site claimed to have
+ * fixed. Sharing the function is what stops the two drifting apart again — and
+ * has already earned itself once, since check-in has since taken the window
+ * above `lg` and this followed it there without being touched.
+ */
+const BAR = pageFrameWidth({ width: '3xl' });
 
 /**
  * One destination in the account surface.
@@ -265,12 +280,17 @@ export function AppShell({ children }: { children: ReactNode }) {
             Also the only chrome a counselor with one tab ever sees — and at that
             width, with no rail to anchor to, its contents take the page's own
             measure rather than the window's, so the wordmark and the heading
-            below it start on the same edge instead of 32px apart. */}
+            below it start on the same edge.
+
+            "The page's own measure" is now literally the page's own function —
+            see `BAR`. The bar keeps its rule and its background full-bleed and
+            hands the horizontal inset to that frame, which is why the padding
+            comes off here in the same breath. */}
         <header
           ref={header}
           className={cn(
             'sticky top-0 z-30 border-b border-ink-800 bg-ink-950/95 px-4 py-2 pt-safe backdrop-blur',
-            showNav ? 'flex items-center justify-between gap-3 lg:hidden' : 'lg:px-0',
+            showNav ? 'flex items-center justify-between gap-3 lg:hidden' : 'px-0',
           )}
         >
           {showNav ? (
@@ -279,16 +299,36 @@ export function AppShell({ children }: { children: ReactNode }) {
               {accountButton(false)}
             </>
           ) : (
-            <div className="mx-auto flex w-full max-w-lg items-center justify-between gap-3 lg:max-w-2xl lg:px-8">
+            <div className={cn(BAR, 'flex items-center justify-between gap-3')}>
               <Wordmark />
               {accountButton(false)}
             </div>
           )}
         </header>
 
+        {/*
+         * A dead stream, and the only recovery the app actually has.
+         *
+         * `onSnapshot`'s error handler is terminal: the listener is gone and
+         * nothing re-opens it, so "Try again" would be a lie and dismissing it
+         * would leave a confident, wrong page with nothing to explain it. A
+         * reload re-runs every subscription from nothing, which is what a person
+         * reading this needs — and until now it was a recovery the product knew
+         * about and never mentioned.
+         *
+         * The banner takes itself down when the offending stream delivers again
+         * — see `DataProvider` — so this is a permanent fault or nothing.
+         */}
         {error ? (
           <div className="px-4 pt-3">
-            <ErrorBanner message={error} />
+            <ErrorBanner
+              message={error}
+              action={
+                <Button variant="secondary" onClick={() => window.location.reload()}>
+                  Reload
+                </Button>
+              }
+            />
           </div>
         ) : null}
 

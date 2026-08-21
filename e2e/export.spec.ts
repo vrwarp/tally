@@ -12,6 +12,7 @@
  */
 import { gotoReady } from './support/auth';
 import { expect, test } from './support/fixtures';
+import { rosterAction } from './support/rosterActions';
 
 test.describe('CSV export', () => {
   test('writes a roster file with a BOM, a real header and real names', async ({
@@ -21,7 +22,10 @@ test.describe('CSV export', () => {
     await signedInAs('core');
     await gotoReady(page, '/students');
 
-    const button = page.getByRole('button', { name: /Export CSV/ });
+    // Below `lg` this is inside the "Roster actions" sheet rather than on the
+    // header row; either way it is the same control, held rather than pressed
+    // because the count on its label is part of what is being checked.
+    const button = await rosterAction(page, /Export CSV/);
     await expect(button).toBeEnabled();
 
     const [download] = await Promise.all([page.waitForEvent('download'), button.click()]);
@@ -68,10 +72,10 @@ test.describe('CSV export', () => {
     const shown = Number(/^(\d+)/.exec((await summary.innerText()).trim())?.[1] ?? 0);
     expect(shown).toBeGreaterThan(0);
 
-    const [download] = await Promise.all([
-      page.waitForEvent('download'),
-      page.getByRole('button', { name: /Export CSV/ }).click(),
-    ]);
+    // Resolved before the race is armed: on a phone reaching this button opens
+    // a sheet, and that must not happen inside the `Promise.all`.
+    const button = await rosterAction(page, /Export CSV/);
+    const [download] = await Promise.all([page.waitForEvent('download'), button.click()]);
 
     expect(download.suggestedFilename()).toMatch(/-filtered\.csv$/);
 

@@ -177,7 +177,11 @@ export function EventHeader({
           aria-label="Switch event"
           value={event.id}
           onChange={(changed) => navigate(`/event/${changed.target.value}`)}
-          className="min-h-11 min-w-0 flex-1 truncate rounded-full bg-ink-900 px-3 text-xs text-ink-200 ring-1 ring-ink-700 focus:outline-none focus:ring-2 focus:ring-brand-400 pointer-fine:min-h-9"
+          /* It flexes because on a phone it is the widest control here and the
+             one most likely to be reached for on the wrong night. On a laptop
+             band the same rule made it a 900px pill: past the width of the
+             longest option there is nothing left to reveal, so it stops. */
+          className="min-h-11 min-w-0 flex-1 truncate rounded-full bg-ink-900 px-3 text-xs text-ink-200 ring-1 ring-ink-700 focus:outline-none focus:ring-2 focus:ring-brand-400 pointer-fine:min-h-9 lg:max-w-sm"
         >
           {options.map((candidate) => (
             <option key={candidate.id} value={candidate.id}>

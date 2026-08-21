@@ -30,6 +30,7 @@ import { useEventSnapshots } from '@/hooks/useEventSnapshots';
 import { useData } from '@/context/dataContext';
 import { usePastEvents } from '@/hooks/usePastEvents';
 import { isCheckInOpen, startOfDay } from '@/lib/time';
+import { cn } from '@/lib/utils';
 import type { TallyEvent } from '@/types';
 
 /**
@@ -175,67 +176,94 @@ export function ChooseEvent({ events, now }: ChooseEventProps) {
   );
 
   return (
-    /* Same frame as every other screen, and the same `widen: false` as the
-       roster it leads to — these two are one tab and must not move under a
-       counselor who taps from one to the other. */
-    <PageFrame widen={false} gap="lg" className="pb-8">
-      {mine.length > 0 ? (
-        <section aria-labelledby="choose-heading">
-          <h1 id="choose-heading" className="pb-1 text-xl font-bold text-ink-50">
-            {mine.length === 1 ? 'On today' : 'Which gathering?'}
-          </h1>
-          <p className="pb-3 text-sm text-ink-500">
-            {mine.length === 1
-              ? 'Open it to start checking students in.'
-              : 'Pick the one you are standing at — attendance is filed against it.'}
-          </p>
+    /*
+     * Same frame, and the same width as the roster it leads to — these two are
+     * one tab and must not move under a counselor who taps from one to the
+     * other, which is what the shared band is for.
+     *
+     * At `lg` it becomes two columns. This screen was a phone screen at laptop
+     * size: one 714px column of 219px hero cards, one per row, of which about
+     * three fitted on a 1440×900 window with the catch-up tail below the fold.
+     * A leader who has to scroll to compare tonight's gatherings is a leader
+     * who picks the wrong one, and this screen exists to make that impossible.
+     * So the cards go two to a row and the two demoted sections — the
+     * gatherings that are not this counselor's, and the nights nobody took the
+     * register for — sit beside them rather than under them.
+     *
+     * `contents` on the two wrappers keeps the phone exactly as it was: below
+     * `lg` they are not boxes at all, so their children are the frame's own
+     * children again and a section that renders nothing still costs no gap.
+     */
+    <PageFrame gap="lg" className="pb-8 lg:flex-row lg:items-start lg:gap-8">
+      <div className="contents lg:flex lg:min-w-0 lg:flex-1 lg:flex-col lg:gap-8">
+        {mine.length > 0 ? (
+          <section aria-labelledby="choose-heading">
+            <h1 id="choose-heading" className="pb-1 text-xl font-bold text-ink-50">
+              {mine.length === 1 ? 'On today' : 'Which gathering?'}
+            </h1>
+            <p className="pb-3 text-sm text-ink-500">
+              {mine.length === 1
+                ? 'Open it to start checking students in.'
+                : 'Pick the one you are standing at — attendance is filed against it.'}
+            </p>
 
-          <div className="flex flex-col gap-3">
-            {mine.map((event) => (
-              <EventHeroCard
-                key={event.id}
-                event={event}
-                now={now}
-                to={`/event/${event.id}`}
-                cta={isCheckInOpen(event, now) ? 'Start check-in' : 'Take attendance'}
-              />
-            ))}
-          </div>
-        </section>
-      ) : (
-        <EmptyState
-          className="py-8"
-          icon={locked.length > 0 ? '🔒' : '🗓'}
-          /*
-           * "Nothing you're on" is a different sentence from "nothing on", and
-           * the difference is the difference between an app that is empty and
-           * one that is refusing. A counselor who reads the first goes and asks
-           * somebody; one who reads the second concludes Tally is broken.
-           */
-          title={locked.length > 0 ? "Nothing you're on today" : 'Nothing on today'}
-          description={
-            locked.length > 0
-              ? `${locked.length === 1 ? 'One gathering is' : `${locked.length} gatherings are`} on today that you have not been added to. They are listed below — ask whoever is named to add you.`
-              : can('core')
-                ? 'Nothing is scheduled for today. The calendar, and everything already held, is on the Events tab.'
-                : 'Nothing is scheduled for today. Ask the core team if a gathering is missing.'
-          }
-          action={
-            can('core') ? (
-              <Link
-                to="/events"
-                className="inline-flex min-h-11 items-center rounded-xl bg-ink-800 px-4 text-sm font-semibold text-ink-100 ring-1 ring-ink-700 hover:bg-ink-700"
-              >
-                Go to events
-              </Link>
-            ) : undefined
-          }
-        />
-      )}
+            {/* Two to a row once there are two. A lone card keeps the column —
+                "On today" is a one-answer question and half a band of empty
+                beside the only answer would read as a second card missing. */}
+            <div className={cn('flex flex-col gap-3', mine.length > 1 && 'lg:grid lg:grid-cols-2')}>
+              {mine.map((event) => (
+                <EventHeroCard
+                  key={event.id}
+                  event={event}
+                  now={now}
+                  to={`/event/${event.id}`}
+                  cta={isCheckInOpen(event, now) ? 'Start check-in' : 'Take attendance'}
+                />
+              ))}
+            </div>
+          </section>
+        ) : (
+          <EmptyState
+            className="py-8"
+            icon={locked.length > 0 ? '🔒' : '🗓'}
+            /*
+             * "Nothing you're on" is a different sentence from "nothing on", and
+             * the difference is the difference between an app that is empty and
+             * one that is refusing. A counselor who reads the first goes and asks
+             * somebody; one who reads the second concludes Tally is broken.
+             */
+            title={locked.length > 0 ? "Nothing you're on today" : 'Nothing on today'}
+            description={
+              locked.length > 0
+                ? `${locked.length === 1 ? 'One gathering is' : `${locked.length} gatherings are`} on today that you have not been added to. They are listed below — ask whoever is named to add you.`
+                : can('core')
+                  ? 'Nothing is scheduled for today. The calendar, and everything already held, is on the Events tab.'
+                  : 'Nothing is scheduled for today. Ask the core team if a gathering is missing.'
+            }
+            action={
+              can('core') ? (
+                <Link
+                  to="/events"
+                  className="inline-flex min-h-11 items-center rounded-xl bg-ink-800 px-4 text-sm font-semibold text-ink-100 ring-1 ring-ink-700 hover:bg-ink-700"
+                >
+                  Go to events
+                </Link>
+              ) : undefined
+            }
+          />
+        )}
+      </div>
 
-      <LockedGatherings events={locked} hasOwn={mine.length > 0} />
+      {/* The column the answer is *not* in. Both of these are escape hatches —
+          "you have not been added to that one", "nobody took the register on
+          Friday" — and beside the cards they stay one glance away without ever
+          competing with them, which is the same demotion they had when they
+          were underneath. */}
+      <div className="contents lg:flex lg:w-96 lg:shrink-0 lg:flex-col lg:gap-8">
+        <LockedGatherings events={locked} hasOwn={mine.length > 0} />
 
-      <CatchUp before={dayStart} now={now} />
+        <CatchUp before={dayStart} now={now} />
+      </div>
     </PageFrame>
   );
 }
