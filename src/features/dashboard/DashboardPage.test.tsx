@@ -101,16 +101,22 @@ describe('DashboardPage', () => {
 
     const { container } = mount();
 
-    // One live region, not two: the skeleton makes its own from `label`, and
-    // the card used to add a second sentence of its own beside it.
+    /*
+     * One live region for the whole screen.
+     *
+     * Several cards wait on the same two reads, and three interleaved
+     * "loading" announcements name no more than one does. This is the half of
+     * the assertion that is about this file; holding the columns' footprint
+     * while they wait is drawn by the cards themselves now and is covered
+     * where it can actually be measured, in e2e/layout-shift.spec.ts.
+     */
     expect(screen.getAllByRole('status')).toHaveLength(1);
     expect(screen.getByRole('status')).toHaveTextContent('Loading attendance history');
 
-    // The right column's placeholder — silent, and only where there are
-    // columns to hold open.
-    const rightColumn = container.querySelector('section.hidden');
-    expect(rightColumn).not.toBeNull();
-    expect(rightColumn).toHaveClass('lg:block');
-    expect(rightColumn!.querySelectorAll('.animate-pulse')).toHaveLength(3);
+    // And nothing claims a number it has not read yet: a ministry with no
+    // gatherings on record gets the empty state rather than four confident
+    // zeros above it.
+    expect(container.querySelectorAll('.animate-pulse')).toHaveLength(0);
+    expect(screen.getByText(/No gatherings on record yet/i)).toBeInTheDocument();
   });
 });

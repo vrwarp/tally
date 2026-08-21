@@ -78,6 +78,61 @@ export interface Gathering {
   lastHeldAt: Date;
 }
 
+/** The name a gathering goes by: its series' if it has one, its own otherwise. */
+function gatheringTitle(
+  event: { seriesId?: string | null; title: string },
+  seriesTitles: ReadonlyMap<string, string>,
+): string {
+  const fromSeries = event.seriesId ? seriesTitles.get(event.seriesId) : undefined;
+  return fromSeries ?? event.title;
+}
+
+/**
+ * Which gatherings the calendar holds, newest first — names and keys only.
+ *
+ * The same grouping `groupByGathering` does, over the events rather than over
+ * their registers, and it exists because of *when* each of those is knowable.
+ * Which gatherings ran is a fact about the calendar, which streams from
+ * Firestore in milliseconds; how many people came to each is a register read
+ * per night. The insights screen names its tabs from the first and everything
+ * under them from the second, so deriving the tabs from the history meant a row
+ * of them appearing seconds late and shoving the whole screen down 60px —
+ * under a leader who had started reading it.
+ *
+ * One-offs are left out here exactly as they are there: a retreat is not an
+ * instance of anything, so it is nobody's tab.
+ */
+export function gatheringsOnCalendar(
+  events: readonly TallyEvent[],
+  series: readonly EventSeries[] = [],
+): Array<{ key: string; title: string }> {
+  const seriesTitles = new Map(series.map((entry) => [entry.id, entry.title]));
+  const held = new Map<string, { key: string; title: string; lastHeldAt: Date }>();
+
+  for (const event of events) {
+    if (event.mode !== 'recurring') continue;
+    const key = chainKey(event);
+    const existing = held.get(key);
+    if (existing) {
+      // The title follows the newest instance, as it does in `groupByGathering`.
+      if (event.startAt > existing.lastHeldAt) {
+        existing.lastHeldAt = event.startAt;
+        existing.title = gatheringTitle(event, seriesTitles);
+      }
+      continue;
+    }
+    held.set(key, {
+      key,
+      title: gatheringTitle(event, seriesTitles),
+      lastHeldAt: event.startAt,
+    });
+  }
+
+  return [...held.values()]
+    .sort((a, b) => b.lastHeldAt.getTime() - a.lastHeldAt.getTime())
+    .map(({ key, title }) => ({ key, title }));
+}
+
 /**
  * Splits the loaded history into the gatherings it belongs to.
  *
@@ -105,12 +160,9 @@ export function groupByGathering(
       existing.snapshots.push(snapshot);
       continue;
     }
-    const seriesTitle = snapshot.event.seriesId
-      ? seriesTitles.get(snapshot.event.seriesId)
-      : undefined;
     gatherings.set(key, {
       key,
-      title: seriesTitle ?? snapshot.event.title,
+      title: gatheringTitle(snapshot.event, seriesTitles),
       snapshots: [snapshot],
       lastHeldAt: snapshot.event.startAt,
     });

@@ -16,6 +16,7 @@ import { Link } from 'react-router-dom';
 import { ExportCsvButton } from '@/components/ExportCsvButton';
 import { Card, CardHeader, EmptyState } from '@/components/ui';
 import { CopyContactsButton, FollowUpActions } from '@/features/dashboard/FollowUpActions';
+import { CallListLoadingRows } from '@/features/dashboard/LoadingRows';
 import {
   buildMiaCsv,
   NO_EXPORT_CONTEXT,
@@ -30,6 +31,13 @@ export interface MiaListProps {
   items: readonly MiaStudent[];
   /** `settings.miaConsecutiveMisses`, quoted back so the list explains itself. */
   threshold: number;
+  /**
+   * True while the roster or the history is still being read — `items` is not
+   * yet an answer. The card keeps its header and shows pulse rows, *inside the
+   * same card*, so the answer landing swaps rows rather than recomposing the
+   * column. See `CallListLoadingRows`.
+   */
+  loading?: boolean;
   /** The gathering being shown, or null when every gathering is in the list. */
   gatheringTitle?: string | null;
   /**
@@ -45,6 +53,7 @@ export interface MiaListProps {
 export function MiaList({
   items,
   threshold,
+  loading = false,
   gatheringTitle = null,
   onContactAdded,
   exportContext = NO_EXPORT_CONTEXT,
@@ -55,14 +64,25 @@ export function MiaList({
     <Card>
       <CardHeader
         title="Missing in action"
-        count={items.length}
+        count={loading ? undefined : items.length}
         description={
           gatheringTitle
             ? `Came to ${gatheringTitle} regularly, then missed ${threshold} or more in a row.`
             : `Was a regular at one gathering, then missed ${threshold} or more of it in a row.`
         }
         action={
-          items.length > 0 ? (
+          /*
+            The real controls while the names are still coming, not a
+            placeholder shaped like them.
+
+            Both disable themselves at zero rows, so a loading header renders
+            the same two buttons a settled one does — same labels, same widths,
+            greyed — and the answer landing turns them on without moving the
+            header. A block of the right height but the wrong width slid the
+            pair 86px sideways the moment the list filled, which is the whole
+            failure this reserves against.
+          */
+          loading || items.length > 0 ? (
             // Two, and deliberately not a menu: the clipboard copy goes to the
             // group chat, the file goes to whoever is tracking who called whom.
             // Different destinations, both one press away — and parallel, so
@@ -94,7 +114,11 @@ export function MiaList({
         }
       />
 
-      {items.length === 0 ? (
+      {loading ? (
+        // Three lines: under "All" every row also names the gathering somebody
+        // has gone missing from, which is this list's tallest and commonest row.
+        <CallListLoadingRows rows={4} lines={gatheringTitle === null ? 3 : 2} />
+      ) : items.length === 0 ? (
         <EmptyState
           title={`Nobody has missed ${threshold} in a row — nice.`}
           description={

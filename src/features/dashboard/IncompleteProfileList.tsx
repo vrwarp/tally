@@ -17,6 +17,7 @@
 import { Link } from 'react-router-dom';
 import { Badge, Card, CardHeader, EmptyState, Spinner } from '@/components/ui';
 import { AddParentContactButton } from '@/features/dashboard/AddParentContactButton';
+import { CallListLoadingRows } from '@/features/dashboard/LoadingRows';
 import { ExportCsvButton } from '@/components/ExportCsvButton';
 import {
   buildIncompleteProfileCsv,
@@ -36,6 +37,12 @@ export interface IncompleteProfileListProps {
   students: readonly Student[];
   /** Passed in rather than read from the clock, so the ageing is testable. */
   now: Date;
+  /**
+   * True while the roster itself is still being read — before `students` means
+   * anything at all. The card keeps its header over pulse rows, in place, so
+   * the roster landing swaps rows rather than recomposing the column.
+   */
+  loading?: boolean;
   /**
    * True while Planning Center is still being asked which profiles have a
    * parent contact. Said out loud: a list that is still counting looks exactly
@@ -58,6 +65,7 @@ export interface IncompleteProfileListProps {
 export function IncompleteProfileList({
   students,
   now,
+  loading = false,
   checking = false,
   error = null,
   gatheringTitle = null,
@@ -68,14 +76,17 @@ export function IncompleteProfileList({
     <Card>
       <CardHeader
         title="Incomplete profiles"
-        count={students.length}
+        count={loading ? undefined : students.length}
         description={
           gatheringTitle
             ? `Seen at ${gatheringTitle}, with no parent phone or email on file.`
             : 'Active students with no parent phone or email on file.'
         }
         action={
-          students.length > 0 ? (
+          // The real control, disabled at zero, so a loading header is the
+          // settled header greyed rather than a placeholder of a guessed width.
+          // See the note in `MiaList`.
+          loading || students.length > 0 ? (
             <ExportCsvButton
               build={() => ({
                 filename: exportFilename({
@@ -96,7 +107,9 @@ export function IncompleteProfileList({
         <p className="px-3 py-2 text-xs text-danger-400">{error}</p>
       ) : null}
 
-      {students.length === 0 ? (
+      {loading ? (
+        <CallListLoadingRows rows={2} />
+      ) : students.length === 0 ? (
         checking ? (
           <p className="flex items-center gap-2 px-3 py-2 text-xs text-ink-500">
             <Spinner /> Checking who has a parent contact…
