@@ -164,12 +164,12 @@ if (withColourMaths.length > 0) {
 /*
  * The icon catalogue must never reach the kiosk either, and for the same money.
  *
- * `src/lib/eventIcons.ts` is sixty kilobytes of path data for a hundred and
- * nine glyphs. A bound kiosk draws exactly one of them, so the lookup happens in
+ * `src/lib/eventIcons.ts` is sixty-odd kilobytes of path data for a hundred-odd
+ * glyphs. A bound kiosk draws exactly one of them, so the lookup happens in
  * `functions/src/kiosk/events.ts` while the chooser row is built and the row
  * carries finished path data — see `src/kiosk/icon.ts`. One
  * `import { findEventIcon }` instead of the string the server already sent would
- * put the other hundred and eight on a lobby tablet's critical path.
+ * put the other hundred-odd on a lobby tablet's critical path.
  *
  * Matched on path data from two glyphs rather than on a name, on the same
  * argument as the colour maths above: a minifier renames every export it can

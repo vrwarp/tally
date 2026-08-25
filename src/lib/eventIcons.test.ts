@@ -96,6 +96,12 @@ describe('searchEventIcons', () => {
    * types into the picker for the gatherings a church actually runs; each one
    * finding nothing is the failure this catches, and the reason somebody would
    * conclude the icons "don't have" what they need.
+   *
+   * Three of them are proper nouns because they are this church's own
+   * gatherings: the Check-Ins kiosk has been counting Footprints, Little Foot
+   * and Shining Stars since before Tally existed (docs/planning-center.md), and
+   * a leader typing one of those names should meet a glyph that means it rather
+   * than the empty grid all three used to return.
    */
   it.each([
     'youth',
@@ -104,6 +110,10 @@ describe('searchEventIcons', () => {
     'nursery',
     'baby',
     'toddler',
+    'footprints',
+    'little foot',
+    'shining stars',
+    'sparkle',
     'bible',
     'study',
     'worship',
@@ -127,6 +137,7 @@ describe('searchEventIcons', () => {
     'camping',
     'retreat',
     'outdoors',
+    'walk',
   ])('has something to offer for "%s"', (query) => {
     expect(searchEventIcons(query).length).toBeGreaterThan(0);
   });
