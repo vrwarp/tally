@@ -112,11 +112,11 @@ export interface KioskEventEntry {
    * `0 -960 960 960` viewBox, or absent for a gathering nobody gave one.
    *
    * The *path*, not the name, for the same reason `palette` is hex rather than
-   * four hue names. The catalogue is sixty kilobytes of path data for a hundred
-   * and nine glyphs (`generated/eventIcons.ts`), the kiosk needs exactly one of
-   * them per gathering, and its first-paint budget is the tightest number in the
-   * repo — so the lookup happens here, where the list already has to exist, and
-   * what lands on the row is the one string the lobby screen will draw.
+   * four hue names. The catalogue is sixty-odd kilobytes of path data for a
+   * hundred-odd glyphs (`generated/eventIcons.ts`), the kiosk needs exactly one
+   * of them per gathering, and its first-paint budget is the tightest number in
+   * the repo — so the lookup happens here, where the list already has to exist,
+   * and what lands on the row is the one string the lobby screen will draw.
    *
    * A name the catalogue no longer holds resolves to nothing at all rather than
    * to a substitute, which is `findEventIcon`'s own rule: a gathering whose icon

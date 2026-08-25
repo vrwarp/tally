@@ -2,10 +2,10 @@
  * The gathering's icon, as one string.
  *
  * The kiosk draws an icon and knows nothing about the catalogue it came from.
- * `src/lib/eventIcons.ts` is sixty kilobytes of path data for a hundred and
- * nine glyphs, of which a bound kiosk needs exactly one — so the lookup happens
- * in `functions/src/kiosk/events.ts` while the chooser row is being built, the
- * row carries finished path data, and everything here is a validator. It is the
+ * `src/lib/eventIcons.ts` is sixty-odd kilobytes of path data for a hundred-odd
+ * glyphs, of which a bound kiosk needs exactly one — so the lookup happens in
+ * `functions/src/kiosk/events.ts` while the chooser row is being built, the row
+ * carries finished path data, and everything here is a validator. It is the
  * same split the palette lives by, for the same reason and against the same
  * budget: see `src/kiosk/theme.ts` and `scripts/check-kiosk-budget.mjs`, which
  * fails the build if `lib/eventIcons` ever turns up in this bundle.

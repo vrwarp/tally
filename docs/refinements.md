@@ -191,8 +191,8 @@ screen a parent walks up to, and the one a volunteer points at a gathering —
 never had.
 
 The plumbing decided itself, because the kiosk's first-paint budget is the
-tightest number in the repo: the catalogue is sixty kilobytes of path data for a
-hundred and nine glyphs, a bound kiosk needs exactly one of them, so the lookup
+tightest number in the repo: the catalogue is sixty-odd kilobytes of path data
+for a hundred-odd glyphs, a bound kiosk needs exactly one of them, so the lookup
 happens in `functions/src/kiosk/events.ts` while the chooser row is built and the
 row carries finished path data — the same split, for the same reason, as the
 gathering's colours. `scripts/check-kiosk-budget.mjs` now fails the build if
