@@ -166,6 +166,17 @@ describe('buildStudentPayload', () => {
     );
   });
 
+  it('is not a visitor: somebody added this one on purpose', () => {
+    /*
+     * The yellow "Missing Info" badge belongs to a quick-add at the door, where
+     * a name was typed with a queue behind it and somebody else finishes the
+     * record. A student added through the editor was added deliberately, with
+     * whatever the person adding them knew — flagging those too would turn the
+     * badge into decoration.
+     */
+    expect(buildStudentPayload(draft, 'uid-miriam')).toMatchObject({ isVisitor: false });
+  });
+
   it('is active unless the caller says otherwise', () => {
     expect(buildStudentPayload(draft, 'uid-miriam').status).toBe('active');
     expect(buildStudentPayload({ ...draft, status: 'inactive' }, 'uid').status).toBe('inactive');
@@ -225,7 +236,14 @@ describe('updateStudent', () => {
   it('writes only the fields the patch names', async () => {
     await updateStudent('pco_1', { notes: 'left early' }, 'uid-miriam');
 
-    expect(written().data).toEqual({
+    /*
+     * `toStrictEqual`, not `toEqual`: a key written as `undefined` is a key,
+     * and `merge: true` treats one as a field to delete. Writing every field
+     * the patch did not name would wipe a student's status and visitor flag
+     * every time somebody typed a note against them, and `toEqual` cannot see
+     * the difference.
+     */
+    expect(written().data).toStrictEqual({
       notes: 'left early',
       updatedAt: 'server-timestamp',
       updatedBy: 'uid-miriam',

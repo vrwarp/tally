@@ -93,6 +93,30 @@ describe('gatheringOptions', () => {
     expect(options[0]!.title).toBe('What it is now');
   });
 
+  it('is not renamed by an older instance arriving later in the list', () => {
+    /*
+     * The same claim as the test above, read the other way round. Events come
+     * off a query in whatever order it returns them, so the newest naming the
+     * chain has to be a comparison rather than a consequence of arrival order —
+     * otherwise a gathering renamed in March goes back to its March name on
+     * whichever page load happened to read the old instance last.
+     */
+    const options = gatheringOptions([saturday(1, 'What it is now'), saturday(3, 'The old name')]);
+
+    expect(options[0]!.title).toBe('What it is now');
+    expect(options[0]!.lastStartAt).toEqual(saturday(1).startAt);
+  });
+
+  it('keeps the first of two instances that start at the same moment', () => {
+    // A duplicate write, or two roots that collapsed onto one chain. Neither
+    // is newer, so neither renames the gathering — and the list a leader sees
+    // does not change between two reads of the same data.
+    const options = gatheringOptions([saturday(2, 'First seen'), saturday(2, 'Second seen')]);
+
+    expect(options).toHaveLength(1);
+    expect(options[0]!.title).toBe('First seen');
+  });
+
   it('puts the most recently active gathering first', () => {
     const options = gatheringOptions([saturday(4), friday(1)]);
 

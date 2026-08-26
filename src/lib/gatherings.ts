@@ -57,6 +57,10 @@ export interface GatheringOption {
  */
 export function gatheringOptions(
   events: readonly TallyEvent[],
+  // Stryker disable next-line ArrayDeclaration: the default is only read when a
+  // caller passes no series at all, and then the lookup below misses whatever
+  // is in it — every entry of any other array has an `id` of `undefined`, which
+  // no event's `seriesId` is. An empty one says there are no titles to find.
   series: readonly EventSeries[] = [],
 ): GatheringOption[] {
   const seriesTitles = new Map(series.map((entry) => [entry.id, entry.title]));
