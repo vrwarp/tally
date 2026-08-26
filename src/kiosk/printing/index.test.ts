@@ -529,6 +529,16 @@ describe('the jobs this module hands the queue', () => {
     expect((queue.warm.mock.calls[0]?.[0] as LabelJob).name).toBe('Ada Nkemelu');
   });
 
+  it('keeps the sticker name as the roster spells it, without a trailing space', async () => {
+    const printing = await load();
+
+    printing.warmLabel({ ...ADA, lastName: '' }, binding());
+
+    // A child with no surname on file. `Ada ` on the printer screen's log
+    // reads as a name that lost something.
+    expect((queue.warm.mock.calls[0]?.[0] as LabelJob).name).toBe('Ada');
+  });
+
   it('starts the allergy lookup before the raster that waits on it', async () => {
     const printing = await load();
 
@@ -616,6 +626,19 @@ describe('the jobs this module hands the queue', () => {
     const job = queue.print.mock.calls.at(-1)?.[0] as LabelJob;
     expect(job.values.eventTitle).toBe('QL-800 · 62');
     expect(job.studentId).toMatch(/^__test__/);
+
+    // The label itself, whole: three centred lines, the first one large and
+    // bold, and none of them required — a test print has to come out of a
+    // printer whose media is wrong, which is when somebody presses it.
+    expect(job.template).toEqual({
+      lines: [
+        { text: 'Tally', size: 'lg', bold: true, align: 'center', requiresValue: false },
+        { text: '{{eventTitle}}', size: 'sm', bold: false, align: 'center', requiresValue: false },
+        { text: '{{time}}', size: 'sm', bold: false, align: 'center', requiresValue: false },
+      ],
+      copies: 1,
+    });
+    expect(job.values.time).toMatch(/\d/);
   });
 
   it('test-prints nothing on a kiosk with no printer configured', async () => {
@@ -707,7 +730,10 @@ describe('rastering', () => {
       values: { firstName: 'Ada' },
     });
 
-    expect((worker.posted[0] as { values: Record<string, string> }).values).toEqual({
+    // `toStrictEqual`, because `toEqual` reads an `allergy: undefined` key as
+    // no key at all — and the whole point is that the job is handed on
+    // untouched when there is nothing to fold into it.
+    expect((worker.posted[0] as { values: Record<string, string> }).values).toStrictEqual({
       firstName: 'Ada',
     });
   });
@@ -771,6 +797,41 @@ describe('sending', () => {
     await printing.ready();
 
     await expect(queue.options.send(result)).rejects.toThrow('No printer is connected.');
+  });
+
+  it('does not reopen a printer that is already open', async () => {
+    const device = makeDevice();
+    usb.paired = [device];
+    configured();
+    const printing = await load();
+    await printing.ready();
+    const { BrotherQLPrinterCore } = (await import(
+      '@vrwarp/brother-ql-webusb/printer-core'
+    )) as unknown as { BrotherQLPrinterCore: { getPairedDevices: { mock: { calls: unknown[] } } } };
+    const asked = BrotherQLPrinterCore.getPairedDevices.mock.calls.length;
+
+    await queue.options.send(result);
+
+    // Reopening is the recovery for a device replugged without a connect
+    // event. Doing it per label is a USB round trip on every sticker.
+    expect(BrotherQLPrinterCore.getPairedDevices.mock.calls.length).toBe(asked);
+  });
+
+  it('does not republish "ready" for a label that went out of a working printer', async () => {
+    const device = makeDevice();
+    usb.paired = [device];
+    configured();
+    const printing = await load();
+    await printing.ready();
+    const seen: string[] = [];
+    printing.subscribe((state) => seen.push(state.kind));
+
+    await queue.options.send(result);
+    await queue.options.send(result);
+
+    // The printer screen redraws on every one of these, and an evening is
+    // hundreds of labels.
+    expect(seen).toEqual(['ready']);
   });
 
   it('takes the trouble state down once a label goes out', async () => {
