@@ -89,8 +89,8 @@ export function csvCell(value: CsvValue): string {
   if (value instanceof Date) return isoDateTime(value);
 
   const text = value;
-  if (text === '') return '';
-
+  // No empty-string fast path: nothing below matches an empty string either, so
+  // it falls through to `return text` and comes out as itself.
   if (FORMULA_LEAD.test(text)) {
     // Excel consumes the apostrophe; Sheets renders it. That is the accepted
     // cost of not shipping a file that runs a formula somebody typed into a
@@ -158,13 +158,18 @@ export interface ExportFilenameParts {
  * normalises names.
  */
 function slug(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 40)
-    .replace(/-$/, '');
+  return (
+    value
+      .toLowerCase()
+      // Runs, not single characters: `Jamie  Rivera — 2026` collapses to one
+      // dash apiece, so there is never a `--` left for a second pass to find.
+      .replace(/[^\p{L}\p{N}]+/gu, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 40)
+      // The slice can land mid-gap, which is the only way a trailing dash gets
+      // back in after the trim above.
+      .replace(/-$/, '')
+  );
 }
 
 /**

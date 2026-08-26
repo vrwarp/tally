@@ -145,4 +145,34 @@ describe('exportFilename', () => {
       'tally-attendance-中文聚會-2026-08-09.csv',
     );
   });
+
+  it('collapses a run of punctuation to one separator', () => {
+    expect(exportFilename({ kind: 'roster', scope: 'Jamie  Rivera — 2026', at })).toBe(
+      'tally-roster-jamie-rivera-2026-2026-08-09.csv',
+    );
+  });
+
+  it('cuts a long title short rather than carrying it into the name', () => {
+    // Forty characters of gathering, and the date still has to be readable at
+    // the end of a row in Downloads.
+    const long = 'The Wednesday Evening Middle School Gathering At The Annex';
+
+    expect(exportFilename({ kind: 'roster', scope: long, at })).toBe(
+      'tally-roster-the-wednesday-evening-middle-school-gath-2026-08-09.csv',
+    );
+  });
+
+  it('never ends the title on the separator the cut landed in', () => {
+    // The fortieth character is where a word ended, so the slice takes the
+    // dash and nothing after it — and `tally-roster-…-hall--2026-08-09` is a
+    // filename that reads as a bug.
+    const name = exportFilename({
+      kind: 'roster',
+      scope: 'Wednesday Evening Gathering At The Hall X',
+      at,
+    });
+
+    expect(name).toBe('tally-roster-wednesday-evening-gathering-at-the-hall-2026-08-09.csv');
+    expect(name).not.toContain('--');
+  });
 });
