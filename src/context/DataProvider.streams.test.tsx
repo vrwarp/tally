@@ -25,16 +25,18 @@ import type { AppSettings, EventAccess, EventSeries, Student, TallyEvent } from 
 interface Stream<T> {
   deliver: (value: T) => void;
   fail: (cause: Error) => void;
+  /** How many times the provider asked for this listener. */
+  opened: number;
   stopped: number;
 }
 
 const streams = vi.hoisted(() => ({
-  students: { deliver: () => {}, fail: () => {}, stopped: 0 },
-  events: { deliver: () => {}, fail: () => {}, stopped: 0 },
-  series: { deliver: () => {}, fail: () => {}, stopped: 0 },
-  settings: { deliver: () => {}, fail: () => {}, stopped: 0 },
-  access: { deliver: () => {}, fail: () => {}, stopped: 0 },
-  edits: { deliver: () => {}, fail: () => {}, stopped: 0 },
+  students: { deliver: () => {}, fail: () => {}, opened: 0, stopped: 0 },
+  events: { deliver: () => {}, fail: () => {}, opened: 0, stopped: 0 },
+  series: { deliver: () => {}, fail: () => {}, opened: 0, stopped: 0 },
+  settings: { deliver: () => {}, fail: () => {}, opened: 0, stopped: 0 },
+  access: { deliver: () => {}, fail: () => {}, opened: 0, stopped: 0 },
+  edits: { deliver: () => {}, fail: () => {}, opened: 0, stopped: 0 },
 })) as unknown as {
   students: Stream<Student[]>;
   events: Stream<TallyEvent[]>;
@@ -56,6 +58,7 @@ const auth = vi.hoisted(
 /** Wires one held stream up to whatever the provider passes the service. */
 function connect<T>(stream: Stream<T>) {
   return (next: (value: T) => void, onError?: (cause: Error) => void) => {
+    stream.opened += 1;
     stream.deliver = next;
     stream.fail = onError ?? (() => {});
     return () => {
@@ -118,7 +121,10 @@ beforeEach(() => {
   eventOptions.latest = null;
   auth.profile = { id: 'uid-counselor' };
   auth.can = (role: string) => role === 'counselor';
-  for (const stream of Object.values(streams)) stream.stopped = 0;
+  for (const stream of Object.values(streams)) {
+    stream.stopped = 0;
+    stream.opened = 0;
+  }
 });
 
 afterEach(() => {
@@ -251,6 +257,47 @@ describe('a stream that fails', () => {
     act(() => streams.access.fail(new Error('same')));
 
     expect(renders).toBe(after);
+  });
+
+  it('names the access stream when that is the one refused', async () => {
+    // Every label is written out by hand at its own call site, so each one is
+    // its own chance to name the wrong collection in a banner.
+    mount();
+    await waitFor(() => expect(latest).not.toBeNull());
+
+    act(() => streams.access.fail(new Error('Missing or insufficient permissions.')));
+
+    expect(latest?.streamErrors?.access).toBe(
+      'Could not load access: Missing or insufficient permissions.',
+    );
+  });
+
+  it('names each of the other three when they are the one refused', async () => {
+    mount();
+    await waitFor(() => expect(latest).not.toBeNull());
+
+    act(() => {
+      streams.students.fail(new Error('refused'));
+      streams.series.fail(new Error('refused'));
+      streams.settings.fail(new Error('refused'));
+    });
+
+    expect(latest?.streamErrors?.students).toBe('Could not load students: refused');
+    expect(latest?.streamErrors?.series).toBe('Could not load series: refused');
+    expect(latest?.streamErrors?.settings).toBe('Could not load settings: refused');
+  });
+
+  it('holds the same errors object when a quiet stream delivers again', async () => {
+    // `streamErrors` is in the context value, so rebuilding it for a snapshot
+    // that cleared nothing re-renders every screen reading `useData`.
+    mount();
+    await waitFor(() => expect(latest).not.toBeNull());
+    act(() => streams.events.deliver([]));
+    const first = latest?.streamErrors;
+
+    act(() => streams.events.deliver([makeEvent({ id: 'friday' })]));
+
+    expect(latest?.streamErrors).toBe(first);
   });
 
   it('says nothing at all while every stream is quiet', async () => {
@@ -422,26 +469,46 @@ describe('the upstream edit queue', () => {
   it('is never opened for a counselor', async () => {
     // The rules refuse it, and a listener that is never opened is the
     // difference between a screen that does not ask and one that is refused.
-    let opened = false;
-    streams.edits.deliver = () => {
-      opened = true;
-    };
-
     mount();
     await waitFor(() => expect(latest).not.toBeNull());
 
-    expect(opened).toBe(false);
+    expect(streams.edits.opened).toBe(0);
     expect(latest?.upstreamEdits).toEqual([]);
   });
 
-  it('is opened for the core team', async () => {
+  it('is opened for the core team, and what it says gets through', async () => {
     auth.can = (role: string) => role === 'core';
     mount();
     await waitFor(() => expect(latest).not.toBeNull());
 
-    expect(typeof streams.edits.fail).toBe('function');
-    act(() => streams.edits.deliver([]));
-    expect(latest?.upstreamEdits).toEqual([]);
+    expect(streams.edits.opened).toBe(1);
+
+    const queued = [{ id: 'edit-1', studentId: 'pco_1', state: 'queued' }];
+    act(() => streams.edits.deliver(queued as never));
+
+    // A job queued on a phone in a corridor lands from a server, and the
+    // laptop watching the same student has to stop saying "sending".
+    expect(latest?.upstreamEdits).toBe(queued);
+  });
+
+  it('empties the queue when the person watching stops being core team', async () => {
+    auth.can = (role: string) => role === 'core';
+    const view = mount();
+    await waitFor(() => expect(latest).not.toBeNull());
+    act(() => streams.edits.deliver([{ id: 'edit-1' }] as never));
+    expect(latest?.upstreamEdits).toHaveLength(1);
+
+    // An admin demoting somebody mid-event: the listener closes and what it
+    // had already said goes with it.
+    auth.can = (role: string) => role === 'counselor';
+    view.rerender(
+      <DataProvider>
+        <Probe />
+      </DataProvider>,
+    );
+
+    await waitFor(() => expect(latest?.upstreamEdits).toEqual([]));
+    expect(streams.edits.stopped).toBe(1);
   });
 
   it('goes quiet rather than banner-ing when its listener is refused', async () => {

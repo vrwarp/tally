@@ -329,6 +329,38 @@ describe('the per-backend report', () => {
     }
   });
 
+  it('tells one reason for failing from another', async () => {
+    // `error` is the sentence the settings screen prints under the backend.
+    // Collapsing two different ones to "there is an error" leaves a leader
+    // reading last hour's explanation of this hour's outage.
+    const failing = (error: string) => [
+      { backendId: 'pco' as const, ok: false, error, people: 0, unresolved: 0, missing: 0 },
+    ];
+    fetchRoster.mockImplementationOnce(async () => ({
+      students: [],
+      fetchedAt: new Date('2026-02-13T19:30:00Z'),
+      offline: false,
+      perBackend: failing('Planning Center is rate-limiting us'),
+    }));
+
+    mount();
+    await waitFor(() => expect(latest?.rosterBackends).toHaveLength(1));
+    const first = latest?.rosterBackends;
+
+    fetchRoster.mockImplementationOnce(async () => ({
+      students: [],
+      fetchedAt: new Date('2026-02-13T19:30:00Z'),
+      offline: false,
+      perBackend: failing('Planning Center is not connected'),
+    }));
+    await act(async () => {
+      await latest?.refreshRoster(true);
+    });
+
+    expect(latest?.rosterBackends).not.toBe(first);
+    expect(latest?.rosterBackends[0]?.error).toBe('Planning Center is not connected');
+  });
+
   it('holds the same array when only the instant of the read moved', async () => {
     // `fetchedAt` is deliberately out of the signature: every read restamps it,
     // and restamping is not a change worth re-rendering every consumer for.

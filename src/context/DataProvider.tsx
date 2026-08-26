@@ -104,12 +104,17 @@ const ROSTER_RESYNC_AFTER_MS = 60 * 1000;
  * somebody reloaded the page. A field worth drawing is a field worth comparing.
  */
 function rosterSignature(students: readonly Student[]): string {
-  return students
-    .map(
-      (s) =>
-        `${s.id}|${s.firstName}|${s.lastName}|${s.grade}|${s.status}|${s.profileComplete}|${s.hasAllergies}|${s.birthday}`,
-    )
-    .join('\n');
+  return (
+    students
+      .map(
+        (s) =>
+          `${s.id}|${s.firstName}|${s.lastName}|${s.grade}|${s.status}|${s.profileComplete}|${s.hasAllergies}|${s.birthday}`,
+      )
+      // Stryker disable next-line StringLiteral: two rosters colliding on a
+      // different separator would need one student whose eight fields spell
+      // out two students' sixteen, which no student document can.
+      .join('\n')
+  );
 }
 
 function describeRosterError(cause: unknown): string {
@@ -141,6 +146,9 @@ function describeRosterError(cause: unknown): string {
  */
 function rosterErrorReport(cause: unknown): PcoErrorReport {
   return {
+    // Stryker disable next-line StringLiteral: `pcoErrorReport` uses this
+    // fallback for `message` and nothing else, and `message` is overwritten on
+    // the very next line. It is here so the call reads honestly on its own.
     ...pcoErrorReport(cause, 'Could not reach the people backend for the roster.'),
     message: describeRosterError(cause),
   };
@@ -153,9 +161,14 @@ function rosterErrorReport(cause: unknown): PcoErrorReport {
  * every consumer of the context for.
  */
 function backendReportSignature(entries: readonly RosterBackendStatus[]): string {
-  return entries
-    .map((e) => `${e.backendId}|${e.ok}|${e.error ?? ''}|${e.people}|${e.unresolved}|${e.missing}`)
-    .join('\n');
+  return (
+    entries
+      .map((e) => `${e.backendId}|${e.ok}|${e.error ?? ''}|${e.people}|${e.unresolved}|${e.missing}`)
+      // Stryker disable next-line StringLiteral: as in `rosterSignature`, a
+      // collision on the separator would need one backend line to spell out
+      // two.
+      .join('\n')
+  );
 }
 
 export function DataProvider({ children }: { children: ReactNode }) {
