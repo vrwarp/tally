@@ -34,6 +34,9 @@ const MAX_LENGTH = 4000;
 export function sanitizeIconPath(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const path = value.trim();
+  // Stryker disable next-line ConditionalExpression: the grammar below requires
+  // a moveto, so an empty string fails it too. This says why one is refused
+  // rather than leaving it to a regex two lines down.
   if (path.length === 0 || path.length > MAX_LENGTH) return null;
   return PATH.test(path) ? path : null;
 }

@@ -104,6 +104,16 @@ function draft(overrides: Partial<EventDraft> = {}): EventDraft {
   };
 }
 
+/** A Firestore document snapshot of one gathering, as `toEvent` reads one. */
+function eventDoc(id: string) {
+  return {
+    id,
+    exists: () => true,
+    data: () => ({ title: id }),
+    metadata: { hasPendingWrites: false },
+  };
+}
+
 /** The payload the last write was handed, whichever call made it. */
 function payload(): Record<string, unknown> {
   const fromSet = (setDoc.mock.calls.at(-1) as unknown[] | undefined)?.[1];
@@ -156,6 +166,34 @@ describe('subscribeEvents', () => {
     expect((since as Date).getMilliseconds()).toBe(0);
   });
 
+  it('filters on the field the calendar is ordered by', () => {
+    // `startAt` and `>=` together are the window. Firestore refuses a range
+    // filter on one field with an order on another, so getting either wrong is
+    // an empty calendar rather than a wrong one.
+    subscribeEvents(() => {});
+
+    const [field, op] = where.mock.calls[0] ?? [];
+    expect(field).toBe('startAt');
+    expect(op).toBe('>=');
+  });
+
+  it('hands the caller what the snapshot held', () => {
+    const onChange = vi.fn();
+    subscribeEvents(onChange);
+
+    const [, next] = onSnapshot.mock.calls.at(-1) as unknown as [
+      unknown,
+      (snapshot: unknown) => void,
+    ];
+    next({ docs: [eventDoc('friday'), eventDoc('sunday')] });
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect((onChange.mock.calls[0]![0] as { id: string }[]).map((event) => event.id)).toEqual([
+      'friday',
+      'sunday',
+    ]);
+  });
+
   it('forwards a refused read to the caller', () => {
     const onError = vi.fn();
     subscribeEvents(() => {}, {}, onError);
@@ -181,6 +219,24 @@ describe('subscribeEvents', () => {
     ];
     expect(() => handler(new Error('refused'))).not.toThrow();
   });
+
+  it('survives a refused read on each of the other streams with nobody listening', () => {
+    // Every screen that reads one of these passes an `onError`; the printer
+    // setup screen and the kiosk pairing screen do not. A stream that assumed
+    // one takes the whole screen down when the rules refuse it.
+    const streams = [
+      () => subscribeEvent('event-1', () => {}),
+      () => subscribeEventSeries(() => {}),
+      () => subscribeSettings(() => {}),
+    ];
+
+    for (const open of streams) {
+      open();
+      const call = onSnapshot.mock.calls.at(-1) as unknown[];
+      const handler = call[2] as (cause: Error) => void;
+      expect(() => handler(new Error('refused'))).not.toThrow();
+    }
+  });
 });
 
 describe('the other streams', () => {
@@ -196,6 +252,41 @@ describe('the other streams', () => {
 
     onNext({ exists: () => false, id: 'event-1', data: () => undefined, metadata: {} });
     expect(seen[0]).toBeNull();
+  });
+
+  it('hands the caller the templates the snapshot held', () => {
+    const onChange = vi.fn();
+    subscribeEventSeries(onChange);
+
+    const [, next] = onSnapshot.mock.calls.at(-1) as unknown as [
+      unknown,
+      (snapshot: unknown) => void,
+    ];
+    next({
+      docs: [
+        { id: 'friday', data: () => ({ name: 'Friday Fellowship', order: 0 }) },
+        { id: 'sunday', data: () => ({ name: 'Sunday Nursery', order: 1 }) },
+      ],
+    });
+
+    expect((onChange.mock.calls[0]![0] as { id: string }[]).map((row) => row.id)).toEqual([
+      'friday',
+      'sunday',
+    ]);
+  });
+
+  it('hands the caller the settings the snapshot held', () => {
+    const onChange = vi.fn();
+    subscribeSettings(onChange);
+
+    const [, next] = onSnapshot.mock.calls.at(-1) as unknown as [
+      unknown,
+      (snapshot: unknown) => void,
+    ];
+    next({ exists: () => true, data: () => ({ predictiveOfLastN: 7 }) });
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect((onChange.mock.calls[0]![0] as { predictiveOfLastN: number }).predictiveOfLastN).toBe(7);
   });
 
   it('reads the recurring templates in the order somebody arranged them', () => {
@@ -261,6 +352,34 @@ describe('fetchPastEvents', () => {
     page(0);
     await fetchPastEvents(new Date());
     expect(startAfter).not.toHaveBeenCalled();
+  });
+
+  it('asks with three constraints and no fourth', async () => {
+    page(0);
+    await fetchPastEvents(new Date());
+
+    // A constraint the query did not mean to carry is a page of the wrong
+    // gatherings, and Firestore will happily serve one.
+    const [q] = getDocs.mock.calls.at(-1) as unknown as [{ constraints: unknown[] }];
+    expect(q.constraints).toHaveLength(3);
+  });
+
+  it('carries the cursor as a fourth constraint and no more', async () => {
+    page(0);
+    await fetchPastEvents(new Date(), { id: 'night-1' } as never);
+
+    const [q] = getDocs.mock.calls.at(-1) as unknown as [{ constraints: unknown[] }];
+    expect(q.constraints).toHaveLength(4);
+  });
+
+  it('hands back the last of the page as the cursor, not the second', async () => {
+    page(3);
+
+    const result = await fetchPastEvents(new Date(), null, 3);
+
+    // The next page starts *after* this one. Any other document means a page
+    // that repeats gatherings the list has already drawn.
+    expect((result.cursor as unknown as { id: string }).id).toBe('night-2');
   });
 
   it('continues from a cursor when there is one', async () => {
@@ -343,6 +462,18 @@ describe('what a gathering is written as', () => {
     );
 
     expect(payload().recurrence).toMatchObject({ interval: 1, weekdays: [5] });
+  });
+
+  it('keeps the chain a repeat belongs to', async () => {
+    // Nulled for a one-off, and a mode check that stopped distinguishing would
+    // detach every recurring gathering from its own series on the next save.
+    await createEvent(
+      draft({ mode: 'recurring', seriesId: 'friday-fellowship', recurrenceRootId: 'root-1' }),
+      'uid-1',
+    );
+
+    expect(payload().seriesId).toBe('friday-fellowship');
+    expect(payload().recurrenceRootId).toBe('root-1');
   });
 
   it('drops the repeat when a gathering becomes a one-off', async () => {

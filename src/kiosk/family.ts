@@ -91,12 +91,17 @@ export function familyOf(
   digits: FamilyDigits,
 ): KioskStudent[] {
   const own = digits.get(student.id);
+  // Stryker disable next-line ConditionalExpression: `buildFamilyDigits` only
+  // creates a set when it has a digit to put in it, so a student present in the
+  // index always has one. The emptiness test is here because the *type* says a
+  // set might be empty, and a family of nobody is not a family.
   if (!own || own.size === 0) return [];
 
   const kin: KioskStudent[] = [];
   for (const other of students) {
     if (other.id === student.id) continue;
     const theirs = digits.get(other.id);
+    /* Stryker disable next-line ConditionalExpression: never empty, as above. */
     if (!theirs || theirs.size === 0) continue;
     if (!within(theirs, own) && !within(own, theirs)) continue;
     kin.push(other);
