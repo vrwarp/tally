@@ -54,6 +54,19 @@ describe('sanitizeKioskPalette', () => {
     ).toBeNull();
   });
 
+  it('refuses a colour that is not a string, however it reads as one', () => {
+    /*
+     * `HEX.test` coerces, so a one-element array or anything with a `toString`
+     * passes the pattern and is then handed to `setProperty` as an object. The
+     * `typeof` is what keeps a value that only *looks* like a colour out of the
+     * thing the kiosk reads back out of storage for the rest of the evening.
+     */
+    expect(sanitizeKioskPalette({ '--color-ink-950': ['#0d0500'] })).toBeNull();
+    expect(
+      sanitizeKioskPalette({ '--color-ink-950': { toString: () => '#0d0500' } }),
+    ).toBeNull();
+  });
+
   it('refuses a property name that is not one of ours', () => {
     expect(sanitizeKioskPalette({ background: '#000000', '--tally-x': '#000000' })).toBeNull();
   });

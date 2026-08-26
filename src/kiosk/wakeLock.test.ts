@@ -252,6 +252,8 @@ describe('on the way out', () => {
   });
 
   it('stops the retry and all three listeners', async () => {
+    const cleared = vi.spyOn(globalThis, 'clearInterval');
+    const started = vi.spyOn(globalThis, 'setInterval');
     const removeDocument = vi.spyOn(document, 'removeEventListener');
     const removeWindow = vi.spyOn(window, 'removeEventListener');
     const addDocument = vi.spyOn(document, 'addEventListener');
@@ -260,6 +262,7 @@ describe('on the way out', () => {
     const stop = keepScreenAwake();
     await settle();
 
+    const handle = started.mock.results.at(-1)?.value as ReturnType<typeof setInterval>;
     const visibilityAdded = addDocument.mock.calls.find(([type]) => type === 'visibilitychange');
     const focusAdded = addWindow.mock.calls.find(([type]) => type === 'focus');
     const touchAdded = addWindow.mock.calls.find(([type]) => type === 'pointerdown');
@@ -274,6 +277,10 @@ describe('on the way out', () => {
     expect(removeDocument).toHaveBeenCalledWith('visibilitychange', visibilityAdded![1]);
     expect(removeWindow).toHaveBeenCalledWith('focus', focusAdded![1]);
     expect(removeWindow).toHaveBeenCalledWith('pointerdown', touchAdded![1]);
+    // And the timer: a kiosk that mounts and unmounts through an evening would
+    // otherwise leave one interval per mount running against a closure that
+    // can no longer do anything with what it asks for.
+    expect(cleared).toHaveBeenCalledWith(handle);
   });
 
   it('asks for nothing more once it has been stopped', async () => {
