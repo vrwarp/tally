@@ -10,7 +10,10 @@ import {
   addMinutes,
   atTimeOfDay,
   daysAgo,
+  formatDateTime,
+  formatEventDay,
   formatEventWindow,
+  formatRelative,
   formatSeenShort,
   fromDateTimeLocalValue,
   isCheckInOpen,
@@ -202,6 +205,20 @@ describe('pickActiveEvent', () => {
     expect(pickActiveEvent([later, fellowship], earlyAfternoon)?.id).toBe('fellowship');
   });
 
+  it('counts a gathering starting this very instant as still to come', () => {
+    // The screen a leader is looking at when the doors open. One tick either
+    // side of the start decides whether they see tonight or an empty page.
+    const startsNow = makeEvent({
+      id: 'starts-now',
+      startAt: FRIDAY_EVENING,
+      endAt: new Date(2026, 1, 13, 21, 30),
+      checkInOpensAt: new Date(2026, 1, 13, 20, 0),
+      checkInClosesAt: new Date(2026, 1, 13, 22, 0),
+    });
+
+    expect(pickActiveEvent([startsNow], FRIDAY_EVENING)?.id).toBe('starts-now');
+  });
+
   it('ignores events on other days and events already finished', () => {
     const tomorrow = makeEvent({
       id: 'tomorrow',
@@ -267,6 +284,25 @@ describe('recentChainInstances', () => {
     const result = recentChainInstances([tonight, ...past], 'friday-fellowship', FRIDAY_EVENING, 5);
     expect(result.map((event) => event.id)).not.toContain('friday-0');
     expect(result).toHaveLength(4);
+  });
+
+  it('excludes an instance closing at this very instant', () => {
+    /*
+     * History is what has finished. An instance whose window shuts exactly now
+     * has not, and counting it would let a gathering predict its own roster
+     * from the register somebody is still filling in.
+     */
+    const closingNow = makeEvent({
+      id: 'closing-now',
+      seriesId: 'friday-fellowship',
+      startAt: new Date(2026, 1, 13, 17, 0),
+      endAt: new Date(2026, 1, 13, 19, 0),
+      checkInOpensAt: new Date(2026, 1, 13, 16, 0),
+      checkInClosesAt: FRIDAY_EVENING,
+    });
+
+    const result = recentChainInstances([closingNow, ...past], 'friday-fellowship', FRIDAY_EVENING, 5);
+    expect(result.map((event) => event.id)).not.toContain('closing-now');
   });
 
   it('excludes other series', () => {
@@ -385,6 +421,19 @@ describe('nextSeriesOccurrence', () => {
     expect(endAt.getHours()).toBe(21);
   });
 
+  it('runs a full day for a series that ends when it starts', () => {
+    /*
+     * A twenty-four-hour prayer chain, written the only way the two-field form
+     * allows. Reading it as zero-length would shut check-in half an hour after
+     * it opened; reading the end as the next day is the same rule that keeps a
+     * lock-in's window open until the morning.
+     */
+    const allDay = { ...fridaySeries, startTime: '19:00', endTime: '19:00' };
+    const { startAt, endAt } = nextSeriesOccurrence(allDay, new Date(2026, 1, 11, 8, 0));
+
+    expect(endAt.getTime() - startAt.getTime()).toBe(24 * 60 * 60 * 1000);
+  });
+
   it('derives the check-in window from the start and end times', () => {
     const { startAt, endAt, checkInOpensAt, checkInClosesAt } = nextSeriesOccurrence(
       fridaySeries,
@@ -452,6 +501,107 @@ describe('datetime-local round-tripping', () => {
     expect(() => fromDateTimeLocalValue('2026-02-13')).toThrow(/Invalid datetime-local/);
     expect(() => fromDateTimeLocalValue('2026-02-13T19:00:00')).toThrow(/Invalid datetime-local/);
     expect(() => fromDateTimeLocalValue('2026-02-13 19:00')).toThrow(/Invalid datetime-local/);
+    // Anchored at both ends: a value with something in front of it is junk with
+    // a date inside, not a date.
+    expect(() => fromDateTimeLocalValue('on 2026-02-13T19:00')).toThrow(/Invalid datetime-local/);
+  });
+
+  /*
+   * The range check, clause by clause.
+   *
+   * All of this guards one screen: the event editor, where a leader types a
+   * date and the value reaches Firestore. `new Date(2026, 12, 1)` is January
+   * 2027 rather than an error, so a slip nothing refuses here is a gathering
+   * that quietly moves — and the people it moved away from find out by
+   * standing in an empty hall.
+   */
+  describe('a value out of range', () => {
+    it('refuses a month either side of the year', () => {
+      expect(() => fromDateTimeLocalValue('2026-00-15T10:00')).toThrow(/out of range/);
+      expect(() => fromDateTimeLocalValue('2026-13-15T10:00')).toThrow(/out of range/);
+    });
+
+    it('refuses a day either side of a month', () => {
+      expect(() => fromDateTimeLocalValue('2026-01-00T10:00')).toThrow(/out of range/);
+      expect(() => fromDateTimeLocalValue('2026-01-32T10:00')).toThrow(/out of range/);
+    });
+
+    it('refuses a clock time no clock shows', () => {
+      expect(() => fromDateTimeLocalValue('2026-01-15T24:00')).toThrow(/out of range/);
+      expect(() => fromDateTimeLocalValue('2026-01-15T10:60')).toThrow(/out of range/);
+    });
+
+    it('says which value it refused', () => {
+      // The message reaches a leader through a toast, and "out of range" on its
+      // own does not say which of the four fields they mistyped.
+      expect(() => fromDateTimeLocalValue('2026-13-15T10:00')).toThrow(
+        'Datetime-local value out of range: "2026-13-15T10:00".',
+      );
+    });
+
+    it('keeps the ends of every range, which are ordinary answers', () => {
+      // The first of the month, the last minute of an hour, midnight, and
+      // midnight on New Year's Eve — all real times a gathering can start at.
+      expect(fromDateTimeLocalValue('2026-01-01T00:00').getDate()).toBe(1);
+      expect(fromDateTimeLocalValue('2026-12-31T23:59').getMinutes()).toBe(59);
+      expect(fromDateTimeLocalValue('2026-12-31T23:59').getHours()).toBe(23);
+      expect(fromDateTimeLocalValue('2026-12-31T23:59').getMonth()).toBe(11);
+    });
+
+    it('refuses a day the month does not have', () => {
+      /*
+       * In range and still not a date. The constructor rolls 31 February
+       * forward to 3 March without complaining, which would put an event on an
+       * evening nobody chose — and it is the only class of mistake here that
+       * produces a perfectly valid Date object.
+       */
+      expect(() => fromDateTimeLocalValue('2026-02-31T19:00')).toThrow(
+        'No such date: "2026-02-31T19:00".',
+      );
+      expect(() => fromDateTimeLocalValue('2026-02-29T19:00')).toThrow(/No such date/);
+      expect(() => fromDateTimeLocalValue('2026-04-31T19:00')).toThrow(/No such date/);
+
+      // And a leap day in a leap year is a date.
+      expect(fromDateTimeLocalValue('2028-02-29T19:00').getDate()).toBe(29);
+    });
+  });
+});
+
+describe('the three ways a date is written on screen', () => {
+  /** Fri 13 Feb 2026, 19:30 — the same "now" the rest of the suite uses. */
+  const now = FRIDAY_EVENING;
+
+  it('names today, tomorrow, and everything else by its day', () => {
+    expect(formatEventDay(new Date(2026, 1, 13, 8, 0), now)).toBe('Today');
+    expect(formatEventDay(new Date(2026, 1, 14, 8, 0), now)).toBe('Tomorrow');
+    expect(formatEventDay(new Date(2026, 1, 15, 8, 0), now)).toBe('Sun, Feb 15');
+    // Yesterday is not "Today" and not "Tomorrow" — the archive uses this too.
+    expect(formatEventDay(new Date(2026, 1, 12, 8, 0), now)).toBe('Thu, Feb 12');
+  });
+
+  it('measures both from the "now" it was handed, not from the wall clock', () => {
+    /*
+     * The whole reason the parameter exists. A screen renders from a `useNow()`
+     * tick, and this line sits next to a header that has already decided
+     * whether the gathering is today — so the two have to be asking the same
+     * question of the same clock.
+     */
+    const realToday = new Date();
+    const realTomorrow = new Date(realToday.getTime() + 86_400_000);
+
+    expect(formatEventDay(realToday, now)).not.toBe('Today');
+    expect(formatEventDay(realTomorrow, now)).not.toBe('Tomorrow');
+  });
+
+  it('writes a full date and time where there is no context to read it from', () => {
+    // The audit lines: no "today", because the row may be a year old.
+    expect(formatDateTime(new Date(2026, 1, 13, 19, 0))).toBe('Feb 13, 2026 · 7:00 PM');
+  });
+
+  it('writes a past instant as a distance, in the past tense', () => {
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+
+    expect(formatRelative(twoHoursAgo)).toBe('2 hours ago');
   });
 });
 
