@@ -8,7 +8,7 @@
  * whole roster repaints — republishing an equal answer repainted two hundred
  * rows a minute for as long as a counselor had the screen open.
  */
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { invalidateSnapshotCache, useEventSnapshots } from '@/hooks/useEventSnapshots';
 import type { TallyEvent } from '@/types';
@@ -181,6 +181,282 @@ describe('useEventSnapshots', () => {
     expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(2);
   });
 
+  describe('what counts as the same answer', () => {
+    /**
+     * The three fields the identity check compares, moved one at a time.
+     *
+     * A field left out of that comparison is an edit to a past register that
+     * the check-in screen never repaints for — the predictive roster goes on
+     * predicting from what it read the first time.
+     */
+    function stableFetch(present: Set<string>, checkedOut: Set<string>) {
+      return (ids: string[]) =>
+        Promise.resolve({
+          byEvent: new Map(ids.map((id) => [id, { present, checkedOut }])),
+          denied: new Set<string>(),
+        });
+    }
+
+    it('is the same array when only the caller’s event objects are new', async () => {
+      // The list is derived from a ticking clock, so this happens once a
+      // minute for as long as the screen is open.
+      const friday = makeEvent({ id: 'evt_1' });
+      const { result, rerender } = renderHook(
+        ({ events }: { events: TallyEvent[] }) => useEventSnapshots(events),
+        { initialProps: { events: [friday] } },
+      );
+      await waitFor(() => expect(result.current.snapshots).toHaveLength(1));
+      const first = result.current.snapshots;
+
+      rerender({ events: [friday] });
+
+      expect(result.current.snapshots).toBe(first);
+    });
+
+    it('is a new array when the gathering itself was edited', async () => {
+      const friday = makeEvent({ id: 'evt_1', title: 'Footprints' });
+      const { result, rerender } = renderHook(
+        ({ events }: { events: TallyEvent[] }) => useEventSnapshots(events),
+        { initialProps: { events: [friday] } },
+      );
+      await waitFor(() => expect(result.current.snapshots).toHaveLength(1));
+      const first = result.current.snapshots;
+
+      // Same id, same register, different gathering — a title corrected on
+      // another device. The snapshot wraps the event, so it has to be re-wrapped.
+      rerender({ events: [makeEvent({ id: 'evt_1', title: 'Footprints (moved)' })] });
+
+      expect(result.current.snapshots).not.toBe(first);
+      expect(result.current.snapshots[0]?.event.title).toBe('Footprints (moved)');
+    });
+
+    /*
+     * The cache is module-wide, so the way one hook's register changes under
+     * it is another screen re-reading the same night — the dashboard and the
+     * check-in roster ask for overlapping windows all evening. The list here
+     * never changes and neither does the event object, so the two set fields
+     * are the only thing left that can decide.
+     */
+    async function reReadElsewhere(present: Set<string>, checkedOut: Set<string>) {
+      invalidateSnapshotCache('evt_1');
+      fetchAttendanceByEvent.mockImplementation(stableFetch(present, checkedOut));
+      const elsewhere = renderHook(() => useEventSnapshots([makeEvent({ id: 'evt_1' })]));
+      await waitFor(() => expect(elsewhere.result.current.snapshots).toHaveLength(1));
+      elsewhere.unmount();
+    }
+
+    it('is a new array when the register of who came changed', async () => {
+      const checkedOut = new Set<string>();
+      fetchAttendanceByEvent.mockImplementation(stableFetch(new Set(['pco_1']), checkedOut));
+
+      const friday = makeEvent({ id: 'evt_1' });
+      const { result, rerender } = renderHook(
+        ({ events }: { events: TallyEvent[] }) => useEventSnapshots(events),
+        { initialProps: { events: [friday] } },
+      );
+      await waitFor(() => expect(result.current.snapshots).toHaveLength(1));
+      const first = result.current.snapshots;
+
+      // Somebody was added to a past register. `checkedOut` is the very same
+      // object, so this is the "present" field on its own.
+      await reReadElsewhere(new Set(['pco_1', 'pco_2']), checkedOut);
+      rerender({ events: [friday] });
+
+      expect(result.current.snapshots).not.toBe(first);
+      expect(result.current.snapshots[0]?.presentStudentIds.has('pco_2')).toBe(true);
+    });
+
+    it('is a new array when only who was checked out changed', async () => {
+      const present = new Set(['pco_1']);
+      fetchAttendanceByEvent.mockImplementation(stableFetch(present, new Set<string>()));
+
+      const friday = makeEvent({ id: 'evt_1' });
+      const { result, rerender } = renderHook(
+        ({ events }: { events: TallyEvent[] }) => useEventSnapshots(events),
+        { initialProps: { events: [friday] } },
+      );
+      await waitFor(() => expect(result.current.snapshots).toHaveLength(1));
+      const first = result.current.snapshots;
+
+      // `present` is the same object; only the pickup register moved.
+      await reReadElsewhere(present, new Set(['pco_1']));
+      rerender({ events: [friday] });
+
+      expect(result.current.snapshots).not.toBe(first);
+      expect(result.current.snapshots[0]?.checkedOutStudentIds.has('pco_1')).toBe(true);
+      expect(result.current.snapshots[0]?.presentStudentIds).toBe(present);
+    });
+  });
+
+  describe('the identity of the question', () => {
+    it('is the same however the caller ordered the list', async () => {
+      // Reordered while the first read is still out — a screen flipping from
+      // newest-first to oldest-first mid-request. Two reads for the same two
+      // gatherings is the thing the sort is there to prevent.
+      let land: (value: unknown) => void = () => {};
+      fetchAttendanceByEvent.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            land = resolve;
+          }),
+      );
+
+      const friday = makeEvent({ id: 'evt_1' });
+      const sunday = makeEvent({ id: 'evt_2' });
+      const { result, rerender } = renderHook(
+        ({ events }: { events: TallyEvent[] }) => useEventSnapshots(events),
+        { initialProps: { events: [friday, sunday] } },
+      );
+      await waitFor(() => expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(1));
+
+      rerender({ events: [sunday, friday] });
+      await act(async () => {});
+
+      expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        land({
+          byEvent: new Map([
+            ['evt_1', { present: new Set<string>(), checkedOut: new Set<string>() }],
+            ['evt_2', { present: new Set<string>(), checkedOut: new Set<string>() }],
+          ]),
+          denied: new Set<string>(),
+        });
+      });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(1);
+    });
+
+    it('tells two gatherings from one whose id runs them together', async () => {
+      const { result, rerender } = renderHook(
+        ({ events }: { events: TallyEvent[] }) => useEventSnapshots(events),
+        { initialProps: { events: [makeEvent({ id: 'a' }), makeEvent({ id: 'b' })] } },
+      );
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      rerender({ events: [makeEvent({ id: 'ab' })] });
+
+      await waitFor(() => expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(2));
+    });
+  });
+
+  describe('a read the caller stopped waiting for', () => {
+    it('is not written down when the list moved on before it landed', async () => {
+      let land: (value: unknown) => void = () => {};
+      fetchAttendanceByEvent.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            land = resolve;
+          }),
+      );
+
+      const { result, rerender } = renderHook(
+        ({ events }: { events: TallyEvent[] }) => useEventSnapshots(events),
+        { initialProps: { events: [makeEvent({ id: 'evt_1' })] } },
+      );
+      rerender({ events: [makeEvent({ id: 'evt_2' })] });
+
+      await act(async () => {
+        land({
+          byEvent: new Map([['evt_1', { present: new Set(['pco_1']), checkedOut: new Set() }]]),
+          denied: new Set<string>(),
+        });
+      });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      // Only the gathering that is still being asked about.
+      expect(result.current.snapshots.map((snapshot) => snapshot.event.id)).toEqual(['evt_2']);
+
+      // And nothing of it was written down: coming back to that night reads
+      // again rather than trusting an answer the hook had already disowned.
+      const before = fetchAttendanceByEvent.mock.calls.length;
+      rerender({ events: [makeEvent({ id: 'evt_1' })] });
+      await waitFor(() =>
+        expect(fetchAttendanceByEvent.mock.calls.length).toBe(before + 1),
+      );
+    });
+  });
+
+  describe('loading, after the first answer', () => {
+    it('goes back up while a wider window is being read', async () => {
+      const friday = makeEvent({ id: 'evt_1' });
+      let land: (value: unknown) => void = () => {};
+
+      const { result, rerender } = renderHook(
+        ({ events }: { events: TallyEvent[] }) => useEventSnapshots(events),
+        { initialProps: { events: [friday] } },
+      );
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      fetchAttendanceByEvent.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            land = resolve;
+          }),
+      );
+      rerender({ events: [friday, makeEvent({ id: 'evt_2' })] });
+
+      // The insights screen shows a skeleton off this; without it the tiles sit
+      // on last window's numbers while a wider one is being read.
+      await waitFor(() => expect(result.current.loading).toBe(true));
+
+      await act(async () => {
+        land({ byEvent: new Map(), denied: new Set<string>() });
+      });
+    });
+  });
+
+  describe('asking about nothing at all', () => {
+    it('takes the previous failure down with the question', async () => {
+      fetchAttendanceByEvent.mockRejectedValue(new Error('network request failed'));
+
+      const { result, rerender } = renderHook(
+        ({ events }: { events: TallyEvent[] }) => useEventSnapshots(events),
+        { initialProps: { events: [makeEvent({ id: 'evt_1' })] } },
+      );
+      await waitFor(() => expect(result.current.error).toBe('network request failed'));
+
+      // Navigating to a gathering with no history behind it. The banner was
+      // about a question nobody is asking any more.
+      rerender({ events: [] });
+
+      await waitFor(() => expect(result.current.error).toBeNull());
+      expect(result.current.loading).toBe(false);
+    });
+  });
+
+  describe('a refusal that belongs to somebody else’s screen', () => {
+    it('hands back the shared empty set rather than a fresh one', async () => {
+      fetchAttendanceByEvent.mockImplementation((ids: string[]) =>
+        Promise.resolve({
+          byEvent: new Map(),
+          denied: new Set(ids),
+        }),
+      );
+
+      const restricted = renderHook(() => useEventSnapshots([makeEvent({ id: 'evt_secret' })]));
+      await waitFor(() => expect(restricted.result.current.denied.size).toBe(1));
+      restricted.unmount();
+
+      // Two other screens, neither of which asked about the refused gathering.
+      fetchAttendanceByEvent.mockImplementation((ids: string[]) =>
+        Promise.resolve({
+          byEvent: new Map(
+            ids.map((id) => [id, { present: new Set<string>(), checkedOut: new Set<string>() }]),
+          ),
+          denied: new Set<string>(),
+        }),
+      );
+      const one = renderHook(() => useEventSnapshots([makeEvent({ id: 'evt_1' })]));
+      const two = renderHook(() => useEventSnapshots([makeEvent({ id: 'evt_2' })]));
+      await waitFor(() => expect(one.result.current.loading).toBe(false));
+      await waitFor(() => expect(two.result.current.loading).toBe(false));
+
+      expect(one.result.current.denied).toBe(two.result.current.denied);
+      expect(one.result.current.denied.size).toBe(0);
+    });
+  });
+
   it('is not loading when there is nothing to ask about', () => {
     // Every screen with no history to read renders this, and a spinner over an
     // empty list is a screen that never finishes.
@@ -282,6 +558,19 @@ describe('useEventSnapshots', () => {
 
     await waitFor(() => expect(result.current.error).toBe('unavailable'));
     expect(result.current.loading).toBe(false);
+  });
+
+  it('publishes what the retry read, not just the fact that it worked', async () => {
+    // The version bump on success is what makes the memo look at the cache
+    // again. Clearing the error re-renders on its own, so a hook that stopped
+    // bumping would look recovered and go on showing nothing.
+    fetchAttendanceByEvent.mockRejectedValueOnce(new Error('network request failed'));
+
+    const { result } = renderHook(() => useEventSnapshots([makeEvent({ id: 'evt_1' })]));
+
+    await waitFor(() => expect(result.current.error).toBeNull());
+    await waitFor(() => expect(result.current.snapshots).toHaveLength(1));
+    expect(result.current.snapshots[0]?.presentStudentIds.has('student-of-evt_1')).toBe(true);
   });
 
   it('clears the failure once the one retry lands', async () => {
