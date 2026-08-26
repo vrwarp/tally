@@ -287,6 +287,72 @@ describe('useStudentHistory', () => {
     expect(result.current.started).toBe(true);
   });
 
+  it('takes a failure down when the student changes', async () => {
+    // A leader who backs out of a profile that could not be read must not find
+    // the next child's page already wearing the last one's error.
+    fetchStudentHistory.mockRejectedValueOnce(new Error('refused'));
+
+    const { result, rerender } = renderHook(({ id }) => useStudentHistory(id), {
+      initialProps: { id: 'pco_1' },
+    });
+    act(() => result.current.loadMore());
+    await waitFor(() => expect(result.current.error).not.toBeNull());
+
+    rerender({ id: 'pco_2' });
+
+    expect(result.current.error).toBeNull();
+  });
+
+  it('tells two students apart when their ids run together', async () => {
+    // The ids are joined into one key, and the separator is the whole of what
+    // stops `['pco_1', '2']` and `['pco_12']` being the same student — which
+    // would page one child's nights into the other's list.
+    fetchStudentHistory.mockResolvedValue(page([entry('a', 13)], true));
+
+    const { result, rerender } = renderHook(({ ids: given }) => useStudentHistory(given), {
+      initialProps: { ids: ['pco_1', '2'] },
+    });
+    act(() => result.current.loadMore());
+    await waitFor(() => expect(result.current.entries).toHaveLength(2));
+
+    rerender({ ids: ['pco_12'] });
+
+    expect(result.current.entries).toEqual([]);
+    expect(result.current.started).toBe(false);
+  });
+
+  it('believes a page that says it is the last one, cursor or no cursor', async () => {
+    fetchStudentHistory.mockResolvedValue({
+      entries: [entry('a', 13)],
+      cursor: { checkedInAt: 0, path: 'after-a' },
+      hasMore: false,
+      withheld: new Set<string>(),
+    });
+
+    const { result } = renderHook(() => useStudentHistory('pco_1'));
+    act(() => result.current.loadMore());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.hasMore).toBe(false);
+  });
+
+  it('stops at a page with nowhere to go next, whatever it claims is left', async () => {
+    // Without a cursor the next read would start from the top again, which is
+    // the same twenty nights over and over.
+    fetchStudentHistory.mockResolvedValue({
+      entries: [entry('a', 13)],
+      cursor: null,
+      hasMore: true,
+      withheld: new Set<string>(),
+    });
+
+    const { result } = renderHook(() => useStudentHistory('pco_1'));
+    act(() => result.current.loadMore());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.hasMore).toBe(false);
+  });
+
   it('dates a night by its gathering, falling back to the check-in', async () => {
     // A record whose event document is gone still stands, and still has to sort
     // into the right place in the list.

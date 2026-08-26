@@ -143,6 +143,12 @@ describe('checkPhone', () => {
     expect(checkPhone('+1 510 555 0134')).toEqual({ ok: true, value: '5105550134' });
   });
 
+  it('keeps a ten-digit number that happens to start with a one', () => {
+    // The country-code strip is about the *eleventh* digit. Reading the first
+    // one as a country code would take a digit off a real number and refuse it.
+    expect(checkPhone('123-456-7890')).toEqual({ ok: true, value: '1234567890' });
+  });
+
   it('refuses eleven digits that do not start with a country code', () => {
     expect(checkPhone('25105550134')).toEqual({
       ok: false,

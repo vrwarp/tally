@@ -185,6 +185,13 @@ export async function fetchRoster(now = new Date(), force = false): Promise<Rost
   const readAt = Date.now();
 
   const failed = new Set((perBackend ?? []).filter((entry) => !entry.ok).map((entry) => entry.backendId));
+  /*
+   * Stryker disable next-line ConditionalExpression,EqualityOperator: reading
+   * storage unconditionally answers the same — nothing is carried when nothing
+   * failed, and the freshness stamps below only consult `stored` for a backend
+   * that did. The guard is here so the common case does not parse a few hundred
+   * people out of `localStorage` on every read.
+   */
   const stored = failed.size > 0 ? readStored() : null;
 
   let people = fresh;

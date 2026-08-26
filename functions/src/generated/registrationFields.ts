@@ -86,6 +86,12 @@ export function checkName(raw: unknown, field: string): FieldCheck<string> {
 export function checkGrade(raw: unknown): FieldCheck<number | null> {
   if (raw === null || raw === undefined) return { ok: true, value: null };
   if (
+    /*
+     * Stryker disable next-line ConditionalExpression: `Number.isInteger` already
+     * refuses everything that is not a number, so this clause changes no answer
+     * at run time. It is here for the narrowing — without it `raw` is still
+     * `unknown` at the comparisons below and at `value: raw`.
+     */
     typeof raw !== 'number' ||
     !Number.isInteger(raw) ||
     raw < MIN_GRADE ||
@@ -110,7 +116,12 @@ export function checkPhone(raw: unknown): FieldCheck<string> {
   let digits = raw.replace(/\D/g, '');
   if (digits.length === 11 && digits.startsWith('1')) digits = digits.slice(1);
   if (digits.length !== 10) return bad('Enter a 10-digit phone number.');
-  if (/^(\d)\1{9}$/.test(digits)) return bad('That does not look like a phone number.');
+  // Every digit the same. Spelled out rather than as `/^(\d)\1{9}$/`, which
+  // restates the ten the line above has just enforced — and would go on
+  // meaning "ten" if that number ever changed.
+  if ([...digits].every((digit) => digit === digits[0])) {
+    return bad('That does not look like a phone number.');
+  }
   return { ok: true, value: digits };
 }
 
