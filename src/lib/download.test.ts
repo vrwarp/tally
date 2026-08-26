@@ -94,12 +94,14 @@ describe('downloadTextFile', () => {
   });
 
   it('says the same for a browser that has the name and not the method', () => {
-    // A stub `URL` object turns up in hardened and embedded runtimes; calling
-    // through it throws a `TypeError` from somewhere unhelpful.
+    // A stub `URL` object turns up in hardened and embedded runtimes. Noticed
+    // up front, so it is "cannot" — the same sentence as no `URL` at all —
+    // rather than the "would not" that a refused call gets.
     vi.stubGlobal('URL', { revokeObjectURL: () => {} });
 
     try {
       expect(() => downloadTextFile('x.csv', 'a')).toThrow(DownloadUnsupportedError);
+      expect(() => downloadTextFile('x.csv', 'a')).toThrow('This browser cannot save files.');
     } finally {
       vi.unstubAllGlobals();
     }
