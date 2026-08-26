@@ -230,10 +230,40 @@ The first pass over the logic core, in the order the sweep reached them:
   carry a mixed roster. Both halves of the linkage come from one
   `linkageOfStudent` now.
 - **A queue's loop guard and a queue's shift guard covered for each other**, and
-  so did four other pairs, none of which any test could have been wrong about.
-  They are the second kind of finding — the code, not the suite — and the fix
-  was to delete one half of each. `warmedAtMs` went the same way: written on
+  so did several other pairs, none of which any test could have been wrong
+  about. They are the second kind of finding — the code, not the suite — and the
+  fix was to delete one half of each. `warmedAtMs` went the same way: written on
   every warm label, read by nothing.
+- **Three assertions that could not fail.** A re-render count read *after* the
+  answer it was meant to be waiting for, and then compared with itself. The RSVP
+  chunking test counting *distinct* paths, which is 401 whether the second batch
+  carries one student or repeats all four hundred and one — and the cap it
+  exists for is on the number of writes. And "the edit-queue listener is never
+  opened for a counselor", which was checked by an empty list, and is equally
+  true of a listener that opened and said nothing.
+- **Every `Stryker disable` annotation in the tree was a no-op**, which is a
+  finding about this file. See [equivalent mutants](#equivalent-mutants) — the
+  wrong comment form reads exactly like the right one and does not warn.
+- **The pull-request gate failed every branch that changed nothing in the
+  scope**, which is most of them. `mutation-sweep.mjs --since` exits without
+  running anything and so never creates the report directory, and the summary
+  read a missing directory as an error rather than as an empty set.
+- **The roster's churn signatures compared two fields of eight and two of six.**
+  A field left out of one is a value that stops updating on screen and never
+  says so; that is how `birthday` got out, and the roster row behind an open
+  panel went on saying "no birthday" until somebody reloaded the page.
+- **The whole queue in front of the roster read had never been executed.**
+  `refreshRoster` is called from four places that know nothing about each other,
+  and what stops two paged Planning Center sweeps running at once — and what
+  keeps a deliberate refresh from being downgraded by an incidental one beside
+  it — was reached by no test at all.
+- **`readBirthdayField` answered "unchanged" to everything**, as far as any test
+  could tell: every one of them typed a day that really was already on file. An
+  unchanged check that is never wrong about *changed* is a Save that silently
+  does nothing.
+- **`fetchRoster` re-sorted an answer it had merged nothing into**, putting this
+  side's ordering rule in front of the server's — which is the one that knows
+  about secondary sorts and about people with no surname.
 
 ## In CI
 
