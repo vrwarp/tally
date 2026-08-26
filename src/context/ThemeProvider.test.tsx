@@ -67,9 +67,12 @@ function deviceFlipsTo(theme: 'light' | 'dark') {
 }
 
 let latest: ThemeContextValue | null = null;
+/** Every value the context has held, in render order. */
+let seen: ThemeContextValue[] = [];
 
 function Probe() {
   latest = useTheme();
+  seen.push(latest);
   return null;
 }
 
@@ -90,6 +93,7 @@ beforeEach(() => {
   deviceIsLight = false;
   legacyOnly = false;
   latest = null;
+  seen = [];
   window.localStorage.clear();
   document.documentElement.removeAttribute('data-theme');
   document.head.innerHTML = '<meta name="theme-color" content="#000000">';
@@ -120,6 +124,27 @@ describe('what the provider opens with', () => {
     // The device says light and the person said dark. The person wins.
     expect(latest?.preference).toBe('dark');
     expect(latest?.theme).toBe('dark');
+  });
+
+  it('has the right theme on the very first render, not one frame later', () => {
+    // The effect below corrects `theme`, but it runs after the first paint —
+    // so a provider that opened on nothing would hand every child `undefined`
+    // for a frame, which is the flash this whole module exists to prevent.
+    window.localStorage.setItem(THEME_STORAGE_KEY, 'dark');
+    deviceIsLight = true;
+
+    mount();
+
+    expect(seen[0]?.theme).toBe('dark');
+    expect(seen[0]?.preference).toBe('dark');
+  });
+
+  it('opens on the device when nobody has chosen, also on the first render', () => {
+    deviceIsLight = true;
+
+    mount();
+
+    expect(seen[0]?.theme).toBe('light');
   });
 
   it('applies the theme on mount, in case the inline script never ran', () => {

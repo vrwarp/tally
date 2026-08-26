@@ -86,8 +86,6 @@ export function birthdaySlots(raw: string): BirthdaySlots {
   let at = 0;
 
   for (const char of raw) {
-    if (at > 2) break;
-
     if (!/\d/.test(char)) {
       // Leading and doubled separators are noise; one after a digit is a person
       // saying "that slot is finished".
@@ -118,6 +116,13 @@ function slotIndex(value: number): 0 | 1 | 2 | 3 {
 function accepts(text: string, char: string, at: number): boolean {
   const slot = SLOTS[at];
   const grown = text + char;
+  /*
+   * Stryker disable next-line ConditionalExpression,BooleanLiteral: a slot that
+   * has reached its size is always `finished`, and `finished` moves the walk on
+   * before anything asks this — so no test can reach a full slot here. It is
+   * kept because it is what makes the line below true in general: for the year,
+   * `inRange` alone would accept a fifth zero.
+   */
   if (grown.length > slot.size) return false;
   // A first digit is always a prefix of something the slot can hold; a second
   // has to make a real value, or `34` would be a day.
@@ -127,7 +132,19 @@ function accepts(text: string, char: string, at: number): boolean {
 /** Full, or as full as it can usefully get — `9` is September, not the 90th. */
 function finished(text: string, at: number): boolean {
   const slot = SLOTS[at];
+  /*
+   * Stryker disable next-line ConditionalExpression: the walk below answers a
+   * full slot the same way — no digit appended to `12`, `31` or a four-digit
+   * year lands back in range — so this is the short cut and not the rule. The
+   * one apparent exception, a year of `0000`, is caught by the size guard in
+   * `accepts` instead.
+   */
   if (text.length === slot.size) return true;
+  /*
+   * Stryker disable next-line EqualityOperator: the slots' ranges are
+   * contiguous, so a slot that can take a `9` can take a `0` too and this loop
+   * has already returned. Stopping one digit early changes no answer.
+   */
   for (let next = 0; next <= 9; next += 1) {
     if (inRange(`${text}${next}`, slot)) return false;
   }
@@ -150,8 +167,9 @@ function inRange(digits: string, slot: { least: number; most: number }): boolean
  */
 export function formatBirthdayInput(raw: string): string {
   const { month, day, year, at } = birthdaySlots(raw);
-  if (month === '') return '';
-
+  // No empty-in-empty-out branch: nothing can close a slot the month has not
+  // opened, so an empty month means an empty everything and the template below
+  // already comes out as `''`.
   const closed = (slot: number) => (at > slot ? SEPARATOR : '');
   return `${month}${closed(0)}${day}${closed(1)}${year}`;
 }
@@ -184,8 +202,9 @@ export function birthdayMaskGhost(raw: string): string {
 export function parseBirthdayInput(raw: string, now: Date = new Date()): BirthdayInputReading {
   const { month, day, year } = birthdaySlots(raw);
   if (month === '') return { state: 'empty' };
-  // A slot holding `0` is the first digit of `01`, not a month or a day.
-  if (Number(month) === 0 || day === '' || Number(day) === 0) {
+  // A slot holding `0` is the first digit of `01`, not a month or a day — and
+  // `Number('')` is 0, so a day nobody has started yet is the same answer.
+  if (Number(month) === 0 || Number(day) === 0) {
     return { state: 'partial', year: false };
   }
   if (year !== '' && year.length < 4) return { state: 'partial', year: true };

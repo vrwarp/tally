@@ -44,14 +44,28 @@ export interface PrinterConfig {
  * ordinary name-badge label, and its 696x271 dot box is what the renderer
  * targets when nobody has said otherwise.
  */
+/*
+ * Stryker disable next-line all: a module-level constant is a *static* mutant —
+ * it is evaluated once when the module loads, before Stryker can activate the
+ * mutant for any one test, so the change never takes effect and the mutant
+ * reports as survived whatever the tests say. `device.test.ts` asserts both of
+ * these values outright.
+ */
 export const DEFAULT_PRINTER_MODEL = 'QL-810W';
+/* Stryker disable next-line all: static — see above. */
 export const DEFAULT_PRINTER_LABEL = '62x29';
 
 function isConfig(value: unknown): value is PrinterConfig {
-  if (!value || typeof value !== 'object') return false;
-  const config = value as Partial<PrinterConfig>;
+  /*
+   * No `typeof value === 'object'` guard in front of this. Reading a property
+   * off a number or a string is `undefined` rather than a throw, so the checks
+   * below already refuse every primitive; only null and undefined needed
+   * handling, and `?.` is that. A guard that refused nothing the rest of the
+   * function did not was a line no test could have been wrong about.
+   */
+  const config = value as Partial<PrinterConfig> | null | undefined;
   return (
-    typeof config.model === 'string' &&
+    typeof config?.model === 'string' &&
     config.model.length > 0 &&
     typeof config.label === 'string' &&
     config.label.length > 0

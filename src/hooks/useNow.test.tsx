@@ -118,6 +118,47 @@ describe('useNow', () => {
     expect(result.current).toBe(last);
   });
 
+  it('takes back the exact interval and handlers it put out', () => {
+    // The check-in screen mounts and unmounts this on every navigation, so a
+    // handler left behind is a handler per visit for the rest of the session —
+    // and `result.current` cannot see the leak, because an unmounted hook
+    // stops reporting whether or not its timer is still firing.
+    const addDocument = vi.spyOn(document, 'addEventListener');
+    const removeDocument = vi.spyOn(document, 'removeEventListener');
+    const addWindow = vi.spyOn(window, 'addEventListener');
+    const removeWindow = vi.spyOn(window, 'removeEventListener');
+    const clear = vi.spyOn(globalThis, 'clearInterval');
+
+    const { unmount } = renderHook(() => useNow(1_000));
+
+    const added = addDocument.mock.calls.find(([type]) => type === 'visibilitychange');
+    const addedFocus = addWindow.mock.calls.find(([type]) => type === 'focus');
+    expect(added).toBeDefined();
+    expect(addedFocus).toBeDefined();
+
+    unmount();
+
+    // The same name and the same function: `removeEventListener` matches on
+    // both, so either being wrong leaves the handler attached.
+    expect(removeDocument).toHaveBeenCalledWith('visibilitychange', added![1]);
+    expect(removeWindow).toHaveBeenCalledWith('focus', addedFocus![1]);
+    expect(clear).toHaveBeenCalled();
+  });
+
+  it('clears the old interval when the cadence changes', () => {
+    const clear = vi.spyOn(globalThis, 'clearInterval');
+    const { rerender } = renderHook(({ every }) => useNow(every), {
+      initialProps: { every: 60_000 },
+    });
+    const before = clear.mock.calls.length;
+
+    rerender({ every: 1_000 });
+
+    // Otherwise a screen that adjusts its cadence accumulates timers, each of
+    // them re-rendering it on its own schedule.
+    expect(clear.mock.calls.length).toBeGreaterThan(before);
+  });
+
   it('restarts the interval when the cadence changes', () => {
     const { result, rerender } = renderHook(({ every }) => useNow(every), {
       initialProps: { every: 60_000 },

@@ -9,6 +9,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  birthdaySlots,
   birthdayMaskGhost,
   formatBirthdayInput,
   parseBirthdayInput,
@@ -78,6 +79,57 @@ describe('the box as it fills up', () => {
   });
 });
 
+describe('where the next digit would land', () => {
+  it('counts the slots off as they close', () => {
+    expect(birthdaySlots('').at).toBe(0);
+    expect(birthdaySlots('1').at).toBe(0);
+    expect(birthdaySlots('4').at).toBe(1);
+    expect(birthdaySlots('45').at).toBe(2);
+    expect(birthdaySlots('12142011').at).toBe(3);
+  });
+
+  it('has nowhere left once the year is whole', () => {
+    // The difference between `3` and `2` here is whether the box prints a
+    // separator after the year and keeps offering `Y`s.
+    const full = birthdaySlots('12142011');
+
+    expect(full).toEqual({ month: '12', day: '14', year: '2011', at: 3 });
+  });
+
+  it('drops a digit typed after a whole date rather than mangling one', () => {
+    // Nothing left to hold it: eight digits is a date, and a ninth belongs to
+    // nobody.
+    expect(birthdaySlots('121420119')).toEqual({
+      month: '12',
+      day: '14',
+      year: '2011',
+      at: 3,
+    });
+    expect(formatBirthdayInput('121420119')).toBe('12 / 14 / 2011');
+  });
+
+  it('drops a separator typed after a whole date too', () => {
+    expect(birthdaySlots('12142011//9')).toEqual({
+      month: '12',
+      day: '14',
+      year: '2011',
+      at: 3,
+    });
+  });
+
+  it('keeps the leading zeros of a year somebody typed', () => {
+    // `0099` is not 99: the box shows what was typed, and the sentence
+    // underneath refuses it as a year rather than silently improving it.
+    expect(birthdaySlots('12250099')).toEqual({
+      month: '12',
+      day: '25',
+      year: '0099',
+      at: 3,
+    });
+    expect(read('12250099')).toEqual({ state: 'impossible', reason: 'early-year' });
+  });
+});
+
 describe('the date it adds up to', () => {
   /** The instruction this whole thing was written to obey. */
   it('is greedy about the month, so 112 is 2 November', () => {
@@ -113,6 +165,33 @@ describe('the date it adds up to', () => {
   it('takes the year when the whole of it is there', () => {
     expect(read('12142011')).toEqual({ state: 'read', month: 12, day: 14, year: 2011 });
   });
+
+  it('refuses a two-digit month that is not one, digit by digit', () => {
+    // `13` is not a month, so the 1 is January and the 3 starts the day. A box
+    // that accepted `13` would have to change its mind about the month later.
+    expect(birthdaySlots('134')).toEqual({ month: '1', day: '3', year: '4', at: 2 });
+    expect(birthdaySlots('1312')).toEqual({ month: '1', day: '31', year: '2', at: 2 });
+  });
+
+  it('reads a child born this year', () => {
+    // The boundary is inclusive on purpose: a nursery register is the one place
+    // a birthday in the current year is ordinary.
+    expect(read(`0114${NOW.getFullYear()}`)).toEqual({
+      state: 'read',
+      month: 1,
+      day: 14,
+      year: NOW.getFullYear(),
+    });
+    expect(read(`0114${NOW.getFullYear() + 1}`)).toEqual({
+      state: 'impossible',
+      reason: 'future-year',
+    });
+  });
+
+  it('reads the earliest year it allows, and refuses the one before it', () => {
+    expect(read('01141900')).toEqual({ state: 'read', month: 1, day: 14, year: 1900 });
+    expect(read('01141899')).toEqual({ state: 'impossible', reason: 'early-year' });
+  });
 });
 
 describe('what is not finished yet', () => {
@@ -127,11 +206,40 @@ describe('what is not finished yet', () => {
     expect(state('0')).toBe('partial');
   });
 
+  it('waits through a slot holding a lone zero', () => {
+    // `0` is the first digit of `01`, not the zeroth month or the zeroth day.
+    // Saying "no such day" here would be an error that clears on the next
+    // keystroke, which teaches nothing and reads as a fault.
+    expect(read('0/5')).toEqual({ state: 'partial', year: false });
+    expect(read('120')).toEqual({ state: 'partial', year: false });
+    expect(read('12/0/2011')).toEqual({ state: 'partial', year: false });
+  });
+
   /** The year is the half somebody may mean to leave out, so it says so. */
   it('knows the year is what is unfinished', () => {
     expect(read('12142')).toEqual({ state: 'partial', year: true });
     expect(read('1214')).toEqual({ state: 'read', month: 12, day: 14, year: null });
     expect(read('12')).toEqual({ state: 'partial', year: false });
+  });
+});
+
+describe('the shape still owed', () => {
+  it('offers nothing more once the year is whole', () => {
+    expect(birthdayMaskGhost('12142011')).toBe('');
+  });
+
+  it('offers nothing more once a separator has closed the year', () => {
+    // The year slot is closed at two digits by the slash, and a ghost that
+    // carried on offering `YY` would be inviting digits the box will drop.
+    expect(birthdaySlots('12/25/20/').at).toBe(3);
+    expect(birthdayMaskGhost('12/25/20/')).toBe('');
+  });
+
+  it('counts down the year one digit at a time', () => {
+    expect(birthdayMaskGhost('1214')).toBe('YYYY');
+    expect(birthdayMaskGhost('12142')).toBe('YYY');
+    expect(birthdayMaskGhost('121420')).toBe('YY');
+    expect(birthdayMaskGhost('1214201')).toBe('Y');
   });
 });
 

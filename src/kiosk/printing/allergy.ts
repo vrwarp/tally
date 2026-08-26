@@ -109,6 +109,11 @@ export function startAllergyLookup(student: KioskStudent, template: LabelTemplat
     // Oldest first. Map iteration is insertion-ordered, which is the order
     // wanted and is why this is not a sort — as in `queue.ts`.
     const oldest = held.keys().next();
+    /*
+     * Stryker disable next-line ConditionalExpression: the map is at its limit
+     * to have got here, so the iterator always has a key and `done` is always
+     * false. It is here because the type says it might not be.
+     */
     if (!oldest.done) held.delete(oldest.value);
   }
 
@@ -148,6 +153,12 @@ export function startAllergyLookup(student: KioskStudent, template: LabelTemplat
  */
 export async function allergyFor(studentId: string): Promise<string | undefined> {
   const pending = held.get(studentId);
+  /*
+   * Stryker disable next-line ConditionalExpression: `Promise.race` resolves a
+   * plain `undefined` immediately, so falling through would answer `undefined`
+   * too. This is here to say so, and to not arm a timer for a job that never
+   * asked.
+   */
   if (!pending) return undefined;
 
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -159,7 +170,11 @@ export async function allergyFor(studentId: string): Promise<string | undefined>
       }),
     ]);
   } finally {
-    if (timer !== undefined) clearTimeout(timer);
+    // Unguarded: the executor above runs synchronously inside `Promise.race`,
+    // so by here the timer always exists — and `clearTimeout(undefined)` is a
+    // no-op anyway. A lobby kiosk prints hundreds of these in an evening and
+    // each one left armed holds the page awake for four seconds.
+    clearTimeout(timer);
   }
 }
 
