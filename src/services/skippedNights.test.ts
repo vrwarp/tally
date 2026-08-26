@@ -199,6 +199,35 @@ describe('recordExamination', () => {
     expect(payload.examinedFrom).toEqual(AUGUST);
   });
 
+  it('moves the watermark earlier when this examination reached further back', async () => {
+    // The other direction, which is the one the rule is *for*: the insights
+    // screen looks back a year where check-in looked back a fortnight.
+    const YEAR_BEFORE = new Date('2024-08-01T00:00:00');
+    await recordExamination({
+      chainKey: 'friday',
+      examinedFrom: YEAR_BEFORE,
+      skipped: [],
+      held: [],
+      known: registry({ examinedFrom: AUGUST }),
+    });
+
+    const [, payload] = setDoc.mock.calls[0] as unknown as [unknown, Record<string, unknown>];
+    expect(payload.examinedFrom).toEqual(YEAR_BEFORE);
+  });
+
+  it('takes this examination as the watermark when nothing was known', async () => {
+    await recordExamination({
+      chainKey: 'friday',
+      examinedFrom: AUGUST,
+      skipped: [],
+      held: [],
+      known: registry({ examinedFrom: null }),
+    });
+
+    const [, payload] = setDoc.mock.calls[0] as unknown as [unknown, Record<string, unknown>];
+    expect(payload.examinedFrom).toEqual(AUGUST);
+  });
+
   /*
    * The self-heal. Attendance can arrive by routes that never tap a phone — an
    * import, a repair script — and this is what notices, without those routes

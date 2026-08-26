@@ -155,6 +155,20 @@ describe('readA32EffectiveSettings', () => {
     expect(readA32EffectiveSettings({}).maxGrade).toBe(12);
   });
 
+  it('falls back over a number that is not one', () => {
+    // Firestore holds a genuine `NaN`, and a grade bound or a cache TTL of NaN
+    // makes every comparison downstream false without anything saying why.
+    expect(readA32EffectiveSettings({ minGrade: Number.NaN }).minGrade).toBe(6);
+    expect(readA32EffectiveSettings({ maxGrade: Number.NaN }).maxGrade).toBe(12);
+    expect(readA32EffectiveSettings({ cacheTtlSeconds: Number.NaN }).cacheTtlSeconds).toBe(30);
+    expect(readA32EffectiveSettings({ minGrade: Number.POSITIVE_INFINITY }).minGrade).toBe(6);
+  });
+
+  it('falls back over a number written as text', () => {
+    expect(readA32EffectiveSettings({ minGrade: '8' }).minGrade).toBe(6);
+    expect(readA32EffectiveSettings({ cacheTtlSeconds: null }).cacheTtlSeconds).toBe(30);
+  });
+
   it('keeps a grade bound of zero rather than falling back over it', () => {
     // Kindergarten is grade 0, and `0 || 6` is 6.
     expect(readA32EffectiveSettings({ minGrade: 0 }).minGrade).toBe(0);
