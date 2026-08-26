@@ -219,6 +219,51 @@ describe('recordExamination', () => {
     expect(payload.skipped).toEqual({ remove: ['was-empty'] });
   });
 
+  it('merges both writes, so an examination never blanks the other fields', async () => {
+    // A `setDoc` without merge replaces the document, which would drop the
+    // watermark on the correction write and the skipped list on the first.
+    await recordExamination({
+      chainKey: 'friday',
+      examinedFrom: AUGUST,
+      skipped: ['night-1'],
+      held: ['night-2'],
+      known: registry({ skipped: new Set(['night-2']) }),
+    });
+
+    expect(setDoc).toHaveBeenCalledTimes(2);
+    for (const call of setDoc.mock.calls) {
+      expect(call[2]).toEqual({ merge: true });
+    }
+  });
+
+  it('keeps a watermark equal to the one it already had', async () => {
+    // The bound is "only ever earlier", and equal is not earlier — writing the
+    // caller's own value back is the same date either way, but the branch has
+    // to hold at the boundary for the earlier case to mean anything.
+    await recordExamination({
+      chainKey: 'friday',
+      examinedFrom: AUGUST,
+      skipped: [],
+      held: [],
+      known: registry({ examinedFrom: AUGUST }),
+    });
+
+    expect((setDoc.mock.calls[0]?.[1] as { examinedFrom: Date }).examinedFrom).toEqual(AUGUST);
+  });
+
+  it('resurrects nothing when the chain has no document yet', async () => {
+    // Nothing was ever called empty, so nothing can have been wrongly called
+    // empty — and the second write would be against a list that does not exist.
+    await recordExamination({
+      chainKey: 'friday',
+      examinedFrom: AUGUST,
+      skipped: [],
+      held: ['night-2'],
+    });
+
+    expect(setDoc).toHaveBeenCalledTimes(1);
+  });
+
   it('does not spend a second write when nothing was resurrected', async () => {
     await recordExamination({
       chainKey: 'friday',
@@ -229,6 +274,52 @@ describe('recordExamination', () => {
     });
 
     expect(setDoc).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('reading a stored document', () => {
+  function stored(data: Record<string, unknown> | undefined) {
+    getDoc.mockResolvedValueOnce({ exists: () => true, data: () => data });
+  }
+
+  it('keeps the ids it recognises and drops the rest', async () => {
+    stored({ skipped: ['night-1', 42, null, { id: 'night-2' }], examinedFrom: AUGUST });
+
+    const { byChain } = await fetchSkippedNights(['friday']);
+
+    expect([...(byChain.get('friday')?.skipped ?? [])]).toEqual(['night-1']);
+  });
+
+  it('reads a list that is not a list as no list', async () => {
+    stored({ skipped: 'night-1', examinedFrom: AUGUST });
+
+    const { byChain } = await fetchSkippedNights(['friday']);
+
+    expect(byChain.get('friday')?.skipped.size).toBe(0);
+  });
+
+  it('reads a document with no list as examined and empty', async () => {
+    // Which is the opposite conclusion from an absent document, and the whole
+    // reason a chain nobody has examined comes back absent rather than empty.
+    stored({ examinedFrom: AUGUST });
+
+    const held = (await fetchSkippedNights(['friday'])).byChain.get('friday');
+    expect(held?.skipped.size).toBe(0);
+    expect(held?.examinedFrom).toEqual(AUGUST);
+  });
+
+  it('reads a document with no watermark as one nobody has examined', async () => {
+    stored({ skipped: ['night-1'] });
+
+    expect((await fetchSkippedNights(['friday'])).byChain.get('friday')?.examinedFrom).toBeNull();
+  });
+
+  it('reads an empty document rather than throwing on it', async () => {
+    stored(undefined);
+
+    const held = (await fetchSkippedNights(['friday'])).byChain.get('friday');
+    expect(held?.skipped.size).toBe(0);
+    expect(held?.examinedFrom).toBeNull();
   });
 });
 

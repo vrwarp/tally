@@ -42,6 +42,27 @@ export interface ResolvedEvent {
 
 const MISSING: ResolvedEvent = { event: null, loading: false, fromArchive: false };
 
+/**
+ * What one read of one document produced, and which id it was a read *of*.
+ *
+ * The id is the load-bearing half. This used to be a bare `TallyEvent | null`
+ * beside a `reading` flag, and both were corrected by the effect — which runs
+ * *after* the render that changed the id. So there was always one frame in
+ * between, and what it drew was the answer to the previous question: tapping
+ * from one archived night straight to another showed the first night's title
+ * and date under the second night's URL, and arriving at an archived night
+ * from a loaded calendar showed "no such gathering" before the read had begun.
+ *
+ * Both are brief, and both are exactly the failure this module was written to
+ * stop — a link that lies about where it went. Keying the result to its id
+ * makes the stale answer unusable rather than merely short-lived: a result for
+ * another id reads as "no answer yet", which is what it is.
+ */
+interface ArchiveRead {
+  eventId: string;
+  event: TallyEvent | null;
+}
+
 export function useEvent(eventId: string | null | undefined): ResolvedEvent {
   const { events, loading: calendarLoading } = useData();
 
@@ -50,36 +71,29 @@ export function useEvent(eventId: string | null | undefined): ResolvedEvent {
   // presence decides whether the fallback runs.
   const isLoaded = loaded !== null;
 
-  const [archived, setArchived] = useState<TallyEvent | null>(null);
-  const [reading, setReading] = useState(false);
+  const [read, setRead] = useState<ArchiveRead | null>(null);
+
+  // Nothing to look up, already have it, or the calendar has not finished
+  // arriving — in the last case the id may be about to show up in it, and
+  // opening a second listener for something already on its way is waste.
+  const needsRead = Boolean(eventId) && !isLoaded && !calendarLoading;
 
   useEffect(() => {
-    setArchived(null);
+    if (!needsRead || !eventId) return;
 
-    // Nothing to look up, already have it, or the calendar has not finished
-    // arriving — in the last case the id may be about to show up in it, and
-    // opening a second listener for something already on its way is waste.
-    if (!eventId || isLoaded || calendarLoading) {
-      setReading(false);
-      return;
-    }
-
-    setReading(true);
     let live = true;
     const stop = subscribeEvent(
       eventId,
       (next) => {
         if (!live) return;
-        setArchived(next);
-        setReading(false);
+        setRead({ eventId, event: next });
       },
       () => {
         // A refused or failed read is indistinguishable from a deleted night
         // to everything downstream, and both mean the same thing to the person
         // looking at it: this is not here. The screens say so.
         if (!live) return;
-        setArchived(null);
-        setReading(false);
+        setRead({ eventId, event: null });
       },
     );
 
@@ -87,14 +101,16 @@ export function useEvent(eventId: string | null | undefined): ResolvedEvent {
       live = false;
       stop();
     };
-  }, [eventId, isLoaded, calendarLoading]);
+  }, [eventId, needsRead]);
 
   if (!eventId) return MISSING;
   if (loaded) return { event: loaded, loading: false, fromArchive: false };
 
+  const answered = read?.eventId === eventId ? read : null;
+
   return {
-    event: archived,
-    loading: calendarLoading || reading,
-    fromArchive: archived !== null,
+    event: answered?.event ?? null,
+    loading: calendarLoading || (needsRead && answered === null),
+    fromArchive: answered?.event != null,
   };
 }
