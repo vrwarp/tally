@@ -35,7 +35,7 @@ vi.mock('@/services/students', () => ({ subscribeStudents: quiet }));
 vi.mock('@/services/upstreamEdits', () => ({ subscribeUpstreamEdits: quiet }));
 vi.mock('@/services/eventAccess', () => ({
   subscribeEventAccess: (next: (value: Map<string, never>) => void) => {
-    next(new Map());
+    next(new Map<string, never>());
     return () => {};
   },
 }));

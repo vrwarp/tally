@@ -104,10 +104,10 @@ function draft(overrides: Partial<EventDraft> = {}): EventDraft {
   };
 }
 
-/** The payload the last write was handed. */
+/** The payload the last write was handed, whichever call made it. */
 function payload(): Record<string, unknown> {
-  const fromSet = setDoc.mock.calls.at(-1)?.[1];
-  const fromUpdate = updateDoc.mock.calls.at(-1)?.[1];
+  const fromSet = (setDoc.mock.calls.at(-1) as unknown[] | undefined)?.[1];
+  const fromUpdate = (updateDoc.mock.calls.at(-1) as unknown[] | undefined)?.[1];
   return (fromSet ?? fromUpdate) as Record<string, unknown>;
 }
 
@@ -220,7 +220,9 @@ describe('the other streams', () => {
       if (subscribe === subscribeEvent) subscribe('event-1', () => {}, onError);
       else (subscribe as typeof subscribeEventSeries)(() => {}, onError);
 
-      const handler = onSnapshot.mock.calls.at(-1)?.at(-1) as (cause: Error) => void;
+      const handler = (onSnapshot.mock.calls.at(-1) as unknown[] | undefined)?.at(-1) as (
+        cause: Error,
+      ) => void;
       handler(new Error('refused'));
       expect(onError).toHaveBeenCalled();
     }
@@ -464,7 +466,9 @@ describe('what a gathering is written as', () => {
   it('edits the gathering the caller named', async () => {
     await updateEvent('event-1', draft(), 'uid-priya');
 
-    expect(updateDoc.mock.calls.at(-1)?.[0]).toEqual({ path: 'events/event-1' });
+    expect((updateDoc.mock.calls.at(-1) as unknown[] | undefined)?.[0]).toEqual({
+      path: 'events/event-1',
+    });
   });
 });
 
@@ -544,7 +548,10 @@ describe('saveSettings', () => {
       'uid-miriam',
     );
 
-    const [ref, data, options] = setDoc.mock.calls.at(-1) ?? [];
+    const call = setDoc.mock.calls.at(-1) as unknown[] | undefined;
+  const ref = call?.[0];
+  const data = call?.[1];
+  const options = call?.[2];
     expect(ref).toEqual({ path: 'config/settings' });
     expect(data).toMatchObject({
       predictiveOfLastN: 4,

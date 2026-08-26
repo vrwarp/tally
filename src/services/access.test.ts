@@ -56,7 +56,10 @@ vi.mock('firebase/firestore', () => ({
 
 /** The write `setDoc` was handed, as `{ ref, data, options }`. */
 function written() {
-  const [ref, data, options] = setDoc.mock.calls.at(-1) ?? [];
+  const call = setDoc.mock.calls.at(-1) as unknown[] | undefined;
+  const ref = call?.[0];
+  const data = call?.[1];
+  const options = call?.[2];
   return {
     path: (ref as { path: string } | undefined)?.path,
     data: data as Record<string, unknown> | undefined,
@@ -151,17 +154,19 @@ describe('pausing and withdrawing', () => {
     // A summer volunteer goes on hold and comes back in September.
     await setInvitationActive('miriam@example,org', false);
 
-    expect(updateDoc).toHaveBeenCalledWith({ path: 'invitations/miriam@example,org' }, {
-      active: false,
-    });
+    expect(updateDoc).toHaveBeenCalledWith(
+      { path: 'invitations/miriam@example,org' },
+      { active: false },
+    );
   });
 
   it('restores one the same way', async () => {
     await setInvitationActive('miriam@example,org', true);
 
-    expect(updateDoc).toHaveBeenCalledWith({ path: 'invitations/miriam@example,org' }, {
-      active: true,
-    });
+    expect(updateDoc).toHaveBeenCalledWith(
+      { path: 'invitations/miriam@example,org' },
+      { active: true },
+    );
   });
 
   it('withdraws by deleting the document', async () => {
@@ -190,7 +195,7 @@ describe('subscribeInvitations', () => {
           email: 'miriam@example.org',
           role: 'core',
           active: true,
-          invitedAt: new Timestamp(1_767_607_200),
+          invitedAt: new Timestamp(1_767_607_200, 0),
           invitedBy: 'uid-admin',
           note: 'Wednesday volunteer',
         },
@@ -212,7 +217,7 @@ describe('subscribeInvitations', () => {
     const [invitation] = published([
       {
         id: 'a@b,org',
-        data: { invitedAt: new Timestamp(1_767_607_200) },
+        data: { invitedAt: new Timestamp(1_767_607_200, 0) },
       },
     ]);
 

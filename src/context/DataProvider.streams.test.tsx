@@ -45,10 +45,13 @@ const streams = vi.hoisted(() => ({
 };
 
 const eventOptions = vi.hoisted(() => ({ latest: null as unknown }));
-const auth = vi.hoisted(() => ({
-  profile: { id: 'uid-counselor', role: 'counselor' } as { id: string } | null,
-  can: (role: string) => role === 'counselor',
-}));
+const auth = vi.hoisted(
+  () =>
+    ({
+      profile: { id: 'uid-counselor', role: 'counselor' },
+      can: (role: string) => role === 'counselor',
+    }) as { profile: { id: string } | null; can: (role: string) => boolean },
+);
 
 /** Wires one held stream up to whatever the provider passes the service. */
 function connect<T>(stream: Stream<T>) {
@@ -97,15 +100,17 @@ function mount(children: ReactNode = <Probe />) {
   return render(<DataProvider>{children}</DataProvider>);
 }
 
-/** Every stream answers, so the provider is out of its loading state. */
-function everyStreamLands() {
-  act(() => {
-    streams.students.deliver([]);
-    streams.events.deliver([]);
-    streams.series.deliver([]);
-    streams.settings.deliver(makeSettings());
-    streams.access.deliver(new Map());
-  });
+/** A restricted gathering's access list, with the bookkeeping filled in. */
+function access(overrides: Partial<EventAccess> = {}): EventAccess {
+  return {
+    id: 'friday-fellowship',
+    chainKey: 'friday-fellowship',
+    restricted: true,
+    members: new Set<string>(),
+    updatedAt: null,
+    updatedBy: 'uid-miriam',
+    ...overrides,
+  };
 }
 
 beforeEach(() => {
@@ -182,7 +187,7 @@ describe('a stream that fails', () => {
 
     act(() => streams.events.fail(new Error('Missing or insufficient permissions.')));
 
-    expect(latest?.streamErrors.events).toBe(
+    expect(latest?.streamErrors?.events).toBe(
       'Could not load events: Missing or insufficient permissions.',
     );
     expect(latest?.error).toBe('Could not load events: Missing or insufficient permissions.');
@@ -209,11 +214,11 @@ describe('a stream that fails', () => {
     await waitFor(() => expect(latest).not.toBeNull());
 
     act(() => streams.series.fail(new Error('gone')));
-    expect(latest?.streamErrors.series).toBeDefined();
+    expect(latest?.streamErrors?.series).toBeDefined();
 
     act(() => streams.series.deliver([]));
 
-    expect(latest?.streamErrors.series).toBeUndefined();
+    expect(latest?.streamErrors?.series).toBeUndefined();
     expect(latest?.error).toBeNull();
   });
 
@@ -345,7 +350,7 @@ describe('canWork', () => {
     act(() =>
       streams.access.deliver(
         new Map([
-          ['friday-fellowship', { restricted: true, members: new Set(['uid-other']) } as EventAccess],
+          ['friday-fellowship', access({ members: new Set(['uid-other']) })],
         ]),
       ),
     );
@@ -361,10 +366,7 @@ describe('canWork', () => {
     act(() =>
       streams.access.deliver(
         new Map([
-          [
-            'friday-fellowship',
-            { restricted: true, members: new Set(['uid-counselor']) } as EventAccess,
-          ],
+          ['friday-fellowship', access({ members: new Set(['uid-counselor']) })],
         ]),
       ),
     );
@@ -380,7 +382,7 @@ describe('canWork', () => {
     act(() =>
       streams.access.deliver(
         new Map([
-          ['friday-fellowship', { restricted: true, members: new Set(['uid-other']) } as EventAccess],
+          ['friday-fellowship', access({ members: new Set(['uid-other']) })],
         ]),
       ),
     );
@@ -407,7 +409,7 @@ describe('canWork', () => {
     act(() =>
       streams.access.deliver(
         new Map([
-          ['friday-fellowship', { restricted: true, members: new Set(['uid-other']) } as EventAccess],
+          ['friday-fellowship', access({ members: new Set(['uid-other']) })],
         ]),
       ),
     );

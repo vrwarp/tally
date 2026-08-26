@@ -232,7 +232,7 @@ describe('recordExamination', () => {
 
     expect(setDoc).toHaveBeenCalledTimes(2);
     for (const call of setDoc.mock.calls) {
-      expect(call[2]).toEqual({ merge: true });
+      expect((call as unknown[])[2]).toEqual({ merge: true });
     }
   });
 
@@ -248,7 +248,8 @@ describe('recordExamination', () => {
       known: registry({ examinedFrom: AUGUST }),
     });
 
-    expect((setDoc.mock.calls[0]?.[1] as { examinedFrom: Date }).examinedFrom).toEqual(AUGUST);
+    const first = setDoc.mock.calls[0] as unknown[] | undefined;
+    expect((first?.[1] as { examinedFrom: Date }).examinedFrom).toEqual(AUGUST);
   });
 
   it('resurrects nothing when the chain has no document yet', async () => {

@@ -69,7 +69,10 @@ function snapshot(data: Record<string, unknown> | null, fromCache = false) {
 }
 
 function written() {
-  const [ref, data, options] = setDoc.mock.calls.at(-1) ?? [];
+  const call = setDoc.mock.calls.at(-1) as unknown[] | undefined;
+  const ref = call?.[0];
+  const data = call?.[1];
+  const options = call?.[2];
   return {
     path: (ref as { path: string } | undefined)?.path,
     data: data as Record<string, unknown>,

@@ -20,6 +20,12 @@ because it tests `main` merged into the branch rather than the branch on its own
 | **docker-e2e** | Builds `docker/e2e/Dockerfile` | Proves the reproducible runner still builds — never pushed anywhere |
 | **ci** | Nothing | A single required status check to protect a branch with, which fails if any job above did not succeed |
 
+A second workflow, `.github/workflows/mutation.yml`, runs [mutation
+testing](mutation-testing.md): the modules a pull request changed, on every pull
+request, and the whole logic core weekly. It is separate because the two halves
+have very different shapes — a couple of minutes against a couple of hours — and
+`ci.yml` is a description of one run rather than of two schedules.
+
 The e2e matrix runs with `fail-fast: false` on purpose: one browser failing says
 nothing about the others, and knowing *which* ones broke is the entire point of
 running four.

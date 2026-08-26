@@ -83,6 +83,8 @@ holding screen, which is what a real volunteer sees before an admin adds them.
 | `npm run test:rules` | Boots the Firestore emulator and runs the security-rules suite against it. |
 | `npm run test:functions` | The Cloud Functions suite (mapping, roster reads, cache, write-back, access), no emulator needed — it drives the real client against the simulator in-process. |
 | `npm run test:all` | All three, in that order. |
+| `npm run test:mutation` | [Mutation testing](mutation-testing.md) over the whole logic core: would the suite notice if the code were wrong? Hours — the per-module loop is `node scripts/mutate.mjs <file>`. |
+| `npm run test:mutation:survivors` | The mutants the last run did not kill, grouped by file. |
 | `npm run emulators` | Emulator Suite with an empty datastore, exporting to `./.emulator-data` on exit. |
 | `npm run emulators:resume` | The same, but importing `./.emulator-data` first so seeded data survives a restart. |
 | `npm run pco-sim` | The Planning Center simulator on port 4010. Needed for anything involving people — the roster and sign-in both read through it locally. Not started by `dev:emulated`. |
@@ -96,7 +98,8 @@ holding screen, which is what a real volunteer sees before an admin adds them.
 | `npm run functions:invokers` | Checks that every deployed callable still answers unauthenticated requests, and fixes the ones that do not. Run it when a callable starts failing in the browser with a CORS error — see [callable functions must allow unauthenticated invocations](deployment-setup.md#callable-functions-must-allow-unauthenticated-invocations). |
 
 Writing and debugging the end-to-end suite is [its own README](../e2e/README.md); what runs on a pull
-request is [continuous integration](ci.md).
+request is [continuous integration](ci.md). Whether the suite would notice a wrong answer at all is
+[mutation testing](mutation-testing.md).
 
 ---
 

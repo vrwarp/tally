@@ -68,7 +68,10 @@ function published(docs: { id: string; data: Record<string, unknown> | undefined
 }
 
 function written() {
-  const [ref, data, options] = setDoc.mock.calls.at(-1) ?? [];
+  const call = setDoc.mock.calls.at(-1) as unknown[] | undefined;
+  const ref = call?.[0];
+  const data = call?.[1];
+  const options = call?.[2];
   return {
     path: (ref as { path: string } | undefined)?.path,
     data: data as Record<string, unknown>,
@@ -77,7 +80,9 @@ function written() {
 }
 
 function updated() {
-  const [ref, data] = updateDoc.mock.calls.at(-1) ?? [];
+  const call = updateDoc.mock.calls.at(-1) as unknown[] | undefined;
+  const ref = call?.[0];
+  const data = call?.[1];
   return {
     path: (ref as { path: string } | undefined)?.path,
     data: data as Record<string, unknown>,
