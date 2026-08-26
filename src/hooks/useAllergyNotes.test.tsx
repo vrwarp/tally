@@ -10,7 +10,7 @@
  * is the warning this screen has always given and an error banner at a door is
  * noise.
  */
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { invalidateAllergyNotes, useAllergyNotes } from '@/hooks/useAllergyNotes';
 import { makeStudent } from '../../tests/factories';
@@ -273,18 +273,115 @@ describe('useAllergyNotes', () => {
   });
 
   it('does not re-render for an answer that was entirely empty', async () => {
-    let renders = 0;
-    getAllergyNotes.mockResolvedValue({ data: { notes: { '4200003': '' } } });
+    let land: (value: unknown) => void = () => {};
+    getAllergyNotes.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          land = resolve;
+        }),
+    );
 
+    let renders = 0;
     const { result } = renderHook(() => {
       renders += 1;
       return useAllergyNotes([entry(sofia)]);
     });
     await waitFor(() => expect(getAllergyNotes).toHaveBeenCalled());
-    const after = renders;
+    const before = renders;
 
+    // Every note blank: there is nothing to add, so there is nothing to
+    // publish, and a check-in screen mid-scroll does not rebuild its roster.
+    await act(async () => {
+      land({ data: { notes: { '4200003': '', '9999': '   ' } } });
+    });
+
+    expect(renders).toBe(before);
     expect(result.current.size).toBe(0);
-    expect(renders).toBe(after);
+  });
+
+  it('re-renders once when one real note lands among the blanks', async () => {
+    let land: (value: unknown) => void = () => {};
+    getAllergyNotes.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          land = resolve;
+        }),
+    );
+
+    let renders = 0;
+    const { result } = renderHook(() => {
+      renders += 1;
+      return useAllergyNotes([entry(sofia)]);
+    });
+    await waitFor(() => expect(getAllergyNotes).toHaveBeenCalled());
+    const before = renders;
+
+    await act(async () => {
+      land({ data: { notes: { '4200003': 'Peanuts', '9999': '  ' } } });
+    });
+
+    expect(renders).toBeGreaterThan(before);
+    expect(result.current.get(sofia.id)).toBe('Peanuts');
+  });
+
+  it('hands back the same empty map to every screen that has no notes', () => {
+    // Identity, not emptiness: this is a `useMemo` dependency on every roster
+    // row, and a fresh empty map per render rebuilds all of them.
+    getAllergyNotes.mockResolvedValue({ data: { notes: {} } });
+
+    const first = renderHook(() => useAllergyNotes([entry(sofia)]));
+    const second = renderHook(() => useAllergyNotes([entry(amara)]));
+
+    expect(first.result.current).toBe(second.result.current);
+  });
+
+  it('leaves a student with no note out of the map rather than in it empty', async () => {
+    const other = makeStudent({
+      id: 'pco_4200009',
+      firstName: 'Wei',
+      pcoPersonId: '4200009',
+      hasAllergies: true,
+    });
+    getAllergyNotes.mockResolvedValue({ data: { notes: { '4200003': 'Peanuts' } } });
+
+    const { result } = renderHook(() => useAllergyNotes([entry(sofia), entry(other)]));
+
+    await waitFor(() => expect(result.current.get(sofia.id)).toBe('Peanuts'));
+    // `has` rather than `get`: a key holding `undefined` reads as a badge with
+    // nothing in it on the row.
+    expect(result.current.has(other.id)).toBe(false);
+    expect(result.current.size).toBe(1);
+  });
+
+  it('drops the badge when the flag comes off a student mid-evening', async () => {
+    // The note is still held for the session; the row is not flagged any more,
+    // and the roster is what decides whether a badge is drawn at all.
+    getAllergyNotes.mockResolvedValue({ data: { notes: { '4200003': 'Peanuts' } } });
+
+    const { result, rerender } = renderHook(({ entries }) => useAllergyNotes(entries), {
+      initialProps: { entries: [entry(sofia)] },
+    });
+    await waitFor(() => expect(result.current.get(sofia.id)).toBe('Peanuts'));
+
+    rerender({ entries: [entry(makeStudent({ ...sofia, hasAllergies: false }))] });
+
+    expect(result.current.has(sofia.id)).toBe(false);
+  });
+
+  it('reads a flagged student with no linkage without reaching into nothing', async () => {
+    // A quick-added visitor never carries the flag, but the roster is server
+    // data and this map is built on every render of the check-in screen.
+    const stranded = makeStudent({
+      id: 'tally-9',
+      pcoPersonId: null,
+      hasAllergies: true,
+    });
+    getAllergyNotes.mockResolvedValue({ data: { notes: { '4200003': 'Peanuts' } } });
+
+    const { result } = renderHook(() => useAllergyNotes([entry(sofia), entry(stranded)]));
+
+    await waitFor(() => expect(result.current.get(sofia.id)).toBe('Peanuts'));
+    expect(result.current.has(stranded.id)).toBe(false);
   });
 
   it('does not set state for a screen that has already gone', async () => {

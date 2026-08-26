@@ -62,6 +62,11 @@ export function useAllergyNotes(entries: readonly RosterEntry[]): ReadonlyMap<st
    * the badges a beat later than the names.
    */
   const [answers, setAnswers] = useState<ReadonlyMap<string, string>>(() =>
+    // Stryker disable next-line ConditionalExpression,EqualityOperator: the
+    // memo below returns `NOTHING` for an empty map anyway, so seeding with a
+    // fresh empty one changes no answer. The branch is what makes the seeding
+    // itself worth doing — a session that already holds notes paints them on
+    // the first frame rather than a beat after the names.
     held.size > 0 ? new Map(held) : NOTHING,
   );
 
@@ -72,6 +77,14 @@ export function useAllergyNotes(entries: readonly RosterEntry[]): ReadonlyMap<st
    * next. Cancelling per run would mark those ids asked and then discard the
    * answer they came back with.
    */
+  /*
+   * Stryker disable all: no test can tell this apart from its absence. The
+   * mount effect sets it before any read can resolve, and the only moment it
+   * is false is after unmount — where React ignores the `setState` this
+   * guards anyway. It is here because "ignored" is a promise React has broken
+   * before, and because a read that outlives its component is the ordinary
+   * case on this screen rather than the exceptional one.
+   */
   const alive = useRef(true);
   useEffect(() => {
     alive.current = true;
@@ -79,6 +92,7 @@ export function useAllergyNotes(entries: readonly RosterEntry[]): ReadonlyMap<st
       alive.current = false;
     };
   }, []);
+  /* Stryker restore all */
 
   useEffect(() => {
     const wanted: Array<{ backendId: BackendId; personId: string }> = [];
