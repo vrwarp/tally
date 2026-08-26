@@ -28,7 +28,13 @@ jobs:
     name: Changed modules
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Generous for what this normally is — one or two modules, a minute or two
+    # — because the cost is not in the number of modules but in the number of
+    # *tests* each one drags in. A branch touching `src/types/index.ts` pulls a
+    # hundred and thirty test files into every one of its runs, and the dry run
+    # alone is minutes. The concurrency group above cancels superseded runs, so
+    # a long ceiling costs nothing on a branch that keeps moving.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
         with:
