@@ -58,6 +58,10 @@ export interface A32EffectiveSettings {
 export function readA32EffectiveSettings(settings: Record<string, unknown>): A32EffectiveSettings {
   const str = (value: unknown): string => (typeof value === 'string' ? value : '');
   const num = (value: unknown, fallback: number): number =>
+    // Stryker disable next-line ConditionalExpression: `Number.isFinite` — the
+    // static one — is already false for everything that is not a number, so the
+    // `typeof` refuses nothing it would let through. It is the narrowing that
+    // makes this a `number` at the return.
     typeof value === 'number' && Number.isFinite(value) ? value : fallback;
   const writeBack = settings.writeBack;
   return {
