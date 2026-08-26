@@ -259,6 +259,11 @@ describe('swapCheckIn', () => {
     // Their last-seen is already later than this Friday, and their first ever
     // is fixed for good — so there is nothing to say about them.
     expect(studentWrite()).toBeNull();
+    // And the batch does not carry a write at all: an empty patch would still
+    // stamp `updatedAt` and `updatedBy` on a profile nothing changed about.
+    expect(set.mock.calls.some(([ref]) => (ref as { path: string }).path.startsWith('students/'))).toBe(
+      false,
+    );
   });
 
   /*

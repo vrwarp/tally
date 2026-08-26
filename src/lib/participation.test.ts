@@ -93,6 +93,19 @@ describe('buildChainScopes', () => {
       expect(scopes.get('friday')?.participated).toEqual(['ada']);
     });
 
+    it('counts one exactly on it', () => {
+      // A year to the day is still inside the year. The boundary matters
+      // because the nightly build runs against a rolling window: a chain that
+      // meets weekly has an instance land on it about once a week, and moving
+      // the edge by one comparison drops a real Friday out of the roster.
+      const scopes = buildChainScopes(
+        [instance('friday', PARTICIPATION_MAX_AGE_DAYS, ['ada'])],
+        RULE,
+        NOW,
+      );
+      expect(scopes.get('friday')?.participated).toEqual(['ada']);
+    });
+
     it('drops an instance a day outside it', () => {
       const scopes = buildChainScopes(
         [instance('friday', PARTICIPATION_MAX_AGE_DAYS + 1, ['ada'])],
@@ -111,6 +124,22 @@ describe('buildChainScopes', () => {
       presentStudentIds: ['ada'],
     };
     expect(buildChainScopes([ahead], RULE, NOW).has('friday')).toBe(false);
+  });
+
+  it('does not read the gathering happening right now', () => {
+    /*
+     * Tonight's own register is not evidence about tonight. The kiosk asks this
+     * question *at* the gathering, while people are walking in — so a window
+     * that included the instance it is scoping for would decide who is a
+     * regular from whoever happened to arrive first.
+     */
+    const tonight: ChainInstance = {
+      chain: 'friday',
+      startAt: NOW,
+      cancelled: false,
+      presentStudentIds: ['ada'],
+    };
+    expect(buildChainScopes([tonight], RULE, NOW).has('friday')).toBe(false);
   });
 
   /*
@@ -146,6 +175,67 @@ describe('buildChainScopes', () => {
       );
       expect(scopes.get('friday')?.recent).toEqual(['ada', 'bo']);
     });
+  });
+
+  it('reads the last three by date, whatever order they arrive in', () => {
+    /*
+     * Instances come off a query that is ordered by nothing in particular, and
+     * the window is the *newest* three rather than the first three seen. Ada
+     * has been to the last three; Cyd came to the three before that and has not
+     * been since. Read in arrival order the two would swap places, and the
+     * kiosk would tick a box beside a student who stopped coming in the spring.
+     */
+    const scopes = buildChainScopes(
+      [
+        instance('friday', 90, ['cyd']),
+        instance('friday', 7, ['ada']),
+        instance('friday', 97, ['cyd']),
+        instance('friday', 21, ['ada']),
+        instance('friday', 104, ['cyd']),
+        instance('friday', 14, ['ada']),
+      ],
+      RULE,
+      NOW,
+    );
+
+    expect(scopes.get('friday')?.recent).toEqual(['ada']);
+  });
+
+  it('counts only the last N, not everything in the year', () => {
+    // Cyd made two of the six, which is 2 of 6 — but the rule is 2 of the last
+    // 3, and Cyd is in neither of those. Widening the window to the whole year
+    // is how "a regular now" quietly becomes "came twice, ever".
+    const scopes = buildChainScopes(
+      [
+        instance('friday', 7, ['ada']),
+        instance('friday', 14, ['ada']),
+        instance('friday', 21, ['ada']),
+        instance('friday', 28, ['cyd']),
+        instance('friday', 35, ['cyd']),
+      ],
+      RULE,
+      NOW,
+    );
+
+    expect(scopes.get('friday')?.participated).toEqual(['ada', 'cyd']);
+    expect(scopes.get('friday')?.recent).toEqual(['ada']);
+  });
+
+  it('leaves out somebody who came to the window once', () => {
+    // One of the last three is not two of the last three. A threshold that
+    // waved through anybody seen at all would tick every visitor's box.
+    const scopes = buildChainScopes(
+      [
+        instance('friday', 7, ['ada', 'bo']),
+        instance('friday', 14, ['ada']),
+        instance('friday', 21, ['ada']),
+      ],
+      RULE,
+      NOW,
+    );
+
+    expect(scopes.get('friday')?.participated).toEqual(['ada', 'bo']);
+    expect(scopes.get('friday')?.recent).toEqual(['ada']);
   });
 
   it('clamps the threshold to a chain that has only met once', () => {
