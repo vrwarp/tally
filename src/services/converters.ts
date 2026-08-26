@@ -93,11 +93,19 @@ function bool(value: unknown, fallback = false): boolean {
   return typeof value === 'boolean' ? value : fallback;
 }
 
+/*
+ * `Number.isFinite` — the static one, not the global — is already false for
+ * everything that is not a number, so the `typeof` in both of these refuses
+ * nothing it would let through. It is here for the narrowing that makes the
+ * value a `number` at the return, which is why the mutants on it are disabled.
+ */
 function num(value: unknown, fallback: number): number {
+  // Stryker disable next-line ConditionalExpression: see above.
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
 
 function numOrNull(value: unknown): number | null {
+  // Stryker disable next-line ConditionalExpression: see above.
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
@@ -239,9 +247,16 @@ function toRecurrence(value: unknown, anchor: Date): RecurrenceRule | null {
             // weekday when none survive, so every array that is not a list of
             // weekdays — this one included — reaches the same rule.
             [],
+      // Stryker disable next-line StringLiteral: `normalizeRecurrence` reads
+      // anything that is not `dayOfWeek` as `dayOfMonth`, so the fallback here
+      // could say anything and reach the same rule. It says what it means.
       monthlyMode: raw.monthlyMode === 'dayOfWeek' ? 'dayOfWeek' : 'dayOfMonth',
       // A malformed `until` reads as "no end date" rather than as "ended", so a
       // corrupt field never makes a live weekly gathering look finished.
+      // Stryker disable next-line ConditionalExpression: `fromDateOnlyValue`
+      // answers null for anything that is not a date-only string, so the
+      // `typeof` refuses nothing it would let through — it is what makes
+      // `raw.until` a string for the field's type.
       until: typeof raw.until === 'string' && fromDateOnlyValue(raw.until) ? raw.until : null,
       count: numOrNull(raw.count),
     },
