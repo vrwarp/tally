@@ -138,6 +138,13 @@ export function useSeriesHistoryEvents(event: TallyEvent | null): TallyEvent[] {
 
   return useMemo(() => {
     const chain = event ? predictionChain(event) : null;
+    /*
+     * Stryker disable next-line ConditionalExpression,LogicalOperator: the walk
+     * below matches instances on `chainKey(event) === chain`, and `chainKey`
+     * never answers null — so with no chain it selects nothing and the two
+     * versions agree. The guard is here to say what "no chain" means rather
+     * than to leave a reader to work it out from an empty filter.
+     */
     if (!event || !chain) return NO_HISTORY;
     const instances = recentChainInstances(
       events,

@@ -45,9 +45,14 @@ const browser = vi.hoisted(() => ({
 const firebaseApp = vi.hoisted(() => ({ options: { authDomain: 'tally.example.org' } }));
 const resolver = vi.hoisted(() => ({ resolver: true }));
 
+/** Whatever `signInWithGoogle` asked Google for, most recent last. */
+const providerParameters = vi.hoisted(() => [] as Record<string, string>[]);
+
 vi.mock('firebase/auth', () => ({
   GoogleAuthProvider: class {
-    setCustomParameters = vi.fn();
+    setCustomParameters(parameters: Record<string, string>) {
+      providerParameters.push(parameters);
+    }
   },
   onAuthStateChanged,
   signInWithPopup,
@@ -55,8 +60,10 @@ vi.mock('firebase/auth', () => ({
   getRedirectResult,
   signOut: firebaseSignOut,
 }));
+const firebaseAuth = vi.hoisted(() => ({ currentUser: null as { uid: string } | null }));
+
 vi.mock('@/lib/firebase', () => ({
-  auth: { currentUser: null as { uid: string } | null },
+  auth: firebaseAuth,
   firebaseApp,
   popupRedirectResolver: async () => resolver,
 }));
@@ -116,11 +123,15 @@ async function signedIn(profile: UserProfile | null = makeProfile()) {
 }
 
 beforeEach(() => {
+  // Shared across the file, so a test that signs somebody in must not leave
+  // them signed in for the next one.
+  firebaseAuth.currentUser = null;
   browser.embedded = false;
   browser.firstParty = true;
   browser.strategy = 'popup';
   firebaseApp.options.authDomain = 'tally.example.org';
   latest = null;
+  providerParameters.length = 0;
   window.sessionStorage.clear();
 
   onAuthStateChanged.mockReset();
@@ -678,8 +689,7 @@ describe('refreshProfile', () => {
   });
 
   it('reads the document from the server and publishes it', async () => {
-    const { auth } = await import('@/lib/firebase');
-    (auth as { currentUser: { uid: string } | null }).currentUser = { uid: 'uid-miriam' };
+    firebaseAuth.currentUser = { uid: 'uid-miriam' };
     getUserProfileFromServer.mockResolvedValueOnce(makeProfile());
 
     mount();
@@ -696,8 +706,7 @@ describe('refreshProfile', () => {
     // Re-subscribing is the point: something else has just written the document
     // the listener is waiting for, and a stalled stream needs a reason to start
     // over.
-    const { auth } = await import('@/lib/firebase');
-    (auth as { currentUser: { uid: string } | null }).currentUser = { uid: 'uid-miriam' };
+    firebaseAuth.currentUser = { uid: 'uid-miriam' };
     getUserProfileFromServer.mockRejectedValueOnce(new Error('denied'));
 
     mount();
@@ -709,6 +718,133 @@ describe('refreshProfile', () => {
     });
 
     expect(subscribeUserProfile.mock.calls.length).toBe(opened + 1);
+  });
+});
+
+describe('the details of getting in', () => {
+  it('always asks Google which account, on a device many people share', async () => {
+    // Without `select_account` a shared lobby laptop silently reuses whoever
+    // signed in last, which is the one failure nobody notices until a
+    // counselor's check-ins are filed under somebody else.
+    mount();
+    await waitFor(() => expect(latest).not.toBeNull());
+
+    await act(async () => {
+      await latest?.signInWithGoogle();
+    });
+
+    expect(providerParameters).toEqual([{ prompt: 'select_account' }]);
+  });
+
+  it('survives a rejection that is not an object at all', async () => {
+    // A rejected promise carries whatever it was rejected with, and a webview
+    // that gives up mid-handshake is not obliged to hand over an Error.
+    signInWithPopup.mockRejectedValueOnce(null);
+    mount();
+    await waitFor(() => expect(latest).not.toBeNull());
+
+    await act(async () => {
+      await latest?.signInWithGoogle().catch(() => {});
+    });
+
+    expect(latest?.error).toBe('Sign-in failed. Try again.');
+  });
+
+  it('survives a redirect result that rejected with nothing', async () => {
+    window.sessionStorage.setItem(REDIRECT_PENDING_KEY, '1');
+    getRedirectResult.mockRejectedValueOnce(undefined);
+
+    mount();
+
+    await waitFor(() => expect(latest?.error).toBe('Sign-in failed. Try again.'));
+  });
+});
+
+describe('a profile that lands too late', () => {
+  it('is ignored once the listener has been torn down', async () => {
+    // The snapshot for the person who has just signed out must not put their
+    // profile back under whoever signed in after them.
+    await signedIn();
+    const stale = profileStream.deliver;
+
+    act(() => announce(null));
+    act(() => stale(makeProfile(), { fromCache: false }));
+
+    expect(latest?.status).toBe('signedOut');
+    expect(latest?.profile).toBeNull();
+  });
+
+  it('is ignored when its failure lands late too', async () => {
+    await signedIn();
+    const staleFail = profileStream.fail;
+
+    act(() => announce(null));
+    act(() => staleFail());
+
+    expect(latest?.status).toBe('signedOut');
+  });
+
+  it('drops the profile when the listener is refused mid-session', async () => {
+    // Somebody deactivated between snapshots. The holding screen is the
+    // honest answer, not the profile they had a second ago.
+    await signedIn();
+    expect(latest?.profile).not.toBeNull();
+
+    act(() => profileStream.fail());
+
+    expect(latest?.profile).toBeNull();
+    expect(latest?.status).toBe('pending');
+  });
+});
+
+describe('the heartbeat, once per person', () => {
+  it('does not stamp again for the same person signing back in', async () => {
+    // The guard is keyed on the uid and lives as long as the tab, so signing
+    // out and back in on a shared laptop is not a second write. What it costs
+    // is a `lastSeenAt` an hour stale; what it prevents is the write loop that
+    // followed from stamping inside the listener that watches the document.
+    await signedIn();
+    expect(touchLastSeen).toHaveBeenCalledTimes(1);
+
+    act(() => announce(null));
+    act(() => announce({ uid: 'uid-miriam' }));
+    await waitFor(() => expect(profileStream.uid).toBe('uid-miriam'));
+    act(() => profileStream.deliver(makeProfile(), { fromCache: false }));
+
+    expect(touchLastSeen).toHaveBeenCalledTimes(1);
+  });
+
+  it('stamps for a different person on the same device', async () => {
+    await signedIn();
+
+    act(() => announce({ uid: 'uid-priya' }));
+    await waitFor(() => expect(profileStream.uid).toBe('uid-priya'));
+    act(() => profileStream.deliver(makeProfile({ id: 'uid-priya' }), { fromCache: false }));
+
+    expect(touchLastSeen).toHaveBeenCalledTimes(2);
+    expect(touchLastSeen).toHaveBeenLastCalledWith('uid-priya');
+  });
+});
+
+describe('refreshProfile, asked twice', () => {
+  it('restarts the listener each time', async () => {
+    // The epoch has to keep moving: two people approved in a row is two
+    // presses of the same button, and the second must not be a no-op.
+    firebaseAuth.currentUser = { uid: 'uid-miriam' };
+    getUserProfileFromServer.mockResolvedValue(makeProfile());
+
+    mount();
+    act(() => announce({ uid: 'uid-miriam' }));
+    const opened = subscribeUserProfile.mock.calls.length;
+
+    await act(async () => {
+      await latest?.refreshProfile();
+    });
+    await act(async () => {
+      await latest?.refreshProfile();
+    });
+
+    expect(subscribeUserProfile.mock.calls.length).toBe(opened + 2);
   });
 });
 

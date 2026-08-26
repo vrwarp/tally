@@ -30,8 +30,8 @@ vi.mock('@/hooks/useNow', () => ({ useNow }));
 /** Friday 13 February 2026, 19:30 — mid-gathering. */
 const NOW = new Date(2026, 1, 13, 19, 30);
 
-function wrapper(events: TallyEvent[], settings = makeSettings()) {
-  const value = {
+function contextValue(events: TallyEvent[], settings = makeSettings()): DataContextValue {
+  return {
     students: [],
     events,
     series: [],
@@ -39,9 +39,20 @@ function wrapper(events: TallyEvent[], settings = makeSettings()) {
     loading: false,
     error: null,
   } as unknown as DataContextValue;
+}
+
+function wrapper(events: TallyEvent[], settings = makeSettings()) {
+  const value = contextValue(events, settings);
 
   return function Wrapper({ children }: { children: ReactNode }) {
     return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
+  };
+}
+
+/** A wrapper whose calendar a test can change between renders. */
+function livingWrapper(read: () => TallyEvent[]) {
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return <DataContext.Provider value={contextValue(read())}>{children}</DataContext.Provider>;
   };
 }
 
@@ -116,17 +127,43 @@ describe('useActiveEvent', () => {
     expect(result.current.selectableEvents.map((event) => event.id)).toEqual(['ahead', 'recent']);
   });
 
-  it('keeps a gathering exactly a month old and drops one a day past that', () => {
+  it('keeps a gathering exactly a month old and drops one a moment older', () => {
     // The boundary is 31 days, and it is the difference between back-filling a
-    // missed Sunday and scrolling through a year.
-    const inside = pastFriday('inside', 30);
-    const outside = pastFriday('outside', 32);
-
-    const { result } = renderHook(() => useActiveEvent(null), {
-      wrapper: wrapper([inside, outside]),
+    // missed Sunday and scrolling through a year. Inclusive: a gathering
+    // landing exactly on it is the last one offered, not the first refused.
+    const onTheLine = makeEvent({
+      id: 'on-the-line',
+      startAt: new Date(NOW.getTime() - 31 * 86_400_000),
+    });
+    const justOver = makeEvent({
+      id: 'just-over',
+      startAt: new Date(NOW.getTime() - 31 * 86_400_000 - 1),
     });
 
-    expect(result.current.selectableEvents.map((event) => event.id)).toEqual(['inside']);
+    const { result } = renderHook(() => useActiveEvent(null), {
+      wrapper: wrapper([onTheLine, justOver]),
+    });
+
+    expect(result.current.selectableEvents.map((event) => event.id)).toEqual(['on-the-line']);
+  });
+
+  it('re-selects when the calendar changes underneath it', () => {
+    // The calendar is a live listener that republishes as gatherings are
+    // added, edited and called off. A memo pinned to its first value would
+    // leave the chooser offering a night that no longer exists.
+    const friday = pastFriday('friday', 7);
+    const sunday = pastFriday('sunday', 3);
+    let calendar = [friday];
+
+    const { result, rerender } = renderHook(() => useActiveEvent(null), {
+      wrapper: livingWrapper(() => calendar),
+    });
+    expect(result.current.selectableEvents.map((event) => event.id)).toEqual(['friday']);
+
+    calendar = [friday, sunday];
+    rerender();
+
+    expect(result.current.selectableEvents.map((event) => event.id)).toEqual(['sunday', 'friday']);
   });
 
   it('never offers a gathering somebody called off', () => {
@@ -224,6 +261,31 @@ describe('useSeriesHistoryEvents', () => {
     rerender();
 
     expect(result.current).toBe(first);
+  });
+
+  it('re-reads when the gathering being checked into changes', () => {
+    // The check-in screen switches events without unmounting, and a history
+    // pinned to the first one predicts the wrong roster from then on.
+    const friday = pastFriday('friday-tonight', 0);
+    const fridayLastWeek = pastFriday('friday-last-week', 7);
+    const trip = makeEvent({
+      id: 'retreat',
+      mode: 'oneoff',
+      seriesId: null,
+      recurrenceRootId: null,
+      predictFromChain: null,
+      startAt: NOW,
+    });
+
+    const { result, rerender } = renderHook(({ event }) => useSeriesHistoryEvents(event), {
+      wrapper: wrapper([friday, fridayLastWeek, trip]),
+      initialProps: { event: friday },
+    });
+    expect(result.current.map((event) => event.id)).toEqual(['friday-last-week']);
+
+    rerender({ event: trip });
+
+    expect(result.current).toEqual([]);
   });
 
   it('hands back the same empty array for every event with no chain', () => {
