@@ -100,6 +100,37 @@ test, not about the constants beside them. Where a constant is load-bearing —
 is a test that states its value outright, which is the same protection by
 another route (`src/lib/paths.test.ts` is the clearest example).
 
+### The hybrid ones, which are not ignored
+
+`ignoreStatic` is narrower than it sounds, and the gap is worth knowing before
+it wastes an afternoon. Stryker only marks a static mutant `Ignored` when it has
+*no* per-test coverage at all. A mutant that is both — module-level code that a
+test also reads — is called **hybrid**, and `ignoreStatic` merely stops it
+running the whole suite: it still runs against its covering tests, and it still
+survives, because the module was loaded long before Stryker could flip the
+switch for any one of them.
+
+So a hybrid static mutant reports as `Survived` and cannot be killed, however
+directly a test asserts the value:
+
+```ts
+export const DEFAULT_PRINTER_MODEL = 'QL-810W';   // mutant: ""
+expect(DEFAULT_PRINTER_MODEL).toBe('QL-810W');    // passes either way
+```
+
+There are only a handful in this codebase — four across the whole scope — and
+they are annotated where they live, with `all` rather than a mutator name,
+because every mutator has the same problem there:
+
+```ts
+/* Stryker disable next-line all: static — see docs/mutation-testing.md. */
+export const DEFAULT_PRINTER_LABEL = '62x29';
+```
+
+Two ways to tell a hybrid from a real survivor when one turns up: the JSON
+report has `"static": true` on the mutant, and the value it changes is almost
+always something assigned once at module scope.
+
 ## Equivalent mutants
 
 Some mutants cannot be killed, because the changed code behaves identically to
@@ -161,6 +192,19 @@ The first pass over the logic core, in the order the sweep reached them:
   archive fallback was written to stop.
 - **`usePastEvents` restarted from a stale boundary**, and its retry button sat
   under its own error message for the length of a round trip.
+- **Every Attendees student's parent contact was invisible.** `usePersonDetails`
+  worked out who to ask about with `personIdFromStudentId`, which is the
+  *Planning Center* compatibility helper and answers null for an `a32_` id by
+  design — so the hook reported `unavailable`, which is the sentence written for
+  a quick-added visitor who has no upstream record at all. `useAllergyNotes` had
+  the same line and the same result, in a request shape built specifically to
+  carry a mixed roster. Both halves of the linkage come from one
+  `linkageOfStudent` now.
+- **A queue's loop guard and a queue's shift guard covered for each other**, and
+  so did four other pairs, none of which any test could have been wrong about.
+  They are the second kind of finding — the code, not the suite — and the fix
+  was to delete one half of each. `warmedAtMs` went the same way: written on
+  every warm label, read by nothing.
 
 ## In CI
 

@@ -199,6 +199,24 @@ function autoShiftAfter(buffer: string): ShiftState {
   return buffer === '' || /[\s'-]$/.test(buffer) ? 'on' : 'off';
 }
 
+/**
+ * The buffer with one keystroke appended.
+ *
+ * Two things happen here and both are about spaces. A leading one is refused,
+ * because it is the one keystroke that would silently do nothing useful, and a
+ * doubled one is collapsed, because `Mary  Jane` on a roster is a name nobody
+ * can search for.
+ */
+function typeInto(buffer: string, value: string): string {
+  /*
+   * Stryker disable next-line MethodExpression: a key's value is one character
+   * — the keyboard emits one per press — and trimming either end of a single
+   * character is the same operation. `trimStart` is which end this is *about*.
+   */
+  const typed = buffer === '' ? value.trimStart() : value;
+  return (buffer + typed).replace(/\s{2,}/g, ' ');
+}
+
 /** Off → on → lock → off, the cycle every phone keyboard's shift key has. */
 function cycleShift(shift: ShiftState): ShiftState {
   return shift === 'off' ? 'on' : shift === 'on' ? 'lock' : 'off';
@@ -227,6 +245,13 @@ export function applyKey(
    * press that does nothing, and the screen says so by being grey rather than
    * by swallowing keystrokes silently. Untick to type.
    */
+  /*
+   * Stryker disable next-line ConditionalExpression: the step check is
+   * redundant with the flag — `advance`, `answerAnother` and `goBack` all clear
+   * `noAllergies` on the way out of this question, so it is never set on any
+   * other step. It stays because that invariant lives in three other functions
+   * and this one should not have to trust them.
+   */
   if (state.step === 'child-allergies' && state.noAllergies) return state;
   if (key.kind === 'shift') return { ...state, shift: cycleShift(state.shift) };
   if (key.kind === 'clear') return { ...state, buffer: '', shift: 'on' };
@@ -247,9 +272,7 @@ export function applyKey(
 
   if (state.step === 'child-allergies') {
     if (!ALLERGY_CHARACTER.test(key.value)) return state;
-    const next = (
-      state.buffer + (state.buffer === '' ? key.value.trimStart() : key.value)
-    ).replace(/\s{2,}/g, ' ');
+    const next = typeInto(state.buffer, key.value);
     if (next.length > ALLERGIES_MAX_LENGTH) return state;
     return {
       ...state,
@@ -259,10 +282,7 @@ export function applyKey(
   }
 
   if (!NAME_CHARACTER.test(key.value)) return state;
-  // A leading space is the one keystroke that would silently do nothing useful.
-  const next = (
-    state.buffer + (state.buffer === '' ? key.value.trimStart() : key.value)
-  ).replace(/\s{2,}/g, ' ');
+  const next = typeInto(state.buffer, key.value);
   if (next.length > NAME_MAX_LENGTH) return state;
   return {
     ...state,
@@ -280,6 +300,12 @@ export function canAdvance(state: RegistrationState): boolean {
   // An empty allergies buffer is not an unanswered question — it is the
   // answer most families give.
   if (state.step === 'child-allergies') return true;
+  /*
+   * Stryker disable next-line MethodExpression: `typeInto` refuses a leading
+   * space and collapses the rest, so the buffer never consists only of
+   * whitespace and the trim can only ever remove a single trailing space from
+   * a non-empty answer. The trim is here to say what "answered" means.
+   */
   if (isTypingStep(state.step)) return state.buffer.trim().length > 0;
   return true;
 }
@@ -464,6 +490,12 @@ export function answerAnother(
  */
 export function goBack(state: RegistrationState): RegistrationState | null {
   switch (state.step) {
+    /*
+     * Stryker disable next-line StringLiteral: `default` answers null too, so
+     * no test can tell this case from falling through to it. It is here because
+     * "the first question has nowhere back" is the rule, and the default is the
+     * catch-all for the steps that have no keyboard at all.
+     */
     case 'child-first':
       return null;
     case 'child-last':

@@ -20,6 +20,8 @@ import {
   formatPhone,
   goBack,
   initialState,
+  MAX_CHILDREN,
+  NAME_MAX_LENGTH,
   PHONE_LENGTH,
   toggleNoAllergies,
   type RegistrationState,
@@ -217,6 +219,399 @@ describe('the loop', () => {
       { firstName: 'Ada', lastName: 'Lovelace', grade: 4, allergies: '' },
       { firstName: 'Byron', lastName: 'Lovelace', grade: 1, allergies: '' },
     ]);
+  });
+});
+
+/**
+ * Every transition, asserted whole.
+ *
+ * The rest of this file checks the judgements a family feels. This block exists
+ * because the state object is what the screen renders from, and a transition
+ * that gets the step right and leaves the buffer holding the previous
+ * question's answer is a wizard that opens the next question pre-filled with
+ * the wrong thing — which no assertion on `step` alone would notice.
+ */
+describe('the whole state, at each transition', () => {
+  const BASE: RegistrationState = {
+    mode: 'family',
+    step: 'child-first',
+    registrationId: 'r-1',
+    allergiesSupported: false,
+    noAllergies: false,
+    children: [],
+    draft: { firstName: '', lastName: '', grade: 9 as Grade, allergies: '' },
+    guardian: { firstName: '', lastName: '', phone: '' },
+    buffer: '',
+    shift: 'on',
+    last4: '',
+    message: '',
+  };
+
+  it('opens on the first question with everything else empty', () => {
+    expect(initialState({ registrationId: 'r-1', requiresCheckOut: false })).toEqual(BASE);
+  });
+
+  it('opens a gathering that hands children back on no grade', () => {
+    expect(initialState({ registrationId: 'r-1', requiresCheckOut: true })).toEqual({
+      ...BASE,
+      draft: { ...BASE.draft, grade: null },
+    });
+  });
+
+  it('takes the mode and the allergy gate from the binding', () => {
+    expect(
+      initialState({
+        registrationId: 'r-2',
+        requiresCheckOut: false,
+        mode: 'sibling',
+        allergiesSupported: true,
+      }),
+    ).toEqual({ ...BASE, registrationId: 'r-2', mode: 'sibling', allergiesSupported: true });
+  });
+
+  it('reads anything but a literal true as "no allergy question"', () => {
+    // The binding is server-written and this is the gate on asking a family
+    // about medicine at a lobby screen; anything short of yes is no.
+    for (const value of [undefined, null, 0, '', 'yes']) {
+      const state = initialState({
+        registrationId: 'r-1',
+        requiresCheckOut: false,
+        allergiesSupported: value as unknown as boolean,
+      });
+      expect(state.allergiesSupported).toBe(false);
+    }
+  });
+
+  it('banks the first name and opens the second question', () => {
+    expect(advance(typeText(start(), 'Ada'))).toEqual({
+      ...BASE,
+      draft: { ...BASE.draft, firstName: 'Ada' },
+      step: 'child-last',
+      buffer: '',
+      shift: 'on',
+    });
+  });
+
+  it('banks the last name and opens the grade chips with an empty box', () => {
+    const named = advance(typeText(advance(typeText(start(), 'Ada')), 'Lovelace'));
+
+    expect(named).toEqual({
+      ...BASE,
+      draft: { ...BASE.draft, firstName: 'Ada', lastName: 'Lovelace' },
+      step: 'child-grade',
+      buffer: '',
+      shift: 'on',
+    });
+  });
+
+  it('goes from the grade straight to the fork when allergies are not asked', () => {
+    const graded = chooseGrade(
+      advance(typeText(advance(typeText(start(), 'Ada')), 'Lovelace')),
+      11 as Grade,
+    );
+
+    expect(graded).toEqual({
+      ...BASE,
+      draft: { firstName: 'Ada', lastName: 'Lovelace', grade: 11 as Grade, allergies: '' },
+      step: 'another',
+      buffer: '',
+      shift: 'on',
+      noAllergies: false,
+    });
+  });
+
+  it('banks the note and unticks the box on the way to the fork', () => {
+    const withAllergies = initialState({
+      registrationId: 'r-1',
+      requiresCheckOut: false,
+      allergiesSupported: true,
+    });
+    const asked = chooseGrade(
+      advance(typeText(advance(typeText(withAllergies, 'Ada')), 'Lovelace')),
+      11 as Grade,
+    );
+    expect(asked.step).toBe('child-allergies');
+
+    expect(advance(typeText(asked, 'Peanuts'))).toEqual({
+      ...BASE,
+      allergiesSupported: true,
+      draft: { firstName: 'Ada', lastName: 'Lovelace', grade: 11 as Grade, allergies: 'Peanuts' },
+      step: 'another',
+      buffer: '',
+      shift: 'on',
+      noAllergies: false,
+    });
+  });
+
+  it('banks the adult and closes on confirm', () => {
+    const atPhone: RegistrationState = {
+      ...BASE,
+      step: 'guardian-phone',
+      guardian: { firstName: 'Dana', lastName: 'Rivera', phone: '' },
+      buffer: '5550103344',
+      shift: 'off',
+    };
+
+    expect(advance(atPhone)).toEqual({
+      ...atPhone,
+      guardian: { firstName: 'Dana', lastName: 'Rivera', phone: '5550103344' },
+      step: 'confirm',
+      buffer: '',
+      shift: 'on',
+    });
+  });
+
+  it("opens the adult's surname prefilled, and the phone with shift down", () => {
+    const atGuardianFirst: RegistrationState = { ...BASE, step: 'guardian-first' };
+    const named = advance(typeText(atGuardianFirst, 'Dana'));
+
+    expect(named).toEqual({
+      ...BASE,
+      step: 'guardian-last',
+      guardian: { firstName: 'Dana', lastName: '', phone: '' },
+      buffer: '',
+      shift: 'on',
+    });
+
+    expect(advance(typeText(named, 'Rivera'))).toEqual({
+      ...BASE,
+      step: 'guardian-phone',
+      guardian: { firstName: 'Dana', lastName: 'Rivera', phone: '' },
+      buffer: '',
+      // A number pad has no capitals to offer.
+      shift: 'off',
+    });
+  });
+
+  it('reopens the adult\'s number rather than making them type it twice', () => {
+    const atPhone: RegistrationState = {
+      ...BASE,
+      step: 'guardian-phone',
+      guardian: { firstName: 'Dana', lastName: 'Rivera', phone: '5550103344' },
+      buffer: '5550103344',
+      shift: 'off',
+    };
+    const confirmed = advance(atPhone);
+
+    expect(goBack(confirmed)).toEqual({ ...confirmed, step: 'guardian-phone', buffer: '5550103344', shift: 'off' });
+  });
+
+  it('starts the next child on a clean draft', () => {
+    const banked = chooseGrade(
+      advance(typeText(advance(typeText(start(), 'Ada')), 'Lovelace')),
+      11 as Grade,
+    );
+
+    expect(answerAnother(banked, true, false)).toEqual({
+      ...BASE,
+      children: [{ firstName: 'Ada', lastName: 'Lovelace', grade: 11 as Grade, allergies: '' }],
+      draft: { firstName: '', lastName: '', grade: 9 as Grade, allergies: '' },
+      step: 'child-first',
+      buffer: '',
+      shift: 'on',
+    });
+  });
+
+  it('goes on to the adult when the family is done', () => {
+    const banked = chooseGrade(
+      advance(typeText(advance(typeText(start(), 'Ada')), 'Lovelace')),
+      11 as Grade,
+    );
+
+    expect(answerAnother(banked, false, false)).toEqual({
+      ...BASE,
+      children: [{ firstName: 'Ada', lastName: 'Lovelace', grade: 11 as Grade, allergies: '' }],
+      draft: { firstName: '', lastName: '', grade: 9 as Grade, allergies: '' },
+      step: 'guardian-first',
+      buffer: '',
+      shift: 'on',
+    });
+  });
+
+  it('carries the gathering default onto the next child too', () => {
+    const banked = chooseGrade(
+      advance(typeText(advance(typeText(start(true), 'Ada')), 'Lovelace')),
+      11 as Grade,
+    );
+
+    expect(answerAnother(banked, true, true).draft.grade).toBeNull();
+  });
+
+  it('stops looping once the family is as large as the kiosk will take', () => {
+    let held = start();
+    for (let index = 0; index < MAX_CHILDREN - 1; index += 1) {
+      held = answerAnother(addChild(held, `Child${index}`, 'Osei', 9 as Grade), true, false);
+      expect(held.step).toBe('child-first');
+    }
+
+    // The sixth is banked and the loop closes rather than offering a seventh.
+    const full = answerAnother(addChild(held, 'Child5', 'Osei', 9 as Grade), true, false);
+    expect(full.children).toHaveLength(MAX_CHILDREN);
+    expect(full.step).toBe('guardian-first');
+  });
+
+  it('clears the error message on the way back to confirm', () => {
+    const failed: RegistrationState = {
+      ...BASE,
+      step: 'error',
+      message: 'Planning Center is having a minute',
+    };
+
+    expect(goBack(failed)).toEqual({ ...BASE, step: 'confirm', buffer: '', shift: 'on', message: '' });
+  });
+
+  it('reopens the grade chips from the allergy question with an empty box', () => {
+    const atAllergies: RegistrationState = {
+      ...BASE,
+      allergiesSupported: true,
+      step: 'child-allergies',
+      buffer: 'Peanuts',
+      noAllergies: true,
+    };
+
+    expect(goBack(atAllergies)).toEqual({ ...atAllergies, step: 'child-grade', buffer: '', shift: 'on' });
+  });
+
+  it('reopens each earlier question with its own answer', () => {
+    const draft = { firstName: 'Ada', lastName: 'Lovelace', grade: 11 as Grade, allergies: 'Peanuts' };
+    const guardian = { firstName: 'Dana', lastName: 'Rivera', phone: '5550103344' };
+    const held: RegistrationState = { ...BASE, draft, guardian };
+
+    expect(goBack({ ...held, step: 'child-last' })).toMatchObject({
+      step: 'child-first',
+      buffer: 'Ada',
+      shift: 'off',
+    });
+    expect(goBack({ ...held, step: 'child-grade' })).toMatchObject({
+      step: 'child-last',
+      buffer: 'Lovelace',
+      shift: 'off',
+    });
+    expect(goBack({ ...held, step: 'guardian-first' })).toMatchObject({
+      step: 'another',
+      buffer: '',
+      shift: 'on',
+    });
+    expect(goBack({ ...held, step: 'guardian-last' })).toMatchObject({
+      step: 'guardian-first',
+      buffer: 'Dana',
+      shift: 'off',
+    });
+    expect(goBack({ ...held, step: 'guardian-phone' })).toMatchObject({
+      step: 'guardian-last',
+      buffer: 'Rivera',
+      shift: 'off',
+    });
+  });
+
+  it('reopens the allergy note unticked, from the fork', () => {
+    const draft = { firstName: 'Ada', lastName: 'Lovelace', grade: 11 as Grade, allergies: 'Peanuts' };
+    const atFork: RegistrationState = {
+      ...BASE,
+      allergiesSupported: true,
+      step: 'another',
+      draft,
+      noAllergies: true,
+    };
+
+    expect(goBack(atFork)).toEqual({
+      ...atFork,
+      step: 'child-allergies',
+      buffer: 'Peanuts',
+      shift: 'off',
+      noAllergies: false,
+    });
+  });
+
+  it('has nowhere to go back to from a step with no question behind it', () => {
+    for (const step of ['submitting', 'success'] as const) {
+      expect(goBack({ ...BASE, step })).toBeNull();
+    }
+  });
+});
+
+describe('the keys that are not letters', () => {
+  it('empties the box and puts shift back up', () => {
+    const typed = typeText(start(), 'Adaa');
+
+    expect(applyKey(typed, { kind: 'clear' })).toMatchObject({ buffer: '', shift: 'on' });
+  });
+
+  it('takes one character off the end, not off the front', () => {
+    const typed = typeText(start(), 'Ada');
+
+    expect(applyKey(typed, { kind: 'backspace' }).buffer).toBe('Ad');
+  });
+
+  it('does nothing to an empty box', () => {
+    expect(applyKey(start(), { kind: 'backspace' }).buffer).toBe('');
+  });
+
+  it('puts shift back up when a backspace lands on a word boundary', () => {
+    const typed = typeText(start(), 'Anne-M');
+    expect(typed.shift).toBe('off');
+
+    expect(applyKey(typed, { kind: 'backspace' }).shift).toBe('on');
+  });
+
+  it('leaves a locked shift locked through a backspace', () => {
+    let held = applyKey(typeText(start(), 'AD'), { kind: 'shift' });
+    held = applyKey(held, { kind: 'shift' });
+    expect(held.shift).toBe('lock');
+
+    expect(applyKey(held, { kind: 'backspace' }).shift).toBe('lock');
+  });
+
+  it('is inert on a step with no keyboard', () => {
+    const atGrade = advance(typeText(advance(typeText(start(), 'Ada')), 'Lovelace'));
+    expect(atGrade.step).toBe('child-grade');
+
+    for (const key of [
+      { kind: 'char', value: 'x' },
+      { kind: 'backspace' },
+      { kind: 'clear' },
+      { kind: 'shift' },
+    ] as const) {
+      expect(applyKey(atGrade, key)).toBe(atGrade);
+    }
+  });
+});
+
+describe('the boundaries of a typed answer', () => {
+  it('takes a name of exactly the length it allows, and no more', () => {
+    const exact = 'A'.repeat(NAME_MAX_LENGTH);
+
+    expect(typeText(start(), exact).buffer).toBe(exact);
+    expect(typeText(start(), `${exact}B`).buffer).toBe(exact);
+  });
+
+  it('capitalises after every boundary a name has, and nowhere else', () => {
+    // The boundaries a name actually has: its start, and after a space, a
+    // hyphen or an apostrophe — which is what makes Anne-Marie and O'Brien come
+    // out right without anybody reaching for shift.
+    expect(typeText(start(), 'Anne').shift).toBe('off');
+    expect(typeText(start(), 'Anne-').shift).toBe('on');
+    expect(typeText(start(), 'Anne-Marie').shift).toBe('off');
+    expect(typeText(start(), "O'").shift).toBe('on');
+    expect(typeText(start(), 'van ').shift).toBe('on');
+    expect(typeText(start(), 'van der').shift).toBe('off');
+  });
+
+  it('trims the trailing space off an answer as it is banked', () => {
+    const trailing = applyKey(typeText(start(), 'Ada'), { kind: 'char', value: ' ' });
+    expect(trailing.buffer).toBe('Ada ');
+
+    expect(advance(trailing).draft.firstName).toBe('Ada');
+  });
+
+  it('takes one digit per press and nothing composite', () => {
+    const atPhone: RegistrationState = { ...start(), step: 'guardian-phone' };
+
+    // A press is a digit: `^\d$` and not `\d`, so nothing arrives carrying a
+    // digit alongside something else.
+    expect(applyKey(atPhone, { kind: 'char', value: '5' }).buffer).toBe('5');
+    expect(applyKey(atPhone, { kind: 'char', value: 'a5' }).buffer).toBe('');
+    expect(applyKey(atPhone, { kind: 'char', value: '5a' }).buffer).toBe('');
   });
 });
 
