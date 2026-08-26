@@ -274,6 +274,44 @@ describe('useEvent, between one night and the next', () => {
     expect(result.current.loading).toBe(true);
   });
 
+  it('does not repaint for a listener it has already closed', () => {
+    /*
+     * The render-time guard already stops a stale answer being *shown* — it
+     * belongs to a different id. What the cancellation flag adds is that the
+     * answer is not written down at all, and the check-in screen rebuilds its
+     * whole roster from this hook, so a write nobody can see still costs the
+     * frame.
+     */
+    let deliver: (event: TallyEvent | null) => void = () => {};
+    let fail: () => void = () => {};
+    subscribeEvent.mockImplementation(
+      (id: string, onChange: (e: TallyEvent | null) => void, onError: () => void) => {
+        if (id === ARCHIVED.id) {
+          deliver = onChange;
+          fail = onError;
+        }
+        return () => {};
+      },
+    );
+
+    let renders = 0;
+    const { rerender } = renderHook(
+      ({ id }: { id: string }) => {
+        renders += 1;
+        return useEvent(id);
+      },
+      { wrapper: wrapper([LOADED]), initialProps: { id: ARCHIVED.id } },
+    );
+
+    rerender({ id: 'another-night' });
+    const settled = renders;
+
+    act(() => deliver(ARCHIVED));
+    act(() => fail());
+
+    expect(renders).toBe(settled);
+  });
+
   it('closes the read the moment the calendar catches up with the night', () => {
     // The window can widen underneath a screen — a page of history landing, or
     // a projection tick. Once the night is in the calendar the second listener

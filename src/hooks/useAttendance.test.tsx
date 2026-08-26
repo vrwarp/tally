@@ -253,3 +253,43 @@ describe('useRsvps', () => {
     expect(rsvpStream.opened).toBe(1);
   });
 });
+
+describe('the first frame, before any listener has answered', () => {
+  /**
+   * Every one of these is read by the check-in screen on its first paint, and
+   * an effect cannot correct them until after it. A wrong initial value is a
+   * roster row, or a spinner, drawn out of nothing and gone again a frame
+   * later.
+   */
+  function firstFrame<T>(use: () => T): T {
+    const seen: T[] = [];
+    renderHook(() => {
+      seen.push(use());
+      return null;
+    });
+    return seen[0]!;
+  }
+
+  it('has nobody checked in and nobody RSVP-d', () => {
+    expect(firstFrame(() => useAttendance('friday')).attendance).toEqual([]);
+    expect(firstFrame(() => useRsvps('friday')).rsvps).toEqual([]);
+  });
+
+  it('is loading for a gathering it is about to open a listener for', () => {
+    expect(firstFrame(() => useAttendance('friday')).loading).toBe(true);
+    expect(firstFrame(() => useRsvps('friday')).loading).toBe(true);
+  });
+
+  it('is not loading with no gathering chosen', () => {
+    // A screen with nothing selected must not sit under a spinner waiting for
+    // a listener nobody is going to open.
+    expect(firstFrame(() => useAttendance(null)).loading).toBe(false);
+    expect(firstFrame(() => useRsvps(null)).loading).toBe(false);
+  });
+
+  it('is not loading for a gathering that does not take RSVPs', () => {
+    // Both halves have to be true before there is anything to wait for.
+    expect(firstFrame(() => useRsvps('friday', false)).loading).toBe(false);
+    expect(firstFrame(() => useRsvps(null, false)).loading).toBe(false);
+  });
+});
