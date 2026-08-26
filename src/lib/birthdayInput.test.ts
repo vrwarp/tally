@@ -117,6 +117,14 @@ describe('where the next digit would land', () => {
     });
   });
 
+  it('spills a second zero to the day rather than making the month "00"', () => {
+    // `00` is not a month, so the first zero opens the month and the second
+    // cannot extend it — it starts the day, and the sentence underneath says
+    // the date is unfinished rather than refusing it.
+    expect(birthdaySlots('00')).toEqual({ month: '0', day: '0', year: '', at: 1 });
+    expect(read('00')).toEqual({ state: 'partial', year: false });
+  });
+
   it('keeps the leading zeros of a year somebody typed', () => {
     // `0099` is not 99: the box shows what was typed, and the sentence
     // underneath refuses it as a year rather than silently improving it.

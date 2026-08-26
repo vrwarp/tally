@@ -95,6 +95,10 @@ export function birthdaySlots(raw: string): BirthdaySlots {
 
     // Down the slots until one can hold this digit, which is how a run with no
     // separators in it spills from month to day to year.
+    // Stryker disable next-line EqualityOperator: the year slot takes any digit
+    // it is offered — four of them, 0 to 9999 — so `accepts` at `at === 2` is
+    // always true and the loop has already stopped. Stopping one slot earlier
+    // changes no answer.
     while (at <= 2 && !accepts(slots[at], char, at)) at += 1;
     if (at > 2) break;
 
@@ -145,6 +149,12 @@ function finished(text: string, at: number): boolean {
   return true;
 }
 
+/*
+ * Both halves are load-bearing — `00` is refused as a month by the first and
+ * `13` by the second — and the whole comparison is reachable only for a slot
+ * holding two digits or more, because a single digit is always a prefix of
+ * something the slot can hold (see `accepts`).
+ */
 function inRange(digits: string, slot: { least: number; most: number }): boolean {
   const value = Number(digits);
   return value >= slot.least && value <= slot.most;
@@ -214,6 +224,10 @@ export function parseBirthdayInput(raw: string, now: Date = new Date()): Birthda
   if (!isRealBirthday(numbers.month, numbers.day)) {
     return { state: 'impossible', reason: 'no-such-day' };
   }
+  // Stryker disable next-line ConditionalExpression: with no year,
+  // `isRealBirthday` falls back to the same longest-February test the line
+  // above already made and passed — so the guard saves a call rather than
+  // changing an answer. It is here to say which question is being asked.
   if (numbers.year !== null && !isRealBirthday(numbers.month, numbers.day, numbers.year)) {
     return { state: 'impossible', reason: 'not-that-year' };
   }
