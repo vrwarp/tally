@@ -84,7 +84,30 @@ const excludes = config.mutate
   .filter((pattern) => pattern.startsWith('!'))
   .map((pattern) => globToRegExp(pattern.slice(1)));
 
-const filter = process.argv.slice(2).filter((arg) => !arg.startsWith('--'));
+/**
+ * Flags first, then whatever is left is a path prefix.
+ *
+ * `--since` takes a value, and it has to be *removed* here rather than merely
+ * recognised: left in, `--since origin/main` put "origin/main" in the path
+ * filter, nothing matched, and the sweep reported "no module changed" — which
+ * on the pull-request gate is a pass. A gate that cannot fail is worse than no
+ * gate, so this parses rather than scans.
+ */
+const argv = process.argv.slice(2);
+const flags = new Set();
+const filter = [];
+let sinceRef = null;
+for (let index = 0; index < argv.length; index += 1) {
+  const arg = argv[index];
+  if (arg === '--since') {
+    sinceRef = argv[index + 1] ?? null;
+    index += 1;
+  } else if (arg.startsWith('--')) {
+    flags.add(arg);
+  } else {
+    filter.push(arg);
+  }
+}
 
 /**
  * What a branch changed, for the pull-request gate.
@@ -92,16 +115,14 @@ const filter = process.argv.slice(2).filter((arg) => !arg.startsWith('--'));
  * Three dots: the modules this branch touched, not the ones `main` moved on
  * underneath it. A rebase should not put eighty modules back through the loop.
  */
-const sinceAt = process.argv.indexOf('--since');
 let changed = null;
-if (sinceAt !== -1) {
-  const base = process.argv[sinceAt + 1];
-  if (!base) {
+if (argv.includes('--since')) {
+  if (!sinceRef) {
     console.error('--since needs a git ref.');
     process.exit(2);
   }
   changed = new Set(
-    execFileSync('git', ['diff', '--name-only', '--diff-filter=d', `${base}...HEAD`], {
+    execFileSync('git', ['diff', '--name-only', '--diff-filter=d', `${sinceRef}...HEAD`], {
       encoding: 'utf8',
     })
       .split('\n')
@@ -116,7 +137,7 @@ function reportFor(file) {
   return `reports/mutation/${label}.json`;
 }
 
-const skipReported = process.argv.includes('--skip-reported');
+const skipReported = flags.has('--skip-reported');
 
 const modules = walk(join(ROOT, 'src'))
   .filter((file) => includes.some((pattern) => pattern.test(file)))
@@ -150,7 +171,7 @@ for (const file of modules) {
 }
 plan.sort((a, b) => a.scope - b.scope || a.file.localeCompare(b.file));
 
-if (process.argv.includes('--list')) {
+if (flags.has('--list')) {
   for (const { file, scope } of plan) {
     console.log(`${scope === Number.MAX_SAFE_INTEGER ? 'none' : String(scope).padStart(4)}  ${file}`);
   }
