@@ -173,11 +173,9 @@ export function createLabelQueue(options: QueueOptions): LabelQueue {
       atMs: now(),
       failed,
     });
-    /*
-     * Stryker disable next-line EqualityOperator: truncating a list that is
-     * already exactly this long is a no-op, so `>=` behaves the same. The
-     * comparison is here to say when the list grows past the bound.
-     */
+    // Stryker disable next-line EqualityOperator: truncating a list that is
+    // already exactly this long is a no-op, so `>=` behaves the same. The
+    // comparison is here to say when the list grows past the bound.
     if (printed.length > MAX_PRINTED_HISTORY) printed.length = MAX_PRINTED_HISTORY;
   }
 
@@ -199,11 +197,9 @@ export function createLabelQueue(options: QueueOptions): LabelQueue {
       // Oldest first. Map iteration is insertion-ordered, which is exactly the
       // order wanted and is why this is not a sort.
       const oldest = warm.keys().next();
-      /*
-       * Stryker disable next-line ConditionalExpression: the map is at its
-       * limit to have got here, so the iterator always has a key. The check is
-       * here because the type says it might not.
-       */
+      // Stryker disable next-line ConditionalExpression: the map is at its
+      // limit to have got here, so the iterator always has a key. The check is
+      // here because the type says it might not.
       if (!oldest.done) warm.delete(oldest.value);
     }
     warm.set(job.studentId, result);

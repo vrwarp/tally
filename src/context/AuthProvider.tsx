@@ -50,6 +50,8 @@ const REDIRECT_PENDING_KEY = 'tally:google-redirect-pending';
 function redirectPending(): boolean {
   try {
     return window.sessionStorage.getItem(REDIRECT_PENDING_KEY) === '1';
+    // Stryker disable next-line BlockStatement: falling out of the catch
+    // answers `undefined`, which every caller reads the same way as `false`.
   } catch {
     // Safari in private mode throws on sessionStorage. Assume no redirect is in
     // flight: the cost of being wrong is one Google sign-in that has to be
@@ -89,6 +91,9 @@ const POPUP_NEVER_OPENED = new Set([
 ]);
 
 function describeAuthError(error: unknown): string {
+  // Stryker disable next-line StringLiteral: the fallback is only ever read by
+  // a `switch` and a `Set.has`, neither of which any string could match — so
+  // what it is does not matter, only that it is a string.
   const code = (error as { code?: string })?.code ?? '';
   const message = (error as { message?: string })?.message ?? '';
   const embedded = isEmbeddedBrowser();
@@ -137,6 +142,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [authResolved, setAuthResolved] = useState(false);
+  // Stryker disable next-line BooleanLiteral: only `status` and `stage` read
+  // this, and both ignore it while there is no user — so the initial value is
+  // never on screen. It is `false` because that is what is true: nobody has
+  // asked yet.
   const [profileResolved, setProfileResolved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** Bumped to re-establish the profile listener. See `refreshProfile`. */
@@ -159,6 +168,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       uid.current = nextUser?.uid ?? null;
       setUser(nextUser);
       setProfile(null);
+      // Stryker disable next-line ConditionalExpression: signing out is a
+      // resolved answer — there is definitively no profile — but nothing reads
+      // this while `user` is null, so no test can tell it from `false`. It says
+      // what is true rather than what is observable.
       setProfileResolved(nextUser === null);
     });
   }, []);
@@ -238,6 +251,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       /* Denied, or unreachable. The listener remains the source of truth. */
     } finally {
+      // Stryker disable next-line ArithmeticOperator: this is a dependency of
+      // the profile effect and nothing else, so any change re-subscribes and
+      // the direction is arbitrary.
       setProfileEpoch((epoch) => epoch + 1);
     }
   }, []);
@@ -336,6 +352,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
        * the same dead end, reached more slowly and explained worse. So the
        * first-party check gates the retry rather than decorating it.
        */
+      /* Stryker disable next-line StringLiteral: read only by `has` — see above. */
       const code = (cause as { code?: string })?.code ?? '';
       if (POPUP_NEVER_OPENED.has(code) && isFirstPartyAuthDomain(authDomain)) {
         try {

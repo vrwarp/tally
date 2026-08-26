@@ -141,14 +141,43 @@ Where that is genuinely the case, the mutant is disabled *where it lives*, with
 the argument next to it:
 
 ```ts
-/*
- * Stryker disable next-line ConditionalExpression: `Number.isInteger` already
- * refuses everything that is not a number, so this clause changes no answer at
- * run time. It is here for the narrowing — without it `raw` is still `unknown`
- * at the comparisons below.
- */
+// Stryker disable next-line ConditionalExpression: `Number.isInteger` already
+// refuses everything that is not a number, so this clause changes no answer at
+// run time. It is here for the narrowing — without it `raw` is still `unknown`
+// at the comparisons below.
 typeof raw !== 'number' ||
 ```
+
+**The form matters and fails silently.** Stryker's directive regex is
+
+```
+/^\s?Stryker (disable|restore)(?: (next-line))? ([a-zA-Z, ]+)(?::(.+)?)?/
+```
+
+against each leading comment's *value*, and `^\s?` allows exactly one leading
+whitespace character. So the directive has to be the first thing in the comment:
+
+```ts
+// Stryker disable next-line EqualityOperator: reason.   ✅
+/* Stryker disable next-line EqualityOperator: reason. */ ✅
+
+/*
+ * Stryker disable next-line EqualityOperator: reason.   ❌ — the value starts
+ */                                                      //   "\n * Stryker…"
+```
+
+The wrong form does not warn. It reads exactly like the right one and the
+mutant goes on surviving, which is how a dozen of these sat here doing nothing
+until a module that should have been at 100% reported 94.9%. Continuation lines
+are fine — only the first comment has to match — and the mutator names have to
+be spelled as Stryker spells them (`ConditionalExpression`, `LogicalOperator`,
+`EqualityOperator`, `StringLiteral`, `BooleanLiteral`, `MethodExpression`,
+`BlockStatement`, `ArithmeticOperator`, `ObjectLiteral`, `ArrayDeclaration`,
+`OptionalChaining`, `Regex`, or `all`). A misspelled one logs
+`Unused 'Stryker disable next-line' directive` and is otherwise ignored.
+
+To check a directive took, look for the mutant's status in the JSON: an honoured
+one is `Ignored` with the reason you wrote as its `statusReason`.
 
 Grep for `Stryker disable` to audit the lot. Each one is a claim that no test
 could distinguish the two versions; if you can think of an input that does, the

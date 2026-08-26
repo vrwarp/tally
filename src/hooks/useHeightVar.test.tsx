@@ -117,6 +117,22 @@ describe('useHeightVar', () => {
     expect(document.documentElement.style.getPropertyValue('--top-bar')).toBe('');
   });
 
+  it('takes back the exact resize handler it put on the window', () => {
+    // Three of these are mounted on the check-in screen and it remounts on
+    // every navigation; a handler left behind measures a node that is gone and
+    // writes a height for a bar nobody can see.
+    const add = vi.spyOn(window, 'addEventListener');
+    const remove = vi.spyOn(window, 'removeEventListener');
+
+    const { unmount } = render(<Bar name="--top-bar" height={48} />);
+    const added = add.mock.calls.find(([type]) => type === 'resize');
+    expect(added).toBeDefined();
+
+    unmount();
+
+    expect(remove).toHaveBeenCalledWith('resize', added![1]);
+  });
+
   it('follows the name when it changes', () => {
     // A callback pinned to the first name would go on writing the old property
     // and never write the new one, leaving whatever sticks below it offset by a

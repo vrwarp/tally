@@ -569,7 +569,13 @@ describe('the sentence a failure gets', () => {
       await messageFor(new Error('Unable to process request due to missing initial state.')),
     ).toBe('Sign-in could not be completed in this browser. Try again in Safari or Chrome.');
 
-    expect(warn.mock.calls[0]?.[0]).toContain('VITE_AUTH_DOMAINS');
+    // The console is the only place the real fix can be named — the person
+    // reading it is a deployer, not the counselor stuck at the door — so it
+    // says both what happened and what to change.
+    expect(warn.mock.calls[0]?.[0]).toBe(
+      '[tally] Google redirect lost its initial state. The auth handler is not first-party: ' +
+        'add this host to VITE_AUTH_DOMAINS and register it with Google (docs/deployment-setup.md).',
+    );
   });
 
   it('blames the webview for anything unrecognised inside one', async () => {
@@ -678,14 +684,24 @@ describe('signing out', () => {
 
 describe('refreshProfile', () => {
   it('does nothing at all when nobody is signed in', async () => {
-    mount();
+    let renders = 0;
+    function Counted() {
+      renders += 1;
+      latest = useAuth();
+      return null;
+    }
+    mount(<Counted />);
     act(() => announce(null));
+    const before = renders;
 
     await act(async () => {
       await latest?.refreshProfile();
     });
 
     expect(getUserProfileFromServer).not.toHaveBeenCalled();
+    // Nothing at all: not a read, and not a re-render of every screen under
+    // the provider for an answer that cannot have changed.
+    expect(renders).toBe(before);
   });
 
   it('reads the document from the server and publishes it', async () => {
@@ -718,6 +734,45 @@ describe('refreshProfile', () => {
     });
 
     expect(subscribeUserProfile.mock.calls.length).toBe(opened + 1);
+  });
+});
+
+describe('a profile answer that arrives too late', () => {
+  it('is dropped once somebody else has signed in', async () => {
+    mount();
+    act(() => announce({ uid: 'uid-miriam' }));
+    await waitFor(() => expect(profileStream.uid).toBe('uid-miriam'));
+    const miriamsStream = profileStream;
+
+    // A shared laptop in the church office: one counselor signs out and the
+    // next signs in before the first listener has answered.
+    act(() => announce({ uid: 'uid-noah' }));
+    await waitFor(() => expect(profileStream.uid).toBe('uid-noah'));
+    act(() => profileStream.deliver(makeProfile({ id: 'uid-noah', role: 'counselor' }), { fromCache: false }));
+    expect(latest?.profile?.id).toBe('uid-noah');
+
+    act(() => miriamsStream.deliver(makeProfile({ id: 'uid-miriam', role: 'admin' }), { fromCache: false }));
+
+    // Miriam's answer must not land on Noah's session — that is an admin's
+    // permissions on a counselor's screen.
+    expect(latest?.profile?.id).toBe('uid-noah');
+    expect(latest?.can('admin')).toBe(false);
+  });
+
+  it('is dropped when it is a refusal', async () => {
+    mount();
+    act(() => announce({ uid: 'uid-miriam' }));
+    await waitFor(() => expect(profileStream.uid).toBe('uid-miriam'));
+    const miriamsStream = profileStream;
+
+    act(() => announce({ uid: 'uid-noah' }));
+    await waitFor(() => expect(profileStream.uid).toBe('uid-noah'));
+    act(() => profileStream.deliver(makeProfile({ id: 'uid-noah' }), { fromCache: false }));
+
+    act(() => miriamsStream.fail());
+
+    expect(latest?.status).toBe('ready');
+    expect(latest?.profile?.id).toBe('uid-noah');
   });
 });
 

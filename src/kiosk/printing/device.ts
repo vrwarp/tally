@@ -44,13 +44,11 @@ export interface PrinterConfig {
  * ordinary name-badge label, and its 696x271 dot box is what the renderer
  * targets when nobody has said otherwise.
  */
-/*
- * Stryker disable next-line all: a module-level constant is a *static* mutant —
- * it is evaluated once when the module loads, before Stryker can activate the
- * mutant for any one test, so the change never takes effect and the mutant
- * reports as survived whatever the tests say. `device.test.ts` asserts both of
- * these values outright.
- */
+// Stryker disable next-line all: a module-level constant is a *static* mutant —
+// it is evaluated once when the module loads, before Stryker can activate the
+// mutant for any one test, so the change never takes effect and the mutant
+// reports as survived whatever the tests say. `device.test.ts` asserts both of
+// these values outright.
 export const DEFAULT_PRINTER_MODEL = 'QL-810W';
 /* Stryker disable next-line all: static — see above. */
 export const DEFAULT_PRINTER_LABEL = '62x29';

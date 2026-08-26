@@ -77,12 +77,10 @@ export function checkName(raw: unknown, field: string): FieldCheck<string> {
 export function checkGrade(raw: unknown): FieldCheck<number | null> {
   if (raw === null || raw === undefined) return { ok: true, value: null };
   if (
-    /*
-     * Stryker disable next-line ConditionalExpression: `Number.isInteger` already
-     * refuses everything that is not a number, so this clause changes no answer
-     * at run time. It is here for the narrowing — without it `raw` is still
-     * `unknown` at the comparisons below and at `value: raw`.
-     */
+    // Stryker disable next-line ConditionalExpression: `Number.isInteger` already
+    // refuses everything that is not a number, so this clause changes no answer
+    // at run time. It is here for the narrowing — without it `raw` is still
+    // `unknown` at the comparisons below and at `value: raw`.
     typeof raw !== 'number' ||
     !Number.isInteger(raw) ||
     raw < MIN_GRADE ||
