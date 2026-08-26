@@ -331,6 +331,32 @@ describe('updateStudent', () => {
     expect(written().data).not.toHaveProperty('searchName');
   });
 
+  it('writes no name when the half that is known is the other one', async () => {
+    // Both halves, or neither. A search key built from one of them reads
+    // "undefined rivera", and it is the field every roster search matches on.
+    await updateStudent('pco_1', { lastName: 'Rivera' }, 'uid-miriam');
+
+    expect(written().data.lastName).toBe('Rivera');
+    expect(written().data).not.toHaveProperty('firstName');
+    expect(written().data).not.toHaveProperty('searchName');
+  });
+
+  it('does not put back the grade somebody just changed', async () => {
+    /*
+     * The grade goes down with the name so an annotation-only document is
+     * readable on its own — but only when the patch has not named one. A
+     * fallback that ran anyway would quietly undo the edit: a leader moving a
+     * child up a year would watch it revert to last year's.
+     */
+    await updateStudent('pco_1', { grade: 10 }, 'uid-miriam', {
+      firstName: 'Jamie',
+      lastName: 'Rivera',
+      grade: 8,
+    });
+
+    expect(written().data.grade).toBe(10);
+  });
+
   it('never invents a grade for somebody who has none', async () => {
     // A document outlives the roster row it was copied from, so a grade written
     // here would be the only surviving claim about it.
