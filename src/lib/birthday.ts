@@ -60,6 +60,9 @@ export interface DatedBirthday extends MonthDay {
  * and cannot accidentally print a year it did not ask for.
  */
 export function parseBirthday(birthday: string | null | undefined): DatedBirthday | null {
+  // Stryker disable next-line ConditionalExpression: `exec` coerces null and
+  // undefined to their own names, neither of which matches the pattern, so
+  // falling through answers null too. This is the cheap path to it.
   if (!birthday) return null;
 
   const match = DATED_PATTERN.exec(birthday);
@@ -83,6 +86,7 @@ export function parseBirthday(birthday: string | null | undefined): DatedBirthda
  * that knows what a year means.
  */
 export function birthdayParts(birthday: string | null | undefined): MonthDay | null {
+  /* Stryker disable next-line ConditionalExpression: as in `parseBirthday`. */
   if (!birthday) return null;
 
   const match = PATTERN.exec(birthday);
@@ -122,6 +126,13 @@ export const EARLIEST_BIRTH_YEAR = 1900;
  * Must stay in step with `isRealBirthday` in functions/src/pco/profile.ts.
  */
 export function isRealBirthday(month: number, day: number, year?: number | null): boolean {
+  /*
+   * Stryker disable next-line ConditionalExpression,LogicalOperator: every
+   * month this refuses indexes `DAYS_IN_MONTH` out of bounds two lines down,
+   * and `day <= undefined` is false — so the answer is the same with any part
+   * of this removed. It is here because relying on that is relying on a
+   * comparison with `undefined` to mean "no".
+   */
   if (!Number.isInteger(month) || month < 1 || month > 12) return false;
   if (!Number.isInteger(day) || day < 1) return false;
 

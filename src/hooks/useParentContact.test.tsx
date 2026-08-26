@@ -239,6 +239,108 @@ describe('useParentContact', () => {
     expect(result.current.reachable.get('pco_1')).toBe(true);
   });
 
+  describe('a refresh pressed while the first sweep is still out', () => {
+    /**
+     * Two sweeps in flight and the fresher one lands first. The stale one is
+     * still remembered — the sweep is expensive and the answer is good — but
+     * nothing about it reaches the screen.
+     */
+    function twoSweeps() {
+      const gates: Array<(value: unknown) => void> = [];
+      getParentContactStatus.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            gates.push(resolve);
+          }),
+      );
+      return gates;
+    }
+
+    it('does not let the stale answer overwrite the fresh one', async () => {
+      const gates = twoSweeps();
+      const { result } = renderHook(() => useParentContact());
+      await waitFor(() => expect(gates).toHaveLength(1));
+
+      act(() => result.current.refresh());
+      await waitFor(() => expect(gates).toHaveLength(2));
+
+      await act(async () => gates[1]!(answer({ pco_1: true })));
+      expect(result.current.reachable.get('pco_1')).toBe(true);
+
+      // The first sweep, arriving late with the state of an hour ago.
+      await act(async () => gates[0]!(answer({ pco_1: false })));
+
+      expect(result.current.reachable.get('pco_1')).toBe(true);
+    });
+
+    it('stays loading while the fresh sweep is still out', async () => {
+      const gates = twoSweeps();
+      const { result } = renderHook(() => useParentContact());
+      await waitFor(() => expect(gates).toHaveLength(1));
+
+      act(() => result.current.refresh());
+      await waitFor(() => expect(gates).toHaveLength(2));
+
+      await act(async () => gates[0]!(answer({ pco_1: false })));
+
+      // The list says "still counting" until the sweep somebody asked for
+      // comes back, not until the one they gave up on does.
+      expect(result.current.loading).toBe(true);
+
+      await act(async () => gates[1]!(answer({ pco_1: true })));
+      expect(result.current.loading).toBe(false);
+    });
+
+    it('counts as settled once any sweep has answered', async () => {
+      const gates = twoSweeps();
+      const { result } = renderHook(() => useParentContact());
+      await waitFor(() => expect(gates).toHaveLength(1));
+
+      act(() => result.current.refresh());
+      await waitFor(() => expect(gates).toHaveLength(2));
+
+      // The first sweep lands while the second is still out. Its answer is
+      // remembered for the session but no state of this screen's was set,
+      // because this screen had stopped waiting for it.
+      await act(async () => gates[0]!(answer({ pco_1: false })));
+
+      // A second press, which is what a leader does when a list has been
+      // saying "counting" for a while. The next render finds an answer already
+      // held, and there is no reason to draw a skeleton over it.
+      act(() => result.current.refresh());
+
+      expect(result.current.loaded).toBe(true);
+      expect(result.current.reachable.get('pco_1')).toBeUndefined();
+    });
+  });
+
+  it('takes the failure down when a later sweep succeeds', async () => {
+    getParentContactStatus.mockRejectedValueOnce(new Error('offline'));
+    const { result } = renderHook(() => useParentContact());
+    await waitFor(() => expect(result.current.error).not.toBeNull());
+
+    getParentContactStatus.mockResolvedValueOnce(answer({ pco_1: true }));
+    act(() => result.current.refresh());
+
+    await waitFor(() => expect(result.current.reachable.get('pco_1')).toBe(true));
+    expect(result.current.error).toBeNull();
+  });
+
+  it('has not settled on the first frame of a cold session', () => {
+    getParentContactStatus.mockReturnValue(new Promise(() => {}));
+    const seen: boolean[] = [];
+
+    renderHook(() => {
+      seen.push(useParentContact().loaded);
+      return null;
+    });
+
+    // Before any effect has run. `loaded` is what the incomplete-profile list
+    // branches on, and starting it true draws "nobody is unreachable" over a
+    // sweep that has not happened.
+    expect(seen[0]).toBe(false);
+  });
+
   it('does not remember an outage as "nobody has a parent"', async () => {
     getParentContactStatus.mockRejectedValueOnce(new Error('offline'));
     const first = renderHook(() => useParentContact());
