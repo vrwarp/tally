@@ -435,6 +435,21 @@ describe('layoutLabel', () => {
       expect(layoutLabel(overfull, {}, DIE_CUT, measure).height).toBe(271);
     });
 
+    it('keeps the one line even when the one line does not fit either', () => {
+      /*
+       * An allergy note somebody typed at length. Shrunk to the floor and
+       * wrapped, it is still taller than a 29mm sticker — and the drop has
+       * nothing left to drop. Running on would leave a blank label, which
+       * tells a leader nothing about a child it exists to warn them about.
+       */
+      const long = Array.from({ length: 110 }, () => 'aaaa').join(' ');
+      const result = layoutLabel(template([line(long, 'sm')]), {}, DIE_CUT, measure);
+
+      expect(result.droppedLines).toBe(0);
+      expect(result.draws.length).toBeGreaterThan(1);
+      expect(result.draws[0]!.text.startsWith('aaaa')).toBe(true);
+    });
+
     it('always keeps at least one line', () => {
       // A blank sticker tells a parent nothing. Whatever will not fit, the name
       // at the top of the template is the last thing to go, and it does not.

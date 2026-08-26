@@ -330,6 +330,15 @@ function fitLine(
     fontPx -= 2;
   }
 
+  /*
+   * A shortcut rather than a decision, which is why the mutants on it are
+   * disabled: `wrap` puts a text that fits back together unchanged — every
+   * prefix of it fits too, so the whole thing accumulates into one line — and
+   * would answer `[line.text]` here whatever this guard did. What it saves is a
+   * pass over the words of every line that did not need wrapping, on a layout
+   * that is attempted up to half a dozen times.
+   */
+  // Stryker disable next-line ConditionalExpression,EqualityOperator,BlockStatement: see above.
   if (measure(line.text, fontPx, line.bold) <= width) {
     return { fontPx, texts: [line.text] };
   }
@@ -449,11 +458,13 @@ export function layoutLabel(
   // does not exist.
   const alignWidth = box.width === null ? contentWidth : innerWidth;
   const height = box.height ?? Math.ceil(contentHeight + paddingTop + paddingBottom);
-  // Stryker disable next-line ConditionalExpression: the two branches agree on a
-  // free height. `maxHeight` is null exactly when `box.height` is, so the offset
-  // is `(0 - contentHeight) / 2`, which is never positive — the `Math.max` then
-  // makes it `paddingTop` either way. The branch says which case is which.
   const top =
+    // Stryker disable next-line ConditionalExpression: the two branches agree on
+    // a free height. `maxHeight` is null exactly when `box.height` is, so the
+    // offset is `(0 - contentHeight) / 2`, which is never positive — the
+    // `Math.max` makes it `paddingTop` either way. The branch says which case is
+    // which. (Under the ternary, not the `const`, because `next-line` matches
+    // the line the node it is attached to starts on.)
     box.height === null
       ? paddingTop
       : paddingTop + Math.max(0, ((maxHeight ?? 0) - contentHeight) / 2);
