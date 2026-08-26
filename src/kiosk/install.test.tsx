@@ -86,6 +86,60 @@ describe('useCanInstall', () => {
 
     expect(result.current).toBe(false);
   });
+
+  it('takes back the exact handlers it put on the window', () => {
+    // The pairing screen mounts and unmounts this on every navigation; a
+    // handler left behind is a `useSyncExternalStore` callback for a component
+    // that no longer exists, called on every install event for the session.
+    const add = vi.spyOn(window, 'addEventListener');
+    const remove = vi.spyOn(window, 'removeEventListener');
+
+    const { unmount } = renderHook(() => useCanInstall());
+    const offered = add.mock.calls.find(([type]) => type === 'beforeinstallprompt');
+    const installed = add.mock.calls.find(([type]) => type === 'appinstalled');
+    expect(offered).toBeDefined();
+    expect(installed).toBeDefined();
+
+    unmount();
+
+    expect(remove).toHaveBeenCalledWith('beforeinstallprompt', offered![1]);
+    expect(remove).toHaveBeenCalledWith('appinstalled', installed![1]);
+  });
+
+  it('stops hearing about a spent prompt after unmount', () => {
+    // The other half of the teardown: `promptInstall` reaches its subscribers
+    // through a module-level set, which window events do not cover.
+    parkedPrompt();
+    const first = renderHook(() => useCanInstall());
+    const second = renderHook(() => useCanInstall());
+    expect(second.result.current).toBe(true);
+
+    first.unmount();
+
+    act(() => {
+      window.__tallyKioskInstall = null;
+      window.dispatchEvent(new Event('appinstalled'));
+    });
+
+    // The surviving one still hears; nothing threw for the departed one.
+    expect(second.result.current).toBe(false);
+    second.unmount();
+  });
+});
+
+describe('rendering where there is no browser', () => {
+  it('offers no install, rather than reading a window that is not there', async () => {
+    // The kiosk does not server-render. The hook still has to answer if
+    // something ever does, and the only honest answer is "no prompt".
+    const { renderToString } = await import('react-dom/server');
+    parkedPrompt();
+
+    function Probe() {
+      return <span>{String(useCanInstall())}</span>;
+    }
+
+    expect(renderToString(<Probe />)).toContain('false');
+  });
 });
 
 describe('promptInstall', () => {
@@ -99,6 +153,25 @@ describe('promptInstall', () => {
 
   it('does nothing when there is no prompt on offer', async () => {
     await expect(promptInstall()).resolves.toBeUndefined();
+  });
+
+  it('tells nobody anything when there is no prompt on offer', async () => {
+    // Not merely harmless: waking every subscriber would repaint the pairing
+    // screen on a tap that could not have changed anything.
+    const { result } = renderHook(() => useCanInstall());
+    const before = result.current;
+    let renders = 0;
+    const counted = renderHook(() => {
+      renders += 1;
+      return useCanInstall();
+    });
+    const rendersBefore = renders;
+
+    await promptInstall();
+
+    expect(result.current).toBe(before);
+    expect(renders).toBe(rendersBefore);
+    counted.unmount();
   });
 
   it('spends the event, so the button goes away rather than doing nothing', async () => {
