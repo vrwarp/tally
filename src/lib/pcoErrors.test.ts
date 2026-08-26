@@ -445,8 +445,12 @@ describe('pcoErrorMarkdown', () => {
 
   it('says nothing about attempts when the call was made once', () => {
     const debug = { ...DEBUG, request: { ...DEBUG.request!, attempts: 1 } };
+    const text = pcoErrorMarkdown(report({ debug }));
 
-    expect(pcoErrorMarkdown(report({ debug }))).not.toContain('Tally retried');
+    expect(text).not.toContain('Tally retried');
+    // Nothing at all, rather than something: the request block closes and the
+    // response heading follows it.
+    expect(text).toContain('Accept: application/json\n```\n\n### Response');
   });
 
   it('counts the attempts from two upwards', () => {

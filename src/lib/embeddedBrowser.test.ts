@@ -50,6 +50,8 @@ describe('isEmbeddedBrowser', () => {
     ['WeChat', 'Mozilla/5.0 (iPhone) MicroMessenger/8.0.40'],
     ['the Google app', 'Mozilla/5.0 (iPhone) GSA/300.0.0'],
     ['a generic Android WebView', 'Mozilla/5.0 (Linux; Android 14; wv) Chrome/120.0.0.0'],
+    // The space after the semicolon is optional in the wild; both shapes ship.
+    ['an Android WebView with no space', 'Mozilla/5.0 (Linux; Android 14;wv) Chrome/120.0.0.0'],
   ];
 
   it.each(WEBVIEWS)('detects %s', (_name, ua) => {
@@ -88,6 +90,11 @@ describe('where there is no browser to ask', () => {
 
   it('reports a browser with no user agent string as an ordinary one', () => {
     setUserAgent('');
+    expect(isEmbeddedBrowser()).toBe(false);
+
+    // A `navigator` whose `userAgent` is missing entirely, which is what a
+    // hardened runtime and some test harnesses give.
+    Object.defineProperty(navigator, 'userAgent', { value: undefined, configurable: true });
     expect(isEmbeddedBrowser()).toBe(false);
   });
 

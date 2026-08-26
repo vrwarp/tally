@@ -390,6 +390,61 @@ describe('the memo', () => {
   });
 });
 
+describe('what a refresh shows while it is happening', () => {
+  it('keeps the details on screen rather than blanking the panel', async () => {
+    const { result } = renderHook(() => usePersonDetails(linked()));
+    await waitFor(() => expect(result.current.details?.parentName).toBe('Dana Rivera'));
+
+    // `refresh` drops the memo on the way in. What is on the panel is the
+    // answer from a second ago, and a leader who pressed it to see one field
+    // change must not watch every other field disappear first.
+    getPersonDetails.mockReturnValueOnce(new Promise(() => {}));
+    act(() => result.current.refresh());
+
+    expect(result.current.details?.parentName).toBe('Dana Rivera');
+    expect(result.current.loaded).toBe(true);
+    expect(result.current.loading).toBe(true);
+  });
+
+  it('clears the failure straight away, so the press shows a spinner', async () => {
+    getPersonDetails.mockRejectedValueOnce(new Error('unavailable'));
+    const { result } = renderHook(() => usePersonDetails(linked()));
+    await waitFor(() => expect(result.current.error).toBeTruthy());
+
+    getPersonDetails.mockReturnValueOnce(new Promise(() => {}));
+    act(() => result.current.refresh());
+
+    expect(result.current.error).toBeNull();
+  });
+
+  it('can be pressed twice', async () => {
+    const { result } = renderHook(() => usePersonDetails(linked()));
+    await waitFor(() => expect(result.current.loaded).toBe(true));
+
+    act(() => result.current.refresh());
+    await waitFor(() => expect(getPersonDetails).toHaveBeenCalledTimes(2));
+
+    act(() => result.current.refresh());
+    await waitFor(() => expect(getPersonDetails).toHaveBeenCalledTimes(3));
+  });
+});
+
+describe('retry, pressed more than once', () => {
+  it('asks again every time', async () => {
+    getPersonDetails.mockRejectedValue(new Error('unavailable'));
+    const { result } = renderHook(() => usePersonDetails(linked()));
+    await waitFor(() => expect(result.current.error).toBeTruthy());
+
+    act(() => result.current.retry());
+    await waitFor(() => expect(getPersonDetails).toHaveBeenCalledTimes(2));
+
+    // A counselor in a hallway presses it until it works. The second press
+    // has to be a real read rather than a no-op.
+    act(() => result.current.retry());
+    await waitFor(() => expect(getPersonDetails).toHaveBeenCalledTimes(3));
+  });
+});
+
 describe('a late answer', () => {
   it('does not land after the student has changed', async () => {
     let answerFirst: (value: { data: PcoPersonDetails | null }) => void = () => {};
@@ -413,6 +468,52 @@ describe('a late answer', () => {
     // The first read resolving after the second must not repaint the screen
     // with the previous child's parent.
     expect(result.current.details?.parentName).toBe('Sam');
+  });
+
+  it('does not put the previous student’s failure on this student’s screen', async () => {
+    let failFirst: (cause: unknown) => void = () => {};
+    getPersonDetails.mockReturnValueOnce(
+      new Promise((_resolve, reject) => {
+        failFirst = reject;
+      }),
+    );
+    getPersonDetails.mockResolvedValueOnce({ data: details({ parentName: 'Sam' }) });
+
+    const { result, rerender } = renderHook(({ student }) => usePersonDetails(student), {
+      initialProps: { student: linked() },
+    });
+    rerender({ student: makeStudent({ id: 'pco_202' }) });
+    await waitFor(() => expect(result.current.details?.parentName).toBe('Sam'));
+
+    await act(async () => {
+      failFirst(new Error('unavailable'));
+    });
+
+    expect(result.current.error).toBeNull();
+  });
+
+  it('does not take the spinner down for the student that is no longer on screen', async () => {
+    let settleFirst: (value: unknown) => void = () => {};
+    getPersonDetails.mockReturnValueOnce(
+      new Promise((resolve) => {
+        settleFirst = resolve;
+      }),
+    );
+    getPersonDetails.mockReturnValueOnce(new Promise(() => {}));
+
+    const { result, rerender } = renderHook(({ student }) => usePersonDetails(student), {
+      initialProps: { student: linked() },
+    });
+    rerender({ student: makeStudent({ id: 'pco_202' }) });
+    expect(result.current.loading).toBe(true);
+
+    await act(async () => {
+      settleFirst({ data: details() });
+    });
+
+    // The read this screen is waiting for has not come back. Saying it has
+    // draws an empty panel as though the answer were "nothing on file".
+    expect(result.current.loading).toBe(true);
   });
 
   it('does not leave a spinner running after an unmount', async () => {

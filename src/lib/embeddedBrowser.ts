@@ -42,10 +42,16 @@ export function isStandaloneDisplay(): boolean {
 
   const matchMedia = window.matchMedia;
   const displayStandalone =
+    // Stryker disable next-line ConditionalExpression: `some` calls through
+    // `matchMedia` inside a `try`, so a missing one throws and is caught and
+    // answered `false` there. This is the cheap path to the same answer, and
+    // the honest statement of what is being asked.
     typeof matchMedia === 'function' &&
     ['standalone', 'fullscreen', 'minimal-ui'].some((mode) => {
       try {
         return matchMedia(`(display-mode: ${mode})`).matches;
+        // Stryker disable next-line BlockStatement: falling out of the catch
+        // answers `undefined`, which `some` reads the same way as `false`.
       } catch {
         return false;
       }
