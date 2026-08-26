@@ -87,6 +87,9 @@ function backendOfPerson(person: PcoRosterPerson): BackendId {
 function readStored(): StoredRoster | null {
   try {
     const raw = window.localStorage.getItem(CACHE_KEY);
+    // Stryker disable next-line ConditionalExpression: `JSON.parse(null)` reads
+    // as `null` and the shape check below then throws into the catch, so the
+    // answer is the same either way. This is the cheap path to it.
     if (!raw) return null;
 
     const parsed = JSON.parse(raw) as Partial<StoredRoster>;
@@ -98,6 +101,8 @@ function readStored(): StoredRoster | null {
       storedAt: parsed.storedAt,
       ...(parsed.freshAt && typeof parsed.freshAt === 'object' ? { freshAt: parsed.freshAt } : {}),
     };
+    // Stryker disable next-line BlockStatement: falling out of the catch
+    // answers `undefined`, which every caller reads the same way as `null`.
   } catch {
     // Corrupt JSON, a quota error, Safari in private mode. None of these are
     // worth a broken screen — the roster simply has to be fetched.
@@ -184,6 +189,10 @@ export async function fetchRoster(now = new Date(), force = false): Promise<Rost
   const perBackend = response.data.perBackend;
   const readAt = Date.now();
 
+  // Stryker disable next-line ArrayDeclaration: a server that reported no
+  // backends and one that reported a nonsense entry reach the same answer —
+  // nothing carried, nothing stamped — because every step below matches on a
+  // real backend id.
   const failed = new Set((perBackend ?? []).filter((entry) => !entry.ok).map((entry) => entry.backendId));
   // Stryker disable next-line ConditionalExpression,EqualityOperator: reading
   // storage unconditionally answers the same — nothing is carried when nothing
@@ -203,6 +212,12 @@ export async function fetchRoster(now = new Date(), force = false): Promise<Rost
     });
     if (kept.length > 0) {
       people = [...fresh, ...kept].sort((a, b) =>
+        // Stryker disable next-line ConditionalExpression,EqualityOperator:
+        // the second branch is unreachable to any test. `Array.prototype.sort`
+        // only ever asks whether a comparator answered *negative*, so 1 and 0
+        // are the same answer to it — the branch is here because a comparator
+        // that never returns a positive is not a total order, and a future
+        // engine is entitled to notice.
         a.searchName < b.searchName ? -1 : a.searchName > b.searchName ? 1 : 0,
       );
     }
@@ -211,6 +226,8 @@ export async function fetchRoster(now = new Date(), force = false): Promise<Rost
   // Every answering backend's slice is fresh as of now; a failed backend keeps
   // the timestamp its carried copy really has.
   let freshAt: StoredRoster['freshAt'];
+  // Stryker disable next-line ArrayDeclaration: as above — a nonsense entry
+  // has no `ok` and no stored stamp, so it contributes nothing here either.
   for (const entry of perBackend ?? []) {
     const at = entry.ok ? readAt : (stored?.freshAt?.[entry.backendId] ?? stored?.storedAt);
     if (at !== undefined) freshAt = { ...(freshAt ?? {}), [entry.backendId]: at };

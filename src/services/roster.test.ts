@@ -359,6 +359,24 @@ describe('fetchRoster with more than one backend', () => {
     expect(snapshot.students.map((student) => student.id)).toEqual(['pco_1', 'pco_2']);
   });
 
+  it('leaves the server’s order alone when there was nothing to carry', async () => {
+    /*
+     * A backend is down *and* there is a fresh stored copy — but the copy holds
+     * nobody from the backend that failed, so nothing is carried and there is
+     * nothing to merge. Re-sorting here would put this side's ordering rule in
+     * front of the server's for a read that never needed one.
+     */
+    park([person()], Date.now() - 60 * 60 * 1000);
+
+    const zoe = person({ id: 'pco_9', pcoPersonId: '9', searchName: 'zoe abbott' });
+    const aaron = person({ id: 'pco_2', pcoPersonId: '2', searchName: 'aaron suzuki' });
+    vi.mocked(getRoster).mockResolvedValue(answer([zoe, aaron], [report({}), DOWN]) as never);
+
+    const snapshot = await fetchRoster();
+
+    expect(snapshot.students.map((student) => student.id)).toEqual(['pco_9', 'pco_2']);
+  });
+
   it('sorts a merged roster by name, so a carried slice is not a block at the end', async () => {
     const wei = { ...WEI, searchName: 'aaron suzuki' };
     park([person(), wei], Date.now() - 60 * 60 * 1000);
