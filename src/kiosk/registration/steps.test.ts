@@ -183,10 +183,41 @@ describe('the surnames', () => {
 
     expect(held.step).toBe('guardian-last');
     expect(held.buffer).toBe('Lovelace');
+    /*
+     * And the keyboard opens lower-case on it, because the next press is a
+     * correction to an existing word rather than the start of a new one. Shift
+     * has to be decided from the same string the buffer was — a prefill offered
+     * in caps is one a parent has to un-capitalise before they can fix it.
+     */
+    expect(held.shift).toBe('off');
   });
 });
 
 describe('the loop', () => {
+  it('answers the fork only while the fork is on screen', () => {
+    /*
+     * Every one of these is a button on some other screen, and the wizard is
+     * one shared state machine — a stray press mid-typing must be a press that
+     * did nothing, not one that banks a half-typed child or jumps a question.
+     */
+    const typing = typeText(start(), 'Ada');
+
+    expect(answerAnother(typing, true, false)).toBe(typing);
+    expect(chooseGrade(typing, 4 as Grade)).toBe(typing);
+    // And the draft is not part of the family until the fork is reached: a
+    // confirm list drawn mid-question would show a child nobody finished.
+    expect(familyOf(typing)).toEqual([]);
+  });
+
+  it('advances nothing while the answer is not one', () => {
+    // Every step that reads a buffer refuses an empty one. `advance` is what
+    // the Next key calls, and the key is drawn disabled — but the rule lives
+    // here, because a hardware keyboard's Enter reaches the same function.
+    const empty = start();
+    expect(canAdvance(empty)).toBe(false);
+    expect(advance(empty)).toBe(empty);
+  });
+
   it('banks the child on the fork, whichever way it is answered', () => {
     const forked = addChild(start(), 'Ada', 'Lovelace', 4 as Grade);
     expect(forked.step).toBe('another');
@@ -630,6 +661,42 @@ describe('the grade question', () => {
   });
 });
 
+describe('going back from the fork', () => {
+  it('reopens the allergies question where the gathering asks one', () => {
+    let held = initialState({ registrationId: 'r-1', requiresCheckOut: false, allergiesSupported: true });
+    held = advance(typeText(held, 'Ada'));
+    held = advance(typeText(applyKey(held, { kind: 'clear' }), 'Lovelace'));
+    held = chooseGrade(held, 4 as Grade);
+    held = advance(typeText(held, 'Peanuts'));
+
+    expect(goBack(held)).toMatchObject({ step: 'child-allergies', buffer: 'Peanuts' });
+  });
+
+  it('steps over it entirely where the gathering does not', () => {
+    // The wizard is exactly as short as it was before the question existed,
+    // backwards as well as forwards — a step back that landed on a question
+    // nobody was asked would be a screen with no way off it.
+    const held = addChild(start(), 'Ada', 'Lovelace', 4 as Grade);
+
+    expect(goBack(held)).toMatchObject({ step: 'child-grade', buffer: '', shift: 'on' });
+  });
+
+  it('sends a sibling run back to the fork rather than to the parent’s number', () => {
+    /*
+     * A sibling run has no adult half — the family is already registered, and
+     * the parent's details came off the existing record. Backing out of the
+     * confirm screen has to land on "anybody else", which is the only question
+     * that run asked.
+     */
+    let held = initialState({ registrationId: 'r-1', requiresCheckOut: false, mode: 'sibling' });
+    held = addChild(held, 'Byron', 'Lovelace', 1 as Grade);
+    held = answerAnother(held, false, false);
+    expect(held.step).toBe('confirm');
+
+    expect(goBack(held)).toMatchObject({ step: 'another', buffer: '', shift: 'on' });
+  });
+});
+
 describe('going back', () => {
   it('reopens the previous question with its answer in the buffer', () => {
     const held = advance(typeText(start(), 'Ada'));
@@ -728,6 +795,36 @@ describe('the allergies question', () => {
     // screen, and a space-separated note reads fine to the human it is for.
     const asked = throughGrade(startAsking());
     expect(typeText(asked, 'Type 1 diabetes').buffer).toBe('Type 1 diabetes');
+  });
+
+  it('refuses the punctuation the keyboard has no key for', () => {
+    // A hardware keyboard, or a paste. The class is the same one the glass
+    // keys are drawn from, so what arrives from anywhere else is held to it.
+    const asked = throughGrade(startAsking());
+
+    expect(typeText(asked, 'Type 1, please.').buffer).toBe('Type 1 please');
+    expect(applyKey(asked, { kind: 'char', value: '.' })).toBe(asked);
+  });
+
+  it('holds the shift lock through a whole note', () => {
+    /*
+     * The one place caps lock earns its keep: a parent writing EPIPEN in the
+     * allergies box. Auto-shift is for names, and it would drop the lock after
+     * the first letter of every word — so the lock, once a parent has chosen
+     * it, outranks the automatic behaviour here exactly as it does in a name.
+     */
+    const locked = applyKey(throughGrade(startAsking()), { kind: 'shift' });
+    expect(locked.shift).toBe('lock');
+
+    expect(typeText(locked, 'EPIPEN').shift).toBe('lock');
+  });
+
+  it('opens the keyboard in capitals when the tick comes off', () => {
+    // An emptied box is the start of a fresh answer, and the first letter of
+    // one is a capital — the same rule every other question opens on.
+    const typed = typeText(throughGrade(startAsking()), 'peanuts');
+    expect(toggleNoAllergies(typed).shift).toBe('on');
+    expect(toggleNoAllergies(toggleNoAllergies(typed)).shift).toBe('on');
   });
 
   it('refuses a note longer than the callable would take', () => {

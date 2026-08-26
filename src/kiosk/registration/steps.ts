@@ -391,6 +391,10 @@ export function advance(state: RegistrationState): RegistrationState {
         buffer: '',
         shift: 'on',
       };
+    // Stryker disable next-line ConditionalExpression: `canAdvance` is false for
+    // every step this would catch — the fork, the confirm screen, the error —
+    // so nothing reaches here. It is the same statement the guard at the top
+    // makes, kept because the switch is over a union that will grow.
     default:
       return state;
   }
