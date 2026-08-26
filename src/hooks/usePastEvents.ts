@@ -60,6 +60,11 @@ export function usePastEvents(before: Date, pageSize = PAST_EVENTS_PAGE_SIZE): P
    */
   const cursor = useRef<PastEventsCursor | null>(null);
   const inFlight = useRef(false);
+  /*
+   * Stryker disable next-line BooleanLiteral: the mount effect calls `load(true)`,
+   * whose reset block assigns this before anything reads it — so no test can
+   * distinguish the two initial values, and none should have to pretend it can.
+   */
   const exhausted = useRef(false);
 
   /*
