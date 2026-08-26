@@ -20,7 +20,7 @@
  * it turns a library error code into — because "PrinterStatusError" is not
  * something to put in front of a volunteer.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { KioskBinding } from '@/kiosk/binding';
 import type { KioskStudent } from '@/kiosk/search';
 import type { LabelJob, QueueOptions, RasterResult } from '@/kiosk/printing/queue';
@@ -29,6 +29,9 @@ import { KIOSK_KEYS } from '@/kiosk/storage';
 /* -------------------------------------------------------------------------- */
 /* The library                                                                 */
 /* -------------------------------------------------------------------------- */
+
+/** Every printer the module has constructed, newest last. */
+const cores = vi.hoisted(() => ({ made: [] as ReturnType<typeof Object.assign>[] }));
 
 const usb = vi.hoisted(() => ({
   supported: true,
@@ -69,6 +72,7 @@ vi.mock('@vrwarp/brother-ql-webusb/printer-core', () => ({
       readonly options: { model: string },
     ) {
       Object.assign(this, makeDevice(), { model: options.model });
+      cores.made.push(this);
     }
   },
   isWebUsbSupported: () => usb.supported,
@@ -190,6 +194,25 @@ async function load() {
   return import('@/kiosk/printing');
 }
 
+/**
+ * The paired-device lookup the *currently loaded* module is holding.
+ *
+ * `vi.resetModules()` re-runs the mock factory, so the stub a test wants to
+ * drive is the one belonging to the instance `load()` just handed back.
+ */
+async function pairedDevices() {
+  const core = await import('@vrwarp/brother-ql-webusb/printer-core');
+  return core.BrotherQLPrinterCore.getPairedDevices as unknown as {
+    mockRejectedValueOnce: (cause: unknown) => void;
+  };
+}
+
+async function pairedDevicesCalls(): Promise<unknown[][]> {
+  const core = await import('@vrwarp/brother-ql-webusb/printer-core');
+  return (core.BrotherQLPrinterCore.getPairedDevices as unknown as { mock: { calls: unknown[][] } })
+    .mock.calls;
+}
+
 function configured(model = 'QL-810W', label = '62x29') {
   window.localStorage.setItem(KIOSK_KEYS.printer, JSON.stringify({ model, label }));
 }
@@ -201,6 +224,7 @@ beforeEach(() => {
   usb.request = null;
   usb.watchers = null;
   usb.stopWatching = 0;
+  cores.made = [];
   worker.posted = [];
   worker.reply = null;
   worker.started = 0;
@@ -297,6 +321,24 @@ describe('opening the printer at boot', () => {
     expect(device.open).toHaveBeenCalledTimes(1);
   });
 
+  it('lets go of the printer when the browser says it is gone', async () => {
+    /*
+     * The other half of the connect watcher. A handle to a device that is not
+     * there answers nothing and takes the busy lock doing it, so the setup
+     * screen has to stop asking until a connect event brings one back.
+     */
+    const device = makeDevice();
+    usb.paired = [device];
+    configured();
+    const printing = await load();
+    await printing.ready();
+    await expect(printing.readStatus()).resolves.not.toBeNull();
+
+    usb.watchers?.disconnect();
+
+    await expect(printing.readStatus()).resolves.toBeNull();
+  });
+
   it('says the printer was unplugged when the reader loop notices', async () => {
     const device = makeDevice();
     usb.paired = [device];
@@ -311,6 +353,92 @@ describe('opening the printer at boot', () => {
       message: 'The printer was unplugged.',
       advice: 'Plug it back in.',
     });
+  });
+
+  it('asks for the printer this kiosk was set up with, not for any printer', async () => {
+    // The chooser is per-model: a lobby with a label printer and a receipt
+    // printer both paired would otherwise reopen whichever the browser
+    // happened to list first, and print a sticker to neither.
+    usb.paired = [makeDevice()];
+    configured('QL-800', '62');
+    const printing = await load();
+
+    await printing.ready();
+
+    expect(await pairedDevicesCalls()).toContainEqual([{ model: 'QL-800' }]);
+  });
+
+  it('lets go of a transport that has already died before opening another', async () => {
+    /*
+     * A replug hands back a different device, and the old one is still holding
+     * a USB interface this origin can only claim once. Reopening in place is
+     * what leaves the kiosk unable to open the printer that is plugged in.
+     */
+    const first = makeDevice();
+    usb.paired = [first];
+    configured();
+    const printing = await load();
+    await printing.ready();
+
+    // The reader loop notices the device go, which drops `opened` without
+    // closing the transport.
+    first.opened = false;
+    const second = makeDevice();
+    usb.paired = [second];
+    usb.watchers?.connect();
+
+    await vi.waitFor(() => expect(second.open).toHaveBeenCalled());
+    expect(first.close).toHaveBeenCalled();
+    expect(printing.currentState()).toMatchObject({ kind: 'ready' });
+  });
+
+  it('says what went wrong when the reopen itself fails', async () => {
+    configured();
+    const printing = await load();
+    await printing.ready();
+
+    (await pairedDevices()).mockRejectedValueOnce(
+      Object.assign(new Error('nope'), { code: 'printer-error', errors: [{ message: 'Lid open' }] }),
+    );
+    usb.watchers?.connect();
+
+    await vi.waitFor(() =>
+      expect(printing.currentState()).toEqual({
+        kind: 'trouble',
+        message: 'Lid open',
+        advice: 'Check the lid, the roll and the cutter.',
+      }),
+    );
+  });
+
+  it('has words of its own for a printer that complained without saying what', async () => {
+    configured();
+    const printing = await load();
+    await printing.ready();
+
+    (await pairedDevices()).mockRejectedValueOnce({ code: 'printer-error' });
+    usb.watchers?.connect();
+
+    await vi.waitFor(() =>
+      expect(printing.currentState()).toMatchObject({
+        kind: 'trouble',
+        message: 'The printer reported a problem.',
+      }),
+    );
+  });
+
+  it('survives a failure with nothing on it at all', async () => {
+    // `null` is what a transport layer throws often enough, and reading a code
+    // off it must not take the lobby screen down with a TypeError.
+    configured();
+    const printing = await load();
+    await printing.ready();
+
+    (await pairedDevices()).mockRejectedValueOnce(null);
+    usb.watchers?.connect();
+
+    await vi.waitFor(() => expect(printing.currentState().kind).toBe('trouble'));
+    expect(printing.currentState()).toMatchObject({ advice: null });
   });
 
   it('holds an already-open device rather than reopening it', async () => {
@@ -381,6 +509,37 @@ describe('changing the media without re-pairing', () => {
       label: '62',
     });
   });
+
+  it('tells the open printer which model it now is', async () => {
+    /*
+     * The raster is built for a model — its head width and margins — and the
+     * device the reopen finds is the same object it was already holding. A
+     * model left at the old value prints the new roll's labels at the old
+     * roll's width, which comes out of the printer looking almost right.
+     */
+    const device = makeDevice();
+    usb.paired = [device];
+    configured('QL-800', '62');
+    const printing = await load();
+    await printing.ready();
+    expect(device.model).toBe('QL-800');
+
+    await printing.configure({ model: 'QL-810W', label: '62' });
+
+    expect(device.model).toBe('QL-810W');
+  });
+
+  it('changes nothing about a printer there is not one of', async () => {
+    // Nothing paired: the config is stored for the next boot and the state
+    // still says so, rather than throwing on the way to saying it.
+    configured();
+    const printing = await load();
+    await printing.ready();
+
+    const state = await printing.configure({ model: 'QL-810W', label: '62' });
+
+    expect(state).toEqual({ kind: 'unpaired' });
+  });
 });
 
 describe('reading the status', () => {
@@ -388,6 +547,21 @@ describe('reading the status', () => {
     const printing = await load();
 
     await expect(printing.readStatus()).resolves.toBeNull();
+  });
+
+  it('has nothing to say for a printer that is there but shut', async () => {
+    // Open is the part that matters: a device the origin is paired with but
+    // has not claimed answers nothing, and asking it would throw on the setup
+    // screen rather than showing the media it is waiting to be told about.
+    const device = makeDevice();
+    usb.paired = [device];
+    configured();
+    const printing = await load();
+    await printing.ready();
+    device.opened = false;
+
+    await expect(printing.readStatus()).resolves.toBeNull();
+    expect(device.queryStatus).not.toHaveBeenCalled();
   });
 
   it('asks the printer what it has loaded', async () => {
@@ -638,7 +812,10 @@ describe('the jobs this module hands the queue', () => {
       ],
       copies: 1,
     });
-    expect(job.values.time).toMatch(/\d/);
+    // A wall-clock time a volunteer can read off the sticker and match against
+    // the screen, rather than the seconds-and-timezone form `toLocaleTimeString`
+    // gives when nobody says otherwise.
+    expect(job.values.time).toMatch(/^\d{1,2}:\d{2}(\s|\u202f)?([AP]M)?$/i);
   });
 
   it('test-prints nothing on a kiosk with no printer configured', async () => {
@@ -775,6 +952,65 @@ describe('sending', () => {
     await queue.options.send(result);
 
     expect(device.sendRaw).toHaveBeenCalledWith(result.job, { pageCount: 1 });
+  });
+
+  describe('when the end-to-end suite is watching', () => {
+    /*
+     * There is no way to give Playwright a USB printer, so the transport is
+     * the one thing the end-to-end suite cannot exercise — and a label written
+     * to a device that is not there is the failure it most wants to catch. The
+     * seam is opt-in from the spec side and inside `__E2E_HOOKS__`, so it is
+     * eliminated from anything a church deploys.
+     */
+    afterEach(() => {
+      delete (window as unknown as Record<string, unknown>).__tallyKioskLabels;
+    });
+
+    it('records the label instead of writing it to the wire', async () => {
+      vi.stubGlobal('__E2E_HOOKS__', true);
+      (window as unknown as Record<string, unknown>).__tallyKioskLabels = [];
+      const device = makeDevice();
+      usb.paired = [device];
+      configured();
+      const printing = await load();
+      await printing.ready();
+
+      await queue.options.send(result);
+
+      expect((window as unknown as Record<string, unknown>).__tallyKioskLabels).toEqual([
+        { bytes: 8, pageCount: 1 },
+      ]);
+      expect(device.sendRaw).not.toHaveBeenCalled();
+    });
+
+    it('writes to the wire when no spec asked for the labels', async () => {
+      // Opt-in: the array only exists if a spec created it. A build with the
+      // hooks compiled in but nobody watching still prints.
+      vi.stubGlobal('__E2E_HOOKS__', true);
+      const device = makeDevice();
+      usb.paired = [device];
+      configured();
+      const printing = await load();
+      await printing.ready();
+
+      await queue.options.send(result);
+
+      expect(device.sendRaw).toHaveBeenCalled();
+    });
+
+    it('writes to the wire in a build that shipped, whatever is on the window', async () => {
+      (window as unknown as Record<string, unknown>).__tallyKioskLabels = [];
+      const device = makeDevice();
+      usb.paired = [device];
+      configured();
+      const printing = await load();
+      await printing.ready();
+
+      await queue.options.send(result);
+
+      expect((window as unknown as Record<string, unknown>).__tallyKioskLabels).toEqual([]);
+      expect(device.sendRaw).toHaveBeenCalled();
+    });
   });
 
   it('reopens a printer that went down rather than failing the label', async () => {
