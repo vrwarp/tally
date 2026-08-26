@@ -243,6 +243,29 @@ describe('subscribeInvitations', () => {
     expect(invitation?.email).toBe('miriam@example.org');
   });
 
+  it('shows the address as it was typed, not as it was folded into an id', () => {
+    // The id is `emailKey`'d — trimmed, lowercased, dots to commas — because
+    // that is what makes inviting twice one invitation. The display copy is
+    // what an admin typed, and it is what the team screen shows back to them.
+    const [invitation] = published([
+      { id: 'miriam@example,org', data: { email: 'Miriam.Chen@Example.org' } },
+    ]);
+
+    expect(invitation?.email).toBe('Miriam.Chen@Example.org');
+  });
+
+  it('falls back to the id for a display copy that is not a string', () => {
+    const [invitation] = published([{ id: 'miriam@example,org', data: { email: 42 } }]);
+
+    expect(invitation?.email).toBe('miriam@example.org');
+  });
+
+  it('puts every dot back, not just the first', () => {
+    const [invitation] = published([{ id: 'a,b@sub,example,org', data: {} }]);
+
+    expect(invitation?.email).toBe('a.b@sub.example.org');
+  });
+
   it('treats an invitation with no flag as active', () => {
     // Absent means "nobody has paused this", which is what every invitation
     // written before the pause switch existed looks like.
