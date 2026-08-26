@@ -216,8 +216,9 @@ Every caller reads the two the same way, so the mutant is equivalent — and
 there is no node starting on the `} catch {` line for a comment to attach to,
 so no `disable next-line` reaches it. An unscoped `disable`/`restore` pair
 around the function would reach it and would also excuse the two BlockStatement
-mutants beside it that *are* checked, which is a worse trade. Both sites say so
-where they live, and both are survivors the score carries.
+mutants beside it that *are* checked, which is a worse trade. The three sites
+in this repo say so where they live, and all three are survivors the score
+carries.
 
 To check a directive took, look for the mutant's status in the JSON: an honoured
 one is `Ignored` with the reason you wrote as its `statusReason`.
