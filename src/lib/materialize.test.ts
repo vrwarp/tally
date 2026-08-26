@@ -120,6 +120,16 @@ describe('projectOccurrences', () => {
     expect(projectOccurrences([friday({ mode: 'oneoff', recurrence: null })], FRIDAY)).toEqual([]);
   });
 
+  it('projects nothing for a trip carrying a rule somebody left on it', () => {
+    /*
+     * A one-off happens once, whatever a leftover field says. Switching a
+     * repeat to a one-off in the editor is how a leader says "just this once",
+     * and the mode has to be the whole answer — a stray rule surviving the
+     * switch would put a retreat on the calendar every week for a year.
+     */
+    expect(projectOccurrences([friday({ mode: 'oneoff' })], FRIDAY)).toEqual([]);
+  });
+
   it('carries the gathering’s shape forward, not just its date', () => {
     const source = friday({
       startAt: new Date(2026, 6, 24, 22, 0),
@@ -165,6 +175,33 @@ describe('projectOccurrences', () => {
    * from it, so every Friday between now and the one that had been touched
    * simply stopped being on the calendar: not cancelled, not hidden, absent.
    */
+  it('takes its shape from the latest instance whatever order they arrive in', () => {
+    // The same claim as above, read the other way round. Documents come off a
+    // query in no particular order, and a chain that took its shape from
+    // whichever arrived last would change room and time between page loads.
+    const original = friday();
+    const moved = friday({
+      id: 'friday-fellowship-2026-07-31',
+      startAt: new Date(2026, 6, 31, 19, 30),
+      endAt: new Date(2026, 6, 31, 21, 30),
+      location: 'Youth room',
+    });
+
+    const [next] = projectOccurrences([moved, original], FRIDAY);
+
+    expect(next?.startAt).toEqual(new Date(2026, 7, 7, 19, 30));
+    expect(next?.source.location).toBe('Youth room');
+  });
+
+  it('keeps the first of two instances written for the same instant', () => {
+    // A duplicate write. Neither is later, so neither takes over — and the
+    // calendar a leader is looking at does not change under them on a refresh.
+    const first = friday({ id: 'friday-a', location: 'Hall' });
+    const second = friday({ id: 'friday-b', location: 'Youth room' });
+
+    expect(projectOccurrences([first, second], FRIDAY)[0]?.source.location).toBe('Hall');
+  });
+
   it('does not erase the nights before a template that is still ahead', () => {
     const original = friday();
     // Somebody opened the Friday four weeks out and edited it.
@@ -319,6 +356,68 @@ describe('projectOccurrences', () => {
     });
   });
 
+  /*
+   * Where a repeat's tally is counted from.
+   *
+   * A `COUNT`-bounded rule means "four Fridays from the one this began on",
+   * and which one that is has to be decided from documents that arrive in
+   * whatever order a query returned them. Get it wrong and a repeat ends a
+   * week early or runs a week late — silently, because both look like a
+   * plausible calendar.
+   */
+  describe('which night a chain began on', () => {
+    const bounded = { ...WEEKLY, count: 4 };
+
+    /** A chain held together by a recurrence root rather than by a series. */
+    const rooted = (id: string, startAt: Date, isRoot = false) =>
+      friday({
+        id,
+        seriesId: null,
+        recurrenceRootId: isRoot ? null : 'root-1',
+        recurrence: bounded,
+        startAt,
+        endAt: new Date(startAt.getTime() + 2 * 3_600_000),
+        checkInOpensAt: new Date(startAt.getTime() - 3_600_000),
+        checkInClosesAt: new Date(startAt.getTime() + 3 * 3_600_000),
+      });
+
+    const ROOT = rooted('root-1', new Date(2026, 6, 24, 19, 0), true);
+    /** The first night, dragged a week earlier than the root it belongs to. */
+    const MOVED = rooted('moved-1', new Date(2026, 6, 17, 19, 0));
+
+    it('is the root document, however late in the list it turns up', () => {
+      // The root *is* the chain — its id is the chain key — so it is the first
+      // occurrence by definition, whatever an instance's date says.
+      expect(ids(projectOccurrences([MOVED, ROOT], FRIDAY)).at(-1)).toBe(
+        'root-1-2026-08-14',
+      );
+    });
+
+    it('stays the root when an earlier instance turns up after it', () => {
+      expect(ids(projectOccurrences([ROOT, MOVED], FRIDAY)).at(-1)).toBe(
+        'root-1-2026-08-14',
+      );
+    });
+
+    it('is the earliest instance loaded when the root is not among them', () => {
+      /*
+       * Only the true beginning if the chain started inside the window the
+       * caller read — a bounded error, and the alternative is reading a
+       * ministry's whole history back on every tick of the clock. What it must
+       * not depend on is the order the two arrived in.
+       */
+      const later = rooted('i-b', new Date(2026, 7, 7, 19, 0));
+      const earlier = rooted('i-a', new Date(2026, 6, 31, 19, 0));
+
+      expect(ids(projectOccurrences([later, earlier], FRIDAY)).at(-1)).toBe(
+        'root-1-2026-08-21',
+      );
+      expect(ids(projectOccurrences([earlier, later], FRIDAY)).at(-1)).toBe(
+        'root-1-2026-08-21',
+      );
+    });
+  });
+
   it('keeps two series in their own chains', () => {
     const sunday = friday({
       id: 'sunday-school-2026-07-26',
@@ -390,6 +489,40 @@ describe('projectOccurrences', () => {
     expect(ids(projected)).not.toContain('friday-fellowship-2026-08-07');
   });
 
+  describe('a gathering whose check-in window shuts before it opens', () => {
+    /*
+     * Not a shape the editor sets out to produce, but one it does not refuse
+     * either — and the expansion's own lookback is derived from that window, so
+     * it is exactly the case where the lookback stops protecting the calendar
+     * from finished nights. What must not happen is a gathering appearing whose
+     * doors closed before a leader could have opened Tally.
+     */
+    const backwards = (startAt: Date) =>
+      friday({
+        startAt,
+        endAt: new Date(startAt.getTime() + 2 * 3_600_000),
+        checkInOpensAt: new Date(startAt.getTime() - 2 * 3_600_000),
+        // An hour before the gathering starts.
+        checkInClosesAt: new Date(startAt.getTime() - 3_600_000),
+      });
+
+    it('is off the calendar once its window has shut', () => {
+      const source = backwards(FRIDAY);
+      // Half an hour after the coming Friday's window shut, and half an hour
+      // before that Friday begins.
+      const projected = projectOccurrences([source], new Date(2026, 6, 31, 18, 30));
+
+      expect(ids(projected)).not.toContain('friday-fellowship-2026-07-31');
+    });
+
+    it('is still on it at the exact instant the window shuts', () => {
+      const source = backwards(FRIDAY);
+      const projected = projectOccurrences([source], new Date(2026, 6, 31, 18, 0));
+
+      expect(ids(projected)).toContain('friday-fellowship-2026-07-31');
+    });
+  });
+
   it('includes a gathering already under way', () => {
     // 19:30 on a Friday whose 19:00 start nobody wrote down.
     const projected = projectOccurrences([friday()], new Date(2026, 6, 31, 19, 30));
@@ -421,6 +554,23 @@ describe('findProjectedOccurrence', () => {
     expect(
       findProjectedOccurrence([friday()], chain, new Date(2026, 6, 17, 19, 0), FRIDAY),
     ).toBeNull();
+  });
+
+  it('refuses the right evening at the wrong time', () => {
+    /*
+     * The id a projection is keyed by carries the day and not the clock, so a
+     * request for 20:00 on a Friday whose gathering starts at 19:00 matches on
+     * id alone. Materialising it would write a document an hour out from the
+     * rule that produced it, with the client deciding when the gathering is.
+     */
+    expect(
+      findProjectedOccurrence([friday()], chain, new Date(2026, 6, 31, 20, 0), FRIDAY),
+    ).toBeNull();
+
+    // And the right evening at the right time is still found.
+    expect(
+      findProjectedOccurrence([friday()], chain, new Date(2026, 6, 31, 19, 0), FRIDAY),
+    ).not.toBeNull();
   });
 
   it('refuses a chain the caller does not belong to', () => {
