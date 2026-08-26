@@ -41,6 +41,14 @@ describe('birthdayFieldFrom', () => {
 });
 
 describe('readBirthdayField', () => {
+  it('sends a day that is not the one on file', () => {
+    // The whole point of the unchanged check is that it says *unchanged*.
+    // Reading every edit as a no-op is a Save that silently does nothing.
+    expect(read('4/20', '03-14')).toEqual({ ok: true, value: '04-20' });
+    expect(read('3/20', '03-14')).toEqual({ ok: true, value: '03-20' });
+    expect(read('4/14', '03-14')).toEqual({ ok: true, value: '04-14' });
+  });
+
   it('sends the day alone, to be kept against the year upstream', () => {
     expect(read('3/16', '03-14')).toEqual({ ok: true, value: '03-16' });
   });
@@ -202,6 +210,17 @@ describe('describeBirthdayField', () => {
     expect(note('2/29', '03-14').tone).toBe('good');
     expect(note('2/29', '2011-03-14').tone).toBe('good');
     expect(note('2/29/2012', null).tone).toBe('good');
+  });
+
+  it('refuses the leap day and no other day on it', () => {
+    // All three of those have to be true at once. 1885 is the year Planning
+    // Center keeps for a birthday nobody knows the year of, and the only day
+    // it does not have is 29 February — every other day of every other month
+    // goes in without a year exactly as it always did.
+    expect(note('2/28', null).tone).toBe('good');
+    expect(note('3/29', null).tone).toBe('good');
+    expect(note('12/29', null).tone).toBe('good');
+    expect(note('2/1', null).tone).toBe('good');
   });
 
   it('reads against the caller’s clock, not the wall clock', () => {

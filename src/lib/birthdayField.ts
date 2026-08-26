@@ -67,6 +67,10 @@ export const BLANK_BIRTHDAY_FIELD = '';
 export function birthdayFieldFrom(birthday: string | null | undefined): string {
   const parts = parseBirthday(birthday);
   if (!parts) return BLANK_BIRTHDAY_FIELD;
+  // Stryker disable next-line ConditionalExpression,StringLiteral:
+  // `formatBirthdayInput` reads digits and treats everything else as a
+  // separator, so `String(null)` and any other letters come out of it as the
+  // same empty year slot. This says what is meant rather than leaning on that.
   const year = parts.year === null ? '' : String(parts.year);
   return formatBirthdayInput(`${pad(parts.month)}${pad(parts.day)}${year}`);
 }
@@ -147,7 +151,9 @@ export function readBirthdayField(text: string, options: BirthdayFieldOptions): 
   if (alreadyOnFile({ month, day, year }, options.onFile)) return { ok: true, value: undefined };
 
   const composed = composeBirthday({ month, day, year });
-  // Every refusal `composeBirthday` has left is one the parser has already made.
+  // Stryker disable next-line all: every refusal `composeBirthday` has left is
+  // one the parser above has already made, so nothing reaches this. It is here
+  // because the two are separate modules and only one of them says so.
   if (composed === null) return { ok: false, error: refusal('no-such-day') };
 
   return { ok: true, value: composed };
