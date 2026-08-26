@@ -130,7 +130,12 @@ export function joinKioskRoster(
     const viaLink = direct
       ? undefined
       : linkedId
-        ? (byId.get(linkedId) ?? byId.get(grafted.get(linkedId) ?? ''))
+        ? // Stryker disable next-line StringLiteral: the fallback is only read
+          // when this person has not been grafted, and then any string that is
+          // not a row id does. Every key in `byId` is either a prefixed person
+          // id or a Firestore document id, and neither can be empty — so no
+          // string here is distinguishable from another by anything observable.
+          (byId.get(linkedId) ?? byId.get(grafted.get(linkedId) ?? ''))
         : undefined;
     const target = direct ?? viaLink;
 
@@ -146,6 +151,18 @@ export function joinKioskRoster(
       continue;
     }
 
+    /*
+     * `!direct && linkedId` cannot be dropped, and cannot be weakened to `||`,
+     * without both being equivalent — which is worth writing down rather than
+     * rediscovering, because a reader's instinct is that a guard this long has
+     * a redundant limb. Reaching here at all means `target` exists, which means
+     * either `direct` did, or `viaLink` did and `linkedId` was truthy to find
+     * it. In the `direct` case `target.id` is the document's own id, so
+     * `target.id === linkedId` can only hold when `documentIds` contains it,
+     * and the last limb is then false anyway. Both halves are load-bearing for
+     * a reader and neither is for a machine.
+     */
+    // Stryker disable next-line ConditionalExpression,LogicalOperator: see above.
     if (!direct && linkedId && target.id === linkedId && !documentIds.has(linkedId)) {
       /*
        * A linked visitor whose person the roster answered for, with no

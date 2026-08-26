@@ -131,6 +131,23 @@ describe('a visitor Tally created', () => {
     expect(rows[0]!.id).toBe('student-bree-sandoval');
   });
 
+  it('is not linked to anything by a backend with no person id beside it', () => {
+    /*
+     * A half-written linkage: something stamped `upstreamBackend` and never got
+     * to the person id. The prefix on its own (`a32_`) is not a person, so this
+     * document is a visitor who stands on their own name — the guard that says
+     * so is the only thing between "no person id" and "joined to whichever row
+     * the bare prefix happens to name".
+     */
+    const rows = joinKioskRoster(
+      [document('student-ana-ruiz', { firstName: 'Ana', upstreamBackend: 'a32' })],
+      [person({ id: 'a32_', pcoPersonId: '', firstName: 'Nobody', lastName: 'Atall' })],
+    );
+
+    expect(rows).toHaveLength(2);
+    expect(rows.find((row) => row.id === 'student-ana-ruiz')?.firstName).toBe('Ana');
+  });
+
   it('stands alone when the roster does not hold their person', () => {
     // A linkage the roster did not answer for: removed from the roster, or the
     // person was deleted upstream. The document still has the name typed at the
@@ -139,6 +156,81 @@ describe('a visitor Tally created', () => {
 
     expect(rows).toHaveLength(1);
     expect(rows[0]!.firstName).toBe('Bree');
+  });
+});
+
+describe('the fields a row ends up with', () => {
+  it('takes the allergy flag from the backend, both ways round', () => {
+    // The label asks about one child rather than four hundred, so `false` has
+    // to mean false — a flag that is always on is the same as no flag at all.
+    expect(joinKioskRoster([], [person({ hasAllergies: false })])[0]!.hasAllergies).toBe(false);
+    expect(joinKioskRoster([], [person({ hasAllergies: true })])[0]!.hasAllergies).toBe(true);
+    // Anything that is not `true` is not a yes: an older sync wrote strings.
+    expect(
+      joinKioskRoster([], [{ ...person(), hasAllergies: 'yes' as unknown as boolean }])[0]!
+        .hasAllergies,
+    ).toBe(false);
+  });
+
+  it('never claims an allergy for a visitor no backend holds', () => {
+    /*
+     * `noMirroredPersonalData` in firestore.rules refuses an `allergies` key on
+     * a student document, so there is nowhere for a real answer to live. The
+     * kiosk says no rather than guessing yes — a label that warns about every
+     * quick-added visitor is a label nobody reads.
+     */
+    const rows = joinKioskRoster([document('student-bree-sandoval', { allergies: 'peanuts' })], []);
+
+    expect(rows[0]!.hasAllergies).toBe(false);
+  });
+
+  it('searches by what the document holds, not by the name recomputed from it', () => {
+    // The document's own `searchName` is what the app's own search matches on,
+    // and it can differ from first + last — a nickname, a maiden name.
+    const rows = joinKioskRoster(
+      [document('student-bree-sandoval', { searchName: 'bree sandoval bea' })],
+      [],
+    );
+
+    expect(rows[0]!.searchName).toBe('bree sandoval bea');
+  });
+
+  it('falls back to the typed name, folded and trimmed, when there is no search name', () => {
+    const rows = joinKioskRoster(
+      [{ id: 'student-bree-sandoval', data: { firstName: 'Bree', lastName: 'Sandoval ' } }],
+      [],
+    );
+
+    // Lower case and trimmed because that is the shape `search.ts` compares
+    // against; a stray space off the end of a typed surname made the child
+    // unfindable by their own name.
+    expect(rows[0]!.searchName).toBe('bree sandoval');
+  });
+
+  it('has no name for a document whose name fields are not strings', () => {
+    // A number where a name should be is not a name. Drawn, it would put "42"
+    // on the lobby glass; kept, it would make the row unsearchable anyway.
+    const rows = joinKioskRoster(
+      [{ id: 'student-nobody', data: { firstName: 42, lastName: null } }],
+      [],
+    );
+
+    expect(rows).toHaveLength(0);
+  });
+
+  it('draws a row for a child with only one of the two names', () => {
+    /*
+     * One name is a name. Families give a single name at the door often enough
+     * — a first name and a "we'll sort the rest out later" — and refusing the
+     * row loses the child rather than the missing surname.
+     */
+    const first = joinKioskRoster([{ id: 'doc-1', data: { firstName: 'Bree' } }], []);
+    expect(first).toHaveLength(1);
+    expect(first[0]!.searchName).toBe('bree');
+
+    const last = joinKioskRoster([{ id: 'doc-2', data: { lastName: 'Sandoval' } }], []);
+    expect(last).toHaveLength(1);
+    expect(last[0]!.searchName).toBe('sandoval');
   });
 });
 

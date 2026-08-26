@@ -25,7 +25,7 @@
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { basename, join, relative } from 'node:path';
+import { join, relative } from 'node:path';
 
 const ROOT = process.cwd();
 const config = JSON.parse(readFileSync('stryker.config.json', 'utf8'));
@@ -131,9 +131,13 @@ if (argv.includes('--since')) {
   );
 }
 
-/** The report `mutate.mjs` would write for a module, so a resumed sweep can skip it. */
+/**
+ * The report `mutate.mjs` would write for a module, so a resumed sweep can skip
+ * it. Must stay in step with `labelFor` there — the whole src-relative path,
+ * because basenames collide (`src/lib/theme.ts`, `src/kiosk/theme.ts`).
+ */
 function reportFor(file) {
-  const label = basename(file).replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const label = relative('src', file).replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '');
   return `reports/mutation/${label}.json`;
 }
 

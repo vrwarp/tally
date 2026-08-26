@@ -17,7 +17,7 @@
  *   node scripts/mutation-summary.mjs --clean    # only the modules at 100%
  *   node scripts/mutation-summary.mjs --min 90   # exit non-zero below a score
  */
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 const DIR = 'reports/mutation';
@@ -42,6 +42,18 @@ try {
   }
 }
 
+/*
+ * Newest report last, and one row per module however many reports name it.
+ *
+ * A module can appear in more than one report — the sweep's own run, a
+ * `mutate.mjs` re-run after a fix, a report written under an older naming
+ * scheme. Summing them all counted the module twice and averaged its before
+ * with its after, which reads as progress that did not happen. The newest
+ * report is the true one, so it is the one that stands.
+ */
+const seen = new Map();
+reports.sort((a, b) => statSync(join(DIR, a)).mtimeMs - statSync(join(DIR, b)).mtimeMs);
+
 for (const name of reports) {
   let report;
   try {
@@ -60,9 +72,11 @@ for (const name of reports) {
       if (mutant.status === 'NoCoverage') uncovered += 1;
       else if (mutant.status !== 'Survived') killed += 1;
     }
-    rows.push({ file, killed, total, uncovered });
+    seen.set(file, { file, killed, total, uncovered });
   }
 }
+
+rows.push(...seen.values());
 
 rows.sort((a, b) => a.killed / (a.total || 1) - b.killed / (b.total || 1) || a.file.localeCompare(b.file));
 

@@ -22,7 +22,7 @@
  */
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { basename, dirname } from 'node:path';
+import { basename, dirname, relative } from 'node:path';
 
 const argv = process.argv.slice(2);
 const passThroughAt = argv.indexOf('--');
@@ -44,11 +44,22 @@ const mutate = args[0] === '--glob' ? [args[1]] : args;
 /*
  * Named after what was mutated, so a morning of one-module runs leaves a
  * directory of reports rather than one file overwritten eleven times.
+ *
+ * The whole path and not the basename, because five pairs of modules in this
+ * repo share one — `src/lib/theme.ts` and `src/kiosk/theme.ts`, two
+ * `roster.ts`, two `planningCenter.ts`, two `eventAccess.ts`, two `index.ts`.
+ * Under a basename label the second run of a pair silently overwrote the
+ * first's report, so the sweep's aggregate scored eighty-three modules out of
+ * seventy-eight reports and `--skip-reported` skipped a module that had never
+ * run. Both were invisible: the numbers looked fine and were quietly missing a
+ * module each time.
  */
-const label =
-  mutate.length === 1
-    ? basename(mutate[0]).replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '')
-    : `${basename(dirname(mutate[0]))}-${mutate.length}-files`;
+const label = labelFor(mutate);
+
+function labelFor(files) {
+  const slug = (path) => relative('src', path).replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return files.length === 1 ? slug(files[0]) : `${basename(dirname(files[0]))}-${files.length}-files`;
+}
 const report = `reports/mutation/${label}.json`;
 mkdirSync('reports/mutation', { recursive: true });
 
