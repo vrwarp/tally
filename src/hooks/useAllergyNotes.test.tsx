@@ -84,6 +84,62 @@ describe('useAllergyNotes', () => {
     });
   });
 
+  it('asks about an Attendees student whose id is the only linkage there is', async () => {
+    // The realistic shape, and the one that used to be dropped: `pcoPersonId`
+    // means Planning Center and is null on an Attendees document, so deriving
+    // the person id from it left `personKeys` empty and the badge blank.
+    getAllergyNotes.mockResolvedValue({ data: { notes: {} } });
+    const wei = makeStudent({
+      id: 'a32_8c1f2c34-9d1e-4f56-8a7b-0c1d2e3f4a5b',
+      firstName: 'Wei',
+      pcoPersonId: null,
+      hasAllergies: true,
+    });
+
+    renderHook(() => useAllergyNotes([entry(wei)]));
+
+    await waitFor(() => expect(getAllergyNotes).toHaveBeenCalled());
+    expect(getAllergyNotes).toHaveBeenCalledWith({
+      pcoPersonIds: [],
+      personKeys: [{ backendId: 'a32', personId: '8c1f2c34-9d1e-4f56-8a7b-0c1d2e3f4a5b' }],
+    });
+  });
+
+  it('reads the note back onto the student the answer was asked for', async () => {
+    getAllergyNotes.mockResolvedValue({
+      data: { notes: { '8c1f2c34-9d1e-4f56-8a7b-0c1d2e3f4a5b': 'Shellfish' } },
+    });
+    const wei = makeStudent({
+      id: 'a32_8c1f2c34-9d1e-4f56-8a7b-0c1d2e3f4a5b',
+      pcoPersonId: null,
+      hasAllergies: true,
+    });
+
+    const { result } = renderHook(() => useAllergyNotes([entry(wei)]));
+
+    await waitFor(() => expect(result.current.size).toBe(1));
+    expect(result.current.get('a32_8c1f2c34-9d1e-4f56-8a7b-0c1d2e3f4a5b')).toBe('Shellfish');
+  });
+
+  it('asks about a visitor linked by the fields rather than by their id', async () => {
+    getAllergyNotes.mockResolvedValue({ data: { notes: {} } });
+    const pushed = makeStudent({
+      id: 'tally-9',
+      pcoPersonId: null,
+      upstreamBackend: 'a32',
+      upstreamPersonId: '8c1f2c34',
+      hasAllergies: true,
+    });
+
+    renderHook(() => useAllergyNotes([entry(pushed)]));
+
+    await waitFor(() => expect(getAllergyNotes).toHaveBeenCalled());
+    expect(getAllergyNotes).toHaveBeenCalledWith({
+      pcoPersonIds: [],
+      personKeys: [{ backendId: 'a32', personId: '8c1f2c34' }],
+    });
+  });
+
   it('asks nothing at all when nobody on screen is flagged', () => {
     renderHook(() => useAllergyNotes([entry(amara)]));
 

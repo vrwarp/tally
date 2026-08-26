@@ -20,12 +20,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getAllergyNotes } from '@/services/functions';
-import {
-  backendOfStudent,
-  personIdFromStudentId,
-  type BackendId,
-  type RosterEntry,
-} from '@/types';
+import { linkageOfStudent, type BackendId, type RosterEntry } from '@/types';
 
 /** Backend person id -> the note, for as long as the tab is open. */
 const held = new Map<string, string>();
@@ -42,16 +37,17 @@ export function invalidateAllergyNotes(): void {
   asked.clear();
 }
 
-/** The person whose upstream record a roster row's note would come from. */
-function personIdOf(entry: RosterEntry): string | null {
-  return entry.student.pcoPersonId ?? personIdFromStudentId(entry.student.id);
-}
-
-/** The same person, named with their backend — the mixed-roster request shape. */
+/**
+ * The person whose upstream record a roster row's note would come from, named
+ * with their backend — the mixed-roster request shape.
+ *
+ * Both halves out of one call. Naming the backend per person and then deriving
+ * the id with `personIdFromStudentId` dropped every Attendees student on the
+ * floor, because that helper answers for Planning Center alone — so the shape
+ * built to carry a mixed roster could only ever carry half of one.
+ */
 function personKeyOf(entry: RosterEntry): { backendId: BackendId; personId: string } | null {
-  const personId = personIdOf(entry);
-  if (!personId) return null;
-  return { backendId: backendOfStudent(entry.student) ?? 'pco', personId };
+  return linkageOfStudent(entry.student);
 }
 
 /**
@@ -136,7 +132,7 @@ export function useAllergyNotes(entries: readonly RosterEntry[]): ReadonlyMap<st
     const byStudent = new Map<string, string>();
     for (const entry of entries) {
       if (!entry.student.hasAllergies) continue;
-      const personId = personIdOf(entry);
+      const personId = personKeyOf(entry)?.personId;
       const note = personId ? answers.get(personId) : undefined;
       if (note) byStudent.set(entry.student.id, note);
     }

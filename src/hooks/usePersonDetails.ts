@@ -14,7 +14,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getPersonDetails } from '@/services/functions';
-import { backendLabelOf, personIdFromStudentId, type PcoPersonDetails, type Student } from '@/types';
+import { backendLabelOf, personIdOfStudent, type PcoPersonDetails, type Student } from '@/types';
 
 const cache = new Map<string, PcoPersonDetails | null>();
 
@@ -58,7 +58,11 @@ export interface PersonDetailsResult {
 }
 
 export function usePersonDetails(student: Student | null): PersonDetailsResult {
-  const personId = student ? (student.pcoPersonId ?? personIdFromStudentId(student.id)) : null;
+  // Whichever backend holds them, not just Planning Center: the callable
+  // dispatches on `studentId` and reads either, and gating on a Planning
+  // Center person id told every Attendees student's screen there was nothing
+  // to look up.
+  const personId = student ? personIdOfStudent(student) : null;
   const key = student?.id ?? '';
   // A string, not the student object, so the fetch effect can depend on it
   // without re-running every time the roster hands down a new array.
