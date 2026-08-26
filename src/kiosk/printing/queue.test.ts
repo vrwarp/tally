@@ -92,6 +92,32 @@ describe('the label queue', () => {
     expect(send.sent).toHaveLength(1);
   });
 
+  it('holds a lobby-full of warm labels and drops the oldest past it', async () => {
+    /*
+     * A lobby screen runs for weeks and warms a label for every row a thumb
+     * rests on, so the cache has to have a ceiling — and it has to be a
+     * ceiling rather than a bucket of one, because reusing the warm raster is
+     * the whole reason it exists. Eight is a family and the two behind them.
+     */
+    const raster = fakeRaster();
+    const send = fakeSend();
+    const queue = createLabelQueue({ raster: raster.fn, send: send.fn });
+
+    for (let i = 0; i < 9; i += 1) queue.warm(job(`child-${i}`));
+    await queue.idle();
+    expect(raster.fn).toHaveBeenCalledTimes(9);
+
+    // The eight most recent are still warm: printing them builds nothing new.
+    for (let i = 1; i < 9; i += 1) queue.print(job(`child-${i}`));
+    await queue.idle();
+    expect(raster.fn).toHaveBeenCalledTimes(9);
+
+    // The ninth-oldest was dropped to make room, so it is built again.
+    queue.print(job('child-0'));
+    await queue.idle();
+    expect(raster.fn).toHaveBeenCalledTimes(10);
+  });
+
   it('builds one on demand when nothing warmed it', async () => {
     const raster = fakeRaster();
     const send = fakeSend();
