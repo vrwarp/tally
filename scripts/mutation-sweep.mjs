@@ -21,10 +21,11 @@
  *   node scripts/mutation-sweep.mjs src/lib            # everything under a path
  *   node scripts/mutation-sweep.mjs --since origin/main # only what a branch changed
  *   node scripts/mutation-sweep.mjs --list             # print the plan and stop
+ *   node scripts/mutation-sweep.mjs --skip-reported    # only modules with no report yet
  */
 import { execFileSync } from 'node:child_process';
-import { readFileSync, readdirSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { basename, join, relative } from 'node:path';
 
 const ROOT = process.cwd();
 const config = JSON.parse(readFileSync('stryker.config.json', 'utf8'));
@@ -109,11 +110,20 @@ if (sinceAt !== -1) {
   );
 }
 
+/** The report `mutate.mjs` would write for a module, so a resumed sweep can skip it. */
+function reportFor(file) {
+  const label = basename(file).replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return `reports/mutation/${label}.json`;
+}
+
+const skipReported = process.argv.includes('--skip-reported');
+
 const modules = walk(join(ROOT, 'src'))
   .filter((file) => includes.some((pattern) => pattern.test(file)))
   .filter((file) => !excludes.some((pattern) => pattern.test(file)))
   .filter((file) => filter.length === 0 || filter.some((prefix) => file.startsWith(prefix)))
-  .filter((file) => changed === null || changed.has(file));
+  .filter((file) => changed === null || changed.has(file))
+  .filter((file) => !skipReported || !existsSync(reportFor(file)));
 
 if (changed !== null && modules.length === 0) {
   console.log('No module in the mutation scope changed on this branch.');
