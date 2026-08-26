@@ -180,4 +180,150 @@ describe('useEventSnapshots', () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(2);
   });
+
+  it('is not loading when there is nothing to ask about', () => {
+    // Every screen with no history to read renders this, and a spinner over an
+    // empty list is a screen that never finishes.
+    const { result } = renderHook(() => useEventSnapshots([]));
+
+    expect(result.current.loading).toBe(false);
+    expect(result.current.snapshots).toEqual([]);
+    expect(fetchAttendanceByEvent).not.toHaveBeenCalled();
+  });
+
+  it('is loading from the first render when there is', () => {
+    const seen: boolean[] = [];
+    renderHook(() => {
+      const state = useEventSnapshots([makeEvent({ id: 'evt_1' })]);
+      seen.push(state.loading);
+      return state;
+    });
+
+    expect(seen[0]).toBe(true);
+  });
+
+  it('settles without asking again when the session already holds the answer', async () => {
+    const friday = makeEvent({ id: 'evt_1' });
+    const first = renderHook(() => useEventSnapshots([friday]));
+    await waitFor(() => expect(first.result.current.loading).toBe(false));
+    first.unmount();
+
+    const { result } = renderHook(() => useEventSnapshots([friday]));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(1);
+    expect(result.current.snapshots).toHaveLength(1);
+  });
+
+  it('asks only about the instances it does not hold', async () => {
+    const friday = makeEvent({ id: 'evt_1' });
+    const sunday = makeEvent({ id: 'evt_2' });
+    const first = renderHook(() => useEventSnapshots([friday]));
+    await waitFor(() => expect(first.result.current.loading).toBe(false));
+
+    renderHook(() => useEventSnapshots([friday, sunday]));
+
+    await waitFor(() => expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(2));
+    expect(fetchAttendanceByEvent).toHaveBeenLastCalledWith(['evt_2']);
+  });
+
+  it('reads a gathering with nobody checked in as one that did not happen', async () => {
+    // The set here is the whole register, so empty really does mean nobody
+    // came — which is the reading every window over history depends on.
+    fetchAttendanceByEvent.mockResolvedValue({
+      byEvent: new Map([['evt_1', { present: new Set<string>(), checkedOut: new Set<string>() }]]),
+      denied: new Set<string>(),
+    });
+
+    const { result } = renderHook(() => useEventSnapshots([makeEvent({ id: 'evt_1' })]));
+
+    await waitFor(() => expect(result.current.snapshots).toHaveLength(1));
+    expect(result.current.snapshots[0]?.held).toBe(false);
+  });
+
+  it('reads a gathering with somebody checked in as held', async () => {
+    const { result } = renderHook(() => useEventSnapshots([makeEvent({ id: 'evt_1' })]));
+
+    await waitFor(() => expect(result.current.snapshots).toHaveLength(1));
+    expect(result.current.snapshots[0]?.held).toBe(true);
+  });
+
+  it('keeps who was checked out apart from who was checked in', async () => {
+    // A gathering nobody remembered to check out of still happened.
+    fetchAttendanceByEvent.mockResolvedValue({
+      byEvent: new Map([
+        ['evt_1', { present: new Set(['pco_1', 'pco_2']), checkedOut: new Set(['pco_1']) }],
+      ]),
+      denied: new Set<string>(),
+    });
+
+    const { result } = renderHook(() => useEventSnapshots([makeEvent({ id: 'evt_1' })]));
+
+    await waitFor(() => expect(result.current.snapshots).toHaveLength(1));
+    expect([...(result.current.snapshots[0]?.presentStudentIds ?? [])]).toEqual(['pco_1', 'pco_2']);
+    expect([...(result.current.snapshots[0]?.checkedOutStudentIds ?? [])]).toEqual(['pco_1']);
+  });
+
+  it('hands back the same empty set of refusals on every screen that has none', async () => {
+    const friday = makeEvent({ id: 'evt_1' });
+    const first = renderHook(() => useEventSnapshots([friday]));
+    await waitFor(() => expect(first.result.current.loading).toBe(false));
+
+    const second = renderHook(() => useEventSnapshots([makeEvent({ id: 'evt_2' })]));
+    await waitFor(() => expect(second.result.current.loading).toBe(false));
+
+    expect(first.result.current.denied).toBe(second.result.current.denied);
+  });
+
+  it('reports the failure and stops loading', async () => {
+    fetchAttendanceByEvent.mockRejectedValue(new Error('unavailable'));
+
+    const { result } = renderHook(() => useEventSnapshots([makeEvent({ id: 'evt_1' })]));
+
+    await waitFor(() => expect(result.current.error).toBe('unavailable'));
+    expect(result.current.loading).toBe(false);
+  });
+
+  it('clears the failure once the one retry lands', async () => {
+    // One dropped request is ordinary on a phone walking into a church hall,
+    // and the retry is what stops that wedging the hook for the session.
+    fetchAttendanceByEvent.mockRejectedValueOnce(new Error('unavailable'));
+
+    const { result } = renderHook(() => useEventSnapshots([makeEvent({ id: 'evt_1' })]));
+
+    await waitFor(() => expect(result.current.snapshots).toHaveLength(1));
+    expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(2);
+    expect(result.current.error).toBeNull();
+  });
+
+  it('forgets one gathering without forgetting the rest', async () => {
+    const friday = makeEvent({ id: 'evt_1' });
+    const sunday = makeEvent({ id: 'evt_2' });
+    const first = renderHook(() => useEventSnapshots([friday, sunday]));
+    await waitFor(() => expect(first.result.current.loading).toBe(false));
+
+    invalidateSnapshotCache('evt_1');
+    renderHook(() => useEventSnapshots([friday, sunday]));
+
+    await waitFor(() => expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(2));
+    expect(fetchAttendanceByEvent).toHaveBeenLastCalledWith(['evt_1']);
+  });
+
+  it('forgets a refusal when the one thing that changes it happens', async () => {
+    // Somebody adding you to the gathering; the access stream firing is what
+    // clears it.
+    fetchAttendanceByEvent.mockResolvedValueOnce({
+      byEvent: new Map(),
+      denied: new Set(['evt_1']),
+    });
+    const friday = makeEvent({ id: 'evt_1' });
+    const first = renderHook(() => useEventSnapshots([friday]));
+    await waitFor(() => expect(first.result.current.denied.has('evt_1')).toBe(true));
+
+    invalidateSnapshotCache('evt_1');
+    const second = renderHook(() => useEventSnapshots([friday]));
+
+    await waitFor(() => expect(second.result.current.snapshots).toHaveLength(1));
+    expect(second.result.current.denied.has('evt_1')).toBe(false);
+  });
 });

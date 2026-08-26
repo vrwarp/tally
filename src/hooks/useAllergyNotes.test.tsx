@@ -175,4 +175,132 @@ describe('useAllergyNotes', () => {
     await waitFor(() => expect(getAllergyNotes).toHaveBeenCalled());
     expect(result.current.size).toBe(0);
   });
+
+  it('paints from what the session already holds, before any read lands', async () => {
+    // Coming back to check-in from another screen must not repaint the badges a
+    // beat later than the names.
+    getAllergyNotes.mockResolvedValue({ data: { notes: { '4200003': 'Peanuts' } } });
+    const first = renderHook(() => useAllergyNotes([entry(sofia)]));
+    await waitFor(() => expect(first.result.current.get(sofia.id)).toBe('Peanuts'));
+    first.unmount();
+
+    const { result } = renderHook(() => useAllergyNotes([entry(sofia)]));
+
+    expect(result.current.get(sofia.id)).toBe('Peanuts');
+  });
+
+  it('starts empty when the session holds nothing', () => {
+    getAllergyNotes.mockResolvedValue({ data: { notes: {} } });
+
+    const { result } = renderHook(() => useAllergyNotes([entry(sofia)]));
+
+    expect(result.current.size).toBe(0);
+  });
+
+  it('drops a note that is nothing but whitespace', async () => {
+    // An upstream field somebody cleared by typing a space. A badge that opens
+    // to a blank line is worse than the badge on its own.
+    getAllergyNotes.mockResolvedValue({ data: { notes: { '4200003': '   ' } } });
+
+    const { result } = renderHook(() => useAllergyNotes([entry(sofia)]));
+    await waitFor(() => expect(getAllergyNotes).toHaveBeenCalled());
+
+    expect(result.current.size).toBe(0);
+  });
+
+  it('trims the note it does keep', async () => {
+    getAllergyNotes.mockResolvedValue({ data: { notes: { '4200003': '  Peanuts  ' } } });
+
+    const { result } = renderHook(() => useAllergyNotes([entry(sofia)]));
+
+    await waitFor(() => expect(result.current.get(sofia.id)).toBe('Peanuts'));
+  });
+
+  it('does not re-render for an answer that was entirely empty', async () => {
+    let renders = 0;
+    getAllergyNotes.mockResolvedValue({ data: { notes: { '4200003': '' } } });
+
+    const { result } = renderHook(() => {
+      renders += 1;
+      return useAllergyNotes([entry(sofia)]);
+    });
+    await waitFor(() => expect(getAllergyNotes).toHaveBeenCalled());
+    const after = renders;
+
+    expect(result.current.size).toBe(0);
+    expect(renders).toBe(after);
+  });
+
+  it('does not set state for a screen that has already gone', async () => {
+    // The read is deliberately allowed to outlive the effect that started it,
+    // but not the component.
+    let land: (value: unknown) => void = () => {};
+    getAllergyNotes.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          land = resolve;
+        }),
+    );
+    const noisy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const { unmount } = renderHook(() => useAllergyNotes([entry(sofia)]));
+    unmount();
+    land({ data: { notes: { '4200003': 'Peanuts' } } });
+    await Promise.resolve();
+
+    expect(noisy).not.toHaveBeenCalled();
+    noisy.mockRestore();
+  });
+
+  it('lets a read started by one roster land during the next', async () => {
+    // The effect re-runs on every rebuild, and cancelling per run would mark
+    // those ids asked and then throw away the answer they came back with.
+    let land: (value: unknown) => void = () => {};
+    getAllergyNotes.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          land = resolve;
+        }),
+    );
+
+    const { result, rerender } = renderHook(({ rows }) => useAllergyNotes(rows), {
+      initialProps: { rows: [entry(sofia)] },
+    });
+
+    rerender({ rows: [entry(sofia)] });
+    await waitFor(() => expect(getAllergyNotes).toHaveBeenCalledTimes(1));
+
+    land({ data: { notes: { '4200003': 'Peanuts' } } });
+    await waitFor(() => expect(result.current.get(sofia.id)).toBe('Peanuts'));
+  });
+
+  it('asks about a flagged student whose only link is their document id', async () => {
+    // A student Planning Center holds but whose row carries no `pcoPersonId` —
+    // the id prefix is the link.
+    getAllergyNotes.mockResolvedValue({ data: { notes: {} } });
+    const linked = makeStudent({
+      id: 'pco_4200009',
+      pcoPersonId: null,
+      hasAllergies: true,
+    });
+
+    renderHook(() => useAllergyNotes([entry(linked)]));
+
+    await waitFor(() =>
+      expect(getAllergyNotes).toHaveBeenCalledWith({
+        pcoPersonIds: ['4200009'],
+        personKeys: [],
+      }),
+    );
+  });
+
+  it('asks nothing for a flagged visitor no backend holds', async () => {
+    // Nothing upstream to read — and they never carry the flag anyway, since
+    // it comes from the roster read.
+    const visitor = makeStudent({ id: 'AbC123xyz', pcoPersonId: null, hasAllergies: true });
+
+    renderHook(() => useAllergyNotes([entry(visitor)]));
+
+    expect(getAllergyNotes).not.toHaveBeenCalled();
+  });
 });
