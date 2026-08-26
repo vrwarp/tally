@@ -240,8 +240,12 @@ The first pass over the logic core, in the order the sweep reached them:
 `.github/workflows/mutation.yml`, in two halves.
 
 **On every pull request**, the narrowed sweep runs over the modules that branch
-changed and requires 90%. A pull request touching two files answers in a minute
-or two; one touching nothing in the scope passes without running anything.
+changed and requires 90% *across them together* — the same aggregate the full
+run's `thresholds.break` uses, so a module with a run of genuinely equivalent
+mutants does not block every branch that touches it. A pull request touching two
+files answers in a minute or two; one touching nothing in the scope passes
+without running anything, which is `mutation-summary.mjs --min` reading a
+missing report directory as an empty set rather than as a failure.
 
 **Weekly, and on demand**, the full run: the whole scope against the whole
 suite, publishing the number and failing below the threshold. The HTML report

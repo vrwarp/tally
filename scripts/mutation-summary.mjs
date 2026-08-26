@@ -22,13 +22,24 @@ import { join } from 'node:path';
 
 const DIR = 'reports/mutation';
 
+const minimumAt = process.argv.indexOf('--min');
+const gating = minimumAt !== -1;
+
 const rows = [];
 let reports = [];
 try {
   reports = readdirSync(DIR).filter((name) => name.endsWith('.json') && name !== 'mutation.json');
 } catch {
-  console.error(`No reports in ${DIR}. Run: node scripts/mutation-sweep.mjs`);
-  process.exit(1);
+  /*
+   * No directory at all is the ordinary shape of the pull-request gate on a
+   * branch that changed nothing in the scope: `mutation-sweep.mjs --since`
+   * exits without running anything, so nothing ever creates it. That is a pass
+   * rather than a zero, and treating it as an error failed every such branch.
+   */
+  if (!gating) {
+    console.error(`No reports in ${DIR}. Run: node scripts/mutation-sweep.mjs`);
+    process.exit(1);
+  }
 }
 
 for (const name of reports) {
@@ -79,8 +90,7 @@ console.log(
     `(${killed}/${total} killed, ${total - killed} left, ${uncovered} never reached by a test)`,
 );
 
-const minimumAt = process.argv.indexOf('--min');
-if (minimumAt !== -1) {
+if (gating) {
   const minimum = Number(process.argv[minimumAt + 1]);
   if (!Number.isFinite(minimum)) {
     console.error('--min needs a number.');
