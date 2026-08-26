@@ -69,7 +69,11 @@ function connect<T>(stream: Stream<T>) {
 
 vi.mock('@/services/students', () => ({ subscribeStudents: connect(streams.students) }));
 vi.mock('@/services/eventAccess', () => ({ subscribeEventAccess: connect(streams.access) }));
-vi.mock('@/services/upstreamEdits', () => ({ subscribeUpstreamEdits: connect(streams.edits) }));
+const pokeUpstreamDrain = vi.hoisted(() => vi.fn(async () => {}));
+vi.mock('@/services/upstreamEdits', () => ({
+  subscribeUpstreamEdits: connect(streams.edits),
+  pokeUpstreamDrain,
+}));
 vi.mock('@/services/events', () => ({
   subscribeEvents: (
     next: (value: TallyEvent[]) => void,
@@ -145,6 +149,35 @@ describe('the loading gate', () => {
 
     act(() => streams.access.deliver(new Map()));
     expect(latest?.loading).toBe(false);
+  });
+
+  it('waits on every one of the five, not on four of them', async () => {
+    /*
+     * One stream at a time, left out. Every screen under the provider paints a
+     * spinner while `loading` is true, so a stream that was never actually
+     * waited on is an empty list drawn as data — no roster, no calendar, no
+     * settings — in the moment before it lands.
+     */
+    const deliver = {
+      students: () => streams.students.deliver([]),
+      events: () => streams.events.deliver([]),
+      series: () => streams.series.deliver([]),
+      settings: () => streams.settings.deliver(makeSettings()),
+      access: () => streams.access.deliver(new Map()),
+    };
+    const names = Object.keys(deliver) as (keyof typeof deliver)[];
+
+    for (const missing of names) {
+      const view = mount();
+      await waitFor(() => expect(latest).not.toBeNull());
+
+      act(() => {
+        for (const name of names) if (name !== missing) deliver[name]();
+      });
+
+      expect(latest?.loading, `still waiting on ${missing}`).toBe(true);
+      view.unmount();
+    }
   });
 
   it('lets go for a stream that failed rather than wedging behind it', async () => {
@@ -423,7 +456,9 @@ describe('canWork', () => {
   });
 
   it('lets an admin through a gathering they are not on', async () => {
-    auth.can = () => true;
+    // An admin and nothing else: `can` is asked about one role here, and a
+    // stub that says yes to every question cannot tell which one was asked.
+    auth.can = (role: string) => role === 'admin';
     mount();
     await waitFor(() => expect(latest).not.toBeNull());
     act(() =>
@@ -511,12 +546,53 @@ describe('the upstream edit queue', () => {
     expect(streams.edits.stopped).toBe(1);
   });
 
+  it('owns the retry of a job it is watching, rather than leaving it to the sweep', async () => {
+    /*
+     * The queue's sweep runs every five minutes, which is a fair answer for a
+     * job nobody is watching and a poor one for a job somebody is: a rate limit
+     * answered with "come back in fifteen seconds" would leave a leader reading
+     * "Waiting on Planning Center" for five minutes, on a screen that promises
+     * it resumes on its own. The provider is where the open tab and the queue
+     * meet, so it is where that wiring has to hold.
+     */
+    vi.useFakeTimers();
+    try {
+      auth.can = (role: string) => role === 'core';
+      pokeUpstreamDrain.mockClear();
+      mount();
+      await vi.waitFor(() => expect(latest).not.toBeNull());
+
+      act(() =>
+        streams.edits.deliver([
+          {
+            id: 'edit-1',
+            studentId: 'pco_101',
+            state: 'waiting',
+            nextAttemptAt: new Date(Date.now() + 15_000),
+          },
+        ] as never),
+      );
+
+      expect(pokeUpstreamDrain).not.toHaveBeenCalled();
+      act(() => void vi.advanceTimersByTime(16_000));
+      expect(pokeUpstreamDrain).toHaveBeenCalledWith('pco_101');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('goes quiet rather than banner-ing when its listener is refused', async () => {
     // The queue is an aid to somebody already editing; a refused listener must
     // not put an error in front of a leader who was doing something else.
     auth.can = (role: string) => role === 'core';
     mount();
     await waitFor(() => expect(latest).not.toBeNull());
+
+    // Something arrived before the listener was refused — a first page, then a
+    // rule change — and it has to go with it: a queue nobody is watching any
+    // more goes on saying "sending" beside a student whose edit landed.
+    act(() => streams.edits.deliver([{ id: 'edit-1' }] as never));
+    expect(latest?.upstreamEdits).toHaveLength(1);
 
     act(() => streams.edits.fail(new Error('refused')));
 

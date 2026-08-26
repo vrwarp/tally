@@ -111,6 +111,15 @@ function mount() {
 }
 
 const realNow = Date.now.bind(Date);
+/*
+ * Frozen at the start of each test and moved only by `offset`.
+ *
+ * Not `realNow() + offset`: the guard these exercise is `< 60_000`, and a few
+ * real milliseconds elapsing between the mount and the assertion put the clock
+ * a hair past the boundary — so the one comparison the test exists to pin was
+ * never actually made at the boundary.
+ */
+let base = 0;
 let offset = 0;
 
 function comeBackToTheTab() {
@@ -134,7 +143,8 @@ beforeEach(() => {
   fetchRoster.mockReset();
   fetchRoster.mockImplementation(() => Promise.resolve(reply()));
   rememberRosterPerson.mockClear();
-  vi.spyOn(Date, 'now').mockImplementation(() => realNow() + offset);
+  base = realNow();
+  vi.spyOn(Date, 'now').mockImplementation(() => base + offset);
 });
 
 afterEach(() => {
@@ -159,6 +169,9 @@ describe('what the provider holds before anything has answered', () => {
     expect(first.rosterBackends).toEqual([]);
     expect(first.rosterLoading).toBe(true);
     expect(first.loading).toBe(true);
+    // The queue of edits on their way upstream is read on the first paint too,
+    // and it has not heard from Firestore yet either.
+    expect(first.upstreamEdits).toEqual([]);
 
     act(() => outstanding.land());
   });

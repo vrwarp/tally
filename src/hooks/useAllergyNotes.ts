@@ -77,14 +77,12 @@ export function useAllergyNotes(entries: readonly RosterEntry[]): ReadonlyMap<st
    * next. Cancelling per run would mark those ids asked and then discard the
    * answer they came back with.
    */
-  /*
-   * Stryker disable all: no test can tell this apart from its absence. The
-   * mount effect sets it before any read can resolve, and the only moment it
-   * is false is after unmount — where React ignores the `setState` this
-   * guards anyway. It is here because "ignored" is a promise React has broken
-   * before, and because a read that outlives its component is the ordinary
-   * case on this screen rather than the exceptional one.
-   */
+  // Stryker disable all: no test can tell this apart from its absence. The
+  // mount effect sets it before any read can resolve, and the only moment it
+  // is false is after unmount — where React ignores the `setState` this
+  // guards anyway. It is here because "ignored" is a promise React has broken
+  // before, and because a read that outlives its component is the ordinary
+  // case on this screen rather than the exceptional one.
   const alive = useRef(true);
   useEffect(() => {
     alive.current = true;

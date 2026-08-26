@@ -73,12 +73,10 @@ export function usePersonDetails(student: Student | null): PersonDetailsResult {
   // sentence, which needs a read, which needs a student.
   const backendLabel = student ? backendLabelOf(student) : 'the backend';
 
-  /*
-   * Stryker disable next-line ArrowFunction,LogicalOperator: what the caller
-   * reads is `details ?? cache.get(key)`, so a session that already holds this
-   * student answers from the memo whatever the state seeds. Seeding it anyway
-   * is what stops the first frame being a render behind.
-   */
+  // Stryker disable next-line ArrowFunction,LogicalOperator: what the caller
+  // reads is `details ?? cache.get(key)`, so a session that already holds this
+  // student answers from the memo whatever the state seeds. Seeding it anyway
+  // is what stops the first frame being a render behind.
   const [details, setDetails] = useState<PcoPersonDetails | null>(() => cache.get(key) ?? null);
   /* Stryker disable next-line ArrowFunction: `loaded || cache.has(key)`, as above. */
   const [loaded, setLoaded] = useState(() => cache.has(key));
@@ -128,13 +126,11 @@ export function usePersonDetails(student: Student | null): PersonDetailsResult {
       .then((response) => {
         if (stale) return;
         cache.set(key, response.data);
-        /*
-         * Stryker disable next-line CallExpression,BooleanLiteral: the memo was
-         * filled on the line above and both getters read it, so none of these
-         * three can be seen on its own. They are here because state is what
-         * re-renders, and because a reader of this function should not have to
-         * know that the getters cover for it.
-         */
+        // Stryker disable next-line CallExpression,BooleanLiteral: the memo was
+        // filled on the line above and both getters read it, so none of these
+        // three can be seen on its own. They are here because state is what
+        // re-renders, and because a reader of this function should not have to
+        // know that the getters cover for it.
         setDetails(response.data);
         setLoaded(true);
         setError(null);
