@@ -15,14 +15,21 @@
  * Anything with fewer than seven digits is refused rather than padded: an
  * extension, a "call the office" note, or a typo short of a real number would
  * otherwise index a student under four digits no parent would think to type.
- * A leading `1` on an eleven-digit number is the US country code and is
- * dropped before the length check only in the sense that it never changes the
- * last four anyway — the check exists to reject garbage, not to parse regions.
+ *
+ * There is deliberately no country-code handling, and there used to be: a
+ * leading `1` on an eleven-digit number was stripped before the length check.
+ * That line could not change the answer for any input on earth — dropping one
+ * of eleven digits leaves ten, which clears seven exactly as eleven did, and
+ * slicing the last four off the tail never touches the head. Mutation testing
+ * is what said so out loud: every mutant of that condition survived, because no
+ * test could tell the two versions apart and none ever could have. It read as a
+ * rule about phone numbers while being a no-op, which is the worst thing a line
+ * in a shared module can be — the next person to reach for regions would have
+ * started from a rule that was not there.
  */
 export function phoneLast4(value: string | null | undefined): string | null {
   if (!value) return null;
-  let digits = value.replace(/\D/g, '');
-  if (digits.length === 11 && digits.startsWith('1')) digits = digits.slice(1);
+  const digits = value.replace(/\D/g, '');
   if (digits.length < 7) return null;
   return digits.slice(-4);
 }
