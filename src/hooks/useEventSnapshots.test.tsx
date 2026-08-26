@@ -74,6 +74,30 @@ describe('useEventSnapshots', () => {
     expect(result.current.snapshots[0].event).toBe(friday);
   });
 
+  it('publishes a second gathering it had to go and read', async () => {
+    /*
+     * The window moving to something the session does not hold: the render
+     * that changed the list draws what is in the cache, which is nothing, and
+     * the only thing that publishes the answer when it lands is the bump the
+     * read does on its way out. A screen scrolling back through a term does
+     * this on every step.
+     */
+    const friday = makeEvent({ id: 'evt_1' });
+    const sunday = makeEvent({ id: 'evt_2' });
+
+    const { result, rerender } = renderHook(
+      ({ events }: { events: TallyEvent[] }) => useEventSnapshots(events),
+      { initialProps: { events: [friday] } },
+    );
+    await waitFor(() => expect(result.current.snapshots).toHaveLength(1));
+
+    rerender({ events: [sunday] });
+
+    await waitFor(() => expect(result.current.snapshots).toHaveLength(1));
+    expect(result.current.snapshots[0]!.event).toBe(sunday);
+    expect(result.current.snapshots[0]!.presentStudentIds.size).toBeGreaterThan(0);
+  });
+
   describe('a gathering the reader is not on', () => {
     const denyingSunday = (ids: string[]) =>
       Promise.resolve({
@@ -154,6 +178,31 @@ describe('useEventSnapshots', () => {
     });
   });
 
+  it('retries a second window that failed, having already retried the first', async () => {
+    /*
+     * The retry is armed by the same bump that publishes an answer, so a hook
+     * that has already used it once has to arm it again for the next question.
+     * A phone walking into a hall drops a request per window, and the second
+     * window is the one somebody is actually waiting on.
+     */
+    const friday = makeEvent({ id: 'evt_1' });
+    const sunday = makeEvent({ id: 'evt_2' });
+    fetchAttendanceByEvent.mockRejectedValue(new Error('offline'));
+
+    const { result, rerender } = renderHook(
+      ({ events }: { events: TallyEvent[] }) => useEventSnapshots(events),
+      { initialProps: { events: [friday] } },
+    );
+    await waitFor(() => expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(2));
+
+    fetchAttendanceByEvent.mockClear();
+    rerender({ events: [sunday] });
+
+    // Once, and then once more: the same allowance the first window had.
+    await waitFor(() => expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(2));
+    expect(result.current.error).toBe('offline');
+  });
+
   it('retries a failed read once, and then leaves it alone', async () => {
     /*
      * This used to be no retries at all, by accident: `version` was bumped only
@@ -211,6 +260,28 @@ describe('useEventSnapshots', () => {
       rerender({ events: [friday] });
 
       expect(result.current.snapshots).toBe(first);
+    });
+
+    it('is a new array when one gathering of several changed', async () => {
+      /*
+       * Every entry has to match, not any of them. A comparison satisfied by
+       * one unchanged row would hold the whole list still while a register
+       * beside it moved — and this list is what a dashboard counts.
+       */
+      const friday = makeEvent({ id: 'evt_1', title: 'Friday' });
+      const sunday = makeEvent({ id: 'evt_2', title: 'Sunday' });
+      const { result, rerender } = renderHook(
+        ({ events }: { events: TallyEvent[] }) => useEventSnapshots(events),
+        { initialProps: { events: [friday, sunday] } },
+      );
+      await waitFor(() => expect(result.current.snapshots).toHaveLength(2));
+      const first = result.current.snapshots;
+
+      // The first is the same object; only the second was edited.
+      rerender({ events: [friday, makeEvent({ id: 'evt_2', title: 'Sunday morning' })] });
+
+      expect(result.current.snapshots).not.toBe(first);
+      expect(result.current.snapshots[1]?.event.title).toBe('Sunday morning');
     });
 
     it('is a new array when the gathering itself was edited', async () => {
@@ -285,6 +356,84 @@ describe('useEventSnapshots', () => {
       expect(result.current.snapshots).not.toBe(first);
       expect(result.current.snapshots[0]?.checkedOutStudentIds.has('pco_1')).toBe(true);
       expect(result.current.snapshots[0]?.presentStudentIds).toBe(present);
+    });
+  });
+
+  describe('an answer that arrives after the question changed', () => {
+    /** A fetch this test decides the fate of. */
+    function held() {
+      let settle: { resolve: (value: unknown) => void; reject: (cause: Error) => void } = {
+        resolve: () => {},
+        reject: () => {},
+      };
+      fetchAttendanceByEvent.mockImplementationOnce(
+        () => new Promise((resolve, reject) => (settle = { resolve, reject })),
+      );
+      return { settle: () => settle };
+    }
+
+    it('does not report a failure the screen has already moved on from', async () => {
+      /*
+       * A window scrolled past while its read was still out. The error belongs
+       * to a question nobody is asking any more, and putting it on screen would
+       * cover the window that *is* being read with the last one's bad news.
+       */
+      const first = held();
+      const friday = makeEvent({ id: 'evt_1' });
+      const sunday = makeEvent({ id: 'evt_2' });
+
+      const { result, rerender } = renderHook(
+        ({ events }: { events: TallyEvent[] }) => useEventSnapshots(events),
+        { initialProps: { events: [friday] } },
+      );
+      await waitFor(() => expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(1));
+
+      rerender({ events: [sunday] });
+      await waitFor(() => expect(result.current.snapshots).toHaveLength(1));
+
+      await act(async () => {
+        first.settle().reject(new Error('offline'));
+        await Promise.resolve();
+      });
+
+      expect(result.current.error).toBeNull();
+      expect(result.current.snapshots[0]!.event).toBe(sunday);
+    });
+
+    it('does not take the spinner down for a read nobody is waiting on', async () => {
+      // The same shape, one step earlier: the abandoned read settling must not
+      // announce that the window on screen has finished loading.
+      const first = held();
+      const second = held();
+      const friday = makeEvent({ id: 'evt_1' });
+      const sunday = makeEvent({ id: 'evt_2' });
+
+      const { result, rerender } = renderHook(
+        ({ events }: { events: TallyEvent[] }) => useEventSnapshots(events),
+        { initialProps: { events: [friday] } },
+      );
+      await waitFor(() => expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(1));
+
+      rerender({ events: [sunday] });
+      await waitFor(() => expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(2));
+      expect(result.current.loading).toBe(true);
+
+      await act(async () => {
+        first.settle().resolve({ byEvent: new Map(), denied: new Set<string>() });
+        await Promise.resolve();
+      });
+
+      expect(result.current.loading).toBe(true);
+
+      await act(async () => {
+        second.settle().resolve({
+          byEvent: new Map([['evt_2', { present: new Set(['pco_1']), checkedOut: new Set() }]]),
+          denied: new Set<string>(),
+        });
+        await Promise.resolve();
+      });
+
+      await waitFor(() => expect(result.current.loading).toBe(false));
     });
   });
 
@@ -465,6 +614,22 @@ describe('useEventSnapshots', () => {
     expect(result.current.loading).toBe(false);
     expect(result.current.snapshots).toEqual([]);
     expect(fetchAttendanceByEvent).not.toHaveBeenCalled();
+  });
+
+  it('is not loading on the very first frame either', () => {
+    /*
+     * Not just by the time the effect has run: a screen with no history to
+     * read paints once before that, and a spinner in that frame is a flicker
+     * on every profile of a student who has never been checked in.
+     */
+    const seen: boolean[] = [];
+    renderHook(() => {
+      const state = useEventSnapshots([]);
+      seen.push(state.loading);
+      return state;
+    });
+
+    expect(seen[0]).toBe(false);
   });
 
   it('is loading from the first render when there is', () => {

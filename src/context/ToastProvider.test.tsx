@@ -94,6 +94,30 @@ describe('showing a toast', () => {
     expect(latest?.toasts[0]?.tone).toBe('success');
   });
 
+  it('draws each tone in its own colour', () => {
+    /*
+     * The tone is the whole message for somebody who has glanced up from a
+     * queue: green means the check-in landed, red means it did not. Three
+     * toasts that look alike put the difference entirely in words nobody has
+     * time to read.
+     */
+    mount();
+    act(() => void latest?.show('Saved', { tone: 'success' }));
+    act(() => void latest?.show('Failed', { tone: 'error' }));
+    act(() => void latest?.show('Heads up', { tone: 'info' }));
+
+    const rows = ['Saved', 'Failed', 'Heads up'].map(
+      (message) => screen.getByText(message).parentElement!,
+    );
+
+    expect(rows[0]!.className).toContain('bg-present-600');
+    expect(rows[1]!.className).toContain('bg-danger-600');
+    expect(rows[2]!.className).toContain('bg-ink-800');
+    // And no row wears another's colour.
+    expect(rows[0]!.className).not.toContain('bg-danger-600');
+    expect(rows[1]!.className).not.toContain('bg-present-600');
+  });
+
   it('carries an action when there is one, and none when there is not', () => {
     mount();
     act(() => void latest?.show('Checked in', { action: { label: 'Undo', onPress: vi.fn() } }));

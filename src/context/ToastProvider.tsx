@@ -25,6 +25,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const dismiss = useCallback((id: string) => {
     setToasts((current) => current.filter((toast) => toast.id !== id));
     const timer = timers.current.get(id);
+    // Stryker disable next-line ConditionalExpression: `clearTimeout(undefined)`
+    // does nothing and deleting a key that is not there does nothing, so the
+    // guard changes no outcome. It says the map is expected to have gaps.
     if (timer) {
       clearTimeout(timer);
       // Stryker disable next-line CallExpression: nothing reads this map except
@@ -33,7 +36,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       // screen's map does not grow by one per check-in for the evening.
       timers.current.delete(id);
     }
-  }, []);
+  },
+  // Stryker disable next-line ArrayDeclaration: any constant array is the same
+  // array to React — the list is compared element by element against the last
+  // render's, and a literal that never changes never differs from itself.
+  []);
 
   const show = useCallback<ToastContextValue['show']>(
     (message, options = {}) => {
@@ -49,6 +56,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       );
       return id;
     },
+    // Stryker disable next-line ArrayDeclaration: `dismiss` is a `useCallback`
+    // over no state, so its identity never changes and an empty list would
+    // behave the same. Naming it keeps that from being an accident.
     [dismiss],
   );
 
@@ -62,7 +72,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       // hope about.
       pending.clear();
     };
-  }, []);
+  },
+  // Stryker disable next-line ArrayDeclaration: any constant array is the same
+  // array to React — the list is compared element by element against the last
+  // render's, and a literal that never changes never differs from itself.
+  []);
 
   const value = useMemo<ToastContextValue>(() => ({ toasts, show, dismiss }), [toasts, show, dismiss]);
 
