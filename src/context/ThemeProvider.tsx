@@ -51,10 +51,19 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     });
   }, [preference]);
 
-  const setPreference = useCallback((next: ThemePreference) => {
-    setPreferenceState(next);
-    storePreference(next);
-  }, []);
+  const setPreference = useCallback(
+    (next: ThemePreference) => {
+      setPreferenceState(next);
+      storePreference(next);
+    },
+    // Stryker disable next-line ArrayDeclaration: any constant array is the same
+    // array to `useCallback` — it compares element by element against the last
+    // render's, and a literal that never changes never differs from itself. What
+    // an empty one *says* is that the callback closes over nothing. (Spelt over
+    // several lines so the directive sits on the array's own line, which is what
+    // `next-line` matches — see docs/mutation-testing.md.)
+    [],
+  );
 
   const value = useMemo<ThemeContextValue>(
     () => ({ preference, theme, setPreference }),

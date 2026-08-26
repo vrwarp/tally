@@ -282,10 +282,14 @@ export function resolveLines(
  * A single word too long to fit is returned as-is: hyphenating a child's name
  * is worse than a name that touches the edges, and the caller has already
  * shrunk as far as it is willing to go.
+ *
+ * Two things about the text are the caller's to guarantee, and both hold. It
+ * does not fit — `fitLine` has already returned for the text that does — and it
+ * has no leading, trailing or repeated spaces, because `fillLabelTokens`
+ * collapses and trims before `resolveLines` ever builds a line. So every word
+ * here is a real word, and there is at least one.
  */
 function wrap(text: string, fontPx: number, bold: boolean, width: number, measure: MeasureText): string[] {
-  if (measure(text, fontPx, bold) <= width) return [text];
-
   const words = text.split(' ');
   const lines: string[] = [];
   let current = '';
@@ -299,7 +303,9 @@ function wrap(text: string, fontPx: number, bold: boolean, width: number, measur
       current = word;
     }
   }
-  if (current !== '') lines.push(current);
+  // Unconditional: the first word is non-empty and `current` only ever becomes
+  // a word or a run of them, so there is always a last line to add.
+  lines.push(current);
 
   return lines;
 }
@@ -371,16 +377,10 @@ export function layoutLabel(
   const maxHeight =
     box.height === null ? null : Math.max(1, box.height - paddingTop - paddingBottom);
 
+  // A template whose every line resolved to nothing needs no special case: the
+  // ordinary path lays out no rows, measures nothing, and returns the same
+  // empty label — the box's own dimensions, or the padding alone on a free axis.
   const resolved = resolveLines(template, values);
-  if (resolved.length === 0) {
-    return {
-      draws: [],
-      width: box.width ?? paddingLeft + paddingRight,
-      height: box.height ?? paddingTop + paddingBottom,
-      droppedLines: 0,
-      scaledToFit: false,
-    };
-  }
 
   /** Lay out at a given scale, reporting the height it wanted. */
   const attempt = (scale: number, lines: ResolvedLine[]) => {
@@ -449,6 +449,10 @@ export function layoutLabel(
   // does not exist.
   const alignWidth = box.width === null ? contentWidth : innerWidth;
   const height = box.height ?? Math.ceil(contentHeight + paddingTop + paddingBottom);
+  // Stryker disable next-line ConditionalExpression: the two branches agree on a
+  // free height. `maxHeight` is null exactly when `box.height` is, so the offset
+  // is `(0 - contentHeight) / 2`, which is never positive — the `Math.max` then
+  // makes it `paddingTop` either way. The branch says which case is which.
   const top =
     box.height === null
       ? paddingTop

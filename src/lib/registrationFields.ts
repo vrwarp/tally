@@ -75,19 +75,25 @@ export function checkName(raw: unknown, field: string): FieldCheck<string> {
  * most.
  */
 export function checkGrade(raw: unknown): FieldCheck<number | null> {
+  const wrong = 'grade must be a whole number from -1 (Pre-K) to 12, or null.';
   if (raw === null || raw === undefined) return { ok: true, value: null };
-  if (
-    // Stryker disable next-line ConditionalExpression: `Number.isInteger` already
-    // refuses everything that is not a number, so this clause changes no answer
-    // at run time. It is here for the narrowing — without it `raw` is still
-    // `unknown` at the comparisons below and at `value: raw`.
-    typeof raw !== 'number' ||
-    !Number.isInteger(raw) ||
-    raw < MIN_GRADE ||
-    raw > MAX_GRADE
-  ) {
-    return bad('grade must be a whole number from -1 (Pre-K) to 12, or null.');
-  }
+
+  /*
+   * Its own guard, and not folded into the test below, because that is the
+   * only arrangement in which the comment on it can be believed.
+   *
+   * The clause changes no answer at run time: `Number.isInteger` already
+   * refuses everything that is not a number. It is here for the narrowing —
+   * without it `raw` is still `unknown` at the comparisons and at `value: raw`.
+   * Saying so to Stryker needs a `disable next-line`, and that directive
+   * matches by line, against a node that *starts* on it. A comment sitting
+   * inside a parenthesised condition is attached to the whole expression and
+   * silently disables nothing, which is worse than no comment at all.
+   */
+  // Stryker disable next-line ConditionalExpression: see above — no input reaches
+  // this guard that the integer check below would not refuse anyway.
+  if (typeof raw !== 'number') return bad(wrong);
+  if (!Number.isInteger(raw) || raw < MIN_GRADE || raw > MAX_GRADE) return bad(wrong);
   return { ok: true, value: raw };
 }
 

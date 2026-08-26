@@ -141,11 +141,10 @@ Where that is genuinely the case, the mutant is disabled *where it lives*, with
 the argument next to it:
 
 ```ts
-// Stryker disable next-line ConditionalExpression: `Number.isInteger` already
-// refuses everything that is not a number, so this clause changes no answer at
-// run time. It is here for the narrowing — without it `raw` is still `unknown`
-// at the comparisons below.
-typeof raw !== 'number' ||
+// Stryker disable next-line ConditionalExpression: `Number.isFinite` is already
+// false for everything that is not a number, so the `typeof` refuses nothing it
+// would let through. It is here for the narrowing.
+return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 ```
 
 **The form matters and fails silently.** Stryker's directive regex is
@@ -175,6 +174,35 @@ be spelled as Stryker spells them (`ConditionalExpression`, `LogicalOperator`,
 `BlockStatement`, `ArithmeticOperator`, `ObjectLiteral`, `ArrayDeclaration`,
 `OptionalChaining`, `Regex`, or `all`). A misspelled one logs
 `Unused 'Stryker disable next-line' directive` and is otherwise ignored.
+
+**And the placement matters, and also fails silently.** `next-line` does not
+mean the line under the comment. Stryker walks the AST, and for each node reads
+that node's *leading comments*; a `disable next-line` it finds there is recorded
+against the line the **node** starts on. So the directive has to sit above
+something that starts on the mutant's own line. A stack of `//` lines is fine —
+they all attach to the same node — but a comment tucked inside a parenthesised
+condition is not:
+
+```ts
+if (
+  // Stryker disable next-line ConditionalExpression: reason.   ❌ — attaches to
+  typeof raw !== 'number' ||                                    //  the whole
+  !Number.isInteger(raw)                                        //  condition
+) {
+```
+
+That one silently disabled nothing for as long as it sat there. The fix is
+usually to give the clause a statement of its own, which is clearer anyway:
+
+```ts
+// Stryker disable next-line ConditionalExpression: reason.     ✅
+if (typeof raw !== 'number') return bad(wrong);
+if (!Number.isInteger(raw) || raw < MIN_GRADE || raw > MAX_GRADE) return bad(wrong);
+```
+
+Note what that buys beyond the annotation working: the mutants on the *second*
+line stay live. Disabling `ConditionalExpression` on a line that carries four
+clauses excuses all four.
 
 To check a directive took, look for the mutant's status in the JSON: an honoured
 one is `Ignored` with the reason you wrote as its `statusReason`.
