@@ -58,6 +58,25 @@ describe('sanitizeKioskPalette', () => {
     expect(sanitizeKioskPalette({ background: '#000000', '--tally-x': '#000000' })).toBeNull();
   });
 
+  it('stops at a sensible number of colours', () => {
+    // The kiosk has nineteen property names it will accept, so a palette
+    // carrying more than that is a server sending something else — and
+    // `setProperty` is being handed every key of it.
+    const flood: Record<string, string> = {};
+    for (let index = 0; index < 40; index += 1) flood[`--color-ink-${index}`] = '#ff0000';
+    // Every one of the real names, so the cap is reached with usable entries.
+    for (const step of [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950]) {
+      flood[`--color-ink-${step}`] = '#ff0000';
+      flood[`--color-brand-${step}`] = '#00ff00';
+      flood[`--color-present-${step}`] = '#0000ff';
+    }
+
+    const safe = sanitizeKioskPalette(flood);
+
+    expect(Object.keys(safe ?? {}).length).toBeLessThanOrEqual(32);
+    expect(Object.keys(safe ?? {}).length).toBeGreaterThan(0);
+  });
+
   it('reads anything that is not an object as no palette', () => {
     expect(sanitizeKioskPalette(null)).toBeNull();
     expect(sanitizeKioskPalette(undefined)).toBeNull();
@@ -100,6 +119,42 @@ describe('applyKioskTheme', () => {
     applyKioskTheme('light', null);
     expect(root().dataset.theme).toBe('light');
     expect(root().getAttribute('style')).toBeFalsy();
+  });
+
+  it('paints the status bar the page colour the palette chose', () => {
+    // `--color-ink-950` is the page. iOS and Android paint the bar above the
+    // screen with this, and a themed kiosk with the shipped slate above it
+    // reads as a rendering fault.
+    meta().content = '#0f172a';
+    applyKioskTheme('dark', { '--color-ink-950': '#0d0500' });
+
+    expect(meta().content).toBe('#0d0500');
+  });
+
+  it('paints it Tally’s own light page for a light gathering with no palette', () => {
+    meta().content = '#0f172a';
+    applyKioskTheme('light', null);
+
+    expect(meta().content).toBe('#e4f1fe');
+  });
+
+  it('never writes an empty colour over the bar', () => {
+    /*
+     * The untinted answer is the document's own `theme-color`, read once
+     * before anything moves it — and in a document that shipped without one
+     * there is nothing to go back to. Writing the empty string there is worse
+     * than leaving the last gathering's colour up: it hands the platform no
+     * answer at all, and what a phone does with that is its own business.
+     */
+    meta().content = '#0f172a';
+    applyKioskTheme('light', { '--color-ink-950': '#f8f3f0' });
+    expect(meta().content).toBe('#f8f3f0');
+
+    applyKioskTheme(null, null);
+
+    // Whatever was up stays up. `setAttribute` with nothing to say writes the
+    // string `null` into the tag, which is not a colour and not an absence.
+    expect(meta().content).toBe('#f8f3f0');
   });
 
   it('leaves properties it did not set alone', () => {
