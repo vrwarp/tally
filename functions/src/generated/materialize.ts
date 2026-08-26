@@ -225,6 +225,9 @@ function chainsToProject(
      * to the ministry's first night on every tick of the clock.
      */
     const origin = origins.get(key);
+    // Stryker disable next-line EqualityOperator: two instances written for the
+    // same instant are the same beginning, and only `origin.startAt` is read
+    // downstream — so which of the two is kept cannot be observed.
     if (!origin || (origin.id !== key && (event.id === key || event.startAt < origin.startAt))) {
       origins.set(key, event);
     }
@@ -233,6 +236,9 @@ function chainsToProject(
   const chains = new Map<string, ChainProjection>();
   for (const [key, origin] of origins) {
     const template = live.get(key) ?? cancelled.get(key);
+    // Stryker disable next-line ConditionalExpression: every key in `origins`
+    // was put there by the same iteration that filled one of the two pools, so
+    // there is always a template. The check is here for the type.
     if (template) chains.set(key, { template, origin });
   }
 
@@ -294,11 +300,19 @@ export function projectOccurrences(
   const taken = new Set<string>();
   for (const event of events) {
     taken.add(event.id);
+    // Stryker disable next-line ConditionalExpression: adding the chain-and-day
+    // key for a one-off changes nothing that can be reached. A one-off is not
+    // projected from (see `chainsToProject`), and one that used to be part of a
+    // chain still carries the id that projection gave it — which the line above
+    // has already claimed.
     if (event.mode === 'recurring') taken.add(occurrenceId(chainKey(event), event.startAt));
   }
 
   for (const [key, { template, origin }] of chainsToProject(events)) {
     const rule: RecurrenceRule | null = template.recurrence;
+    // Stryker disable next-line ConditionalExpression: `chainsToProject` pools
+    // only events that have a rule, so a template without one never gets here.
+    // The check is what makes `rule` a `RecurrenceRule` below.
     if (!rule) continue;
 
     // Worked out from the chain's beginning rather than from the template, and
@@ -344,6 +358,10 @@ export function projectOccurrences(
 
       const id = occurrenceId(key, startAt);
       if (taken.has(id)) continue;
+      // Stryker disable next-line CallExpression: each chain is visited once
+      // and a rule yields at most one occurrence per day, so nothing in this
+      // run can produce the same id twice. It is here so the set means "spoken
+      // for" rather than "spoken for by a document".
       taken.add(id);
 
       projected.push({
@@ -381,6 +399,8 @@ export function findProjectedOccurrence(
       (occurrence) =>
         occurrence.startAt.getTime() === startAt.getTime() &&
         occurrence.id === occurrenceId(chain, startAt),
+      // Both halves, because the id carries the day and not the clock: a
+      // request for the right Friday at the wrong hour matches the id alone.
     ) ?? null
   );
 }
