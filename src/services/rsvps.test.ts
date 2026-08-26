@@ -170,6 +170,10 @@ describe('addRsvps', () => {
 
     expect(writeBatch).toHaveBeenCalledTimes(2);
     expect(commit).toHaveBeenCalledTimes(2);
+    // Exactly once each, not once per batch: the cap is 500 writes, so a
+    // second batch that re-sends the first four hundred is what the chunking
+    // exists to prevent.
+    expect(set).toHaveBeenCalledTimes(401);
     expect(new Set(writtenPaths()).size).toBe(401);
     expect(writtenPaths().at(-1)).toBe('events/event-1/rsvps/pco_400');
   });
