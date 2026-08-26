@@ -101,8 +101,12 @@ function readStored(): StoredRoster | null {
       storedAt: parsed.storedAt,
       ...(parsed.freshAt && typeof parsed.freshAt === 'object' ? { freshAt: parsed.freshAt } : {}),
     };
-    // Stryker disable next-line BlockStatement: falling out of the catch
-    // answers `undefined`, which every caller reads the same way as `null`.
+    /*
+     * The `return null` below is an equivalent mutant that cannot be annotated
+     * away — see `docs/mutation-testing.md`. Emptying the catch answers
+     * `undefined`, which every caller reads the same way, and `disable
+     * next-line` has no node starting on a `} catch {` line to attach to.
+     */
   } catch {
     // Corrupt JSON, a quota error, Safari in private mode. None of these are
     // worth a broken screen — the roster simply has to be fetched.
